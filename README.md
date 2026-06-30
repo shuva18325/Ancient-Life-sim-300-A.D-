@@ -18,11 +18,15 @@ historical content** from the period. No mythical content.
 
 | Option | Link / How |
 | --- | --- |
-| **Instant play (no setup)** | [Open via htmlpreview](https://htmlpreview.github.io/?https://github.com/shuva18325/ancient-life-sim-300-a.d-/blob/claude/pixel-gladiator-game-ostlrm/index.html) |
-| **Download & double-click** | Download `index.html` and open it in any modern browser |
-| **Permanent GitHub Pages link** | After this branch is merged to `main`, the included Actions workflow publishes the game to `https://shuva18325.github.io/ancient-life-sim-300-a.d-/` (enable **Settings → Pages → Source: GitHub Actions** if prompted) |
+| **▶ Instant play (no setup)** | **[Play now via htmlpreview](https://htmlpreview.github.io/?https://github.com/shuva18325/Ancient-Life-sim-300-A.D-/blob/claude/pixel-gladiator-game-ostlrm/index.html)** |
+| **Download & double-click** | Download `index.html` from this repo and open it in any modern browser |
+| **Permanent GitHub Pages link** | One-time setup: go to **Settings → Pages → Build and deployment → Source: GitHub Actions**, then re-run the *Deploy SAND & STEEL* workflow (or push again). The game publishes to `https://shuva18325.github.io/ancient-life-sim-300-a.d-/` |
 
-> Click the game once to give it keyboard focus, then play.
+> The htmlpreview link works immediately — no account, no setup. Click the game once
+> to give it keyboard focus, then use the controls below.
+>
+> *(GitHub Pages can't be enabled automatically — the Actions token isn't allowed to flip
+> that switch — so the one-time Source setting above is required for the permanent link.)*
 
 ---
 
