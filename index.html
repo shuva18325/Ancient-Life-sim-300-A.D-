@@ -1,0 +1,1309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>SAND &amp; STEEL — Gladiators of 200 A.D.</title>
+<style>
+  /* ---------- SAND & STEEL : pixel-art physics hopper gladiator game ---------- */
+  :root{
+    --sand:#d8b271; --sand2:#c79a55; --blood:#8a1d1d; --gold:#e8c34a;
+    --ink:#1c130c; --stone:#3a2c20; --stone2:#54402e; --bone:#efe3c2;
+    --green:#5b7a32; --sky:#cf9a5a;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;height:100%;background:#0c0a08;color:var(--bone);
+    font-family:'Courier New',ui-monospace,monospace;font-weight:bold;
+    image-rendering:pixelated; overflow:hidden;}
+  #wrap{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;}
+  #stage{position:relative;width:min(100vw,calc(100vh*16/9));height:min(100vh,calc(100vw*9/16));
+    background:#000;box-shadow:0 0 0 4px #000,0 0 40px #000;}
+  canvas{position:absolute;inset:0;width:100%;height:100%;
+    image-rendering:pixelated;image-rendering:crisp-edges;display:block;}
+  /* DOM UI overlays use the same pixel aesthetic as the canvas */
+  .screen{position:absolute;inset:0;display:none;flex-direction:column;
+    color:var(--bone);text-shadow:2px 2px 0 #000;letter-spacing:1px;}
+  .screen.on{display:flex;}
+  /* only the active screen may render — beats the .center utility's display:flex */
+  .screen:not(.on){display:none !important;}
+  .panel{background:rgba(20,13,8,.92);border:4px solid var(--gold);
+    box-shadow:inset 0 0 0 2px #000,0 0 0 2px #000;}
+  h1,h2,h3{margin:0;text-transform:uppercase;letter-spacing:2px;}
+  .btn{cursor:pointer;background:var(--stone2);color:var(--bone);border:3px solid #000;
+    box-shadow:inset -3px -3px 0 rgba(0,0,0,.45),inset 3px 3px 0 rgba(255,255,255,.12);
+    padding:8px 12px;text-transform:uppercase;letter-spacing:1px;user-select:none;
+    font-family:inherit;font-weight:bold;transition:transform .04s;}
+  .btn:hover{background:#6b5236;}
+  .btn:active{transform:translate(2px,2px);box-shadow:inset 3px 3px 0 rgba(0,0,0,.5);}
+  .btn.gold{background:var(--gold);color:#3a2400;}
+  .btn.gold:hover{background:#f3d264;}
+  .btn.blood{background:var(--blood);} .btn.blood:hover{background:#a82626;}
+  .btn:disabled{opacity:.4;cursor:not-allowed;filter:grayscale(1);}
+  .btn.sm{padding:5px 8px;font-size:11px;}
+  .row{display:flex;gap:8px;flex-wrap:wrap;}
+  .pill{display:inline-block;background:#000;border:2px solid var(--gold);
+    padding:2px 8px;border-radius:0;font-size:12px;}
+  a{color:var(--gold);}
+  /* HUD top stat strip */
+  #statbar{position:absolute;top:0;left:0;right:0;display:flex;gap:6px;padding:6px 8px;
+    background:linear-gradient(#1c130cdd,#1c130c99);font-size:clamp(8px,1.6vw,13px);
+    border-bottom:2px solid #000;z-index:5;pointer-events:none;flex-wrap:wrap;align-items:center;}
+  .stat{display:flex;align-items:center;gap:4px;background:#000;padding:2px 7px;border:2px solid #3a2c20;}
+  .stat b{color:var(--gold);}
+  .scrollbox{overflow:auto;scrollbar-width:thin;scrollbar-color:var(--gold) #000;}
+  /* world map regions */
+  .region{position:absolute;cursor:pointer;border:2px solid #000;background:#3a2c2099;
+    font-size:clamp(7px,1.4vw,11px);padding:2px 4px;white-space:nowrap;color:var(--bone);
+    text-shadow:1px 1px 0 #000;transform:translate(-50%,-50%);transition:transform .06s;}
+  .region:hover{transform:translate(-50%,-50%) scale(1.12);z-index:3;}
+  .region.locked{filter:grayscale(1) brightness(.55);cursor:not-allowed;}
+  .region.cur{background:var(--blood);border-color:var(--gold);box-shadow:0 0 0 2px var(--gold);}
+  .region.done{background:var(--green);}
+  .region.imperial{background:#5a2d8a;border-color:var(--gold);}
+  .dot{width:10px;height:10px;background:var(--gold);border:2px solid #000;display:inline-block;}
+  .toast{position:absolute;left:50%;top:46%;transform:translateX(-50%);z-index:30;
+    padding:12px 18px;text-align:center;font-size:clamp(10px,2.4vw,20px);
+    background:rgba(0,0,0,.85);border:3px solid var(--gold);display:none;}
+  .small{font-size:11px;opacity:.85;font-weight:bold;}
+  .tag{font-size:10px;padding:1px 5px;border:1px solid #000;background:#000;margin-left:4px;}
+  .tag.f{background:var(--blood);color:#fff;}
+  .bar{height:10px;background:#000;border:2px solid #000;flex:1;position:relative;}
+  .bar > i{display:block;height:100%;}
+  ::selection{background:var(--gold);color:#000;}
+  .center{display:flex;align-items:center;justify-content:center;}
+  .col{display:flex;flex-direction:column;}
+  .gap{gap:10px;} .gap6{gap:6px;}
+  .grow{flex:1 1 auto;min-height:0;}
+  .pad{padding:14px;}
+  .muted{opacity:.7;}
+  .kbd{display:inline-block;background:#000;border:2px solid var(--gold);color:var(--gold);
+    padding:1px 6px;margin:1px;font-size:11px;min-width:18px;text-align:center;}
+  .shopcard{border:3px solid #000;background:#1c130c;padding:8px;display:flex;flex-direction:column;gap:4px;}
+  .shopcard.eq{border-color:var(--gold);box-shadow:0 0 0 2px var(--gold);}
+  .grid{display:grid;gap:8px;}
+  .blink{animation:bl 1s steps(2) infinite;}
+  @keyframes bl{50%{opacity:.25;}}
+  .hide{display:none!important;}
+</style>
+</head>
+<body>
+<div id="wrap"><div id="stage">
+  <canvas id="game" width="480" height="270"></canvas>
+
+  <!-- ===== TOP STAT BAR (visible on meta screens) ===== -->
+  <div id="statbar" class="hide">
+    <span class="stat">🏛 <b id="s-name">—</b></span>
+    <span class="stat">⭐ Glory <b id="s-glory">0</b></span>
+    <span class="stat">🔥 Pop <b id="s-pop">0</b>/100</span>
+    <span class="stat">🪙 <b id="s-coin">0</b> denarii</span>
+    <span class="stat">⚔ Lv <b id="s-lvl">1</b></span>
+    <span class="stat">🩸 <b id="s-rec">0–0</b></span>
+  </div>
+
+  <!-- ===== TITLE ===== -->
+  <div id="scr-title" class="screen center">
+    <div class="col center gap" style="text-align:center;">
+      <div class="panel pad col center gap" style="max-width:86%;">
+        <h1 style="font-size:clamp(18px,5vw,40px);color:var(--gold);">SAND &amp; STEEL</h1>
+        <div class="small" style="color:var(--blood);font-size:clamp(9px,2vw,15px)">GLADIATORS OF 200 A.D.</div>
+        <div class="small muted" style="max-width:420px;line-height:1.5;">
+          The reign of Emperor Septimius Severus. Rise from a nameless tiro in a
+          provincial ludus to a champion fighting before the Emperor in Roma.
+          Win glory, court the mob, grow rich — and survive the sand.
+        </div>
+        <div class="row center gap" style="margin-top:6px;">
+          <button class="btn gold" id="btn-new">▶ NEW CAREER</button>
+          <button class="btn" id="btn-continue">CONTINUE</button>
+          <button class="btn" id="btn-help">HOW TO PLAY</button>
+        </div>
+        <div class="small muted">An original physics-hopper gladiator game · all art rendered live</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== CREATE GLADIATOR ===== -->
+  <div id="scr-create" class="screen center">
+    <div class="panel pad col gap" style="width:min(92%,560px);max-height:90%;">
+      <h2 style="color:var(--gold)">ENROL AT THE LUDUS</h2>
+      <div class="row gap6"><span class="small">Name:</span>
+        <input id="inp-name" maxlength="14" value="" style="background:#000;color:var(--bone);
+          border:2px solid var(--gold);font-family:inherit;font-weight:bold;padding:4px;flex:1;"/></div>
+      <div class="small">Choose your homeland (200 A.D.):</div>
+      <div id="origin-list" class="grid" style="grid-template-columns:repeat(auto-fill,minmax(150px,1fr));"></div>
+      <div class="small">Choose your fighter style (these are real gladiator classes):</div>
+      <div id="class-list" class="grid" style="grid-template-columns:repeat(auto-fill,minmax(150px,1fr));"></div>
+      <div class="row gap" style="justify-content:flex-end;">
+        <button class="btn" id="btn-create-back">BACK</button>
+        <button class="btn gold" id="btn-create-go">SWEAR THE OATH ▶</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== HELP ===== -->
+  <div id="scr-help" class="screen center">
+    <div class="panel pad col gap scrollbox" style="width:min(92%,620px);max-height:90%;">
+      <h2 style="color:var(--gold)">HOW TO PLAY</h2>
+      <div class="grid" style="grid-template-columns:1fr 1fr;">
+        <div class="col gap6">
+          <h3 style="color:var(--gold)">MOVEMENT (physics hop)</h3>
+          <div><span class="kbd">A</span> hop left</div>
+          <div><span class="kbd">D</span> hop right</div>
+          <div><span class="kbd">W</span> jump upward</div>
+          <div class="small muted">You don't walk — you hop. Momentum and gravity rule the sand.</div>
+        </div>
+        <div class="col gap6">
+          <h3 style="color:var(--gold)">COMBAT</h3>
+          <div><span class="kbd">L-CLICK</span> attack (swing weapon)</div>
+          <div><span class="kbd">SPACE</span> change stance high / mid / low</div>
+          <div><span class="kbd">→</span> elbow strike (fast, close)</div>
+          <div><span class="kbd">←</span> stab / thrust (lunge, long)</div>
+        </div>
+      </div>
+      <div class="small muted" style="line-height:1.6">
+        <b style="color:var(--gold)">Guard:</b> your stance is your guard zone. Match the foe's
+        stance to block their blow; mismatch and you eat steel. Watch their crest tilt —
+        high crest = high attack.<br/>
+        <b style="color:var(--gold)">Crowd:</b> aggression, combos and clean blocks please the mob.
+        Running and turtling bores them. The crowd meter decides mercy when a fighter falls
+        — and how much Glory &amp; Popularity you earn.<br/>
+        <b style="color:var(--gold)">Stamina:</b> every swing, hop and thrust costs wind. Rest on the
+        ground to recover.
+      </div>
+      <div class="row" style="justify-content:flex-end;"><button class="btn gold" id="btn-help-back">BACK</button></div>
+    </div>
+  </div>
+
+  <!-- ===== WORLD MAP ===== -->
+  <div id="scr-map" class="screen">
+    <div style="height:42px"></div>
+    <div class="grow" style="position:relative;margin:6px;">
+      <div class="panel" style="position:absolute;inset:0;overflow:hidden;background:#5b6b78;">
+        <canvas id="mapcv" width="480" height="216" style="position:absolute;inset:0;width:100%;height:100%;image-rendering:pixelated;"></canvas>
+        <div id="region-layer" style="position:absolute;inset:0;"></div>
+        <div style="position:absolute;left:6px;bottom:4px;font-size:10px;" class="muted">
+          IMPERIVM ROMANVM · ANNO CC · ⬡ current ⬡ ✓ cleared ⬡ ✦ imperial</div>
+      </div>
+    </div>
+    <div class="panel" style="margin:6px;padding:8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+      <button class="btn gold" id="btn-fightcur">⚔ FIGHT HERE</button>
+      <button class="btn" id="btn-shop">🛒 ARMOURY</button>
+      <button class="btn" id="btn-train">🏋 TRAIN</button>
+      <button class="btn sm" id="btn-save">💾 SAVE</button>
+      <button class="btn sm" id="btn-quit">QUIT</button>
+      <span id="map-hint" class="small muted grow" style="text-align:right;">Pick a region, then FIGHT HERE.</span>
+    </div>
+  </div>
+
+  <!-- ===== ARMOURY / SHOP ===== -->
+  <div id="scr-shop" class="screen">
+    <div style="height:42px"></div>
+    <div class="panel grow scrollbox" style="margin:6px;padding:10px;">
+      <h2 style="color:var(--gold)">THE ARMOURY <span class="small muted">— real arms &amp; armour of the imperial arena</span></h2>
+      <div id="shop-tabs" class="row gap6" style="margin:8px 0;"></div>
+      <div id="shop-grid" class="grid" style="grid-template-columns:repeat(auto-fill,minmax(190px,1fr));"></div>
+    </div>
+    <div class="panel" style="margin:6px;padding:8px;"><button class="btn gold" id="btn-shop-back">◀ BACK TO MAP</button>
+      <span id="loadout-line" class="small muted" style="margin-left:10px;"></span></div>
+  </div>
+
+  <!-- ===== PRE-FIGHT BRIEF ===== -->
+  <div id="scr-brief" class="screen center">
+    <div class="panel pad col gap scrollbox" style="width:min(94%,640px);max-height:92%;">
+      <h2 id="brief-title" style="color:var(--gold)">MATCH BRIEF</h2>
+      <div id="brief-body" class="col gap6 small" style="line-height:1.6"></div>
+      <div id="brief-forbidden" class="small"></div>
+      <div class="row gap" style="margin-top:4px;flex-wrap:wrap;">
+        <button class="btn blood" id="btn-fight-go">⚔ ENTER THE ARENA</button>
+        <button class="btn" id="btn-rig">🤝 RIG THE BOUT</button>
+        <button class="btn" id="btn-skip">🪙 BUY YOUR WAY PAST</button>
+        <button class="btn" id="btn-brief-back">◀ RETREAT</button>
+      </div>
+      <div id="brief-note" class="small muted"></div>
+    </div>
+  </div>
+
+  <!-- ===== FIGHT HUD ===== -->
+  <div id="fight-hud" class="screen" style="pointer-events:none;">
+    <div style="position:absolute;top:6px;left:6px;right:6px;display:flex;justify-content:space-between;gap:10px;">
+      <div style="flex:1;max-width:46%">
+        <div class="small" id="hud-p-name" style="color:var(--gold)">YOU</div>
+        <div class="bar"><i id="hud-p-hp" style="width:100%;background:linear-gradient(#e85b5b,#8a1d1d)"></i></div>
+        <div class="bar" style="height:6px;margin-top:2px;"><i id="hud-p-st" style="width:100%;background:#e8c34a"></i></div>
+        <div class="small" id="hud-p-stance">STANCE: MID</div>
+      </div>
+      <div style="flex:1;max-width:46%;text-align:right">
+        <div class="small" id="hud-e-name" style="color:var(--gold)">FOE</div>
+        <div class="bar"><i id="hud-e-hp" style="width:100%;background:linear-gradient(#e85b5b,#8a1d1d)"></i></div>
+        <div class="bar" style="height:6px;margin-top:2px;"><i id="hud-e-st" style="width:100%;background:#e8c34a"></i></div>
+        <div class="small" id="hud-e-stance">&nbsp;</div>
+      </div>
+    </div>
+    <div style="position:absolute;top:52px;left:50%;transform:translateX(-50%);text-align:center;width:60%">
+      <div class="small" style="color:var(--gold)">CROWD</div>
+      <div class="bar" style="height:9px;"><i id="hud-crowd" style="width:50%;background:linear-gradient(90deg,#8a1d1d,#e8c34a,#5b7a32)"></i></div>
+    </div>
+    <div id="hud-toast" class="toast"></div>
+  </div>
+
+  <!-- ===== RESULT ===== -->
+  <div id="scr-result" class="screen center">
+    <div class="panel pad col gap center" style="width:min(92%,520px);text-align:center;">
+      <h1 id="res-head" style="color:var(--gold)">VICTORY</h1>
+      <div id="res-body" class="col gap6 small" style="line-height:1.7"></div>
+      <div class="row center gap" style="margin-top:6px;">
+        <button class="btn gold" id="btn-res-continue">CONTINUE ▶</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- on-screen touch controls (mobile) -->
+  <div id="touch" class="hide" style="position:absolute;inset:0;z-index:8;">
+    <div style="position:absolute;left:8px;bottom:8px;display:flex;gap:8px;">
+      <button class="btn t" data-k="a" style="width:54px;height:54px">◀</button>
+      <button class="btn t" data-k="w" style="width:54px;height:54px">▲</button>
+      <button class="btn t" data-k="d" style="width:54px;height:54px">▶</button>
+    </div>
+    <div style="position:absolute;right:8px;bottom:8px;display:flex;gap:8px;align-items:flex-end;">
+      <button class="btn t" data-k="thrust" style="width:50px;height:50px">↤</button>
+      <button class="btn t" data-k="space" style="width:50px;height:50px">≣</button>
+      <button class="btn t" data-k="elbow" style="width:50px;height:50px">↦</button>
+      <button class="btn t blood" data-k="attack" style="width:64px;height:64px">⚔</button>
+    </div>
+  </div>
+</div></div>
+
+<script>
+"use strict";
+/* =====================================================================
+   SAND & STEEL — Gladiators of 200 A.D.
+   An original 2D pixel-art physics-hopper gladiator game.
+   Single-file. No external assets. All sprites drawn procedurally.
+   ===================================================================== */
+(function(){
+const cv = document.getElementById('game');
+const ctx = cv.getContext('2d');
+ctx.imageSmoothingEnabled = false;
+const W = cv.width, H = cv.height;          // 480 x 270 internal
+const GROUND = 210;                         // floor y (sand line)
+const WALL_L = 18, WALL_R = W-18;
+
+/* ---------- tiny helpers ---------- */
+const rnd=(a,b)=>a+Math.random()*(b-a);
+const ri=(a,b)=>Math.floor(rnd(a,b+1));
+const clamp=(v,a,b)=>v<a?a:v>b?b:v;
+const lerp=(a,b,t)=>a+(b-a)*t;
+const pick=a=>a[Math.floor(Math.random()*a.length)];
+function px(x,y,w,h,c){ctx.fillStyle=c;ctx.fillRect(x|0,y|0,w|0,h|0);}
+function $(id){return document.getElementById(id);}
+function show(id){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('on'));
+  if(id) $(id).classList.add('on');}
+
+/* =====================================================================
+   DATA — real historical content from c.200 A.D.
+   ===================================================================== */
+// 21 regions EXACTLY as specified, with stylised map positions (% of map box)
+const REGIONS = [
+  {id:'Britannia',            x:21,y:14, tier:1, city:'Londinium',     prov:'Britannia'},
+  {id:'Gallia',               x:27,y:30, tier:1, city:'Lugdunum',      prov:'Gallia'},
+  {id:'Germania Magna',       x:39,y:18, tier:3, city:'beyond the Limes', prov:'Germania'},
+  {id:'Hispania Baetica',     x:13,y:50, tier:1, city:'Corduba',       prov:'Hispania'},
+  {id:'Italia',               x:38,y:46, tier:1, city:'Capua',         prov:'Italia'},
+  {id:'Insulae Baleares & Sicilia', x:32,y:60, tier:2, city:'Panormus', prov:'Sicilia'},
+  {id:'Africa Proconsularis', x:34,y:74, tier:1, city:'Thysdrus (Tunisia)', prov:'Africa'},
+  {id:'Dalmatia',             x:46,y:44, tier:2, city:'Salona',        prov:'Dalmatia'},
+  {id:'Illyricum',            x:48,y:38, tier:2, city:'Sirmium',       prov:'Illyricum'},
+  {id:'Achaea',               x:51,y:58, tier:2, city:'Corinthus',     prov:'Achaea'},
+  {id:'Creta',                x:55,y:67, tier:2, city:'Gortyna',       prov:'Creta'},
+  {id:'Asia Minor',           x:60,y:54, tier:2, city:'Ephesus',       prov:'Asia'},
+  {id:'Bosporan Kingdom',     x:67,y:32, tier:3, city:'Panticapaeum',  prov:'Bosporus'},
+  {id:'Cyprus',               x:64,y:64, tier:2, city:'Salamis',       prov:'Cyprus'},
+  {id:'Aegyptus',             x:62,y:84, tier:3, city:'Alexandria',    prov:'Aegyptus'},
+  {id:'Syria Palaestina',     x:70,y:70, tier:3, city:'Caesarea (Judea)', prov:'Syria'},
+  {id:'Arabia Petraea',       x:74,y:80, tier:3, city:'Petra',         prov:'Arabia'},
+  {id:'Mesopotamia',          x:80,y:62, tier:4, city:'Nisibis',       prov:'Mesopotamia'},
+  {id:'Asōristān',            x:84,y:70, tier:4, city:'Ctesiphon',     prov:'Sasanian frontier'},
+  {id:'Ērānshahr',            x:90,y:60, tier:4, city:'Persis',        prov:'Sasanian heart'},
+  {id:'Sogdiana',             x:95,y:42, tier:4, city:'Maracanda',     prov:'far east'},
+];
+const REGION_BY_ID = Object.fromEntries(REGIONS.map(r=>[r.id,r]));
+
+// Gladiator classes (real types). Each grants a starting loadout + trait.
+const CLASSES = {
+  Murmillo:{desc:'Heavy fish-man. Gladius, big scutum, crested helm.', hp:14, trait:'+block', start:{weapon:'gladius',shield:'scutum',helmet:'galea_murmillo',armor:'manica'}},
+  Thraex:{desc:'Thracian. Curved sica, small parmula, greaves.', hp:11, trait:'+speed', start:{weapon:'sica',shield:'parmula',helmet:'galea_thraex',armor:'ocrea'}},
+  Retiarius:{desc:'Net-fighter. Trident, net, no helm — agile.', hp:10, trait:'+reach', start:{weapon:'fuscina',shield:'rete',helmet:'none',armor:'galerus'}},
+  Secutor:{desc:'Pursuer. Gladius + smooth helm to hunt the net-man.', hp:13, trait:'+stamina', start:{weapon:'gladius',shield:'scutum',helmet:'galea_secutor',armor:'manica'}},
+  Hoplomachus:{desc:'Greek-armed. Long hasta + small shield.', hp:12, trait:'+reach', start:{weapon:'hasta',shield:'parmula',helmet:'galea_hoplo',armor:'ocrea'}},
+  Dimachaerus:{desc:'Two-blade duellist. Twin swords, no shield.', hp:10, trait:'+attack', start:{weapon:'gladius',shield:'none',helmet:'galea_secutor',armor:'manica'}},
+  Provocator:{desc:'Challenger. Gladius, breastplate, rectangular shield.', hp:15, trait:'+armor', start:{weapon:'gladius',shield:'scutum',helmet:'galea_prov',armor:'cardiophylax'}},
+};
+const CLASS_ORDER = ['Murmillo','Thraex','Retiarius','Secutor','Hoplomachus','Dimachaerus','Provocator'];
+
+// Real arms & armour of the arena. reach in px, dmg per clean hit, spd = swing speed.
+const GEAR = {
+  weapon:[
+    {id:'gladius', name:'Gladius',   cost:0,   reach:30, dmg:3.0, spd:1.0, desc:'Roman short sword — the standard arena blade.'},
+    {id:'sica',    name:'Sica',      cost:120, reach:28, dmg:3.2, spd:1.15,desc:'Curved Thracian blade, hooks behind shields.'},
+    {id:'pugio',   name:'Pugio',     cost:60,  reach:20, dmg:2.4, spd:1.4, desc:'Military dagger. Fast but short.'},
+    {id:'spatha',  name:'Spatha',    cost:260, reach:40, dmg:3.6, spd:0.85,desc:'Long cavalry sword — great reach, slower.'},
+    {id:'hasta',   name:'Hasta',     cost:200, reach:52, dmg:3.4, spd:0.8, desc:'Thrusting spear of the hoplomachus.'},
+    {id:'fuscina', name:'Fuscina (Trident)', cost:240, reach:50, dmg:3.5, spd:0.85, desc:'Three-pronged trident of the retiarius.'},
+    {id:'dolabra', name:'Dolabra',   cost:300, reach:30, dmg:4.4, spd:0.7, desc:'Legionary pick-axe. Brutal, banned in fair bouts.', forbidden:true},
+  ],
+  shield:[
+    {id:'none',    name:'No Shield', cost:0, block:0,   desc:'Hands free, nothing to hide behind.'},
+    {id:'parmula', name:'Parmula',   cost:80, block:.5, desc:'Small round buckler — light guard.'},
+    {id:'scutum',  name:'Scutum',    cost:180,block:.8, desc:'Great rectangular legionary shield.'},
+    {id:'rete',    name:'Rete (Net)',cost:140,block:.2, special:'net', desc:'Casting net — can ensnare and stagger a foe.'},
+  ],
+  helmet:[
+    {id:'none',        name:'Bare Head',       cost:0, armor:0,  desc:'No helm — fast but fragile (retiarius style).'},
+    {id:'galea_thraex',name:'Galea (Thraex)',  cost:90, armor:.10, desc:'Wide-brim crested Thracian helm with griffin.'},
+    {id:'galea_murmillo',name:'Galea (Murmillo)',cost:110,armor:.14, desc:'Tall-crested fish helm.'},
+    {id:'galea_secutor',name:'Galea (Secutor)', cost:120,armor:.16, desc:'Smooth round helm, tiny eye-holes.'},
+    {id:'galea_hoplo', name:'Galea (Hoplomachus)',cost:100,armor:.12, desc:'Brimmed helm with plume.'},
+    {id:'galea_prov',  name:'Galea (Provocator)', cost:130,armor:.18, desc:'Brimmed legion-style helm.'},
+  ],
+  armor:[
+    {id:'galerus',      name:'Galerus',       cost:50, armor:.06, desc:'Shoulder-guard of the net-fighter.'},
+    {id:'manica',       name:'Manica',        cost:90, armor:.12, desc:'Segmented arm-guard.'},
+    {id:'ocrea',        name:'Ocrea (Greaves)',cost:100,armor:.14, desc:'Bronze shin-guards.'},
+    {id:'cardiophylax', name:'Cardiophylax',  cost:170,armor:.22, desc:'Bronze breastplate of the provocator.'},
+    {id:'lorica',       name:'Lorica Segmentata',cost:320,armor:.34, desc:'Full legion plate. Forbidden in most ludi.', forbidden:true},
+  ],
+};
+function gearOf(slot,id){return GEAR[slot].find(g=>g.id===id)|| GEAR[slot][0];}
+
+// Opponent name pools by cultural flavour (real-ish ancient names)
+const FOE_NAMES = ['Verus','Priscus','Flamma','Spiculus','Hermes','Tetraites','Crixus','Commodus',
+  'Tigris','Felix','Maximus','Carpophorus','Glaucus','Astyanax','Pugnax','Memnon','Bato','Rapidus',
+  'Columbus','Triumphus','Hilarus','Danaos','Diodorus','Urbicus','Margareth','Achillia'];
+const FOE_TITLES=['the Gaul','of Capua','the Thracian','of Alexandria','the Unbeaten','the Net',
+  'Hammer of Carthage','the Pursuer','of Pannonia','the Bear','the Quick','Iron-arm','of Petra','the Parthian'];
+
+/* =====================================================================
+   GAME STATE / SAVE
+   ===================================================================== */
+const SAVE_KEY='sand_and_steel_save_v1';
+let G = null;  // player career
+function freshCareer(name,origin,cls){
+  const c=CLASSES[cls];
+  return {
+    name, origin, cls,
+    glory:0, pop:5, coin:60, level:1, xp:0,
+    wins:0, losses:0,
+    hpBonus:0, dmgBonus:0,
+    loadout:Object.assign({},c.start),
+    owned:{
+      weapon:[c.start.weapon],
+      shield:[c.start.shield],
+      helmet:[c.start.helmet],
+      armor:[c.start.armor],
+    },
+    cleared:{},            // region id -> true
+    current:'Italia',      // current selected region
+    imperialDone:false,
+    rigsUsed:0,
+  };
+}
+function saveGame(){ try{ localStorage.setItem(SAVE_KEY, JSON.stringify(G)); toast('Saved.'); }catch(e){} }
+function hasSave(){ try{ return !!localStorage.getItem(SAVE_KEY); }catch(e){ return false; } }
+function loadGame(){ try{ G=JSON.parse(localStorage.getItem(SAVE_KEY)); return !!G; }catch(e){ return false; } }
+
+/* =====================================================================
+   UI: stat bar + toast
+   ===================================================================== */
+function refreshStatbar(){
+  if(!G) return;
+  $('s-name').textContent=G.name;
+  $('s-glory').textContent=G.glory;
+  $('s-pop').textContent=G.pop;
+  $('s-coin').textContent=G.coin;
+  $('s-lvl').textContent=G.level;
+  $('s-rec').textContent=G.wins+'–'+G.losses;
+}
+let toastT=0;
+function toast(msg,ms=1400){ const t=$('hud-toast'); t.textContent=msg; t.style.display='block'; toastT=performance.now()+ms; }
+
+/* =====================================================================
+   PIXEL SPRITE: gladiator (drawn procedurally, faces +x by default)
+   pose = {torsoX,torsoY,rot,armSwing,legPhase,facing,crouch}
+   ===================================================================== */
+const SKIN=['#caa06a','#b07a4a','#8a5a36','#e0b888'];
+function drawGladiator(f){
+  ctx.save();
+  const flip=f.facing;
+  // physics wobble: lean by horizontal velocity, bob on landing
+  const lean = clamp(f.vx*0.04,-0.5,0.5) + f.rot;
+  const cx=f.x, baseY=f.y;          // f.y is feet
+  ctx.translate(cx, baseY);
+  ctx.scale(flip*1.25,1.25);        // a touch larger for arena presence
+  ctx.rotate(lean);
+  // colors
+  const tunic = f.tunic||'#9a3b2a';
+  const skin = f.skin||SKIN[0];
+  const metal='#b9c0c8', metal2='#7d8893', gold='#e8c34a', leather='#6b4a2a';
+  const stance=f.stance||'mid';
+  // legs (hopping splay based on air + legPhase)
+  const legSpread = f.onGround? Math.sin(f.legPhase)*2 : 3;
+  const ocrea = f.gear.armor.id==='ocrea';
+  // back leg
+  px(-4-legSpread, -10, 4, 10, skin);
+  px(-5-legSpread, -1, 6, 3, leather);
+  // front leg
+  px( 1+legSpread, -10, 4, 10, ocrea? metal: skin);
+  px( 1+legSpread, -1, 6, 3, leather);
+  if(ocrea){ px(1+legSpread,-9,4,7,metal); px(1+legSpread,-8,1,5,'#eef'); }
+  // torso (tunic + optional cuirass)
+  const ty=-26;
+  px(-6, ty, 12, 16, tunic);
+  px(-6, ty, 12, 3, '#000'); // belt shadow top
+  px(-6, ty+13, 12, 3, leather); // belt
+  px(-2, ty+13, 4, 5, '#caa'); // subligaculum hint
+  const arm=f.gear.armor;
+  if(arm.id==='cardiophylax'){ px(-5,ty+1,10,9,metal); px(-5,ty+1,10,2,'#eef'); px(-1,ty+4,2,4,metal2);}
+  if(arm.id==='lorica'){ for(let i=0;i<5;i++) px(-6,ty+i*3,12,2,i%2?metal2:metal); }
+  // head
+  const hy=ty-9;
+  px(-4,hy,8,9,skin);
+  // helmet
+  drawHelmet(f.gear.helmet.id,hy,gold,metal,metal2,tunic);
+  // weapon arm + weapon, animated by attack
+  drawArmAndWeapon(f,ty);
+  // shield arm (front, on -x side visually = back)
+  drawShield(f,ty,metal,metal2,gold,leather);
+  ctx.restore();
+}
+function drawHelmet(id,hy,gold,metal,metal2,tunic){
+  if(id==='none'){ px(-4,hy,8,3,'#3a2c20'); return; } // hair band
+  // base helm
+  px(-5,hy-1,10,7,metal);
+  px(-5,hy-1,10,2,'#dfe6ee');
+  px(-5,hy+5,10,2,metal2);
+  if(id==='galea_secutor'){ px(-5,hy+1,2,3,'#000'); px(3,hy+1,2,3,'#000'); px(-5,hy-3,10,3,metal); }
+  else if(id==='galea_thraex'){ px(-1,hy-7,2,6,gold); px(-3,hy-7,6,2,gold); px(-7,hy+1,2,3,metal2); px(5,hy+1,2,3,metal2);} // crest hook + brim
+  else if(id==='galea_murmillo'){ px(-1,hy-9,2,9,'#b51d1d'); px(-2,hy-9,4,2,'#b51d1d'); }      // tall crest
+  else if(id==='galea_hoplo'){ px(-1,hy-8,2,8,tunic); px(-7,hy+2,2,2,metal2); px(5,hy+2,2,2,metal2);} // plume + brim
+  else if(id==='galea_prov'){ px(-7,hy+1,2,2,metal2); px(5,hy+1,2,2,metal2); px(-2,hy-4,4,3,metal);} // brim
+  // eye slit
+  px(-3,hy+1,6,2,'#000');
+}
+function drawArmAndWeapon(f,ty){
+  const wp=f.gear.weapon, metal='#cfd6de', wood='#7a5a30', gold='#e8c34a';
+  // arm swing angle from attack timer
+  let ang=0.2, lunge=0;
+  if(f.atk){
+    const p=1-(f.atkT/f.atkDur); // 0->1 progress
+    if(f.atkType==='slash') ang = lerp(-1.4,1.1,Math.min(1,p*1.4));
+    else if(f.atkType==='thrust'){ ang=0; lunge=Math.sin(Math.min(1,p*1.6)*Math.PI)*10; }
+    else if(f.atkType==='elbow'){ ang = lerp(-0.6,0.3,Math.min(1,p*2)); }
+  } else {
+    // idle guard pose by stance
+    ang = f.stance==='high'? -0.7 : f.stance==='low'? 0.7 : 0.0;
+  }
+  ctx.save();
+  ctx.translate(4, ty+4);
+  ctx.rotate(ang);
+  // upper arm
+  px(0,-2,6,4, f.skin||SKIN[0]);
+  ctx.translate(6+lunge,0);
+  if(f.atkType==='elbow' && f.atk){
+    // elbow: draw bent arm/forearm jab, no weapon extended
+    px(-2,-3,5,6, f.gear.armor.id==='manica'?'#b9c0c8':(f.skin||SKIN[0]));
+    px(2,-4,3,3,'#dfe6ee'); // elbow guard glint
+  } else {
+    // forearm
+    px(0,-2,5,4, f.gear.armor.id==='manica'?'#b9c0c8':(f.skin||SKIN[0]));
+    ctx.translate(5,0);
+    // weapon
+    drawWeapon(wp.id,metal,wood,gold);
+  }
+  ctx.restore();
+}
+function drawWeapon(id,metal,wood,gold){
+  if(id==='gladius'){ px(0,-1,3,2,wood); px(3,-1,12,2,metal); px(3,-2,12,1,'#fff'); px(2,-3,1,5,gold);}
+  else if(id==='spatha'){ px(0,-1,3,2,wood); px(3,-1,20,2,metal); px(3,-2,20,1,'#fff'); px(2,-3,1,5,gold);}
+  else if(id==='sica'){ px(0,-1,3,2,wood); for(let i=0;i<10;i++) px(3+i,-1-(i>5?1:0),2,2,metal); }
+  else if(id==='pugio'){ px(0,-1,2,2,wood); px(2,-1,8,2,metal); px(2,-2,8,1,'#fff');}
+  else if(id==='hasta'){ px(0,-1,30,2,wood); px(30,-2,8,4,metal); px(30,-2,8,1,'#fff'); for(let i=0;i<6;i++) px(31+i,-1,1,2,metal);}
+  else if(id==='fuscina'){ px(0,-1,28,2,wood); px(28,-3,2,7,metal); px(30,-3,4,2,metal); px(30,0,4,2,metal); px(30,3,4,2,metal);} // trident
+  else if(id==='dolabra'){ px(0,-1,16,2,wood); px(15,-5,3,5,metal); px(15,3,5,3,metal);} // pick
+  else { px(0,-1,12,2,metal); }
+}
+function drawShield(f,ty,metal,metal2,gold,leather){
+  const sh=f.gear.shield;
+  if(sh.id==='none') return;
+  ctx.save();
+  // shield held on near side toward viewer (front), slightly forward
+  ctx.translate(-2, ty+3);
+  if(sh.id==='scutum'){
+    px(-3,-7,8,18,'#a8201f'); px(-3,-7,8,2,'#c95'); px(-3,9,8,2,'#7a1414');
+    px(0,-1,3,4,gold); px(-2,-7,1,18,'#000');
+  } else if(sh.id==='parmula'){
+    px(-2,-3,7,10,metal2); px(-2,-3,7,2,metal); px(0,0,3,3,gold);
+  } else if(sh.id==='rete'){
+    // net: draw a mesh
+    ctx.globalAlpha=.85;
+    for(let i=0;i<5;i++){ px(-4,-6+i*3,12,1,'#d8c89a'); }
+    for(let i=0;i<5;i++){ px(-4+i*3,-6,1,15,'#d8c89a'); }
+    ctx.globalAlpha=1;
+  }
+  ctx.restore();
+}
+
+/* =====================================================================
+   ARENA RENDERING
+   ===================================================================== */
+function makeFighter(opts){
+  return Object.assign({
+    x:120,y:GROUND,vx:0,vy:0,onGround:true,facing:1,
+    hp:14,maxHp:14,stamina:100,maxStamina:100,
+    stance:'mid',rot:0, legPhase:0,
+    atk:false,atkT:0,atkDur:18,atkType:'slash',atkHit:false,
+    hopCd:0, stanceCd:0, atkCd:0, hurt:0, blockFlash:0, netted:0,
+    combo:0, knock:false, koTimer:0,
+    skin:SKIN[0], tunic:'#9a3b2a',
+    gear:{weapon:gearOf('weapon','gladius'),shield:gearOf('shield','scutum'),
+          helmet:gearOf('helmet','galea_murmillo'),armor:gearOf('armor','manica')},
+    isPlayer:false, ai:null,
+  },opts);
+}
+
+let FT=null;   // active fight context
+function startFight(region, briefData){
+  const tier=region.tier;
+  // player fighter from career loadout
+  const cls=CLASSES[G.cls];
+  const pHpBase = 100 + cls.hp*4 + G.hpBonus*6;
+  const p=makeFighter({
+    isPlayer:true, x:140, facing:1,
+    maxHp:pHpBase, hp:pHpBase, name:G.name,
+    skin:SKIN[0], tunic:'#7a2f22',
+    gear:{
+      weapon:gearOf('weapon',G.loadout.weapon),
+      shield:gearOf('shield',G.loadout.shield),
+      helmet:gearOf('helmet',G.loadout.helmet),
+      armor:gearOf('armor',G.loadout.armor),
+    },
+  });
+  // foe scales with tier + popularity (battle escalation)
+  const esc = 1 + (G.pop/100)*0.5;
+  const foeHp = (88 + tier*22) * esc;
+  const fname = pick(FOE_NAMES)+' '+pick(FOE_TITLES);
+  const foeClasses=Object.keys(CLASSES);
+  const fcls=pick(foeClasses); const fc=CLASSES[fcls].start;
+  const foe=makeFighter({
+    isPlayer:false, x:340, facing:-1,
+    maxHp:foeHp, hp:foeHp, name:fname,
+    skin:pick(SKIN), tunic:pick(['#2f4a7a','#4a2f5a','#2f5a3a','#5a4a2f','#5a2f2f']),
+    gear:{
+      weapon:gearOf('weapon',fc.weapon),shield:gearOf('shield',fc.shield),
+      helmet:gearOf('helmet',fc.helmet),armor:gearOf('armor',fc.armor),
+    },
+    ai:{ react:clamp(0.5-tier*0.05,0.12,0.5), aggr:clamp(0.4+tier*0.12,0.4,0.95),
+         think:0, want:'approach', skill:tier },
+  });
+  FT={
+    region, brief:briefData, p, foe,
+    crowd:50, time:0, over:false, result:null,
+    rigged:briefData.rigged||false, forbiddenEquipped:briefData.forbiddenEquipped||false,
+    emperor: region.id==='Italia' && briefData.imperial,
+    shake:0, particles:[], banners:[],
+  };
+  if(FT.rigged){ foe.maxHp*=0.45; foe.hp=foe.maxHp; foe.ai.aggr*=0.5; foe.ai.react*=2; }
+  state='fight';
+  show('fight-hud');
+  $('statbar').classList.add('hide');
+  $('hud-p-name').textContent=p.name.toUpperCase();
+  $('hud-e-name').textContent=foe.name.toUpperCase();
+  if(isTouch) $('touch').classList.remove('hide');
+  resetInputEdges();
+}
+
+/* ---------- combat resolution ---------- */
+function attackZone(f){
+  if(f.atkType==='elbow') return 'high';
+  return f.stance; // slash & thrust strike at your stance height
+}
+function weaponReach(f){
+  let r=f.gear.weapon.reach;
+  if(f.atkType==='thrust') r+=10;
+  if(f.atkType==='elbow') r=16;
+  return r;
+}
+function tryHit(att,def){
+  if(!att.atk || att.atkHit) return;
+  // active window: middle of swing
+  const p=1-(att.atkT/att.atkDur);
+  if(p<0.25||p>0.85) return;
+  const reach=weaponReach(att);
+  const dx=(def.x-att.x)*att.facing;        // positive if foe is in front
+  const dy=Math.abs((def.y-26)-(att.y-26));
+  if(dx>-6 && dx<reach+10 && dy<30){
+    att.atkHit=true;
+    // blocked? defender guarding the same zone & facing attacker & has block
+    const facingAtt = Math.sign(att.x-def.x)===def.facing;
+    const zone=attackZone(att);
+    const blockVal=def.gear.shield.block;
+    const guarded = facingAtt && def.stance===zone && (blockVal>0||def.gear.shield.id==='rete');
+    let dmg=att.gear.weapon.dmg*8;
+    if(att.isPlayer) dmg*=(1+G.dmgBonus*0.12+ (CLASSES[G.cls].trait==='+attack'?0.18:0));
+    if(FT.forbiddenEquipped && att.isPlayer) dmg*=1.25; // forbidden gear hits harder
+    // defender armor mitigation
+    const armorMit = def.gear.helmet.armor + def.gear.armor.armor;
+    dmg *= (1-clamp(armorMit,0,0.55));
+    if(guarded){
+      dmg *= (1-blockVal);
+      def.stamina-=8; def.blockFlash=8;
+      att.vx += att.facing*-1.2;            // recoil
+      addParticles(def.x+def.facing*10, def.y-24, 6, '#dfe6ee');
+      if(att.isPlayer===false) FT.crowd+=1.0; else FT.crowd+=2.0; // good defence pleases mob
+      sfx('block');
+      banner(def.x, def.y-46,'BLOCK!','#cfe');
+      def.combo=0;
+    } else {
+      def.hp-=dmg; def.hurt=12;
+      def.vx += att.facing*(att.atkType==='thrust'?5:3.2);
+      def.vy -= 2.2; def.onGround=false; def.rot += att.facing*0.15;
+      addParticles(def.x, def.y-22, 10, '#b51d1d');
+      FT.shake=Math.min(6,FT.shake+3);
+      att.combo++;
+      sfx('hit');
+      // crowd reaction
+      const cr = (att.isPlayer? 2.4:-2.0) + (att.combo>2?1.5:0) + (att.atkType==='elbow'?1.2:0);
+      FT.crowd=clamp(FT.crowd+cr,0,100);
+      if(att.combo>1) banner(att.x,att.y-50,att.combo+' HITS!','#e8c34a');
+    }
+  }
+}
+// net special: retiarius rete can ensnare
+function maybeNet(att,def){
+  if(att.gear.shield.id!=='rete') return;
+}
+function addParticles(x,y,n,c){
+  for(let i=0;i<n;i++) FT.particles.push({x,y,vx:rnd(-2,2),vy:rnd(-3,0.5),life:rnd(10,22),c});
+}
+function banner(x,y,t,c){ FT.banners.push({x,y,t,c,life:40}); }
+
+/* ---------- AI ---------- */
+function aiUpdate(f,opp,dt){
+  const ai=f.ai; ai.think-=dt;
+  f.facing = opp.x<f.x? -1:1;
+  const dist=Math.abs(opp.x-f.x);
+  const reach=weaponReach(f)|| f.gear.weapon.reach;
+  if(f.netted>0){ return; } // can't act while netted
+  if(ai.think<=0){
+    ai.think=ri(8,24)*(1.2-ai.aggr);
+    // decide
+    if(dist>reach+8){ ai.want='approach'; }
+    else if(Math.random()<ai.aggr){ ai.want= Math.random()<0.5?'slash': (Math.random()<0.5?'thrust':'elbow'); }
+    else if(Math.random()<0.4){ ai.want='guard'; f.stance = opp.atk? attackZone(opp): pick(['high','mid','low']); }
+    else ai.want = Math.random()<0.5?'back':'approach';
+    // mirror player's stance sometimes to block
+    if(opp.atk && Math.random()<ai.skill*0.18) f.stance=attackZone(opp);
+  }
+  // act
+  if(f.onGround){
+    if(ai.want==='approach' && dist>reach-4){ hop(f, f.facing); }
+    else if(ai.want==='back' && dist<reach+30){ hop(f,-f.facing); }
+    else if(ai.want==='slash'){ doAttack(f,'slash'); ai.want='guard'; }
+    else if(ai.want==='thrust'){ doAttack(f,'thrust'); ai.want='guard'; }
+    else if(ai.want==='elbow' && dist<24){ doAttack(f,'elbow'); ai.want='guard'; }
+    else if(ai.want==='elbow'){ hop(f,f.facing); }
+  }
+}
+
+/* ---------- fighter physics + state ---------- */
+const GRAV=0.42, HOPVX=2.4, HOPVY=-4.2, JUMPVY=-7.4, FRICT=0.80, AIRDRAG=0.985;
+function hop(f,dir){
+  if(!f.onGround||f.hopCd>0||f.netted>0) return;
+  if(f.stamina<6) return;
+  f.vx += dir*HOPVX*(CLASSES_TRAIT(f,'+speed')?1.2:1);
+  f.vy = HOPVY; f.onGround=false; f.hopCd=6; f.stamina-=4;
+  f.facing= dir; f.legPhase+=1.4;
+}
+function jump(f){
+  if(!f.onGround||f.netted>0) return;
+  if(f.stamina<8) return;
+  f.vy=JUMPVY; f.onGround=false; f.stamina-=8;
+}
+function CLASSES_TRAIT(f,t){ return f.isPlayer && CLASSES[G.cls].trait===t; }
+function doAttack(f,type){
+  if(f.atk||f.atkCd>0||f.netted>0) return;
+  const cost = type==='thrust'?16:type==='elbow'?9:12;
+  if(f.stamina<cost) return;
+  f.atk=true; f.atkType=type; f.atkHit=false;
+  f.atkDur = Math.round((type==='thrust'?22:type==='elbow'?12:18)/f.gear.weapon.spd);
+  if(type==='elbow') f.atkDur=12;
+  f.atkT=f.atkDur; f.stamina-=cost; f.atkCd=f.atkDur+8;
+  if(type==='thrust'){ f.vx+=f.facing*2.5; } // lunge
+  sfx('swing');
+}
+function changeStance(f){
+  if(f.stanceCd>0) return;
+  f.stance = f.stance==='high'?'mid': f.stance==='mid'?'low':'high';
+  f.stanceCd=8;
+}
+function physics(f,dt){
+  f.hopCd=Math.max(0,f.hopCd-dt); f.stanceCd=Math.max(0,f.stanceCd-dt);
+  f.atkCd=Math.max(0,f.atkCd-dt); f.hurt=Math.max(0,f.hurt-dt);
+  f.blockFlash=Math.max(0,f.blockFlash-dt); f.stanceCd=Math.max(0,f.stanceCd-dt);
+  if(f.netted>0) f.netted-=dt;
+  if(f.atk){ f.atkT-=dt; if(f.atkT<=0){ f.atk=false; } }
+  // gravity
+  f.vy+=GRAV*dt;
+  f.x+=f.vx*dt; f.y+=f.vy*dt;
+  if(f.onGround){ f.vx*=Math.pow(FRICT,dt); } else { f.vx*=Math.pow(AIRDRAG,dt); }
+  // ground collide
+  if(f.y>=GROUND){ if(!f.onGround){ addParticles(f.x,GROUND,4,'#caa066'); } f.y=GROUND; f.vy=0; f.onGround=true; f.rot*=0.5; }
+  else f.onGround=false;
+  // walls
+  if(f.x<WALL_L){ f.x=WALL_L; f.vx=Math.abs(f.vx)*0.4; }
+  if(f.x>WALL_R){ f.x=WALL_R; f.vx=-Math.abs(f.vx)*0.4; }
+  // rot decay
+  f.rot*=Math.pow(0.9,dt);
+  // stamina regen on ground & idle
+  if(f.onGround && Math.abs(f.vx)<0.4 && !f.atk){ f.stamina=Math.min(f.maxStamina,f.stamina+0.7*dt*(CLASSES_TRAIT(f,'+stamina')?1.5:1)); }
+  f.legPhase+=Math.abs(f.vx)*0.08*dt;
+}
+
+/* ---------- fight update ---------- */
+function updateFight(dt){
+  const {p,foe}=FT;
+  FT.time+=dt;
+  // player input
+  if(!p.knock && !FT.over){
+    if(edge.a||held.a) {} // edge handled below
+    if(consume('a')) hop(p,-1);
+    if(consume('d')) hop(p, 1);
+    if(consume('w')) jump(p);
+    if(consume('space')) changeStance(p);
+    if(consume('attack')) doAttack(p,'slash');
+    if(consume('elbow')) doAttack(p,'elbow');
+    if(consume('thrust')) doAttack(p,'thrust');
+    // allow holding A/D to keep hopping
+    if(held.a && p.onGround) hop(p,-1);
+    if(held.d && p.onGround) hop(p, 1);
+  }
+  // AI
+  if(!foe.knock && !FT.over) aiUpdate(foe,p,dt);
+  physics(p,dt); physics(foe,dt);
+  // hits
+  tryHit(p,foe); tryHit(foe,p);
+  // crowd drift: passivity bores them
+  const dist=Math.abs(p.x-foe.x);
+  if(dist>120) FT.crowd=clamp(FT.crowd-0.08*dt,0,100);
+  FT.crowd=clamp(FT.crowd-0.01*dt,0,100); // slow decay toward needing action
+  // particles
+  for(const pa of FT.particles){ pa.x+=pa.vx*dt; pa.y+=pa.vy*dt; pa.vy+=0.18*dt; pa.life-=dt; }
+  FT.particles=FT.particles.filter(p=>p.life>0);
+  for(const b of FT.banners){ b.y-=0.4*dt; b.life-=dt; }
+  FT.banners=FT.banners.filter(b=>b.life>0);
+  FT.shake*=Math.pow(0.8,dt);
+  // KO check
+  if(!FT.over){
+    if(foe.hp<=0){ foe.hp=0; endFight(true); }
+    else if(p.hp<=0){ p.hp=0; endFight(false); }
+  }
+  // hud
+  $('hud-p-hp').style.width=clamp(p.hp/p.maxHp*100,0,100)+'%';
+  $('hud-e-hp').style.width=clamp(foe.hp/foe.maxHp*100,0,100)+'%';
+  $('hud-p-st').style.width=clamp(p.stamina/p.maxStamina*100,0,100)+'%';
+  $('hud-e-st').style.width=clamp(foe.stamina/foe.maxStamina*100,0,100)+'%';
+  $('hud-p-stance').textContent='STANCE: '+p.stance.toUpperCase()+(FT.forbiddenEquipped?'  ⚠FORBIDDEN':'');
+  $('hud-crowd').style.width=FT.crowd+'%';
+  if(performance.now()>toastT) $('hud-toast').style.display='none';
+}
+let endLock=false;
+function endFight(won){
+  FT.over=true; endLock=true;
+  const {p,foe}=FT;
+  (won?foe:p).knock=true;
+  setTimeout(()=>finishFight(won), 900);
+}
+function finishFight(won){
+  const reg=FT.region, tier=reg.tier;
+  const crowdLove=FT.crowd;
+  let glory=0,coin=0,popDelta=0,note='';
+  if(won){
+    const mult=(0.6+crowdLove/100*1.4);
+    glory=Math.round((12+tier*8)*mult);
+    coin=Math.round((25+tier*22)*mult*(FT.rigged?0.4:1));
+    popDelta=Math.round((4+tier*2)*(crowdLove/60))*(FT.rigged?0:1);
+    if(FT.forbiddenEquipped){ popDelta-=4; note+='The mob jeers your forbidden arms. '; coin=Math.round(coin*0.7);}
+    if(FT.rigged){ note+='A fixed bout — little glory, and whispers spread. '; if(Math.random()<0.3){popDelta-=8; note+='Some swear it was rigged! ';} }
+    if(FT.emperor){ glory*=2; popDelta+=20; note+='THE EMPEROR IS PLEASED. '; }
+    G.wins++; G.coin+=coin; G.glory+=glory; G.pop=clamp(G.pop+popDelta,0,100);
+    G.cleared[reg.id]=true;
+    // xp / level
+    G.xp+=glory; while(G.xp>=G.level*60){ G.xp-=G.level*60; G.level++; G.hpBonus++; if(G.level%2===0)G.dmgBonus++; note+='LEVEL UP! '; }
+    if(FT.emperor){ G.imperialDone=true; }
+  } else {
+    // crowd verdict on you
+    const spared = crowdLove>=45 || Math.random()<crowdLove/100;
+    G.losses++;
+    popDelta = spared? -3 : -10;
+    G.pop=clamp(G.pop+popDelta,0,100);
+    coin = -Math.min(G.coin, ri(0,10));
+    G.coin+=coin;
+    note = spared? 'The mob spares you — Mitte! You live to fight again.'
+                 : 'Pollice verso… but the editor grants you mercy this once. Your name suffers.';
+  }
+  showResult(won,{glory,coin,popDelta,note,crowdLove});
+  saveQuiet();
+}
+function saveQuiet(){ try{ localStorage.setItem(SAVE_KEY, JSON.stringify(G)); }catch(e){} }
+
+function showResult(won,r){
+  state='menu'; endLock=false;
+  $('touch').classList.add('hide');
+  show('scr-result');
+  $('res-head').textContent = won? (FT.emperor?'CHAMPION OF THE EMPIRE':'VICTORY') : 'DEFEAT';
+  $('res-head').style.color = won? 'var(--gold)':'var(--blood)';
+  const verdict = won? (r.crowdLove>70?'The crowd roars your name!':r.crowdLove>40?'A solid win.':'You survive — barely.')
+                     : '';
+  $('res-body').innerHTML =
+    `<div>${r.note||''}</div>`+
+    (won?`<div class="row center gap" style="margin-top:6px">
+       <span class="pill">⭐ +${r.glory} Glory</span>
+       <span class="pill">🪙 ${r.coin>=0?'+':''}${r.coin} denarii</span>
+       <span class="pill">🔥 ${r.popDelta>=0?'+':''}${r.popDelta} Pop</span>
+     </div><div class="small muted">${verdict} Crowd approval: ${Math.round(r.crowdLove)}%</div>`
+    :`<div class="row center gap" style="margin-top:6px">
+       <span class="pill">🔥 ${r.popDelta} Pop</span>
+       <span class="pill">🪙 ${r.coin} denarii</span>
+     </div>`)+
+    (G.imperialDone?`<div class="small" style="color:var(--gold);margin-top:8px">
+       You have conquered the sand of every province and triumphed before
+       Emperor Septimius Severus himself. Your legend is eternal. (You may keep
+       fighting for ever-greater glory.)</div>`:'');
+}
+
+/* =====================================================================
+   ARENA DRAW
+   ===================================================================== */
+function drawArena(){
+  const t=FT;
+  let sx=(Math.random()-0.5)*t.shake, sy=(Math.random()-0.5)*t.shake;
+  ctx.save(); ctx.translate(sx,sy);
+  // sky / awning by region flavour
+  const reg=t.region;
+  const imperial=t.emperor;
+  // upper sky band above the seating
+  px(-4,-4,W+8,12,imperial?'#2a1d40':'#b88a4a');
+  // crowd tiers (seating)
+  drawCrowd();
+  const seatBottom=10+4*14+3; // ~69
+  // arena facade wall (fills the middle): pilasters + arched openings
+  const wallTop=seatBottom, wallH=GROUND-wallTop;
+  const wallC=imperial?'#4a3a2e':'#8a6a46', wallSh=imperial?'#352a22':'#6b5236', wallHi=imperial?'#5a4636':'#a07a52';
+  px(0,wallTop,W,wallH,wallC);
+  px(0,wallTop,W,3,wallHi);                      // cornice under seats
+  px(0,wallTop+3,W,2,wallSh);
+  // pilasters + arches every 48px
+  for(let x=6;x<W;x+=48){
+    px(x,wallTop+6,6,wallH-6,wallHi);            // column
+    px(x+1,wallTop+6,1,wallH-6,'#d8c089');       // column highlight
+    px(x+4,wallTop+6,2,wallH-6,wallSh);          // column shadow
+    // arched dark opening
+    const ax=x+12, ay=wallTop+14, aw=30, ah=wallH-24;
+    if(aw>0&&ah>0){ px(ax,ay,aw,ah,wallSh); px(ax,ay,aw,2,'#000'); px(ax+2,ay+3,aw-4,3,wallC); }
+  }
+  // low podium barrier just above the sand (fighters stand in front of it)
+  px(0,GROUND-14,W,14,'#7a5a3a');
+  px(0,GROUND-14,W,3,'#9a7a52');
+  for(let x=0;x<W;x+=20){ px(x,GROUND-14,2,14,'#5a3f28'); }
+  // sand floor
+  px(0,GROUND,W,H-GROUND,'#d8b271');
+  px(0,GROUND,W,3,'#c79a55');
+  for(let i=0;i<70;i++){ px((i*97)%W,GROUND+4+((i*53)%(H-GROUND-6)),1,1,'#c79a55'); }
+  // blood stains
+  ctx.globalAlpha=.5;
+  for(const pa of t.particles){ if(pa.c==='#b51d1d'&&pa.y>=GROUND-2) px(pa.x,GROUND+2,2,1,'#7a1414'); }
+  ctx.globalAlpha=1;
+  // emperor box
+  if(t.emperor) drawEmperorBox();
+  // fighters (draw far one first)
+  const order = t.p.x<t.foe.x? [t.p,t.foe]:[t.foe,t.p];
+  drawShadow(t.p); drawShadow(t.foe);
+  drawGladiator(order[0]); drawGladiator(order[1]);
+  // net overlay if netted
+  // particles
+  for(const pa of t.particles){ if(pa.y<GROUND) px(pa.x,pa.y,2,2,pa.c); }
+  // banners
+  ctx.textAlign='center';
+  for(const b of t.banners){ pixelText(b.t,b.x,b.y,b.c,1); }
+  ctx.restore();
+  // verdict overlay
+  if(t.over) drawVerdict();
+}
+function drawShadow(f){ ctx.globalAlpha=.25; px(f.x-7, GROUND+1, 14, 3, '#000'); ctx.globalAlpha=1; }
+function drawCrowd(){
+  const crowdMood=FT.crowd;
+  for(let row=0;row<4;row++){
+    const y=10+row*14;
+    px(0,y,W,14,row%2?'#6a5238':'#5a442e');
+    for(let x=4+((row*7)%14);x<W;x+=12){
+      const c = crowdMood>60? pick(['#caa','#b97','#a86']) : pick(['#876','#765','#654']);
+      px(x,y+3,6,7,c); px(x+1,y+1,4,3,pick(SKIN)); // body + head
+      // raised arms when crowd hot
+      if(crowdMood>65 && Math.random()<0.15){ px(x,y-1,1,3,pick(SKIN)); px(x+5,y-1,1,3,pick(SKIN)); }
+    }
+  }
+  px(0,10+4*14,W,3,'#3a2c20');
+}
+function drawEmperorBox(){
+  const bx=W/2-26, by=14;
+  px(bx,by,52,26,'#5a2d8a'); px(bx,by,52,3,'#e8c34a'); px(bx,by+23,52,3,'#e8c34a');
+  // emperor figure
+  px(bx+22,by+6,8,12,'#c9a'); px(bx+23,by+3,6,5,SKIN[0]); px(bx+22,by+1,8,2,'#e8c34a'); // laurel/crown
+  // guards
+  px(bx+6,by+8,5,10,'#8a1d1d'); px(bx+41,by+8,5,10,'#8a1d1d');
+  px(bx+8,by+4,2,6,'#b9c0c8'); px(bx+43,by+4,2,6,'#b9c0c8'); // spears
+  pixelText('SEVERVS',W/2,by-4,'#e8c34a',1);
+}
+function drawVerdict(){
+  ctx.fillStyle='rgba(0,0,0,.45)'; ctx.fillRect(0,0,W,H);
+  const up=FT.crowd>=45 && FT.foe.knock || (FT.p.knock&&FT.crowd>=45);
+  // thumb gesture
+  const cx=W/2, cy=H/2-10;
+  const finishing = FT.foe.knock? (FT.crowd>70) : false;
+  pixelText(FT.foe.knock? (FT.crowd>70?'MISSVS! (SPARED IN HONOUR)':'POLLICE VERSO'):'VERDICT', cx, cy-30, '#e8c34a',2);
+  // big thumb
+  const tx=cx-8, ty=cy;
+  px(tx,ty,16,14,SKIN[0]);
+  if(FT.crowd>=50){ px(tx+6,ty-8,4,9,SKIN[0]); } else { px(tx+6,ty+13,4,9,SKIN[0]); }
+}
+
+/* simple pixel text using canvas font but snapped */
+function pixelText(t,x,y,c,scale=1){
+  ctx.save();
+  ctx.font=`${6*scale}px "Courier New", monospace`;
+  ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillStyle='#000'; ctx.fillText(t,(x|0)+1,(y|0)+1);
+  ctx.fillStyle=c; ctx.fillText(t,x|0,y|0);
+  ctx.restore();
+}
+
+/* =====================================================================
+   AUDIO (tiny WebAudio blips, guarded)
+   ===================================================================== */
+let AC=null, muted=false;
+function sfx(kind){
+  if(muted) return;
+  try{
+    AC=AC||new (window.AudioContext||window.webkitAudioContext)();
+    const o=AC.createOscillator(),g=AC.createGain();
+    o.connect(g);g.connect(AC.destination);
+    let f=200,d=0.08,ty='square';
+    if(kind==='hit'){f=110;d=0.1;ty='sawtooth';}
+    else if(kind==='block'){f=320;d=0.06;}
+    else if(kind==='swing'){f=180;d=0.05;ty='triangle';}
+    else if(kind==='win'){f=520;d=0.25;}
+    o.type=ty;o.frequency.value=f;
+    g.gain.setValueAtTime(0.06,AC.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.0001,AC.currentTime+d);
+    o.start();o.stop(AC.currentTime+d);
+  }catch(e){}
+}
+
+/* =====================================================================
+   INPUT  (exact scheme required)
+   ===================================================================== */
+const held={a:false,d:false,w:false};
+const edge={}; // edge-triggered actions to consume
+function setEdge(k){ edge[k]=true; }
+function consume(k){ if(edge[k]){ edge[k]=false; return true; } return false; }
+function resetInputEdges(){ for(const k in edge) edge[k]=false; held.a=held.d=held.w=false; }
+let isTouch = ('ontouchstart' in window) || navigator.maxTouchPoints>0;
+
+window.addEventListener('keydown',e=>{
+  const k=e.key.toLowerCase();
+  if(['a','d','w',' ','arrowleft','arrowright'].includes(k)) e.preventDefault();
+  if(k==='a'){ if(!held.a) setEdge('a'); held.a=true; }
+  else if(k==='d'){ if(!held.d) setEdge('d'); held.d=true; }
+  else if(k==='w'){ setEdge('w'); held.w=true; }
+  else if(k===' '){ setEdge('space'); }
+  else if(k==='arrowright'){ setEdge('elbow'); }
+  else if(k==='arrowleft'){ setEdge('thrust'); }
+  else if(k==='m'){ muted=!muted; toast(muted?'Muted':'Sound on'); }
+},{passive:false});
+window.addEventListener('keyup',e=>{
+  const k=e.key.toLowerCase();
+  if(k==='a')held.a=false; else if(k==='d')held.d=false; else if(k==='w')held.w=false;
+});
+cv.addEventListener('mousedown',e=>{ if(e.button===0){ setEdge('attack'); } });
+// touch buttons
+document.querySelectorAll('#touch .t').forEach(b=>{
+  const k=b.getAttribute('data-k');
+  const dn=ev=>{ev.preventDefault();
+    if(k==='a'){held.a=true;setEdge('a');}
+    else if(k==='d'){held.d=true;setEdge('d');}
+    else if(k==='w'){setEdge('w');}
+    else if(k==='space'){setEdge('space');}
+    else if(k==='attack'){setEdge('attack');}
+    else if(k==='elbow'){setEdge('elbow');}
+    else if(k==='thrust'){setEdge('thrust');}
+  };
+  const up=ev=>{ if(k==='a')held.a=false; if(k==='d')held.d=false; };
+  b.addEventListener('touchstart',dn,{passive:false});
+  b.addEventListener('touchend',up,{passive:false});
+  b.addEventListener('mousedown',dn); b.addEventListener('mouseup',up);
+});
+
+/* =====================================================================
+   MAIN LOOP
+   ===================================================================== */
+let state='title';   // title|create|help|map|shop|brief|fight|menu
+let last=performance.now();
+function loop(now){
+  let dt=(now-last)/16.6667; last=now;
+  dt=clamp(dt,0,3);
+  if(state==='fight' && FT){ updateFight(dt); drawArena(); }
+  else if(state==='map'){ drawMapCanvas(); }
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+
+/* =====================================================================
+   META SCREENS WIRING
+   ===================================================================== */
+// ---- title ----
+$('btn-new').onclick=()=>openCreate();
+$('btn-continue').onclick=()=>{ if(loadGame()){ enterMap(); } else toast('No saved career.'); };
+$('btn-continue').disabled=!hasSave();
+$('btn-help').onclick=()=>show('scr-help');
+$('btn-help-back').onclick=()=>show(prevHelp||'scr-title');
+let prevHelp=null;
+
+// ---- create ----
+let sel={origin:'Italia',cls:'Murmillo'};
+function openCreate(){
+  show('scr-create');
+  $('inp-name').value = $('inp-name').value || pick(['Lucius','Marcus','Gaius','Titus','Decimus','Quintus']);
+  // origins
+  const ol=$('origin-list'); ol.innerHTML='';
+  REGIONS.forEach(r=>{
+    const b=document.createElement('button'); b.className='btn sm'+(sel.origin===r.id?' gold':'');
+    b.textContent=r.id; b.onclick=()=>{sel.origin=r.id; openCreate();};
+    ol.appendChild(b);
+  });
+  // classes
+  const cl=$('class-list'); cl.innerHTML='';
+  CLASS_ORDER.forEach(c=>{
+    const card=document.createElement('button');
+    card.className='btn sm'+(sel.cls===c?' gold':'');
+    card.style.textAlign='left';card.style.whiteSpace='normal';
+    card.innerHTML=`<b>${c}</b><br><span class="small">${CLASSES[c].desc}</span><br><span class="tag">${CLASSES[c].trait}</span>`;
+    card.onclick=()=>{sel.cls=c; openCreate();};
+    cl.appendChild(card);
+  });
+}
+$('btn-create-back').onclick=()=>show('scr-title');
+$('btn-create-go').onclick=()=>{
+  const nm=($('inp-name').value||'Tiro').slice(0,14);
+  G=freshCareer(nm, sel.origin, sel.cls);
+  G.current = sel.origin; // start in homeland if a tier-1 region else Italia
+  if(REGION_BY_ID[sel.origin].tier>1) G.current='Italia';
+  enterMap();
+  toast('Swear by the sand — fight well, '+nm+'!',1800);
+};
+
+// ---- map ----
+function enterMap(){
+  state='map'; show('scr-map'); $('statbar').classList.remove('hide');
+  refreshStatbar(); buildRegions();
+}
+function regionUnlocked(r){
+  if(G.cleared[r.id]) return true;
+  // tier gating by popularity (escalation)
+  const need=[0,0,20,45,70][r.tier]||0;
+  if(r.id==='Italia' && imperialAvailable()) return true;
+  return G.pop>=need;
+}
+function imperialAvailable(){ return G.pop>=100 || G.glory>=400; }
+function buildRegions(){
+  const layer=$('region-layer'); layer.innerHTML='';
+  REGIONS.forEach(r=>{
+    const d=document.createElement('div');
+    const unlocked=regionUnlocked(r);
+    const imperial = r.id==='Italia' && imperialAvailable() && !G.imperialDone;
+    d.className='region'+(unlocked?'':' locked')+(G.cleared[r.id]?' done':'')+(G.current===r.id?' cur':'')+(imperial?' imperial':'');
+    d.style.left=r.x+'%'; d.style.top=r.y+'%';
+    d.textContent=(G.cleared[r.id]?'✓ ':'')+(imperial?'✦ ':'')+r.id;
+    d.title=r.city;
+    d.onclick=()=>{
+      if(!unlocked){ toast('Locked — reach '+([0,0,20,45,70][r.tier])+' Popularity.'); return; }
+      G.current=r.id; buildRegions(); openBrief(r,imperial);
+    };
+    layer.appendChild(d);
+  });
+}
+$('btn-fightcur').onclick=()=>{ const r=REGION_BY_ID[G.current]; if(!regionUnlocked(r)){toast('Locked.');return;}
+  openBrief(r, r.id==='Italia'&&imperialAvailable()&&!G.imperialDone); };
+$('btn-shop').onclick=()=>openShop();
+$('btn-train').onclick=()=>trainScreen();
+$('btn-save').onclick=()=>{ saveGame(); $('btn-continue').disabled=false; };
+$('btn-quit').onclick=()=>{ show('scr-title'); $('statbar').classList.add('hide'); state='title'; $('btn-continue').disabled=!hasSave(); };
+
+// stylised map background drawn on canvas
+const mapcv=$('mapcv'), mctx=mapcv.getContext('2d');
+function drawMapCanvas(){
+  const w=mapcv.width,h=mapcv.height;
+  mctx.imageSmoothingEnabled=false;
+  // sea
+  mctx.fillStyle='#5b6b78'; mctx.fillRect(0,0,w,h);
+  for(let i=0;i<200;i++){ mctx.fillStyle=(i%2?'#54636f':'#62727e'); mctx.fillRect((i*53)%w,(i*31)%h,2,1); }
+  // landmass blocks (rough Mediterranean world, stylised pixels)
+  const land='#caa86a', land2='#b8965a', desert='#d8c089';
+  function blob(x,y,bw,bh,c){ mctx.fillStyle=c; mctx.fillRect(x|0,y|0,bw|0,bh|0); }
+  // Europe
+  blob(20,20,140,70,land); blob(40,12,90,30,land2);
+  blob(30,55,60,40,land); // Iberia/Gaul
+  blob(150,25,70,55,land2);// Balkans/Asia minor west
+  // Italia boot
+  blob(86,82,16,30,land2); blob(90,108,12,8,land2);
+  // North Africa strip
+  blob(20,150,250,40,desert); blob(60,160,120,30,'#d0b878');
+  // Asia Minor / Levant
+  blob(250,80,90,60,land); blob(300,120,90,70,desert);
+  // Persia / east
+  blob(360,80,110,90,'#c8a060'); blob(420,60,60,60,'#be9656');
+  // Britannia island
+  blob(70,10,28,24,land);
+  // seas labels color hint (Mare Internum)
+  blob(110,120,150,30,'#4a5a66');
+  // grid graticule
+  mctx.fillStyle='rgba(0,0,0,.12)';
+  for(let x=0;x<w;x+=24) mctx.fillRect(x,0,1,h);
+  for(let y=0;y<h;y+=24) mctx.fillRect(0,y,w,1);
+}
+
+// ---- pre-fight brief ----
+let briefCtx=null;
+function tierName(t){return ['','Provincial bout','Provincial bout','Grand spectacle','Frontier death-match'][t]||'Bout';}
+function openBrief(reg,imperial){
+  state='brief'; show('scr-brief'); $('statbar').classList.remove('hide');
+  const tier=reg.tier;
+  const forbid = pick(GEAR.weapon.filter(w=>!w.forbidden && w.id!=='gladius')).id; // a normally-legal arm that THIS arena bans
+  const purse = Math.round((25+tier*22)*(0.6+ (50)/100*1.4));
+  const escDesc = G.pop>70? 'roaring' : G.pop>40? 'eager':'curious';
+  briefCtx={reg,tier,forbid,imperial};
+  const flavour = imperial
+    ? `IMPERIAL SPECTACLE in <b>Roma</b> — Emperor <b>Septimius Severus</b> watches from the pulvinar. Win and your name is carved into history.`
+    : tier>=4 ? `A brutal frontier death-match near <b>${reg.city}</b>, ${reg.id}. The Sassanid border is close; mercy is rare.`
+    : tier>=3 ? `A grand provincial spectacle at <b>${reg.city}</b> in ${reg.id}.`
+    : `An arena match at <b>${reg.city}</b>, ${reg.id}.`;
+  $('brief-title').textContent = imperial? 'IMPERIAL SPECTACLE — ROMA' : (tierName(tier)+' — '+reg.id).toUpperCase();
+  $('brief-body').innerHTML=
+    `<div>${flavour}</div>
+     <div class="row gap6"><span class="pill">Region tier ${tier}</span>
+       <span class="pill">Crowd: ${escDesc}</span>
+       <span class="pill">Purse ≈ ${purse} denarii</span></div>
+     <div class="small muted">Battle escalation: foes scale with your Popularity (${G.pop}/100).</div>`;
+  // forbidden gear notice
+  const eqForbidden = (gearOf('weapon',G.loadout.weapon).forbidden) || (gearOf('armor',G.loadout.armor).forbidden) || (G.loadout.weapon===forbid);
+  $('brief-forbidden').innerHTML =
+    `<div class="panel" style="padding:8px;margin-top:4px;">
+       <b style="color:var(--blood)">FORBIDDEN GEAR HERE:</b> the editor outlaws the
+       <b>${gearOf('weapon',forbid).name}</b> in this arena${GEAR.weapon.some(w=>w.forbidden)?', as well as all illegal arms ('+GEAR.weapon.filter(w=>w.forbidden).map(w=>w.name).join(', ')+')':''}.
+       <div class="small muted">Carry forbidden steel and you hit harder — but the mob and editor turn on you (less coin &amp; popularity, risk of disgrace).</div>
+       <div class="small ${eqForbidden?'':'muted'}" style="color:${eqForbidden?'var(--gold)':''}">
+         ${eqForbidden?'⚠ Your current loadout BREAKS the rules of this arena.':'Your loadout is within the rules.'}</div>
+     </div>`;
+  // rig & skip costs
+  const rigCost=Math.round(40+tier*45);
+  const skipCost=Math.round(120+tier*120);
+  $('btn-rig').textContent=`🤝 RIG THE BOUT (${rigCost}d)`;
+  $('btn-skip').textContent=`🪙 BUY YOUR WAY PAST (${skipCost}d)`;
+  $('btn-rig').disabled = G.coin<rigCost || imperial;
+  $('btn-skip').disabled = G.coin<skipCost || imperial;
+  briefCtx.rigCost=rigCost; briefCtx.skipCost=skipCost; briefCtx.eqForbidden=eqForbidden;
+  $('brief-note').innerHTML = imperial? 'The Emperor permits no fixing and no flight. You must fight.' :
+    `Rig: bribe the editor for an easy foe — but little glory and whispers of corruption.<br>
+     Buy past: skip the fight if you are rich enough — clears the region, but the crowd brands you a coward (−popularity).`;
+}
+$('btn-brief-back').onclick=()=>enterMap();
+$('btn-fight-go').onclick=()=>{
+  const b=briefCtx;
+  startFight(b.reg,{forbiddenEquipped:b.eqForbidden, rigged:false, imperial:b.imperial});
+};
+$('btn-rig').onclick=()=>{
+  const b=briefCtx; if(G.coin<b.rigCost) return;
+  G.coin-=b.rigCost; G.rigsUsed++; refreshStatbar();
+  startFight(b.reg,{forbiddenEquipped:b.eqForbidden, rigged:true, imperial:false});
+};
+$('btn-skip').onclick=()=>{
+  const b=briefCtx; if(G.coin<b.skipCost) return;
+  G.coin-=b.skipCost; G.cleared[b.reg.id]=true;
+  G.pop=clamp(G.pop-6,0,100);
+  refreshStatbar(); saveQuiet();
+  toast('You buy your way past '+b.reg.id+'. The crowd grumbles…',1800);
+  enterMap();
+};
+
+// ---- shop / armoury ----
+let shopTab='weapon';
+function openShop(){
+  state='shop'; show('scr-shop'); $('statbar').classList.remove('hide'); refreshStatbar();
+  const tabs=$('shop-tabs'); tabs.innerHTML='';
+  [['weapon','Weapons'],['shield','Shields'],['helmet','Helmets'],['armor','Armour']].forEach(([k,l])=>{
+    const b=document.createElement('button'); b.className='btn sm'+(shopTab===k?' gold':'');
+    b.textContent=l; b.onclick=()=>{shopTab=k; openShop();}; tabs.appendChild(b);
+  });
+  const grid=$('shop-grid'); grid.innerHTML='';
+  GEAR[shopTab].forEach(g=>{
+    const owned=G.owned[shopTab].includes(g.id);
+    const equipped=G.loadout[shopTab]===g.id;
+    const card=document.createElement('div'); card.className='shopcard'+(equipped?' eq':'');
+    let stats='';
+    if(shopTab==='weapon') stats=`reach ${g.reach} · dmg ${g.dmg} · spd ${g.spd}`;
+    else if(shopTab==='shield') stats=`block ${Math.round(g.block*100)}%`;
+    else stats=`armour +${Math.round(g.armor*100)}%`;
+    card.innerHTML=`<div><b style="color:var(--gold)">${g.name}</b>${g.forbidden?'<span class="tag f">FORBIDDEN</span>':''}</div>
+      <div class="small">${stats}</div>
+      <div class="small muted" style="line-height:1.4">${g.desc}</div>`;
+    const row=document.createElement('div'); row.className='row gap6';
+    if(equipped){ const e=document.createElement('span'); e.className='pill'; e.textContent='EQUIPPED'; row.appendChild(e); }
+    else if(owned){ const b=document.createElement('button'); b.className='btn sm gold'; b.textContent='EQUIP';
+      b.onclick=()=>{ G.loadout[shopTab]=g.id; openShop(); }; row.appendChild(b); }
+    else { const b=document.createElement('button'); b.className='btn sm'; b.textContent='BUY '+g.cost+'d';
+      b.disabled=G.coin<g.cost;
+      b.onclick=()=>{ if(G.coin<g.cost) return; G.coin-=g.cost; G.owned[shopTab].push(g.id); G.loadout[shopTab]=g.id; refreshStatbar(); openShop(); };
+      row.appendChild(b); }
+    card.appendChild(row); grid.appendChild(card);
+  });
+  $('loadout-line').textContent='Loadout: '+gearOf('weapon',G.loadout.weapon).name+' · '+gearOf('shield',G.loadout.shield).name+' · '+gearOf('helmet',G.loadout.helmet).name+' · '+gearOf('armor',G.loadout.armor).name;
+}
+$('btn-shop-back').onclick=()=>enterMap();
+
+// ---- train ----
+function trainScreen(){
+  const cost=30+G.level*10;
+  if(G.coin<cost){ toast('Need '+cost+'d to train.'); return; }
+  G.coin-=cost; G.xp+=Math.round((30+G.level*10)*0.8);
+  while(G.xp>=G.level*60){ G.xp-=G.level*60; G.level++; G.hpBonus++; if(G.level%2===0)G.dmgBonus++; }
+  refreshStatbar(); saveQuiet();
+  toast('You drill in the ludus. Stronger! (Lv '+G.level+')',1600);
+}
+
+// ---- result continue ----
+$('btn-res-continue').onclick=()=>{ FT=null; enterMap(); };
+
+/* =====================================================================
+   BOOT
+   ===================================================================== */
+prevHelp='scr-title';
+$('btn-help').onclick=()=>{ prevHelp='scr-title'; show('scr-help'); };
+show('scr-title');
+// expose for screenshot tooling
+window.__SS = {
+  show, openCreate, enterMap, openShop, openBrief, startFight, FT:()=>FT,
+  setG:(g)=>{G=g;}, newDemo:(name,origin,cls)=>{G=freshCareer(name||'Verus',origin||'Italia',cls||'Murmillo');},
+  regionById:id=>REGION_BY_ID[id], get state(){return state;},
+  press:(k)=>setEdge(k), hold:(k,v)=>{held[k]=v;},
+};
+})();
+</script>
+</body>
+</html>
