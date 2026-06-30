@@ -24,6 +24,22 @@ historical content** from the period. No mythical content.
 
 > The htmlpreview link works immediately — no account, no setup. Click the game once
 > to give it keyboard focus, then use the controls below.
+
+### Latest additions
+- **Fighter cards** — choose a champion from themed cards (Roman Legionary, Celtic Warrior,
+  Persian Immortal, Pit Brawler, Blood Fanatic, Net-Fighter), each with a drawn portrait,
+  stat bars and a real gladiator class. No default — you must pick.
+- **Visible attacks** — every swing draws a bright slash arc, with heavy knockback, blood
+  spray and ground gore so hits read clearly. Left-click anywhere in a bout to attack.
+- **Honor** — a public-reputation stat. Fighting fair raises it; rigging, ambush and hiring sink it.
+- **Travel: Stable & Larder** — long journeys to richer provinces cost rations and need a good
+  mount (mule → horse → chariot). Arrive well-provisioned for a bigger purse.
+- **Villa & Farm** — buy an estate and slaves for passive denarii + rations after every bout.
+- **Shady play** — *Hire a champion* (a substitute fights for you), *Ambush* a foe so he enters
+  wounded, or *Rig* the bout — all trade honor for advantage.
+- **More gear** — Gilded Gladius, Celtic Longsword, Akinakes, Sagaris, Cestus, Praetorian &
+  Persian & Celtic helms, Aspis, Lorica Squamata, and more.
+- Mobile on-screen buttons removed — keyboard + mouse only.
 >
 > *(GitHub Pages can't be enabled automatically — the Actions token isn't allowed to flip
 > that switch — so the one-time Source setting above is required for the permanent link.)*
