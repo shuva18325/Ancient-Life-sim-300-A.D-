@@ -540,6 +540,23 @@ const PLOT_TARGETS=[
   {name:'the Praetorian Prefect',    needSold:7000,  needFav:14, buff:2.0, reward:3000, glory:220, enemyArmy:6000},
   {name:'EMPEROR SEPTIMIUS SEVERUS', needSold:15000, needFav:24, buff:2.4, reward:8000, glory:600, enemyArmy:14000},
 ];
+/* ===== GENERALS: appointed to lead army conquests, with hidden traits ===== */
+const GEN_NAMES=['Crixus','Gannicus','Oenomaus','Castus','Brennus','Vercingetorix','Arash','Bato','Ardashir',
+  'Tarbus','Dacius','Memnon','Rufus','Vala','Zenobius','Odaenathus','Palfurius','Scaeva'];
+// each trait: label, secret hint, and a power multiplier for army battles
+const GEN_TRAITS=[
+  {t:'Slave-Born',   look:'a scarred slave — looks half-broken',        power:1.6, casualty:0.9, note:'Underestimated by all — a secret genius of the field.'},
+  {t:'Frail Scholar',look:'thin and sickly, no muscle at all',          power:1.5, casualty:0.8, note:'Weak of arm, but the sharpest strategist alive.'},
+  {t:'Veteran',      look:'grey and steady, a lifetime under arms',      power:1.35,casualty:0.85,note:'Dependable and hard to rattle.'},
+  {t:'Brutal',       look:'a giant who reeks of blood',                  power:1.4, casualty:1.3, note:'Wins fast and bloody — his men die in heaps.'},
+  {t:'Cautious',     look:'quiet, watchful, slow to commit',            power:1.1, casualty:0.6, note:'Loses few men, seldom routs.'},
+  {t:'Lucky',        look:'a grinning chancer',                          power:1.25,casualty:1.0, note:'Fortune favours him — usually.'},
+  {t:'Green',        look:'young and eager, unproven',                   power:0.95,casualty:1.1, note:'Untested — a gamble.'},
+];
+function makeGeneral(fromSlave){
+  const tr=pick(GEN_TRAITS);
+  return { name:pick(GEN_NAMES), trait:tr.t, look:tr.look, note:tr.note, power:tr.power, casualty:tr.casualty, fromSlave:!!fromSlave };
+}
 function makeElite(region){
   const isWife=Math.random()<0.42;
   const name=pick(isWife?ELITE_WOMEN:ELITE_MEN);
@@ -574,6 +591,7 @@ function freshCareer(name,origin,arch,social){
     emperor:false, approval:50, legions:0, rivals:0, retired:false,  // rule of Rome
     detachments:[], day:0,   // marching army detachments (with travel time)
     titles:{}, clears:{}, army:{}, armyGear:0, armyTrain:0, hasOrganizer:false,   // provincial titles, clear counts, army composition
+    generals:[],   // appointed generals who lead army conquests
     wins:0, losses:0,
     hpBonus:0, dmgBonus:0,
     loadout:lo,
@@ -590,7 +608,7 @@ function freshCareer(name,origin,arch,social){
   };
 }
 // fill in any fields missing from older saves
-function migrate(g){ const d={honor:50,food:4,mount:0,slaves:0,hasVilla:false,boat:false,favor:0,soldiers:0,hidden:[],plotTier:0,emperor:false,approval:50,legions:0,rivals:0,retired:false,detachments:[],day:0,titles:{},clears:{},socialClass:'gladiator',army:{},armyGear:0,armyTrain:0,hasOrganizer:false}; for(const k in d){ if(g[k]===undefined) g[k]=d[k]; } if(!g.current) g.current='Italia'; return g; }
+function migrate(g){ const d={honor:50,food:4,mount:0,slaves:0,hasVilla:false,boat:false,favor:0,soldiers:0,hidden:[],plotTier:0,emperor:false,approval:50,legions:0,rivals:0,retired:false,detachments:[],day:0,titles:{},clears:{},socialClass:'gladiator',army:{},armyGear:0,armyTrain:0,hasOrganizer:false,generals:[]}; for(const k in d){ if(g[k]===undefined) g[k]=d[k]; } if(!g.current) g.current='Italia'; return g; }
 function saveGame(){ try{ localStorage.setItem(SAVE_KEY, JSON.stringify(G)); toast('Saved.'); }catch(e){} }
 function hasSave(){ try{ return !!localStorage.getItem(SAVE_KEY); }catch(e){ return false; } }
 function loadGame(){ try{ G=migrate(JSON.parse(localStorage.getItem(SAVE_KEY))); return !!G; }catch(e){ return false; } }
@@ -898,6 +916,7 @@ function startFight(region, briefData){
     crowd:50, time:0, over:false, result:null,
     rigged:briefData.rigged||false, forbiddenEquipped:briefData.forbiddenEquipped||false,
     hired:briefData.hired||false, ambush:briefData.ambush||false, provisioned:!!G.provisioned,
+    upperHelp:!!briefData.upperHelp,
     siege:briefData.siege||null, plot:briefData.plot||null, rival:briefData.rival||false,
     emperor: (region.id==='Italia' && briefData.imperial) || (briefData.plot && briefData.plot.name.indexOf('EMPEROR')>=0) || briefData.rival,
     shake:0, particles:[], banners:[], decals:[], flash:0, hitstop:0,
@@ -905,6 +924,7 @@ function startFight(region, briefData){
   if(FT.rigged){ foe.maxHp*=0.45; foe.hp=foe.maxHp; foe.ai.aggr*=0.5; foe.ai.react*=2; }
   if(FT.ambush){ foe.hp=foe.maxHp*0.55; foe.hurt=20; foe.vx=-foe.facing*4; foe.vy=-3; foe.onGround=false; }  // you struck first
   if(FT.hired){ p.maxHp*=2.2; p.hp=p.maxHp; p.dmgMul=2.4; foe.ai.aggr*=0.7; }                                  // a brawny substitute
+  if(FT.upperHelp){ FT.crowd=68; foe.maxHp*=0.7; foe.hp=foe.maxHp; foe.ai.aggr*=0.75; foe.ai.react*=1.4; }      // eques: the editor quietly tilts the bout
   if(FT.siege){ foe.name=(FT.siege.isWife?'Bodyguard of ':'Guard of ')+FT.siege.name.split(' ').slice(-1)[0];
     foe.maxHp*=(1+FT.siege.guardTier*0.15); foe.hp=foe.maxHp; $('hud-e-name')&&0; }
   if(FT.plot){ const ratio=armyPower()/Math.max(1,FT.plot.enemyArmy); p.maxHp*=clamp(1+ratio*0.5,1,2.8); p.hp=p.maxHp; p.dmgMul=clamp(1+ratio*0.4,1,2.6);
@@ -1170,15 +1190,23 @@ function finishFight(won){
         note:'The overthrow of '+t.name+' is crushed and your army scattered.'}); }
     return;
   }
-  // ---- Imperial rival (holding the throne) ----
+  // ---- rival in single combat (throne rival if Emperor, else a jealous provincial rival) ----
   if(FT.rival){
-    if(won){ G.rivals=Math.max(0,G.rivals-1); G.approval=clamp(G.approval+10,0,100); G.coin+=800; G.wins++; saveQuiet();
-      showResult(true,{glory:40,coin:800,popDelta:0,honorDelta:0,crowdLove:FT.crowd,
-        note:'The usurper lies dead on the Senate floor. Your grip on the purple tightens.'}); }
-    else { G.approval=clamp(G.approval-18,0,100); G.losses++;
-      if(G.approval<=0){ G.emperor=false; G.plotTier=Math.max(0,PLOT_TARGETS.length-1); saveQuiet();
-        showResult(false,{glory:0,coin:0,popDelta:-20,honorDelta:0,crowdLove:FT.crowd,note:'The conspiracy triumphs — you are dragged from the throne. The purple is lost.'}); }
-      else { saveQuiet(); showResult(false,{glory:0,coin:0,popDelta:0,honorDelta:0,crowdLove:FT.crowd,note:'You are wounded and forced to flee — the rival lives, and Rome doubts you.'}); }
+    if(won){ G.rivals=Math.max(0,G.rivals-1); if(G.emperor) G.approval=clamp(G.approval+10,0,100); G.coin+=800; G.wins++; saveQuiet();
+      showResult(true,{glory:40,coin:800,popDelta:0,honorDelta:2,crowdLove:FT.crowd,
+        note: G.emperor?'The usurper lies dead on the Senate floor. Your grip on the purple tightens.':'The rival lies dead. His faction scatters and your provinces are safe.'}); }
+    else { G.losses++;
+      if(G.emperor){ G.approval=clamp(G.approval-18,0,100);
+        if(G.approval<=0){ G.emperor=false; G.plotTier=Math.max(0,PLOT_TARGETS.length-1); saveQuiet();
+          showResult(false,{glory:0,coin:0,popDelta:-20,honorDelta:0,crowdLove:FT.crowd,note:'The conspiracy triumphs — you are dragged from the throne. The purple is lost.'}); }
+        else { saveQuiet(); showResult(false,{glory:0,coin:0,popDelta:0,honorDelta:0,crowdLove:FT.crowd,note:'You are wounded and forced to flee — the rival lives, and Rome doubts you.'}); }
+      } else {
+        // a governor who loses forfeits a province to the rival
+        const ks=Object.keys(G.titles); let lost='';
+        if(ks.length){ lost=ks[ri(0,ks.length-1)]; delete G.titles[lost]; }
+        G.pop=clamp(G.pop-6,0,100); saveQuiet();
+        showResult(false,{glory:0,coin:0,popDelta:-6,honorDelta:0,crowdLove:FT.crowd,note: lost? 'You are beaten — the rival seizes '+lost+' from your grasp.':'You are beaten and forced to yield ground to the rival.'});
+      }
     }
     return;
   }
@@ -1691,6 +1719,7 @@ $('btn-stable-back').onclick=()=>enterMap();
 function slaveCost(){ return 80 + G.slaves*45; }
 function villaIncome(){ return {coin:G.slaves*12, food:Math.floor(G.slaves/2)}; }
 function provinceTribute(){ let s=0; for(const id in (G.titles||{})){ const r=REGION_BY_ID[id]; if(r) s+=40+r.tier*45; } return s; }
+function titlesCount(){ return Object.keys(G.titles||{}).length; }
 function claimReq(reg){ return 3+reg.tier; }   // wins needed to claim governance
 function canClaim(reg){ return !(G.titles&&G.titles[reg.id]) && (G.clears[reg.id]||0)>=claimReq(reg); }
 function claimProvince(reg){
@@ -1792,6 +1821,17 @@ function openIntrigue(){
   buildOrganizer(b);
   // ---- CAMPAIGN: send army detachments (they march the map over days) ----
   buildCampaign(b);
+  // ---- provincial rivals (governing many lands breeds jealousy) ----
+  if(!G.emperor && G.rivals>0){
+    const rh=document.createElement('div'); rh.className='small'; rh.style.color='var(--blood)'; rh.style.marginTop='6px';
+    rh.textContent='RIVALS CONTEST YOUR PROVINCES:'; b.appendChild(rh);
+    const rc=document.createElement('div'); rc.className='shopcard';
+    rc.innerHTML=`<div>You govern <b>${titlesCount()}</b> provinces (${Object.values(G.titles).join(', ')}).
+      <b style="color:var(--blood)">${G.rivals}</b> jealous rival${G.rivals>1?'s plot':' plots'} to strip you of them.</div>
+      <div class="small muted">Beat a rival in single combat to break his faction. Lose, and you forfeit a province.</div>`;
+    const bt=document.createElement('button'); bt.className='btn sm blood'; bt.textContent='⚔ MEET A RIVAL IN COMBAT';
+    bt.onclick=()=>startRival(); rc.appendChild(bt); b.appendChild(rc);
+  }
   // ---- imperial rule (after seizing the purple) ----
   if(G.emperor){ buildRule(b); return; }
   // ---- grand plot / overthrow ----
@@ -1825,32 +1865,71 @@ function detCost(fromId,toId,size){
   const days = Math.max(2, Math.round(t.dist/6) + Math.round(size/2500));  // bigger army marches slower
   const coin = Math.round(size*0.15 + t.dist*3);   // pay + supply for the march
   const rations = Math.max(1, Math.round(size/1200));
-  return {days, coin, rations, dist:t.dist};
+  return {days, coin, rations, dist:t.dist, needRange:t.needRange};
 }
-function sendDetachment(toId,size){
+// an army can only march where YOU could travel (islands need a fleet)
+function detReachable(toId){
+  const from=REGION_BY_ID[G.current], to=REGION_BY_ID[toId];
+  if((to.sea||from.sea) && !G.boat) return {ok:false, why:to.id+' is across open sea — you need a fleet (buy a ship at the Stable) before an army can cross.'};
+  const t=travelCost(G.current,toId);
+  if(!to.sea && !from.sea && MOUNTS[G.mount].range<t.needRange) return {ok:false, why:'No road that far — get a stronger mount at the Stable first.'};
+  return {ok:true};
+}
+function sendDetachment(toId,size,generalIdx,purpose){
+  purpose=purpose||'raid';
+  const reach=detReachable(toId); if(!reach.ok){ toast(reach.why,2800); return; }
   size=Math.min(size, G.soldiers);
   if(size<200){ toast('A detachment needs at least 200 men.'); return; }
+  if(purpose==='conquer' && (generalIdx==null || !G.generals[generalIdx])){ toast('Appoint a general to lead a conquest.'); return; }
+  if(purpose==='conquer' && G.titles[toId]){ toast('You already govern '+toId+'.'); return; }
   const c=detCost(G.current,toId,size);
   if(G.coin<c.coin){ toast('Not enough denarii to supply the march ('+c.coin+'d).'); return; }
   if(G.food<c.rations){ toast('Not enough rations for the march ('+c.rations+').'); return; }
-  G.coin-=c.coin; G.food-=c.rations; G.soldiers-=size;
+  G.coin-=c.coin; G.food-=c.rations; G.soldiers-=size; syncArmy();
   const reg=REGION_BY_ID[toId];
   const reward = { coin:Math.round(size*rnd(0.25,0.5)+reg.tier*300), troops:Math.round(size*rnd(0.05,0.2)+reg.tier*150), slaves:ri(0,2)+reg.tier };
-  G.detachments.push({ fromId:G.current, toId, size, day:0, eta:c.days, phase:'out', reward, purpose:'raid' });
-  refreshStatbar(); toast('A detachment of '+fmt(size)+' marches for '+toId+' — ETA '+c.days+' days.',2200); openIntrigue();
+  const gen = purpose==='conquer'? G.generals[generalIdx] : null;
+  G.detachments.push({ fromId:G.current, toId, size, day:0, eta:c.days, phase:'out', reward, purpose, gen });
+  refreshStatbar();
+  toast('A '+(purpose==='conquer'?'conquest army':'detachment')+' of '+fmt(size)+(gen?' under '+gen.name:'')+' marches for '+toId+' — ETA '+c.days+' days.',2600); openIntrigue();
 }
 // advance the campaign clock (called after each bout / END DAY)
 function advanceDay(n){
   n=n||1; if(!G.detachments) return;
   for(let k=0;k<n;k++){ G.day++;
     for(const d of G.detachments){ d.day++;
-      if(d.day>=d.eta && d.phase==='out'){ d.phase='back'; d.day=0; d.msg=fmt(d.size)+' reach '+d.toId+' and raid it — marching home.'; }
-      else if(d.day>=d.eta && d.phase==='back'){ d.phase='done'; }
+      if(d.day>=d.eta && d.phase==='out'){
+        if(d.purpose==='conquer'){
+          const gearMult=(1+G.armyGear*0.15)*(1+G.armyTrain*0.12);
+          const yourPower=Math.round(d.size*gearMult*(d.gen?d.gen.power:1));
+          const reg=REGION_BY_ID[d.toId];
+          const defense=Math.round((1500+reg.tier*2200)*rnd(0.85,1.15));
+          if(yourPower>=defense){ d.won=true; d.loss=Math.round(defense*0.4*(d.gen?d.gen.casualty:1)); d.size=Math.max(0,d.size-d.loss);
+            G.titles[d.toId]=REGION_TITLES[d.toId]||('Dominus '+d.toId);
+            d.msg=(d.gen?d.gen.name:'Your army')+' storms '+d.toId+' — the province is YOURS ('+fmt(d.loss)+' fallen)!';
+          } else { d.won=false; d.loss=Math.round(d.size*rnd(0.5,0.8)); d.size=Math.max(0,d.size-d.loss);
+            d.msg='The assault on '+d.toId+' is thrown back ('+fmt(d.loss)+' lost).'; if(d.gen&&Math.random()<0.4) d.genDied=true; }
+        } else { d.msg=fmt(d.size)+' reach '+d.toId+' and raid it — marching home.'; }
+        d.phase='back'; d.day=0;
+      }
+      else if(d.day>=d.eta && d.phase==='back'){ d.phase='home'; }
     }
-    const done=G.detachments.filter(d=>d.phase==='done');
-    for(const d of done){ addTroops('levy',d.size+d.reward.troops); G.coin+=d.reward.coin; G.slaves+=d.reward.slaves;
-      G.lastRaid='Your detachment returns from '+d.toId+': +'+fmt(d.reward.coin)+'d, +'+fmt(d.reward.troops)+' recruits, +'+d.reward.slaves+' slaves.'; }
-    G.detachments=G.detachments.filter(d=>d.phase!=='done');
+    const home=G.detachments.filter(d=>d.phase==='home');
+    for(const d of home){
+      if(d.purpose==='conquer'){
+        addTroops('levy', d.size);
+        if(d.genDied){ const gi=G.generals.indexOf(d.gen); if(gi>=0) G.generals.splice(gi,1); }
+        G.lastRaid=(d.won?('★ You now GOVERN '+d.toId+'! '):'')+'Your conquest army returns'+(d.won?'':' battered')+(d.genDied?' — the general fell in the retreat.':'.');
+      } else {
+        addTroops('levy', d.size+d.reward.troops); G.coin+=d.reward.coin; G.slaves+=d.reward.slaves;
+        G.lastRaid='Your detachment returns from '+d.toId+': +'+fmt(d.reward.coin)+'d, +'+fmt(d.reward.troops)+' recruits, +'+d.reward.slaves+' slaves.';
+      }
+    }
+    G.detachments=G.detachments.filter(d=>d.phase!=='home');
+    // governing many provinces breeds jealous rivals
+    if(!G.emperor && titlesCount()>=2 && G.rivals<titlesCount() && Math.random()<0.10*titlesCount()){
+      G.rivals++; G.lastRaid='A jealous rival raises troops to contest your growing power — face him in the Intrigue hall.';
+    }
   }
   refreshStatbar();
 }
@@ -1892,30 +1971,72 @@ function buildCampaign(b){
       <div class="bar" style="margin-top:3px"><i style="width:${Math.round(prog*100)}%;height:100%;background:var(--gold)"></i></div>`;
     b.appendChild(card);
   });
-  // dispatch a new detachment
+  // ---- GENERALS: appoint leaders (needed to conquer) ----
+  buildGenerals(b);
+  // dispatch a new detachment / conquest
   const card=document.createElement('div'); card.className='shopcard';
   if(!detTargetId||detTargetId===G.current) detTargetId=(REGIONS.find(r=>r.id!==G.current)||{}).id;
+  const reach=detReachable(detTargetId);
   const c=detCost(G.current,detTargetId,Math.min(detSize,G.soldiers||detSize));
-  card.innerHTML=`<div>Dispatch from <b>${G.current}</b> → <b style="color:var(--gold)" id="det-to">${detTargetId}</b></div>`;
-  const selRow=document.createElement('div'); selRow.className='row gap6'; selRow.style.margin='4px 0';
-  const sel=document.createElement('select'); sel.style.cssText='background:#000;color:var(--gold);border:2px solid var(--gold);font-family:inherit;font-weight:bold;padding:3px;';
-  REGIONS.filter(r=>r.id!==G.current).forEach(r=>{ const o=document.createElement('option'); o.value=r.id; o.textContent=r.id; if(r.id===detTargetId)o.selected=true; sel.appendChild(o); });
+  const mkSelStyle='background:#000;color:var(--gold);border:2px solid var(--gold);font-family:inherit;font-weight:bold;padding:3px;';
+  card.innerHTML=`<div>March from <b>${G.current}</b> → <b style="color:var(--gold)">${detTargetId}</b></div>`;
+  const selRow=document.createElement('div'); selRow.className='row gap6'; selRow.style.margin='4px 0'; selRow.style.flexWrap='wrap';
+  const sel=document.createElement('select'); sel.style.cssText=mkSelStyle;
+  REGIONS.filter(r=>r.id!==G.current).forEach(r=>{ const o=document.createElement('option'); o.value=r.id; o.textContent=r.id+(G.titles[r.id]?' ♦':''); if(r.id===detTargetId)o.selected=true; sel.appendChild(o); });
   sel.onchange=()=>{ detTargetId=sel.value; openIntrigue(); };
-  const sizeSel=document.createElement('select'); sizeSel.style.cssText=sel.style.cssText;
-  [500,2000,5000,10000].forEach(s=>{ const o=document.createElement('option'); o.value=s; o.textContent=fmt(s)+' men'; if(s===detSize)o.selected=true; sizeSel.appendChild(o); });
+  const sizeSel=document.createElement('select'); sizeSel.style.cssText=mkSelStyle;
+  [500,2000,5000,10000,25000].forEach(s=>{ const o=document.createElement('option'); o.value=s; o.textContent=fmt(s)+' men'; if(s===detSize)o.selected=true; sizeSel.appendChild(o); });
   sizeSel.onchange=()=>{ detSize=+sizeSel.value; openIntrigue(); };
-  selRow.appendChild(sel); selRow.appendChild(sizeSel); card.appendChild(selRow);
+  const purSel=document.createElement('select'); purSel.style.cssText=mkSelStyle;
+  [['raid','Raid (loot & return)'],['conquer','Conquer (claim province)']].forEach(([v,l])=>{ const o=document.createElement('option'); o.value=v; o.textContent=l; if(v===detPurpose)o.selected=true; purSel.appendChild(o); });
+  purSel.onchange=()=>{ detPurpose=purSel.value; openIntrigue(); };
+  selRow.appendChild(sel); selRow.appendChild(sizeSel); selRow.appendChild(purSel); card.appendChild(selRow);
+  // general picker for conquest
+  if(detPurpose==='conquer'){
+    if(G.generals.length){ const gRow=document.createElement('div'); gRow.className='row gap6'; gRow.style.margin='0 0 4px';
+      const gs=document.createElement('span'); gs.className='small'; gs.textContent='Led by: '; gRow.appendChild(gs);
+      const gSel=document.createElement('select'); gSel.style.cssText=mkSelStyle;
+      G.generals.forEach((g,i)=>{ const o=document.createElement('option'); o.value=i; o.textContent=g.name+' ('+g.trait+')'; if(i===detGeneral)o.selected=true; gSel.appendChild(o); });
+      gSel.onchange=()=>{ detGeneral=+gSel.value; openIntrigue(); }; gRow.appendChild(gSel); card.appendChild(gRow);
+      const g=G.generals[detGeneral]||G.generals[0];
+      const gd=document.createElement('div'); gd.className='small muted'; gd.textContent=g.look+' — '+g.note; card.appendChild(gd);
+    } else { const w=document.createElement('div'); w.className='small'; w.style.color='var(--blood)'; w.textContent='Appoint a general above to lead a conquest.'; card.appendChild(w); }
+  }
   const info=document.createElement('div'); info.className='small muted';
-  info.innerHTML=`March: <b>${c.days} days</b> · supply <b>${c.coin}d</b> + ${c.rations} rations · you have ${fmt(G.soldiers)} troops`;
+  info.innerHTML = reach.ok
+    ? `March: <b>${c.days} days</b> · supply <b>${c.coin}d</b> + ${c.rations} rations · you have ${fmt(G.soldiers)} troops`+(detPurpose==='conquer'?` · defenders ~${fmt(1500+REGION_BY_ID[detTargetId].tier*2200)}`:'')
+    : `<span style="color:var(--blood)">✕ ${reach.why}</span>`;
   card.appendChild(info);
   const row=document.createElement('div'); row.className='row gap6'; row.style.marginTop='4px';
-  const send=document.createElement('button'); send.className='btn sm gold'; send.textContent='🏇 SEND DETACHMENT';
-  send.disabled=G.soldiers<Math.min(detSize,200)||G.coin<c.coin||G.food<c.rations;
-  send.onclick=()=>sendDetachment(detTargetId, detSize);
+  const send=document.createElement('button'); send.className='btn sm gold'; send.textContent = detPurpose==='conquer'?'⚔ SEND CONQUEST ARMY':'🏇 SEND DETACHMENT';
+  send.disabled = !reach.ok || G.soldiers<Math.min(detSize,200) || G.coin<c.coin || G.food<c.rations || (detPurpose==='conquer' && (!G.generals.length || G.titles[detTargetId]));
+  send.onclick=()=>sendDetachment(detTargetId, detSize, detGeneral, detPurpose);
   const wait=document.createElement('button'); wait.className='btn sm'; wait.textContent='⏳ END DAY (let armies march)';
-  wait.onclick=()=>{ advanceDay(1); if(G.lastRaid){toast(G.lastRaid,2600); G.lastRaid=null;} openIntrigue(); };
+  wait.onclick=()=>{ advanceDay(1); if(G.lastRaid){toast(G.lastRaid,3000); G.lastRaid=null;} openIntrigue(); };
   row.appendChild(send); if(G.detachments.length) row.appendChild(wait);
   card.appendChild(row); b.appendChild(card);
+}
+let detPurpose='raid', detGeneral=0, genCandidates=null;
+function buildGenerals(b){
+  const gh=document.createElement('div'); gh.className='small'; gh.style.color='var(--gold)'; gh.style.marginTop='6px';
+  gh.textContent='GENERALS — appoint leaders for your conquests:'; b.appendChild(gh);
+  // your generals
+  G.generals.forEach(g=>{ const card=document.createElement('div'); card.className='shopcard';
+    card.innerHTML=`<div><b style="color:var(--gold)">${g.name}</b> — <b>${g.trait}</b>${g.fromSlave?' <span class="small muted">(freed slave)</span>':''}</div>
+      <div class="small muted">${g.look} — ${g.note}</div>`; b.appendChild(card); });
+  // recruit
+  const card=document.createElement('div'); card.className='shopcard';
+  if(!genCandidates) genCandidates=[makeGeneral(false),makeGeneral(true)];
+  card.innerHTML='<div class="small">Candidates present themselves (traits are hinted, never certain):</div>';
+  genCandidates.forEach((g,i)=>{ const row=document.createElement('div'); row.className='row gap6'; row.style.margin='3px 0'; row.style.alignItems='center';
+    const info=document.createElement('span'); info.className='small'; info.style.flex='1'; info.innerHTML=`<b>${g.name}</b> — ${g.look}`;
+    const cost=g.fromSlave?60:200;
+    const bt=document.createElement('button'); bt.className='btn sm gold'; bt.textContent='Appoint ('+cost+'d)';
+    bt.disabled=G.coin<cost; bt.onclick=()=>{ if(G.coin<cost)return; G.coin-=cost; G.generals.push(g); genCandidates.splice(i,1); if(!genCandidates.length) genCandidates=null; refreshStatbar(); openIntrigue(); };
+    row.appendChild(info); row.appendChild(bt); card.appendChild(row); });
+  const rf=document.createElement('button'); rf.className='btn sm'; rf.textContent='↻ New candidates (10d)';
+  rf.disabled=G.coin<10; rf.onclick=()=>{ if(G.coin<10)return; G.coin-=10; genCandidates=[makeGeneral(false),makeGeneral(true)]; refreshStatbar(); openIntrigue(); };
+  card.appendChild(rf); b.appendChild(card);
 }
 // Imperial rule panel: public approval, legions, political rivals, retirement
 function buildRule(b){
@@ -2040,6 +2161,9 @@ function drawMapCanvas(){
   const mesopotamia=[[356,104],[404,98],[414,126],[398,146],[374,144],[360,124]];
   const britannia=[[62,28],[92,24],[100,42],[90,62],[66,64],[56,44]];
   [iberia,gaul,italia,greece,anatolia,levant,mesopotamia,britannia].forEach(p=>P(p,RD));
+  // crisp coastline definition on the empire (dark-red edge)
+  function edge(pts){ mctx.beginPath(); mctx.moveTo(pts[0][0],pts[0][1]); for(let k=1;k<pts.length;k++) mctx.lineTo(pts[k][0],pts[k][1]); mctx.closePath(); mctx.lineWidth=1; mctx.strokeStyle='#8f2f1e'; mctx.stroke(); }
+  [iberia,gaul,italia,greece,anatolia,levant,mesopotamia,britannia].forEach(edge);
   // Africa Roman coastal strip
   P([[14,150],[80,144],[150,140],[200,146],[262,154],[330,158],[350,166],[352,176],[300,172],[240,168],[160,158],[80,158],[14,162]],RD);
   // Aegyptus / Nile valley
@@ -2126,29 +2250,39 @@ function openBrief(reg,imperial){
      ${govBlock(reg)}`;
   const gb=$('brief-claim'); if(gb) gb.onclick=()=>{ claimProvince(reg); openBrief(reg,imperial); refreshStatbar(); };
   // forbidden gear notice
-  const eqForbidden = (gearOf('weapon',G.loadout.weapon).forbidden) || (gearOf('armor',G.loadout.armor).forbidden) || (G.loadout.weapon===forbid);
+  // social standing / governance rules
+  const isElite=G.socialClass==='elite', isUpper=G.socialClass==='upper', isGovernor=!!G.titles[reg.id];
+  const cantFight = isElite || isGovernor;
+  let eqForbidden = (gearOf('weapon',G.loadout.weapon).forbidden) || (gearOf('armor',G.loadout.armor).forbidden) || (G.loadout.weapon===forbid);
+  if(isUpper) eqForbidden=false;   // the editor looks the other way for a well-born eques
   $('brief-forbidden').innerHTML =
-    `<div class="panel" style="padding:8px;margin-top:4px;">
+    (isElite? `<div class="panel" style="padding:8px;margin-top:4px;border-color:var(--blood)">
+       <b style="color:var(--blood)">THE EDITOR REFUSES YOU.</b> No games-giver dares stage a patrician to be slain for the mob — it would ruin him. As an <b>Elite</b>, the arena is closed to you. Rise instead through <b>INTRIGUE</b>, the army, and governance.</div>`
+    : isGovernor? `<div class="panel" style="padding:8px;margin-top:4px;border-color:var(--gold)">
+       <b style="color:var(--gold)">♦ ${G.titles[reg.id]}.</b> You <b>govern</b> ${reg.id} — a governor does not brawl in his own sand. Defend or expand your realm with armies and generals via <b>INTRIGUE</b>.</div>`
+    : `<div class="panel" style="padding:8px;margin-top:4px;">
        <b style="color:var(--blood)">FORBIDDEN GEAR HERE:</b> the editor outlaws the
        <b>${gearOf('weapon',forbid).name}</b> in this arena${GEAR.weapon.some(w=>w.forbidden)?', as well as all illegal arms ('+GEAR.weapon.filter(w=>w.forbidden).map(w=>w.name).join(', ')+')':''}.
-       <div class="small muted">Carry forbidden steel and you hit harder — but the mob and editor turn on you (less coin &amp; popularity, risk of disgrace).</div>
+       ${isUpper? '<div class="small" style="color:var(--gold)">As an eques, the editor quietly ignores your gear and tilts the bout your way — he cannot let a knight lose badly.</div>' : '<div class="small muted">Carry forbidden steel and you hit harder — but the mob and editor turn on you (less coin &amp; popularity, risk of disgrace).</div>'}
        <div class="small ${eqForbidden?'':'muted'}" style="color:${eqForbidden?'var(--gold)':''}">
          ${eqForbidden?'⚠ Your current loadout BREAKS the rules of this arena.':'Your loadout is within the rules.'}</div>
-     </div>`;
+     </div>`);
   // rig & skip costs
   const rigCost=Math.round(40+tier*45);
   const skipCost=Math.round(120+tier*120);
   const hireCost=Math.round(180+tier*140);
+  $('btn-fight-go').textContent = cantFight? '⚔ (ARENA CLOSED TO YOU)' : '⚔ ENTER THE ARENA';
+  $('btn-fight-go').disabled = cantFight;
   $('btn-rig').textContent=`🤝 RIG THE BOUT (${rigCost}d)`;
   $('btn-skip').textContent=`🪙 BUY YOUR WAY PAST (${skipCost}d)`;
   $('btn-hire').textContent=`🛡 HIRE A CHAMPION (${hireCost}d)`;
   $('btn-ambush').textContent=`🗡 AMBUSH (SHADY)`;
-  $('btn-rig').disabled = G.coin<rigCost || imperial;
+  $('btn-rig').disabled = G.coin<rigCost || imperial || cantFight;
   $('btn-skip').disabled = G.coin<skipCost || imperial;
-  $('btn-hire').disabled = G.coin<hireCost || imperial;
-  $('btn-ambush').disabled = imperial;
-  briefCtx.rigCost=rigCost; briefCtx.skipCost=skipCost; briefCtx.hireCost=hireCost; briefCtx.eqForbidden=eqForbidden;
-  $('brief-note').innerHTML = imperial? 'The Emperor permits no fixing, hiring or flight. You must fight in person.' :
+  $('btn-hire').disabled = G.coin<hireCost || imperial || isGovernor;
+  $('btn-ambush').disabled = imperial || cantFight;
+  briefCtx.rigCost=rigCost; briefCtx.skipCost=skipCost; briefCtx.hireCost=hireCost; briefCtx.eqForbidden=eqForbidden; briefCtx.upperHelp=isUpper;
+  $('brief-note').innerHTML = cantFight? 'Use INTRIGUE to grow your power — sieges, armies, generals and conquest.' : imperial? 'The Emperor permits no fixing, hiring or flight. You must fight in person.' :
     `<b style="color:var(--gold)">Honor:</b> ${G.honor}/100 — fighting fair raises it; rigging, hiring and ambush sink it.<br>
      <b>Hire a champion:</b> a hulking substitute fights in your place — you keep the purse, but earn little glory and lose honor.<br>
      <b>Ambush (shady):</b> waylay your foe beforehand so he enters already wounded — effective, dishonourable.<br>
@@ -2157,7 +2291,7 @@ function openBrief(reg,imperial){
 $('btn-brief-back').onclick=()=>enterMap();
 $('btn-fight-go').onclick=()=>{
   const b=briefCtx;
-  startFight(b.reg,{forbiddenEquipped:b.eqForbidden, rigged:false, imperial:b.imperial});
+  startFight(b.reg,{forbiddenEquipped:b.eqForbidden, rigged:false, imperial:b.imperial, upperHelp:b.upperHelp});
 };
 $('btn-hire').onclick=()=>{
   const b=briefCtx; if(G.coin<b.hireCost) return;
