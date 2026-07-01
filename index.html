@@ -53,9 +53,11 @@
   .scrollbox{overflow:auto;scrollbar-width:thin;scrollbar-color:var(--gold) #000;}
   /* world map regions */
   .region{position:absolute;cursor:pointer;border:2px solid #000;background:#3a2c2099;
-    font-size:clamp(7px,1.4vw,11px);padding:2px 4px;white-space:nowrap;color:var(--bone);
-    text-shadow:1px 1px 0 #000;transform:translate(-50%,-50%);transition:transform .06s;}
-  .region:hover{transform:translate(-50%,-50%) scale(1.12);z-index:3;}
+    font-size:clamp(7px,1.4vw,11px);padding:3px 6px;white-space:nowrap;color:var(--bone);
+    text-shadow:1px 1px 0 #000;transform:translate(-50%,-50%);transition:transform .06s;
+    user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent;touch-action:manipulation;}
+  .region:hover{transform:translate(-50%,-50%) scale(1.16);z-index:5;background:#54402e;}
+  .region.owned{background:var(--gold);color:#3a2400;border-color:#fff;}
   .region.locked{filter:grayscale(1) brightness(.55);cursor:not-allowed;}
   .region.cur{background:var(--blood);border-color:var(--gold);box-shadow:0 0 0 2px var(--gold);}
   .region.done{background:var(--green);}
@@ -138,6 +140,11 @@
         <span class="small" style="margin-left:8px;">Homeland:</span>
         <select id="sel-home" style="background:#000;color:var(--gold);border:2px solid var(--gold);
           font-family:inherit;font-weight:bold;padding:4px;"></select>
+      </div>
+      <div class="row gap6" style="align-items:center;flex-wrap:wrap;">
+        <span class="small">Born:</span>
+        <div id="class-row" class="row gap6"></div>
+        <span id="class-note" class="small muted"></span>
       </div>
       <div id="card-list" class="scrollbox" style="display:grid;gap:10px;
         grid-template-columns:repeat(auto-fill,minmax(176px,1fr));overflow:auto;padding:2px;"></div>
@@ -253,6 +260,18 @@
       <h2 id="elite-head" style="color:var(--gold)">THE ELITE KNEELS</h2>
       <div id="elite-body" class="col gap6 small" style="line-height:1.7"></div>
       <div id="elite-choices" class="row center gap" style="margin-top:6px;flex-wrap:wrap;"></div>
+    </div>
+  </div>
+
+  <!-- ===== TRAVEL CONFIRM (route / ETA / yes-no) ===== -->
+  <div id="scr-travel" class="screen center">
+    <div class="panel pad col gap center" style="width:min(92%,480px);text-align:center;">
+      <h2 style="color:var(--gold)">PLAN THE JOURNEY</h2>
+      <div id="travel-body" class="col gap6 small" style="line-height:1.7"></div>
+      <div class="row center gap" style="margin-top:6px;">
+        <button class="btn gold" id="btn-travel-go">▶ YES, TRAVEL</button>
+        <button class="btn" id="btn-travel-no">✕ NO, STAY</button>
+      </div>
     </div>
   </div>
 
@@ -390,6 +409,15 @@ const REGIONS = [
   {id:'Sogdiana',             x:94,y:25, tier:4, city:'Maracanda',     prov:'far east'},
 ];
 const REGION_BY_ID = Object.fromEntries(REGIONS.map(r=>[r.id,r]));
+// grand titles you can claim once you dominate a province
+const REGION_TITLES={
+  'Britannia':'Dux Britanniae','Gallia':'Dominus Galliae','Germania Magna':'Victor Germaniae',
+  'Hispania Baetica':'Dominus Hispaniae','Italia':'Princeps Italiae','Insulae Baleares & Sicilia':'Dominus Insularum',
+  'Africa Proconsularis':'Proconsul Africae','Dalmatia':'Dux Dalmatiae','Illyricum':'Dux Illyrici',
+  'Achaea':'Archon Achaeae','Creta':'Dominus Cretae','Asia Minor':'Satrapes Asiae',
+  'Bosporan Kingdom':'Rex Bospori','Cyprus':'Dominus Cypri','Aegyptus':'Magister Magnus Aegypti',
+  'Syria Palaestina':'Dominus Palaestinae','Arabia Petraea':'Dux Arabiae','Mesopotamia':'Dux Mesopotamiae',
+  'Asōristān':'Marzban Asōristān','Ērānshahr':'Shahanshah Ērānshahr','Sogdiana':'Dominus Sogdianae'};
 
 // Gladiator classes (real types). Each grants a starting loadout + trait.
 const CLASSES = {
@@ -491,6 +519,15 @@ const ARCHETYPES = {
 };
 const ARCH_ORDER=['Roman','Celt','Persian','Brawler','Fanatic','Retiarius'];
 
+// starting social class — rich birth vs the sand
+const SOCIAL={
+  gladiator:{name:'Slave / Gladiator', coin:60,   honor:45, purse:1.0, note:'The classic path — you are poor, but the sand welcomes your blood.'},
+  citizen:  {name:'Free Citizen',      coin:200,  honor:50, purse:1.0, note:'A modest purse to begin; the arena is fully open to you.'},
+  upper:    {name:'Upper Class (Eques)',coin:600, honor:60, purse:0.8, note:'Rich and respected — but editors are wary of an eques bleeding for the mob (smaller purses).'},
+  elite:    {name:'Elite (Patrician)', coin:1500, honor:72, purse:0.5, note:'Very rich & powerful — yet no editor dares let a patrician be slain, so the crowd shuns you. Rise by INTRIGUE instead.'},
+};
+const SOCIAL_ORDER=['gladiator','citizen','upper','elite'];
+
 /* ===== INTRIGUE: Elite Siege targets ===== */
 const ELITE_MEN=['Senator Gaius Metellus','Legate Aulus Varro','Publican Titus Rufus','Magnate Lucius Balbus',
   'Governor Sextus Priscus','Duumvir Marcus Celsus','Eques Decimus Naso','Praetor Quintus Galba'];
@@ -520,21 +557,23 @@ function makeElite(region){
    ===================================================================== */
 const SAVE_KEY='sand_and_steel_save_v1';
 let G = null;  // player career
-function freshCareer(name,origin,arch){
+function freshCareer(name,origin,arch,social){
   const A=ARCHETYPES[arch]||ARCHETYPES.Roman;
+  const S=SOCIAL[social]||SOCIAL.gladiator;
   const cls=A.cls;
   const lo=Object.assign({},A.loadout);
   return {
-    name, origin, cls, arch,
+    name, origin, cls, arch, socialClass:social||'gladiator',
     skin:A.skin, tunic:A.tunic,
-    glory:0, pop:5, coin:60, level:1, xp:0,
-    honor:50,              // public reputation (0-100)
+    glory:0, pop:5, coin:S.coin, level:1, xp:0,
+    honor:S.honor,         // public reputation (0-100)
     food:4,                // travel rations
     mount:0,               // 0 on foot · 1 mule · 2 horse · 3 chariot
     slaves:0, hasVilla:false, boat:false,
     favor:0, soldiers:0, hidden:[], plotTier:0,   // intrigue: favors, private army, hidden elites, overthrow progress
     emperor:false, approval:50, legions:0, rivals:0, retired:false,  // rule of Rome
     detachments:[], day:0,   // marching army detachments (with travel time)
+    titles:{}, clears:{}, army:{}, armyGear:0, armyTrain:0, hasOrganizer:false,   // provincial titles, clear counts, army composition
     wins:0, losses:0,
     hpBonus:0, dmgBonus:0,
     loadout:lo,
@@ -551,7 +590,7 @@ function freshCareer(name,origin,arch){
   };
 }
 // fill in any fields missing from older saves
-function migrate(g){ const d={honor:50,food:4,mount:0,slaves:0,hasVilla:false,boat:false,favor:0,soldiers:0,hidden:[],plotTier:0,emperor:false,approval:50,legions:0,rivals:0,retired:false,detachments:[],day:0}; for(const k in d){ if(g[k]===undefined) g[k]=d[k]; } if(!g.current) g.current='Italia'; return g; }
+function migrate(g){ const d={honor:50,food:4,mount:0,slaves:0,hasVilla:false,boat:false,favor:0,soldiers:0,hidden:[],plotTier:0,emperor:false,approval:50,legions:0,rivals:0,retired:false,detachments:[],day:0,titles:{},clears:{},socialClass:'gladiator',army:{},armyGear:0,armyTrain:0,hasOrganizer:false}; for(const k in d){ if(g[k]===undefined) g[k]=d[k]; } if(!g.current) g.current='Italia'; return g; }
 function saveGame(){ try{ localStorage.setItem(SAVE_KEY, JSON.stringify(G)); toast('Saved.'); }catch(e){} }
 function hasSave(){ try{ return !!localStorage.getItem(SAVE_KEY); }catch(e){ return false; } }
 function loadGame(){ try{ G=migrate(JSON.parse(localStorage.getItem(SAVE_KEY))); return !!G; }catch(e){ return false; } }
@@ -868,7 +907,7 @@ function startFight(region, briefData){
   if(FT.hired){ p.maxHp*=2.2; p.hp=p.maxHp; p.dmgMul=2.4; foe.ai.aggr*=0.7; }                                  // a brawny substitute
   if(FT.siege){ foe.name=(FT.siege.isWife?'Bodyguard of ':'Guard of ')+FT.siege.name.split(' ').slice(-1)[0];
     foe.maxHp*=(1+FT.siege.guardTier*0.15); foe.hp=foe.maxHp; $('hud-e-name')&&0; }
-  if(FT.plot){ const ratio=G.soldiers/Math.max(1,FT.plot.enemyArmy); p.maxHp*=clamp(1+ratio*0.5,1,2.6); p.hp=p.maxHp; p.dmgMul=clamp(1+ratio*0.4,1,2.4);
+  if(FT.plot){ const ratio=armyPower()/Math.max(1,FT.plot.enemyArmy); p.maxHp*=clamp(1+ratio*0.5,1,2.8); p.hp=p.maxHp; p.dmgMul=clamp(1+ratio*0.4,1,2.6);
     foe.maxHp*=FT.plot.buff; foe.hp=foe.maxHp; foe.tunic='#5a2d8a'; foe.name=FT.plot.name; foe.ai.aggr=Math.min(0.95,foe.ai.aggr*1.2); foe.ai.skill+=1; }
   if(FT.rival){ p.maxHp*=1.3; p.hp=p.maxHp; foe.maxHp*=1.8; foe.hp=foe.maxHp; foe.tunic='#5a2d8a'; foe.name='The Usurper'; foe.ai.aggr=0.9; foe.ai.skill+=1; }
   state='fight';
@@ -1150,7 +1189,7 @@ function finishFight(won){
   if(won){
     const mult=(0.6+crowdLove/100*1.4);
     glory=Math.round((12+tier*8)*mult);
-    coin=Math.round((25+tier*22)*mult*provBonus*(FT.rigged||FT.hired?0.4:1));
+    coin=Math.round((25+tier*22)*mult*provBonus*(FT.rigged||FT.hired?0.4:1)*((SOCIAL[G.socialClass]||SOCIAL.gladiator).purse));
     popDelta=Math.round((4+tier*2)*(crowdLove/60))*(FT.rigged?0:1);
     honorDelta = 4;
     if(FT.provisioned) note+='Well-provisioned, you fought fresh — a richer purse. ';
@@ -1160,7 +1199,7 @@ function finishFight(won){
     if(FT.ambush){ honorDelta-=10; note+='You struck from the shadows beforehand — effective, but dishonourable. '; }
     if(FT.emperor){ glory*=2; popDelta+=20; honorDelta+=6; note+='THE EMPEROR IS PLEASED. '; }
     G.wins++; G.coin+=coin; G.glory+=glory; G.pop=clamp(G.pop+popDelta,0,100);
-    G.cleared[reg.id]=true;
+    G.cleared[reg.id]=true; G.clears[reg.id]=(G.clears[reg.id]||0)+1;
     // xp / level
     G.xp+=glory; while(G.xp>=G.level*60){ G.xp-=G.level*60; G.level++; G.hpBonus++; if(G.level%2===0)G.dmgBonus++; note+='LEVEL UP! '; }
     if(FT.emperor){ G.imperialDone=true; }
@@ -1180,6 +1219,9 @@ function finishFight(won){
   let slaveCoin=0, slaveFood=0;
   if(G.hasVilla && G.slaves>0){ const inc=villaIncome(); slaveCoin=inc.coin; slaveFood=inc.food; G.coin+=slaveCoin; G.food+=slaveFood;
     note+='Your estate sends '+slaveCoin+' denarii'+(slaveFood?' and '+slaveFood+' rations':'')+'. '; }
+  // provinces you govern pay tribute
+  const trib=provinceTribute();
+  if(trib>0){ G.coin+=trib; note+='Your provinces render '+fmt(trib)+' denarii in tribute. '; }
   FT.provisioned=false; G.provisioned=false;
   showResult(won,{glory,coin,popDelta,honorDelta,note,crowdLove,slaveCoin});
   saveQuiet();
@@ -1385,7 +1427,7 @@ function loop(now){
   let dt=(now-last)/16.6667; last=now;
   dt=clamp(dt,0,3);
   if(state==='fight' && FT){ updateFight(dt); drawArena(); }
-  else if(state==='map'){ drawMapCanvas(); }
+  else if(state==='map'||state==='travel'){ drawMapCanvas(); }
   requestAnimationFrame(loop);
 }
 requestAnimationFrame(loop);
@@ -1402,7 +1444,7 @@ $('btn-help-back').onclick=()=>show(prevHelp||'scr-title');
 let prevHelp=null;
 
 // ---- create ----
-let sel={origin:'Italia',arch:null};
+let sel={origin:'Italia',arch:null,social:'gladiator'};
 const STAT_COL={STR:'#e0533a',SPD:'#e8c34a',DEF:'#6fa9d8',VIT:'#5b9a4a'};
 // draw a forward-facing bust portrait of an archetype onto a small canvas
 function drawCardPortrait(cnv,A){
@@ -1459,6 +1501,12 @@ function openCreate(){
   const hs=$('sel-home');
   if(!hs.dataset.built){ hs.innerHTML=''; REGIONS.forEach(r=>{ const o=document.createElement('option'); o.value=r.id; o.textContent=r.id; hs.appendChild(o); }); hs.dataset.built='1';
     hs.value=sel.origin; hs.onchange=()=>{ sel.origin=hs.value; }; }
+  // social class row
+  const cr=$('class-row'); cr.innerHTML='';
+  SOCIAL_ORDER.forEach(k=>{ const S=SOCIAL[k]; const bt=document.createElement('button');
+    bt.className='btn sm'+(sel.social===k?' gold':''); bt.textContent=S.name+' · '+S.coin+'d';
+    bt.onclick=()=>{ sel.social=k; openCreate(); }; cr.appendChild(bt); });
+  $('class-note').textContent=SOCIAL[sel.social].note;
   // cards
   const cl=$('card-list'); cl.innerHTML='';
   ARCH_ORDER.forEach(key=>{
@@ -1497,7 +1545,7 @@ $('btn-create-go').onclick=()=>{
   if(!sel.arch){ toast('Choose a champion card first.'); return; }
   const nm=($('inp-name').value||'Tiro').slice(0,14);
   const origin=$('sel-home').value||sel.origin;
-  G=freshCareer(nm, origin, sel.arch);
+  G=freshCareer(nm, origin, sel.arch, sel.social);
   G.current = REGION_BY_ID[origin] && REGION_BY_ID[origin].tier===1 ? origin : 'Italia';
   enterMap();
   toast('Swear by the sand — fight well, '+nm+'!',1800);
@@ -1522,7 +1570,8 @@ function travelCost(fromId,toId){
   const dist=Math.hypot((a.x-b.x)*0.9,(a.y-b.y)*0.55);
   const rations=Math.max(1,Math.round(dist/8));
   const needRange = dist>42?4 : dist>26?3 : dist>12?2 : 1;
-  return {rations, needRange, dist:Math.round(dist)};
+  const days = Math.max(1, Math.round(dist/6) - (G?G.mount:0));   // faster mounts shorten the road
+  return {rations, needRange, dist:Math.round(dist), days};
 }
 function travelTo(r){
   if(r.id===G.current) return true;
@@ -1547,19 +1596,51 @@ function buildRegions(){
     const d=document.createElement('div');
     const unlocked=regionUnlocked(r);
     const imperial = r.id==='Italia' && imperialAvailable() && !G.imperialDone;
-    d.className='region'+(unlocked?'':' locked')+(G.cleared[r.id]?' done':'')+(G.current===r.id?' cur':'')+(imperial?' imperial':'');
+    const owned=G.titles&&G.titles[r.id];
+    d.className='region'+(unlocked?'':' locked')+(owned?' owned':(G.cleared[r.id]?' done':''))+(G.current===r.id?' cur':'')+(imperial?' imperial':'');
     d.style.left=r.x+'%'; d.style.top=r.y+'%';
-    d.textContent=(G.cleared[r.id]?'✓ ':'')+(imperial?'✦ ':'')+r.id;
+    d.textContent=(owned?'♦ ':(G.cleared[r.id]?'✓ ':''))+(imperial?'✦ ':'')+r.id;
     const tc=travelCost(G.current,r.id);
-    d.title=r.city+(r.id===G.current?' (you are here)':' — travel: '+tc.rations+' rations, '+MOUNTS[tc.needRange-1].name.toLowerCase()+'+');
-    d.onclick=()=>{
+    d.title=r.city+(owned?' — '+G.titles[r.id]:'')+(r.id===G.current?' (you are here)':' — travel: '+tc.days+'d, '+tc.rations+' rations');
+    d.onclick=(ev)=>{
+      ev.preventDefault(); ev.stopPropagation();
       if(!unlocked){ toast('Locked — reach '+([0,0,20,45,70][r.tier])+' Popularity.'); return; }
-      if(!travelTo(r)){ return; }
-      buildRegions(); openBrief(r,imperial);
+      if(r.id===G.current){ openBrief(r,imperial); return; }   // already here → straight to the bout
+      openTravel(r,imperial);                                    // elsewhere → confirm the journey
     };
     layer.appendChild(d);
   });
 }
+// travel confirmation with route + ETA + yes/no
+let travelCtx=null;
+function openTravel(r,imperial){
+  const cur=REGION_BY_ID[G.current], t=travelCost(G.current,r.id);
+  const seaCross=(r.sea||cur.sea);
+  const needMount=!seaCross && MOUNTS[G.mount].range<t.needRange;
+  const noBoat=seaCross && !G.boat;
+  const noFood=G.food<t.rations;
+  travelCtx={r,imperial,t};
+  G.pendingDest=r.id;                                            // map draws a preview route
+  state='travel'; show('scr-travel'); $('statbar').classList.remove('hide');
+  $('travel-body').innerHTML=
+    `<div>From <b style="color:var(--gold)">${G.current}</b> to <b style="color:var(--gold)">${r.id}</b> — ${r.city}.</div>
+     <div class="row center gap6" style="flex-wrap:wrap;margin-top:4px">
+       <span class="pill">🗓 ${t.days} days${seaCross?' by sea':''}</span>
+       <span class="pill">🍖 ${t.rations} rations</span>
+       <span class="pill">🐎 ${MOUNTS[G.mount].name}${seaCross?' + ship':''}</span>
+     </div>
+     <div class="small muted">Bigger journeys cost more time &amp; rations. A dashed line on the map traces your road.</div>`+
+    (noBoat?`<div class="small" style="color:var(--blood)">✕ Open-sea crossing — you need a ship (buy one at the Stable).</div>`:'')+
+    (needMount?`<div class="small" style="color:var(--blood)">✕ Too far on ${MOUNTS[G.mount].short.toLowerCase()} — a stronger mount is needed.</div>`:'')+
+    (noFood?`<div class="small" style="color:var(--blood)">✕ Not enough rations (need ${t.rations}, have ${G.food}).</div>`:'');
+  $('btn-travel-go').disabled = noBoat||needMount||noFood;
+}
+$('btn-travel-no').onclick=()=>{ G.pendingDest=null; travelCtx=null; enterMap(); };
+$('btn-travel-go').onclick=()=>{
+  const c=travelCtx; if(!c) return; G.pendingDest=null;
+  if(!travelTo(c.r)){ enterMap(); return; }
+  buildRegions(); openBrief(c.r, c.imperial);
+};
 $('btn-fightcur').onclick=()=>{ const r=REGION_BY_ID[G.current]; if(!regionUnlocked(r)){toast('Locked.');return;}
   openBrief(r, r.id==='Italia'&&imperialAvailable()&&!G.imperialDone); };
 $('btn-shop').onclick=()=>openShop();
@@ -1609,6 +1690,29 @@ $('btn-stable-back').onclick=()=>enterMap();
 // ---- VILLA & FARM (passive income) ----
 function slaveCost(){ return 80 + G.slaves*45; }
 function villaIncome(){ return {coin:G.slaves*12, food:Math.floor(G.slaves/2)}; }
+function provinceTribute(){ let s=0; for(const id in (G.titles||{})){ const r=REGION_BY_ID[id]; if(r) s+=40+r.tier*45; } return s; }
+function claimReq(reg){ return 3+reg.tier; }   // wins needed to claim governance
+function canClaim(reg){ return !(G.titles&&G.titles[reg.id]) && (G.clears[reg.id]||0)>=claimReq(reg); }
+function claimProvince(reg){
+  if(!canClaim(reg)) return;
+  G.titles[reg.id]=REGION_TITLES[reg.id]||('Dominus '+reg.id);
+  G.pop=clamp(G.pop+6,0,100); G.honor=clamp(G.honor+3,0,100);
+  toast('You are proclaimed '+G.titles[reg.id]+' — '+reg.id+' now flies your colours!',2600);
+  saveQuiet();
+}
+function govBlock(reg){
+  if(G.titles&&G.titles[reg.id]){
+    return `<div class="panel" style="padding:6px;margin-top:4px;border-color:var(--gold)">
+      <b style="color:var(--gold)">♦ ${G.titles[reg.id]}</b> — you govern ${reg.id}; it flies your colours and pays tribute.</div>`;
+  }
+  const need=claimReq(reg), got=G.clears[reg.id]||0;
+  if(got>=need){
+    return `<div class="panel" style="padding:6px;margin-top:4px;border-color:var(--gold)">
+      <div class="small">You have dominated ${reg.id} (${got}/${need} wins). Claim it as your own province:</div>
+      <button class="btn sm gold" id="brief-claim" style="margin-top:4px">♦ CLAIM GOVERNANCE — become ${REGION_TITLES[reg.id]||('Dominus '+reg.id)}</button></div>`;
+  }
+  return `<div class="small muted" style="margin-top:2px">Dominate this province — win here ${need} times (${got}/${need}) to claim a grand title and govern it.</div>`;
+}
 function openVilla(){
   state='villa'; show('scr-villa'); $('statbar').classList.remove('hide'); refreshStatbar();
   const b=$('villa-body'); b.innerHTML='';
@@ -1668,7 +1772,7 @@ function openIntrigue(){
       bg.onclick=()=>{ G.coin+=gu.gift; if(Math.random()<0.25){ toast(gu.name+' slips away in the night!'); G.hidden.splice(i,1);} else toast(gu.name+' pays you '+gu.gift+' denarii.'); refreshStatbar(); openIntrigue(); };
       const leg=gu.legion||1500;
       const bf=document.createElement('button'); bf.className='btn sm gold'; bf.textContent='Call in the favor (+'+fmt(leg)+' troops, +2 favor)';
-      bf.onclick=()=>{ G.soldiers+=leg; G.favor+=2; G.hidden.splice(i,1); toast(gu.name+' raises '+fmt(leg)+' men for your cause and departs.'); refreshStatbar(); openIntrigue(); };
+      bf.onclick=()=>{ addTroops('levy',leg); G.favor+=2; G.hidden.splice(i,1); toast(gu.name+' raises '+fmt(leg)+' men for your cause and departs.'); refreshStatbar(); openIntrigue(); };
       row.appendChild(bg); row.appendChild(bf); card.appendChild(row); b.appendChild(card);
     });
   }
@@ -1680,10 +1784,12 @@ function openIntrigue(){
   const mrow=document.createElement('div'); mrow.className='row gap6';
   [['+500 troops',180,2,500],['+2,000 troops',640,6,2000]].forEach(([lbl,c,f,n])=>{
     const bt=document.createElement('button'); bt.className='btn sm'; bt.textContent=lbl+' ('+c+'d, '+f+' favor)';
-    bt.disabled=G.coin<c||G.favor<f; bt.onclick=()=>{ if(G.coin<c||G.favor<f)return; G.coin-=c; G.favor-=f; G.soldiers+=n; refreshStatbar(); openIntrigue(); };
+    bt.disabled=G.coin<c||G.favor<f; bt.onclick=()=>{ if(G.coin<c||G.favor<f)return; G.coin-=c; G.favor-=f; addTroops('roman',n); refreshStatbar(); openIntrigue(); };
     mrow.appendChild(bt);
   });
   mcard.appendChild(mrow); b.appendChild(mcard);
+  // ---- ARMY ORGANIZER ----
+  buildOrganizer(b);
   // ---- CAMPAIGN: send army detachments (they march the map over days) ----
   buildCampaign(b);
   // ---- imperial rule (after seizing the purple) ----
@@ -1702,6 +1808,16 @@ function openIntrigue(){
   pcard.appendChild(bt); b.appendChild(pcard);
 }
 function fmt(n){ return (n||0).toLocaleString('en-US'); }
+/* ---- army composition (organizer) ---- */
+const TROOP={roman:{name:'Romans',str:1.2},celt:{name:'Celts',str:1.05},germanic:{name:'Germanics',str:1.15},
+  persian:{name:'Persians',str:1.0},bosporan:{name:'Bosporans',str:0.95},slave:{name:'Slave levies',str:0.6},levy:{name:'Provincial levies',str:0.8}};
+function regionEthnicity(reg){ const id=reg?reg.id:''; if(id==='Britannia'||id==='Gallia')return'celt';
+  if(id==='Germania Magna')return'germanic'; if(['Ērānshahr','Asōristān','Mesopotamia','Sogdiana'].includes(id))return'persian';
+  if(id==='Bosporan Kingdom')return'bosporan'; if(['Italia','Africa Proconsularis','Hispania Baetica'].includes(id))return'roman'; return'levy'; }
+function addTroops(type,n){ n=Math.round(n); if(n<=0)return; if(!G.army)G.army={}; G.army[type]=(G.army[type]||0)+n; G.soldiers+=n; }
+function armyTotal(){ let s=0; for(const k in (G.army||{})) s+=G.army[k]; return s; }
+function syncArmy(){ if(!G.army)G.army={}; const tot=armyTotal(); if(G.soldiers<=0){ G.army={}; return; } if(tot<=0){ G.army={levy:G.soldiers}; return; } if(tot!==G.soldiers){ const f=G.soldiers/tot; let acc=0,keys=Object.keys(G.army); keys.forEach((k,i)=>{ if(i<keys.length-1){ G.army[k]=Math.round(G.army[k]*f); acc+=G.army[k]; } else G.army[k]=G.soldiers-acc; }); } }
+function armyPower(){ syncArmy(); let s=0; for(const k in G.army) s+=G.army[k]*(TROOP[k]?TROOP[k].str:0.8); return Math.round(s*(1+(G.armyGear||0)*0.15)*(1+(G.armyTrain||0)*0.12)); }
 // ---- army detachments: cost/time scale with distance AND army size ----
 let detTargetId=null, detSize=2000;
 function detCost(fromId,toId,size){
@@ -1732,11 +1848,38 @@ function advanceDay(n){
       else if(d.day>=d.eta && d.phase==='back'){ d.phase='done'; }
     }
     const done=G.detachments.filter(d=>d.phase==='done');
-    for(const d of done){ G.soldiers+=d.size+d.reward.troops; G.coin+=d.reward.coin; G.slaves+=d.reward.slaves;
+    for(const d of done){ addTroops('levy',d.size+d.reward.troops); G.coin+=d.reward.coin; G.slaves+=d.reward.slaves;
       G.lastRaid='Your detachment returns from '+d.toId+': +'+fmt(d.reward.coin)+'d, +'+fmt(d.reward.troops)+' recruits, +'+d.reward.slaves+' slaves.'; }
     G.detachments=G.detachments.filter(d=>d.phase!=='done');
   }
   refreshStatbar();
+}
+function buildOrganizer(b){
+  const oh=document.createElement('div'); oh.className='small'; oh.style.color='var(--gold)'; oh.style.marginTop='6px';
+  oh.textContent='ARMY ORGANIZER — muster rolls, gear & training:'; b.appendChild(oh);
+  const card=document.createElement('div'); card.className='shopcard';
+  if(!G.hasOrganizer){
+    card.innerHTML=`<div><b style="color:var(--gold)">Hire a camp prefect</b> to organise your rabble into ordered units.</div>
+      <div class="small muted">Unlocks the muster roll (who fights for you) plus gear &amp; training upgrades that make each man deadlier.</div>`;
+    const bt=document.createElement('button'); bt.className='btn sm gold'; bt.textContent='BUY ARMY ORGANIZER (300d)';
+    bt.disabled=G.coin<300; bt.onclick=()=>{ if(G.coin<300)return; G.coin-=300; G.hasOrganizer=true; refreshStatbar(); openIntrigue(); };
+    card.appendChild(bt); b.appendChild(card); return;
+  }
+  syncArmy();
+  let rows='';
+  for(const k of ['roman','germanic','celt','persian','bosporan','levy','slave']){ const n=G.army[k]||0; if(n<=0) continue;
+    rows+=`<div style="display:flex;justify-content:space-between;font-size:11px"><span>${TROOP[k].name}</span><span>${fmt(n)} <span class="muted">×${TROOP[k].str}</span></span></div>`; }
+  if(!rows) rows='<div class="small muted">No troops yet — muster men, or spare/plunder elites.</div>';
+  card.innerHTML=`<div><b style="color:var(--gold)">Muster roll</b> — total <b>${fmt(G.soldiers)}</b> · effective power <b style="color:var(--gold)">${fmt(armyPower())}</b></div>
+    ${rows}
+    <div class="small muted" style="margin-top:3px">Gear Lv ${G.armyGear} (+${G.armyGear*15}%) · Training Lv ${G.armyTrain} (+${G.armyTrain*12}%)</div>`;
+  const row=document.createElement('div'); row.className='row gap6'; row.style.marginTop='4px';
+  const gc=Math.round(500*(G.armyGear+1)), tc=Math.round(250*(G.armyTrain+1));
+  const gb=document.createElement('button'); gb.className='btn sm'; gb.textContent='⚒ Better Gear ('+gc+'d)';
+  gb.disabled=G.coin<gc||G.armyGear>=6; gb.onclick=()=>{ if(G.coin<gc)return; G.coin-=gc; G.armyGear++; refreshStatbar(); openIntrigue(); };
+  const tb=document.createElement('button'); tb.className='btn sm'; tb.textContent='🏋 Drill & Train ('+tc+'d)';
+  tb.disabled=G.coin<tc||G.armyTrain>=6; tb.onclick=()=>{ if(G.coin<tc)return; G.coin-=tc; G.armyTrain++; refreshStatbar(); openIntrigue(); };
+  row.appendChild(gb); row.appendChild(tb); card.appendChild(row); b.appendChild(card);
 }
 function buildCampaign(b){
   const ch=document.createElement('div'); ch.className='small'; ch.style.color='var(--gold)'; ch.style.marginTop='6px';
@@ -1847,8 +1990,9 @@ function showElite(el){
     or hide ${el.isWife?'her':'him'} away in your villa to bleed for years.</div>`;
   const c=$('elite-choices'); c.innerHTML='';
   const mk=(cls,txt,fn)=>{ const b=document.createElement('button'); b.className='btn '+cls; b.textContent=txt; b.onclick=fn; c.appendChild(b); };
-  mk('gold','🕊 SPARE (+1 favor · +'+fmt(el.troops)+' troops pledged)',()=>{ G.favor+=1; G.soldiers+=el.troops; G.honor=clamp(G.honor+4,0,100); afterElite(el,'Spared, '+el.name+' swears you a favor and sends '+fmt(el.troops)+' household men to your banner.'); });
-  mk('blood','💰 PLUNDER (+'+fmt(el.loot)+'d · +'+el.slaves+' slaves · +'+fmt(Math.round(el.troops*0.5))+' troops)',()=>{ G.coin+=el.loot; G.slaves+=el.slaves; G.soldiers+=Math.round(el.troops*0.5); G.favor+=1; G.honor=clamp(G.honor-9,0,100); afterElite(el,'You strip the estate bare — '+fmt(el.loot)+' denarii, '+el.slaves+' slaves, and the guards defect to you.'); });
+  const eth=regionEthnicity(REGION_BY_ID[G.current]);
+  mk('gold','🕊 SPARE (+1 favor · +'+fmt(el.troops)+' troops pledged)',()=>{ G.favor+=1; addTroops(eth,el.troops); G.honor=clamp(G.honor+4,0,100); afterElite(el,'Spared, '+el.name+' swears you a favor and sends '+fmt(el.troops)+' household men to your banner.'); });
+  mk('blood','💰 PLUNDER (+'+fmt(el.loot)+'d · +'+el.slaves+' slaves · +'+fmt(Math.round(el.troops*0.5))+' troops)',()=>{ G.coin+=el.loot; G.slaves+=el.slaves; addTroops('slave',Math.round(el.troops*0.5)); G.favor+=1; G.honor=clamp(G.honor-9,0,100); afterElite(el,'You strip the estate bare — '+fmt(el.loot)+' denarii, '+el.slaves+' slaves, and captives pressed into service.'); });
   const hideBtn=()=>{ if(!G.hasVilla){ toast('Buy a villa first to hide a guest.'); return; } G.hidden.push({name:el.name,gift:el.gift,legion:el.legion}); G.favor+=2; G.honor=clamp(G.honor-3,0,100); afterElite(el,'You spirit '+el.name+' away to your villa — a secret asset worth a legion.'); };
   mk('', (G.hasVilla?'🏡 HIDE IN VILLA (+2 favor · a legion later)':'🏡 HIDE (needs villa)'), hideBtn);
 }
@@ -1927,9 +2071,21 @@ function drawMapCanvas(){
   mctx.fillText('OCEANVS',28,110);
   mctx.fillText('MARE  RVBRVM',374,188);
   mctx.textAlign='left';
+  // ===== travel/army dashed routes =====
+  const px=r=>[r.x/100*w, r.y/100*h];
+  // provinces you govern fly your colours (gold diamond + ring)
+  if(G&&G.titles){ for(const id in G.titles){ const r=REGION_BY_ID[id]; if(!r) continue; const p=px(r);
+    mctx.fillStyle='#e8c34a'; mctx.beginPath(); mctx.moveTo(p[0],p[1]-6); mctx.lineTo(p[0]+5,p[1]); mctx.lineTo(p[0],p[1]+6); mctx.lineTo(p[0]-5,p[1]); mctx.closePath(); mctx.fill();
+    mctx.strokeStyle='#fff'; mctx.lineWidth=1; mctx.stroke(); mctx.fillStyle='#8a1d1d'; mctx.fillRect(p[0]-1,p[1]-1,2,2); } }
+  // preview route while planning a journey
+  if(G&&G.pendingDest&&REGION_BY_ID[G.pendingDest]&&REGION_BY_ID[G.current]){
+    const a=px(REGION_BY_ID[G.current]), b=px(REGION_BY_ID[G.pendingDest]);
+    mctx.strokeStyle='rgba(232,195,74,.95)'; mctx.lineWidth=2; mctx.setLineDash([5,4]);
+    mctx.beginPath(); mctx.moveTo(a[0],a[1]); mctx.lineTo(b[0],b[1]); mctx.stroke(); mctx.setLineDash([]);
+    mctx.fillStyle='#e8c34a'; mctx.beginPath(); mctx.ellipse(b[0],b[1],3.5,3,0,0,7); mctx.fill();
+  }
   // ===== marching army detachments: dotted routes + moving markers =====
   if(G&&G.detachments&&G.detachments.length){
-    const px=r=>[r.x/100*w, r.y/100*h];
     for(const d of G.detachments){
       const A=REGION_BY_ID[d.fromId], B=REGION_BY_ID[d.toId]; if(!A||!B) continue;
       const a=px(A), b=px(B), prog=Math.min(1,d.day/d.eta);
@@ -1966,7 +2122,9 @@ function openBrief(reg,imperial){
      <div class="row gap6"><span class="pill">Region tier ${tier}</span>
        <span class="pill">Crowd: ${escDesc}</span>
        <span class="pill">Purse ≈ ${purse} denarii</span></div>
-     <div class="small muted">Battle escalation: foes scale with your Popularity (${G.pop}/100).</div>`;
+     <div class="small muted">Battle escalation: foes scale with your Popularity (${G.pop}/100).</div>
+     ${govBlock(reg)}`;
+  const gb=$('brief-claim'); if(gb) gb.onclick=()=>{ claimProvince(reg); openBrief(reg,imperial); refreshStatbar(); };
   // forbidden gear notice
   const eqForbidden = (gearOf('weapon',G.loadout.weapon).forbidden) || (gearOf('armor',G.loadout.armor).forbidden) || (G.loadout.weapon===forbid);
   $('brief-forbidden').innerHTML =
