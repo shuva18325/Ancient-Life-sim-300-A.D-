@@ -321,8 +321,8 @@
         <div class="small" id="hud-e-stance">&nbsp;</div>
       </div>
     </div>
-    <div style="position:absolute;top:52px;left:50%;transform:translateX(-50%);text-align:center;width:60%">
-      <div class="small" style="color:var(--gold)">CROWD</div>
+    <div id="hud-crowd-box" style="position:absolute;top:52px;left:50%;transform:translateX(-50%);text-align:center;width:60%">
+      <div class="small" id="hud-crowd-label" style="color:var(--gold)">CROWD</div>
       <div class="bar" style="height:9px;"><i id="hud-crowd" style="width:50%;background:linear-gradient(90deg,#8a1d1d,#e8c34a,#5b7a32)"></i></div>
     </div>
     <div id="hud-toast" class="toast"></div>
@@ -540,22 +540,26 @@ const PLOT_TARGETS=[
   {name:'the Praetorian Prefect',    needSold:7000,  needFav:14, buff:2.0, reward:3000, glory:220, enemyArmy:6000},
   {name:'EMPEROR SEPTIMIUS SEVERUS', needSold:15000, needFav:24, buff:2.4, reward:8000, glory:600, enemyArmy:14000},
 ];
-/* ===== GENERALS: appointed to lead army conquests, with hidden traits ===== */
+/* ===== GENERALS: appointed to lead armies. Rolled STRENGTH & SMARTS ===== */
 const GEN_NAMES=['Crixus','Gannicus','Oenomaus','Castus','Brennus','Vercingetorix','Arash','Bato','Ardashir',
   'Tarbus','Dacius','Memnon','Rufus','Vala','Zenobius','Odaenathus','Palfurius','Scaeva'];
-// each trait: label, secret hint, and a power multiplier for army battles
-const GEN_TRAITS=[
-  {t:'Slave-Born',   look:'a scarred slave — looks half-broken',        power:1.6, casualty:0.9, note:'Underestimated by all — a secret genius of the field.'},
-  {t:'Frail Scholar',look:'thin and sickly, no muscle at all',          power:1.5, casualty:0.8, note:'Weak of arm, but the sharpest strategist alive.'},
-  {t:'Veteran',      look:'grey and steady, a lifetime under arms',      power:1.35,casualty:0.85,note:'Dependable and hard to rattle.'},
-  {t:'Brutal',       look:'a giant who reeks of blood',                  power:1.4, casualty:1.3, note:'Wins fast and bloody — his men die in heaps.'},
-  {t:'Cautious',     look:'quiet, watchful, slow to commit',            power:1.1, casualty:0.6, note:'Loses few men, seldom routs.'},
-  {t:'Lucky',        look:'a grinning chancer',                          power:1.25,casualty:1.0, note:'Fortune favours him — usually.'},
-  {t:'Green',        look:'young and eager, unproven',                   power:0.95,casualty:1.1, note:'Untested — a gamble.'},
-];
+// roll a general — slaves tend brawny (rare genius), free-born tend cunning (rare bruiser)
 function makeGeneral(fromSlave){
-  const tr=pick(GEN_TRAITS);
-  return { name:pick(GEN_NAMES), trait:tr.t, look:tr.look, note:tr.note, power:tr.power, casualty:tr.casualty, fromSlave:!!fromSlave };
+  let str, smart;
+  if(fromSlave){ str=ri(6,10); smart=(Math.random()<0.25)? ri(8,10) : ri(2,6); }   // strong; usually not clever, sometimes a secret genius
+  else { smart=ri(6,10); str=(Math.random()<0.3)? ri(7,10) : ri(2,6); }             // clever; usually frail, sometimes also strong
+  // battle multiplier — tactics matter more than muscle; casualties fall with smarts
+  const power = 0.8 + (str*0.35 + smart*0.85)/10;
+  const casualty = clamp(1.15 - smart*0.06, 0.55, 1.2);
+  let label, note;
+  if(smart>=8 && str<=5) { label='Frail Genius'; note='No muscle at all — but a peerless mind. Loses few men.'; }
+  else if(str>=8 && smart<=4){ label='Brute'; note='A mountain of muscle, short on cunning — victories are bloody.'; }
+  else if(str>=7 && smart>=7){ label='Great Captain'; note='Strong AND shrewd — a rare, priceless find.'; }
+  else if(fromSlave && smart>=8){ label='Slave Genius'; note='Looks a broken slave; secretly the sharpest mind in Rome.'; }
+  else if(smart>=6){ label='Tactician'; note='Thinks before he strikes.'; }
+  else { label='Soldier'; note='Solid and unremarkable.'; }
+  const look = str>=8? 'a hulking brute' : str<=3? 'thin and unassuming' : 'a steady soldier';
+  return { name:pick(GEN_NAMES), fromSlave:!!fromSlave, str, smart, power, casualty, label, note, look, trait:label };
 }
 function makeElite(region){
   const isWife=Math.random()<0.42;
@@ -1145,6 +1149,7 @@ function updateFight(dt){
   $('hud-p-st').style.width=clamp(p.stamina/p.maxStamina*100,0,100)+'%';
   $('hud-e-st').style.width=clamp(foe.stamina/foe.maxStamina*100,0,100)+'%';
   $('hud-p-stance').textContent='STANCE: '+p.stance.toUpperCase()+(FT.forbiddenEquipped?'  ⚠FORBIDDEN':'');
+  const cb=$('hud-crowd-box'); if(cb) cb.style.display = FT.siege? 'none':'block';
   $('hud-crowd').style.width=FT.crowd+'%';
   if(performance.now()>toastT) $('hud-toast').style.display='none';
 }
@@ -1287,6 +1292,41 @@ function showResult(won,r){
 /* =====================================================================
    ARENA DRAW
    ===================================================================== */
+// Night-villa interior backdrop for an Elite Siege (columns, atrium, torches).
+function drawVillaBg(){
+  // night sky through the open roof (compluvium)
+  px(-4,-4,W+8,20,'#181528');
+  for(let i=0;i<40;i++){ px((i*53)%W,((i*29)%16),1,1, i%5?'#4a4468':'#c9c0e0'); } // faint stars
+  // back wall of the villa hall (warm plaster, dark at night)
+  const wallTop=16, wallC='#6a4a3a', wallSh='#4a3226', wallHi='#7f5c46';
+  px(0,wallTop,W,GROUND-wallTop,wallC);
+  px(0,wallTop,W,3,wallHi);
+  // fresco band (Pompeian red panels with black dividers)
+  const fy=wallTop+8;
+  px(0,fy,W,20,'#7a2a24');
+  for(let x=0;x<W;x+=40){ px(x,fy,3,20,'#2a1414'); px(x+18,fy+4,8,12,'#9a3a30'); }
+  px(0,fy+20,W,2,'#2a1414');
+  // colonnade of the peristyle: tall columns with capitals
+  for(let x=8;x<W;x+=54){
+    const cx=x, colTop=wallTop+2, colH=GROUND-colTop-6;
+    px(cx,colTop,10,colH,'#d8c8a8');            // shaft
+    px(cx+1,colTop,2,colH,'#efe4cc');           // highlight
+    px(cx+7,colTop,3,colH,'#b8a684');           // shadow
+    for(let f=cx+2;f<cx+8;f+=2) px(f,colTop,1,colH,'#c4b494'); // fluting
+    px(cx-2,colTop-3,14,4,'#e8dcbf');           // capital
+    px(cx-2,GROUND-6,14,6,'#c8b890');           // base
+  }
+  // hanging oil lamps / torches casting warm pools
+  for(let x=30;x<W;x+=80){
+    px(x,wallTop+4,2,6,'#3a2a1a');              // bracket
+    px(x-2,wallTop+9,6,5,'#ffcf5a');            // flame glow
+    px(x-1,wallTop+8,4,3,'#ff9a2a');
+    ctx.globalAlpha=.10; px(x-14,wallTop+6,30,GROUND-wallTop,'#ffcf7a'); ctx.globalAlpha=1;
+  }
+  // impluvium pool lip along the front of the hall
+  px(0,GROUND-10,W,10,'#5a4636');
+  px(0,GROUND-10,W,2,'#7a624a');
+}
 function drawArena(){
   const t=FT;
   let sx=(Math.random()-0.5)*t.shake, sy=(Math.random()-0.5)*t.shake;
@@ -1294,34 +1334,36 @@ function drawArena(){
   // sky / awning by region flavour
   const reg=t.region;
   const imperial=t.emperor;
-  // upper sky band above the seating
-  px(-4,-4,W+8,12,imperial?'#2a1d40':'#b88a4a');
-  // crowd tiers (seating)
-  drawCrowd();
-  const seatBottom=10+4*14+3; // ~69
-  // arena facade wall (fills the middle): pilasters + arched openings
-  const wallTop=seatBottom, wallH=GROUND-wallTop;
-  const wallC=imperial?'#4a3a2e':'#8a6a46', wallSh=imperial?'#352a22':'#6b5236', wallHi=imperial?'#5a4636':'#a07a52';
-  px(0,wallTop,W,wallH,wallC);
-  px(0,wallTop,W,3,wallHi);                      // cornice under seats
-  px(0,wallTop+3,W,2,wallSh);
-  // pilasters + arches every 48px
-  for(let x=6;x<W;x+=48){
-    px(x,wallTop+6,6,wallH-6,wallHi);            // column
-    px(x+1,wallTop+6,1,wallH-6,'#d8c089');       // column highlight
-    px(x+4,wallTop+6,2,wallH-6,wallSh);          // column shadow
-    // arched dark opening
-    const ax=x+12, ay=wallTop+14, aw=30, ah=wallH-24;
-    if(aw>0&&ah>0){ px(ax,ay,aw,ah,wallSh); px(ax,ay,aw,2,'#000'); px(ax+2,ay+3,aw-4,3,wallC); }
+  if(t.siege){ drawVillaBg(); }
+  else {
+    // upper sky band above the seating
+    px(-4,-4,W+8,12,imperial?'#2a1d40':'#b88a4a');
+    // crowd tiers (seating)
+    drawCrowd();
+    const seatBottom=10+4*14+3; // ~69
+    // arena facade wall (fills the middle): pilasters + arched openings
+    const wallTop=seatBottom, wallH=GROUND-wallTop;
+    const wallC=imperial?'#4a3a2e':'#8a6a46', wallSh=imperial?'#352a22':'#6b5236', wallHi=imperial?'#5a4636':'#a07a52';
+    px(0,wallTop,W,wallH,wallC);
+    px(0,wallTop,W,3,wallHi);                      // cornice under seats
+    px(0,wallTop+3,W,2,wallSh);
+    for(let x=6;x<W;x+=48){
+      px(x,wallTop+6,6,wallH-6,wallHi);            // column
+      px(x+1,wallTop+6,1,wallH-6,'#d8c089');       // column highlight
+      px(x+4,wallTop+6,2,wallH-6,wallSh);          // column shadow
+      const ax=x+12, ay=wallTop+14, aw=30, ah=wallH-24;
+      if(aw>0&&ah>0){ px(ax,ay,aw,ah,wallSh); px(ax,ay,aw,2,'#000'); px(ax+2,ay+3,aw-4,3,wallC); }
+    }
+    // low podium barrier just above the sand (fighters stand in front of it)
+    px(0,GROUND-14,W,14,'#7a5a3a');
+    px(0,GROUND-14,W,3,'#9a7a52');
+    for(let x=0;x<W;x+=20){ px(x,GROUND-14,2,14,'#5a3f28'); }
   }
-  // low podium barrier just above the sand (fighters stand in front of it)
-  px(0,GROUND-14,W,14,'#7a5a3a');
-  px(0,GROUND-14,W,3,'#9a7a52');
-  for(let x=0;x<W;x+=20){ px(x,GROUND-14,2,14,'#5a3f28'); }
-  // sand floor
-  px(0,GROUND,W,H-GROUND,'#d8b271');
-  px(0,GROUND,W,3,'#c79a55');
-  for(let i=0;i<70;i++){ px((i*97)%W,GROUND+4+((i*53)%(H-GROUND-6)),1,1,'#c79a55'); }
+  // floor (villa atrium tiles for a siege, sand for the arena)
+  if(t.siege){ px(0,GROUND,W,H-GROUND,'#3a4a3a'); px(0,GROUND,W,3,'#4a5a48');
+    for(let x=0;x<W;x+=16) for(let y=GROUND+4;y<H;y+=12){ px(x,y,14,1,'#2c382c'); px(x,y,1,10,'#2c382c'); } }
+  else { px(0,GROUND,W,H-GROUND,'#d8b271'); px(0,GROUND,W,3,'#c79a55');
+    for(let i=0;i<70;i++){ px((i*97)%W,GROUND+4+((i*53)%(H-GROUND-6)),1,1,'#c79a55'); } }
   // blood decals soaked into the sand
   for(const d of t.decals){ ctx.globalAlpha=d.a; px(d.x,d.y,d.w,d.h,d.c); }
   ctx.globalAlpha=1;
@@ -1455,10 +1497,85 @@ function loop(now){
   let dt=(now-last)/16.6667; last=now;
   dt=clamp(dt,0,3);
   if(state==='fight' && FT){ updateFight(dt); drawArena(); }
+  else if(state==='battle' && BT){ updateBattle(dt); drawBattle(); }
   else if(state==='map'||state==='travel'){ drawMapCanvas(); }
   requestAnimationFrame(loop);
 }
 requestAnimationFrame(loop);
+
+/* =====================================================================
+   ARMY BATTLE — army-vs-army (a different battle type, no 1v1)
+   ===================================================================== */
+let BT=null;
+function armyBattle(cfg){
+  // cfg: {title, sub, yourMen, enemyMen, general, night, onWin, onLose}
+  const gearMult=(1+G.armyGear*0.15)*(1+G.armyTrain*0.12);
+  const gp = cfg.general? cfg.general.power : 1;
+  const yourPower=Math.round(cfg.yourMen*gearMult*gp);
+  const enemyPower=Math.round(cfg.enemyMen*rnd(0.85,1.15));
+  const win = yourPower>=enemyPower;
+  const r = yourPower/(yourPower+enemyPower);
+  const yourLoss=Math.min(cfg.yourMen, Math.round(cfg.yourMen*(win?(0.10+(1-r)*0.5):(0.40+(1-r)*0.4))*(cfg.general?cfg.general.casualty:1)));
+  const enemyLoss=win? cfg.enemyMen : Math.round(cfg.enemyMen*r*0.8);
+  BT={cfg,win,yourPower,enemyPower,yourLoss,enemyLoss,yourMen:cfg.yourMen,enemyMen:cfg.enemyMen,
+      t:0,dur:170,parts:[],shake:0,ended:false};
+  state='battle';
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('on'));
+}
+function updateBattle(dt){
+  const t=BT; t.t+=dt;
+  const p=Math.min(1,t.t/t.dur), clash=clamp((p-0.28)/0.5,0,1);
+  t.yourNow=Math.round(t.cfg.yourMen - t.yourLoss*clash);
+  t.enemyNow=Math.round(t.cfg.enemyMen - t.enemyLoss*clash);
+  if(clash>0&&clash<1){ t.shake=Math.min(5,t.shake+2*dt);
+    if(Math.random()<0.6*dt) for(let i=0;i<3;i++) t.parts.push({x:W/2+rnd(-40,40),y:150+rnd(-24,24),vx:rnd(-2,2),vy:rnd(-3,0),life:rnd(8,20),c:pick(['#b51d1d','#8a1414','#caa066','#dfe6ee'])}); }
+  t.shake*=Math.pow(0.85,dt);
+  for(const b of t.parts){ b.x+=b.vx*dt; b.y+=b.vy*dt; b.vy+=0.2*dt; b.life-=dt; }
+  t.parts=t.parts.filter(b=>b.life>0);
+  if(t.t>=t.dur && !t.ended){ t.ended=true; setTimeout(finishBattle,700); }
+}
+function drawBattleHost(x,men,maxMen,facing,col,crest,advance){
+  // draw a block of soldiers representing an army; icons scaled to men
+  const cols=10, rows=5, icons=Math.max(1,Math.min(cols*rows, Math.round(men/maxMen*cols*rows)));
+  for(let i=0;i<icons;i++){
+    const cc=i%cols, rr=(i/cols)|0;
+    const sx=x + facing*(cc*7) + (advance)*facing;
+    const sy=150 - 22 + rr*9 + Math.sin((BT.t*0.2)+i)*0.6;
+    px(sx,sy,3,6,col); px(sx,sy-3,3,3,'#caa06a'); px(sx,sy-4,3,1,crest); // body, head, crest
+    px(sx+facing*3,sy-6,1,8,'#b9c0c8');                                   // spear
+  }
+}
+function drawBattle(){
+  const t=BT, sx=(Math.random()-0.5)*t.shake, sy=(Math.random()-0.5)*t.shake;
+  ctx.save(); ctx.translate(sx,sy);
+  // sky + field
+  px(-4,-4,W+8,86,t.cfg.night?'#2a2440':'#9ab6cf');
+  px(-4,80,W+8,H,'#7a6a44'); px(-4,80,W+8,4,'#8f7d50');
+  for(let i=0;i<120;i++) px((i*89)%W,86+((i*47)%(H-90)),1,1,'#6a5a38');
+  // banners
+  px(40,40,3,44,'#8a1d1d'); px(30,40,16,10,'#c0392b');
+  px(W-43,40,3,44,'#5a2d8a'); px(W-46,40,16,10,'#6a3aa0');
+  const p=Math.min(1,t.t/t.dur), adv=clamp((p)/0.3,0,1)*70;
+  drawBattleHost(70,  t.yourNow||t.yourMen,   t.yourMen,  1,  '#c8a24a','#e8c34a', adv);   // your army (gold)
+  drawBattleHost(W-70,t.enemyNow||t.enemyMen, t.enemyMen, -1, '#7d5aa0','#b070d0', adv);   // enemy (purple)
+  for(const b of t.parts) px(b.x,b.y,2,2,b.c);
+  ctx.restore();
+  // HUD banner (below the stat bar) for legible text
+  ctx.fillStyle='rgba(20,14,10,.85)'; ctx.fillRect(36,34,W-72,58);
+  ctx.fillStyle='#e8c34a'; ctx.fillRect(36,34,W-72,2); ctx.fillRect(36,90,W-72,2);
+  ctx.textAlign='center';
+  pixelText(t.cfg.title, W/2, 48, '#e8c34a', 1.6);
+  if(t.cfg.sub) pixelText(t.cfg.sub, W/2, 63, '#cfe', 1);
+  pixelText('YOUR ARMY  '+fmt(t.yourNow||t.yourMen), W/4+8, 82, '#e8c34a', 1.1);
+  pixelText((t.cfg.enemyName||'ENEMY')+'  '+fmt(t.enemyNow||t.enemyMen), W*3/4-8, 82, '#d0a0e0', 1.1);
+  if(t.ended){ ctx.fillStyle='rgba(0,0,0,.5)'; ctx.fillRect(0,0,W,H);
+    pixelText(t.win?'THE FIELD IS YOURS!':'YOUR ARMY IS BROKEN', W/2, H/2-6, t.win?'#e8c34a':'#e05b5b', 2.2); }
+}
+function finishBattle(){
+  const t=BT; state='menu';
+  if(t.win && t.cfg.onWin) t.cfg.onWin(t.yourLoss,t.enemyLoss);
+  else if(!t.win && t.cfg.onLose) t.cfg.onLose(t.yourLoss,t.enemyLoss);
+}
 
 /* =====================================================================
    META SCREENS WIRING
@@ -1926,9 +2043,9 @@ function advanceDay(n){
       }
     }
     G.detachments=G.detachments.filter(d=>d.phase!=='home');
-    // governing many provinces breeds jealous rivals
-    if(!G.emperor && titlesCount()>=2 && G.rivals<titlesCount() && Math.random()<0.10*titlesCount()){
-      G.rivals++; G.lastRaid='A jealous rival raises troops to contest your growing power — face him in the Intrigue hall.';
+    // the moment you govern a province, jealous rivals begin to plot
+    if(!G.emperor && titlesCount()>=1 && G.rivals<=titlesCount() && Math.random()<0.14*titlesCount()){
+      G.rivals++; G.lastRaid='A jealous rival raises troops to contest your power — face him in the Intrigue hall.';
     }
   }
   refreshStatbar();
@@ -2010,7 +2127,7 @@ function buildCampaign(b){
   const row=document.createElement('div'); row.className='row gap6'; row.style.marginTop='4px';
   const send=document.createElement('button'); send.className='btn sm gold'; send.textContent = detPurpose==='conquer'?'⚔ SEND CONQUEST ARMY':'🏇 SEND DETACHMENT';
   send.disabled = !reach.ok || G.soldiers<Math.min(detSize,200) || G.coin<c.coin || G.food<c.rations || (detPurpose==='conquer' && (!G.generals.length || G.titles[detTargetId]));
-  send.onclick=()=>sendDetachment(detTargetId, detSize, detGeneral, detPurpose);
+  send.onclick=()=>{ if(detPurpose==='conquer') launchConquest(detTargetId, detSize, detGeneral); else sendDetachment(detTargetId, detSize, detGeneral, detPurpose); };
   const wait=document.createElement('button'); wait.className='btn sm'; wait.textContent='⏳ END DAY (let armies march)';
   wait.onclick=()=>{ advanceDay(1); if(G.lastRaid){toast(G.lastRaid,3000); G.lastRaid=null;} openIntrigue(); };
   row.appendChild(send); if(G.detachments.length) row.appendChild(wait);
@@ -2022,7 +2139,10 @@ function buildGenerals(b){
   gh.textContent='GENERALS — appoint leaders for your conquests:'; b.appendChild(gh);
   // your generals
   G.generals.forEach(g=>{ const card=document.createElement('div'); card.className='shopcard';
+    const bar=(v,c)=>`<span style="display:inline-block;width:52px;height:6px;background:#2a241c;border:1px solid #000;vertical-align:middle">`+
+      `<span style="display:block;width:${v*10}%;height:100%;background:${c}"></span></span>`;
     card.innerHTML=`<div><b style="color:var(--gold)">${g.name}</b> — <b>${g.trait}</b>${g.fromSlave?' <span class="small muted">(freed slave)</span>':''}</div>
+      <div class="small" style="margin:2px 0">STR ${bar(g.str,'var(--blood)')} ${g.str}/10 &nbsp; WIT ${bar(g.smart,'#5aa0e0')} ${g.smart}/10</div>
       <div class="small muted">${g.look} — ${g.note}</div>`; b.appendChild(card); });
   // recruit
   const card=document.createElement('div'); card.className='shopcard';
@@ -2078,10 +2198,35 @@ function startSiege(el,idx){
   startFight(REGION_BY_ID[G.current],{siege:el});
   toast('You steal into '+el.name.split(' ').slice(-1)[0]+'’s villa and cut down the guard…',1800);
 }
+// launch an immediate ARMY BATTLE to conquer a province (fixes "sending men did nothing")
+function launchConquest(toId,size,generalIdx){
+  const reach=detReachable(toId); if(!reach.ok){ toast(reach.why,2800); return; }
+  if(G.titles[toId]){ toast('You already govern '+toId+'.'); return; }
+  const gen=G.generals[generalIdx]; if(!gen){ toast('Appoint a general to lead the conquest.'); return; }
+  size=Math.min(size, G.soldiers);
+  if(size<500){ toast('A conquest needs at least 500 men.'); return; }
+  const reg=REGION_BY_ID[toId];
+  const cost=Math.round(size*0.12 + travelCost(G.current,toId).dist*3);
+  if(G.coin<cost){ toast('Not enough denarii to supply the campaign ('+cost+'d).'); return; }
+  G.coin-=cost; G.soldiers-=size; syncArmy();
+  const enemyMen=Math.round((1500+reg.tier*2200)*rnd(0.85,1.15));
+  armyBattle({ title:'BATTLE FOR '+toId.toUpperCase(), sub:'led by '+gen.name+' — '+gen.label, enemyName:'GARRISON',
+    yourMen:size, enemyMen, general:gen,
+    onWin:(yl)=>{ addTroops('levy', Math.max(0,size-yl)); G.titles[toId]=REGION_TITLES[toId]||('Dominus '+toId);
+      G.pop=clamp(G.pop+5,0,100); saveQuiet(); toast('★ '+toId+' is YOURS — you are proclaimed '+G.titles[toId]+'! ('+fmt(yl)+' fallen)',3200); openIntrigue(); },
+    onLose:(yl)=>{ addTroops('levy', Math.max(0,size-yl)); if(Math.random()<0.4){ const gi=G.generals.indexOf(gen); if(gi>=0) G.generals.splice(gi,1); }
+      saveQuiet(); toast('The assault on '+toId+' is thrown back — '+fmt(yl)+' lost.',3000); openIntrigue(); } });
+}
 function startPlot(){
   const t=PLOT_TARGETS[G.plotTier];
-  startFight(REGION_BY_ID[G.current],{plot:t});
-  toast('Your '+fmt(G.soldiers)+' men storm the gates — you seek out '+t.name+'!',2000);
+  const gen=G.generals[0]||null;
+  const size=G.soldiers;
+  armyBattle({ title:'OVERTHROW — '+t.name.toUpperCase(), sub:gen?('led by '+gen.name+' — '+gen.label):'you lead the assault yourself', enemyName:'LOYALISTS',
+    yourMen:size, enemyMen:t.enemyArmy, general:gen,
+    onWin:(yl)=>{ G.soldiers=Math.max(0,G.soldiers-yl); syncArmy(); G.coin+=t.reward; G.glory+=t.glory; G.pop=clamp(G.pop+15,0,100); G.honor=clamp(G.honor-8,0,100); G.plotTier++; G.wins++;
+      const champ=G.plotTier>=PLOT_TARGETS.length; if(champ){ G.imperialDone=true; G.emperor=true; G.approval=60; G.legions=Math.max(6,Math.round(G.soldiers/5000)+6); G.rivals=2; }
+      saveQuiet(); toast(champ?'THE EMPEROR IS SLAIN — the purple is YOURS!':'You have toppled '+t.name+'! (+'+fmt(t.reward)+'d, +'+t.glory+' glory)',3400); openIntrigue(); },
+    onLose:(yl)=>{ G.soldiers=Math.max(0,G.soldiers-yl); syncArmy(); G.honor=clamp(G.honor-6,0,100); G.losses++; saveQuiet(); toast('The overthrow of '+t.name+' is crushed — '+fmt(yl)+' lost.',3200); openIntrigue(); } });
 }
 function startRival(){
   startFight(REGION_BY_ID['Italia'],{rival:true});
@@ -2133,67 +2278,106 @@ const mapcv=$('mapcv'), mctx=mapcv.getContext('2d');
 function drawMapCanvas(){
   const w=mapcv.width,h=mapcv.height;                 // 480 x 216
   mctx.imageSmoothingEnabled=false;
-  const SEA='#a7d8ea',SEA2='#9bcfe3',GR='#a6cf83',RD='#e1543b';
-  mctx.fillStyle=SEA; mctx.fillRect(0,0,w,h);
-  for(let i=0;i<240;i++){ mctx.fillStyle=(i%2?SEA2:'#b3deee'); mctx.fillRect((i*61)%w,(i*37)%h,3,1); }
+  // palette — antique-atlas feel
+  const SEA='#7fb7d4', SEA2='#72add0', SEAdk='#5f9cc0';
+  const LAND='#cdb98a', LANDdk='#b8a374';   // barbaricum (non-Roman) parchment land
+  const RD='#c8503a', RDdk='#9c3826', RDhi='#d96a52'; // Roman empire terracotta
+  const COAST='#5a4632';
   function P(pts,c){ mctx.beginPath(); mctx.moveTo(pts[0][0],pts[0][1]); for(let k=1;k<pts.length;k++) mctx.lineTo(pts[k][0],pts[k][1]); mctx.closePath(); mctx.fillStyle=c; mctx.fill(); }
-  function disc(x,y,r,c){ mctx.beginPath(); mctx.ellipse(x,y,r,r*0.8,0,0,7); mctx.fillStyle=c; mctx.fill(); }
+  function stroke(pts,c,lw){ mctx.beginPath(); mctx.moveTo(pts[0][0],pts[0][1]); for(let k=1;k<pts.length;k++) mctx.lineTo(pts[k][0],pts[k][1]); mctx.closePath(); mctx.lineWidth=lw||1; mctx.strokeStyle=c; mctx.lineJoin='round'; mctx.stroke(); }
+  function disc(x,y,rx,ry,c){ mctx.beginPath(); mctx.ellipse(x,y,rx,ry,0,0,7); mctx.fillStyle=c; mctx.fill(); }
 
-  // ===== connected GREEN land base (Europe + Asia) =====
-  const eurasiaG=[[20,100],[44,142],[80,140],[104,132],[112,118],[152,114],[198,106],[212,100],
-    [238,108],[258,114],[272,120],[298,124],[326,126],[352,122],[372,120],[388,140],[478,140],
-    [478,18],[150,10],[96,52],[16,64]];
-  const africaG=[[14,150],[80,144],[150,140],[200,146],[262,154],[330,158],[352,166],[352,212],[14,212]];
-  const arabiaG=[[350,150],[406,150],[394,210],[352,206],[340,178]];
-  const greeceG=[[228,104],[252,110],[250,128],[241,150],[231,132],[224,116]];
-  const hiberniaG=[[40,54],[66,50],[70,80],[44,82]];
-  const britanniaG=[[60,28],[94,24],[102,42],[90,64],[64,66],[54,44]];
-  [eurasiaG,africaG,arabiaG,greeceG,hiberniaG,britanniaG].forEach(p=>P(p,GR));
+  // ===== SEA =====
+  mctx.fillStyle=SEA; mctx.fillRect(0,0,w,h);
+  for(let i=0;i<260;i++){ mctx.fillStyle=(i%2?SEA2:SEAdk); mctx.fillRect((i*53)%w,(i*71)%h,3,1); } // ripple texture
 
-  // ===== RED empire painted on the connected land =====
-  const iberia=[[18,100],[60,96],[98,100],[100,120],[80,136],[44,140],[20,124]];
-  const gaul=[[96,100],[92,72],[100,54],[130,48],[156,54],[164,78],[152,100],[120,102]];
-  // the Italian BOOT (toe ~204,158 · heel ~226,146)
-  const italia=[[172,98],[192,92],[204,102],[200,116],[210,132],[216,142],[226,146],[220,152],[210,155],[204,158],[198,150],[196,136],[190,122],[182,110],[172,104]];
-  const greece=[[228,104],[252,110],[250,128],[241,150],[231,132],[224,116]];
-  const anatolia=[[256,98],[302,92],[346,96],[358,110],[352,124],[322,128],[290,126],[266,120],[256,108]];
-  const levant=[[352,110],[364,124],[362,150],[352,162],[342,156],[342,130],[346,118]];
-  const mesopotamia=[[356,104],[404,98],[414,126],[398,146],[374,144],[360,124]];
-  const britannia=[[62,28],[92,24],[100,42],[90,62],[66,64],[56,44]];
-  [iberia,gaul,italia,greece,anatolia,levant,mesopotamia,britannia].forEach(p=>P(p,RD));
-  // crisp coastline definition on the empire (dark-red edge)
-  function edge(pts){ mctx.beginPath(); mctx.moveTo(pts[0][0],pts[0][1]); for(let k=1;k<pts.length;k++) mctx.lineTo(pts[k][0],pts[k][1]); mctx.closePath(); mctx.lineWidth=1; mctx.strokeStyle='#8f2f1e'; mctx.stroke(); }
-  [iberia,gaul,italia,greece,anatolia,levant,mesopotamia,britannia].forEach(edge);
-  // Africa Roman coastal strip
-  P([[14,150],[80,144],[150,140],[200,146],[262,154],[330,158],[350,166],[352,176],[300,172],[240,168],[160,158],[80,158],[14,162]],RD);
-  // Aegyptus / Nile valley
-  P([[330,158],[352,164],[354,204],[338,206],[330,180]],RD);
+  // ===== CONTINENTS (parchment land base) =====
+  // Europe + Anatolia (one connected northern landmass; south coast is the Med's north shore)
+  const europe=[
+    [8,120],[3,96],[10,76],[30,66],[52,62],[78,66],[104,58],[120,44],   // Iberia Atlantic → N Gaul
+    [150,32],[200,22],[264,20],[330,22],[404,28],[460,32],[478,36],     // Germania/Scythia north coast
+    [478,86],[452,90],[420,94],[360,86],                                 // NE / Armenia
+    [356,106],[334,120],[310,126],[286,124],[266,116],[260,110],        // Anatolia south coast
+    [236,110],[214,112],[196,108],[172,106],[150,110],[122,116],        // Balkans → Gaul → Liguria
+    [98,124],[80,132],[50,138],[24,134]                                  // Iberia Mediterranean coast
+  ];
+  // Africa (solid landmass across the bottom; north edge is the Med's south shore)
+  const africa=[[0,152],[46,148],[110,145],[150,152],[188,148],[248,152],[300,150],[330,150],
+    [352,158],[352,216],[0,216]];
+  // East land-bridge (Levant + Arabia + Mesopotamia + Persia; closes the Med's east end)
+  const east=[[356,84],[478,86],[478,216],[350,216],[352,158],[358,146],[356,128],[360,112],[356,106]];
+  // hanging peninsulas
+  const italy=[[164,104],[186,104],[192,116],[188,128],[196,138],[201,150],[196,159],[187,158],[183,147],[178,134],[172,122],[166,113]]; // the boot
+  const sinai=[[338,150],[352,158],[352,176],[344,180],[336,166]];
+  [europe,africa,east].forEach(p=>P(p,LAND));
+  P(italy,LAND); P(sinai,LAND);
 
-  // ===== islands (soft discs) =====
-  disc(190,150,7,RD);   // Sicilia
-  disc(154,120,6,RD);   // Sardinia
-  disc(154,107,4,RD);   // Corsica
-  disc(232,158,4,RD); disc(240,158,4,RD); disc(224,158,3,RD); // Creta (long)
-  disc(330,130,5,RD);   // Cyprus
-  disc(126,126,3,RD);   // Baleares
+  // ===== ROMAN EMPIRE (terracotta) painted around the Mediterranean =====
+  // one connected European arc: Iberia → Gaul → Italy base → Balkans → Anatolia
+  const empEuro=[
+    [8,118],[24,132],[50,134],[80,128],[98,120],[120,112],   // Iberia + S Gaul coast
+    [150,108],[172,106],[196,108],[214,110],[236,110],[260,110],[266,116],
+    [286,124],[310,126],[334,120],[356,106],                 // Anatolia coast
+    [358,92],[356,80],[320,74],[270,72],[220,70],[176,68],   // limes (northern border)
+    [150,62],[128,58],[108,66],[92,80],[74,92],[46,100],[18,106]
+  ];
+  P(empEuro,RD);
+  P(italy,RD);
+  // Greece / Achaea peninsula
+  P([[214,108],[242,110],[248,122],[243,135],[236,150],[229,137],[225,123],[219,113]],RD);
+  // Africa Proconsularis coastal province (Tunisia bulge dips south for the marker)
+  P([[0,150],[46,147],[92,146],[110,146],[140,150],[150,168],[132,182],[104,184],[84,176],[60,168],[30,164],[0,162]],RD);
+  // Aegyptus — the Nile valley strip
+  P([[322,150],[344,150],[346,182],[340,204],[328,204],[324,178]],RD);
+  mctx.fillStyle='#4f97b8'; mctx.fillRect(332,152,2,52); mctx.fillRect(326,150,16,3); // Nilus + delta
+  // Syria Palaestina (Levant coast)
+  P([[352,106],[368,120],[366,146],[356,158],[346,150],[346,126],[350,114]],RD);
+  // Mesopotamia frontier
+  P([[358,94],[402,90],[418,114],[404,136],[378,138],[360,118]],RD);
+  // Arabia Petraea (Petra frontier)
+  P([[358,156],[392,154],[404,176],[386,192],[362,184],[356,168]],RD);
+
+  // ===== ISLANDS =====
+  disc(80,44,20,15,RD);                       // Britannia
+  disc(186,164,7,4,RD);                        // Sicilia (off the toe)
+  disc(150,120,5,9,RD);                        // Sardinia
+  disc(150,106,4,4,RD);                        // Corsica
+  disc(228,158,10,4,RD);                       // Creta (long, low)
+  disc(332,132,7,5,RD);                        // Cyprus
+  disc(120,124,3,2,RD); disc(128,127,2,2,RD);  // Baleares
   // Aegean island dots (between Greece & Anatolia)
-  mctx.fillStyle=RD; [[258,120],[262,128],[254,132],[266,120],[260,138]].forEach(p=>mctx.fillRect(p[0],p[1],2,2));
+  mctx.fillStyle=RD; [[256,120],[260,128],[252,133],[264,122],[258,140],[250,126]].forEach(p=>mctx.fillRect(p[0],p[1],2,2));
 
   // ===== carve inland seas =====
-  P([[258,58],[334,56],[350,72],[330,90],[272,90],[254,74]],SEA);           // Pontus Euxinus
-  P([[406,72],[426,78],[430,102],[414,114],[400,98],[400,78]],SEA);         // Mare Caspium
-  P([[350,164],[354,202],[338,206],[338,176]],SEA);                         // Mare Rubrum
-  mctx.fillStyle='#5aa0c0'; mctx.fillRect(338,164,2,42); mctx.fillRect(332,162,12,3); // Nilus
+  P([[248,56],[330,54],[356,68],[344,84],[300,90],[262,84],[244,70]],SEA);   // Pontus Euxinus (Black Sea)
+  P([[410,60],[432,66],[436,96],[420,110],[406,94],[404,74]],SEA);           // Mare Caspium
+  P([[350,164],[360,192],[350,208],[342,190],[344,172]],SEA);                // Mare Rubrum (Red Sea)
+  P([[406,150],[424,164],[416,182],[404,168],[402,158]],SEA);                // Persian Gulf
 
-  // graticule + sea names
-  mctx.fillStyle='rgba(40,70,90,.10)';
+  // ===== crisp coastlines (dark edges only where land meets the Mediterranean) =====
+  function coast(pts,c,lw){ mctx.beginPath(); mctx.moveTo(pts[0][0],pts[0][1]); for(let k=1;k<pts.length;k++) mctx.lineTo(pts[k][0],pts[k][1]); mctx.lineWidth=lw||1.2; mctx.strokeStyle=c; mctx.lineJoin='round'; mctx.lineCap='round'; mctx.stroke(); }
+  coast([[8,120],[3,96],[10,76],[30,66],[52,62],[78,66]],COAST,1.2);                       // Iberia/Gaul Atlantic
+  coast([[24,134],[50,138],[80,132],[98,124],[122,116],[150,110],[172,106],[196,108],
+    [214,112],[236,110],[260,110],[266,116],[286,124],[310,126],[334,120],[356,106]],COAST,1.2); // Med north shore
+  coast([[0,152],[46,148],[110,145],[150,152],[188,148],[248,152],[300,150],[330,150],[352,158]],COAST,1.2); // Africa north shore
+  stroke(italy,COAST,1);
+  // ring the islands
+  [[80,44,20,15],[186,164,7,4],[150,120,5,9],[228,158,10,4],[332,132,7,5]].forEach(o=>{ mctx.beginPath(); mctx.ellipse(o[0],o[1],o[2],o[3],0,0,7); mctx.lineWidth=1; mctx.strokeStyle=RDdk; mctx.stroke(); });
+  // ===== imperial frontier (limes) — gold dashed line along the empire's north edge =====
+  const limes=[[18,106],[46,100],[74,92],[92,80],[108,66],[128,58],[150,62],[176,68],[220,70],[270,72],[320,74],[356,80],[358,92]];
+  mctx.beginPath(); mctx.moveTo(limes[0][0],limes[0][1]); for(let k=1;k<limes.length;k++) mctx.lineTo(limes[k][0],limes[k][1]);
+  mctx.strokeStyle='rgba(232,195,74,.9)'; mctx.lineWidth=1.2; mctx.setLineDash([4,3]); mctx.stroke(); mctx.setLineDash([]);
+
+  // ===== graticule + labels =====
+  mctx.fillStyle='rgba(40,60,80,.10)';
   for(let x=0;x<w;x+=24) mctx.fillRect(x,0,1,h);
   for(let y=0;y<h;y+=24) mctx.fillRect(0,y,w,1);
-  mctx.fillStyle='rgba(40,80,110,.6)'; mctx.font='7px "Courier New",monospace'; mctx.textAlign='center';
-  mctx.fillText('MARE  INTERNVM',176,150);
-  mctx.fillText('PONTVS  EVXINVS',300,74);
-  mctx.fillText('OCEANVS',28,110);
-  mctx.fillText('MARE  RVBRVM',374,188);
+  mctx.fillStyle='rgba(30,60,86,.55)'; mctx.font='7px "Courier New",monospace'; mctx.textAlign='center';
+  mctx.fillText('MARE  INTERNVM',176,138);
+  mctx.fillText('MARE  AEGAEVM',256,150);
+  mctx.fillText('PONTVS  EVXINVS',300,72);
+  mctx.fillText('OCEANVS',24,150);
+  mctx.fillText('MARE  RVBRVM',372,196);
   mctx.textAlign='left';
   // ===== travel/army dashed routes =====
   const px=r=>[r.x/100*w, r.y/100*h];
@@ -2278,8 +2462,8 @@ function openBrief(reg,imperial){
   $('btn-hire').textContent=`🛡 HIRE A CHAMPION (${hireCost}d)`;
   $('btn-ambush').textContent=`🗡 AMBUSH (SHADY)`;
   $('btn-rig').disabled = G.coin<rigCost || imperial || cantFight;
-  $('btn-skip').disabled = G.coin<skipCost || imperial;
-  $('btn-hire').disabled = G.coin<hireCost || imperial || isGovernor;
+  $('btn-skip').disabled = G.coin<skipCost || imperial || cantFight;
+  $('btn-hire').disabled = G.coin<hireCost || imperial || cantFight;
   $('btn-ambush').disabled = imperial || cantFight;
   briefCtx.rigCost=rigCost; briefCtx.skipCost=skipCost; briefCtx.hireCost=hireCost; briefCtx.eqForbidden=eqForbidden; briefCtx.upperHelp=isUpper;
   $('brief-note').innerHTML = cantFight? 'Use INTRIGUE to grow your power — sieges, armies, generals and conquest.' : imperial? 'The Emperor permits no fixing, hiring or flight. You must fight in person.' :
@@ -2378,6 +2562,7 @@ window.__SS = {
   setG:(g)=>{G=g;}, newDemo:(name,origin,arch)=>{G=freshCareer(name||'Verus',origin||'Italia',arch||'Roman');},
   cheat:(o)=>{ Object.assign(G,o); refreshStatbar(); }, regionById:id=>REGION_BY_ID[id], get state(){return state;},
   press:(k)=>setEdge(k), hold:(k,v)=>{held[k]=v;},
+  armyBattle, launchConquest, makeGeneral, get G(){return G;},
 };
 })();
 </script>
