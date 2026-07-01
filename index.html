@@ -201,6 +201,7 @@
       <button class="btn" id="btn-shop">🛒 ARMOURY</button>
       <button class="btn" id="btn-stable">🐎 STABLE</button>
       <button class="btn" id="btn-villa">🏡 VILLA</button>
+      <button class="btn" id="btn-intrigue">🗡 INTRIGUE</button>
       <button class="btn" id="btn-train">🏋 TRAIN</button>
       <button class="btn sm" id="btn-save">💾 SAVE</button>
       <button class="btn sm" id="btn-quit">QUIT</button>
@@ -227,6 +228,31 @@
         bout — win or lose. More slaves, more wealth.</div>
       <div id="villa-body" class="col gap"></div>
       <div class="row" style="justify-content:flex-end;"><button class="btn gold" id="btn-villa-back">◀ BACK</button></div>
+    </div>
+  </div>
+
+  <!-- ===== INTRIGUE (Elite Siege / plots / private army) ===== -->
+  <div id="scr-intrigue" class="screen center">
+    <div class="panel pad col gap scrollbox" style="width:min(96%,680px);max-height:94%;">
+      <div class="row" style="align-items:center;gap:10px;flex-wrap:wrap;">
+        <h2 style="color:var(--blood)">🗡 INTRIGUE &amp; ELITE SIEGE</h2>
+        <span class="pill">⚜ Favor <b id="i-favor">0</b></span>
+        <span class="pill">🛡 Soldiers <b id="i-sold">0</b></span>
+      </div>
+      <div class="small muted">By night, storm a rich elite's estate. Cut down the guards, then
+        show mercy for a favor — or take everything. Favors buy soldiers; enough favor and steel
+        lets you march on the powerful, even the Emperor himself.</div>
+      <div id="intrigue-body" class="col gap"></div>
+      <div class="row" style="justify-content:flex-end;"><button class="btn gold" id="btn-intrigue-back">◀ BACK</button></div>
+    </div>
+  </div>
+
+  <!-- ===== ELITE CONFRONTATION (after a siege win) ===== -->
+  <div id="scr-elite" class="screen center">
+    <div class="panel pad col gap center" style="width:min(92%,540px);text-align:center;">
+      <h2 id="elite-head" style="color:var(--gold)">THE ELITE KNEELS</h2>
+      <div id="elite-body" class="col gap6 small" style="line-height:1.7"></div>
+      <div id="elite-choices" class="row center gap" style="margin-top:6px;flex-wrap:wrap;"></div>
     </div>
   </div>
 
@@ -465,6 +491,27 @@ const ARCHETYPES = {
 };
 const ARCH_ORDER=['Roman','Celt','Persian','Brawler','Fanatic','Retiarius'];
 
+/* ===== INTRIGUE: Elite Siege targets ===== */
+const ELITE_MEN=['Senator Gaius Metellus','Legate Aulus Varro','Publican Titus Rufus','Magnate Lucius Balbus',
+  'Governor Sextus Priscus','Duumvir Marcus Celsus','Eques Decimus Naso','Praetor Quintus Galba'];
+const ELITE_WOMEN=['Domina Fulvia Metella','Matron Livia Sabina','Lady Cornelia Prisca','Domina Claudia Rufina',
+  'Priestess Aemilia Vera','Lady Junia Marcella','Domina Valeria Paulla'];
+// grand-plot targets, escalating to the Emperor
+const PLOT_TARGETS=[
+  {name:'a Provincial Magnate', needSold:6,  needFav:4,  buff:1.4, reward:400,  glory:60},
+  {name:'the Provincial Governor', needSold:12, needFav:8,  buff:1.7, reward:900,  glory:120},
+  {name:'the Praetorian Prefect', needSold:20, needFav:14, buff:2.0, reward:1800, glory:220},
+  {name:'EMPEROR SEPTIMIUS SEVERUS', needSold:32, needFav:24, buff:2.4, reward:4000, glory:500},
+];
+function makeElite(region){
+  const isWife=Math.random()<0.42;
+  const name=pick(isWife?ELITE_WOMEN:ELITE_MEN);
+  const wealth=1+region.tier; // richer provinces = richer elites
+  return { name, isWife, guardTier:region.tier, guards:ri(1,2),
+    loot: Math.round((120+region.tier*90)*rnd(0.9,1.4)),
+    gift: 30+region.tier*18 };
+}
+
 /* =====================================================================
    GAME STATE / SAVE
    ===================================================================== */
@@ -482,6 +529,7 @@ function freshCareer(name,origin,arch){
     food:4,                // travel rations
     mount:0,               // 0 on foot · 1 mule · 2 horse · 3 chariot
     slaves:0, hasVilla:false, boat:false,
+    favor:0, soldiers:0, hidden:[], plotTier:0,   // intrigue: favors, private army, hidden elites, overthrow progress
     wins:0, losses:0,
     hpBonus:0, dmgBonus:0,
     loadout:lo,
@@ -498,7 +546,7 @@ function freshCareer(name,origin,arch){
   };
 }
 // fill in any fields missing from older saves
-function migrate(g){ const d={honor:50,food:4,mount:0,slaves:0,hasVilla:false,boat:false}; for(const k in d){ if(g[k]===undefined) g[k]=d[k]; } if(!g.current) g.current='Italia'; return g; }
+function migrate(g){ const d={honor:50,food:4,mount:0,slaves:0,hasVilla:false,boat:false,favor:0,soldiers:0,hidden:[],plotTier:0}; for(const k in d){ if(g[k]===undefined) g[k]=d[k]; } if(!g.current) g.current='Italia'; return g; }
 function saveGame(){ try{ localStorage.setItem(SAVE_KEY, JSON.stringify(G)); toast('Saved.'); }catch(e){} }
 function hasSave(){ try{ return !!localStorage.getItem(SAVE_KEY); }catch(e){ return false; } }
 function loadGame(){ try{ G=migrate(JSON.parse(localStorage.getItem(SAVE_KEY))); return !!G; }catch(e){ return false; } }
@@ -806,12 +854,17 @@ function startFight(region, briefData){
     crowd:50, time:0, over:false, result:null,
     rigged:briefData.rigged||false, forbiddenEquipped:briefData.forbiddenEquipped||false,
     hired:briefData.hired||false, ambush:briefData.ambush||false, provisioned:!!G.provisioned,
-    emperor: region.id==='Italia' && briefData.imperial,
+    siege:briefData.siege||null, plot:briefData.plot||null,
+    emperor: (region.id==='Italia' && briefData.imperial) || (briefData.plot && briefData.plot.name.indexOf('EMPEROR')>=0),
     shake:0, particles:[], banners:[], decals:[], flash:0, hitstop:0,
   };
   if(FT.rigged){ foe.maxHp*=0.45; foe.hp=foe.maxHp; foe.ai.aggr*=0.5; foe.ai.react*=2; }
   if(FT.ambush){ foe.hp=foe.maxHp*0.55; foe.hurt=20; foe.vx=-foe.facing*4; foe.vy=-3; foe.onGround=false; }  // you struck first
   if(FT.hired){ p.maxHp*=2.2; p.hp=p.maxHp; p.dmgMul=2.4; foe.ai.aggr*=0.7; }                                  // a brawny substitute
+  if(FT.siege){ foe.name=(FT.siege.isWife?'Bodyguard of ':'Guard of ')+FT.siege.name.split(' ').slice(-1)[0];
+    foe.maxHp*=(1+FT.siege.guardTier*0.15); foe.hp=foe.maxHp; $('hud-e-name')&&0; }
+  if(FT.plot){ const sb=1+G.soldiers*0.05; p.maxHp*=Math.min(3,sb); p.hp=p.maxHp; p.dmgMul=Math.min(2.6,1+G.soldiers*0.04);
+    foe.maxHp*=FT.plot.buff; foe.hp=foe.maxHp; foe.tunic='#5a2d8a'; foe.name=FT.plot.name; foe.ai.aggr=Math.min(0.95,foe.ai.aggr*1.2); foe.ai.skill+=1; }
   state='fight';
   show('fight-hud');
   $('statbar').classList.add('hide');
@@ -1044,6 +1097,29 @@ function endFight(won){
   setTimeout(()=>finishFight(won), 1050);
 }
 function finishFight(won){
+  // ---- Elite Siege outcome ----
+  if(FT.siege){
+    const el=FT.siege;
+    if(won){ showElite(el); }
+    else { G.honor=clamp(G.honor-4,0,100); G.losses++; saveQuiet();
+      showResult(false,{glory:0,coin:0,popDelta:0,honorDelta:-4,crowdLove:FT.crowd,note:'Your night assault on '+el.name+' failed — you barely escape the guards.'}); }
+    return;
+  }
+  // ---- Grand Plot / overthrow outcome ----
+  if(FT.plot){
+    const t=FT.plot;
+    if(won){ G.coin+=t.reward; G.glory+=t.glory; G.pop=clamp(G.pop+15,0,100); G.honor=clamp(G.honor-10,0,100);
+      G.soldiers=Math.max(0,G.soldiers-Math.ceil(t.needSold*0.4)); G.plotTier++; G.wins++;
+      const champ = G.plotTier>=PLOT_TARGETS.length;
+      if(champ) G.imperialDone=true;
+      saveQuiet();
+      showResult(true,{glory:t.glory,coin:t.reward,popDelta:15,honorDelta:-10,crowdLove:FT.crowd,
+        note: champ? 'THE EMPEROR IS DEAD. Your legions hail you Imperator — Rome is yours.'
+                   : 'You have toppled '+t.name+'! Your name is whispered in fear across the provinces.'}); }
+    else { G.soldiers=Math.max(0,G.soldiers-Math.ceil(t.needSold*0.6)); G.honor=clamp(G.honor-6,0,100); G.losses++; saveQuiet();
+      showResult(false,{glory:0,coin:0,popDelta:0,honorDelta:-6,crowdLove:FT.crowd,note:'The overthrow of '+t.name+' is crushed. Your army is scattered.'}); }
+    return;
+  }
   const reg=FT.region, tier=reg.tier;
   const crowdLove=FT.crowd;
   let glory=0,coin=0,popDelta=0,honorDelta=0,note='';
@@ -1534,6 +1610,107 @@ function openVilla(){
   card.appendChild(bt); b.appendChild(card);
 }
 $('btn-villa-back').onclick=()=>enterMap();
+
+// ---- INTRIGUE: Elite Siege, hidden guests, private army, grand plot ----
+$('btn-intrigue').onclick=()=>openIntrigue();
+$('btn-intrigue-back').onclick=()=>enterMap();
+let eliteTargets=null;   // regenerated on demand
+function openIntrigue(){
+  state='intrigue'; show('scr-intrigue'); $('statbar').classList.remove('hide'); refreshStatbar();
+  $('i-favor').textContent=G.favor; $('i-sold').textContent=G.soldiers;
+  const reg=REGION_BY_ID[G.current];
+  if(!eliteTargets||eliteTargets.reg!==reg.id) eliteTargets={reg:reg.id, list:[makeElite(reg),makeElite(reg)]};
+  const b=$('intrigue-body'); b.innerHTML='';
+  // ---- elite targets ----
+  const th=document.createElement('div'); th.className='small'; th.style.color='var(--gold)';
+  th.innerHTML='ELITE ESTATES NEAR '+reg.id.toUpperCase()+' — storm one tonight:'; b.appendChild(th);
+  eliteTargets.list.forEach((el,idx)=>{
+    const card=document.createElement('div'); card.className='shopcard';
+    card.innerHTML=`<div><b style="color:var(--gold)">${el.name}</b> <span class="small muted">${el.isWife?'(a noble matron)':''}</span></div>
+      <div class="small">Household guards: ${el.guards} · est. plunder ≈ ${el.loot}d · favors owed if spared</div>`;
+    const bt=document.createElement('button'); bt.className='btn sm blood'; bt.textContent='⚔ BESIEGE THE ESTATE';
+    bt.onclick=()=>startSiege(el,idx);
+    card.appendChild(bt); b.appendChild(card);
+  });
+  // ---- hidden guests ----
+  if(G.hidden.length){
+    const hh=document.createElement('div'); hh.className='small'; hh.style.color='var(--gold)'; hh.style.marginTop='6px';
+    hh.textContent='HIDDEN IN YOUR VILLA — call in what they owe:'; b.appendChild(hh);
+    G.hidden.forEach((gu,i)=>{
+      const card=document.createElement('div'); card.className='shopcard';
+      card.innerHTML=`<div><b>${gu.name}</b> <span class="small muted">— grateful, and afraid</span></div>`;
+      const row=document.createElement('div'); row.className='row gap6';
+      const bg=document.createElement('button'); bg.className='btn sm'; bg.textContent='Extort a gift (+'+gu.gift+'d)';
+      bg.onclick=()=>{ G.coin+=gu.gift; if(Math.random()<0.25){ toast(gu.name+' slips away in the night!'); G.hidden.splice(i,1);} else toast(gu.name+' pays you '+gu.gift+' denarii.'); refreshStatbar(); openIntrigue(); };
+      const bf=document.createElement('button'); bf.className='btn sm gold'; bf.textContent='Call in the favor (+2 soldiers, +1 favor)';
+      bf.onclick=()=>{ G.soldiers+=2; G.favor+=1; G.hidden.splice(i,1); toast(gu.name+' repays the debt and departs.'); refreshStatbar(); openIntrigue(); };
+      row.appendChild(bg); row.appendChild(bf); card.appendChild(row); b.appendChild(card);
+    });
+  }
+  // ---- muster army ----
+  const mh=document.createElement('div'); mh.className='small'; mh.style.color='var(--gold)'; mh.style.marginTop='6px';
+  mh.textContent='MUSTER A PRIVATE ARMY:'; b.appendChild(mh);
+  const mcard=document.createElement('div'); mcard.className='shopcard';
+  mcard.innerHTML=`<div>Soldiers: <b>${G.soldiers}</b> — each strengthens you in an overthrow.</div>`;
+  const mrow=document.createElement('div'); mrow.className='row gap6';
+  [['+3 soldiers',120,1,3],['+8 soldiers',300,3,8]].forEach(([lbl,c,f,n])=>{
+    const bt=document.createElement('button'); bt.className='btn sm'; bt.textContent=lbl+' ('+c+'d, '+f+' favor)';
+    bt.disabled=G.coin<c||G.favor<f; bt.onclick=()=>{ if(G.coin<c||G.favor<f)return; G.coin-=c; G.favor-=f; G.soldiers+=n; refreshStatbar(); openIntrigue(); };
+    mrow.appendChild(bt);
+  });
+  mcard.appendChild(mrow); b.appendChild(mcard);
+  // ---- grand plot / overthrow ----
+  const ph=document.createElement('div'); ph.className='small'; ph.style.color='var(--blood)'; ph.style.marginTop='6px';
+  ph.textContent='THE GRAND PLOT:'; b.appendChild(ph);
+  const pcard=document.createElement('div'); pcard.className='shopcard';
+  if(G.plotTier>=PLOT_TARGETS.length){
+    pcard.innerHTML=`<div style="color:var(--gold)">You have toppled the Emperor himself and seized the purple. Rome is yours.</div>`;
+    b.appendChild(pcard);
+  } else {
+    const t=PLOT_TARGETS[G.plotTier];
+    const ready=G.soldiers>=t.needSold && G.favor>=t.needFav;
+    pcard.innerHTML=`<div>Next target: <b style="color:var(--gold)">${t.name}</b></div>
+      <div class="small ${ready?'':'muted'}">Requires ${t.needSold} soldiers &amp; ${t.needFav} favor (you: ${G.soldiers} sold · ${G.favor} favor)</div>
+      <div class="small muted">Win and seize ${t.reward} denarii and ${t.glory} glory. Your army fights at your side.</div>`;
+    const bt=document.createElement('button'); bt.className='btn'+(ready?' gold':''); bt.textContent='⚔ LAUNCH THE OVERTHROW';
+    bt.disabled=!ready; bt.onclick=()=>startPlot();
+    pcard.appendChild(bt); b.appendChild(pcard);
+  }
+}
+function startSiege(el,idx){
+  G.siegeIdx=idx; // remember which target to consume on win
+  startFight(REGION_BY_ID[G.current],{siege:el});
+  toast('You steal into '+el.name.split(' ').slice(-1)[0]+'’s villa and cut down the guard…',1800);
+}
+function startPlot(){
+  const t=PLOT_TARGETS[G.plotTier];
+  startFight(REGION_BY_ID[G.current],{plot:t});
+  toast('Your army storms the gates — you seek out '+t.name+'!',2000);
+}
+// confrontation shown after a won siege
+function showElite(el){
+  state='menu';
+  show('scr-elite');
+  $('elite-head').textContent = el.isWife?'THE MATRON KNEELS':'THE ELITE KNEELS';
+  $('elite-body').innerHTML=`<div>The guards lie still. <b style="color:var(--gold)">${el.name}</b> kneels before your blade,
+    ${el.isWife?'her':'his'} household treasure at your feet.</div>
+    <div class="small muted">Spare ${el.isWife?'her':'him'} for a lasting favor, plunder everything for coin,
+    or hide ${el.isWife?'her':'him'} away in your villa to bleed for years.</div>`;
+  const c=$('elite-choices'); c.innerHTML='';
+  const mk=(cls,txt,fn)=>{ const b=document.createElement('button'); b.className='btn '+cls; b.textContent=txt; b.onclick=fn; c.appendChild(b); };
+  mk('gold','🕊 SPARE (+1 favor, +honor)',()=>{ G.favor+=1; G.honor=clamp(G.honor+4,0,100); afterElite(el,'Spared, '+el.name+' swears you a favor.'); });
+  mk('blood','💰 PLUNDER (+'+el.loot+'d, +1 favor, −honor)',()=>{ G.coin+=el.loot; G.favor+=1; G.honor=clamp(G.honor-9,0,100); afterElite(el,'You strip the estate bare — '+el.loot+' denarii richer.'); });
+  const hideBtn=()=>{ if(!G.hasVilla){ toast('Buy a villa first to hide a guest.'); return; } G.hidden.push({name:el.name,gift:el.gift}); G.favor+=2; G.honor=clamp(G.honor-3,0,100); afterElite(el,'You spirit '+el.name+' away to your villa — a secret asset.'); };
+  mk('', (G.hasVilla?'🏡 HIDE IN VILLA (+2 favor)':'🏡 HIDE (needs villa)'), hideBtn);
+}
+function afterElite(el,msg){
+  // consume the target
+  if(eliteTargets && eliteTargets.list) eliteTargets.list.splice(G.siegeIdx,1);
+  if(eliteTargets && eliteTargets.list.length===0) eliteTargets=null;
+  refreshStatbar(); saveQuiet();
+  toast(msg,2200);
+  FT=null; openIntrigue();
+}
 $('btn-save').onclick=()=>{ saveGame(); $('btn-continue').disabled=false; };
 $('btn-quit').onclick=()=>{ show('scr-title'); $('statbar').classList.add('hide'); state='title'; $('btn-continue').disabled=!hasSave(); };
 
@@ -1737,7 +1914,7 @@ $('btn-help').onclick=()=>{ prevHelp='scr-title'; show('scr-help'); };
 show('scr-title');
 // expose for screenshot tooling
 window.__SS = {
-  show, openCreate, enterMap, openShop, openBrief, openStable, openVilla, startFight, FT:()=>FT,
+  show, openCreate, enterMap, openShop, openBrief, openStable, openVilla, openIntrigue, startFight, FT:()=>FT,
   setG:(g)=>{G=g;}, newDemo:(name,origin,arch)=>{G=freshCareer(name||'Verus',origin||'Italia',arch||'Roman');},
   cheat:(o)=>{ Object.assign(G,o); refreshStatbar(); }, regionById:id=>REGION_BY_ID[id], get state(){return state;},
   press:(k)=>setEdge(k), hold:(k,v)=>{held[k]=v;},
