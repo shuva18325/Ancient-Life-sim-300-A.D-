@@ -506,10 +506,13 @@ const PLOT_TARGETS=[
 function makeElite(region){
   const isWife=Math.random()<0.42;
   const name=pick(isWife?ELITE_WOMEN:ELITE_MEN);
-  const wealth=1+region.tier; // richer provinces = richer elites
-  return { name, isWife, guardTier:region.tier, guards:ri(1,2),
-    loot: Math.round((120+region.tier*90)*rnd(0.9,1.4)),
-    gift: 30+region.tier*18 };
+  const t=region.tier;
+  return { name, isWife, guardTier:t, guards:ri(1,2),
+    loot:   Math.round((400+t*350)*rnd(0.9,1.5)),      // a lot more coin
+    gift:   80+t*50,
+    troops: Math.round((400+t*350)*rnd(0.9,1.3)),       // household men pledged / captured
+    slaves: ri(2,3)+t,                                  // captives for your villa
+    legion: Math.round((1200+t*900)*rnd(0.9,1.3)) };    // a whole legion if you call in a hidden guest's favor
 }
 
 /* =====================================================================
@@ -531,6 +534,7 @@ function freshCareer(name,origin,arch){
     slaves:0, hasVilla:false, boat:false,
     favor:0, soldiers:0, hidden:[], plotTier:0,   // intrigue: favors, private army, hidden elites, overthrow progress
     emperor:false, approval:50, legions:0, rivals:0, retired:false,  // rule of Rome
+    detachments:[], day:0,   // marching army detachments (with travel time)
     wins:0, losses:0,
     hpBonus:0, dmgBonus:0,
     loadout:lo,
@@ -547,7 +551,7 @@ function freshCareer(name,origin,arch){
   };
 }
 // fill in any fields missing from older saves
-function migrate(g){ const d={honor:50,food:4,mount:0,slaves:0,hasVilla:false,boat:false,favor:0,soldiers:0,hidden:[],plotTier:0,emperor:false,approval:50,legions:0,rivals:0,retired:false}; for(const k in d){ if(g[k]===undefined) g[k]=d[k]; } if(!g.current) g.current='Italia'; return g; }
+function migrate(g){ const d={honor:50,food:4,mount:0,slaves:0,hasVilla:false,boat:false,favor:0,soldiers:0,hidden:[],plotTier:0,emperor:false,approval:50,legions:0,rivals:0,retired:false,detachments:[],day:0}; for(const k in d){ if(g[k]===undefined) g[k]=d[k]; } if(!g.current) g.current='Italia'; return g; }
 function saveGame(){ try{ localStorage.setItem(SAVE_KEY, JSON.stringify(G)); toast('Saved.'); }catch(e){} }
 function hasSave(){ try{ return !!localStorage.getItem(SAVE_KEY); }catch(e){ return false; } }
 function loadGame(){ try{ G=migrate(JSON.parse(localStorage.getItem(SAVE_KEY))); return !!G; }catch(e){ return false; } }
@@ -1662,8 +1666,9 @@ function openIntrigue(){
       const row=document.createElement('div'); row.className='row gap6';
       const bg=document.createElement('button'); bg.className='btn sm'; bg.textContent='Extort a gift (+'+gu.gift+'d)';
       bg.onclick=()=>{ G.coin+=gu.gift; if(Math.random()<0.25){ toast(gu.name+' slips away in the night!'); G.hidden.splice(i,1);} else toast(gu.name+' pays you '+gu.gift+' denarii.'); refreshStatbar(); openIntrigue(); };
-      const bf=document.createElement('button'); bf.className='btn sm gold'; bf.textContent='Call in the favor (+2 soldiers, +1 favor)';
-      bf.onclick=()=>{ G.soldiers+=2; G.favor+=1; G.hidden.splice(i,1); toast(gu.name+' repays the debt and departs.'); refreshStatbar(); openIntrigue(); };
+      const leg=gu.legion||1500;
+      const bf=document.createElement('button'); bf.className='btn sm gold'; bf.textContent='Call in the favor (+'+fmt(leg)+' troops, +2 favor)';
+      bf.onclick=()=>{ G.soldiers+=leg; G.favor+=2; G.hidden.splice(i,1); toast(gu.name+' raises '+fmt(leg)+' men for your cause and departs.'); refreshStatbar(); openIntrigue(); };
       row.appendChild(bg); row.appendChild(bf); card.appendChild(row); b.appendChild(card);
     });
   }
@@ -1679,6 +1684,8 @@ function openIntrigue(){
     mrow.appendChild(bt);
   });
   mcard.appendChild(mrow); b.appendChild(mcard);
+  // ---- CAMPAIGN: send army detachments (they march the map over days) ----
+  buildCampaign(b);
   // ---- imperial rule (after seizing the purple) ----
   if(G.emperor){ buildRule(b); return; }
   // ---- grand plot / overthrow ----
@@ -1695,6 +1702,78 @@ function openIntrigue(){
   pcard.appendChild(bt); b.appendChild(pcard);
 }
 function fmt(n){ return (n||0).toLocaleString('en-US'); }
+// ---- army detachments: cost/time scale with distance AND army size ----
+let detTargetId=null, detSize=2000;
+function detCost(fromId,toId,size){
+  const t=travelCost(fromId,toId);                 // reuse map distance
+  const days = Math.max(2, Math.round(t.dist/6) + Math.round(size/2500));  // bigger army marches slower
+  const coin = Math.round(size*0.15 + t.dist*3);   // pay + supply for the march
+  const rations = Math.max(1, Math.round(size/1200));
+  return {days, coin, rations, dist:t.dist};
+}
+function sendDetachment(toId,size){
+  size=Math.min(size, G.soldiers);
+  if(size<200){ toast('A detachment needs at least 200 men.'); return; }
+  const c=detCost(G.current,toId,size);
+  if(G.coin<c.coin){ toast('Not enough denarii to supply the march ('+c.coin+'d).'); return; }
+  if(G.food<c.rations){ toast('Not enough rations for the march ('+c.rations+').'); return; }
+  G.coin-=c.coin; G.food-=c.rations; G.soldiers-=size;
+  const reg=REGION_BY_ID[toId];
+  const reward = { coin:Math.round(size*rnd(0.25,0.5)+reg.tier*300), troops:Math.round(size*rnd(0.05,0.2)+reg.tier*150), slaves:ri(0,2)+reg.tier };
+  G.detachments.push({ fromId:G.current, toId, size, day:0, eta:c.days, phase:'out', reward, purpose:'raid' });
+  refreshStatbar(); toast('A detachment of '+fmt(size)+' marches for '+toId+' — ETA '+c.days+' days.',2200); openIntrigue();
+}
+// advance the campaign clock (called after each bout / END DAY)
+function advanceDay(n){
+  n=n||1; if(!G.detachments) return;
+  for(let k=0;k<n;k++){ G.day++;
+    for(const d of G.detachments){ d.day++;
+      if(d.day>=d.eta && d.phase==='out'){ d.phase='back'; d.day=0; d.msg=fmt(d.size)+' reach '+d.toId+' and raid it — marching home.'; }
+      else if(d.day>=d.eta && d.phase==='back'){ d.phase='done'; }
+    }
+    const done=G.detachments.filter(d=>d.phase==='done');
+    for(const d of done){ G.soldiers+=d.size+d.reward.troops; G.coin+=d.reward.coin; G.slaves+=d.reward.slaves;
+      G.lastRaid='Your detachment returns from '+d.toId+': +'+fmt(d.reward.coin)+'d, +'+fmt(d.reward.troops)+' recruits, +'+d.reward.slaves+' slaves.'; }
+    G.detachments=G.detachments.filter(d=>d.phase!=='done');
+  }
+  refreshStatbar();
+}
+function buildCampaign(b){
+  const ch=document.createElement('div'); ch.className='small'; ch.style.color='var(--gold)'; ch.style.marginTop='6px';
+  ch.textContent='CAMPAIGN — MARCH ARMY DETACHMENTS (they raid for coin, recruits & slaves):'; b.appendChild(ch);
+  // in-transit detachments
+  G.detachments.forEach(d=>{
+    const prog=Math.min(1,d.day/d.eta), leg=d.phase==='out'?'→ '+d.toId:'← home from '+d.toId;
+    const card=document.createElement('div'); card.className='shopcard';
+    card.innerHTML=`<div><b>${fmt(d.size)} men</b> ${leg} <span class="small muted">· day ${d.day}/${d.eta}</span></div>
+      <div class="bar" style="margin-top:3px"><i style="width:${Math.round(prog*100)}%;height:100%;background:var(--gold)"></i></div>`;
+    b.appendChild(card);
+  });
+  // dispatch a new detachment
+  const card=document.createElement('div'); card.className='shopcard';
+  if(!detTargetId||detTargetId===G.current) detTargetId=(REGIONS.find(r=>r.id!==G.current)||{}).id;
+  const c=detCost(G.current,detTargetId,Math.min(detSize,G.soldiers||detSize));
+  card.innerHTML=`<div>Dispatch from <b>${G.current}</b> → <b style="color:var(--gold)" id="det-to">${detTargetId}</b></div>`;
+  const selRow=document.createElement('div'); selRow.className='row gap6'; selRow.style.margin='4px 0';
+  const sel=document.createElement('select'); sel.style.cssText='background:#000;color:var(--gold);border:2px solid var(--gold);font-family:inherit;font-weight:bold;padding:3px;';
+  REGIONS.filter(r=>r.id!==G.current).forEach(r=>{ const o=document.createElement('option'); o.value=r.id; o.textContent=r.id; if(r.id===detTargetId)o.selected=true; sel.appendChild(o); });
+  sel.onchange=()=>{ detTargetId=sel.value; openIntrigue(); };
+  const sizeSel=document.createElement('select'); sizeSel.style.cssText=sel.style.cssText;
+  [500,2000,5000,10000].forEach(s=>{ const o=document.createElement('option'); o.value=s; o.textContent=fmt(s)+' men'; if(s===detSize)o.selected=true; sizeSel.appendChild(o); });
+  sizeSel.onchange=()=>{ detSize=+sizeSel.value; openIntrigue(); };
+  selRow.appendChild(sel); selRow.appendChild(sizeSel); card.appendChild(selRow);
+  const info=document.createElement('div'); info.className='small muted';
+  info.innerHTML=`March: <b>${c.days} days</b> · supply <b>${c.coin}d</b> + ${c.rations} rations · you have ${fmt(G.soldiers)} troops`;
+  card.appendChild(info);
+  const row=document.createElement('div'); row.className='row gap6'; row.style.marginTop='4px';
+  const send=document.createElement('button'); send.className='btn sm gold'; send.textContent='🏇 SEND DETACHMENT';
+  send.disabled=G.soldiers<Math.min(detSize,200)||G.coin<c.coin||G.food<c.rations;
+  send.onclick=()=>sendDetachment(detTargetId, detSize);
+  const wait=document.createElement('button'); wait.className='btn sm'; wait.textContent='⏳ END DAY (let armies march)';
+  wait.onclick=()=>{ advanceDay(1); if(G.lastRaid){toast(G.lastRaid,2600); G.lastRaid=null;} openIntrigue(); };
+  row.appendChild(send); if(G.detachments.length) row.appendChild(wait);
+  card.appendChild(row); b.appendChild(card);
+}
 // Imperial rule panel: public approval, legions, political rivals, retirement
 function buildRule(b){
   const rh=document.createElement('div'); rh.className='small'; rh.style.color='var(--gold)'; rh.style.marginTop='8px';
@@ -1768,10 +1847,10 @@ function showElite(el){
     or hide ${el.isWife?'her':'him'} away in your villa to bleed for years.</div>`;
   const c=$('elite-choices'); c.innerHTML='';
   const mk=(cls,txt,fn)=>{ const b=document.createElement('button'); b.className='btn '+cls; b.textContent=txt; b.onclick=fn; c.appendChild(b); };
-  mk('gold','🕊 SPARE (+1 favor, +honor)',()=>{ G.favor+=1; G.honor=clamp(G.honor+4,0,100); afterElite(el,'Spared, '+el.name+' swears you a favor.'); });
-  mk('blood','💰 PLUNDER (+'+el.loot+'d, +1 favor, −honor)',()=>{ G.coin+=el.loot; G.favor+=1; G.honor=clamp(G.honor-9,0,100); afterElite(el,'You strip the estate bare — '+el.loot+' denarii richer.'); });
-  const hideBtn=()=>{ if(!G.hasVilla){ toast('Buy a villa first to hide a guest.'); return; } G.hidden.push({name:el.name,gift:el.gift}); G.favor+=2; G.honor=clamp(G.honor-3,0,100); afterElite(el,'You spirit '+el.name+' away to your villa — a secret asset.'); };
-  mk('', (G.hasVilla?'🏡 HIDE IN VILLA (+2 favor)':'🏡 HIDE (needs villa)'), hideBtn);
+  mk('gold','🕊 SPARE (+1 favor · +'+fmt(el.troops)+' troops pledged)',()=>{ G.favor+=1; G.soldiers+=el.troops; G.honor=clamp(G.honor+4,0,100); afterElite(el,'Spared, '+el.name+' swears you a favor and sends '+fmt(el.troops)+' household men to your banner.'); });
+  mk('blood','💰 PLUNDER (+'+fmt(el.loot)+'d · +'+el.slaves+' slaves · +'+fmt(Math.round(el.troops*0.5))+' troops)',()=>{ G.coin+=el.loot; G.slaves+=el.slaves; G.soldiers+=Math.round(el.troops*0.5); G.favor+=1; G.honor=clamp(G.honor-9,0,100); afterElite(el,'You strip the estate bare — '+fmt(el.loot)+' denarii, '+el.slaves+' slaves, and the guards defect to you.'); });
+  const hideBtn=()=>{ if(!G.hasVilla){ toast('Buy a villa first to hide a guest.'); return; } G.hidden.push({name:el.name,gift:el.gift,legion:el.legion}); G.favor+=2; G.honor=clamp(G.honor-3,0,100); afterElite(el,'You spirit '+el.name+' away to your villa — a secret asset worth a legion.'); };
+  mk('', (G.hasVilla?'🏡 HIDE IN VILLA (+2 favor · a legion later)':'🏡 HIDE (needs villa)'), hideBtn);
 }
 function afterElite(el,msg){
   // consume the target
@@ -1848,6 +1927,22 @@ function drawMapCanvas(){
   mctx.fillText('OCEANVS',28,110);
   mctx.fillText('MARE  RVBRVM',374,188);
   mctx.textAlign='left';
+  // ===== marching army detachments: dotted routes + moving markers =====
+  if(G&&G.detachments&&G.detachments.length){
+    const px=r=>[r.x/100*w, r.y/100*h];
+    for(const d of G.detachments){
+      const A=REGION_BY_ID[d.fromId], B=REGION_BY_ID[d.toId]; if(!A||!B) continue;
+      const a=px(A), b=px(B), prog=Math.min(1,d.day/d.eta);
+      // dotted line
+      mctx.strokeStyle='rgba(30,20,12,.85)'; mctx.lineWidth=1.5; mctx.setLineDash([4,4]);
+      mctx.beginPath(); mctx.moveTo(a[0],a[1]); mctx.lineTo(b[0],b[1]); mctx.stroke(); mctx.setLineDash([]);
+      // marker position: out = A→B by prog, back = B→A by prog
+      const t = d.phase==='out'? prog : 1-prog;
+      const mx=a[0]+(b[0]-a[0])*t, my=a[1]+(b[1]-a[1])*t;
+      mctx.fillStyle='#e8c34a'; mctx.beginPath(); mctx.ellipse(mx,my,3.5,3,0,0,7); mctx.fill();
+      mctx.fillStyle='#1c130c'; mctx.fillRect(mx-1,my-1,2,2);
+    }
+  }
 }
 
 // ---- pre-fight brief ----
@@ -1977,7 +2072,7 @@ function trainScreen(){
 }
 
 // ---- result continue ----
-$('btn-res-continue').onclick=()=>{ FT=null; enterMap(); };
+$('btn-res-continue').onclick=()=>{ FT=null; advanceDay(1); if(G.lastRaid){ toast(G.lastRaid,2800); G.lastRaid=null; } enterMap(); };
 
 /* =====================================================================
    BOOT
