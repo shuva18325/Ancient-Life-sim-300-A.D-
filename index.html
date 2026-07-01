@@ -496,12 +496,12 @@ const ELITE_MEN=['Senator Gaius Metellus','Legate Aulus Varro','Publican Titus R
   'Governor Sextus Priscus','Duumvir Marcus Celsus','Eques Decimus Naso','Praetor Quintus Galba'];
 const ELITE_WOMEN=['Domina Fulvia Metella','Matron Livia Sabina','Lady Cornelia Prisca','Domina Claudia Rufina',
   'Priestess Aemilia Vera','Lady Junia Marcella','Domina Valeria Paulla'];
-// grand-plot targets, escalating to the Emperor
+// grand-plot targets, escalating to the Emperor. needSold in real troops; enemyArmy = defenders.
 const PLOT_TARGETS=[
-  {name:'a Provincial Magnate', needSold:6,  needFav:4,  buff:1.4, reward:400,  glory:60},
-  {name:'the Provincial Governor', needSold:12, needFav:8,  buff:1.7, reward:900,  glory:120},
-  {name:'the Praetorian Prefect', needSold:20, needFav:14, buff:2.0, reward:1800, glory:220},
-  {name:'EMPEROR SEPTIMIUS SEVERUS', needSold:32, needFav:24, buff:2.4, reward:4000, glory:500},
+  {name:'a Provincial Magnate',      needSold:800,   needFav:4,  buff:1.4, reward:600,  glory:60,  enemyArmy:600},
+  {name:'the Provincial Governor',   needSold:3000,  needFav:8,  buff:1.7, reward:1400, glory:120, enemyArmy:2500},
+  {name:'the Praetorian Prefect',    needSold:7000,  needFav:14, buff:2.0, reward:3000, glory:220, enemyArmy:6000},
+  {name:'EMPEROR SEPTIMIUS SEVERUS', needSold:15000, needFav:24, buff:2.4, reward:8000, glory:600, enemyArmy:14000},
 ];
 function makeElite(region){
   const isWife=Math.random()<0.42;
@@ -530,6 +530,7 @@ function freshCareer(name,origin,arch){
     mount:0,               // 0 on foot · 1 mule · 2 horse · 3 chariot
     slaves:0, hasVilla:false, boat:false,
     favor:0, soldiers:0, hidden:[], plotTier:0,   // intrigue: favors, private army, hidden elites, overthrow progress
+    emperor:false, approval:50, legions:0, rivals:0, retired:false,  // rule of Rome
     wins:0, losses:0,
     hpBonus:0, dmgBonus:0,
     loadout:lo,
@@ -546,7 +547,7 @@ function freshCareer(name,origin,arch){
   };
 }
 // fill in any fields missing from older saves
-function migrate(g){ const d={honor:50,food:4,mount:0,slaves:0,hasVilla:false,boat:false,favor:0,soldiers:0,hidden:[],plotTier:0}; for(const k in d){ if(g[k]===undefined) g[k]=d[k]; } if(!g.current) g.current='Italia'; return g; }
+function migrate(g){ const d={honor:50,food:4,mount:0,slaves:0,hasVilla:false,boat:false,favor:0,soldiers:0,hidden:[],plotTier:0,emperor:false,approval:50,legions:0,rivals:0,retired:false}; for(const k in d){ if(g[k]===undefined) g[k]=d[k]; } if(!g.current) g.current='Italia'; return g; }
 function saveGame(){ try{ localStorage.setItem(SAVE_KEY, JSON.stringify(G)); toast('Saved.'); }catch(e){} }
 function hasSave(){ try{ return !!localStorage.getItem(SAVE_KEY); }catch(e){ return false; } }
 function loadGame(){ try{ G=migrate(JSON.parse(localStorage.getItem(SAVE_KEY))); return !!G; }catch(e){ return false; } }
@@ -854,8 +855,8 @@ function startFight(region, briefData){
     crowd:50, time:0, over:false, result:null,
     rigged:briefData.rigged||false, forbiddenEquipped:briefData.forbiddenEquipped||false,
     hired:briefData.hired||false, ambush:briefData.ambush||false, provisioned:!!G.provisioned,
-    siege:briefData.siege||null, plot:briefData.plot||null,
-    emperor: (region.id==='Italia' && briefData.imperial) || (briefData.plot && briefData.plot.name.indexOf('EMPEROR')>=0),
+    siege:briefData.siege||null, plot:briefData.plot||null, rival:briefData.rival||false,
+    emperor: (region.id==='Italia' && briefData.imperial) || (briefData.plot && briefData.plot.name.indexOf('EMPEROR')>=0) || briefData.rival,
     shake:0, particles:[], banners:[], decals:[], flash:0, hitstop:0,
   };
   if(FT.rigged){ foe.maxHp*=0.45; foe.hp=foe.maxHp; foe.ai.aggr*=0.5; foe.ai.react*=2; }
@@ -863,8 +864,9 @@ function startFight(region, briefData){
   if(FT.hired){ p.maxHp*=2.2; p.hp=p.maxHp; p.dmgMul=2.4; foe.ai.aggr*=0.7; }                                  // a brawny substitute
   if(FT.siege){ foe.name=(FT.siege.isWife?'Bodyguard of ':'Guard of ')+FT.siege.name.split(' ').slice(-1)[0];
     foe.maxHp*=(1+FT.siege.guardTier*0.15); foe.hp=foe.maxHp; $('hud-e-name')&&0; }
-  if(FT.plot){ const sb=1+G.soldiers*0.05; p.maxHp*=Math.min(3,sb); p.hp=p.maxHp; p.dmgMul=Math.min(2.6,1+G.soldiers*0.04);
+  if(FT.plot){ const ratio=G.soldiers/Math.max(1,FT.plot.enemyArmy); p.maxHp*=clamp(1+ratio*0.5,1,2.6); p.hp=p.maxHp; p.dmgMul=clamp(1+ratio*0.4,1,2.4);
     foe.maxHp*=FT.plot.buff; foe.hp=foe.maxHp; foe.tunic='#5a2d8a'; foe.name=FT.plot.name; foe.ai.aggr=Math.min(0.95,foe.ai.aggr*1.2); foe.ai.skill+=1; }
+  if(FT.rival){ p.maxHp*=1.3; p.hp=p.maxHp; foe.maxHp*=1.8; foe.hp=foe.maxHp; foe.tunic='#5a2d8a'; foe.name='The Usurper'; foe.ai.aggr=0.9; foe.ai.skill+=1; }
   state='fight';
   show('fight-hud');
   $('statbar').classList.add('hide');
@@ -1105,19 +1107,36 @@ function finishFight(won){
       showResult(false,{glory:0,coin:0,popDelta:0,honorDelta:-4,crowdLove:FT.crowd,note:'Your night assault on '+el.name+' failed — you barely escape the guards.'}); }
     return;
   }
-  // ---- Grand Plot / overthrow outcome ----
+  // ---- Grand Plot / overthrow outcome (a real battle: casualties both sides) ----
   if(FT.plot){
     const t=FT.plot;
-    if(won){ G.coin+=t.reward; G.glory+=t.glory; G.pop=clamp(G.pop+15,0,100); G.honor=clamp(G.honor-10,0,100);
-      G.soldiers=Math.max(0,G.soldiers-Math.ceil(t.needSold*0.4)); G.plotTier++; G.wins++;
+    if(won){
+      const yourLoss=Math.min(G.soldiers, Math.round(t.enemyArmy*rnd(0.18,0.38)));
+      const theirLoss=t.enemyArmy;
+      G.soldiers=Math.max(0,G.soldiers-yourLoss);
+      G.coin+=t.reward; G.glory+=t.glory; G.pop=clamp(G.pop+15,0,100); G.honor=clamp(G.honor-8,0,100); G.plotTier++; G.wins++;
       const champ = G.plotTier>=PLOT_TARGETS.length;
-      if(champ) G.imperialDone=true;
+      if(champ){ G.imperialDone=true; G.emperor=true; G.approval=60; G.legions=Math.max(6,Math.round(G.soldiers/5000)+6); G.rivals=2; }
       saveQuiet();
-      showResult(true,{glory:t.glory,coin:t.reward,popDelta:15,honorDelta:-10,crowdLove:FT.crowd,
-        note: champ? 'THE EMPEROR IS DEAD. Your legions hail you Imperator — Rome is yours.'
-                   : 'You have toppled '+t.name+'! Your name is whispered in fear across the provinces.'}); }
-    else { G.soldiers=Math.max(0,G.soldiers-Math.ceil(t.needSold*0.6)); G.honor=clamp(G.honor-6,0,100); G.losses++; saveQuiet();
-      showResult(false,{glory:0,coin:0,popDelta:0,honorDelta:-6,crowdLove:FT.crowd,note:'The overthrow of '+t.name+' is crushed. Your army is scattered.'}); }
+      showResult(true,{glory:t.glory,coin:t.reward,popDelta:15,honorDelta:-8,crowdLove:FT.crowd,battle:{yourLoss,theirLoss},
+        note: champ? 'THE EMPEROR IS SLAIN. Your legions hail you Imperator — the purple is yours, Rome at your feet.'
+                   : 'You have toppled '+t.name+'! The provinces whisper your name in fear.'}); }
+    else { const yourLoss=Math.round(t.enemyArmy*rnd(0.4,0.7)); G.soldiers=Math.max(0,G.soldiers-yourLoss);
+      G.honor=clamp(G.honor-6,0,100); G.losses++; saveQuiet();
+      showResult(false,{glory:0,coin:0,popDelta:0,honorDelta:-6,crowdLove:FT.crowd,battle:{yourLoss,theirLoss:Math.round(t.enemyArmy*0.2)},
+        note:'The overthrow of '+t.name+' is crushed and your army scattered.'}); }
+    return;
+  }
+  // ---- Imperial rival (holding the throne) ----
+  if(FT.rival){
+    if(won){ G.rivals=Math.max(0,G.rivals-1); G.approval=clamp(G.approval+10,0,100); G.coin+=800; G.wins++; saveQuiet();
+      showResult(true,{glory:40,coin:800,popDelta:0,honorDelta:0,crowdLove:FT.crowd,
+        note:'The usurper lies dead on the Senate floor. Your grip on the purple tightens.'}); }
+    else { G.approval=clamp(G.approval-18,0,100); G.losses++;
+      if(G.approval<=0){ G.emperor=false; G.plotTier=Math.max(0,PLOT_TARGETS.length-1); saveQuiet();
+        showResult(false,{glory:0,coin:0,popDelta:-20,honorDelta:0,crowdLove:FT.crowd,note:'The conspiracy triumphs — you are dragged from the throne. The purple is lost.'}); }
+      else { saveQuiet(); showResult(false,{glory:0,coin:0,popDelta:0,honorDelta:0,crowdLove:FT.crowd,note:'You are wounded and forced to flee — the rival lives, and Rome doubts you.'}); }
+    }
     return;
   }
   const reg=FT.region, tier=reg.tier;
@@ -1171,8 +1190,9 @@ function showResult(won,r){
   $('res-head').style.color = won? 'var(--gold)':'var(--blood)';
   const verdict = won? (r.crowdLove>70?'The crowd roars your name!':r.crowdLove>40?'A solid win.':'You survive — barely.')
                      : '';
+  const battle = r.battle? `<div class="small" style="margin-top:6px;color:var(--gold)">⚔ BATTLE REPORT — your losses: <b style="color:var(--blood)">${fmt(r.battle.yourLoss)}</b> · enemy losses: <b>${fmt(r.battle.theirLoss)}</b> · army remaining: <b>${fmt(G.soldiers)}</b></div>`:'';
   $('res-body').innerHTML =
-    `<div>${r.note||''}</div>`+
+    `<div>${r.note||''}</div>`+ battle +
     (won?`<div class="row center gap" style="margin-top:6px;flex-wrap:wrap">
        <span class="pill">⭐ +${r.glory} Glory</span>
        <span class="pill">🪙 ${r.coin>=0?'+':''}${r.coin} denarii</span>
@@ -1647,35 +1667,68 @@ function openIntrigue(){
       row.appendChild(bg); row.appendChild(bf); card.appendChild(row); b.appendChild(card);
     });
   }
-  // ---- muster army ----
+  // ---- muster army (real numbers) ----
   const mh=document.createElement('div'); mh.className='small'; mh.style.color='var(--gold)'; mh.style.marginTop='6px';
   mh.textContent='MUSTER A PRIVATE ARMY:'; b.appendChild(mh);
   const mcard=document.createElement('div'); mcard.className='shopcard';
-  mcard.innerHTML=`<div>Soldiers: <b>${G.soldiers}</b> — each strengthens you in an overthrow.</div>`;
+  mcard.innerHTML=`<div>Troops under arms: <b>${fmt(G.soldiers)}</b> — an overthrow is a real battle; more men, fewer losses.</div>`;
   const mrow=document.createElement('div'); mrow.className='row gap6';
-  [['+3 soldiers',120,1,3],['+8 soldiers',300,3,8]].forEach(([lbl,c,f,n])=>{
+  [['+500 troops',180,2,500],['+2,000 troops',640,6,2000]].forEach(([lbl,c,f,n])=>{
     const bt=document.createElement('button'); bt.className='btn sm'; bt.textContent=lbl+' ('+c+'d, '+f+' favor)';
     bt.disabled=G.coin<c||G.favor<f; bt.onclick=()=>{ if(G.coin<c||G.favor<f)return; G.coin-=c; G.favor-=f; G.soldiers+=n; refreshStatbar(); openIntrigue(); };
     mrow.appendChild(bt);
   });
   mcard.appendChild(mrow); b.appendChild(mcard);
+  // ---- imperial rule (after seizing the purple) ----
+  if(G.emperor){ buildRule(b); return; }
   // ---- grand plot / overthrow ----
   const ph=document.createElement('div'); ph.className='small'; ph.style.color='var(--blood)'; ph.style.marginTop='6px';
-  ph.textContent='THE GRAND PLOT:'; b.appendChild(ph);
+  ph.textContent='THE GRAND PLOT — MARCH ON THE POWERFUL:'; b.appendChild(ph);
   const pcard=document.createElement('div'); pcard.className='shopcard';
-  if(G.plotTier>=PLOT_TARGETS.length){
-    pcard.innerHTML=`<div style="color:var(--gold)">You have toppled the Emperor himself and seized the purple. Rome is yours.</div>`;
-    b.appendChild(pcard);
-  } else {
-    const t=PLOT_TARGETS[G.plotTier];
-    const ready=G.soldiers>=t.needSold && G.favor>=t.needFav;
-    pcard.innerHTML=`<div>Next target: <b style="color:var(--gold)">${t.name}</b></div>
-      <div class="small ${ready?'':'muted'}">Requires ${t.needSold} soldiers &amp; ${t.needFav} favor (you: ${G.soldiers} sold · ${G.favor} favor)</div>
-      <div class="small muted">Win and seize ${t.reward} denarii and ${t.glory} glory. Your army fights at your side.</div>`;
-    const bt=document.createElement('button'); bt.className='btn'+(ready?' gold':''); bt.textContent='⚔ LAUNCH THE OVERTHROW';
-    bt.disabled=!ready; bt.onclick=()=>startPlot();
-    pcard.appendChild(bt); b.appendChild(pcard);
+  const t=PLOT_TARGETS[G.plotTier];
+  const ready=G.soldiers>=t.needSold && G.favor>=t.needFav;
+  pcard.innerHTML=`<div>Next target: <b style="color:var(--gold)">${t.name}</b> — defended by <b>${fmt(t.enemyArmy)}</b> men.</div>
+    <div class="small ${ready?'':'muted'}">Needs an army of <b>${fmt(t.needSold)}</b> &amp; ${t.needFav} favor (you: ${fmt(G.soldiers)} troops · ${G.favor} favor)</div>
+    <div class="small muted">Victory seizes ${t.reward} denarii &amp; ${t.glory} glory — but expect casualties on both sides.</div>`;
+  const bt=document.createElement('button'); bt.className='btn'+(ready?' gold':''); bt.textContent='⚔ LAUNCH THE OVERTHROW';
+  bt.disabled=!ready; bt.onclick=()=>startPlot();
+  pcard.appendChild(bt); b.appendChild(pcard);
+}
+function fmt(n){ return (n||0).toLocaleString('en-US'); }
+// Imperial rule panel: public approval, legions, political rivals, retirement
+function buildRule(b){
+  const rh=document.createElement('div'); rh.className='small'; rh.style.color='var(--gold)'; rh.style.marginTop='8px';
+  rh.textContent='⚜ IMPERIAL RULE — YOU WEAR THE PURPLE:'; b.appendChild(rh);
+  const rc=document.createElement('div'); rc.className='shopcard eq';
+  rc.innerHTML=`<div><b style="color:var(--gold)">Imperator ${G.name}</b></div>
+    <div>Public approval: <b>${G.approval}/100</b> · Legions: <b>${G.legions}</b> (${fmt(G.legions*5000)} men) · Plotting rivals: <b style="color:var(--blood)">${G.rivals}</b></div>
+    <div class="bar" style="margin-top:4px"><i style="width:${G.approval}%;height:100%;background:linear-gradient(90deg,#8a1d1d,#e8c34a,#5b7a32)"></i></div>
+    <div class="small muted">${G.approval<25?'Rome seethes — a coup is near. Win the mob back or crush the plotters.':G.approval<55?'The mob is restless.':'The people love their new Caesar.'}</div>`;
+  b.appendChild(rc);
+  // actions
+  const acts=document.createElement('div'); acts.className='shopcard';
+  acts.innerHTML='<div class="small" style="color:var(--gold)">DECREES:</div>';
+  const arow=document.createElement('div'); arow.className='row gap6'; arow.style.marginTop='4px';
+  const games=document.createElement('button'); games.className='btn sm'; games.textContent='🎪 Hold Grand Games (600d, +approval)';
+  games.disabled=G.coin<600; games.onclick=()=>{ if(G.coin<600)return; G.coin-=600; G.approval=clamp(G.approval+14,0,100); refreshStatbar(); toast('The Colosseum roars — the mob adores you.'); openIntrigue(); };
+  const dole=document.createElement('button'); dole.className='btn sm'; dole.textContent='🌾 Corn Dole (300d, +approval)';
+  dole.disabled=G.coin<300; dole.onclick=()=>{ if(G.coin<300)return; G.coin-=300; G.approval=clamp(G.approval+7,0,100); refreshStatbar(); toast('Free grain for the plebs.'); openIntrigue(); };
+  const tax=document.createElement('button'); tax.className='btn sm'; tax.textContent='💰 Tax the Provinces (+1,200d, −approval)';
+  tax.onclick=()=>{ G.coin+=1200; G.approval=clamp(G.approval-10,0,100); refreshStatbar(); toast('The treasury swells; the provinces grumble.'); openIntrigue(); };
+  arow.appendChild(games); arow.appendChild(dole); arow.appendChild(tax);
+  acts.appendChild(arow); b.appendChild(acts);
+  // rivals
+  if(G.rivals>0){
+    const rv=document.createElement('div'); rv.className='shopcard';
+    rv.innerHTML=`<div><b style="color:var(--blood)">A rival plots your fall.</b> Face ${G.rivals>1?'the boldest of them':'the usurper'} in single combat to break the conspiracy.</div>`;
+    const bt=document.createElement('button'); bt.className='btn sm blood'; bt.textContent='⚔ CRUSH THE RIVAL';
+    bt.onclick=()=>startRival(); rv.appendChild(bt); b.appendChild(rv);
   }
+  // retire
+  const ret=document.createElement('div'); ret.className='shopcard';
+  ret.innerHTML='<div class="small muted">Lay down the sword and rule as a statesman — a retired gladiator is no soft man.</div>';
+  const rb=document.createElement('button'); rb.className='btn sm gold'; rb.textContent='🏛 RETIRE INTO POLITICS';
+  rb.onclick=()=>retire(); ret.appendChild(rb); b.appendChild(ret);
 }
 function startSiege(el,idx){
   G.siegeIdx=idx; // remember which target to consume on win
@@ -1685,7 +1738,24 @@ function startSiege(el,idx){
 function startPlot(){
   const t=PLOT_TARGETS[G.plotTier];
   startFight(REGION_BY_ID[G.current],{plot:t});
-  toast('Your army storms the gates — you seek out '+t.name+'!',2000);
+  toast('Your '+fmt(G.soldiers)+' men storm the gates — you seek out '+t.name+'!',2000);
+}
+function startRival(){
+  startFight(REGION_BY_ID['Italia'],{rival:true});
+  toast('A rival senator draws steel to seize your throne…',2000);
+}
+function retire(){
+  G.retired=true; saveQuiet();
+  state='menu'; show('scr-result');
+  $('res-head').textContent='RETIRED INTO GLORY'; $('res-head').style.color='var(--gold)';
+  const era = G.emperor? 'You step back from the daily blade to rule Rome as a statesman-Caesar — proof that a man of the sand is no soft creature, but iron who has earned the purple.'
+    : 'You hang up the gladius and buy your way into the Senate — a freed champion turned political power, and no one dares call you soft.';
+  $('res-body').innerHTML=`<div>${era}</div>
+    <div class="row center gap" style="margin-top:6px;flex-wrap:wrap">
+      <span class="pill">⭐ ${G.glory} Glory</span><span class="pill">🪙 ${fmt(G.coin)} denarii</span>
+      <span class="pill">⚖ ${G.honor} Honor</span><span class="pill">🏛 ${G.emperor?'IMPERATOR':'Senator'}</span>
+      <span class="pill">🩸 ${G.wins}–${G.losses}</span></div>
+    <div class="small muted" style="margin-top:6px">Your legend endures. (You may keep playing — the sand always calls.)</div>`;
 }
 // confrontation shown after a won siege
 function showElite(el){
@@ -1719,29 +1789,29 @@ const mapcv=$('mapcv'), mctx=mapcv.getContext('2d');
 function drawMapCanvas(){
   const w=mapcv.width,h=mapcv.height;                 // 480 x 216
   mctx.imageSmoothingEnabled=false;
-  const SEA='#a7d8ea',SEA2='#9bcfe3',GR='#a6cf83',RD='#e1543b',COAST='#3c6e8a';
+  const SEA='#a7d8ea',SEA2='#9bcfe3',GR='#a6cf83',RD='#e1543b';
   mctx.fillStyle=SEA; mctx.fillRect(0,0,w,h);
   for(let i=0;i<240;i++){ mctx.fillStyle=(i%2?SEA2:'#b3deee'); mctx.fillRect((i*61)%w,(i*37)%h,3,1); }
   function P(pts,c){ mctx.beginPath(); mctx.moveTo(pts[0][0],pts[0][1]); for(let k=1;k<pts.length;k++) mctx.lineTo(pts[k][0],pts[k][1]); mctx.closePath(); mctx.fillStyle=c; mctx.fill(); }
-  function E(pts){ mctx.beginPath(); mctx.moveTo(pts[0][0],pts[0][1]); for(let k=1;k<pts.length;k++) mctx.lineTo(pts[k][0],pts[k][1]); mctx.closePath(); mctx.lineWidth=1; mctx.strokeStyle=COAST; mctx.stroke(); }
+  function disc(x,y,r,c){ mctx.beginPath(); mctx.ellipse(x,y,r,r*0.8,0,0,7); mctx.fillStyle=c; mctx.fill(); }
 
-  // ===== connected GREEN land base (so nothing floats) =====
+  // ===== connected GREEN land base (Europe + Asia) =====
   const eurasiaG=[[20,100],[44,142],[80,140],[104,132],[112,118],[152,114],[198,106],[212,100],
     [238,108],[258,114],[272,120],[298,124],[326,126],[352,122],[372,120],[388,140],[478,140],
     [478,18],[150,10],[96,52],[16,64]];
   const africaG=[[14,150],[80,144],[150,140],[200,146],[262,154],[330,158],[352,166],[352,212],[14,212]];
   const arabiaG=[[350,150],[406,150],[394,210],[352,206],[340,178]];
-  const italiaG=[[168,96],[186,90],[202,98],[198,112],[208,130],[216,144],[224,150],[212,153],[200,151],[194,138],[186,124],[176,110],[166,102]];
-  const greeceG=[[230,104],[252,110],[250,128],[242,146],[232,132],[226,116]];
+  const greeceG=[[228,104],[252,110],[250,128],[241,150],[231,132],[224,116]];
   const hiberniaG=[[40,54],[66,50],[70,80],[44,82]];
   const britanniaG=[[60,28],[94,24],[102,42],[90,64],[64,66],[54,44]];
-  [eurasiaG,africaG,arabiaG,italiaG,greeceG,hiberniaG,britanniaG].forEach(p=>P(p,GR));
+  [eurasiaG,africaG,arabiaG,greeceG,hiberniaG,britanniaG].forEach(p=>P(p,GR));
 
   // ===== RED empire painted on the connected land =====
   const iberia=[[18,100],[60,96],[98,100],[100,120],[80,136],[44,140],[20,124]];
   const gaul=[[96,100],[92,72],[100,54],[130,48],[156,54],[164,78],[152,100],[120,102]];
-  const italia=[[168,96],[186,90],[202,98],[198,112],[208,130],[216,144],[224,150],[212,153],[200,151],[194,138],[186,124],[176,110],[166,102]];
-  const greece=[[230,104],[252,110],[250,128],[242,146],[232,132],[226,116]];
+  // the Italian BOOT (toe ~204,158 · heel ~226,146)
+  const italia=[[172,98],[192,92],[204,102],[200,116],[210,132],[216,142],[226,146],[220,152],[210,155],[204,158],[198,150],[196,136],[190,122],[182,110],[172,104]];
+  const greece=[[228,104],[252,110],[250,128],[241,150],[231,132],[224,116]];
   const anatolia=[[256,98],[302,92],[346,96],[358,110],[352,124],[322,128],[290,126],[266,120],[256,108]];
   const levant=[[352,110],[364,124],[362,150],[352,162],[342,156],[342,130],[346,118]];
   const mesopotamia=[[356,104],[404,98],[414,126],[398,146],[374,144],[360,124]];
@@ -1751,12 +1821,16 @@ function drawMapCanvas(){
   P([[14,150],[80,144],[150,140],[200,146],[262,154],[330,158],[350,166],[352,176],[300,172],[240,168],[160,158],[80,158],[14,162]],RD);
   // Aegyptus / Nile valley
   P([[330,158],[352,164],[354,204],[338,206],[330,180]],RD);
-  // islands
-  P([[178,142],[194,142],[186,155]],RD);                                    // Sicilia
-  mctx.fillStyle=RD; mctx.fillRect(150,116,8,16); mctx.fillRect(150,104,8,9); // Sardinia / Corsica
-  mctx.fillRect(214,154,32,5);                                              // Creta
-  P([[320,128],[338,126],[339,133],[321,135]],RD);                          // Cyprus
-  mctx.fillStyle=RD; mctx.fillRect(122,124,6,4); mctx.fillRect(132,120,5,3); // Baleares
+
+  // ===== islands (soft discs) =====
+  disc(190,150,7,RD);   // Sicilia
+  disc(154,120,6,RD);   // Sardinia
+  disc(154,107,4,RD);   // Corsica
+  disc(232,158,4,RD); disc(240,158,4,RD); disc(224,158,3,RD); // Creta (long)
+  disc(330,130,5,RD);   // Cyprus
+  disc(126,126,3,RD);   // Baleares
+  // Aegean island dots (between Greece & Anatolia)
+  mctx.fillStyle=RD; [[258,120],[262,128],[254,132],[266,120],[260,138]].forEach(p=>mctx.fillRect(p[0],p[1],2,2));
 
   // ===== carve inland seas =====
   P([[258,58],[334,56],[350,72],[330,90],[272,90],[254,74]],SEA);           // Pontus Euxinus
@@ -1764,7 +1838,6 @@ function drawMapCanvas(){
   P([[350,164],[354,202],[338,206],[338,176]],SEA);                         // Mare Rubrum
   mctx.fillStyle='#5aa0c0'; mctx.fillRect(338,164,2,42); mctx.fillRect(332,162,12,3); // Nilus
 
-  // (filled shapes read cleanly without coastline strokes)
   // graticule + sea names
   mctx.fillStyle='rgba(40,70,90,.10)';
   for(let x=0;x<w;x+=24) mctx.fillRect(x,0,1,h);
