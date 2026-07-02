@@ -110,6 +110,7 @@
     <span class="stat">🪙 <b id="s-coin">0</b> denarii</span>
     <span class="stat">⚖ Honor <b id="s-honor">50</b></span>
     <span class="stat">🍖 <b id="s-food">0</b></span>
+    <span class="stat">🧼 <b id="s-hyg">70</b></span>
     <span class="stat">🐎 <b id="s-mount">—</b></span>
     <span class="stat">⚔ Lv <b id="s-lvl">1</b></span>
     <span class="stat">🩸 <b id="s-rec">0–0</b></span>
@@ -770,6 +771,10 @@ function freshCareer(name,origin,arch,social){
     parthia:50, parthiaPact:false,                   // relations with the Parthian Empire
     wifeRel:0, lastTalkDay:-9,                       // the bond with your wife (0-100) + talk cooldown
     isFemale:false, lineage:[],                      // succession: who you are, and who came before
+    hygiene:70, wifePhys:45,                         // 🧼 how you smell · 🔥 the physical side of the marriage
+    hasPool:false, hasWardrobe:false,                // villa renovations
+    loveDay:-1, loveQuick:0, loveLong:0, loveNight:0,// bedchamber sessions used today
+    lastWashDay:-9, lastPoolDay:-9, lastWardrobeDay:-9, lastKidsDay:-9,
     wins:0, losses:0,
     hpBonus:0, dmgBonus:0,
     loadout:lo,
@@ -786,7 +791,7 @@ function freshCareer(name,origin,arch,social){
   };
 }
 // fill in any fields missing from older saves
-function migrate(g){ const d={honor:50,food:4,mount:0,slaves:0,hasVilla:false,boat:false,favor:0,soldiers:0,hidden:[],plotTier:0,emperor:false,approval:50,legions:0,rivals:0,retired:false,detachments:[],day:0,titles:{},clears:{},socialClass:'gladiator',army:{},armyGear:0,armyTrain:0,hasOrganizer:false,generals:[],wife:null,married:false,marryPrompted:false,children:[],pregnant:null,lastLoveDay:-9,injury:null,lastDebateDay:-9,office:0,path:null,parthia:50,parthiaPact:false,wifeRel:50,lastTalkDay:-9,isFemale:false,lineage:[]}; for(const k in d){ if(g[k]===undefined) g[k]=d[k]; } if(!g.current) g.current='Italia'; return g; }
+function migrate(g){ const d={honor:50,food:4,mount:0,slaves:0,hasVilla:false,boat:false,favor:0,soldiers:0,hidden:[],plotTier:0,emperor:false,approval:50,legions:0,rivals:0,retired:false,detachments:[],day:0,titles:{},clears:{},socialClass:'gladiator',army:{},armyGear:0,armyTrain:0,hasOrganizer:false,generals:[],wife:null,married:false,marryPrompted:false,children:[],pregnant:null,lastLoveDay:-9,injury:null,lastDebateDay:-9,office:0,path:null,parthia:50,parthiaPact:false,wifeRel:50,lastTalkDay:-9,isFemale:false,lineage:[],hygiene:70,wifePhys:45,hasPool:false,hasWardrobe:false,loveDay:-1,loveQuick:0,loveLong:0,loveNight:0,lastWashDay:-9,lastPoolDay:-9,lastWardrobeDay:-9,lastKidsDay:-9}; for(const k in d){ if(g[k]===undefined) g[k]=d[k]; } if(!g.current) g.current='Italia'; return g; }
 function saveGame(){ try{ localStorage.setItem(SAVE_KEY, JSON.stringify(G)); toast('Saved.'); }catch(e){} }
 function hasSave(){ try{ return !!localStorage.getItem(SAVE_KEY); }catch(e){ return false; } }
 function loadGame(){ try{ G=migrate(JSON.parse(localStorage.getItem(SAVE_KEY))); return !!G; }catch(e){ return false; } }
@@ -805,6 +810,8 @@ function refreshStatbar(){
   $('s-mount').textContent=MOUNTS[G.mount].short;
   $('s-lvl').textContent=G.level;
   $('s-rec').textContent=G.wins+'–'+G.losses;
+  const hy=$('s-hyg'); if(hy){ hy.textContent=(G.hygiene===undefined?70:G.hygiene)|0;
+    hy.style.color=G.hygiene<30?'var(--blood)':G.hygiene>=85?'#8ad48a':''; }
   const inj=$('s-injury'); if(inj){ inj.style.display=G.injury?'flex':'none';
     if(G.injury) $('s-inj-name').textContent=G.injury.name+' ('+G.injury.daysLeft+'d)'; }
 }
@@ -1460,6 +1467,7 @@ function endFight(won){
   setTimeout(()=>finishFight(won), 1050);
 }
 function finishFight(won){
+  G.hygiene=clamp((G.hygiene===undefined?70:G.hygiene)-8,0,100);   // sand, sweat and other men's blood
   // ---- Elite Siege outcome ----
   if(FT.siege){
     const el=FT.siege;
@@ -2000,6 +2008,7 @@ function loop(now){
   if(state==='fight' && FT){ updateFight(dt); drawArena(); }
   else if(state==='battle' && BT){ updateBattle(dt); drawBattle(); }
   else if(state==='bed' && BC){ updateBed(dt); if(BC) drawBed(); }
+  else if(state==='domus' && DM){ updateDomus(dt); if(DM) drawDomus(); }
   else if(state==='map'||state==='travel'){ drawMapCanvas(); }
   else if(state==='title'||state==='create'||state==='help'){ drawMenuBg(now); }
   requestAnimationFrame(loop);
@@ -2290,10 +2299,12 @@ function openPortrait(){
    closes... and the lamps burn low. (All suggestion, nothing shown.)
    ===================================================================== */
 let BC=null, BEDSPR=null;
-function startBedScene(mode){
+function startBedScene(mode,len){
   if(!G.isFemale){ const cv=document.createElement('canvas'); cv.width=cv.height=148;
     drawBridePortrait(cv,G.wife,true); BEDSPR=cv; } else BEDSPR=null;
-  BC={t:0, props:[], hearts:[], mode:mode||'heir',
+  len=len||'quick';
+  BC={t:0, props:[], hearts:[], mode:mode||'heir', len,
+      dur: len==='night'?3600 : len==='long'?1800 : 700,
       line:pick(['“Veni…”','“Te amo.”','“Nunc, mi gladiator…”','“Tarde venis…”'])};
   G.lastLoveDay=G.day;
   state='bed'; document.querySelectorAll('.screen').forEach(s=>s.classList.remove('on'));
@@ -2311,24 +2322,38 @@ function updateBed(dt){ const s=BC; s.t+=dt; const T=s.t;
   const T1=[150,190,218,240,258], T2=[360,378,392,404,416];
   first.forEach((it,i)=>{ const tt=T1[i]; if(T>tt&&T<tt+2){ s.props.push({kind:it[0],x:368,y:it[1],vx:it[2],vy:it[3],r:0,vr:it[4]}); if(it[0]==='subligar') sfx('giggle'); } });
   second.forEach((it,i)=>{ const tt=T2[i]; if(T>tt&&T<tt+2){ s.props.push({kind:it[0],x:368,y:it[1],vx:it[2],vy:it[3],r:0,vr:it[4]}); if(it[0]==='subligar') sfx('giggle'); } });
+  // longer sessions: MORE of the wardrobe goes airborne before the door shuts
+  if(s.len!=='quick'){
+    if(T>424&&T<426) s.props.push({kind:'veil',   x:368,y:144,vx:-2.2,vy:-2.2,r:0,vr:0.05});
+    if(T>438&&T<440) s.props.push({kind:'necklace',x:368,y:150,vx:-2.7,vy:-3.1,r:0,vr:0.22});
+    if(T>452&&T<454) s.props.push({kind:'girdle', x:368,y:156,vx:-3.0,vy:-2.4,r:0,vr:-0.14});
+  }
   // door + voice cues
   if(T>100&&T<102) sfx('creak');
+  if(T>430&&T<432) sfx('giggle');                                  // the sundial, corrected
   if(T>448&&T<450) sfx('giggle');                                  // her word for it
   if(T>460&&T<462) sfx('kiss');                                    // the first kiss, before the door
   if(T>474&&T<476) sfx('creak');
-  // ...and then the sounds carry through the closed door
-  if(T>500){
-    if(!s.nextClap||T>=s.nextClap){ sfx('clap'); s.nextClap=T+28+Math.random()*14; }
-    if(!s.nextMoan||T>=s.nextMoan){ sfx('moan'); s.nextMoan=T+64+Math.random()*46; }
-    if(!s.nextKiss||T>=s.nextKiss){ sfx('kiss'); s.nextKiss=T+46+Math.random()*40; }
+  // the ALL-NIGHT intermission: silence... then a hand snakes out for the wine
+  const inter = s.len==='night' && T>1500 && T<1600;
+  if(s.len==='night'){
+    if(T>1556&&T<1558 && !s.wineTaken){ s.wineTaken=true; sfx('giggle'); }
+    if(T>1600&&T<1602) sfx('creak');
   }
-  if(T>=700) finishBed();
+  // ...and then the sounds carry through the closed door
+  if(T>500 && !inter){
+    const pace = (s.len==='night' && T>1600)? 0.8 : 1;             // round two: bolder
+    if(!s.nextClap||T>=s.nextClap){ sfx('clap'); s.nextClap=T+(28+Math.random()*14)*pace; }
+    if(!s.nextMoan||T>=s.nextMoan){ sfx('moan'); s.nextMoan=T+(64+Math.random()*46)*pace; }
+    if(!s.nextKiss||T>=s.nextKiss){ sfx('kiss'); s.nextKiss=T+(46+Math.random()*40)*pace; }
+  }
+  if(T>=(s.dur||700)) finishBed();
 }
 // the master of the house, full height, striding to the door
 function drawShadowMale(fx,fy,ph){
   const S='#1c130c', stride=Math.sin(ph);
-  px(fx-4,fy-78,10,11,S); px(fx-2,fy-80,7,3,S);                    // head + cropped hair
-  px(fx-1,fy-67,5,4,S);                                            // neck
+  px(fx-4,fy-83,10,11,S); px(fx-2,fy-85,7,3,S);                    // head + cropped hair — a head above the domina
+  px(fx-1,fy-72,5,9,S);                                            // neck
   px(fx-9,fy-63,19,6,S);                                           // broad shoulders
   px(fx-7,fy-57,15,16,S); px(fx-5,fy-41,11,6,S);                   // torso tapering to the waist
   px(fx-9+stride*2,fy-61,4,14,S); px(fx+6-stride*2,fy-61,4,14,S);  // swinging arms
@@ -2385,23 +2410,30 @@ function drawShadowFigure(fx,fy,ph,beckon,open){
   ctx.globalAlpha=1;
 }
 function finishBed(){
-  const mode=BC.mode, w=G.wife;
+  const mode=BC.mode, w=G.wife, len=BC.len||'quick';
+  const emoF= len==='night'?9 : len==='long'?6 : 4;                 // fun-mode emotional gain
+  const phys= len==='night'?12 : len==='long'?7 : 4;                // physical gain, always
   advanceDay(1);
+  G.hygiene=clamp((G.hygiene===undefined?70:G.hygiene)-6,0,100);    // worth it
+  G.wifePhys=clamp((G.wifePhys===undefined?45:G.wifePhys)+phys,0,100);
   if(mode==='fun'){
-    G.wifeRel=clamp(G.wifeRel+8+(G.wifeRel<40?3:0),0,100);
+    G.wifeRel=clamp(G.wifeRel+emoF+(G.wifeRel<40?3:0),0,100);
     BC=null; state='menu'; saveQuiet(); openVilla();
-    toast('🍷 No heir tonight — only each other. '+(G.isFemale?'He falls asleep at your side.':'She falls asleep on your chest.')+' (+'+(G.wifeRel>=100?'MAX':'8')+' ♥ bond)',3200);
+    toast(len==='night'? '🌌 Dawn finds you both wrecked and grinning. The slaves pretend not to notice the walk. (+'+emoF+' ♥, +'+phys+' 🔥)'
+        : len==='long'? '🌙 The lamps burned all the way down. '+(G.isFemale?'He':'She')+' hums at breakfast for days. (+'+emoF+' ♥, +'+phys+' 🔥)'
+        : '🍷 No heir tonight — only each other. '+(G.isFemale?'He falls asleep at your side.':'She falls asleep on your chest.')+' (+'+emoF+' ♥, +'+phys+' 🔥)',3400);
     return;
   }
-  const chance=0.32 + (G.honor/400) + (w&&w.build!=='slender'?0.06:0) + (G.wifeRel/500);
+  const base= len==='night'?0.55 : len==='long'?0.42 : 0.32;        // the gods favour the thorough
+  const chance=base + (G.honor/400) + (w&&w.build!=='slender'?0.06:0) + (G.wifeRel/500);
   const hit=Math.random()<chance;
   if(hit && !G.pregnant) G.pregnant={due:G.day+27};
-  G.wifeRel=clamp(G.wifeRel+4,0,100);
+  G.wifeRel=clamp(G.wifeRel+(len==='night'?4:len==='long'?3:2),0,100);
   saveQuiet();
   BC=null; state='menu'; openVilla();
-  toast(hit? (G.isFemale?'🌙 …weeks later you are certain: YOU ARE WITH CHILD! Nine months now. (+4 ♥)'
-                        :'🌙 …weeks later the word comes: SHE IS WITH CHILD! Nine months now. (+4 ♥)')
-           : '🌙 A night to remember — but the gods grant no child yet. Try again soon. (+4 ♥)', 3200);
+  toast(hit? (G.isFemale?'🌙 …weeks later you are certain: YOU ARE WITH CHILD! Nine months now. (+🔥, +♥)'
+                        :'🌙 …weeks later the word comes: SHE IS WITH CHILD! Nine months now. (+🔥, +♥)')
+           : '🌙 A night to remember — but the gods grant no child yet. Try again soon. (+🔥, +♥)', 3200);
 }
 // wife sprite in 3 overlapping slices — bust & hips bounce WITHOUT the body splitting
 function drawJiggleSprite(spr,x,y,ph,alpha){
@@ -2425,6 +2457,8 @@ function drawBed(){
   px(40,196,64,18,'#5a3a22'); px(40,196,64,4,'#7a2f4a'); px(42,192,60,6,'#9a4a66');
   px(150,202,26,4,'#6a4a2c'); px(154,206,4,16,'#5a3c22'); px(168,206,4,16,'#5a3c22');
   px(158,194,6,8,'#8a2a3a'); px(159,192,4,2,'#c8c0b0');
+  // an amphora of good Falernian, prudently left by the door
+  if(!s.wineTaken){ px(316,198,8,14,'#a86a34'); px(316,198,8,2,'#c88a4e'); px(318,193,4,5,'#8a5428'); px(317,192,6,2,'#c88a4e'); px(315,206,2,4,'#8a5428'); px(323,206,2,4,'#8a5428'); }
   // oil lamp
   px(120,84,10,6,'#7a5c2e'); px(123,80,4,4,'#ffcf5a'); px(124,78,2,2,'#fff2b0');
   ctx.globalAlpha=.08; px(96,70,60,150,'#ffcf7a'); ctx.globalAlpha=1;
@@ -2441,27 +2475,37 @@ function drawBed(){
       px(dx+5,186,8,5,'#c8b090');                                                             // pillow
       const jr=Math.max(0,Math.sin(T*0.18))*1.2, S2='#17100a';
       if(!G.isFemale){
-        px(dx+8,182,8,6,S2); px(dx+6,180,4,4,S2);                                             // her head + hair on the pillow
-        px(dx+15,183,10,6,S2);                                                                 // her back low
-        px(dx+24,175-jr,9,9,S2); px(dx+26,172-jr,6,4,S2);                                      // the famous rear, raised & swaying
-        px(dx+32,181,7,4,S2); px(dx+37,183,4,3,S2);                                            // folded legs
+        // she SITS on the bed's edge, patting the covers — an invitation nobody misreads
+        const pat=((T*0.15)|0)%2;
+        px(dx+26,157,7,4,S2);                                                                  // hair piled high
+        px(dx+27,160,8,9,S2); px(dx+33,163,3,5,S2);                                            // head + a loose lock
+        px(dx+29,169,3,3,S2);                                                                  // neck
+        px(dx+26,172,9,11,S2); px(dx+34,174+jr,4,6,S2);                                        // torso upright, bust toward the door
+        px(dx+24,183,13,8,S2);                                                                 // seated hips settle into the covers
+        px(dx+33,190,4,11,S2); px(dx+29,190,4,9,S2);                                           // legs over the bedside
+        px(dx+32,201,6,2,S2); px(dx+28,199,6,2,S2);                                            // bare feet, dangling
+        px(dx+34,176,6,3,S2); px(dx+38,183+pat*2,4,3,S2);                                      // arm out — pat, pat
       } else {
         px(dx+5,182,10,4,'#e8dcc2'); px(dx+18,186,14,3,'#9a4a66');                             // covers turned down, a rose left waiting
         px(dx+20,184,4,2,'#c03a4a'); px(dx+23,185,4,1,'#4a6a34');
       }
-      // HIS standing profile, facing the bed — and yes, the silhouette hides nothing
+      // HIS standing profile — a full head taller than her, and the silhouette hides nothing
       if(T>400 && T<474){
         const lean=T>458? Math.min(6,(T-458)*0.5):0, gx=dx+60-lean, S3='#1c130c';
-        px(gx-4,136,10,11,S3); px(gx-2,134,7,3,S3);                                            // head
-        px(gx-8,147,17,6,S3); px(gx-6,153,13,20,S3);                                           // shoulders → torso
-        px(gx-5,173,5,21,S3); px(gx+1,173,5,21,S3); px(gx-6,194,7,2,S3); px(gx+1,194,7,2,S3);  // legs
-        px(gx-13,175,8,4,S3); px(gx-17,174,5,6,S3);                                            // ...the long shadow of the 🍆
-        px(gx-17,173,5,1,'rgba(255,176,80,.5)'); px(gx-18,176,1,3,'rgba(255,176,80,.4)');      // backlit by the lamp
-        if((T|0)%20<1.5) s.hearts.push({x:gx-8,y:150,vy:0.7,life:40,c:'#e26a8a'});
+        px(gx-4,126,10,12,S3); px(gx-2,124,8,3,S3);                                            // head, up near the lintel
+        px(gx-1,138,4,3,S3);                                                                   // neck
+        px(gx-9,141,18,6,S3); px(gx-6,147,13,22,S3);                                           // broad shoulders → torso
+        px(gx-5,169,5,25,S3); px(gx+1,169,5,25,S3); px(gx-6,194,7,2,S3); px(gx+1,194,7,2,S3);  // long legs
+        // ...the famous silhouette: humbled at first — then the sundial corrects itself
+        const rise = T<430?0 : T>440?1 : (T-430)/10;
+        if(rise<=0){      px(gx-10,172,5,3,S3); px(gx-13,175,5,4,S3); px(gx-15,179,3,3,S3); }  // slanted DOWN — it was a long day
+        else if(rise>=1){ px(gx-10,168,5,3,S3); px(gx-13,164,5,4,S3); px(gx-15,160,3,3,S3);    // she pats the bed — UP it swings
+                          px(gx-15,159,3,1,'rgba(255,176,80,.55)'); px(gx-16,161,1,3,'rgba(255,176,80,.4)'); }
+        else {            px(gx-12,170,7,4,S3); px(gx-16,169,4,5,S3); }                        // ...rising
+        if(rise>=1 && (T|0)%20<1.5) s.hearts.push({x:gx-8,y:146,vy:0.7,life:40,c:'#e26a8a'});
       }
-      if(T>444 && T<478){ pixelText(G.isFemale?'“Veni, domina mea…”':s.line,dx+dw/2,128,'#f0c8d4',1); }
-      if(T>458 && T<474){ px(dx+34,158,6,6,'#17100a'); px(dx+41,157,6,6,'#1c130c');            // two shadows lean together
-        pixelText('♥',dx+41,150,'#e26a8a',1); }
+      if(T>444 && T<478){ pixelText(G.isFemale?'“Veni, domina mea…”':s.line,dx+dw/2,120,'#f0c8d4',1); }
+      if(T>458 && T<474){ pixelText('♥',dx+46,150,'#e26a8a',1.3); }                            // the lean-in
     }
   }
   // the door leaf swings on its FAR hinge (right jamb), like a real door
@@ -2493,7 +2537,11 @@ function drawBed(){
     else drawShadowWalkerF(mx, 216, T*0.35);
   }
   // flung clothes arc across the room and settle — full garments, not scraps
-  for(const p of s.props){ ctx.save(); ctx.translate(p.x,p.y); ctx.rotate(p.r);
+  for(const p of s.props) drawFlungProp(p);
+  drawBedAfterProps(s,T,dx,dw);
+}
+function drawFlungProp(p){ ctx.save(); ctx.translate(p.x,p.y); ctx.rotate(p.r);
+  {
     if(p.kind==='toga'){
       px(-16,-8,32,15,'#efe3c2'); px(-16,-8,32,3,'#fff8ea');                   // the great white sweep of it
       px(-13,-2,26,2,'#d8ccb0'); px(-10,3,22,2,'#d8ccb0');                     // drape folds
@@ -2506,8 +2554,12 @@ function drawBed(){
     else if(p.kind==='belt'){ px(-11,-2,22,4,'#5a3a22'); px(-11,-2,22,1,'#7a5634'); px(-2,-4,5,8,'#b9c0c8'); px(-1,-3,3,3,'#e8c34a'); }
     else if(p.kind==='subligar'){ px(-7,-3,14,6,'#efe3c2'); px(-7,-3,14,2,'#fff8ea'); px(-7,3,5,3,'#d8ccb0'); px(2,3,5,3,'#d8ccb0'); }
     else if(p.kind==='msandal'){ px(-8,-3,16,5,'#6a4426'); px(-8,-5,6,3,'#8a5c34'); px(-7,-2,14,1,'#8a5c34'); }
+    else if(p.kind==='veil'){ px(-13,-7,26,11,'#cfc4e2'); px(-13,-7,26,2,'#e6def2'); px(-11,-1,22,1,'#b8ace0'); px(-13,3,3,3,'#b8ace0'); px(10,2,3,3,'#b8ace0'); }
+    else if(p.kind==='necklace'){ for(let i=0;i<9;i++) px(-8+i*2,-2+((i-4)*(i-4)*0.3|0),2,2,'#e8c34a'); px(-1,2,3,4,'#c03a4a'); px(0,2,1,1,'#ffd0da'); }
     else { px(-7,-3,14,5,'#8a5c34'); px(-7,-5,5,3,'#a8743e'); px(-6,-2,12,1,'#a8743e'); px(5,-4,2,6,'#6a4426'); }  // strappy sandal
-    ctx.restore(); }
+  }
+  ctx.restore(); }
+function drawBedAfterProps(s,T,dx,dw){
   // the door is shut: the lamps dim, the door rattles, love drifts upward
   if(T>490){
     const dim=clamp((T-490)/60,0,1)*0.55;
@@ -2520,12 +2572,267 @@ function drawBed(){
     if(beat===0) pixelText('♥',dx+dw/2-16,102,'#e26a8a',1.5);
     else if(beat===1) pixelText('♪',dx+dw/2+18,108,'#f0d0da',1.2);
     else pixelText('✧',dx+dw/2+2,98,'#ffd0da',1);
-    if(T>560) pixelText(BC.mode==='fun'? '~ just the two of them ~':'~ the lamps burn low ~',W/2,248,'rgba(232,195,74,.75)',1);
+    if(T>560 && T<1100) pixelText(BC.mode==='fun'? '~ just the two of them ~':'~ the lamps burn low ~',W/2,248,'rgba(232,195,74,.75)',1);
+    // LONG session: the encore
+    if(s.len==='long' && T>1150 && T<1400) pixelText('“…again?”  “Again.”',W/2,248,'rgba(240,200,212,.8)',1);
+    // ALL NIGHT: the intermission — a bare arm snakes out for the Falernian
+    if(s.len==='night'){
+      if(T>1500 && T<1600){
+        ctx.globalAlpha=0.5; px(dx,94,5,126,'#ffb050'); ctx.globalAlpha=1;                     // the door cracks
+        const reach= T<1540? clamp((T-1505)/35,0,1) : T<1560? 1 : clamp(1-(T-1560)/30,0,1);
+        if(reach>0 && !s.wineTaken){ const ax=dx-Math.round(reach*22);
+          px(ax,197,dx-ax,4,'#1c130c'); px(ax-4,195,6,7,'#1c130c'); }                          // arm + groping hand
+        else if(reach>0 && s.wineTaken){ const ax=dx-Math.round(reach*22);
+          px(ax,197,dx-ax,4,'#1c130c'); px(ax-5,190,8,14,'#a86a34'); px(ax-3,186,4,4,'#8a5428'); } // got it
+        if(T>1520&&T<1590) pixelText('~ intermission ~',W/2,248,'rgba(232,195,74,.7)',1);
+      }
+      if(T>1650 && T<2400) pixelText('~ the second wind ~',W/2,248,'rgba(240,200,212,.8)',1);
+      if(T>2800){ const dawn=clamp((T-2800)/500,0,1);                                          // dawn creeps under the door
+        ctx.globalAlpha=dawn*0.28; px(-4,-4,W+8,H+8,'#e8a050'); ctx.globalAlpha=1;
+        px(0,222,W,2,'rgba(255,208,120,'+(dawn*0.5)+')'); }
+      if(T>3100) pixelText('~ dawn, and still the door holds ~',W/2,248,'rgba(255,214,138,.85)',1);
+    }
   }
   ctx.textAlign='center';
   for(const h of s.hearts) pixelText('♥',h.x,h.y,h.c,1);
   // cinematic letterbox
   px(-4,-4,W+8,18,'#0a0705'); px(-4,H-14,W+8,18,'#0a0705');
+}
+
+/* =====================================================================
+   THE DOMUS — walk your own villa. A/D stroll · SPACE act · W invite.
+   The lagoon steams, the wardrobe endures, and everything stays implied.
+   ===================================================================== */
+let DM=null;
+function openDomus(){
+  DM={x:230, face:1, t:0, scene:null, wifeX:330, wifeDir:-1, wifePause:0, props:[], hearts:[], steam:[], splash:[]};
+  state='domus'; document.querySelectorAll('.screen').forEach(s2=>s2.classList.remove('on'));
+  $('statbar').classList.add('hide');
+  resetInputEdges();
+}
+function domusExit(){ DM=null; $('statbar').classList.remove('hide'); openVilla(); }
+// a dressed lady of the house, in miniature
+function drawWifeFig(c,x,y,w,ph){
+  const P=(a,b2,ww,h,col)=>{c.fillStyle=col;c.fillRect(Math.round(x+a),Math.round(y+b2),Math.round(ww),Math.round(h));};
+  const skin=w.skin||'#e6bd94', dress=w.dress||'#8a2f5a', hair=w.hair||'#5a3a1e';
+  const yy=-Math.abs(Math.sin(ph||0))*1.2;
+  P(-8,yy-26,16,26,dress); P(-8,yy-26,16,2,shade(dress,26)); P(-9,yy-6,18,6,shade(dress,-20));   // gown to the floor
+  P(-9,yy-30,18,8,dress); P(-9,yy-30,18,1,shade(dress,20));                                       // hips flare
+  P(-4,yy-36,8,6,shade(dress,-10));                                                               // cinched waist
+  P(-6,yy-46,12,10,dress); P(-6,yy-46,12,2,shade(dress,26));                                      // bodice
+  P(-7,yy-44,4,6,shade(dress,14)); P(3,yy-44,4,6,shade(dress,14)); P(-1,yy-44,2,5,shade(dress,-24)); // the bust, unmistakable
+  P(-2,yy-49,5,4,skin);                                                                           // neck + décolleté
+  P(-8,yy-45,3,12,skin); P(5,yy-45,3,12,skin);                                                    // arms
+  P(-4,yy-58,9,9,skin); P(-4,yy-58,9,1,shade(skin,20));                                           // head
+  P(-5,yy-61,11,5,hair); P(-6,yy-57,2,7,hair); P(5,yy-57,2,9,hair);                               // piled hair + falls
+  P(-2,yy-54,2,2,'#241408'); P(1,yy-54,2,2,'#241408'); P(-1,yy-51,3,1,'#a84a52');                 // eyes + lips
+  if(w.jewel) P(-1,yy-48,2,2,'#e8c34a');
+}
+// the same lady, robe left on the rim — the steam does the censoring
+function drawUndressedFig(c,x,y,w){
+  const P=(a,b2,ww,h,col)=>{c.fillStyle=col;c.fillRect(Math.round(x+a),Math.round(y+b2),Math.round(ww),Math.round(h));};
+  const skin=w.skin||'#e6bd94', hair=w.hair||'#5a3a1e', sh=shade(skin,-24);
+  P(-3,-32,7,15,skin); P(-4,-17,4,15,skin); P(1,-17,4,15,skin); P(-4,-2,5,2,'#8a5c34'); P(0,-2,5,2,'#8a5c34'); // legs
+  P(-6,-40,12,10,skin); P(-6,-40,12,1,shade(skin,20)); P(4,-38,2,8,sh);                            // hips
+  P(-3,-44,7,5,skin);                                                                              // waist
+  P(-5,-53,10,9,skin); P(-7,-51,3,6,skin);                                                         // torso + bust hint
+  P(-2,-57,5,4,skin);                                                                              // neck
+  P(-8,-52,3,11,skin); P(5,-52,3,11,skin);                                                         // arms
+  P(-4,-66,9,9,skin); P(-5,-69,11,5,hair); P(5,-65,2,10,hair);                                     // head + hair down
+}
+function drawDomusPlayer(x,y,ph){
+  if(G.isFemale) drawWifeFig(ctx,x,y,{skin:G.skin,dress:G.tunic,hair:'#3a2618',jewel:true},ph);
+  else { ctx.save(); ctx.translate(x,y-Math.abs(Math.sin(ph||0))*1.5); drawHusbandFig(ctx,0,0,G.wifeRel|0); ctx.restore(); }
+}
+function tryPoolInvite(){
+  if(!G.married||!G.wife){ toast('You have no one to invite — the steam rises alone.',2200); return; }
+  const pcd=G.day-(G.lastPoolDay===undefined?-9:G.lastPoolDay);
+  if(pcd<1){ toast('“Twice in one day? The neighbours ALREADY talk.” (tomorrow)',2400); return; }
+  if(!spouseWilling()){ toast('“In that water? With you? Not tonight.” — win the heart first.',2400); return; }
+  G.lastPoolDay=G.day; DM.scene={kind:'poolwife',t:0}; saveQuiet();
+}
+function tryWardrobe(){
+  if(!G.married||!G.wife){ toast('A fine wardrobe. You hang up a tunic. Thrilling.',2200); return; }
+  const wcd=G.day-(G.lastWardrobeDay===undefined?-9:G.lastWardrobeDay);
+  if(wcd<1){ toast('The wardrobe still needs repairs from LAST time. (tomorrow)',2400); return; }
+  if((G.hygiene|0)<30){ toast('“Into a CLOSED wardrobe? Smelling like that? Bathe first.”',2600); return; }
+  if(!spouseWilling()){ toast((G.wife.male?'He raises':'She raises')+' an eyebrow at the wardrobe, then at you. “No.”',2400); return; }
+  G.lastWardrobeDay=G.day; DM.scene={kind:'wardrobe',t:0, fromX:DM.wifeX}; saveQuiet();
+}
+function updateDomus(dt){
+  const D=DM; D.t+=dt;
+  for(const st of D.steam){ st.y-=st.vy*dt; st.x+=Math.sin(st.y*0.08)*0.25*dt; st.life-=dt; }
+  D.steam=D.steam.filter(s2=>s2.life>0);
+  for(const h of D.hearts){ h.y-=h.vy*dt; h.life-=dt; } D.hearts=D.hearts.filter(h=>h.life>0);
+  for(const p of D.props){ p.x+=p.vx*dt; p.y+=p.vy*dt; p.vy+=0.16*dt; p.r+=p.vr*dt; if(p.y>208){ p.y=208; p.vx*=0.5; p.vy=0; p.vr*=0.3; } }
+  for(const sp of D.splash){ sp.x+=sp.vx*dt; sp.y+=sp.vy*dt; sp.vy+=0.2*dt; sp.life-=dt; }
+  D.splash=D.splash.filter(s2=>s2.life>0);
+  if(D.scene){ updateDomusScene(dt); return; }
+  const sp2=1.5*dt;
+  if(held.a){ D.x-=sp2; D.face=-1; } if(held.d){ D.x+=sp2; D.face=1; }
+  D.x=clamp(D.x, 24, 470);
+  if(G.married && G.wife){
+    if(D.wifePause>0) D.wifePause-=dt;
+    else { D.wifeX+=D.wifeDir*0.35*dt;
+      if(D.wifeX<236||D.wifeX>376){ D.wifeDir*=-1; D.wifePause=rnd(80,220); } }
+  }
+  const nearPool=G.hasPool && Math.abs(D.x-86)<36;
+  const nearWard=G.hasWardrobe && Math.abs(D.x-309)<20;
+  const nearDoor=Math.abs(D.x-414)<16;
+  const nearExit=D.x>452;
+  if(consume('space')){
+    if(nearExit){ domusExit(); return; }
+    else if(nearPool) D.scene={kind:'bath',t:0};
+    else if(nearWard) tryWardrobe();
+    else if(nearDoor){
+      if(!G.married) toast('An empty bed, neatly made. The house waits for a family.',2200);
+      else if(loveLeft(bedLen)<=0) toast('“AGAIN?!” — no '+bedLen+' sessions left today.',2200);
+      else if(!spouseWilling()) toast('“Not tonight.” — win the heart first.',2200);
+      else { spendLove(bedLen); saveQuiet(); DM=null; startBedScene('fun',bedLen); return; }
+    }
+  }
+  if(consume('w') && nearPool) tryPoolInvite();
+}
+function updateDomusScene(dt){
+  const D=DM, sc=D.scene; sc.t+=dt; const T=sc.t;
+  if(sc.kind==='bath'){
+    if(T>10 && (T|0)%6<1) D.steam.push({x:44+Math.random()*84,y:204,vy:0.35+Math.random()*0.25,life:56+Math.random()*30});
+    if(T>16&&T<18){ sfx('thud'); for(let i=0;i<8;i++) D.splash.push({x:86+rnd(-8,8),y:202,vx:rnd(-1.2,1.2),vy:rnd(-2.4,-0.8),life:26}); }
+    if(T>=320){ D.scene=null; G.hygiene=100; refreshStatbar(); saveQuiet();
+      toast('🧼 You soak until the arena leaves your skin. HYGIENE 100.',2600); }
+  } else if(sc.kind==='poolwife'){
+    // 0-160 the walk · 160-260 the robe drops behind stubborn steam · 262 the dive · then ~20s the water keeps its counsel
+    if(T>150 && T<268 && (T|0)%3<1) D.steam.push({x:112+Math.random()*26,y:198,vy:0.5,life:66});
+    if(T>190&&T<192) D.props.push({kind:'toga',x:128,y:178,vx:1.6,vy:-2.4,r:0,vr:0.08});
+    if(T>216&&T<218) D.props.push({kind:'breastband',x:128,y:182,vx:2.0,vy:-2.6,r:0,vr:-0.1});
+    if(T>238&&T<240){ D.props.push({kind:'girdle',x:128,y:186,vx:1.4,vy:-2.2,r:0,vr:0.14}); sfx('giggle'); }
+    if(T>262&&T<264){ sfx('thud'); for(let i=0;i<12;i++) D.splash.push({x:98+rnd(-12,12),y:200,vx:rnd(-1.6,1.6),vy:rnd(-2.8,-1),life:30}); }
+    if(T>290 && (T|0)%4<1) D.steam.push({x:36+Math.random()*100,y:202,vy:0.3+Math.random()*0.3,life:76});
+    if(T>310){
+      if(!sc.nGig||T>=sc.nGig){ sfx('giggle'); sc.nGig=T+70+Math.random()*60; }
+      if(!sc.nKiss||T>=sc.nKiss){ sfx('kiss'); sc.nKiss=T+90+Math.random()*70; }
+      if(!sc.nMoan||T>=sc.nMoan){ sfx('moan'); sc.nMoan=T+130+Math.random()*80; }
+      if((T|0)%38<1) D.hearts.push({x:86+rnd(-24,24),y:190,vy:0.5,life:60});
+    }
+    if(T>=1500){ D.scene=null; G.hygiene=100; G.wifePhys=clamp((G.wifePhys===undefined?45:G.wifePhys)+8,0,100); G.wifeRel=clamp(G.wifeRel+4,0,100);
+      refreshStatbar(); saveQuiet();
+      toast('🏝 The steam keeps its secrets. You are both extremely clean and extremely pleased. (+4 ♥, +8 🔥, 🧼 100)',3600); }
+  } else if(sc.kind==='wardrobe'){
+    // 0-140 she crosses the atrium · 140-180 the doors click shut · 180-900 the wardrobe earns its price
+    if(T>182&&T<184) sfx('creak');
+    if(T>180&&T<900){
+      [[220,'tunic'],[268,'breastband'],[320,'girdle'],[372,'sandal'],[430,'subligar'],[490,'msandal'],[560,'veil'],[640,'necklace']]
+        .forEach(([tt,kind])=>{ if(T>tt&&T<tt+2) D.props.push({kind,x:309,y:148,vx:rnd(-2.6,-1.0),vy:rnd(-3.2,-1.8),r:0,vr:rnd(-0.2,0.2)}); });
+      if(!sc.nClap||T>=sc.nClap){ sfx('clap'); sc.nClap=T+34+Math.random()*20; }
+      if(!sc.nGig||T>=sc.nGig){ sfx('giggle'); sc.nGig=T+80+Math.random()*70; }
+      if(!sc.nKiss||T>=sc.nKiss){ sfx('kiss'); sc.nKiss=T+60+Math.random()*50; }
+      if((T|0)%34<1) D.hearts.push({x:309+rnd(-12,12),y:128,vy:0.6,life:56});
+      if(T>620&&T<622) sfx('thud');                                     // a slat gives way. worth it.
+    }
+    if(T>=900){ D.scene=null; G.wifePhys=clamp((G.wifePhys===undefined?45:G.wifePhys)+7,0,100); G.hygiene=clamp((G.hygiene|0)-4,0,100);
+      refreshStatbar(); saveQuiet();
+      toast('🚪 You emerge adjusting your tunic; '+(G.wife.male?'he':'she')+' emerges fixing '+(G.wife.male?'his':'her')+' hair — in the wrong order. The wardrobe will live. (+7 🔥)',3600); }
+  }
+}
+function drawDomus(){
+  const D=DM, T=D.t, FY=214;
+  // walls, frieze, floor
+  px(-4,-4,W+8,H+8,'#2a1c12');
+  px(-4,-4,W+8,130,'#4a3626');
+  px(-4,50,W+8,4,'#7a2f4a'); px(-4,56,W+8,1,'#e8c34a');
+  for(let i=0;i<3;i++) px(-4,72+i*18,W+8,1,'#3e2c1e');
+  px(0,FY,W,H-FY,'#3a2c1e'); for(let fx=0;fx<W;fx+=22){ px(fx,FY,1,H-FY,'#2c2014'); px(fx+11,FY+6,1,H-FY-6,'#31241a'); }
+  px(0,FY-2,W,2,'#241812');
+  for(const cx of [172,252,332]){ px(cx,58,10,156,'#cfc0a2'); px(cx+1,58,3,156,'#e8dcc2'); px(cx-2,56,14,4,'#e8dcc2'); px(cx-2,210,14,4,'#b8a88a'); }
+  px(196,64,10,6,'#7a5c2e'); px(199,60,4,4,'#ffcf5a'); ctx.globalAlpha=.07; px(168,50,68,164,'#ffcf7a'); ctx.globalAlpha=1;
+  // THE LAGOON (or the humble basin)
+  if(G.hasPool){
+    px(18,196,124,4,'#cfc0a2'); px(18,196,124,1,'#e8dcc2');
+    px(22,200,116,18,'#2a5a7a'); px(22,200,116,2,'#5a9ec4');
+    for(let i=0;i<5;i++) px(26+((T*0.6+i*19)%104),203+i*3,8,1,'#4a8aae');
+    px(8,180,6,26,'#4a6a34'); px(6,172,10,10,'#5a8a3e');
+    px(144,182,6,24,'#4a6a34'); px(142,174,10,10,'#5a8a3e');
+    if((T|0)%9<1) D.steam.push({x:28+Math.random()*104,y:202,vy:0.2+Math.random()*0.15,life:44});
+  } else {
+    px(62,196,36,4,'#cfc0a2'); px(66,200,28,10,'#3a6a8a'); px(60,206,4,12,'#8a7a5c'); px(96,206,4,12,'#8a7a5c');
+  }
+  // THE WARDROBE
+  if(G.hasWardrobe){
+    const busy=D.scene&&D.scene.kind==='wardrobe'&&D.scene.t>180&&D.scene.t<900;
+    const shake= busy? Math.sin(D.scene.t*0.9)*1.6+rnd(-0.5,0.5) : 0;
+    const wx=292+shake;
+    px(wx,136,34,78,'#6a4a2c'); px(wx,136,34,3,'#8a6640');
+    px(wx+2,140,14,70,'#7a5634'); px(wx+18,140,14,70,'#7a5634');
+    px(wx+15,168,2,8,'#e8c34a'); px(wx+17,168,2,8,'#e8c34a');
+    px(wx-2,212,38,4,'#4a3420');
+    if(busy){ if((D.scene.t|0)%12<1) px(wx+rnd(4,28),132,2,2,'#8a6640'); pixelText('♥',wx+17,124,'#e26a8a',1); }
+  }
+  // BEDCHAMBER DOOR + EXIT
+  px(392,120,44,94,'#5a4028'); px(396,124,36,90,'#c07830'); px(396,124,36,3,'#e8a050'); px(426,166,3,8,'#e8c34a');
+  px(452,110,28,104,'#241812'); px(456,114,22,100,'#160e08'); pixelText('EXIT',466,150,'#8a7a5c',1);
+  // clothes on the wing, splashes
+  for(const p of D.props) drawFlungProp(p);
+  for(const sp of D.splash) px(sp.x,sp.y,2,2,'#8ac4e0');
+  // letterbox first, so prompts print on top of it
+  px(-4,-4,W+8,16,'#0a0705'); ctx.textAlign='center'; pixelText('VILLA RUSTICA — your halls · A/D walk · SPACE act',W/2,8,'#c8b060',1);
+  px(-4,H-14,W+8,18,'#0a0705');
+  // actors
+  const sc=D.scene, w=G.wife;
+  if(!sc){
+    if(G.married && w){
+      if(w.male){ ctx.save(); ctx.translate(D.wifeX,FY); drawHusbandFig(ctx,0,0,G.wifeRel|0,w.skin,w.dress); ctx.restore(); }
+      else drawWifeFig(ctx,D.wifeX,FY,w,D.wifePause>0?0:D.t*0.2);
+    }
+    drawDomusPlayer(D.x,FY,(held.a||held.d)?D.t*0.35:0);
+    let prompt='';
+    if(D.x>452) prompt='SPACE: LEAVE THE HALLS';
+    else if(G.hasPool&&Math.abs(D.x-86)<36) prompt='SPACE: BATHE'+(G.married?'  ·  W: INVITE '+(w&&w.male?'HIM':'HER'):'');
+    else if(G.hasWardrobe&&Math.abs(D.x-309)<20) prompt=G.married?'SPACE: …THE WARDROBE 😏':'SPACE: WARDROBE';
+    else if(Math.abs(D.x-414)<16) prompt='SPACE: THE BEDCHAMBER ('+bedLen.toUpperCase()+')';
+    if(prompt){ ctx.textAlign='center'; pixelText(prompt,W/2,H-6,'#e8c34a',1); }
+  } else if(sc.kind==='bath'){
+    const T2=sc.t, skin=G.skin||'#caa06a';
+    px(78,190,10,10,skin); px(78,188,10,3,G.isFemale?'#3a2618':'#3a2618');           // head above the water
+    if(G.isFemale) px(87,190,3,9,'#3a2618');                                          // her hair, wet down her neck
+    px(72,199,22,3,shade(skin,-12));                                                  // shoulders at the waterline
+    px(118,190,16,6,G.tunic||'#7a2f22'); px(118,190,16,2,shade(G.tunic||'#7a2f22',22)); // tunic folded on the rim
+    if(T2<316){ ctx.textAlign='center'; pixelText('~ the water takes the week away ~',W/2,H-6,'#c8b060',1); }
+  } else if(sc.kind==='poolwife'){
+    const T2=sc.t;
+    // the player waits in the water from the start
+    px(60,192,9,9,G.skin||'#caa06a'); px(60,190,9,3,'#3a2618'); px(55,200,19,3,shade(G.skin||'#caa06a',-12));
+    if(T2<160){ const wx2=330-(T2/160)*(330-124);                                     // the walk over
+      if(w.male){ ctx.save(); ctx.translate(wx2,FY); drawHusbandFig(ctx,0,0,G.wifeRel|0,w.skin,w.dress); ctx.restore(); }
+      else drawWifeFig(ctx,wx2,FY,w,T2*0.25); }
+    else if(T2<262){                                                                   // the robe drops — steam is a gentleman
+      if(w.male){ ctx.save(); ctx.translate(124,FY); drawHusbandFig(ctx,0,0,G.wifeRel|0,w.skin,w.dress); ctx.restore(); }
+      else drawUndressedFig(ctx,124,FY,w);
+      ctx.globalAlpha=.85; px(115,FY-52,19,11,'#efeae2'); px(114,FY-38,21,13,'#efeae2'); ctx.globalAlpha=1;  // two stubborn clouds
+    }
+    else if(T2>290){                                                                   // two heads in the mist, very close
+      const b1=Math.sin(T2*0.1)*1.5, b2=Math.sin(T2*0.1+1.5)*1.5;
+      px(74,192+b1,9,8,'#1c130c'); px(73,190+b1,11,3,'#1c130c');
+      px(89,193+b2,8,7,'#17100a'); px(87,190+b2,11,4,'#17100a');
+      px(70,200+b1,16,3,'#152a3a'); px(86,201+b2,14,3,'#152a3a');
+      ctx.textAlign='center'; pixelText('~ the steam keeps its secrets ~',W/2,H-6,'#c8b060',1);
+    }
+  } else if(sc.kind==='wardrobe'){
+    const T2=sc.t;
+    if(T2<140){ const wx2=(sc.fromX||330)+(280-(sc.fromX||330))*(T2/140);
+      if(w.male){ ctx.save(); ctx.translate(wx2,FY); drawHusbandFig(ctx,0,0,G.wifeRel|0,w.skin,w.dress); ctx.restore(); }
+      else drawWifeFig(ctx,wx2,FY,w,T2*0.25);
+      drawDomusPlayer(D.x,FY,0); }
+    else if(T2<180){ ctx.globalAlpha=1-(T2-140)/40;                                    // they slip inside
+      drawDomusPlayer(300,FY,0);
+      if(w.male){ ctx.save(); ctx.translate(284,FY); drawHusbandFig(ctx,0,0,G.wifeRel|0,w.skin,w.dress); ctx.restore(); }
+      else drawWifeFig(ctx,284,FY,w,0);
+      ctx.globalAlpha=1; }
+    else if(T2<900){ ctx.textAlign='center'; pixelText('~ sturdy craftsmanship ~',W/2,H-6,'#c8b060',1); }
+  }
+  // steam veils all — drawn last on purpose
+  for(const st of D.steam){ ctx.globalAlpha=clamp(st.life/50,0,1)*0.55; px(st.x-4,st.y-8,9,7,'#e8e2da'); px(st.x-2,st.y-13,6,5,'#f2eee8'); ctx.globalAlpha=1; }
+  ctx.textAlign='center';
+  for(const h of D.hearts) pixelText('♥',h.x,h.y,'#e26a8a',1);
 }
 
 /* =====================================================================
@@ -3069,6 +3376,41 @@ function openVilla(){
   const c=slaveCost(); bt.textContent='BUY SLAVE ('+c+'d)';
   bt.disabled=G.coin<c||G.slaves>=8; bt.onclick=()=>{ if(G.coin<c||G.slaves>=8)return; G.coin-=c; G.slaves++; refreshStatbar(); openVilla(); };
   card.appendChild(bt); b.appendChild(card);
+  // ---- RENOVATIONS: the villa grows with the legend ----
+  const rh=document.createElement('div'); rh.className='small'; rh.style.color='var(--gold)'; rh.style.marginTop='6px';
+  rh.textContent='🏗 RENOVATIONS — build the house of the century:'; b.appendChild(rh);
+  const rrow=document.createElement('div'); rrow.className='shopcard';
+  const rr=document.createElement('div'); rr.className='row gap6';
+  const walkBt=document.createElement('button'); walkBt.className='btn sm gold'; walkBt.textContent='🚶 WALK THE VILLA';
+  walkBt.title='Stroll your own halls — bathe in the lagoon, find your spouse, misuse the wardrobe. A/D to walk, SPACE to act.';
+  walkBt.onclick=()=>openDomus(); rr.appendChild(walkBt);
+  if(!G.hasPool){
+    const pb=document.createElement('button'); pb.className='btn sm'; pb.textContent='🏝 BUILD A GARDEN LAGOON (600d)';
+    pb.title='A heated bathing pool among the laurels. Bathe to full 🧼 hygiene — and the domina may be persuaded to join you…';
+    pb.disabled=G.coin<600;
+    pb.onclick=()=>{ if(G.coin<600)return; G.coin-=600; G.hasPool=true; refreshStatbar();
+      toast('🏝 Masons and steam-fitters labour a week. Your lagoon glitters like Baiae. (bathe on your villa walks)',3200); openVilla(); };
+    rr.appendChild(pb);
+  }
+  if(!G.hasWardrobe){
+    const wb=document.createElement('button'); wb.className='btn sm'; wb.textContent='🚪 GRAND CEDAR WARDROBE (250d)';
+    wb.title='A wardrobe you could hold games in. Sturdy. Very sturdy. You will test this.';
+    wb.disabled=G.coin<250;
+    wb.onclick=()=>{ if(G.coin<250)return; G.coin-=250; G.hasWardrobe=true; refreshStatbar();
+      toast('🚪 The carpenters ask no questions. The wardrobe stands like a fortress. (find it on your villa walks)',3200); openVilla(); };
+    rr.appendChild(wb);
+  }
+  if(!G.hasPool){
+    const wsh=document.createElement('button'); wsh.className='btn sm';
+    const wcd=G.day-(G.lastWashDay===undefined?-9:G.lastWashDay);
+    wsh.textContent= wcd<1? '🧼 (washed today)':'🧼 WASH AT THE BASIN (free)';
+    wsh.title='Cold water and a strigil. Hygiene up to 70 — a lagoon does better.';
+    wsh.disabled=wcd<1;
+    wsh.onclick=()=>{ G.lastWashDay=G.day; G.hygiene=Math.max(G.hygiene|0,70); refreshStatbar();
+      toast('🧼 You scrape off the arena. HYGIENE '+G.hygiene+'. (a lagoon would reach 100)',2400); openVilla(); };
+    rr.appendChild(wsh);
+  }
+  rrow.appendChild(rr); b.appendChild(rrow);
 }
 $('btn-villa-back').onclick=()=>enterMap();
 
@@ -3102,8 +3444,8 @@ function succession(ch){
   G.glory=Math.floor(G.glory*0.25); G.pop=20;
   G.level=Math.max(1,Math.round(G.level/3)); G.xp=0;
   G.wins=0; G.losses=0; G.injury=null;
-  G.married=false; G.wife=null; G.wifeRel=0; G.pregnant=null;
-  G.lastLoveDay=-9; G.lastTalkDay=-9; G.marryPrompted=false;
+  G.married=false; G.wife=null; G.wifeRel=0; G.wifePhys=45; G.pregnant=null;
+  G.lastLoveDay=-9; G.lastTalkDay=-9; G.marryPrompted=false; G.hygiene=70;
   G.retired=false; G.path=null; G.office=0;
   refreshStatbar(); saveQuiet(); openVilla();
   toast(fem
@@ -3132,55 +3474,112 @@ function marriageEffectsText(b){
   if(b.tradeFood) bits.push('+'+b.tradeFood+' rations/bout');
   return bits.join(' · ');
 }
+// ---- bedchamber sessions: how long the lamps burn, and how often ----
+const LOVE_CAP={quick:3,long:2,night:1};
+let bedLen='quick';
+function loveLeft(len){ if(G.loveDay!==G.day) return LOVE_CAP[len];
+  return LOVE_CAP[len]-(len==='quick'?(G.loveQuick||0):len==='long'?(G.loveLong||0):(G.loveNight||0)); }
+function spendLove(len){ if(G.loveDay!==G.day){ G.loveDay=G.day; G.loveQuick=0; G.loveLong=0; G.loveNight=0; }
+  if(len==='quick')G.loveQuick++; else if(len==='long')G.loveLong++; else G.loveNight++; }
+function spouseWilling(){ return G.married && ((G.wifeRel+(G.wifePhys===undefined?45:G.wifePhys))/2)>=40; }
+// what the spouse tells her friends — two bars, two verdicts
+function wifeVerdict(){
+  const e=G.wifeRel|0, p=(G.wifePhys===undefined?45:G.wifePhys)|0, hy=(G.hygiene===undefined?70:G.hygiene)|0;
+  const S=G.isFemale?'She':'He', s2=G.isFemale?'she':'he';
+  const pw= p>=90?'“In the bedchamber? A LEGEND. The neighbours know the schedule.”'
+        : p>=70?'“The 🍑🍆… I have no complaints. None.”'
+        : p>=45?'“Enthusiastic. Improving with practice.”'
+        : p>=25?'“…'+s2+' tries. Bless.”'
+        : '“We are strangers by lamplight.”';
+  let ew= e>=90?'“'+S+' is my whole heart.”'
+        : e>=70?'“'+S+' listens. '+S+' remembers.”'
+        : e>=45?'“A good match, in its way.”'
+        : e>=25?'“'+S+' speaks mostly of swords.”'
+        : '“Who IS this person I married?”';
+  if(hy<30) ew=ew.slice(0,-1)+' — but by Jupiter, '+s2+' SMELLS of the arena.”';
+  else if(hy>=85) ew=ew.slice(0,-1)+' — and '+s2+' smells of rose oil.”';
+  return {pw,ew,p,e,hy};
+}
 function buildMarriageCard(b){
   const card=document.createElement('div'); card.className='shopcard';
   if(G.married && G.wife){
     const w=G.wife; const row=document.createElement('div'); row.className='row gap'; row.style.alignItems='center';
     row.appendChild(briadeImg(w,84));
     const preg=G.pregnant, month=preg? Math.min(9, 9-Math.ceil((preg.due-G.day)/3)) : 0;
-    const rel=G.wifeRel|0, relC= rel>=75?'#e26a8a': rel>=45?'#e8c34a':'#8a6a4a';
-    const relWord= rel>=85?'devoted': rel>=65?'loving': rel>=45?'fond': rel>=25?'dutiful':'cold';
+    const v=wifeVerdict();
+    const mkbar=(val,col)=>`<span style="display:inline-block;width:70px;height:7px;background:#241812;border:1px solid #000;vertical-align:middle"><span style="display:block;width:${val}%;height:100%;background:${col}"></span></span>`;
+    const eC= v.e>=75?'#e26a8a': v.e>=45?'#e8c34a':'#8a6a4a';
+    const pC= v.p>=75?'#e0533a': v.p>=45?'#d88a3a':'#8a6a4a';
     const info=document.createElement('div'); info.innerHTML=
       `<div><b style="color:var(--gold)">⚭ ${w.name}</b> <span class="small muted">— your ${w.adj} ${w.rank} ${w.male?'husband':'wife'}</span></div>
-       <div class="small">♥ Bond: <span style="display:inline-block;width:70px;height:7px;background:#241812;border:1px solid #000;vertical-align:middle"><span style="display:block;width:${rel}%;height:100%;background:${relC}"></span></span>
-         <b style="color:${relC}">${rel}</b>/100 <span class="muted">(${relWord})</span></div>
+       <div class="small">♥ Emotional: ${mkbar(v.e,eC)} <b style="color:${eC}">${v.e}</b>/100 <span class="muted">${v.ew}</span></div>
+       <div class="small">🔥 Physical: ${mkbar(v.p,pC)} <b style="color:${pC}">${v.p}</b>/100 <span class="muted">${v.pw}</span></div>
        <div class="small" style="color:var(--gold)">${marriageEffectsText(w)}</div>`+
       (preg? `<div class="small" style="color:#e2a0b8">🤰 ${G.isFemale?'You are':'She is'} with child — month <b>${Math.max(1,month)}</b> of 9.</div>`:'');
     row.appendChild(info); card.appendChild(row);
-    // talk · bedchamber for an heir · bedchamber for love
-    const cd=G.day-(G.lastLoveDay||-9), tcd=G.day-(G.lastTalkDay||-9);
+    const rel=v.e, tcd=G.day-(G.lastTalkDay||-9);
+    // session length picker — the daily ration of ♥
+    const lenRow=document.createElement('div'); lenRow.className='row gap6'; lenRow.style.marginTop='4px';
+    const lh=document.createElement('span'); lh.className='small muted'; lh.textContent='Session:'; lenRow.appendChild(lh);
+    [['quick','🕯 QUICK 10s'],['long','🌙 LONG 30s'],['night','🌌 ALL NIGHT 1m']].forEach(([id,label])=>{
+      const c2=document.createElement('button'); c2.className='btn sm'+(bedLen===id?' gold':'');
+      const left=loveLeft(id);
+      c2.textContent=label+' ('+left+'/'+LOVE_CAP[id]+')';
+      c2.title= id==='quick'?'A stolen hour. 3 a day.': id==='long'?'The lamps burn a while — more of the wardrobe ends up airborne. 2 a day.':'The WHOLE night unfolds behind that door — intermissions included. Once a day; you will both walk funny.';
+      c2.disabled=left<=0;
+      c2.onclick=()=>{ bedLen=id; openVilla(); };
+      lenRow.appendChild(c2);
+    });
+    card.appendChild(lenRow);
+    // talk (4 questions) · bedchamber for an heir · bedchamber for love
     const btns=document.createElement('div'); btns.className='row gap6'; btns.style.marginTop='4px';
-    const talk=document.createElement('button'); talk.className='btn sm'; talk.textContent= tcd<1? '💬 (you spoke today)':'💬 TALK WITH HER';
-    talk.disabled=tcd<1;
-    talk.onclick=()=>{
+    const talk=document.createElement('button'); talk.className='btn sm'; talk.textContent='💬 TALK WITH '+(w.male?'HIM':'HER');
+    const qrow=document.createElement('div'); qrow.className='row gap6'; qrow.style.display='none'; qrow.style.marginTop='4px';
+    talk.onclick=()=>{ qrow.style.display = qrow.style.display==='none'?'flex':'none'; };
+    const q=(label,title,dis,fn)=>{ const bq=document.createElement('button'); bq.className='btn sm'; bq.textContent=label; bq.title=title||''; bq.disabled=!!dis; bq.onclick=fn; qrow.appendChild(bq); };
+    q(tcd<1?'💬 (you spoke today)':'💬 “How was your day?”','Listen. Actually listen.',tcd<1,()=>{
       G.lastTalkDay=G.day;
       const lines=[
         ['She retells your last bout blow-by-blow — she was watching closer than you knew.',4],
         ['You gossip about the senators. Her impression of the fat one is merciless.',3],
         ['She oils and mends your gear herself, humming an old song of '+w.adj+' hills.',4],
         ['You talk of the children you will raise, and the villa you will grow old in.',5],
-        ['She names every scar on your arms, and kisses the newest one.',5],
-        ['She asks for a silver comb from the forum (50d)…',0]];
+        ['She names every scar on your arms, and kisses the newest one.',5]];
       const pickL=lines[ri(0,lines.length-1)];
-      if(pickL[1]===0){
-        if(G.coin>=50){ G.coin-=50; G.wifeRel=clamp(G.wifeRel+8,0,100); toast('💬 '+pickL[0]+' You buy it. Her eyes shine (+8 bond).',3000); }
-        else { G.wifeRel=clamp(G.wifeRel+1,0,100); toast('💬 '+pickL[0]+' Your purse is empty — she laughs and says your arm is gift enough (+1 bond).',3000); }
-      } else { G.wifeRel=clamp(G.wifeRel+pickL[1],0,100); toast('💬 '+pickL[0]+' (+'+pickL[1]+' bond)',2800); }
+      G.wifeRel=clamp(G.wifeRel+pickL[1],0,100); toast('💬 '+pickL[0]+' (+'+pickL[1]+' ♥)',2800);
       refreshStatbar(); saveQuiet(); openVilla();
-    };
+    });
+    q(tcd<1?'🌹 (you spoke today)':'🌹 “You look beautiful tonight.”','Flattery: the oldest weapon in the house.',tcd<1,()=>{
+      G.lastTalkDay=G.day;
+      if(rel<25){ G.wifeRel=clamp(G.wifeRel+1,0,100); toast('🌹 One raised eyebrow: “What do you want.” (+1 ♥)',2600); }
+      else { G.wifeRel=clamp(G.wifeRel+3,0,100); toast('🌹 '+(w.male?'He grins like a recruit.':'She hides a smile behind her cup — badly.')+' (+3 ♥)',2600); }
+      refreshStatbar(); saveQuiet(); openVilla();
+    });
+    q('🎁 A gift from the forum (50d)','A silver comb, Tyrian ribbon, honeyed figs — 50 denarii of pure strategy.',G.coin<50,()=>{
+      G.coin-=50; G.wifeRel=clamp(G.wifeRel+8,0,100);
+      toast('🎁 You present it with terrible ceremony. '+(w.male?'His':'Her')+' eyes shine. (+8 ♥)',2800);
+      refreshStatbar(); saveQuiet(); openVilla();
+    });
+    q('😏 “Let’s woohoo.”','Directness is also a Roman virtue.',false,()=>{
+      if((G.hygiene|0)<30){ toast('😏 '+(w.male?'He':'She')+' wrinkles a nose: “Bathe FIRST, gladiator. You smell like the losing side.” (raise 🧼 at the baths or your lagoon)',3400); return; }
+      if(!spouseWilling()){ toast('😏 “Not tonight.” — win the heart (or impress in the bedchamber) and ask again.',3000); return; }
+      if(loveLeft(bedLen)<=0){ toast('😏 “AGAIN?! The lamps are out of oil, love.” (no '+bedLen+' sessions left today)',2800); return; }
+      spendLove(bedLen); saveQuiet(); startBedScene('fun',bedLen);
+    });
     const bedH=document.createElement('button'); bedH.className='btn sm gold';
-    bedH.textContent = preg? (G.isFemale?'🍆🍑 (you are with child)':'🍆🍑 (she is with child)') : cd<2? '🍆🍑 (rest tonight)' : '🍆🍑 FOR AN HEIR';
-    bedH.disabled=!!preg || cd<2;
-    bedH.onclick=()=>startBedScene('heir');
+    bedH.textContent = preg? (G.isFemale?'🍆🍑 (you are with child)':'🍆🍑 (she is with child)') : loveLeft(bedLen)<=0? '🍆🍑 (spent for today)' : '🍆🍑 FOR AN HEIR';
+    bedH.disabled=!!preg || loveLeft(bedLen)<=0;
+    bedH.onclick=()=>{ spendLove(bedLen); saveQuiet(); startBedScene('heir',bedLen); };
     const bedF=document.createElement('button'); bedF.className='btn sm';
-    bedF.textContent = cd<2? '🍷 (let her rest)' : '🍷 FOR LOVE — just the two of you';
-    bedF.title='No heir tonight — only each other. The bond deepens (+8 ♥).';
-    bedF.disabled=cd<2;
-    bedF.onclick=()=>startBedScene('fun');
+    bedF.textContent = loveLeft(bedLen)<=0? '🍷 (spent for today)' : '🍷 FOR LOVE — just the two of you';
+    bedF.title='No heir tonight — only each other. The bond deepens.';
+    bedF.disabled=loveLeft(bedLen)<=0;
+    bedF.onclick=()=>{ spendLove(bedLen); saveQuiet(); startBedScene('fun',bedLen); };
     btns.appendChild(talk); btns.appendChild(bedH); btns.appendChild(bedF);
     const port=document.createElement('button'); port.className='btn sm'; port.textContent='🖼 FAMILY PORTRAIT';
     port.onclick=()=>openPortrait(); btns.appendChild(port);
     card.appendChild(btns);
+    card.appendChild(qrow);
     // ---- DEVOTED (90+ ♥): the marriage the poets write about ----
     if(rel>=90){
       const dv=document.createElement('div'); dv.className='row gap6'; dv.style.marginTop='4px';
@@ -3208,17 +3607,33 @@ function buildMarriageCard(b){
       }
       card.appendChild(dv);
     }
-    // the children of your house (sons come of age at 40 days)
+    // the children of your house (sons come of age at 40 days) — each has a heart to win too
     if(G.children.length){
       const kids=document.createElement('div'); kids.className='small'; kids.style.marginTop='4px';
       kids.innerHTML='<b style="color:var(--gold)">YOUR HOUSE:</b> '+G.children.map(c=>{
-        const age=G.day-c.born;
-        return (c.sex==='m'?'👦 ':'👧 ')+c.name+' <span class="muted">('+age+'d'
+        const age=G.day-c.born, kr=(c.rel===undefined?55:c.rel)|0;
+        const krC= kr>=75?'#e26a8a': kr>=45?'#e8c34a':'#8a6a4a';
+        return (c.sex==='m'?'👦 ':'👧 ')+c.name+' <span style="color:'+krC+'">♥'+kr+'</span> <span class="muted">('+age+'d'
           +(c.sex==='m'&&age>=40&&!c.wedTo?(c.appointed?' · serves as your general':' · OF AGE — appoint him in INTRIGUE'):'')
           +(c.wedTo?' · wed to '+c.wedTo: c.wed?' · wed to a foreign court':'')
           +(c.kids?' · '+c.kids+'👶':'')+')</span>';
       }).join(' · ');
       card.appendChild(kids);
+      const kcd=G.day-(G.lastKidsDay===undefined?-9:G.lastKidsDay);
+      const home=G.children.filter(c=>!c.wed);
+      if(home.length){
+        const kb=document.createElement('button'); kb.className='btn sm'; kb.style.marginTop='4px';
+        kb.textContent= kcd<1? '🧸 (you played today)':'🧸 SPEND TIME WITH THE CHILDREN';
+        kb.title='Wooden swords, piggyback rides, terrible jokes. +4 ♥ with each child at home.';
+        kb.disabled=kcd<1;
+        kb.onclick=()=>{ G.lastKidsDay=G.day;
+          home.forEach(c=>{ c.rel=clamp((c.rel===undefined?55:c.rel)+4,0,100); });
+          toast('🧸 '+pick(['You lose a wooden-sword duel on purpose. They know. They love it.',
+            'Piggyback cavalry charges through the atrium — a vase is avenged.',
+            'You tell the story of your first bout. The dramatic parts grow with each telling.'])+' (+4 ♥ each)',3200);
+          saveQuiet(); openVilla(); };
+        card.appendChild(kb);
+      }
     }
   } else if(marriageUnlocked()){
     card.innerHTML=`<div><b style="color:var(--gold)">⚭ Take a ${G.isFemale?'husband':'wife'}</b></div>
@@ -3411,6 +3826,7 @@ function sendDetachment(toId,size,generalIdx,purpose){
 function advanceDay(n){
   n=n||1; if(!G.detachments) return;
   for(let k=0;k<n;k++){ G.day++;
+    G.hygiene=clamp((G.hygiene===undefined?70:G.hygiene)-2,0,100);   // the road is dusty
     // wounds knit with time
     if(G.injury){ G.injury.daysLeft--; if(G.injury.daysLeft<=0){ toast('🩹 Your '+G.injury.name+' has healed.',1800); G.injury=null; refreshStatbar(); } }
     // the household grows: pregnancy runs its nine months (3 days = 1 month)
@@ -4478,6 +4894,7 @@ window.__SS = {
   advanceDay, openVilla,
   succession, openPortrait, startBedScene,
   get BC(){return BC;}, setBCT:(t)=>{ if(BC) BC.t=t; },
+  openDomus, get DM(){return DM;}, setDMT:(t)=>{ if(DM&&DM.scene) DM.scene.t=t; }, wifeVerdict, loveLeft,
 };
 })();
 </script>
