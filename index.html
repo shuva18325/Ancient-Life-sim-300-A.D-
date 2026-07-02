@@ -52,7 +52,8 @@
   #statbar{position:absolute;top:0;left:0;right:0;display:flex;gap:6px;padding:6px 8px;
     background:linear-gradient(#1c130cdd,#1c130c99);font-size:clamp(8px,1.6vw,13px);
     border-bottom:2px solid #000;z-index:5;pointer-events:none;flex-wrap:wrap;align-items:center;}
-  .stat{display:flex;align-items:center;gap:4px;background:#000;padding:2px 7px;border:2px solid #3a2c20;}
+  .stat{display:flex;align-items:center;gap:4px;background:linear-gradient(#241811,#150d07);
+    padding:2px 7px;border:1px solid #6b4e2a;border-radius:3px;box-shadow:0 1px 2px rgba(0,0,0,.5);}
   .stat b{color:var(--gold);}
   .scrollbox{overflow:auto;scrollbar-width:thin;scrollbar-color:var(--gold) #000;}
   /* world map regions */
@@ -85,8 +86,12 @@
   .muted{opacity:.7;}
   .kbd{display:inline-block;background:#000;border:2px solid var(--gold);color:var(--gold);
     padding:1px 6px;margin:1px;font-size:11px;min-width:18px;text-align:center;}
-  .shopcard{border:3px solid #000;background:#1c130c;padding:8px;display:flex;flex-direction:column;gap:4px;}
-  .shopcard.eq{border-color:var(--gold);box-shadow:0 0 0 2px var(--gold);}
+  .shopcard{border:2px solid #000;border-radius:4px;background:linear-gradient(#251a10,#170f08);
+    padding:9px;display:flex;flex-direction:column;gap:4px;
+    box-shadow:inset 0 0 0 1px rgba(232,195,74,.14), 0 2px 6px rgba(0,0,0,.45);}
+  .shopcard.eq{border-color:var(--gold);box-shadow:inset 0 0 0 1px rgba(232,195,74,.3),0 0 0 2px var(--gold);}
+  .toast{border-radius:4px;box-shadow:0 4px 18px rgba(0,0,0,.7);}
+  .pill{border-radius:3px;}
   .grid{display:grid;gap:8px;}
   .blink{animation:bl 1s steps(2) infinite;}
   @keyframes bl{50%{opacity:.25;}}
@@ -108,6 +113,7 @@
     <span class="stat">🐎 <b id="s-mount">—</b></span>
     <span class="stat">⚔ Lv <b id="s-lvl">1</b></span>
     <span class="stat">🩸 <b id="s-rec">0–0</b></span>
+    <span class="stat" id="s-injury" style="display:none;border-color:var(--blood)">🩹 <b id="s-inj-name"></b></span>
   </div>
 
   <!-- ===== TITLE ===== -->
@@ -311,6 +317,7 @@
       <div class="row gap" style="margin-top:4px;flex-wrap:wrap;">
         <button class="btn blood" id="btn-fight-go">⚔ ENTER THE ARENA</button>
         <button class="btn" id="btn-skirmish">🏴 PIT SKIRMISH</button>
+        <button class="btn" id="btn-wager">🎲 WAGER: —</button>
         <button class="btn" id="btn-hire">🛡 HIRE A CHAMPION</button>
         <button class="btn" id="btn-ambush">🗡 AMBUSH (SHADY)</button>
         <button class="btn" id="btn-rig">🤝 RIG THE BOUT</button>
@@ -428,14 +435,15 @@ const REGIONS = [
 ];
 const REGION_BY_ID = Object.fromEntries(REGIONS.map(r=>[r.id,r]));
 // grand titles you can claim once you dominate a province
+// grand governor titles — office + victory epithet, as the triumphators bore
 const REGION_TITLES={
-  'Britannia':'Dux Britanniae','Gallia':'Dominus Galliae','Germania Magna':'Victor Germaniae',
-  'Hispania Baetica':'Dominus Hispaniae','Italia':'Princeps Italiae','Insulae Baleares & Sicilia':'Dominus Insularum',
-  'Africa Proconsularis':'Proconsul Africae','Dalmatia':'Dux Dalmatiae','Illyricum':'Dux Illyrici',
-  'Achaea':'Archon Achaeae','Creta':'Dominus Cretae','Asia Minor':'Satrapes Asiae',
-  'Bosporan Kingdom':'Rex Bospori','Cyprus':'Dominus Cypri','Aegyptus':'Magister Magnus Aegypti',
-  'Syria Palaestina':'Dominus Palaestinae','Arabia Petraea':'Dux Arabiae','Mesopotamia':'Dux Mesopotamiae',
-  'Asōristān':'Marzban Asōristān','Ērānshahr':'Shahanshah Ērānshahr','Sogdiana':'Dominus Sogdianae'};
+  'Britannia':'Dux Britanniarum, BRITANNICUS','Gallia':'Comes Galliarum, GALLICUS','Germania Magna':'Victor Limitis, GERMANICUS MAXIMUS',
+  'Hispania Baetica':'Praetor Baeticae, HISPANUS','Italia':'Princeps Italiae, PATER PATRIAE','Insulae Baleares & Sicilia':'Dominus Insularum, SICULUS',
+  'Africa Proconsularis':'Proconsul Africae, AFRICANUS','Dalmatia':'Dux Dalmatiae, DALMATICUS','Illyricum':'Magister Illyrici, ILLYRICUS',
+  'Achaea':'Archon Achaeae, ACHAICUS','Creta':'Praetor Cretae, CRETICUS','Asia Minor':'Satrapes Asiae, ASIATICUS',
+  'Bosporan Kingdom':'Rex Bospori, TAURICUS','Cyprus':'Dominus Cypri, CYPRIUS','Aegyptus':'Praefectus Aegypti, AEGYPTIACUS',
+  'Syria Palaestina':'Dominus Palaestinae, SYRIACUS','Arabia Petraea':'Dux Arabiae, ARABICUS','Mesopotamia':'Dux Mesopotamiae, PARTHICUS',
+  'Asōristān':'Marzban of Asōristān, VICTOR ORIENTIS','Ērānshahr':'Shahanshah of Ērānshahr','Sogdiana':'Lord of the Silk Road, ULTIMUS ORIENTIS'};
 
 // Gladiator classes (real types). Each grants a starting loadout + trait.
 const CLASSES = {
@@ -719,6 +727,8 @@ function freshCareer(name,origin,arch,social){
     titles:{}, clears:{}, army:{}, armyGear:0, armyTrain:0, hasOrganizer:false,   // provincial titles, clear counts, army composition
     generals:[],   // appointed generals who lead army conquests
     wife:null, married:false, marryPrompted:false,   // marriage / dynasty
+    children:[], pregnant:null, lastLoveDay:-9,      // heirs of your house
+    injury:null,                                     // wounds taken in the sand
     wins:0, losses:0,
     hpBonus:0, dmgBonus:0,
     loadout:lo,
@@ -735,7 +745,7 @@ function freshCareer(name,origin,arch,social){
   };
 }
 // fill in any fields missing from older saves
-function migrate(g){ const d={honor:50,food:4,mount:0,slaves:0,hasVilla:false,boat:false,favor:0,soldiers:0,hidden:[],plotTier:0,emperor:false,approval:50,legions:0,rivals:0,retired:false,detachments:[],day:0,titles:{},clears:{},socialClass:'gladiator',army:{},armyGear:0,armyTrain:0,hasOrganizer:false,generals:[],wife:null,married:false,marryPrompted:false}; for(const k in d){ if(g[k]===undefined) g[k]=d[k]; } if(!g.current) g.current='Italia'; return g; }
+function migrate(g){ const d={honor:50,food:4,mount:0,slaves:0,hasVilla:false,boat:false,favor:0,soldiers:0,hidden:[],plotTier:0,emperor:false,approval:50,legions:0,rivals:0,retired:false,detachments:[],day:0,titles:{},clears:{},socialClass:'gladiator',army:{},armyGear:0,armyTrain:0,hasOrganizer:false,generals:[],wife:null,married:false,marryPrompted:false,children:[],pregnant:null,lastLoveDay:-9,injury:null}; for(const k in d){ if(g[k]===undefined) g[k]=d[k]; } if(!g.current) g.current='Italia'; return g; }
 function saveGame(){ try{ localStorage.setItem(SAVE_KEY, JSON.stringify(G)); toast('Saved.'); }catch(e){} }
 function hasSave(){ try{ return !!localStorage.getItem(SAVE_KEY); }catch(e){ return false; } }
 function loadGame(){ try{ G=migrate(JSON.parse(localStorage.getItem(SAVE_KEY))); return !!G; }catch(e){ return false; } }
@@ -754,6 +764,8 @@ function refreshStatbar(){
   $('s-mount').textContent=MOUNTS[G.mount].short;
   $('s-lvl').textContent=G.level;
   $('s-rec').textContent=G.wins+'–'+G.losses;
+  const inj=$('s-injury'); if(inj){ inj.style.display=G.injury?'flex':'none';
+    if(G.injury) $('s-inj-name').textContent=G.injury.name+' ('+G.injury.daysLeft+'d)'; }
 }
 const MOUNTS=[{name:'On foot',short:'—',cost:0,range:1},{name:'Mule',short:'Mule',cost:120,range:2},
   {name:'Horse',short:'Horse',cost:300,range:3},{name:'Chariot',short:'Chariot',cost:700,range:4}];
@@ -1089,10 +1101,11 @@ function startFight(region, briefData){
     siege:briefData.siege||null, plot:briefData.plot||null, rival:briefData.rival||false,
     pit:!!briefData.pit || !!briefData.gauntlet,
     gauntlet: briefData.gauntlet? {total:briefData.gauntlet, left:briefData.gauntlet-1, wave:1, corpses:[]} : null,
-    waveLock:false,
+    waveLock:false, wager:briefData.wager||0,
     emperor: (region.id==='Italia' && briefData.imperial) || (briefData.plot && briefData.plot.name.indexOf('EMPEROR')>=0) || briefData.rival,
     shake:0, particles:[], banners:[], decals:[], flash:0, hitstop:0,
   };
+  if(G.injury){ p.maxHp*=0.85; p.hp=p.maxHp; p.dmgMul=(p.dmgMul||1)*0.85; }   // fighting wounded
   if(FT.rigged){ foe.maxHp*=0.45; foe.hp=foe.maxHp; foe.ai.aggr*=0.5; foe.ai.react*=2; }
   if(FT.ambush){ foe.hp=foe.maxHp*0.55; foe.hurt=20; foe.vx=-foe.facing*4; foe.vy=-3; foe.onGround=false; }  // you struck first
   if(FT.hired){ p.maxHp*=2.2; p.hp=p.maxHp; p.dmgMul=2.4; foe.ai.aggr*=0.7; }                                  // a brawny substitute
@@ -1428,6 +1441,7 @@ function finishFight(won){
     if(FT.gauntlet){ const n=FT.gauntlet.total; glory=Math.round(glory*(1+n*0.45)); coin=Math.round(coin*(1+n*0.55));
       popDelta+=n; note+='You felled '+n+' men in the pits — the tale spreads like fire. '; }
     if(FT.emperor){ glory*=2; popDelta+=20; honorDelta+=6; note+='THE EMPEROR IS PLEASED. '; }
+    if(FT.wager>0){ coin+=FT.wager; note+='🎲 Your wager pays double (+'+FT.wager+'d). '; }
     G.wins++; G.coin+=coin; G.glory+=glory; G.pop=clamp(G.pop+popDelta,0,100);
     G.cleared[reg.id]=true; G.clears[reg.id]=(G.clears[reg.id]||0)+1;
     // xp / level
@@ -1440,9 +1454,16 @@ function finishFight(won){
     honorDelta = spared? 1 : -2;
     G.pop=clamp(G.pop+popDelta,0,100);
     coin = -Math.min(G.coin, ri(0,10));
+    let wnote='';
+    if(FT.wager>0){ coin-=Math.min(Math.max(0,G.coin+coin), FT.wager); wnote='🎲 The bookmakers keep your '+FT.wager+'d. '; }
     G.coin+=coin;
-    note = spared? 'The mob spares you — Mitte! You live to fight again.'
-                 : 'Pollice verso… but the editor grants you mercy this once. Your name suffers.';
+    note = wnote + (spared? 'The mob spares you — Mitte! You live to fight again.'
+                 : 'Pollice verso… but the editor grants you mercy this once. Your name suffers.');
+    // wounds taken in defeat linger
+    if(!FT.hired && !G.injury && Math.random()<0.4){
+      G.injury={name:pick(['torn shoulder','cracked ribs','gashed thigh','broken hand','split brow']), daysLeft:ri(3,6)};
+      note+=' You take a '+G.injury.name+' — weakened until it heals (rest, or pay a medicus).';
+    }
   }
   G.honor=clamp(G.honor+honorDelta,0,100);
   // villa & slaves bring passive income after every bout
@@ -2168,25 +2189,26 @@ function drawBridePortrait(cnv,b){
     P(-6,-2,5,2,'#6a4828'); P(0,-2,6,2,'#8a5c34');                            // sandals
     P(1,-6,4,1,'#8a5c34'); P(-5,-6,4,1,'#6a4828');                            // ankle laces
   }
-  // ================= HIPS & REAR — TWO cheeks with a visible cleft =================
+  // ================= HIPS & REAR — two round cheeks split by a CENTRE cleft =================
   P(-6,hipTop,hips-2,hipBot-hipTop,dress);
-  // far cheek (peeks out behind, slightly darker for depth)
-  P(-8-rear,hipTop+3,3,7,shade(dress,-10));
-  P(-9-rear,hipTop+5,1,4,shade(dress,-10));
-  P(-8-rear,hipTop+4,1,3,shade(dress,12));                                    // far-cheek rim light
-  // near cheek (the full round one)
-  P(-6-rear,hipTop+1,rear+1,9,dress);
-  P(-7-rear,hipTop+3,1,6,dress);
-  P(-6-rear,hipTop+2,1,6,dHi); P(-7-rear,hipTop+4,1,3,dHi);                  // bright rim on the curve
-  // THE CLEFT — dark separation line between the two cheeks
-  P(-7-rear,hipTop+2,1,9,shade(dress,-52));
-  P(-8-rear,hipTop+9,2,1,shade(dress,-40));                                   // cleft flares at the base
-  // gluteal folds — each cheek gets its own under-crease
-  P(-6-rear+1,hipTop+10,rear+2,1,dSh);
-  P(-8-rear,hipTop+10,3,1,shade(dress,-46));
-  P(-6-rear+2,hipTop+11,rear,1,shade(dress,-52));
-  P(-5,hipTop+1,2,2,dHi);                                                     // hip sheen
-  P(hips-8,hipTop,2,hipBot-hipTop,dSh);                                       // front hip shadow
+  const bx0=-8-rear, bw2=rear+3, cleftX=bx0+((bw2/2)|0);                       // rear mass + its midline
+  P(bx0,hipTop+1,bw2,9,dress);                                                 // the full rear mass
+  P(bx0-1,hipTop+3,1,6,dress); P(bx0,hipTop+9,bw2,1,dress);                    // outer + lower rounding
+  // THE CLEFT — dark line straight down the MIDDLE, splitting two clear cheeks
+  P(cleftX,hipTop+1,1,9,shade(dress,-54));
+  P(cleftX,hipTop+8,1,3,shade(dress,-44));                                     // flares as it meets the folds
+  P(cleftX-1,hipTop+1,1,2,shade(dress,-22)); P(cleftX+1,hipTop+1,1,2,shade(dress,-22)); // soft press at the top
+  // OUTER cheek: bright rim light on its curve
+  P(bx0,hipTop+2,1,6,dHi); P(bx0-1,hipTop+4,1,3,dHi); P(bx0+1,hipTop+2,1,2,shade(dress,16));
+  // INNER cheek: its own highlight + shadow toward the hip
+  P(cleftX+1,hipTop+2,1,4,shade(dress,14)); P(cleftX+2,hipTop+3,1,2,dHi);
+  P(bx0+bw2-1,hipTop+2,1,7,shade(dress,-16));
+  // separate gluteal fold under EACH cheek
+  P(bx0,hipTop+10,((bw2/2)|0),1,shade(dress,-48));
+  P(cleftX+1,hipTop+10,bw2-((bw2/2)|0)-1,1,shade(dress,-48));
+  P(bx0+1,hipTop+11,bw2-2,1,shade(dress,-54));                                 // deep shadow beneath both
+  P(-5,hipTop+1,2,2,dHi);                                                      // hip sheen
+  P(hips-8,hipTop,2,hipBot-hipTop,dSh);                                        // front hip shadow
   // girdle low on the hips
   P(-6-rear+1,hipTop,hips+rear-2,2,noble?gold:shade(dress,-52)); if(noble)P(0,hipTop,2,2,goldHi);
   // ================= WAIST =================
@@ -2206,7 +2228,8 @@ function drawBridePortrait(cnv,b){
     // the exposed skin V of the cleavage — deep, with graded shading
     P(-1,bustTop-1,5,1,sGlow);                                                 // sunlit brim of the V
     P(0,bustTop,3,1,skin); P(0,bustTop+1,3,1,skin); P(1,bustTop+2,2,1,skin); P(1,bustTop+3,1,1,skin);
-    P(1,bustTop,1,2,shade(skin,-16)); P(1,bustTop+2,1,3,sSh);                  // centre line darkens with depth
+    if(bd>=9) P(1,bustTop+4,1,1,shade(skin,-28));                              // the V plunges deeper on full figures
+    P(1,bustTop,1,2,shade(skin,-16)); P(1,bustTop+2,1,2,sSh); P(1,bustTop+3,1,1,shade(skin,-46)); // centre darkens with depth
     P(0,bustTop,1,2,sGlow); P(2,bustTop,1,2,sGlow);                            // lit inner swells
     P(0,bustTop+2,1,1,shade(skin,-8)); P(2,bustTop+2,1,1,shade(skin,-8));      // curves rolling inward
     c.fillStyle='rgba(220,110,110,.20)'; c.fillRect(-1,bustTop,1,3); c.fillRect(3,bustTop,1,3); // soft blush at the curves
@@ -2242,15 +2265,21 @@ function drawBridePortrait(cnv,b){
   P(-4,-66,10,11,skin); P(-4,-66,10,2,sHi); P(5,-64,1,8,sSh);                  // head (3/4 to her right)
   P(-3,-55,8,2,skin); P(-1,-54,5,1,sSh);                                       // jaw
   c.fillStyle='rgba(214,92,92,.32)'; c.fillRect(-3,-59,2,2); c.fillRect(3,-59,2,2);
-  // face — BIG clear eyes, nothing covering them
-  P(-2,-63,3,3,'#fff'); P(2,-63,3,3,'#fff');                                   // large whites
-  const iris=b.eth==='celt'?'#3a6a4a':b.eth==='germanic'?'#3a5a7a':'#2a1a10';
-  P(-1,-62,2,2,iris); P(3,-62,2,2,iris);                                       // big irises
-  P(-1,-62,1,1,'#fff'); P(3,-62,1,1,'#fff');                                   // sparkle
-  P(-2,-65,2,1,hSh); P(3,-65,2,1,hSh);                                         // thin brows, well above
-  if(b.eth==='egyptian'){ P(-3,-62,1,1,'#101014'); P(5,-62,1,1,'#101014'); }   // kohl wings at the corners
+  // face — sultry half-lidded almond eyes (heavy lash line, winged liner, smoky lid)
+  const iris=b.eth==='celt'?'#3a7a52':b.eth==='germanic'?'#3f6a94':b.eth==='numidian'?'#3a2416':'#4a2c16';
+  P(-3,-63,4,1,'#191009'); P(2,-63,4,1,'#191009');                             // heavy upper lash lines
+  P(-4,-63,1,1,'#191009'); P(6,-63,1,1,'#191009');                             // winged flicks at the corners
+  P(-3,-64,4,1,shade(skin,-14)); P(2,-64,4,1,shade(skin,-14));                 // smoky lid shadow above
+  P(-3,-62,4,2,'#f2e8da'); P(2,-62,4,2,'#f2e8da');                             // soft almond whites
+  P(-2,-62,2,2,iris); P(3,-62,2,2,iris);                                       // irises tucked under the lash (half-lidded)
+  P(-2,-62,2,1,shade(iris,-24)); P(3,-62,2,1,shade(iris,-24));                 // lash shades the iris top
+  P(-1,-61,1,1,'#fff8ec'); P(4,-61,1,1,'#fff8ec');                             // low glints
+  P(-3,-60,4,1,shade(skin,-10)); P(2,-60,4,1,shade(skin,-10));                 // soft under-eye
+  P(-3,-66,3,1,hSh); P(3,-66,3,1,hSh); P(-1,-65,1,1,hSh); P(5,-65,1,1,hSh);    // thin arched brows, tails dipped
+  if(b.eth==='egyptian'){ P(-5,-63,1,1,'#101014'); P(7,-63,1,1,'#101014'); P(-4,-62,1,1,'#101014'); P(6,-62,1,1,'#101014'); } // long kohl wings
   P(3,-59,2,1,sSh);                                                            // nose
-  P(1,-58,4,2,'#b0384a'); P(2,-57,2,1,'#d8607a');                              // lips
+  P(1,-58,4,1,'#a83246'); P(1,-57,4,1,'#c44a60'); P(2,-57,2,1,'#e2708a');      // full bitten lips
+  P(2,-56,2,1,shade(skin,-16));                                                 // lip shadow
   // ================= HAIR (frames the face — never covers the eyes) =================
   if(b.eth==='egyptian'){
     P(-6,-68,13,4,hair);                                                       // straight-cut bangs end above the brows
@@ -2394,8 +2423,19 @@ function travelTo(r){
     toast('Need '+t.rations+' rations to travel there (you have '+G.food+'). Stock the Larder.',2200); return false; }
   G.food-=t.rations; G.current=r.id;
   G.provisioned = (G.food>=2 && G.mount>=2);     // well-stocked → bonus purse/crowd
+  advanceDay(Math.max(1,t.days||1));
   refreshStatbar();
-  toast('You journey to '+r.id+' ('+t.rations+' rations spent).',1500);
+  // ---- something always happens on a Roman road ----
+  if(Math.random()<0.28){
+    const roll=Math.random();
+    if(roll<0.3){
+      if(G.soldiers>=400){ G.honor=clamp(G.honor+2,0,100); toast('🗡 Bandits eye your column on the road — one look at your soldiers and they melt away (+2 honor).',3000); }
+      else { const loss=Math.min(G.coin, ri(15,60)); G.coin-=loss; toast('🗡 Bandits fall on you at a mountain pass! You fight free, but they cut your purse (−'+loss+'d).',3000); }
+    } else if(roll<0.55){ G.food+=3; toast('🐫 A merchant caravan shares your road — you trade tales and they gift you 3 rations.',2600); }
+    else if(roll<0.8){ G.pop=clamp(G.pop+2,0,100); toast('🎪 A roadside festival! You are recognised and toasted (+2 popularity).',2600); }
+    else { G.honor=clamp(G.honor+2,0,100); G.favor+=1; toast('⛩ You rest at a wayside shrine and leave an offering — the priest blesses your house (+2 honor, +1 favor).',2800); }
+  } else toast('You journey to '+r.id+' ('+t.rations+' rations spent).',1500);
+  refreshStatbar();
   return true;
 }
 function buildRegions(){
@@ -2526,6 +2566,14 @@ function govBlock(reg){
 function openVilla(){
   state='villa'; show('scr-villa'); $('statbar').classList.remove('hide'); refreshStatbar();
   const b=$('villa-body'); b.innerHTML='';
+  // the medicus treats wounds for coin
+  if(G.injury){
+    const mc=document.createElement('div'); mc.className='shopcard'; mc.style.borderColor='var(--blood)';
+    mc.innerHTML=`<div><b style="color:var(--blood)">🩹 ${G.injury.name}</b> <span class="small muted">— you fight weakened (${G.injury.daysLeft} days to heal on its own)</span></div>`;
+    const mb=document.createElement('button'); mb.className='btn sm gold'; mb.textContent='⚕ MEDICUS — treat the wound (60d)';
+    mb.disabled=G.coin<60; mb.onclick=()=>{ if(G.coin<60)return; G.coin-=60; G.injury=null; refreshStatbar(); toast('The medicus binds and stitches — you are whole again.',1800); openVilla(); };
+    mc.appendChild(mb); b.appendChild(mc);
+  }
   buildMarriageCard(b);
   if(!G.hasVilla){
     const card=document.createElement('div'); card.className='shopcard';
@@ -2571,11 +2619,33 @@ function buildMarriageCard(b){
   if(G.married && G.wife){
     const w=G.wife; const row=document.createElement('div'); row.className='row gap'; row.style.alignItems='center';
     row.appendChild(briadeImg(w,84));
+    const preg=G.pregnant, month=preg? Math.min(9, 9-Math.ceil((preg.due-G.day)/3)) : 0;
     const info=document.createElement('div'); info.innerHTML=
       `<div><b style="color:var(--gold)">⚭ ${w.name}</b> <span class="small muted">— your ${w.adj} ${w.rank} wife</span></div>
        <div class="small muted">${w.perk}</div>
-       <div class="small" style="color:var(--gold)">${marriageEffectsText(w)}</div>`;
+       <div class="small" style="color:var(--gold)">${marriageEffectsText(w)}</div>`+
+      (preg? `<div class="small" style="color:#e2a0b8">🤰 She is with child — month <b>${Math.max(1,month)}</b> of 9.</div>`:'');
     row.appendChild(info); card.appendChild(row);
+    // the bedchamber — try for an heir (then nine months of waiting, then the roll)
+    const cd=G.day-(G.lastLoveDay||-9);
+    const bed=document.createElement('button'); bed.className='btn sm'; bed.style.marginTop='4px';
+    bed.textContent = preg? '🍆🍑 (she is with child)' : cd<2? '🍆🍑 (let her rest a day)' : '🍆🍑 RETIRE TO THE BEDCHAMBER';
+    bed.disabled=!!preg || cd<2;
+    bed.onclick=()=>{
+      G.lastLoveDay=G.day; advanceDay(1);
+      const chance=0.32 + (G.honor/400) + (w.build!=='slender'?0.06:0);
+      if(Math.random()<chance){ G.pregnant={due:G.day+27}; toast('🌙 The lamps burn low… weeks later the word comes: SHE IS WITH CHILD! Nine months now.',3200); }
+      else toast('🌙 A tender night together — but the gods grant no child yet. Try again soon.',2400);
+      saveQuiet(); openVilla();
+    };
+    card.appendChild(bed);
+    // the children of your house
+    if(G.children.length){
+      const kids=document.createElement('div'); kids.className='small'; kids.style.marginTop='4px';
+      kids.innerHTML='<b style="color:var(--gold)">YOUR HOUSE:</b> '+G.children.map(c=>(c.sex==='m'?'👦 ':'👧 ')+c.name).join(' · ')+
+        (G.children.some(c=>c.sex==='m')? ' <span class="muted">— an heir secures your legacy (rivals hesitate).</span>':'');
+      card.appendChild(kids);
+    }
   } else if(marriageUnlocked()){
     card.innerHTML=`<div><b style="color:var(--gold)">⚭ Take a wife</b></div>
       <div class="small muted">${marriageRequired()?'Your rank <b>demands</b> a dynastic match — you must wed to secure heirs and alliance.':'You have grown powerful enough to make a match. A wife brings dowry, allies and standing.'}</div>`;
@@ -2756,6 +2826,26 @@ function sendDetachment(toId,size,generalIdx,purpose){
 function advanceDay(n){
   n=n||1; if(!G.detachments) return;
   for(let k=0;k<n;k++){ G.day++;
+    // wounds knit with time
+    if(G.injury){ G.injury.daysLeft--; if(G.injury.daysLeft<=0){ toast('🩹 Your '+G.injury.name+' has healed.',1800); G.injury=null; refreshStatbar(); } }
+    // the household grows: pregnancy runs its nine months (3 days = 1 month)
+    if(G.pregnant && G.day>=G.pregnant.due){
+      const roll=Math.random();
+      if(roll<0.08){ G.pregnant=null; G.honor=clamp(G.honor+2,0,100);
+        toast('🕯 The birth goes hard — the child is lost. The house mourns, and endures.',3200); }
+      else {
+        const son=Math.random()<0.5;
+        const nm= son? (pick(['Titus','Lucius','Gaius','Marcus','Quintus','Decimus'])+' '+(G.name.split(' ')[0])+'i filius')
+                     : pick(['Julia','Livia','Antonia','Claudia','Valeria','Aurelia'])+' '+(G.wife?G.wife.name.split(' ')[0]:'');
+        G.children.push({name:nm, sex:son?'m':'f', born:G.day});
+        G.pregnant=null;
+        if(son){ G.approval=clamp(G.approval+3,0,100); G.pop=clamp(G.pop+3,0,100);
+          toast('👶 A SON! '+nm+' — an heir for your house! (+3 approval, +3 pop)',3400); }
+        else { G.pop=clamp(G.pop+2,0,100);
+          toast('👶 A daughter — '+nm+'. One day her marriage will seal an alliance. (+2 pop)',3200); }
+      }
+      saveQuiet();
+    }
     for(const d of G.detachments){ d.day++;
       if(d.day>=d.eta && d.phase==='out'){
         if(d.purpose==='conquer'){
@@ -2786,7 +2876,8 @@ function advanceDay(n){
     }
     G.detachments=G.detachments.filter(d=>d.phase!=='home');
     // the moment you govern a province, jealous rivals begin to plot
-    if(!G.emperor && titlesCount()>=1 && G.rivals<=titlesCount() && Math.random()<0.14*titlesCount()){
+    const heirGuard=Math.max(0.4, 1-0.2*G.children.filter(c=>c.sex==='m').length); // sons deter usurpers
+    if(!G.emperor && titlesCount()>=1 && G.rivals<=titlesCount() && Math.random()<0.14*titlesCount()*heirGuard){
       G.rivals++; G.lastRaid='A jealous rival raises troops to contest your power — face him in the Intrigue hall.';
     }
   }
@@ -3073,9 +3164,10 @@ function drawMapCanvas(){
   function label(t,lon,lat,c,fs,ls){ const p=Q(lon,lat); mctx.fillStyle=c; mctx.font=fs; mctx.textAlign='center';
     if(ls){ mctx.save(); mctx.translate(p[0],p[1]); let x=-(t.length-1)*ls/2; for(const ch of t){ mctx.fillText(ch,x,0); x+=ls; } mctx.restore(); } else mctx.fillText(t,p[0],p[1]); }
 
-  // ===== SEA =====
-  mctx.fillStyle=SEA; mctx.fillRect(0,0,w,h);
-  for(let i=0;i<170;i++){ mctx.fillStyle=(i%2?SEA2:SEAdk); mctx.fillRect((i*53)%w,(i*71)%h,2,1); }
+  // ===== SEA (depth gradient: paler north, deeper south) =====
+  const seaBands=['#b2d9ea','#a9d3e6','#a0cde2','#96c6dd','#8cbfd8'];
+  for(let i=0;i<5;i++){ mctx.fillStyle=seaBands[i]; mctx.fillRect(0,i*(h/5),w,h/5+1); }
+  for(let i=0;i<120;i++){ mctx.fillStyle=(i%2?SEA2:SEAdk); mctx.fillRect((i*53)%w,(i*71)%h,4,1); }
 
   // ============ REAL COASTLINES (lon,lat) ============
   // Europe + Anatolia — Atlantic ↑, barbarian north, ↓ east, Mediterranean coast back to Gibraltar
@@ -3099,6 +3191,10 @@ function drawMapCanvas(){
   const BRIT=[[-5.7,50],[-4.5,51.6],[-5.1,52.5],[-4.5,53.4],[-3,53.4],[-3.2,55],[-2,57],[-3.2,58.6],[-1.8,57.4],[-1.4,54.5],[0.6,53],[1.7,52.8],[1.3,51.4],[-0.3,50.7],[-3,50.2]];
   const HIB=[[-10,52],[-9.5,54.5],[-7,55.4],[-5.6,54.2],[-6.2,52.2],[-9,51.5]];
 
+  // soft drop shadow beneath the landmasses (printed depth)
+  mctx.save(); mctx.translate(1.4,1.8);
+  [EUR,AFR,EAS,BRIT,HIB].forEach(p=>{ poly(p); mctx.fillStyle='rgba(52,84,100,.28)'; mctx.fill(); });
+  mctx.restore();
   // printed-map waterline: pale halo in the sea hugging every coast
   [EUR,AFR,EAS,BRIT,HIB].forEach(p=>{ poly(p); mctx.lineWidth=4; mctx.strokeStyle='rgba(240,250,253,.55)'; mctx.lineJoin='round'; mctx.stroke(); });
   // fill all mainland the empire colour, then paint barbaricum back to cream
@@ -3325,6 +3421,10 @@ function openBrief(reg,imperial){
   $('btn-skirmish').textContent=`🏴 PIT SKIRMISH (1 v ${skirN})`;
   $('btn-skirmish').title='An unsanctioned mass bout on the field outside the walls — face '+skirN+' men in a row for a far greater purse.';
   $('btn-skirmish').disabled = cantFight || imperial;
+  briefCtx.wager=0;
+  $('btn-wager').textContent='🎲 WAGER: —';
+  $('btn-wager').title='Stake coin on your own blood: win and it pays double, lose and the bookmakers keep it.';
+  $('btn-wager').disabled = cantFight;
   $('btn-rig').textContent=`🤝 RIG THE BOUT (${rigCost}d)`;
   $('btn-skip').textContent=`🪙 BUY YOUR WAY PAST (${skipCost}d)`;
   $('btn-hire').textContent=`🛡 HIRE A CHAMPION (${hireCost}d)`;
@@ -3339,16 +3439,23 @@ function openBrief(reg,imperial){
      <b>Hire a champion:</b> a hulking substitute fights in your place — you keep the purse, but earn little glory and lose honor.<br>
      <b>Ambush (shady):</b> waylay your foe beforehand so he enters already wounded — effective, dishonourable.<br>
      <b>Rig:</b> bribe the editor for an easy foe. <b>Buy past:</b> skip the fight if you are rich (−popularity).`;
+  if(G.injury) $('brief-note').innerHTML = '<b style="color:var(--blood)">🩹 You are wounded ('+G.injury.name+') — you will fight at reduced strength. Rest or see the medicus at your villa.</b><br>'+$('brief-note').innerHTML;
 }
 $('btn-brief-back').onclick=()=>enterMap();
 $('btn-fight-go').onclick=()=>{
   const b=briefCtx;
-  startFight(b.reg,{forbiddenEquipped:b.eqForbidden, rigged:false, imperial:b.imperial, upperHelp:b.upperHelp});
+  startFight(b.reg,{forbiddenEquipped:b.eqForbidden, rigged:false, imperial:b.imperial, upperHelp:b.upperHelp, wager:b.wager||0});
 };
 $('btn-skirmish').onclick=()=>{
   const b=briefCtx;
-  startFight(b.reg,{forbiddenEquipped:b.eqForbidden, gauntlet:2+b.tier, pit:true, upperHelp:b.upperHelp});
+  startFight(b.reg,{forbiddenEquipped:b.eqForbidden, gauntlet:2+b.tier, pit:true, upperHelp:b.upperHelp, wager:b.wager||0});
   toast('You march out past the walls to the fighting pits…',1500);
+};
+$('btn-wager').onclick=()=>{
+  const steps=[0,50,200,500].filter(v=>v<=G.coin);
+  const cur=briefCtx.wager||0, i=steps.indexOf(cur);
+  briefCtx.wager=steps[(i+1)%steps.length]||0;
+  $('btn-wager').textContent='🎲 WAGER: '+(briefCtx.wager? briefCtx.wager+'d':'—');
 };
 $('btn-hire').onclick=()=>{
   const b=briefCtx; if(G.coin<b.hireCost) return;
@@ -3503,6 +3610,7 @@ window.__SS = {
   press:(k)=>setEdge(k), hold:(k,v)=>{held[k]=v;},
   armyBattle, launchConquest, makeGeneral, get G(){return G;},
   openMarry, marry, rollBrides, makeBride, get marryList(){return marryList;},
+  advanceDay, openVilla,
 };
 })();
 </script>
