@@ -704,19 +704,24 @@ function makeBride(eth, noble){
   b.approval=b.approval||0; b.favor=b.favor||0; b.honor=b.honor||0; b.pop=b.pop||0; b.tradeCoin=b.tradeCoin||0; b.tradeFood=b.tradeFood||0;
   return b;
 }
-// three suitors present themselves — rank scales with your wealth & standing
+// suitors present themselves — ANYONE may wed, but noble alliances have a price.
+// The rich eastern courts (Aegyptus, Persia) demand far more standing than a village father.
+const NOBLE_PRICE={roman:900, greek:900, celt:500, germanic:500, numidian:650, persian:1800, egyptian:2200};
+function allianceTier(){ return G.coin + G.glory*4 + titlesCount()*800 +
+  (G.socialClass==='elite'?2200:G.socialClass==='upper'?1100:0) + (G.office||0)*400; }
 function rollBrides(){
-  const wealthy = G.socialClass==='elite'||G.socialClass==='upper'||G.coin>=1500||G.plotTier>=2||!!titlesCount&&titlesCount()>0;
+  const tier=allianceTier();
   const eths=[...BRIDE_ETHS].sort(()=>Math.random()-0.5);
   // always offer a Roman first, then three others
   const order=['roman', ...eths.filter(e=>e!=='roman').slice(0,3)];
-  return order.map((e,i)=>{
-    // the Roman match mirrors your class; foreigners are noble alliances more often
-    const noble = e==='roman' ? wealthy : (wealthy? true : Math.random()<0.6);
+  return order.map(e=>{
+    const price=NOBLE_PRICE[e]||800;
+    // a poor man weds a poor man's daughter; grand houses open only to the great
+    const noble = tier>=price || (tier>=price*0.6 && Math.random()<0.2);
     return makeBride(e, noble);
   });
 }
-function marriageUnlocked(){ return !!G && !G.married && (G.socialClass==='elite'||G.socialClass==='upper'||G.plotTier>=1||G.glory>=150||(titlesCount&&titlesCount()>0)); }
+function marriageUnlocked(){ return !!G && !G.married; }   // even the poorest tiro may take a wife
 function marriageRequired(){ return !!G && !G.married && (G.socialClass==='elite'||G.socialClass==='upper'); }
 
 /* =====================================================================
@@ -1906,6 +1911,9 @@ function sfx(kind){
     else if(kind==='cheer'){ noise(0.4,0.05,1600); tone(420,0.25,'triangle',0.02,560); }   // crowd roar
     else if(kind==='ko'){ tone(180,0.5,'sawtooth',0.08,40); noise(0.3,0.1,700); }          // knockdown
     else if(kind==='win'){ [523,659,784,1046].forEach((f,i)=>setTimeout(()=>{try{tone(f,0.18,'square',0.06);}catch(e){}},i*90)); } // fanfare
+    else if(kind==='clap'){ noise(0.05,0.10,1100); tone(180,0.06,'square',0.025,120); }    // a rhythmic slap through the door
+    else if(kind==='moan'){ if(Math.random()<0.5) tone(210,0.5,'sine',0.05,330); else tone(320,0.55,'sine',0.045,180); } // muffled... enjoyment
+    else if(kind==='creak'){ tone(90,0.35,'sawtooth',0.02,140); }                          // the door swings
     else { tone(200,0.08,'square',0.05); }
   }catch(e){}
 }
@@ -2172,15 +2180,57 @@ function startBedScene(){
 }
 function updateBed(dt){ const s=BC; s.t+=dt; const T=s.t;
   for(const p of s.props){ p.x+=p.vx*dt; p.y+=p.vy*dt; p.vy+=0.16*dt; p.r+=p.vr*dt;
-    if(p.y>226){ p.y=226; p.vx*=0.5; p.vy=0; p.vr=0; } }
+    if(p.y>222){ p.y=222; p.vx*=0.5; p.vy=0; p.vr*=0.3; } }
   for(const h of s.hearts){ h.y-=h.vy*dt; h.x+=Math.sin(h.y*0.09)*0.4*dt; h.life-=dt; }
   s.hearts=s.hearts.filter(h=>h.life>0);
   // her clothes come sailing out of the doorway, one by one
-  if(T>150&&T<152) s.props.push({kind:'toga',  x:372,y:150,vx:-2.6,vy:-2.4,r:0,vr:0.08});
-  if(T>190&&T<192) s.props.push({kind:'girdle',x:372,y:158,vx:-2.1,vy:-2.9,r:0,vr:-0.11});
-  if(T>222&&T<224) s.props.push({kind:'sandal',x:372,y:168,vx:-3.0,vy:-2.0,r:0,vr:0.2});
-  if(T>246&&T<248) s.props.push({kind:'sandal',x:372,y:168,vx:-2.2,vy:-3.1,r:0,vr:-0.16});
+  if(T>150&&T<152) s.props.push({kind:'toga',  x:368,y:146,vx:-2.8,vy:-2.6,r:0,vr:0.07});
+  if(T>190&&T<192) s.props.push({kind:'breastband',x:368,y:152,vx:-2.3,vy:-3.0,r:0,vr:-0.1});
+  if(T>218&&T<220) s.props.push({kind:'girdle',x:368,y:158,vx:-2.0,vy:-2.7,r:0,vr:-0.12});
+  if(T>240&&T<242) s.props.push({kind:'sandal',x:368,y:166,vx:-3.1,vy:-2.1,r:0,vr:0.2});
+  if(T>258&&T<260) s.props.push({kind:'sandal',x:368,y:166,vx:-2.3,vy:-3.2,r:0,vr:-0.16});
+  // the door creaks, then... sounds carry through it
+  if(T>100&&T<102) sfx('creak');
+  if(T>330&&T<332) sfx('creak');
+  if(T>380){
+    if(!s.nextClap||T>=s.nextClap){ sfx('clap'); s.nextClap=T+30+Math.random()*14; }
+    if(!s.nextMoan||T>=s.nextMoan){ sfx('moan'); s.nextMoan=T+70+Math.random()*50; }
+  }
   if(T>=560) finishBed();
+}
+// undressed silhouette at the doorway — shape only, facing back into the room (left)
+function drawShadowFigure(fx,fy,ph,beckon,open){
+  const S='#17100a';
+  const jB=Math.sin(ph)*1.0, jC=Math.sin(ph+1.1)*1.2;
+  ctx.globalAlpha=Math.min(1,open);
+  // lit bare leg steps out into the lamplight first — a promise, nothing more
+  if(beckon){ const step=Math.sin(ph*0.5)*1.5;
+    px(fx-10+step,fy-30,6,18,'#e0b088'); px(fx-10+step,fy-30,2,18,'#f0c8a0');   // thigh catches the light
+    px(fx-9+step,fy-12,5,10,'#d8a880'); px(fx-10+step,fy-2,7,2,'#8a5c34'); }    // calf + sandal
+  // head + loose hair fallen from its bun
+  px(fx-4,fy-74,9,10,S); px(fx-2,fy-79,8,6,S); px(fx+4,fy-70,4,16,S);
+  // neck, shoulders
+  px(fx-1,fy-65,4,4,S); px(fx-6,fy-62,12,4,S);
+  // bust thrust forward (left) — it bounces
+  px(fx-6,fy-60,10,14,S);
+  px(fx-11,fy-58+jB,6,8,S); px(fx-12,fy-56+jB,2,4,S);
+  // pinched waist, flaring hips
+  px(fx-4,fy-46,8,6,S);
+  px(fx-7,fy-40,14,9,S);
+  // the famous rear (right side) — it bounces on its own beat
+  px(fx+6,fy-39+jC,6,9,S); px(fx+11,fy-37+jC,2,5,S);
+  // back leg stays in shadow
+  px(fx,fy-31,6,19,S); px(fx+1,fy-12,5,10,S); px(fx,fy-2,7,2,S);
+  if(!beckon){ px(fx-8,fy-31,6,19,S); px(fx-7,fy-12,5,10,S); px(fx-8,fy-2,7,2,S); }
+  // the beckoning arm — extended, finger curling "come"
+  if(beckon){ const curl=((ph*0.8)|0)%2;
+    px(fx-16,fy-58,10,3,S); px(fx-20,fy-60,5,4,S);
+    px(fx-22,fy-59-(curl?2:0),3,2,S);                                            // curling fingertip
+    // warm rim light kisses her edge
+    px(fx-11,fy-58+jB,1,7,'rgba(255,176,80,.5)'); px(fx-6,fy-62,1,3,'rgba(255,176,80,.45)');
+    px(fx+11,fy-37+jC,1,4,'rgba(255,176,80,.4)');
+  }
+  ctx.globalAlpha=1;
 }
 function finishBed(){
   const w=G.wife, chance=0.32 + (G.honor/400) + (w&&w.build!=='slender'?0.06:0);
@@ -2191,15 +2241,15 @@ function finishBed(){
   toast(hit? '🌙 …weeks later the word comes: SHE IS WITH CHILD! Nine months now.'
            : '🌙 A night to remember — but the gods grant no child yet. Try again soon.', 3200);
 }
-// wife sprite in 3 slices with independent bounce — bust & hips carry real jiggle
+// wife sprite in 3 overlapping slices — bust & hips bounce WITHOUT the body splitting
 function drawJiggleSprite(spr,x,y,ph,alpha){
-  const SC=0.62;
-  const H1=Math.round(spr.height*0.42), H2=Math.round(spr.height*0.2), H3=spr.height-H1-H2;
-  const jB=Math.sin(ph)*1.6, jC=Math.sin(ph+1.1)*2.1;
+  const SC=0.62, OV=3;                                    // slices overlap so nothing slides apart
+  const H1=Math.round(spr.height*0.42), H2=Math.round(spr.height*0.22), H3=spr.height-H1-H2;
+  const jB=Math.max(0,Math.sin(ph))*0.9, jC=Math.max(0,Math.sin(ph+1.1))*1.1;   // downward-only bounce
   ctx.globalAlpha=alpha===undefined?1:alpha;
-  ctx.drawImage(spr, 0,0,spr.width,H1,        x, y,                        spr.width*SC, H1*SC);
-  ctx.drawImage(spr, 0,H1,spr.width,H2,       x, y+H1*SC-1+jB*0.6,         spr.width*SC, H2*SC);
-  ctx.drawImage(spr, 0,H1+H2,spr.width,H3,    x, y+(H1+H2)*SC-1+jC*0.6,    spr.width*SC, H3*SC);
+  ctx.drawImage(spr, 0,H1+H2-OV,spr.width,H3+OV, x, y+(H1+H2-OV)*SC+jC*0.5, spr.width*SC,(H3+OV)*SC); // hips first (behind)
+  ctx.drawImage(spr, 0,H1-OV,spr.width,H2+OV,    x, y+(H1-OV)*SC+jB*0.5,    spr.width*SC,(H2+OV)*SC); // bust band
+  ctx.drawImage(spr, 0,0,spr.width,H1,           x, y,                       spr.width*SC, H1*SC);     // head/shoulders on top
   ctx.globalAlpha=1;
 }
 function drawBed(){
@@ -2222,34 +2272,38 @@ function drawBed(){
   let open = T<100?0 : T<130? (T-100)/30 : T<330?1 : T<360? 1-(T-330)/30 : 0;
   if(open>0){ ctx.globalAlpha=0.35*open; px(dx-44,96,44+dw,128,'#ffb050'); ctx.globalAlpha=1;
     px(dx,92,dw,130,'#c07830'); px(dx,92,dw,4,'#e8a050'); }
-  if(open<1){ const lw=Math.max(0,dw*(1-open));
-    px(dx,92,lw,130,'#6a4a2c'); if(lw>8) px(dx+2,96,lw-6,122,'#7a5634'); if(lw>10) px(dx+lw-5,152,3,8,'#e8c34a'); }
+  // the door leaf swings on its FAR hinge (right jamb), like a real door
+  if(open<1){ const lw=Math.max(0,Math.round(dw*(1-open)));
+    px(dx+dw-lw,92,lw,130,'#6a4a2c');
+    if(lw>8){ px(dx+dw-lw+2,96,lw-6,122,'#7a5634'); px(dx+dw-lw+3,100,lw-8>0?lw-8:0,3,'#8a6640'); }  // panel
+    if(lw>6){ px(dx+dw-lw,92,2,130,'#4a3420'); }                                                      // leading edge
+    if(lw>10) px(dx+dw-lw+4,152,3,8,'#e8c34a'); }                                                     // handle
   const spr=BEDSPR;
   if(T<130 && spr){
-    // she RUNS for the door — bust and hips bouncing with each stride
+    // she RUNS for the door — bust and hips bouncing with each stride (body stays whole)
     const wx= 40 + Math.min(1,T/112)*(dx-66-40);
     drawJiggleSprite(spr, wx, 122-Math.abs(Math.sin(T*0.4))*2, T*0.55, 1);
     if((T|0)%8===0) px(wx+10,218,3,1,'#5a4630');                              // dust at her heels
-  } else if(spr){
-    // the shadow-show: her figure in silhouette against the lamplight — nothing more
-    if(T<330){ ctx.save(); ctx.filter='brightness(16%)';
-      drawJiggleSprite(spr, dx+4+Math.sin(T*0.1)*1.5, 120, T*0.3, open);
-      ctx.filter='none'; ctx.restore(); }
-    // she beckons around the doorframe
-    if(T>260 && T<330){ const bk=Math.sin(T*0.25)*3;
-      px(dx-12+bk,140,12,3,'#160e07'); px(dx-15+bk,137,5,5,'#160e07');
-      if((T|0)%28<1.5) s.hearts.push({x:dx-6,y:132,vy:0.6,life:52,c:'#e26a8a'});
-    }
-    // and the master of the house answers
-    if(T>270 && T<334){ const mx=110+Math.min(1,(T-270)/58)*(dx-36-110);
+  } else if(T<334){
+    // the shadow-show: her clothes are OFF now — an undressed silhouette, shape only
+    drawShadowFigure(dx+22+Math.sin(T*0.08)*1.2, 216, T*0.3, T>260, open);
+    if(T>260 && (T|0)%28<1.5) s.hearts.push({x:dx-4,y:140,vy:0.6,life:52,c:'#e26a8a'});
+    // and the master of the house answers her curling finger
+    if(T>270){ const mx=110+Math.min(1,(T-270)/58)*(dx-36-110);
       px(mx,178,12,36,'#2a1c12'); px(mx+2,170,8,9,'#3a281a'); px(mx+3,166,6,5,'#4a3422');
       px(mx+10,188,7,3,'#2a1c12'); }
   }
-  // flung clothes arc across the room and settle
+  // flung clothes arc across the room and settle — full garments, not scraps
   for(const p of s.props){ ctx.save(); ctx.translate(p.x,p.y); ctx.rotate(p.r);
-    if(p.kind==='toga'){ px(-9,-4,18,8,'#efe3c2'); px(-9,-4,18,2,'#fff8ea'); px(-7,3,14,2,'#d8ccb0'); }
-    else if(p.kind==='girdle'){ px(-6,-1,12,3,'#e8c34a'); px(-2,-2,3,5,'#b8912f'); }
-    else { px(-4,-2,8,3,'#8a5c34'); px(-4,-3,3,2,'#a8743e'); }
+    if(p.kind==='toga'){
+      px(-16,-8,32,15,'#efe3c2'); px(-16,-8,32,3,'#fff8ea');                   // the great white sweep of it
+      px(-13,-2,26,2,'#d8ccb0'); px(-10,3,22,2,'#d8ccb0');                     // drape folds
+      px(-16,5,32,2,'#c8bca0'); px(-15,-6,3,12,'#e0d4b8');
+      px(-4,-8,8,2,'#8a2f5a');                                                 // her stola's dyed border
+    }
+    else if(p.kind==='breastband'){ px(-9,-2,18,5,'#e8d8c0'); px(-9,-2,18,1,'#f8ecd8'); px(-9,1,4,3,'#d0c0a8'); px(5,1,4,3,'#d0c0a8'); }
+    else if(p.kind==='girdle'){ px(-10,-2,20,4,'#e8c34a'); px(-10,-2,20,1,'#ffe9a0'); px(-3,-4,5,8,'#b8912f'); px(-1,-3,2,2,'#c03a4a'); }
+    else { px(-7,-3,14,5,'#8a5c34'); px(-7,-5,5,3,'#a8743e'); px(-6,-2,12,1,'#a8743e'); px(5,-4,2,6,'#6a4426'); }  // strappy sandal
     ctx.restore(); }
   // the door is shut: the lamps dim, the door rattles, love drifts upward
   if(T>360){
