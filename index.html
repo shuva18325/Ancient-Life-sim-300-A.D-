@@ -774,7 +774,7 @@ function freshCareer(name,origin,arch,social){
     hygiene:70, wifePhys:45,                         // 🧼 how you smell · 🔥 the physical side of the marriage
     hasPool:false, hasWardrobe:false,                // villa renovations
     loveDay:-1, loveQuick:0, loveLong:0, loveNight:0,// bedchamber sessions used today
-    lastWashDay:-9, lastPoolDay:-9, lastWardrobeDay:-9, lastKidsDay:-9,
+    lastWashDay:-9, lastPoolDay:-9, lastWardrobeDay:-9, lastKidsDay:-9, lastBathDay:-9,
     wins:0, losses:0,
     hpBonus:0, dmgBonus:0,
     loadout:lo,
@@ -791,7 +791,7 @@ function freshCareer(name,origin,arch,social){
   };
 }
 // fill in any fields missing from older saves
-function migrate(g){ const d={honor:50,food:4,mount:0,slaves:0,hasVilla:false,boat:false,favor:0,soldiers:0,hidden:[],plotTier:0,emperor:false,approval:50,legions:0,rivals:0,retired:false,detachments:[],day:0,titles:{},clears:{},socialClass:'gladiator',army:{},armyGear:0,armyTrain:0,hasOrganizer:false,generals:[],wife:null,married:false,marryPrompted:false,children:[],pregnant:null,lastLoveDay:-9,injury:null,lastDebateDay:-9,office:0,path:null,parthia:50,parthiaPact:false,wifeRel:50,lastTalkDay:-9,isFemale:false,lineage:[],hygiene:70,wifePhys:45,hasPool:false,hasWardrobe:false,loveDay:-1,loveQuick:0,loveLong:0,loveNight:0,lastWashDay:-9,lastPoolDay:-9,lastWardrobeDay:-9,lastKidsDay:-9}; for(const k in d){ if(g[k]===undefined) g[k]=d[k]; } if(!g.current) g.current='Italia'; return g; }
+function migrate(g){ const d={honor:50,food:4,mount:0,slaves:0,hasVilla:false,boat:false,favor:0,soldiers:0,hidden:[],plotTier:0,emperor:false,approval:50,legions:0,rivals:0,retired:false,detachments:[],day:0,titles:{},clears:{},socialClass:'gladiator',army:{},armyGear:0,armyTrain:0,hasOrganizer:false,generals:[],wife:null,married:false,marryPrompted:false,children:[],pregnant:null,lastLoveDay:-9,injury:null,lastDebateDay:-9,office:0,path:null,parthia:50,parthiaPact:false,wifeRel:50,lastTalkDay:-9,isFemale:false,lineage:[],hygiene:70,wifePhys:45,hasPool:false,hasWardrobe:false,loveDay:-1,loveQuick:0,loveLong:0,loveNight:0,lastWashDay:-9,lastPoolDay:-9,lastWardrobeDay:-9,lastKidsDay:-9,lastBathDay:-9}; for(const k in d){ if(g[k]===undefined) g[k]=d[k]; } if(!g.current) g.current='Italia'; return g; }
 function saveGame(){ try{ localStorage.setItem(SAVE_KEY, JSON.stringify(G)); toast('Saved.'); }catch(e){} }
 function hasSave(){ try{ return !!localStorage.getItem(SAVE_KEY); }catch(e){ return false; } }
 function loadGame(){ try{ G=migrate(JSON.parse(localStorage.getItem(SAVE_KEY))); return !!G; }catch(e){ return false; } }
@@ -1581,6 +1581,7 @@ function finishFight(won){
 function saveQuiet(){ try{ localStorage.setItem(SAVE_KEY, JSON.stringify(G)); }catch(e){} }
 
 function showResult(won,r){
+  if(won) advanceDay(2);   // victory feasts eat the calendar — a month per triumph (with the road home)
   state='menu'; endLock=false;
   $('touch').classList.add('hide');
   show('scr-result');
@@ -2299,11 +2300,13 @@ function openPortrait(){
    closes... and the lamps burn low. (All suggestion, nothing shown.)
    ===================================================================== */
 let BC=null, BEDSPR=null;
-function startBedScene(mode,len){
+function startBedScene(mode,len,place){
   if(!G.isFemale){ const cv=document.createElement('canvas'); cv.width=cv.height=148;
     drawBridePortrait(cv,G.wife,true); BEDSPR=cv; } else BEDSPR=null;
-  len=len||'quick';
-  BC={t:0, props:[], hearts:[], mode:mode||'heir', len,
+  len=len||'quick'; place=place||'bed';
+  if(place==='pool'&&!G.hasPool) place='bed';
+  if(place==='wardrobe'&&!G.hasWardrobe) place='bed';
+  BC={t:0, props:[], hearts:[], mode:mode||'heir', len, place,
       dur: len==='night'?3600 : len==='long'?1800 : 700,
       line:pick(['“Veni…”','“Te amo.”','“Nunc, mi gladiator…”','“Tarde venis…”'])};
   G.lastLoveDay=G.day;
@@ -2328,12 +2331,19 @@ function updateBed(dt){ const s=BC; s.t+=dt; const T=s.t;
     if(T>438&&T<440) s.props.push({kind:'necklace',x:368,y:150,vx:-2.7,vy:-3.1,r:0,vr:0.22});
     if(T>452&&T<454) s.props.push({kind:'girdle', x:368,y:156,vx:-3.0,vy:-2.4,r:0,vr:-0.14});
   }
-  // door + voice cues
-  if(T>100&&T<102) sfx('creak');
+  const pool=(s.place==='pool'||s.place==='bath');
+  // door / screen / water cues
+  if(T>100&&T<102) sfx(pool?'swing':'creak');
   if(T>430&&T<432) sfx('giggle');                                  // the sundial, corrected
   if(T>448&&T<450) sfx('giggle');                                  // her word for it
   if(T>460&&T<462) sfx('kiss');                                    // the first kiss, before the door
-  if(T>474&&T<476) sfx('creak');
+  if(T>474&&T<476) sfx(pool?'thud':'creak');
+  if(pool){ if(T>400&&T<402) sfx('thud'); }                        // the first dive
+  // a wardrobe under strain occasionally returns fire
+  if(s.place==='wardrobe' && T>520 && (T|0)%150<1.5)
+    s.props.push({kind:pick(['sandal','veil','breastband','msandal']),x:384,y:96,vx:rnd(-1.6,1.4),vy:-2.1,r:0,vr:rnd(-0.2,0.2)});
+  if(s.place==='wardrobe' && T>600&&T<602) sfx('giggle');          // the small invader giggles
+  if(s.place==='wardrobe' && T>642&&T<644) sfx('swing');           // ...and is scooped up
   // the ALL-NIGHT intermission: silence... then a hand snakes out for the wine
   const inter = s.len==='night' && T>1500 && T<1600;
   if(s.len==='night'){
@@ -2350,7 +2360,7 @@ function updateBed(dt){ const s=BC; s.t+=dt; const T=s.t;
   if(T>=(s.dur||700)) finishBed();
 }
 // the master of the house, full height, striding to the door
-function drawShadowMale(fx,fy,ph){
+function drawShadowMale(fx,fy,ph,gag){
   const S='#1c130c', stride=Math.sin(ph);
   px(fx-4,fy-83,10,11,S); px(fx-2,fy-85,7,3,S);                    // head + cropped hair — a head above the domina
   px(fx-1,fy-72,5,9,S);                                            // neck
@@ -2361,6 +2371,7 @@ function drawShadowMale(fx,fy,ph){
   px(fx-5,fy-35,5,18,S); px(fx+1,fy-35,5,18,S);                    // thighs
   px(fx-5+stride*3,fy-17,5,15,S); px(fx+1-stride*3,fy-17,5,15,S);  // striding legs
   px(fx-6+stride*3,fy-2,7,2,S); px(fx+0-stride*3,fy-2,7,2,S);      // feet
+  if(gag){ px(fx-9,fy-37,4,3,S); px(fx-12,fy-40,4,3,S); px(fx-14,fy-42,2,2,S); }  // summoned — the silhouette leads the way
 }
 // the domina of the house — still dressed, striding to answer the call
 function drawShadowWalkerF(fx,fy,ph){
@@ -2413,7 +2424,7 @@ function finishBed(){
   const mode=BC.mode, w=G.wife, len=BC.len||'quick';
   const emoF= len==='night'?9 : len==='long'?6 : 4;                 // fun-mode emotional gain
   const phys= len==='night'?12 : len==='long'?7 : 4;                // physical gain, always
-  advanceDay(1);
+  advanceDay(3);                                                    // a MONTH passes — the house moves on happily
   G.hygiene=clamp((G.hygiene===undefined?70:G.hygiene)-6,0,100);    // worth it
   G.wifePhys=clamp((G.wifePhys===undefined?45:G.wifePhys)+phys,0,100);
   if(mode==='fun'){
@@ -2447,33 +2458,59 @@ function drawJiggleSprite(spr,x,y,ph,alpha){
   ctx.globalAlpha=1;
 }
 function drawBed(){
-  const s=BC, T=s.t;
-  // the chamber
+  const s=BC, T=s.t, place=s.place||'bed';
+  const dx=346, dw=76;
+  if(place==='pool'||place==='bath'){ drawPoolPlace(s,T,dx,dw,place); }
+  else { drawRoomPlace(s,T,dx,dw,place); }
+  // flung clothes arc across the room and settle — full garments, not scraps
+  for(const p of s.props) drawFlungProp(p);
+  drawBedAfterProps(s,T,dx,dw);
+}
+function drawRoomPlace(s,T,dx,dw,place){
+  const ward=place==='wardrobe';
+  // the chamber (or the atrium, if the wardrobe is tonight's arena)
   px(-4,-4,W+8,H+8,'#241812');
   px(-4,-4,W+8,124,'#4a3626'); px(-4,118,W+8,4,'#2e2016');
   for(let i=0;i<4;i++) px(-4,26+i*24,W+8,1,'#3e2c1e');
   px(0,224,W,H-224,'#3a2c1e'); for(let fx=0;fx<W;fx+=26) px(fx,224,1,H-224,'#2c2014');
-  // furnishings: a couch, a small table with wine
-  px(40,196,64,18,'#5a3a22'); px(40,196,64,4,'#7a2f4a'); px(42,192,60,6,'#9a4a66');
-  px(150,202,26,4,'#6a4a2c'); px(154,206,4,16,'#5a3c22'); px(168,206,4,16,'#5a3c22');
-  px(158,194,6,8,'#8a2a3a'); px(159,192,4,2,'#c8c0b0');
-  // an amphora of good Falernian, prudently left by the door
+  if(ward){
+    px(-4,20,W+8,3,'#7a2f4a'); px(-4,25,W+8,1,'#e8c34a');                       // atrium frieze
+    for(const cx of [60,150,250]){ px(cx,40,9,184,'#cfc0a2'); px(cx+1,40,3,184,'#e8dcc2'); px(cx-2,38,13,4,'#e8dcc2'); px(cx-2,220,13,4,'#b8a88a'); }
+    px(300,202,26,4,'#6a4a2c'); px(304,206,4,16,'#5a3c22'); px(318,206,4,16,'#5a3c22');   // a stool by the wardrobe
+  } else {
+    // furnishings: a couch, a small table with wine
+    px(40,196,64,18,'#5a3a22'); px(40,196,64,4,'#7a2f4a'); px(42,192,60,6,'#9a4a66');
+    px(150,202,26,4,'#6a4a2c'); px(154,206,4,16,'#5a3c22'); px(168,206,4,16,'#5a3c22');
+    px(158,194,6,8,'#8a2a3a'); px(159,192,4,2,'#c8c0b0');
+  }
+  // an amphora of good Falernian, prudently left within arm's reach
   if(!s.wineTaken){ px(316,198,8,14,'#a86a34'); px(316,198,8,2,'#c88a4e'); px(318,193,4,5,'#8a5428'); px(317,192,6,2,'#c88a4e'); px(315,206,2,4,'#8a5428'); px(323,206,2,4,'#8a5428'); }
   // oil lamp
   px(120,84,10,6,'#7a5c2e'); px(123,80,4,4,'#ffcf5a'); px(124,78,2,2,'#fff2b0');
   ctx.globalAlpha=.08; px(96,70,60,150,'#ffcf7a'); ctx.globalAlpha=1;
-  // door frame at the right — wide enough for the two-shot before the door swings to
-  const dx=346, dw=76;
-  px(dx-6,86,dw+12,138,'#5a4028'); px(dx-4,90,dw+8,134,'#2a1a10');
+  // the COVER at the right: a doorway — or the great cedar wardrobe, which shakes
+  const shake= ward && T>510 ? Math.sin(T*0.7)*1.5 : 0;
+  const dX=dx+shake;
+  if(ward){ px(dX-8,80,dw+16,144,'#6a4a2c'); px(dX-8,80,dw+16,4,'#8a6640'); px(dX-12,76,dw+24,6,'#8a6640');  // cabinet body + pediment
+    px(dX-6,86,dw+12,138,'#5a4028'); px(dX-4,90,dw+8,134,'#2a1a10');
+    if(T>510 && (T|0)%12<1.5) px(dX+rnd(0,dw),74,2,2,'#8a6640');                 // dust pops off the top
+  } else { px(dX-6,86,dw+12,138,'#5a4028'); px(dX-4,90,dw+8,134,'#2a1a10'); }
   let open = T<100?0 : T<130? (T-100)/30 : T<474?1 : T<500? 1-(T-474)/26 : 0;
-  if(open>0){ ctx.globalAlpha=0.35*open; px(dx-44,96,44+dw,128,'#ffb050'); ctx.globalAlpha=1;
-    px(dx,92,dw,130,'#c07830'); px(dx,92,dw,4,'#e8a050');
-    // through the open door: THE TWO-SHOT — the bed on the left, the master's profile on the right
+  if(open>0){ ctx.globalAlpha=0.35*open; px(dX-44,96,44+dw,128,'#ffb050'); ctx.globalAlpha=1;
+    px(dX,92,dw,130,'#c07830'); px(dX,92,dw,4,'#e8a050');
+    // through the opening: THE TWO-SHOT
     if(T>340){
-      // the bed, and the one waiting on it
-      px(dx+3,196,38,6,'#5a3a22'); px(dx+3,190,38,7,'#7a2f4a'); px(dx+3,190,38,2,'#9a4a66');
-      px(dx+5,186,8,5,'#c8b090');                                                             // pillow
       const jr=Math.max(0,Math.sin(T*0.18))*1.2, S2='#17100a';
+      if(ward){
+        // inside: the racks — and a cedar chest to sit on
+        for(let i=0;i<3;i++){ const rx=dX+5+i*12; px(rx,102,8,26,['#7a2f22','#2f4a7a','#4a2f5a'][i]); px(rx,102,8,3,['#9a4433','#4a6a9a','#6a4a7a'][i]); px(rx+3,98,2,4,'#8a6640'); }
+        px(dX+2,98,dw-4,2,'#8a6640');                                            // the rail
+        px(dX+3,190,38,12,'#7a5634'); px(dX+3,190,38,3,'#8a6640');               // cedar chest
+      } else {
+        // the bed, and the one waiting on it
+        px(dX+3,196,38,6,'#5a3a22'); px(dX+3,190,38,7,'#7a2f4a'); px(dX+3,190,38,2,'#9a4a66');
+        px(dX+5,186,8,5,'#c8b090');                                              // pillow
+      }
       if(!G.isFemale){
         // she SITS on the bed's edge, patting the covers — an invitation nobody misreads
         const pat=((T*0.15)|0)%2;
@@ -2508,12 +2545,20 @@ function drawBed(){
       if(T>458 && T<474){ pixelText('♥',dx+46,150,'#e26a8a',1.3); }                            // the lean-in
     }
   }
-  // the door leaf swings on its FAR hinge (right jamb), like a real door
-  if(open<1){ const lw=Math.max(0,Math.round(dw*(1-open)));
-    px(dx+dw-lw,92,lw,130,'#6a4a2c');
-    if(lw>8){ px(dx+dw-lw+2,96,lw-6,122,'#7a5634'); px(dx+dw-lw+3,100,lw-8>0?lw-8:0,3,'#8a6640'); }  // panel
-    if(lw>6){ px(dx+dw-lw,92,2,130,'#4a3420'); }                                                      // leading edge
-    if(lw>10) px(dx+dw-lw+4,152,3,8,'#e8c34a'); }                                                     // handle
+  if(open<1){
+    if(ward){ // double doors meet in the middle
+      const lw=Math.max(0,Math.round(dw/2*(1-open)));
+      px(dX,92,lw,130,'#6a4a2c'); px(dX+dw-lw,92,lw,130,'#6a4a2c');
+      if(lw>6){ px(dX+2,96,lw-4,122,'#7a5634'); px(dX+dw-lw+2,96,lw-4,122,'#7a5634'); }
+      if(lw>4){ px(dX+lw-2,152,2,8,'#e8c34a'); px(dX+dw-lw,152,2,8,'#e8c34a'); }                      // meeting handles
+    } else { // the door leaf swings on its FAR hinge (right jamb), like a real door
+      const lw=Math.max(0,Math.round(dw*(1-open)));
+      px(dx+dw-lw,92,lw,130,'#6a4a2c');
+      if(lw>8){ px(dx+dw-lw+2,96,lw-6,122,'#7a5634'); px(dx+dw-lw+3,100,lw-8>0?lw-8:0,3,'#8a6640'); } // panel
+      if(lw>6){ px(dx+dw-lw,92,2,130,'#4a3420'); }                                                     // leading edge
+      if(lw>10) px(dx+dw-lw+4,152,3,8,'#e8c34a');                                                      // handle
+    }
+  }
   const spr=BEDSPR;
   if(T<130){
     // the eager one RUNS for the door
@@ -2536,9 +2581,17 @@ function drawBed(){
     if(!G.isFemale) drawShadowMale(mx, 216, T*0.35);
     else drawShadowWalkerF(mx, 216, T*0.35);
   }
-  // flung clothes arc across the room and settle — full garments, not scraps
-  for(const p of s.props) drawFlungProp(p);
-  drawBedAfterProps(s,T,dx,dw);
+  // a small invader makes for the shaking wardrobe — and is scooped up by a slave
+  if(ward && T>560 && T<700 && G.children.some(c=>!c.wed && (G.day-c.born)<40)){
+    const kt=clamp((T-560)/80,0,1);
+    const caught=T>642;
+    const kx= caught? 300-(T-642)*1.1 : 60+kt*(300-60);
+    const sxx= caught? kx-6 : 90+clamp((T-575)/67,0,1)*(300-90);
+    ctx.save(); ctx.translate(sxx,216); ctx.scale(1.2,1.2); drawHusbandFig(ctx,0,0,0,'#b07a4a','#8a8a72'); ctx.restore();  // the long-suffering slave
+    if(caught){ ctx.save(); ctx.translate(kx,178); ctx.scale(1.1,1.1); drawKidFig(ctx,0,0,'m',16); ctx.restore();          // held aloft, protesting
+      if((T|0)%16<1.5) pixelText('!',kx+6,160,'#e8c34a',1); }
+    else { ctx.save(); ctx.translate(kx,216); ctx.scale(1.1,1.1); drawKidFig(ctx,0,0,'m',16); ctx.restore(); }
+  }
 }
 function drawFlungProp(p){ ctx.save(); ctx.translate(p.x,p.y); ctx.rotate(p.r);
   {
@@ -2560,43 +2613,223 @@ function drawFlungProp(p){ ctx.save(); ctx.translate(p.x,p.y); ctx.rotate(p.r);
   }
   ctx.restore(); }
 function drawBedAfterProps(s,T,dx,dw){
-  // the door is shut: the lamps dim, the door rattles, love drifts upward
+  const place=s.place||'bed', pool=(place==='pool'||place==='bath');
+  // the cover is shut: the lamps dim — and the shadow-theatre begins
   if(T>490){
-    const dim=clamp((T-490)/60,0,1)*0.55;
-    ctx.globalAlpha=dim; px(-4,-4,W+8,H+8,'#0c0806'); ctx.globalAlpha=1;
-    const knock=Math.sin(T*0.35)*clamp((T-502)/40,0,1);
-    px(dx-3+knock*1.8,88,3,136,'#5a4028');                                     // the frame knocks
-    if((T|0)%42<1.5) s.hearts.push({x:dx+dw/2+rnd(-12,12), y:118, vy:0.5, life:76, c:pick(['#e26a8a','#f090a8','#ffd0da'])});
+    if(!pool){
+      const dim=clamp((T-490)/60,0,1)*0.5;
+      ctx.globalAlpha=dim; px(-4,-4,W+8,H+8,'#0c0806'); ctx.globalAlpha=1;
+      if(place==='bed'){ const knock=Math.sin(T*0.35)*clamp((T-502)/40,0,1);
+        px(dx-3+knock*1.8,88,3,136,'#5a4028'); }                               // the frame knocks
+      if(T>520) drawShadowPlay(s,T);                                           // the lamp throws EVERYTHING on the wall
+    }
+    const hx0= pool? 150 : dx+dw/2;
+    if((T|0)%42<1.5) s.hearts.push({x:hx0+rnd(-14,14), y:pool?176:118, vy:0.5, life:76, c:pick(['#e26a8a','#f090a8','#ffd0da'])});
     ctx.textAlign='center';
     const beat=((T/24)|0)%3;
-    if(beat===0) pixelText('♥',dx+dw/2-16,102,'#e26a8a',1.5);
-    else if(beat===1) pixelText('♪',dx+dw/2+18,108,'#f0d0da',1.2);
-    else pixelText('✧',dx+dw/2+2,98,'#ffd0da',1);
-    if(T>560 && T<1100) pixelText(BC.mode==='fun'? '~ just the two of them ~':'~ the lamps burn low ~',W/2,248,'rgba(232,195,74,.75)',1);
+    if(beat===0) pixelText('♥',hx0-16,pool?160:102,'#e26a8a',1.5);
+    else if(beat===1) pixelText('♪',hx0+18,pool?166:108,'#f0d0da',1.2);
+    else pixelText('✧',hx0+2,pool?156:98,'#ffd0da',1);
+    if(T>560 && T<1100) pixelText(BC.mode==='fun'? '~ just the two of them ~': pool?'~ the steam keeps its secrets ~':'~ the lamps burn low ~',W/2,248,'rgba(232,195,74,.75)',1);
     // LONG session: the encore
     if(s.len==='long' && T>1150 && T<1400) pixelText('“…again?”  “Again.”',W/2,248,'rgba(240,200,212,.8)',1);
     // ALL NIGHT: the intermission — a bare arm snakes out for the Falernian
     if(s.len==='night'){
-      if(T>1500 && T<1600){
+      if(T>1500 && T<1600 && place==='bed'){
         ctx.globalAlpha=0.5; px(dx,94,5,126,'#ffb050'); ctx.globalAlpha=1;                     // the door cracks
         const reach= T<1540? clamp((T-1505)/35,0,1) : T<1560? 1 : clamp(1-(T-1560)/30,0,1);
         if(reach>0 && !s.wineTaken){ const ax=dx-Math.round(reach*22);
           px(ax,197,dx-ax,4,'#1c130c'); px(ax-4,195,6,7,'#1c130c'); }                          // arm + groping hand
         else if(reach>0 && s.wineTaken){ const ax=dx-Math.round(reach*22);
           px(ax,197,dx-ax,4,'#1c130c'); px(ax-5,190,8,14,'#a86a34'); px(ax-3,186,4,4,'#8a5428'); } // got it
-        if(T>1520&&T<1590) pixelText('~ intermission ~',W/2,248,'rgba(232,195,74,.7)',1);
       }
+      if(T>1520&&T<1590) pixelText('~ intermission ~',W/2,248,'rgba(232,195,74,.7)',1);
       if(T>1650 && T<2400) pixelText('~ the second wind ~',W/2,248,'rgba(240,200,212,.8)',1);
-      if(T>2800){ const dawn=clamp((T-2800)/500,0,1);                                          // dawn creeps under the door
+      if(T>2800){ const dawn=clamp((T-2800)/500,0,1);                                          // dawn creeps in
         ctx.globalAlpha=dawn*0.28; px(-4,-4,W+8,H+8,'#e8a050'); ctx.globalAlpha=1;
         px(0,222,W,2,'rgba(255,208,120,'+(dawn*0.5)+')'); }
-      if(T>3100) pixelText('~ dawn, and still the door holds ~',W/2,248,'rgba(255,214,138,.85)',1);
+      if(T>3100) pixelText(pool?'~ dawn finds the water still warm ~':'~ dawn, and still the door holds ~',W/2,248,'rgba(255,214,138,.85)',1);
     }
   }
   ctx.textAlign='center';
   for(const h of s.hearts) pixelText('♥',h.x,h.y,h.c,1);
   // cinematic letterbox
   px(-4,-4,W+8,18,'#0a0705'); px(-4,H-14,W+8,18,'#0a0705');
+}
+// THE SHADOW-THEATRE — the oil lamp throws the whole story on the wall,
+// vignette by vignette. Silhouettes only; the wall tells no lies.
+function drawShadowPlay(s,T){
+  const gx=96,gy=58,gw=190,gh=104, S='#2a180e';
+  ctx.globalAlpha=.14; px(gx-10,gy-10,gw+20,gh+20,'#ffcf7a');
+  ctx.globalAlpha=.24; px(gx,gy,gw,gh,'#ffd99a'); ctx.globalAlpha=1;
+  px(gx,gy,gw,2,'rgba(120,70,20,.5)'); px(gx,gy+gh-2,gw,2,'rgba(120,70,20,.5)');
+  const total= s.len==='quick'?6:8;
+  const vi=(((T-520)/130)|0)%total, vt=(T-520)%130, cx0=gx+gw/2, base=gy+gh-10;
+  const jB=Math.max(0,Math.sin(T*0.22))*1.6, jC=Math.max(0,Math.sin(T*0.22+1.1))*1.8;
+  if(vi===0){ // two profiles slide together — the kiss
+    const d=Math.max(0,26-vt*0.4);
+    px(cx0-24-d,base-58,13,13,S); px(cx0-14-d,base-52,5,3,S);                   // his head + nose toward her
+    px(cx0-26-d,base-45,16,35,S);
+    px(cx0+12+d,base-52,11,11,S); px(cx0+10+d,base-56,13,5,S); px(cx0+8+d,base-44,4,3,S); // her head, piled hair, lips
+    px(cx0+10+d,base-41,13,31,S); px(cx0+8+d,base-36+jB,4,7,S);                 // her profile — the bust bounces
+    if(d<=0 && (vt|0)%14<2) pixelText('♥',cx0-2,base-62,'#e26a8a',1.2);
+  } else if(vi===1){ // her seated profile — and his hand, fanning like a man near a fire
+    px(cx0-2,base-50,11,11,S); px(cx0-4,base-54,13,5,S);
+    px(cx0-4,base-39,13,22,S); px(cx0-8,base-34+jB,5,8,S);                      // the 🍒 profile, lively
+    px(cx0-10,base-17,20,8,S);
+    const fan=Math.sin(T*0.4)*4;
+    px(cx0+22,base-40+fan,10,4,S); px(cx0+30,base-42+fan,5,7,S);                // the awed hand
+    if((vt|0)%20<2) pixelText('✧',cx0+30,base-52,'#ffd0da',1);
+  } else if(vi===2){ // the 🍑 — two proud rounds, swaying like a censer at a triumph
+    const sw=Math.sin(T*0.18)*5;
+    px(cx0-12+sw,base-24,10,17,S); px(cx0+3+sw,base-22,10,15,S);                // thighs below, parted
+    px(cx0-15+sw,base-41+jC,14,15,S); px(cx0+1+sw,base-39+jC*0.6,14,13,S);      // the rounds — SEPARATE, and alive
+    px(cx0-5+sw,base-46+jC,10,5,S);                                             // the small of the back above
+    px(cx0-28,base-46,9,4,S); px(cx0-31,base-48,4,7,S);                         // two reverent hands hover
+    px(cx0+21,base-43,9,4,S); px(cx0+29,base-45,4,7,S);
+  } else if(vi===3){ // the sundial gag, act two — down, up, OVER-up, correct
+    px(cx0-6,base-62,12,13,S); px(cx0-8,base-49,16,34,S);                       // his profile
+    const ph2=(vt/32)|0;
+    if(ph2===0){ px(cx0-16,base-38,6,4,S); px(cx0-20,base-34,4,4,S); }          // down
+    else if(ph2===1){ px(cx0-18,base-42,8,4,S); }                                // level
+    else if(ph2===2){ px(cx0-15,base-48,5,4,S); px(cx0-18,base-53,4,5,S); px(cx0-19,base-56,3,3,S); pixelText('!',cx0-22,base-60,'#e8c34a',1); } // UP
+    else { px(cx0-16,base-46,6,4,S); px(cx0-19,base-50,4,4,S); if((vt|0)%12<2) pixelText('♥',cx0-22,base-56,'#e26a8a',1); }
+  } else if(vi===4){ // a pillow crosses the light at speed
+    const pxx=gx+10+vt*1.6;
+    if(pxx<gx+gw-16){ ctx.save(); ctx.translate(pxx,base-46); ctx.rotate(vt*0.1); px(-10,-5,20,10,S); px(-12,-2,3,4,S); px(9,-2,3,4,S); ctx.restore(); }
+    px(cx0-30,base-20,24,12,S); px(cx0+10,base-22,22,14,S);                     // two laughing lumps below
+  } else if(vi===5){ // four feet skyward — two of them wiggling
+    const wig=Math.sin(T*0.5)*2;
+    px(cx0-22,base-34,6,26,S); px(cx0-13,base-38,6,30,S);
+    px(cx0-24,base-40+wig,9,6,S); px(cx0-15,base-44-wig,9,6,S);                 // her toes, dancing
+    px(cx0+6,base-30,7,22,S); px(cx0+16,base-33,7,25,S);
+    px(cx0+4,base-36,10,6,S); px(cx0+14,base-39,10,6,S);                        // his, flat as planks
+  } else if(vi===6){ // the toast — two cups meet above the sheets
+    const cl=Math.max(0,10-vt*0.3);
+    px(cx0-18-cl,base-48,8,10,S); px(cx0-16-cl,base-38,4,8,S);
+    px(cx0+10+cl,base-48,8,10,S); px(cx0+12+cl,base-38,4,8,S);
+    if(cl<=0 && (vt|0)%16<2) pixelText('✦',cx0,base-54,'#ffe9a0',1);
+    px(cx0-26,base-24,52,14,S);                                                 // the shared lump of blankets
+  } else { // the fruit bowl — 🍒 knocked flying, as is tradition
+    px(cx0-8,base-18,20,6,S); px(cx0-4,base-12,12,4,S);                         // the bowl on a stool
+    const fy2=Math.min(26,vt*0.8), fx2=vt*0.9;
+    px(cx0-14-fx2*0.4,base-24-((26-fy2)*(fy2)/12),4,4,S); px(cx0-10-fx2*0.3,base-26-((24-fy2)*(fy2)/14),4,4,S); // two cherries aloft
+    px(cx0-12-fx2*0.35,base-22-((25-fy2)*(fy2)/13),1,3,S);                       // the shared stem
+    if(vt>60) pixelText('~ the bowl is avenged ~',cx0,base+6,'rgba(232,195,74,.6)',1);
+  }
+}
+
+// THE WATER SCENES — lagoon by moonlight, or the marble town baths.
+// A folding screen for modesty; the water and the steam do the rest.
+function drawPoolPlace(s,T,dx,dw,kind){
+  const bath=kind==='bath';
+  if(bath){ // marble hall, mosaic band, bronze lamps
+    px(-4,-4,W+8,H+8,'#3a3226');
+    px(-4,-4,W+8,124,'#5a5040'); px(-4,118,W+8,4,'#3e372a');
+    px(-4,30,W+8,6,'#2a5a6a'); px(-4,32,W+8,1,'#4a8a9a'); for(let i=0;i<24;i++) px(-4+i*22,30,2,6,'#e8dcc2');  // mosaic wave band
+    for(const cx of [60,290]){ px(cx,44,10,166,'#cfc0a2'); px(cx+1,44,3,166,'#e8dcc2'); px(cx-2,42,14,4,'#e8dcc2'); }
+    for(const lx of [130,230]){ px(lx,40,2,18,'#6a5a3a'); px(lx-4,58,10,5,'#8a7040'); px(lx-2,56,6,3,'#ffcf5a'); }  // hanging lamps
+    px(0,210,W,H-210,'#8a7a5c'); for(let fx=0;fx<W;fx+=12) px(fx,210,1,H-210,'#6a5c42');   // marble floor
+  } else { // the lagoon garden at night
+    px(-4,-4,W+8,H+8,'#101426');
+    for(let i=0;i<34;i++) px(((i*67)%W)|0,(i*29)%90,1,1,'#e8e2d0');                        // stars
+    px(388,26,14,14,'#e8e2cf'); px(392,30,8,8,'#cfc8b4'); px(386,24,4,4,'#101426');        // gibbous moon
+    px(-4,120,W+8,4,'#182034');
+    px(0,150,W,66,'#1a2416');                                                              // dark lawn bank
+    for(const tx of [30,300,450]){ px(tx,96,6,58,'#0e1810'); px(tx-4,84,14,22,'#142016'); px(tx-2,74,10,16,'#142016'); } // cypress
+    px(0,216,W,H-216,'#16200f'); for(let fx=0;fx<W;fx+=18) px(fx+((fx*7)%5),218,2,1,'#22301a');
+  }
+  // THE POOL — wide, steaming, waist deep
+  const px0=56, pw2=204, wy=198;
+  px(px0-8,wy-6,pw2+16,6,bath?'#cfc0a2':'#8a7a5c'); px(px0-8,wy-6,pw2+16,2,bath?'#e8dcc2':'#a89a78');   // rim
+  px(px0,wy,pw2,20,bath?'#2a6a8a':'#1e4a66'); px(px0,wy,pw2,2,'#5a9ec4');
+  for(let i=0;i<6;i++) px(px0+8+((T*0.5+i*31)%(pw2-16)),wy+4+i*2.5,9,1,'#4a8aae');
+  // torch/brazier light on the water — layered soft
+  ctx.globalAlpha=.05; px(px0+16,wy-46,170,46,'#ffcf7a');
+  ctx.globalAlpha=.07; px(px0+44,wy-30,112,30,'#ffcf7a'); ctx.globalAlpha=1;
+  // the folding screen (three panels), lamplit from behind
+  ctx.globalAlpha=.22; px(dx-34,132,34+dw,90,'#ffb050'); ctx.globalAlpha=1;
+  for(let i=0;i<3;i++){ const sx2=dx+i*(dw/3);
+    px(sx2,96,dw/3-2,126,bath?'#c8b088':'#a8743e'); px(sx2,96,dw/3-2,3,bath?'#e0cca4':'#c8925a');
+    px(sx2,96,2,126,'#5a4028'); }
+  px(dx-2,94,dw+4,3,'#5a4028'); px(dx-2,220,dw+4,3,'#5a4028');
+  // phases: run — shadow on the screen — cross to the water — the long soak
+  const spr=BEDSPR;
+  if(T<130){
+    const wx= 40 + Math.min(1,T/112)*(dx-66-40);
+    if(!G.isFemale && spr) drawJiggleSprite(spr, wx, 122-Math.abs(Math.sin(T*0.4))*2, T*0.55, 1);
+    else { ctx.save(); ctx.translate(wx+8,214-Math.abs(Math.sin(T*0.4))*2); ctx.scale(1.15,1.15); drawHusbandFig(ctx,0,0,G.wifeRel|0); ctx.restore(); }
+  } else if(T<340){
+    // undressing BEHIND the screen — the lamp betrays every curve
+    if(!G.isFemale) drawShadowFigure(dx+30+Math.sin(T*0.08)*1.2, 216, T*0.3, T>260, 1);
+    else { drawShadowMale(dx+34+Math.sin(T*0.08)*1.2, 214, Math.sin(T*0.05)*0.4);
+      if(T>260){ const bk=Math.sin(T*0.25)*3; px(dx+16+bk,150,12,3,'#1c130c'); px(dx+13+bk,147,5,5,'#1c130c'); } }
+    if(T>260 && (T|0)%28<1.5) s.hearts.push({x:dx-4,y:140,vy:0.6,life:52,c:'#e26a8a'});
+  }
+  if(T>280 && T<352){ const mx=90+Math.min(1,(T-280)/64)*(dx+16-90);
+    if(!G.isFemale) drawShadowMale(mx, 216, T*0.35);
+    else drawShadowWalkerF(mx, 216, T*0.35);
+  }
+  // the first one crosses from the screen to the water — a silhouette, nothing more
+  if(T>352 && T<400){ const cxw=dx+10-((T-352)/48)*(dx+10-(px0+pw2-24));
+    if(!G.isFemale) drawShadowFigure(cxw,216,T*0.3,false,1); else drawShadowMale(cxw,214,T*0.35);
+  }
+  if(T>400&&T<430){ const sp2=(T-400)/30;                                       // SPLASH one
+    for(let i=0;i<7;i++){ const a2=i/7*Math.PI; px(px0+pw2-24+Math.cos(a2)*16*sp2, wy-4-Math.sin(a2)*14*sp2,2,2,'#8ac4e0'); } }
+  // the second follows — and the silhouette announces the mood
+  if(T>430 && T<466){ const cxw=dx+10-((T-430)/36)*(dx+10-(px0+pw2-40));
+    if(!G.isFemale) drawShadowMale(cxw,214,T*0.35,true); else drawShadowFigure(cxw,216,T*0.3,false,1);
+  }
+  if(T>466&&T<496){ const sp2=(T-466)/30;                                       // SPLASH two
+    for(let i=0;i<8;i++){ const a2=i/8*Math.PI; px(px0+pw2-40+Math.cos(a2)*18*sp2, wy-4-Math.sin(a2)*16*sp2,2,2,'#8ac4e0'); } }
+  // the soak: full silhouettes in the shallows, drifting together
+  if(T>500) drawWaterCouple(px0+80, wy, T, s);
+  // steam — coherent wisps rising just off the water
+  const nSteam= T<300? 5 : T<500? 9 : 14;
+  for(let i=0;i<nSteam;i++){
+    const ph2=(T*0.5+i*41)%84, sxx=px0+14+(i*53)%(pw2-20)+Math.sin((T+i*30)*0.02)*5;
+    ctx.globalAlpha=clamp(1-ph2/84,0,1)*0.34;
+    px(sxx,wy-4-ph2*0.4,9,6,'#e8e2da'); px(sxx+2,wy-9-ph2*0.4,5,4,'#f2eee8');
+  }
+  ctx.globalAlpha=1;
+  if(bath && T>500 && (T|0)%200<1.5) s.hearts.push({x:px0+80,y:wy-46,vy:0.5,life:56,c:'#ffd0da'});
+}
+// two silhouettes waist-deep: the drift, the dolphin roll, the merge
+function drawWaterCouple(cx0,wy,T,s){
+  const S='#17100a', S2='#1c130c';
+  const close=clamp((T-540)/260,0,1);                                            // they drift together
+  const b1=Math.sin(T*0.09)*1.5, b2=Math.sin(T*0.09+1.4)*1.5;
+  const hx=cx0-20+close*11, wx2=cx0+20-close*11;
+  if(close<1){
+    // HIM: head + broad shoulders riding the waterline
+    px(hx-4,wy-28+b1,9,10,S2); px(hx-2,wy-30+b1,7,3,S2);
+    px(hx-9,wy-18+b1,19,6,S2); px(hx-6,wy-12+b1,13,14,S2);
+    // HER: piled wet hair, shoulders — and the profile that started three wars
+    px(wx2-4,wy-25+b2,9,9,S); px(wx2-5,wy-29+b2,11,4,S); px(wx2+3,wy-20+b2,3,8,S);
+    px(wx2-6,wy-16+b2,13,5,S); px(wx2-5,wy-11+b2,11,13,S);
+    px(wx2-9,wy-9+b2+Math.max(0,Math.sin(T*0.18))*1.4,5,7,S);                    // the bust profile, buoyant
+  } else {
+    // ONE silhouette now — two heads tilting into a kiss above a single shape
+    const kiss=Math.sin(T*0.06)*1.2;
+    px(cx0-11,wy-28+kiss,9,10,S2); px(cx0-9,wy-30+kiss,7,3,S2);
+    px(cx0+2,wy-26-kiss,9,9,S); px(cx0+1,wy-30-kiss,11,4,S);
+    px(cx0-13,wy-18,26,8,S); px(cx0-10,wy-10,20,12,S);
+    if((T|0)%22<2) s.hearts.push({x:cx0,y:wy-36,vy:0.6,life:50,c:'#e26a8a'});
+  }
+  // every so often the famous 🍑 breaches like a dolphin — Rome would weep
+  const roll=(T-500)%240;
+  if(close>=0.4 && roll>190 && roll<230){
+    const rp=(roll-190)/40, arc=Math.sin(rp*Math.PI)*11;
+    px(cx0+34,wy+4-arc,9,7,S); px(cx0+42,wy+6-arc,8,8,S); px(cx0+49,wy+7-arc,3,5,S);   // back → the two rounds → gone
+    if(rp>0.4&&rp<0.6) for(let i=0;i<4;i++) px(cx0+36+i*5,wy-arc,2,2,'#8ac4e0');
+  }
+  // the water takes them from the waist down
+  px(cx0-44,wy+2,88,14,'rgba(26,66,92,.78)'); px(cx0-44,wy+2,88,1,'rgba(90,158,196,.55)');
+  // ripple rings spreading from the pair
+  const rr=(T*0.8)%46;
+  ctx.globalAlpha=clamp(1-rr/46,0,1)*0.5;
+  px(cx0-14-rr,wy+4,6,1,'#5a9ec4'); px(cx0+10+rr,wy+5,6,1,'#5a9ec4'); px(cx0-2,wy+7,4+rr,1,'rgba(90,158,196,.4)');
+  ctx.globalAlpha=1;
 }
 
 /* =====================================================================
@@ -2809,11 +3042,8 @@ function drawDomus(){
       else drawUndressedFig(ctx,124,FY,w);
       ctx.globalAlpha=.85; px(115,FY-52,19,11,'#efeae2'); px(114,FY-38,21,13,'#efeae2'); ctx.globalAlpha=1;  // two stubborn clouds
     }
-    else if(T2>290){                                                                   // two heads in the mist, very close
-      const b1=Math.sin(T2*0.1)*1.5, b2=Math.sin(T2*0.1+1.5)*1.5;
-      px(74,192+b1,9,8,'#1c130c'); px(73,190+b1,11,3,'#1c130c');
-      px(89,193+b2,8,7,'#17100a'); px(87,190+b2,11,4,'#17100a');
-      px(70,200+b1,16,3,'#152a3a'); px(86,201+b2,14,3,'#152a3a');
+    else if(T2>290){                                                                   // full silhouettes in the shallows
+      drawWaterCouple(80,202,T2+210,D);
       ctx.textAlign='center'; pixelText('~ the steam keeps its secrets ~',W/2,H-6,'#c8b060',1);
     }
   } else if(sc.kind==='wardrobe'){
@@ -3060,6 +3290,16 @@ function drawBridePortrait(cnv,b,bare){
   P(3,-59,2,1,sSh);                                                            // nose
   P(1,-58,4,1,'#a83246'); P(1,-57,4,1,'#c44a60'); P(2,-57,2,1,'#e2708a');      // full bitten lips
   P(2,-56,2,1,shade(skin,-16));                                                 // lip shadow
+  if(b._expr==='love'){
+    // the word lands — her whole face changes: wide bright eyes, hearts in them
+    P(-3,-64,4,3,'#f6efe2'); P(2,-64,4,3,'#f6efe2');                            // eyes fly OPEN
+    P(-2,-64,2,2,'#e2708a'); P(3,-64,2,2,'#e2708a');                            // heart-lit irises
+    P(-2,-64,1,1,'#fff'); P(3,-64,1,1,'#fff');                                  // sparkle
+    P(-3,-67,3,1,hSh); P(3,-67,3,1,hSh);                                        // brows lift
+    c.fillStyle='rgba(226,92,110,.6)'; c.fillRect(-4,-59,3,2); c.fillRect(4,-59,3,2);  // deep blush
+    P(1,-58,4,2,'#a83246'); P(2,-58,2,1,'#3a1016'); P(2,-56,2,1,'#e2708a');     // lips part — a small gasp
+    P(7,-66,2,2,'#e26a8a'); P(9,-64,1,1,'#e26a8a');                             // a heart escapes
+  }
   // ================= HAIR (frames the face — never covers the eyes) =================
   if(b.eth==='egyptian'){
     P(-6,-68,13,4,hair);                                                       // straight-cut bangs end above the brows
@@ -3476,7 +3716,7 @@ function marriageEffectsText(b){
 }
 // ---- bedchamber sessions: how long the lamps burn, and how often ----
 const LOVE_CAP={quick:3,long:2,night:1};
-let bedLen='quick';
+let bedLen='quick', bedPlace='bed';
 function loveLeft(len){ if(G.loveDay!==G.day) return LOVE_CAP[len];
   return LOVE_CAP[len]-(len==='quick'?(G.loveQuick||0):len==='long'?(G.loveLong||0):(G.loveNight||0)); }
 function spendLove(len){ if(G.loveDay!==G.day){ G.loveDay=G.day; G.loveQuick=0; G.loveLong=0; G.loveNight=0; }
@@ -3504,7 +3744,7 @@ function buildMarriageCard(b){
   const card=document.createElement('div'); card.className='shopcard';
   if(G.married && G.wife){
     const w=G.wife; const row=document.createElement('div'); row.className='row gap'; row.style.alignItems='center';
-    row.appendChild(briadeImg(w,84));
+    const portImg=briadeImg(w,84); row.appendChild(portImg);
     const preg=G.pregnant, month=preg? Math.min(9, 9-Math.ceil((preg.due-G.day)/3)) : 0;
     const v=wifeVerdict();
     const mkbar=(val,col)=>`<span style="display:inline-block;width:70px;height:7px;background:#241812;border:1px solid #000;vertical-align:middle"><span style="display:block;width:${val}%;height:100%;background:${col}"></span></span>`;
@@ -3531,6 +3771,27 @@ function buildMarriageCard(b){
       lenRow.appendChild(c2);
     });
     card.appendChild(lenRow);
+    // place picker — the empire is your bedchamber
+    const plRow=document.createElement('div'); plRow.className='row gap6'; plRow.style.marginTop='4px';
+    const plh=document.createElement('span'); plh.className='small muted'; plh.textContent='Place:'; plRow.appendChild(plh);
+    [['bed','🛏 BEDCHAMBER',true],['wardrobe','🚪 WARDROBE',G.hasWardrobe],['pool','🏝 LAGOON',G.hasPool],['bath','🏛 BATHHOUSE',true]].forEach(([id,label,ok])=>{
+      const c3=document.createElement('button'); c3.className='btn sm'+(bedPlace===id?' gold':'');
+      c3.textContent=label; c3.disabled=!ok;
+      c3.title= id==='wardrobe'&&!ok?'Build the grand cedar wardrobe first.': id==='pool'&&!ok?'Build the garden lagoon first.':
+        id==='bed'?'The classic. The door does the censoring.': id==='wardrobe'?'Sturdy. VERY sturdy. Clothes will exit at speed.':
+        id==='pool'?'Moonlight, steam, and a folding screen with opinions.':'The town baths after hours — marble, echo, scandal.';
+      c3.onclick=()=>{ bedPlace=id; openVilla(); };
+      plRow.appendChild(c3);
+    });
+    card.appendChild(plRow);
+    // the launcher: her face changes FIRST — lovingly, excitedly — then the scene
+    const launch=(mode)=>{
+      spendLove(bedLen); saveQuiet();
+      if(!w.male){ w._expr='love'; const cv=document.createElement('canvas'); cv.width=cv.height=148;
+        drawBridePortrait(cv,w); portImg.src=cv.toDataURL(); delete w._expr; }
+      toast('😍 '+(w.male?'His face lights like a festival lamp.':'Her eyes go wide and soft at once — loving, excited, and NOT patient.'),1500);
+      setTimeout(()=>{ if(G.married) startBedScene(mode,bedLen,bedPlace); },1000);
+    };
     // talk (4 questions) · bedchamber for an heir · bedchamber for love
     const btns=document.createElement('div'); btns.className='row gap6'; btns.style.marginTop='4px';
     const talk=document.createElement('button'); talk.className='btn sm'; talk.textContent='💬 TALK WITH '+(w.male?'HIM':'HER');
@@ -3564,17 +3825,17 @@ function buildMarriageCard(b){
       if((G.hygiene|0)<30){ toast('😏 '+(w.male?'He':'She')+' wrinkles a nose: “Bathe FIRST, gladiator. You smell like the losing side.” (raise 🧼 at the baths or your lagoon)',3400); return; }
       if(!spouseWilling()){ toast('😏 “Not tonight.” — win the heart (or impress in the bedchamber) and ask again.',3000); return; }
       if(loveLeft(bedLen)<=0){ toast('😏 “AGAIN?! The lamps are out of oil, love.” (no '+bedLen+' sessions left today)',2800); return; }
-      spendLove(bedLen); saveQuiet(); startBedScene('fun',bedLen);
+      launch('fun');
     });
     const bedH=document.createElement('button'); bedH.className='btn sm gold';
     bedH.textContent = preg? (G.isFemale?'🍆🍑 (you are with child)':'🍆🍑 (she is with child)') : loveLeft(bedLen)<=0? '🍆🍑 (spent for today)' : '🍆🍑 FOR AN HEIR';
     bedH.disabled=!!preg || loveLeft(bedLen)<=0;
-    bedH.onclick=()=>{ spendLove(bedLen); saveQuiet(); startBedScene('heir',bedLen); };
+    bedH.onclick=()=>launch('heir');
     const bedF=document.createElement('button'); bedF.className='btn sm';
     bedF.textContent = loveLeft(bedLen)<=0? '🍷 (spent for today)' : '🍷 FOR LOVE — just the two of you';
     bedF.title='No heir tonight — only each other. The bond deepens.';
     bedF.disabled=loveLeft(bedLen)<=0;
-    bedF.onclick=()=>{ spendLove(bedLen); saveQuiet(); startBedScene('fun',bedLen); };
+    bedF.onclick=()=>launch('fun');
     btns.appendChild(talk); btns.appendChild(bedH); btns.appendChild(bedF);
     const port=document.createElement('button'); port.className='btn sm'; port.textContent='🖼 FAMILY PORTRAIT';
     port.onclick=()=>openPortrait(); btns.appendChild(port);
@@ -3846,6 +4107,16 @@ function advanceDay(n){
           toast('👶 A daughter — '+nm+'. One day her marriage will seal an alliance. (+2 pop)',3200); }
       }
       saveQuiet();
+    }
+    // fire without love: a marriage of 🔥 and no ♥ combusts in public
+    if(G.married && G.wife && (G.wifePhys===undefined?45:G.wifePhys)>=70 && G.wifeRel<25 && Math.random()<0.05){
+      const sp=G.wife.male?'he':'she', Sp=G.wife.male?'He':'She', r2=Math.random();
+      if(r2<0.34){ const c2=ri(80,220); G.coin=Math.max(0,G.coin-c2);
+        G.lastRaid='💔 JEALOUSY — '+Sp+' empties '+c2+'d on Tyrian silk “since you only ever notice the body anyway.” Win the HEART too.'; }
+      else if(r2<0.67){ G.honor=clamp(G.honor-3,0,100);
+        G.lastRaid='💔 JEALOUSY — a senator lingers at your gate with poems. '+Sp+' lets him read TWO. Rome giggles (−3 honor). Talk to '+(G.wife.male?'him':'her')+', fool.'; }
+      else { G.loveDay=G.day; G.loveQuick=3; G.loveLong=2; G.loveNight=1;
+        G.lastRaid='💔 JEALOUSY — the bedchamber is barred from inside: “Tonight we TALK.” (all sessions spent; ♥ '+G.wifeRel+' vs 🔥 '+(G.wifePhys|0)+')'; }
     }
     // the THIRD generation: wed sons and daughters bring grandchildren
     for(const c of G.children){
@@ -4776,6 +5047,16 @@ function openShop(){
     b.textContent=l; b.onclick=()=>{shopTab=k; openShop();}; tabs.appendChild(b);
   });
   const grid=$('shop-grid'); grid.innerHTML='';
+  // ---- the town baths: hygiene on the road ----
+  const bathCard=document.createElement('div'); bathCard.className='shopcard';
+  const bcd=G.day-(G.lastBathDay===undefined?-9:G.lastBathDay);
+  bathCard.innerHTML=`<div><b style="color:var(--gold)">🏛 THE TOWN BATHS</b> <span class="small muted">— caldarium, strigil, gossip. Your 🧼: <b>${G.hygiene|0}</b>/100</span></div>`;
+  const bathBt=document.createElement('button'); bathBt.className='btn sm gold';
+  bathBt.textContent= bcd<1? '🧖 (already bathed today)' : '🧖 TAKE THE WATERS (15d)';
+  bathBt.disabled=G.coin<15||bcd<1;
+  bathBt.onclick=()=>{ if(G.coin<15)return; G.coin-=15; G.lastBathDay=G.day; G.hygiene=100; G.pop=clamp(G.pop+1,0,100); refreshStatbar(); saveQuiet();
+    toast('🏛 Steam, oil, and a merciless strigil. You emerge pink and glorious. 🧼 100 (+1 pop — you were SEEN)',3000); openShop(); };
+  bathCard.appendChild(bathBt); grid.appendChild(bathCard);
   GEAR[shopTab].forEach(g=>{
     const owned=G.owned[shopTab].includes(g.id);
     const equipped=G.loadout[shopTab]===g.id;
@@ -4895,6 +5176,7 @@ window.__SS = {
   succession, openPortrait, startBedScene,
   get BC(){return BC;}, setBCT:(t)=>{ if(BC) BC.t=t; },
   openDomus, get DM(){return DM;}, setDMT:(t)=>{ if(DM&&DM.scene) DM.scene.t=t; }, wifeVerdict, loveLeft,
+  setPlace:(p)=>{ bedPlace=p; }, setLen:(l)=>{ bedLen=l; },
 };
 })();
 </script>
