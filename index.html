@@ -731,7 +731,7 @@ function freshCareer(name,origin,arch,social){
     generals:[],   // appointed generals who lead army conquests
     wife:null, married:false, marryPrompted:false,   // marriage / dynasty
     children:[], pregnant:null, lastLoveDay:-9,      // heirs of your house
-    injury:null,                                     // wounds taken in the sand
+    injury:null, lastDebateDay:-9,                   // wounds & Curia cooldown
     wins:0, losses:0,
     hpBonus:0, dmgBonus:0,
     loadout:lo,
@@ -748,7 +748,7 @@ function freshCareer(name,origin,arch,social){
   };
 }
 // fill in any fields missing from older saves
-function migrate(g){ const d={honor:50,food:4,mount:0,slaves:0,hasVilla:false,boat:false,favor:0,soldiers:0,hidden:[],plotTier:0,emperor:false,approval:50,legions:0,rivals:0,retired:false,detachments:[],day:0,titles:{},clears:{},socialClass:'gladiator',army:{},armyGear:0,armyTrain:0,hasOrganizer:false,generals:[],wife:null,married:false,marryPrompted:false,children:[],pregnant:null,lastLoveDay:-9,injury:null}; for(const k in d){ if(g[k]===undefined) g[k]=d[k]; } if(!g.current) g.current='Italia'; return g; }
+function migrate(g){ const d={honor:50,food:4,mount:0,slaves:0,hasVilla:false,boat:false,favor:0,soldiers:0,hidden:[],plotTier:0,emperor:false,approval:50,legions:0,rivals:0,retired:false,detachments:[],day:0,titles:{},clears:{},socialClass:'gladiator',army:{},armyGear:0,armyTrain:0,hasOrganizer:false,generals:[],wife:null,married:false,marryPrompted:false,children:[],pregnant:null,lastLoveDay:-9,injury:null,lastDebateDay:-9}; for(const k in d){ if(g[k]===undefined) g[k]=d[k]; } if(!g.current) g.current='Italia'; return g; }
 function saveGame(){ try{ localStorage.setItem(SAVE_KEY, JSON.stringify(G)); toast('Saved.'); }catch(e){} }
 function hasSave(){ try{ return !!localStorage.getItem(SAVE_KEY); }catch(e){ return false; } }
 function loadGame(){ try{ G=migrate(JSON.parse(localStorage.getItem(SAVE_KEY))); return !!G; }catch(e){ return false; } }
@@ -1792,27 +1792,50 @@ function drawShadow(f){
   ctx.globalAlpha=1;
 }
 function drawCrowd(){
-  const crowdMood=FT.crowd;
+  const mood=FT.crowd, tt=FT.time;
+  const HOTC=['#c8a24a','#a52828','#7d5aa0','#4a7a8c','#b9976a','#c8a9a0','#8a9a5a','#946a4a'];
+  const COLDC=['#887766','#776655','#665544','#558855','#775555','#6a5a6a','#557788','#776644'];
   for(let row=0;row<4;row++){
     const y=10+row*14;
     px(0,y,W,14,row%2?'#6a5238':'#5a442e');
+    for(let ax=44;ax<W;ax+=96){ px(ax,y,6,14,'#46341f'); px(ax,y,6,1,'#5a442c'); }   // aisle stairways
     for(let x=4+((row*7)%14);x<W;x+=12){
-      const c = crowdMood>60? pick(['#c8a24a','#a52828','#7d5aa0','#4a7a8c','#b97','#caa','#8a9a5a'])
-                            : pick(['#876','#765','#654','#585','#755']);
-      px(x,y+3,6,7,c); px(x,y+3,6,1,shade(c,26)); px(x+1,y+1,4,3,pick(SKIN)); // toga + head
-      if((x*7+row*13)%9===0) px(x+1,y,4,1,'#3a2a18');                          // dark hair
-      // raised waving arms when the crowd is hot
-      if(crowdMood>65 && Math.random()<0.18){ px(x-1,y-1,2,4,pick(SKIN)); px(x+5,y-2,2,4,pick(SKIN)); }
-      if(crowdMood>80 && Math.random()<0.05){ px(x,y-3,6,2,'#e8c34a'); }       // waved cloth
+      const h=(x*7+row*13)%97;                                    // stable per-spectator hash
+      const skinC=SKIN[h%4], c=(mood>60?HOTC:COLDC)[h%8];
+      const hot = mood>65;
+      // the crowd JUMPS in waves when the blood is up, sways gently when calm
+      const bounce = hot? Math.max(0,Math.sin(tt*0.14 + x*0.05 + row))*2.4 : Math.sin(tt*0.04+h)*0.6;
+      const yy=y+3-bounce;
+      px(x,yy,6,7,c); px(x,yy,6,1,shade(c,26));                    // toga
+      px(x+1,yy-2,4,3,skinC);                                      // head
+      if(h%9<4) px(x+1,yy-3,4,1,'#3a2a18');                        // hair
+      if(h%17===0) px(x+1,yy-3,4,1,'#d8ccb4');                      // greybeards
+      if(hot){
+        const up=Math.sin(tt*0.14 + x*0.05 + row)>0;               // alternating pumping arms
+        px(x-1,yy-3-(up?3:0),2,4,skinC); px(x+5,yy-3-(up?0:3),2,4,skinC);
+        if(h%11===0) px(x-1,yy-6-(up?2:0),8,2,'#e8c34a');           // flourished gold cloth
+        if(h%13===0) px(x+1,yy-5,3,2,'#c03a4a');                    // roses held aloft
+        if(h%23===0){ px(x,yy-6,6,3,'#efe3c2'); px(x+1,yy-5,4,1,'#8a1d1d'); } // painted placard
+      } else if(h%7===0){ px(x+5,yy-2,2,3,skinC); }                 // a lone pointing arm
     }
   }
   px(0,10+4*14,W,3,'#3a2c20');
+  // rose petals rain from the stands when the mob is ecstatic
+  if(mood>72){
+    for(let i=0;i<16;i++){
+      const py2=30+((tt*0.6+i*41)%(GROUND-70));
+      const px2=(i*67+Math.sin(tt*0.03+i)*18+W*2)%W;
+      px(px2,py2,2,1,i%3?'#c03a4a':'#e88098');
+    }
+  }
 }
 function drawEmperorBox(){
   const bx=W/2-26, by=14;
   px(bx,by,52,26,'#5a2d8a'); px(bx,by,52,3,'#e8c34a'); px(bx,by+23,52,3,'#e8c34a');
-  // emperor figure
+  // emperor figure — he rises and salutes when the fight thrills him
   px(bx+22,by+6,8,12,'#c9a'); px(bx+23,by+3,6,5,SKIN[0]); px(bx+22,by+1,8,2,'#e8c34a'); // laurel/crown
+  if(FT.crowd>70){ const up=Math.sin(FT.time*0.1)>0?1:0;
+    px(bx+30,by+3-up,3,6,SKIN[0]); px(bx+30,by+1-up,3,2,'#e8c34a'); }                    // raised saluting arm
   // guards
   px(bx+6,by+8,5,10,'#8a1d1d'); px(bx+41,by+8,5,10,'#8a1d1d');
   px(bx+8,by+4,2,6,'#b9c0c8'); px(bx+43,by+4,2,6,'#b9c0c8'); // spears
@@ -2205,8 +2228,8 @@ function drawBridePortrait(cnv,b){
   const bd = b.build==='ample'?11 : b.build==='curvy'?9 : 6;     // bust depth
   const bp = b.build==='ample'?6 : b.build==='curvy'?5 : 3;      // bust protrusion (front, +x)
   const hips = b.build==='ample'?15 : b.build==='curvy'?14 : 12; // hips shapely, never wide/fat
-  const rear = b.build==='ample'?8 : b.build==='curvy'?7 : 4;    // buttock projection — THICC
-  const thigh = b.build==='ample'?6 : b.build==='curvy'?6 : 4;   // thigh width matches the rear
+  const rear = b.build==='ample'?6 : b.build==='curvy'?5 : 3;    // thicc but tight — hourglass, never fat
+  const thigh = b.build==='ample'?5 : b.build==='curvy'?5 : 4;   // firm full thigh
   const waistW = b.build==='slender'?7 : b.build==='curvy'?6 : 7; // waist stays SLIM on all
   const bustTop=-47, bustBot=bustTop+bd, hipTop=-32, hipBot=-23;
   const noble=b.rank==='noble';
@@ -2242,23 +2265,23 @@ function drawBridePortrait(cnv,b){
   P(-6,hipTop,hips-2,hipBot-hipTop,dress);
   const bx0=-8-rear, bw2=rear+3, cleftX=bx0+((bw2/2)|0);                       // rear mass + its midline
   P(bx0+1,hipTop,bw2-2,1,dress);                                               // rounded crown
-  P(bx0,hipTop+1,bw2,10,dress);                                                // the full rear mass (taller)
-  P(bx0-1,hipTop+3,1,7,dress); P(bx0+1,hipTop+11,bw2-2,1,dress);               // outer bulge + rounded base
-  // THE CLEFT — dark line straight down the MIDDLE, splitting two clear cheeks
-  P(cleftX,hipTop,1,11,shade(dress,-54));
-  P(cleftX,hipTop+9,1,3,shade(dress,-44));                                     // flares as it meets the folds
+  P(bx0,hipTop+1,bw2,8,dress);                                                 // lifted, tight rear mass
+  P(bx0-1,hipTop+2,1,6,dress); P(bx0+1,hipTop+9,bw2-2,1,dress);                // outer bulge + rounded base
+  // THE CLEFT — dark line straight down the MIDDLE, splitting two perky cheeks
+  P(cleftX,hipTop,1,9,shade(dress,-54));
+  P(cleftX,hipTop+7,1,3,shade(dress,-44));                                     // flares as it meets the folds
   P(cleftX-1,hipTop,1,2,shade(dress,-22)); P(cleftX+1,hipTop,1,2,shade(dress,-22)); // soft press at the crown
   // OUTER cheek: bright rim light rolling round its curve
-  P(bx0,hipTop+2,1,7,dHi); P(bx0-1,hipTop+4,1,4,dHi); P(bx0+1,hipTop+1,2,2,shade(dress,16));
-  P(bx0+1,hipTop+9,2,1,shade(dress,-20));                                      // under-curve turn
+  P(bx0,hipTop+1,1,6,dHi); P(bx0-1,hipTop+3,1,3,dHi); P(bx0+1,hipTop+1,2,2,shade(dress,16));
+  P(bx0+1,hipTop+7,2,1,shade(dress,-20));                                      // under-curve turn
   // INNER cheek: its own highlight + shadow toward the hip
-  P(cleftX+1,hipTop+1,1,5,shade(dress,14)); P(cleftX+2,hipTop+2,2,2,dHi);
-  P(cleftX+1,hipTop+9,2,1,shade(dress,-20));
-  P(bx0+bw2-1,hipTop+2,1,8,shade(dress,-16));
-  // separate gluteal fold under EACH cheek
-  P(bx0,hipTop+11,((bw2/2)|0),1,shade(dress,-48));
-  P(cleftX+1,hipTop+11,bw2-((bw2/2)|0)-1,1,shade(dress,-48));
-  P(bx0+1,hipTop+12,bw2-2,1,shade(dress,-54));                                 // deep shadow beneath both
+  P(cleftX+1,hipTop+1,1,4,shade(dress,14)); P(cleftX+2,hipTop+2,2,2,dHi);
+  P(cleftX+1,hipTop+7,2,1,shade(dress,-20));
+  P(bx0+bw2-1,hipTop+1,1,7,shade(dress,-16));
+  // high, separate gluteal fold under EACH cheek (a lifted shelf, not a sag)
+  P(bx0,hipTop+9,((bw2/2)|0),1,shade(dress,-48));
+  P(cleftX+1,hipTop+9,bw2-((bw2/2)|0)-1,1,shade(dress,-48));
+  P(bx0+1,hipTop+10,bw2-2,1,shade(dress,-54));                                 // deep shadow beneath both
   P(-5,hipTop+1,2,2,dHi);                                                      // hip sheen
   P(hips-8,hipTop,2,hipBot-hipTop,dSh);                                        // front hip shadow
   // girdle low on the hips
@@ -2772,6 +2795,8 @@ function openIntrigue(){
     bt.onclick=()=>startSiege(el,idx);
     card.appendChild(bt); b.appendChild(card);
   });
+  // ---- the political arena (senators, elites and emperors fight with words & coin) ----
+  if(G.retired || G.socialClass==='elite' || G.emperor) buildPolitics(b);
   // ---- hidden guests ----
   if(G.hidden.length){
     const hh=document.createElement('div'); hh.className='small'; hh.style.color='var(--gold)'; hh.style.marginTop='6px';
@@ -3018,6 +3043,40 @@ function buildCampaign(b){
   const wait=document.createElement('button'); wait.className='btn sm'; wait.textContent='⏳ END DAY (let armies march)';
   wait.onclick=()=>{ advanceDay(1); if(G.lastRaid){toast(G.lastRaid,3000); G.lastRaid=null;} openIntrigue(); };
   row.appendChild(send); if(G.detachments.length) row.appendChild(wait);
+  card.appendChild(row); b.appendChild(card);
+}
+// ---- THE POLITICAL ARENA: the battles a toga demands ----
+function buildPolitics(b){
+  const ph=document.createElement('div'); ph.className='small'; ph.style.color='var(--gold)'; ph.style.marginTop='6px';
+  ph.textContent='🏛 THE POLITICAL ARENA — battles of the Curia:'; b.appendChild(ph);
+  const card=document.createElement('div'); card.className='shopcard';
+  const cool=(G.day-(G.lastDebateDay===undefined?-9:G.lastDebateDay))<1;
+  card.innerHTML=`<div class="small muted">Word-blades and purse-strings — the only combat a senator is permitted. One political stroke per day.${cool?' <b style="color:var(--gold)">(You have already moved today — END DAY or travel.)</b>':''}</div>`;
+  const row=document.createElement('div'); row.className='row gap6';
+  const mk=(label,title,fn,dis)=>{ const bt=document.createElement('button'); bt.className='btn sm'; bt.textContent=label; bt.title=title; bt.disabled=cool||dis; bt.onclick=fn; row.appendChild(bt); };
+  mk('🗣 DEBATE IN THE CURIA (100d)','Cross rhetoric with a rival senator — approval, favor and new clients to the victor.',()=>{
+    if(G.coin<100) return; G.coin-=100; G.lastDebateDay=G.day;
+    const skill=(G.approval+G.honor)/2 + rnd(-20,20);
+    if(skill>=50){ G.approval=clamp(G.approval+6,0,100); G.favor+=2; G.coin+=220;
+      toast('🗣 Your oration brings the Curia to its feet! (+6 approval, +2 favor, +220d in new clients)',3000); }
+    else { G.honor=clamp(G.honor-3,0,100); toast('🗣 The rival orator turns your own words against you — laughter from the benches (−3 honor).',2800); }
+    refreshStatbar(); saveQuiet(); openIntrigue();
+  }, G.coin<100);
+  mk('🗳 BUY THE BLOC (250d)','Grease a whole voting bloc — approval now, scandal maybe later.',()=>{
+    if(G.coin<250) return; G.coin-=250; G.lastDebateDay=G.day;
+    G.approval=clamp(G.approval+8,0,100);
+    if(Math.random()<0.25){ G.honor=clamp(G.honor-6,0,100); G.pop=clamp(G.pop-4,0,100);
+      toast('🗳 The bloc votes your way (+8 approval) — but a scribe talks. SCANDAL! (−6 honor, −4 pop)',3200); }
+    else toast('🗳 The bloc votes your way, quiet as coin (+8 approval).',2600);
+    refreshStatbar(); saveQuiet(); openIntrigue();
+  }, G.coin<250);
+  mk('⚖ PROSECUTE A PRAETOR (3 favor)','Drag a corrupt praetor before the courts — glory or a new enemy.',()=>{
+    if(G.favor<3) return; G.favor-=3; G.lastDebateDay=G.day;
+    if(Math.random()<0.6){ const fine=ri(300,700); G.coin+=fine; G.honor=clamp(G.honor+6,0,100); G.approval=clamp(G.approval+4,0,100);
+      toast('⚖ GUILTY! The praetor is stripped of office — you claim '+fine+'d of his fines (+6 honor, +4 approval).',3200); }
+    else { G.rivals++; toast('⚖ Acquitted! The praetor walks free — and now he wants your head (a new rival stirs).',3000); }
+    refreshStatbar(); saveQuiet(); openIntrigue();
+  }, G.favor<3);
   card.appendChild(row); b.appendChild(card);
 }
 let detPurpose='raid', detGeneral=0, genCandidates=null;
@@ -3450,11 +3509,13 @@ function openBrief(reg,imperial){
   // forbidden gear notice
   // social standing / governance rules
   const isElite=G.socialClass==='elite', isUpper=G.socialClass==='upper', isGovernor=!!G.titles[reg.id];
-  const cantFight = isElite || isGovernor;
+  const cantFight = isElite || isGovernor || G.retired;
   let eqForbidden = (gearOf('weapon',G.loadout.weapon).forbidden) || (gearOf('armor',G.loadout.armor).forbidden) || (G.loadout.weapon===forbid);
   if(isUpper) eqForbidden=false;   // the editor looks the other way for a well-born eques
   $('brief-forbidden').innerHTML =
-    (isElite? `<div class="panel" style="padding:8px;margin-top:4px;border-color:var(--blood)">
+    (G.retired? `<div class="panel" style="padding:8px;margin-top:4px;border-color:var(--gold)">
+       <b style="color:var(--gold)">🏛 A SENATOR DOES NOT BLEED FOR THE MOB.</b> You have hung up the gladius — the arena is beneath your dignity now. Your battles are fought in the <b>Curia</b>: elite sieges, armies, and the new <b>political arena</b> await in INTRIGUE.</div>`
+    : isElite? `<div class="panel" style="padding:8px;margin-top:4px;border-color:var(--blood)">
        <b style="color:var(--blood)">THE EDITOR REFUSES YOU.</b> No games-giver dares stage a patrician to be slain for the mob — it would ruin him. As an <b>Elite</b>, the arena is closed to you. Rise instead through <b>INTRIGUE</b>, the army, and governance.</div>`
     : isGovernor? `<div class="panel" style="padding:8px;margin-top:4px;border-color:var(--gold)">
        <b style="color:var(--gold)">♦ ${G.titles[reg.id]}.</b> You <b>govern</b> ${reg.id} — a governor does not brawl in his own sand. Defend or expand your realm with armies and generals via <b>INTRIGUE</b>.</div>`
