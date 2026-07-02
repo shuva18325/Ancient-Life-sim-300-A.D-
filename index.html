@@ -665,6 +665,11 @@ BRIDE.numidian={names:['Sophonisba','Tanit','Kahina','Massiva','Zana','Cirta','Y
   surn:['of Cirta','of Numidia','the Massylian','of Leptis','of Carthago'],
   skin:'#8a5a36', hair:['#141014','#2a1a12'], adj:'Numidian'};
 const BRIDE_ETHS=['roman','persian','egyptian','celt','germanic','greek','numidian'];
+// when the head of the house is a woman, the suitors are men
+const GROOM_NAMES={roman:['Gaius','Marcus','Lucius','Quintus','Titus','Decimus'],persian:['Ardashir','Farhad','Mithradates','Bahram'],
+  egyptian:['Ptolemaios','Nakht','Khaemwaset','Senusret'],celt:['Brennus','Caradoc','Cunobelin','Dumnorix'],
+  germanic:['Arminius','Segimer','Chariovald','Theudebald'],greek:['Alexandros','Demetrios','Lysandros','Nikias'],
+  numidian:['Juba','Massinissa','Gauda','Adherbal']};
 // craft one bride of an ethnicity at a rank ('noble'|'peasant')
 function makeBride(eth, noble){
   const D=BRIDE[eth]||BRIDE.roman;
@@ -712,6 +717,7 @@ function makeBride(eth, noble){
   }
   b.dowryCoin=b.dowryCoin||0; b.dowryFood=b.dowryFood||0; b.dowrySoldiers=b.dowrySoldiers||0;
   b.approval=b.approval||0; b.favor=b.favor||0; b.honor=b.honor||0; b.pop=b.pop||0; b.tradeCoin=b.tradeCoin||0; b.tradeFood=b.tradeFood||0;
+  if(G && G.isFemale){ b.male=true; b.name=pick(GROOM_NAMES[eth]||GROOM_NAMES.roman)+' '+pick(D.surn); }
   return b;
 }
 // suitors present themselves — ANYONE may wed, but noble alliances have a price.
@@ -763,6 +769,7 @@ function freshCareer(name,origin,arch,social){
     office:0, path:null,                             // cursus honorum rank + chosen road (politics|general)
     parthia:50, parthiaPact:false,                   // relations with the Parthian Empire
     wifeRel:0, lastTalkDay:-9,                       // the bond with your wife (0-100) + talk cooldown
+    isFemale:false, lineage:[],                      // succession: who you are, and who came before
     wins:0, losses:0,
     hpBonus:0, dmgBonus:0,
     loadout:lo,
@@ -779,7 +786,7 @@ function freshCareer(name,origin,arch,social){
   };
 }
 // fill in any fields missing from older saves
-function migrate(g){ const d={honor:50,food:4,mount:0,slaves:0,hasVilla:false,boat:false,favor:0,soldiers:0,hidden:[],plotTier:0,emperor:false,approval:50,legions:0,rivals:0,retired:false,detachments:[],day:0,titles:{},clears:{},socialClass:'gladiator',army:{},armyGear:0,armyTrain:0,hasOrganizer:false,generals:[],wife:null,married:false,marryPrompted:false,children:[],pregnant:null,lastLoveDay:-9,injury:null,lastDebateDay:-9,office:0,path:null,parthia:50,parthiaPact:false,wifeRel:50,lastTalkDay:-9}; for(const k in d){ if(g[k]===undefined) g[k]=d[k]; } if(!g.current) g.current='Italia'; return g; }
+function migrate(g){ const d={honor:50,food:4,mount:0,slaves:0,hasVilla:false,boat:false,favor:0,soldiers:0,hidden:[],plotTier:0,emperor:false,approval:50,legions:0,rivals:0,retired:false,detachments:[],day:0,titles:{},clears:{},socialClass:'gladiator',army:{},armyGear:0,armyTrain:0,hasOrganizer:false,generals:[],wife:null,married:false,marryPrompted:false,children:[],pregnant:null,lastLoveDay:-9,injury:null,lastDebateDay:-9,office:0,path:null,parthia:50,parthiaPact:false,wifeRel:50,lastTalkDay:-9,isFemale:false,lineage:[]}; for(const k in d){ if(g[k]===undefined) g[k]=d[k]; } if(!g.current) g.current='Italia'; return g; }
 function saveGame(){ try{ localStorage.setItem(SAVE_KEY, JSON.stringify(G)); toast('Saved.'); }catch(e){} }
 function hasSave(){ try{ return !!localStorage.getItem(SAVE_KEY); }catch(e){ return false; } }
 function loadGame(){ try{ G=migrate(JSON.parse(localStorage.getItem(SAVE_KEY))); return !!G; }catch(e){ return false; } }
@@ -912,6 +919,7 @@ function drawTorso(f,C){
   px(-4,-33,3,1,C.skinSh); px(1,-33,3,1,C.skinSh);                    // collarbones
   for(let r=0;r<3;r++){ px(-3,-25+r*2,1,1,C.skinSh); px(0,-25+r*2,1,1,C.skinSh); px(3,-25+r*2,1,1,C.skinSh); }
   px(-1,-21,1,1,C.skinSh);                                            // navel
+  if(f.female){ px(-6,-33,12,5,'#c8b494'); px(-6,-33,12,1,'#e0d0ac'); px(-1,-32,1,4,'#a89474'); }  // gladiatrix breastband
   if(a==='cardiophylax'){
     px(-6,-34,12,13,C.bronze); px(-6,-34,12,2,C.bronzeHi); px(-6,-23,12,2,C.bronzeSh);
     px(-1,-32,2,10,C.bronzeSh); px(-5,-31,4,4,C.bronzeHi); px(2,-31,4,4,C.bronzeHi);
@@ -949,6 +957,7 @@ function drawHead(f,C){
   if(id==='none'){
     px(-4,-47,8,3,'#3a2618'); px(-4,-47,8,1,'#241408'); px(-5,-44,1,4,'#3a2618');
     px(4,-43,1,3,'#3a2618');
+    if(f.female){ px(4,-45,2,11,'#3a2618'); px(-6,-45,2,7,'#3a2618'); px(-2,-49,5,2,'#3a2618'); }  // her braid falls loose
     // expressive face: whites + pupils, brows angle with fury when attacking
     px(-3,-43,2,2,'#f2ead8'); px(1,-43,2,2,'#f2ead8');
     px(-2,-43,1,2,'#1a1006'); px(2,-43,1,2,'#1a1006');
@@ -956,6 +965,8 @@ function drawHead(f,C){
     else { px(-3,-44,2,1,C.skinSh); px(1,-44,2,1,C.skinSh); }
     px(-1,-39,3,1,f.hurt>0?'#5a1010':C.skinSh);                                // mouth (snarls when hit)
   } else drawHelmet2(id,C);
+  // her braid escapes even a helm
+  if(f.female && !fullFace && id!=='none'){ px(4,-42,2,10,'#2a1a10'); }
   // beard on the bare jaw (any helm that leaves the chin open)
   if(f.beard && !fullFace){
     px(-4,-40,8,3,f.beardC); px(-4,-40,8,1,shade(f.beardC,18));
@@ -1154,6 +1165,7 @@ function startFight(region, briefData){
       armor:gearOf('armor',G.loadout.armor),
     },
   });
+  if(G.isFemale){ p.female=true; p.beard=false; }   // the gladiatrix fights bare-braided
   // foe scales with tier + popularity (battle escalation)
   const esc = 1 + (G.pop/100)*0.5;
   const foe=makeArenaFoe(tier, esc, 1);
@@ -2198,10 +2210,10 @@ function finishBattle(){
 /* =====================================================================
    THE FAMILY PORTRAIT — the whole house, painted in one gold frame
    ===================================================================== */
-function drawHusbandFig(c,x,y,bond){
+function drawHusbandFig(c,x,y,bond,skinOv,tunOv){
   const P=(a,b2,w,h,col)=>{c.fillStyle=col;c.fillRect(Math.round(x+a),Math.round(y+b2),Math.round(w),Math.round(h));};
-  const skin=G.skin||'#caa06a', sSh=shade(skin,-30), sHi=shade(skin,22);
-  const tun=G.tunic||'#7a2f22', tSh=shade(tun,-32), tHi=shade(tun,24);
+  const skin=skinOv||G.skin||'#caa06a', sSh=shade(skin,-30), sHi=shade(skin,22);
+  const tun=tunOv||G.tunic||'#7a2f22', tSh=shade(tun,-32), tHi=shade(tun,24);
   // legs + sandals
   P(-6,-22,5,20,skin); P(1,-22,5,20,skin); P(-6,-22,1,20,sHi); P(5,-22,1,20,sSh);
   P(-7,-2,7,2,'#6a4426'); P(0,-2,7,2,'#6a4426');
@@ -2220,7 +2232,7 @@ function drawHusbandFig(c,x,y,bond){
   P(-4,-66,3,1,'#241408'); P(1,-66,3,1,'#241408');
   P(-1,-61,2,1,sSh); P(-2,-59,5,1,'#8a4038');                       // nose + easy smile
   P(3,-67,1,4,'#8a5a4a');                                            // the old scar he never hides
-  if(G.emperor){ P(-7,-73,14,2,'#e8c34a'); P(-1,-74,2,2,'#fff0b0'); } // the laurel of an emperor
+  if(G.emperor && !skinOv){ P(-7,-73,14,2,'#e8c34a'); P(-1,-74,2,2,'#fff0b0'); } // the laurel of an emperor
   if(bond>=90){ P(-11,-44,4,3,skin); }                               // his arm reaches round her waist
 }
 function drawKidFig(c,x,y,sex,age){
@@ -2246,10 +2258,15 @@ function openPortrait(){
   for(let i=0;i<8;i++){ c.fillStyle=shade('#5a2d6a',i*5); c.fillRect(408+i*2,20,3,210); }             // curtain
   c.fillStyle='#3a2c1e'; c.fillRect(0,222,480,28); for(let fx=0;fx<480;fx+=24){c.fillStyle='#2c2014';c.fillRect(fx,222,1,28);}
   // the family, gathered
-  const bond=G.wifeRel|0;
-  if(G.wife){ const wc=document.createElement('canvas'); wc.width=wc.height=148; drawBridePortrait(wc,G.wife,true);
+  const bond=G.wifeRel|0, spouseMale=!!(G.wife&&G.wife.male);
+  if(G.wife && !spouseMale){ const wc=document.createElement('canvas'); wc.width=wc.height=148; drawBridePortrait(wc,G.wife,true);
     c.drawImage(wc, 178,88, 148*0.9,148*0.9); }                                                       // the domina
-  c.save(); c.translate(312,222); c.scale(1.62,1.62); drawHusbandFig(c,0,0,bond); c.restore();         // the master — her equal in height
+  else if(G.isFemale){ // the head of the house is herself the domina — paint HER at the center
+    const me={build:'curvy',skin:G.skin||'#e6bd94',hair:'#3a2618',dress:G.tunic||'#8a2f5a',neckline:'fine',jewel:true,rank:'noble',eth:'roman',adj:'Roman',name:G.name};
+    const wc=document.createElement('canvas'); wc.width=wc.height=148; drawBridePortrait(wc,me,true);
+    c.drawImage(wc, 178,88, 148*0.9,148*0.9); }
+  if(spouseMale){ c.save(); c.translate(312,222); c.scale(1.62,1.62); drawHusbandFig(c,0,0,bond,G.wife.skin,G.wife.dress); c.restore(); } // her lord at her side
+  else if(!G.isFemale){ c.save(); c.translate(312,222); c.scale(1.62,1.62); drawHusbandFig(c,0,0,bond); c.restore(); }                    // the master — her equal in height
   const kids=G.children.slice(0,6);
   kids.forEach((k,i)=>{ c.save(); c.translate(168-i*34,222); c.scale(1.45,1.45); drawKidFig(c,0,0,k.sex,G.day-k.born); c.restore(); });
   if(bond>=90){ c.fillStyle='#e26a8a'; c.font='14px monospace'; c.fillText('♥', 272, 96); }            // devoted
@@ -2259,9 +2276,12 @@ function openPortrait(){
   c.fillStyle='#e8c34a'; [[6,6],[468,6],[6,238],[468,238]].forEach(p=>c.fillRect(p[0]-2,p[1]-2,10,10));
   c.fillStyle='#c8b060'; c.font='italic 11px Georgia,serif'; c.textAlign='center';
   c.fillText('DOMUS  ·  '+(G.name||'').toUpperCase()+'  ·  ANNO CC', 240, 236);
+  const gk=G.children.reduce((a,k)=>a+(k.kids||0),0);
   $('portrait-caption').innerHTML =
     `<b style="color:var(--gold)">${G.name}</b>${G.wife? ' & <b style="color:#e2a0b8">'+G.wife.name+'</b>':''}`+
     (G.children.length? ' — with '+G.children.map(k=>k.name.split(' ')[0]).join(', ') : '')+
+    (gk? ' <span class="muted">· '+gk+' grandchild'+(gk>1?'ren':'')+' beyond the frame</span>':'')+
+    ((G.lineage&&G.lineage.length)? ' <span class="muted">· heir of '+G.lineage[G.lineage.length-1].name.split(' ')[0]+'</span>':'')+
     (bond>=90? ' <span style="color:#e26a8a">— a house built on devotion ♥</span>':'');
 }
 
@@ -2271,8 +2291,8 @@ function openPortrait(){
    ===================================================================== */
 let BC=null, BEDSPR=null;
 function startBedScene(mode){
-  const cv=document.createElement('canvas'); cv.width=cv.height=148;
-  drawBridePortrait(cv,G.wife,true); BEDSPR=cv;
+  if(!G.isFemale){ const cv=document.createElement('canvas'); cv.width=cv.height=148;
+    drawBridePortrait(cv,G.wife,true); BEDSPR=cv; } else BEDSPR=null;
   BC={t:0, props:[], hearts:[], mode:mode||'heir',
       line:pick(['“Veni…”','“Te amo.”','“Nunc, mi gladiator…”','“Tarde venis…”'])};
   G.lastLoveDay=G.day;
@@ -2284,22 +2304,18 @@ function updateBed(dt){ const s=BC; s.t+=dt; const T=s.t;
     if(p.y>222){ p.y=222; p.vx*=0.5; p.vy=0; p.vr*=0.3; } }
   for(const h of s.hearts){ h.y-=h.vy*dt; h.x+=Math.sin(h.y*0.09)*0.4*dt; h.life-=dt; }
   s.hearts=s.hearts.filter(h=>h.life>0);
-  // HER clothes come sailing out of the doorway, one by one
-  if(T>150&&T<152) s.props.push({kind:'toga',  x:368,y:146,vx:-2.8,vy:-2.6,r:0,vr:0.07});
-  if(T>190&&T<192) s.props.push({kind:'breastband',x:368,y:152,vx:-2.3,vy:-3.0,r:0,vr:-0.1});
-  if(T>218&&T<220) s.props.push({kind:'girdle',x:368,y:158,vx:-2.0,vy:-2.7,r:0,vr:-0.12});
-  if(T>240&&T<242) s.props.push({kind:'sandal',x:368,y:166,vx:-3.1,vy:-2.1,r:0,vr:0.2});
-  if(T>258&&T<260) s.props.push({kind:'sandal',x:368,y:166,vx:-2.3,vy:-3.2,r:0,vr:-0.16});
-  // then HIS — tunic, sword-belt, subligaculum, sandals
-  if(T>360&&T<362) s.props.push({kind:'tunic', x:368,y:148,vx:-2.9,vy:-2.5,r:0,vr:-0.08});
-  if(T>378&&T<380) s.props.push({kind:'belt',  x:368,y:154,vx:-2.4,vy:-2.9,r:0,vr:0.12});
-  if(T>392&&T<394){ s.props.push({kind:'subligar',x:368,y:150,vx:-2.6,vy:-3.4,r:0,vr:0.18}); sfx('giggle'); }
-  if(T>404&&T<406) s.props.push({kind:'msandal',x:368,y:166,vx:-3.2,vy:-2.2,r:0,vr:-0.2});
+  // two wardrobes come sailing out of the doorway — whoever waits inside undresses FIRST
+  const HERS=[['toga',146,-2.8,-2.6,0.07],['breastband',152,-2.3,-3.0,-0.1],['girdle',158,-2.0,-2.7,-0.12],['sandal',166,-3.1,-2.1,0.2],['sandal',166,-2.3,-3.2,-0.16]];
+  const HIS=[['tunic',148,-2.9,-2.5,-0.08],['belt',154,-2.4,-2.9,0.12],['subligar',150,-2.6,-3.4,0.18],['msandal',166,-3.2,-2.2,-0.2]];
+  const first=G.isFemale?HIS:HERS, second=G.isFemale?HERS:HIS;
+  const T1=[150,190,218,240,258], T2=[360,378,392,404,416];
+  first.forEach((it,i)=>{ const tt=T1[i]; if(T>tt&&T<tt+2){ s.props.push({kind:it[0],x:368,y:it[1],vx:it[2],vy:it[3],r:0,vr:it[4]}); if(it[0]==='subligar') sfx('giggle'); } });
+  second.forEach((it,i)=>{ const tt=T2[i]; if(T>tt&&T<tt+2){ s.props.push({kind:it[0],x:368,y:it[1],vx:it[2],vy:it[3],r:0,vr:it[4]}); if(it[0]==='subligar') sfx('giggle'); } });
   // door + voice cues
   if(T>100&&T<102) sfx('creak');
   if(T>448&&T<450) sfx('giggle');                                  // her word for it
-  if(T>452&&T<454) sfx('kiss');                                    // the first kiss, before the door
-  if(T>460&&T<462) sfx('creak');
+  if(T>460&&T<462) sfx('kiss');                                    // the first kiss, before the door
+  if(T>474&&T<476) sfx('creak');
   // ...and then the sounds carry through the closed door
   if(T>500){
     if(!s.nextClap||T>=s.nextClap){ sfx('clap'); s.nextClap=T+28+Math.random()*14; }
@@ -2320,6 +2336,19 @@ function drawShadowMale(fx,fy,ph){
   px(fx-5,fy-35,5,18,S); px(fx+1,fy-35,5,18,S);                    // thighs
   px(fx-5+stride*3,fy-17,5,15,S); px(fx+1-stride*3,fy-17,5,15,S);  // striding legs
   px(fx-6+stride*3,fy-2,7,2,S); px(fx+0-stride*3,fy-2,7,2,S);      // feet
+}
+// the domina of the house — still dressed, striding to answer the call
+function drawShadowWalkerF(fx,fy,ph){
+  const S='#1c130c', stride=Math.sin(ph), jB=Math.max(0,Math.sin(ph))*0.8;
+  px(fx-4,fy-76,9,10,S); px(fx-3,fy-80,8,5,S); px(fx+3,fy-72,3,10,S);   // head, piled hair, a loose lock
+  px(fx-1,fy-66,4,4,S);                                                  // neck
+  px(fx-6,fy-62,13,4,S);                                                 // shoulders
+  px(fx-5,fy-58,10,12,S); px(fx-8,fy-56+jB,4,7,S);                       // bodice — the bust leads, bouncing
+  px(fx-3,fy-46,7,4,S);                                                  // cinched waist
+  px(fx-8,fy-42,16,10,S);                                                // hips flare into the gown
+  px(fx-9,fy-32,18,20,S); px(fx-10,fy-12,20,10,S);                       // the stola sweeps to the floor
+  px(fx-8+stride*2,fy-58,3,12,S); px(fx+6-stride*2,fy-58,3,12,S);        // swinging arms
+  px(fx-4+stride*2,fy-4,5,2,S); px(fx+1-stride*2,fy-4,5,2,S);            // slippered feet beneath the hem
 }
 // undressed silhouette at the doorway — shape only, facing back into the room (left)
 function drawShadowFigure(fx,fy,ph,beckon,open){
@@ -2361,7 +2390,7 @@ function finishBed(){
   if(mode==='fun'){
     G.wifeRel=clamp(G.wifeRel+8+(G.wifeRel<40?3:0),0,100);
     BC=null; state='menu'; saveQuiet(); openVilla();
-    toast('🍷 No heir tonight — only each other. She falls asleep on your chest. (+'+(G.wifeRel>=100?'MAX':'8')+' ♥ bond)',3200);
+    toast('🍷 No heir tonight — only each other. '+(G.isFemale?'He falls asleep at your side.':'She falls asleep on your chest.')+' (+'+(G.wifeRel>=100?'MAX':'8')+' ♥ bond)',3200);
     return;
   }
   const chance=0.32 + (G.honor/400) + (w&&w.build!=='slender'?0.06:0) + (G.wifeRel/500);
@@ -2370,7 +2399,8 @@ function finishBed(){
   G.wifeRel=clamp(G.wifeRel+4,0,100);
   saveQuiet();
   BC=null; state='menu'; openVilla();
-  toast(hit? '🌙 …weeks later the word comes: SHE IS WITH CHILD! Nine months now. (+4 ♥)'
+  toast(hit? (G.isFemale?'🌙 …weeks later you are certain: YOU ARE WITH CHILD! Nine months now. (+4 ♥)'
+                        :'🌙 …weeks later the word comes: SHE IS WITH CHILD! Nine months now. (+4 ♥)')
            : '🌙 A night to remember — but the gods grant no child yet. Try again soon. (+4 ♥)', 3200);
 }
 // wife sprite in 3 overlapping slices — bust & hips bounce WITHOUT the body splitting
@@ -2398,24 +2428,40 @@ function drawBed(){
   // oil lamp
   px(120,84,10,6,'#7a5c2e'); px(123,80,4,4,'#ffcf5a'); px(124,78,2,2,'#fff2b0');
   ctx.globalAlpha=.08; px(96,70,60,150,'#ffcf7a'); ctx.globalAlpha=1;
-  // door frame at the right
-  const dx=360, dw=56;
+  // door frame at the right — wide enough for the two-shot before the door swings to
+  const dx=346, dw=76;
   px(dx-6,86,dw+12,138,'#5a4028'); px(dx-4,90,dw+8,134,'#2a1a10');
-  let open = T<100?0 : T<130? (T-100)/30 : T<460?1 : T<490? 1-(T-460)/30 : 0;
+  let open = T<100?0 : T<130? (T-100)/30 : T<474?1 : T<500? 1-(T-474)/26 : 0;
   if(open>0){ ctx.globalAlpha=0.35*open; px(dx-44,96,44+dw,128,'#ffb050'); ctx.globalAlpha=1;
     px(dx,92,dw,130,'#c07830'); px(dx,92,dw,4,'#e8a050');
-    // through the open door: the bed — and her waiting on it, that famous rear raised
+    // through the open door: THE TWO-SHOT — the bed on the left, the master's profile on the right
     if(T>340){
-      px(dx+6,196,44,6,'#5a3a22'); px(dx+6,190,44,7,'#7a2f4a'); px(dx+6,190,44,2,'#9a4a66'); // bed + covers
-      px(dx+8,186,8,5,'#c8b090');                                                            // pillow
+      // the bed, and the one waiting on it
+      px(dx+3,196,38,6,'#5a3a22'); px(dx+3,190,38,7,'#7a2f4a'); px(dx+3,190,38,2,'#9a4a66');
+      px(dx+5,186,8,5,'#c8b090');                                                             // pillow
       const jr=Math.max(0,Math.sin(T*0.18))*1.2, S2='#17100a';
-      px(dx+12,182,9,6,S2); px(dx+10,180,4,4,S2);                                            // her head+hair on the pillow
-      px(dx+20,183,12,6,S2);                                                                  // her back low
-      px(dx+31,176-jr,9,8,S2); px(dx+33,173-jr,6,4,S2);                                       // the raised rear, swaying
-      px(dx+39,181,8,4,S2); px(dx+45,183,5,3,S2);                                             // folded legs
-      if(T>448 && T<470){ pixelText(s.line,dx+dw/2,166,'#f0c8d4',1); }                        // her word for it
-      if(T>452 && T<462){ px(dx+18,168,6,6,'#17100a'); px(dx+25,167,6,6,'#1c130c');           // two shadows lean together
-        pixelText('♥',dx+25,160,'#e26a8a',1); }
+      if(!G.isFemale){
+        px(dx+8,182,8,6,S2); px(dx+6,180,4,4,S2);                                             // her head + hair on the pillow
+        px(dx+15,183,10,6,S2);                                                                 // her back low
+        px(dx+24,175-jr,9,9,S2); px(dx+26,172-jr,6,4,S2);                                      // the famous rear, raised & swaying
+        px(dx+32,181,7,4,S2); px(dx+37,183,4,3,S2);                                            // folded legs
+      } else {
+        px(dx+5,182,10,4,'#e8dcc2'); px(dx+18,186,14,3,'#9a4a66');                             // covers turned down, a rose left waiting
+        px(dx+20,184,4,2,'#c03a4a'); px(dx+23,185,4,1,'#4a6a34');
+      }
+      // HIS standing profile, facing the bed — and yes, the silhouette hides nothing
+      if(T>400 && T<474){
+        const lean=T>458? Math.min(6,(T-458)*0.5):0, gx=dx+60-lean, S3='#1c130c';
+        px(gx-4,136,10,11,S3); px(gx-2,134,7,3,S3);                                            // head
+        px(gx-8,147,17,6,S3); px(gx-6,153,13,20,S3);                                           // shoulders → torso
+        px(gx-5,173,5,21,S3); px(gx+1,173,5,21,S3); px(gx-6,194,7,2,S3); px(gx+1,194,7,2,S3);  // legs
+        px(gx-13,175,8,4,S3); px(gx-17,174,5,6,S3);                                            // ...the long shadow of the 🍆
+        px(gx-17,173,5,1,'rgba(255,176,80,.5)'); px(gx-18,176,1,3,'rgba(255,176,80,.4)');      // backlit by the lamp
+        if((T|0)%20<1.5) s.hearts.push({x:gx-8,y:150,vy:0.7,life:40,c:'#e26a8a'});
+      }
+      if(T>444 && T<478){ pixelText(G.isFemale?'“Veni, domina mea…”':s.line,dx+dw/2,128,'#f0c8d4',1); }
+      if(T>458 && T<474){ px(dx+34,158,6,6,'#17100a'); px(dx+41,157,6,6,'#1c130c');            // two shadows lean together
+        pixelText('♥',dx+41,150,'#e26a8a',1); }
     }
   }
   // the door leaf swings on its FAR hinge (right jamb), like a real door
@@ -2425,27 +2471,26 @@ function drawBed(){
     if(lw>6){ px(dx+dw-lw,92,2,130,'#4a3420'); }                                                      // leading edge
     if(lw>10) px(dx+dw-lw+4,152,3,8,'#e8c34a'); }                                                     // handle
   const spr=BEDSPR;
-  if(T<130 && spr){
-    // she RUNS for the door — bust and hips bouncing with each stride (body stays whole)
+  if(T<130){
+    // the eager one RUNS for the door
     const wx= 40 + Math.min(1,T/112)*(dx-66-40);
-    drawJiggleSprite(spr, wx, 122-Math.abs(Math.sin(T*0.4))*2, T*0.55, 1);
-    if((T|0)%8===0) px(wx+10,218,3,1,'#5a4630');                              // dust at her heels
+    if(!G.isFemale && spr) drawJiggleSprite(spr, wx, 122-Math.abs(Math.sin(T*0.4))*2, T*0.55, 1);   // she runs, everything bouncing
+    else { ctx.save(); ctx.translate(wx+8,214-Math.abs(Math.sin(T*0.4))*2); ctx.scale(1.15,1.15); drawHusbandFig(ctx,0,0,G.wifeRel|0); ctx.restore(); } // he runs
+    if((T|0)%8===0) px(wx+10,218,3,1,'#5a4630');                              // dust at their heels
   } else if(T<340){
-    // the shadow-show: her clothes are OFF now — an undressed silhouette, shape only
-    drawShadowFigure(dx+22+Math.sin(T*0.08)*1.2, 216, T*0.3, T>260, open);
+    // the shadow-show: clothes OFF — an undressed silhouette in the doorway
+    if(!G.isFemale){
+      drawShadowFigure(dx+30+Math.sin(T*0.08)*1.2, 216, T*0.3, T>260, open);
+    } else {
+      drawShadowMale(dx+34+Math.sin(T*0.08)*1.2, 214, Math.sin(T*0.05)*0.4);
+      if(T>260){ const bk=Math.sin(T*0.25)*3; px(dx+16+bk,150,12,3,'#1c130c'); px(dx+13+bk,147,5,5,'#1c130c'); } // his beckoning arm
+    }
     if(T>260 && (T|0)%28<1.5) s.hearts.push({x:dx-4,y:140,vy:0.6,life:52,c:'#e26a8a'});
   }
-  // the master of the house answers — FULL height, striding
+  // the other answers the call — FULL height, striding to the door
   if(T>280 && T<352){ const mx=90+Math.min(1,(T-280)/64)*(dx+16-90);
-    drawShadowMale(mx, 216, T*0.35); }
-  // ...he stands in the doorway a beat — and his own silhouette leaves nothing to guess
-  if(T>415 && T<448){
-    const gx=dx+16, S3='#1c130c';
-    px(gx-4,138,10,11,S3); px(gx-2,136,7,3,S3);                                // head
-    px(gx-8,149,18,6,S3); px(gx-6,155,14,18,S3);                               // shoulders, torso
-    px(gx-5,173,5,20,S3); px(gx+2,173,5,20,S3); px(gx-6,193,7,2,S3); px(gx+1,193,7,2,S3); // legs
-    px(gx-12,178,6,3,S3); px(gx-14,177,3,5,S3);                                // ...the shadow of the 🍆, briefly
-    if((T|0)%22<1.5) s.hearts.push({x:dx+30,y:150,vy:0.7,life:40,c:'#e26a8a'});
+    if(!G.isFemale) drawShadowMale(mx, 216, T*0.35);
+    else drawShadowWalkerF(mx, 216, T*0.35);
   }
   // flung clothes arc across the room and settle — full garments, not scraps
   for(const p of s.props){ ctx.save(); ctx.translate(p.x,p.y); ctx.rotate(p.r);
@@ -3003,6 +3048,7 @@ function openVilla(){
     mc.appendChild(mb); b.appendChild(mc);
   }
   buildMarriageCard(b);
+  buildSuccessionCard(b);
   if(!G.hasVilla){
     const card=document.createElement('div'); card.className='shopcard';
     card.innerHTML=`<div><b style="color:var(--gold)">🏡 Buy a country villa</b></div>
@@ -3026,8 +3072,52 @@ function openVilla(){
 }
 $('btn-villa-back').onclick=()=>enterMap();
 
+// ---- SUCCESSION: the house outlives the man — play on as your heir ----
+function buildSuccessionCard(b){
+  const adults=G.children.filter(c=>(G.day-c.born)>=40 && !c.wed);
+  if(!adults.length) return;
+  const card=document.createElement('div'); card.className='shopcard'; card.style.borderColor='var(--gold)';
+  card.innerHTML=`<div><b style="color:var(--gold)">⚱ SUCCESSION — the house outlives the man</b></div>
+    <div class="small muted">Hang up your sword and hand the ludus to an heir: you PLAY ON as them. Coin, titles, armies, villa and generals pass down — but glory must be won anew, and they will take their own spouse.</div>`;
+  const row=document.createElement('div'); row.className='row gap6'; row.style.marginTop='4px';
+  adults.forEach(ch=>{
+    const bt=document.createElement('button'); bt.className='btn sm '+(ch.sex==='f'?'gold':'');
+    bt.textContent=(ch.sex==='m'?'⚔ PLAY AS ':'🗡 PLAY AS ')+ch.name.split(' ')[0].toUpperCase()+(ch.sex==='f'?' — GLADIATRIX':'');
+    bt.title= ch.sex==='f'
+      ? 'The Emperor banned women from the sand — she fights anyway. The first gladiatrix of your line.'
+      : 'The heir takes up his father’s sword and the family name.';
+    bt.onclick=()=>succession(ch);
+    row.appendChild(bt);
+  });
+  card.appendChild(row); b.appendChild(card);
+}
+function succession(ch){
+  const fem=ch.sex==='f', heir=ch.name;
+  G.lineage=G.lineage||[];
+  G.lineage.push({name:G.name, glory:G.glory, wins:G.wins, losses:G.losses, day:G.day, emperor:!!G.emperor});
+  // the appointed son gives up his command to take the family name
+  G.generals=(G.generals||[]).filter(g=>!(g.son && g.name===ch.name));
+  G.children=G.children.filter(c=>c!==ch);
+  G.name=heir; G.isFemale=fem;
+  G.glory=Math.floor(G.glory*0.25); G.pop=20;
+  G.level=Math.max(1,Math.round(G.level/3)); G.xp=0;
+  G.wins=0; G.losses=0; G.injury=null;
+  G.married=false; G.wife=null; G.wifeRel=0; G.pregnant=null;
+  G.lastLoveDay=-9; G.lastTalkDay=-9; G.marryPrompted=false;
+  G.retired=false; G.path=null; G.office=0;
+  refreshStatbar(); saveQuiet(); openVilla();
+  toast(fem
+    ? '🗡 '+heir+' takes the sand in DEFIANCE of the Emperor’s ban — the first GLADIATRIX of your house! The dynasty endures.'
+    : '⚔ The sword passes to '+heir+'. The dynasty endures — now win a glory of your own.', 4600);
+}
+
 // ---- MARRIAGE ----
-function briadeImg(b,size){ const cv=document.createElement('canvas'); cv.width=cv.height=148; drawBridePortrait(cv,b);
+function briadeImg(b,size){ const cv=document.createElement('canvas'); cv.width=cv.height=148;
+  if(b.male){ const c=cv.getContext('2d'); c.imageSmoothingEnabled=false;
+    const g2=c.createLinearGradient(0,0,0,148); g2.addColorStop(0,'#33203e'); g2.addColorStop(1,'#150c18');
+    c.fillStyle=g2; c.fillRect(0,0,148,148);
+    c.save(); c.translate(74,142); c.scale(1.85,1.85); drawHusbandFig(c,0,0,0,b.skin,b.dress); c.restore(); }
+  else drawBridePortrait(cv,b);
   const im=document.createElement('img'); im.src=cv.toDataURL(); im.width=im.height=size||148; im.style.cssText='image-rendering:pixelated;border:1px solid #000;border-radius:4px;flex:0 0 auto'; return im; }
 function marriageEffectsText(b){
   const bits=[];
@@ -3051,11 +3141,11 @@ function buildMarriageCard(b){
     const rel=G.wifeRel|0, relC= rel>=75?'#e26a8a': rel>=45?'#e8c34a':'#8a6a4a';
     const relWord= rel>=85?'devoted': rel>=65?'loving': rel>=45?'fond': rel>=25?'dutiful':'cold';
     const info=document.createElement('div'); info.innerHTML=
-      `<div><b style="color:var(--gold)">⚭ ${w.name}</b> <span class="small muted">— your ${w.adj} ${w.rank} wife</span></div>
+      `<div><b style="color:var(--gold)">⚭ ${w.name}</b> <span class="small muted">— your ${w.adj} ${w.rank} ${w.male?'husband':'wife'}</span></div>
        <div class="small">♥ Bond: <span style="display:inline-block;width:70px;height:7px;background:#241812;border:1px solid #000;vertical-align:middle"><span style="display:block;width:${rel}%;height:100%;background:${relC}"></span></span>
          <b style="color:${relC}">${rel}</b>/100 <span class="muted">(${relWord})</span></div>
        <div class="small" style="color:var(--gold)">${marriageEffectsText(w)}</div>`+
-      (preg? `<div class="small" style="color:#e2a0b8">🤰 She is with child — month <b>${Math.max(1,month)}</b> of 9.</div>`:'');
+      (preg? `<div class="small" style="color:#e2a0b8">🤰 ${G.isFemale?'You are':'She is'} with child — month <b>${Math.max(1,month)}</b> of 9.</div>`:'');
     row.appendChild(info); card.appendChild(row);
     // talk · bedchamber for an heir · bedchamber for love
     const cd=G.day-(G.lastLoveDay||-9), tcd=G.day-(G.lastTalkDay||-9);
@@ -3079,7 +3169,7 @@ function buildMarriageCard(b){
       refreshStatbar(); saveQuiet(); openVilla();
     };
     const bedH=document.createElement('button'); bedH.className='btn sm gold';
-    bedH.textContent = preg? '🍆🍑 (she is with child)' : cd<2? '🍆🍑 (let her rest)' : '🍆🍑 FOR AN HEIR';
+    bedH.textContent = preg? (G.isFemale?'🍆🍑 (you are with child)':'🍆🍑 (she is with child)') : cd<2? '🍆🍑 (rest tonight)' : '🍆🍑 FOR AN HEIR';
     bedH.disabled=!!preg || cd<2;
     bedH.onclick=()=>startBedScene('heir');
     const bedF=document.createElement('button'); bedF.className='btn sm';
@@ -3123,14 +3213,17 @@ function buildMarriageCard(b){
       const kids=document.createElement('div'); kids.className='small'; kids.style.marginTop='4px';
       kids.innerHTML='<b style="color:var(--gold)">YOUR HOUSE:</b> '+G.children.map(c=>{
         const age=G.day-c.born;
-        return (c.sex==='m'?'👦 ':'👧 ')+c.name+' <span class="muted">('+age+'d'+(c.sex==='m'&&age>=40?(c.appointed?' · serves as your general':' · OF AGE — appoint him in INTRIGUE'):'')+')</span>';
+        return (c.sex==='m'?'👦 ':'👧 ')+c.name+' <span class="muted">('+age+'d'
+          +(c.sex==='m'&&age>=40&&!c.wedTo?(c.appointed?' · serves as your general':' · OF AGE — appoint him in INTRIGUE'):'')
+          +(c.wedTo?' · wed to '+c.wedTo: c.wed?' · wed to a foreign court':'')
+          +(c.kids?' · '+c.kids+'👶':'')+')</span>';
       }).join(' · ');
       card.appendChild(kids);
     }
   } else if(marriageUnlocked()){
-    card.innerHTML=`<div><b style="color:var(--gold)">⚭ Take a wife</b></div>
-      <div class="small muted">${marriageRequired()?'Your rank <b>demands</b> a dynastic match — you must wed to secure heirs and alliance.':'You have grown powerful enough to make a match. A wife brings dowry, allies and standing.'}</div>`;
-    const bt=document.createElement('button'); bt.className='btn sm gold'; bt.textContent='⚭ SEEK A BRIDE';
+    card.innerHTML=`<div><b style="color:var(--gold)">⚭ Take a ${G.isFemale?'husband':'wife'}</b></div>
+      <div class="small muted">${marriageRequired()?'Your rank <b>demands</b> a dynastic match — you must wed to secure heirs and alliance.':'You have grown powerful enough to make a match. A '+(G.isFemale?'husband':'wife')+' brings dowry, allies and standing.'}</div>`;
+    const bt=document.createElement('button'); bt.className='btn sm gold'; bt.textContent=G.isFemale?'⚭ RECEIVE SUITORS':'⚭ SEEK A BRIDE';
     bt.onclick=()=>openMarry(false); card.appendChild(bt);
   } else {
     card.innerHTML=`<div><b>⚭ Marriage</b> <span class="small muted">— locked</span></div>
@@ -3153,7 +3246,7 @@ function openMarry(forced){
     row.appendChild(briadeImg(w,132));
     const info=document.createElement('div'); info.style.flex='1'; info.innerHTML=
       `<div><b style="color:var(--gold)">${w.name}</b></div>
-       <div class="small">${w.adj} ${w.rank} · <span class="muted">${w.build} of figure${w.jewel?', richly adorned':''}</span></div>
+       <div class="small">${w.adj} ${w.rank} · <span class="muted">${w.male? 'a lord of his people'+(w.jewel?', gold-ringed':'') : w.build+' of figure'+(w.jewel?', richly adorned':'')}</span></div>
        <div class="small muted" style="margin:2px 0">${w.perk}</div>
        <div class="small" style="color:var(--gold)">${marriageEffectsText(w)}</div>`;
     row.appendChild(info); card.appendChild(row);
@@ -3338,6 +3431,16 @@ function advanceDay(n){
       }
       saveQuiet();
     }
+    // the THIRD generation: wed sons and daughters bring grandchildren
+    for(const c of G.children){
+      if(!(c.wed||c.wedTo) || (c.kids||0)>=3 || Math.random()>=0.03) continue;
+      c.kids=(c.kids||0)+1;
+      if(c.sex==='f'){ G.approval=clamp(G.approval+2,0,100); G.favor+=1;
+        G.lastRaid='👶 Word rides in from the east: '+c.name.split(' ')[0]+' has borne a child — your grandchild rocks in a royal cradle (+2 approval, +1 favor).'; }
+      else { G.approval=clamp(G.approval+2,0,100); G.pop=clamp(G.pop+2,0,100);
+        G.lastRaid='👶 '+c.name.split(' ')[0]+'’s wife is delivered of a child — the bloodline grows to a third generation (+2 approval, +2 pop).'; }
+      saveQuiet();
+    }
     // the King of Kings strikes back when hostility runs hot
     if(G.parthia>70 && Math.random()<0.08){
       const east=['Mesopotamia','Syria Palaestina','Asōristān','Asia Minor'].filter(k=>G.titles[k]);
@@ -3477,9 +3580,30 @@ const SUITOR_KINGS=[
 function buildBetrothals(b){
   if(!G.married) return;
   const eligible=G.children.filter(c=>c.sex==='f' && (G.day-c.born)>=40 && !c.wed);
-  if(!eligible.length) return;
+  const sons=G.children.filter(c=>c.sex==='m' && (G.day-c.born)>=40 && !c.wedTo);
+  if(!eligible.length && !sons.length) return;
   const bh=document.createElement('div'); bh.className='small'; bh.style.color='var(--gold)'; bh.style.marginTop='6px';
-  bh.textContent='💍 BETROTHALS — client kings court your daughters:'; b.appendChild(bh);
+  bh.textContent='💍 BETROTHALS — the next generation weds:'; b.appendChild(bh);
+  // sons take brides of the great Roman houses — the line must continue
+  sons.forEach(son=>{
+    const card=document.createElement('div'); card.className='shopcard';
+    const bride=pick(['Aemilia','Fabia','Claudia','Sempronia','Cassia','Vipsania'])+' '+pick(['of the Aemilii','of the Fabii','of the Claudii','Prisca','Secunda']);
+    card.innerHTML=`<div><b style="color:#8ab4e0">👦→⚭ ${son.name}</b> <span class="small muted">— of age; the great houses offer their daughters</span></div>
+      <div class="small muted">${bride} is proposed — a match to carry your name into the third generation.</div>`;
+    const row=document.createElement('div'); row.className='row gap6';
+    const bt=document.createElement('button'); bt.className='btn sm gold'; bt.textContent='💍 ARRANGE HIS MARRIAGE (200d)';
+    bt.disabled=G.coin<200;
+    bt.onclick=()=>{ if(G.coin<200) return; G.coin-=200;
+      son.wedTo=bride; G.approval=clamp(G.approval+3,0,100); G.honor=clamp(G.honor+2,0,100);
+      saveQuiet(); toast('💍 '+son.name+' weds '+bride+' beneath your roof — grandchildren will follow. (+3 approval, +2 honor)',3600);
+      refreshStatbar(); openIntrigue();
+    };
+    const keep=document.createElement('button'); keep.className='btn sm'; keep.textContent='⏳ NOT YET';
+    keep.onclick=()=>{ toast('He grumbles, and goes back to his drills.',1600); };
+    row.appendChild(bt); row.appendChild(keep);
+    card.appendChild(row); b.appendChild(card);
+  });
+  if(!eligible.length) return;
   eligible.forEach(dau=>{
     const card=document.createElement('div'); card.className='shopcard';
     card.innerHTML=`<div><b style="color:#e2a0b8">👧→👑 ${dau.name}</b> <span class="small muted">— of age; her hand is worth a treaty</span></div>`;
@@ -4352,6 +4476,8 @@ window.__SS = {
   armyBattle, launchConquest, makeGeneral, get G(){return G;},
   openMarry, marry, rollBrides, makeBride, get marryList(){return marryList;},
   advanceDay, openVilla,
+  succession, openPortrait, startBedScene,
+  get BC(){return BC;}, setBCT:(t)=>{ if(BC) BC.t=t; },
 };
 })();
 </script>
