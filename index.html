@@ -742,6 +742,57 @@ function marriageUnlocked(){ return !!G && !G.married; }   // even the poorest t
 function marriageRequired(){ return !!G && !G.married && (G.socialClass==='elite'||G.socialClass==='upper'); }
 
 /* =====================================================================
+   THE LEGACY HOUSE — a dynastic seat you plant in a province of your
+   choosing. WHERE you build it decides everything: a rich core province
+   pours gold, influence and status into your house; a poor frontier
+   barely pays and draws raiders. Poor and rich alike gain — proportionally.
+   Ask your spouse for advice; the counsel sounds like them, warmed (or
+   chilled) by the bond between you.
+   ===================================================================== */
+const LEGACY_INFO={
+  'Aegyptus':{w:5,s:true,note:'the granary of the world — grain-ships and gold without end'},
+  'Asia Minor':{w:5,s:true,note:'silk roads, marble cities and old Greek gold'},
+  'Italia':{w:5,s:true,note:'the very heart of the Empire; to seat our name here is to sit at Rome’s own table'},
+  'Syria Palaestina':{w:4,s:true,note:'the caravan crossroads of the East, thick with spice-coin'},
+  'Africa Proconsularis':{w:4,s:true,note:'oil, grain and the wealth Carthage left behind'},
+  'Achaea':{w:4,s:true,note:'the prestige of Hellas — a name built here is a name of culture'},
+  'Cyprus':{w:3,s:true},'Gallia':{w:3,s:true},'Hispania Baetica':{w:3,s:true,note:'silver mines and good wine'},
+  'Insulae Baleares & Sicilia':{w:3,s:true},'Ērānshahr':{w:3,s:false,note:'the rich Persian heartland — but far, and no friend of Rome'},
+  'Dalmatia':{w:2,s:true},'Illyricum':{w:2,s:true},'Creta':{w:2,s:true},
+  'Bosporan Kingdom':{w:2,s:false},'Arabia Petraea':{w:2,s:false},'Mesopotamia':{w:2,s:false},'Asōristān':{w:2,s:false},'Sogdiana':{w:2,s:false},
+  'Britannia':{w:1,s:false,note:'cold, wet, and very far from anyone who matters — the babes would grow up in fog'},
+  'Germania Magna':{w:1,s:false,note:'a forest full of men who want us dead; no place for a cradle'},
+};
+function legacyInfo(id){ return LEGACY_INFO[id]||{w:2,s:true}; }
+const LEGACY_LEVELS=[{name:'a modest family house',cost:400},{name:'a fine domus',cost:1200},{name:'a grand dynastic estate',cost:3000}];
+function legacyScore(){ if(!G.legacy) return 0; const inf=legacyInfo(G.legacy.prov);
+  const gk=(G.children||[]).reduce((a,c)=>a+(c.kids||0),0);
+  return inf.w*G.legacy.level*20 + gk*15 + (G.wifeRel>=90?40:0) + ((G.titles&&G.titles[G.legacy.prov])?60:0); }
+function legacyHomeProvince(w){ return ({egyptian:'Aegyptus',greek:'Achaea',persian:'Ērānshahr',celt:'Gallia',germanic:'Germania Magna',numidian:'Africa Proconsularis',roman:'Italia'})[w&&w.eth]||'Italia'; }
+// the spouse's counsel on WHERE to plant the house — voice shifts with the bond
+function wifeLegacyAdvice(){
+  const rel=G.wifeRel|0, w=G.wife, isM=w&&w.male;
+  const ranked=Object.keys(LEGACY_INFO).sort((a,b)=>legacyInfo(b).w-legacyInfo(a).w);
+  const rich=ranked.filter(id=>legacyInfo(id).w>=4), pick3=rich.slice(0,3);
+  const home=legacyHomeProvince(w), pet= rel>=80? pick(['my love','my heart','my champion']) : rel>=45? (isM?'husband':'wife') : '';
+  if(rel>=80) return '💬 '+(pet)+': “If we plant our name forever, plant it where it will GROW — '+pick3.join(', ')+'. '+
+    (legacyInfo(home).note? 'And my heart leans to '+home+' — '+legacyInfo(home).note+'. ':'')+
+    'Build it rich and our children inherit an empire in miniature. But NOT Britannia — I will not raise our babies in the fog to be carried off by painted men.”';
+  if(rel>=45) return '💬 “You want counsel? Sensible. The gold is in '+pick3.join(', ')+' — a house there pays for itself and lifts our standing. '+
+    home+' would suit us. The frontier is cheap, and you get what you pay for: raids and rain. Your choice, in the end.”';
+  return '💬 “Advice? NOW you ask. Fine — somewhere RICH, '+pick3[0]+' or '+pick3[1]+', so at least the coin makes up for the company. Bury it in Britannia and you’ll have earned the mud. That’s all you get from me today.”';
+}
+function wifeLegacyVerdict(){
+  const rel=G.wifeRel|0, w=G.wife, inf=legacyInfo(G.legacy.prov), home=legacyHomeProvince(w);
+  const good=inf.w>=4, homey=G.legacy.prov===home, bad=inf.w<=1;
+  if(homey) return '💬 '+(rel>=70?'“You built it in '+G.legacy.prov+' — my own country. You listened. I could kiss you.”':'“'+G.legacy.prov+'. My people’s land. …A fair choice. Thank you.”');
+  if(good) return '💬 '+(rel>=70?'“'+G.legacy.prov+' — rich, safe, and worthy of us. The children will thank you, and so do I. ♥”':'“'+G.legacy.prov+' is a shrewd seat. The coin flows and the neighbours are jealous. Good.”');
+  if(bad) return '💬 '+(rel>=70?'“'+G.legacy.prov+', my love? It is… far. And cold. I trust you know what you are doing.”':'“'+G.legacy.prov+'?! Did you LOSE a bet? We shall be robbed by breakfast. I hope the land was cheap.”');
+  return '💬 “'+G.legacy.prov+'. It will do. Not grand, but ours — and that is something.”';
+}
+let legacyPick=null;
+
+/* =====================================================================
    GAME STATE / SAVE
    ===================================================================== */
 const SAVE_KEY='sand_and_steel_save_v1';
@@ -773,6 +824,7 @@ function freshCareer(name,origin,arch,social){
     isFemale:false, lineage:[],                      // succession: who you are, and who came before
     hygiene:70, wifePhys:45,                         // 🧼 how you smell · 🔥 the physical side of the marriage
     hasPool:false, hasWardrobe:false,                // villa renovations
+    legacy:null, lastFeastDay:-9,                     // the legacy house + family feasts
     loveDay:-1, loveQuick:0, loveLong:0, loveNight:0, loveVigil:0,  // bedchamber sessions used today
     venusUntil:-1,                                   // blessed of Venus: +fire in the arena until this day
     lastWashDay:-9, lastPoolDay:-9, lastWardrobeDay:-9, lastKidsDay:-9, lastBathDay:-9,
@@ -792,7 +844,7 @@ function freshCareer(name,origin,arch,social){
   };
 }
 // fill in any fields missing from older saves
-function migrate(g){ const d={honor:50,food:4,mount:0,slaves:0,hasVilla:false,boat:false,favor:0,soldiers:0,hidden:[],plotTier:0,emperor:false,approval:50,legions:0,rivals:0,retired:false,detachments:[],day:0,titles:{},clears:{},socialClass:'gladiator',army:{},armyGear:0,armyTrain:0,hasOrganizer:false,generals:[],wife:null,married:false,marryPrompted:false,children:[],pregnant:null,lastLoveDay:-9,injury:null,lastDebateDay:-9,office:0,path:null,parthia:50,parthiaPact:false,wifeRel:50,lastTalkDay:-9,isFemale:false,lineage:[],hygiene:70,wifePhys:45,hasPool:false,hasWardrobe:false,loveDay:-1,loveQuick:0,loveLong:0,loveNight:0,loveVigil:0,venusUntil:-1,lastWashDay:-9,lastPoolDay:-9,lastWardrobeDay:-9,lastKidsDay:-9,lastBathDay:-9}; for(const k in d){ if(g[k]===undefined) g[k]=d[k]; } if(!g.current) g.current='Italia'; return g; }
+function migrate(g){ const d={honor:50,food:4,mount:0,slaves:0,hasVilla:false,boat:false,favor:0,soldiers:0,hidden:[],plotTier:0,emperor:false,approval:50,legions:0,rivals:0,retired:false,detachments:[],day:0,titles:{},clears:{},socialClass:'gladiator',army:{},armyGear:0,armyTrain:0,hasOrganizer:false,generals:[],wife:null,married:false,marryPrompted:false,children:[],pregnant:null,lastLoveDay:-9,injury:null,lastDebateDay:-9,office:0,path:null,parthia:50,parthiaPact:false,wifeRel:50,lastTalkDay:-9,isFemale:false,lineage:[],hygiene:70,wifePhys:45,hasPool:false,hasWardrobe:false,legacy:null,lastFeastDay:-9,loveDay:-1,loveQuick:0,loveLong:0,loveNight:0,loveVigil:0,venusUntil:-1,lastWashDay:-9,lastPoolDay:-9,lastWardrobeDay:-9,lastKidsDay:-9,lastBathDay:-9}; for(const k in d){ if(g[k]===undefined) g[k]=d[k]; } if(!g.current) g.current='Italia'; return g; }
 function saveGame(){ try{ localStorage.setItem(SAVE_KEY, JSON.stringify(G)); toast('Saved.'); }catch(e){} }
 function hasSave(){ try{ return !!localStorage.getItem(SAVE_KEY); }catch(e){ return false; } }
 function loadGame(){ try{ G=migrate(JSON.parse(localStorage.getItem(SAVE_KEY))); return !!G; }catch(e){ return false; } }
@@ -2295,6 +2347,7 @@ function openPortrait(){
     `<b style="color:var(--gold)">${G.name}</b>${G.wife? ' & <b style="color:#e2a0b8">'+G.wife.name+'</b>':''}`+
     (G.children.length? ' — with '+G.children.map(k=>k.name.split(' ')[0]).join(', ') : '')+
     (gk? ' <span class="muted">· '+gk+' grandchild'+(gk>1?'ren':'')+' beyond the frame</span>':'')+
+    (G.legacy? ' <span class="muted">· seated at '+G.legacy.prov+'</span>':'')+
     ((G.lineage&&G.lineage.length)? ' <span class="muted">· heir of '+G.lineage[G.lineage.length-1].name.split(' ')[0]+'</span>':'')+
     (bond>=90? ' <span style="color:#e26a8a">— a house built on devotion ♥</span>':'');
 }
@@ -3772,6 +3825,7 @@ function openVilla(){
   }
   buildMarriageCard(b);
   buildSuccessionCard(b);
+  buildLegacyCard(b);
   // ---- PASS THE TIME: watch the house grow ----
   const tc=document.createElement('div'); tc.className='shopcard';
   const preg2=G.pregnant? ' 🤰 month '+Math.max(1,Math.min(9,9-Math.ceil((G.pregnant.due-G.day)/3)))+'/9 ·' : '';
@@ -3844,6 +3898,70 @@ function openVilla(){
 }
 $('btn-villa-back').onclick=()=>enterMap();
 
+// ---- THE LEGACY HOUSE ----
+function buildLegacyCard(b){
+  if(!G.hasVilla) return;   // a man builds his farm first, his dynasty second
+  const head=document.createElement('div'); head.className='small'; head.style.color='var(--gold)'; head.style.marginTop='6px';
+  head.textContent='🏛 THE LEGACY HOUSE — where your name outlives you:'; b.appendChild(head);
+  const card=document.createElement('div'); card.className='shopcard'; card.style.borderColor='var(--gold)';
+  if(!G.legacy){
+    card.innerHTML=`<div class="small muted">Plant a dynastic seat in a province and move the family into it. <b>WHERE decides everything.</b> A rich core (Aegyptus, Asia, Italia) pours gold &amp; influence into your house and lifts your status; a poor frontier (Britannia, Germania) barely pays — and raiders circle. Even a modest house lifts a poor man; a grand one crowns a rich one.</div>`;
+    const provs=Object.keys(LEGACY_INFO).sort((a,b2)=>legacyInfo(b2).w-legacyInfo(a).w);
+    if(!legacyPick||LEGACY_INFO[legacyPick]===undefined) legacyPick=provs[0];
+    const sel=document.createElement('select'); sel.style.cssText='background:#241812;color:#e8dcc2;border:1px solid var(--gold);border-radius:4px;padding:3px;font-size:11px;max-width:200px';
+    provs.forEach(id=>{ const o=document.createElement('option'); o.value=id; const inf=legacyInfo(id);
+      o.textContent=id+'  '+'★'.repeat(inf.w)+(inf.s?'':' ⚠frontier'); sel.appendChild(o); });
+    sel.value=legacyPick; sel.onchange=()=>{ legacyPick=sel.value; openVilla(); };
+    const inf=legacyInfo(legacyPick);
+    const note=document.createElement('div'); note.className='small'; note.style.marginTop='4px';
+    note.innerHTML=`<b style="color:var(--gold)">${legacyPick}</b> — ${'★'.repeat(inf.w)} wealth${inf.s?'':' · <span style="color:var(--blood)">⚠ frontier: raiders will come</span>'}`+
+      (inf.note?`<br><span class="muted">${inf.note}</span>`:'');
+    const selRow=document.createElement('div'); selRow.className='row gap6'; selRow.style.alignItems='center'; selRow.style.marginTop='4px';
+    selRow.appendChild(document.createTextNode('Province:')); selRow.appendChild(sel);
+    card.appendChild(selRow); card.appendChild(note);
+    const row=document.createElement('div'); row.className='row gap6'; row.style.marginTop='4px';
+    LEGACY_LEVELS.forEach((lv,i)=>{ const bt=document.createElement('button'); bt.className='btn sm'+(i===0?' gold':'');
+      bt.textContent='BUILD — '+lv.name.toUpperCase()+' ('+lv.cost+'d)'; bt.disabled=G.coin<lv.cost;
+      bt.onclick=()=>{ if(G.coin<lv.cost) return; G.coin-=lv.cost; const prov=legacyPick, inf2=legacyInfo(prov);
+        G.legacy={prov, level:i+1, day:G.day}; const stat=inf2.w*(i+1);
+        G.approval=clamp(G.approval+Math.round(stat*0.8),0,100); G.honor=clamp(G.honor+inf2.w,0,100); G.pop=clamp(G.pop+inf2.w,0,100);
+        refreshStatbar(); saveQuiet();
+        toast('🏛 Your legacy house rises in '+prov+' — '+(inf2.w>=4?'a seat worthy of a dynasty. All Rome takes note.':inf2.w<=1?'far from everything, but it is YOURS.':'a solid foundation for the family.'),4000);
+        openVilla(); };
+      row.appendChild(bt); });
+    card.appendChild(row);
+    if(G.married&&G.wife){ const aw=document.createElement('button'); aw.className='btn sm'; aw.style.marginTop='4px';
+      aw.textContent='💬 ASK '+(G.wife.male?'HIM':'HER')+' WHERE TO BUILD';
+      aw.onclick=()=>{ toast(wifeLegacyAdvice(),7000); }; card.appendChild(aw); }
+  } else {
+    const lg=G.legacy, inf=legacyInfo(lg.prov), lv=LEGACY_LEVELS[lg.level-1], inc=inf.w*lg.level*5;
+    card.innerHTML=`<div><b style="color:var(--gold)">🏛 ${lv.name} · ${lg.prov}</b> ${'★'.repeat(inf.w)}${inf.s?'':' <span style="color:var(--blood)">⚠ frontier</span>'}</div>
+      <div class="small">Dividend <b style="color:var(--gold)">+${inc}d/day</b> · standing ${inf.w>=4?'greatly elevated':inf.w<=1?'barely helped':'lifted'} · legacy score <b>${legacyScore()}</b></div>
+      <div class="small muted">The family name is seated here; your heir inherits its prestige at succession.</div>`;
+    const row=document.createElement('div'); row.className='row gap6'; row.style.marginTop='4px';
+    if(lg.level<3){ const up=LEGACY_LEVELS[lg.level]; const ub=document.createElement('button'); ub.className='btn sm gold';
+      ub.textContent='⬆ UPGRADE — '+up.name.toUpperCase()+' ('+up.cost+'d)'; ub.disabled=G.coin<up.cost;
+      ub.onclick=()=>{ if(G.coin<up.cost) return; G.coin-=up.cost; lg.level++; G.approval=clamp(G.approval+inf.w,0,100); refreshStatbar(); saveQuiet();
+        toast('🏛 The house grows grander — now '+LEGACY_LEVELS[lg.level-1].name+'. Your standing rises with it.',3200); openVilla(); };
+      row.appendChild(ub); }
+    const feastCd=G.day-(G.lastFeastDay===undefined?-9:G.lastFeastDay), fcost=100+inf.w*40;
+    const fb=document.createElement('button'); fb.className='btn sm';
+    fb.textContent= feastCd<2? '🍇 (the tables are cleared)' : '🍇 THROW A FAMILY FEAST ('+fcost+'d)';
+    fb.title='Gather the whole house — deepen the bond with spouse and children, and be SEEN doing it.';
+    fb.disabled=feastCd<2||G.coin<fcost;
+    fb.onclick=()=>{ if(G.coin<fcost) return; G.coin-=fcost; G.lastFeastDay=G.day;
+      if(G.married) G.wifeRel=clamp(G.wifeRel+5,0,100);
+      (G.children||[]).forEach(c=>{ if(!c.wed) c.rel=clamp((c.rel===undefined?55:c.rel)+5,0,100); });
+      G.pop=clamp(G.pop+inf.w,0,100); G.approval=clamp(G.approval+2,0,100); refreshStatbar(); saveQuiet();
+      toast('🍇 The legacy house blazes with lamps and laughter — the whole family closer, half the province talking. (+5 ♥ to all, +pop)',3800); openVilla(); };
+    row.appendChild(fb);
+    if(G.married&&G.wife){ const aw=document.createElement('button'); aw.className='btn sm'; aw.textContent='💬 '+(G.wife.male?'HIS':'HER')+' VERDICT';
+      aw.onclick=()=>{ toast(wifeLegacyVerdict(),7000); }; row.appendChild(aw); }
+    card.appendChild(row);
+  }
+  b.appendChild(card);
+}
+
 // ---- SUCCESSION: the house outlives the man — play on as your heir ----
 function buildSuccessionCard(b){
   const adults=G.children.filter(c=>(G.day-c.born)>=40 && !c.wed);
@@ -3865,22 +3983,25 @@ function buildSuccessionCard(b){
 }
 function succession(ch){
   const fem=ch.sex==='f', heir=ch.name;
+  const prestige=legacyScore();                       // the legacy house's standing passes down
   G.lineage=G.lineage||[];
   G.lineage.push({name:G.name, glory:G.glory, wins:G.wins, losses:G.losses, day:G.day, emperor:!!G.emperor});
   // the appointed son gives up his command to take the family name
   G.generals=(G.generals||[]).filter(g=>!(g.son && g.name===ch.name));
   G.children=G.children.filter(c=>c!==ch);
   G.name=heir; G.isFemale=fem;
-  G.glory=Math.floor(G.glory*0.25); G.pop=20;
+  G.glory=Math.floor(G.glory*0.25) + Math.round(prestige*0.4); G.pop=clamp(20+Math.round(prestige*0.08),0,100);
+  G.coin+=Math.round(prestige*2);
   G.level=Math.max(1,Math.round(G.level/3)); G.xp=0;
   G.wins=0; G.losses=0; G.injury=null;
   G.married=false; G.wife=null; G.wifeRel=0; G.wifePhys=45; G.pregnant=null;
   G.lastLoveDay=-9; G.lastTalkDay=-9; G.marryPrompted=false; G.hygiene=70;
   G.retired=false; G.path=null; G.office=0;
   refreshStatbar(); saveQuiet(); openVilla();
-  toast(fem
+  toast((fem
     ? '🗡 '+heir+' takes the sand in DEFIANCE of the Emperor’s ban — the first GLADIATRIX of your house! The dynasty endures.'
-    : '⚔ The sword passes to '+heir+'. The dynasty endures — now win a glory of your own.', 4600);
+    : '⚔ The sword passes to '+heir+'. The dynasty endures — now win a glory of your own.')
+    + (prestige>0? ' The legacy house grants a head start: +'+Math.round(prestige*0.4)+' glory, +'+Math.round(prestige*2)+'d.':''), 5000);
 }
 
 // ---- MARRIAGE ----
@@ -4284,6 +4405,11 @@ function advanceDay(n){
   n=n||1; if(!G.detachments) return;
   for(let k=0;k<n;k++){ G.day++;
     G.hygiene=clamp((G.hygiene===undefined?70:G.hygiene)-2,0,100);   // the road is dusty
+    // the legacy house works while you sleep — richer province, richer dividend
+    if(G.legacy){ const inf=legacyInfo(G.legacy.prov); G.coin+=inf.w*G.legacy.level*5;
+      if(!inf.s && Math.random()<0.035){ const loss=ri(60,200)+inf.w*20; G.coin=Math.max(0,G.coin-loss);
+        G.lastRaid='🔥 Raiders strike your legacy house in '+G.legacy.prov+' — '+loss+'d of damage. A safer province would have spared you this.'; }
+      else if(inf.w>=4 && G.day%6===0){ G.approval=clamp(G.approval+1,0,100); } }
     // wounds knit with time
     if(G.injury){ G.injury.daysLeft--; if(G.injury.daysLeft<=0){ toast('🩹 Your '+G.injury.name+' has healed.',1800); G.injury=null; refreshStatbar(); } }
     // the household grows: pregnancy runs its nine months (3 days = 1 month)
@@ -5373,6 +5499,7 @@ window.__SS = {
   get BC(){return BC;}, setBCT:(t)=>{ if(BC) BC.t=t; },
   openDomus, get DM(){return DM;}, setDMT:(t)=>{ if(DM&&DM.scene) DM.scene.t=t; }, wifeVerdict, loveLeft,
   setPlace:(p)=>{ bedPlace=p; }, setLen:(l)=>{ bedLen=l; },
+  legacyScore, wifeLegacyAdvice, wifeLegacyVerdict, setLegacyPick:(p)=>{ legacyPick=p; },
 };
 })();
 </script>
