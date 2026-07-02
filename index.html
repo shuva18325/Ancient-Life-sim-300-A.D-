@@ -249,6 +249,16 @@
     </div>
   </div>
 
+  <!-- ===== FAMILY PORTRAIT ===== -->
+  <div id="scr-portrait" class="screen center">
+    <div class="panel pad col center gap" style="width:min(94%,760px);">
+      <h2 style="color:var(--gold)">🖼 THE HOUSE PORTRAIT</h2>
+      <canvas id="portrait-cv" width="480" height="250" style="position:static;width:min(88%,660px);height:auto;image-rendering:pixelated;border:0;"></canvas>
+      <div id="portrait-caption" class="small muted"></div>
+      <button class="btn gold" id="btn-portrait-back">◀ BACK TO THE VILLA</button>
+    </div>
+  </div>
+
   <!-- ===== MARRIAGE (take a wife / dynastic alliance) ===== -->
   <div id="scr-marry" class="screen center">
     <div class="panel pad col gap scrollbox" style="width:min(97%,900px);max-height:95%;">
@@ -1162,8 +1172,8 @@ function startFight(region, briefData){
   };
   if(G.injury){ p.maxHp*=0.85; p.hp=p.maxHp; p.dmgMul=(p.dmgMul||1)*0.85; }   // fighting wounded
   // sometimes your wife slips into the stands — you fight harder under her eyes
-  FT.wifeWatch = !!(G.married && G.wife && !FT.siege && Math.random() < 0.2 + (G.wifeRel||50)/300);
-  if(FT.wifeWatch){ p.dmgMul=(p.dmgMul||1)*(1.05+(G.wifeRel||50)/1000); p.maxStamina+=15; p.stamina=p.maxStamina;
+  FT.wifeWatch = !!(G.married && G.wife && !FT.siege && Math.random() < ((G.wifeRel||50)>=90? 1 : 0.2 + (G.wifeRel||50)/300));
+  if(FT.wifeWatch){ p.dmgMul=(p.dmgMul||1)*(1.05+(G.wifeRel||50)/1000+((G.wifeRel||50)>=90?0.05:0)); p.maxStamina+=15; p.stamina=p.maxStamina;
     setTimeout(()=>{ if(FT&&FT.wifeWatch&&!FT.over) banner(FT.p.x, FT.p.y-56,'♥ SHE IS WATCHING','#e26a8a'); },700); }
   if(FT.rigged){ foe.maxHp*=0.45; foe.hp=foe.maxHp; foe.ai.aggr*=0.5; foe.ai.react*=2; }
   if(FT.ambush){ foe.hp=foe.maxHp*0.55; foe.hurt=20; foe.vx=-foe.facing*4; foe.vy=-3; foe.onGround=false; }  // you struck first
@@ -1541,6 +1551,9 @@ function finishFight(won){
   if(G.office>=1){ G.coin+=8; note+='The quaestorship skims +8d. '; }
   if(G.office>=2 && won){ G.pop=clamp(G.pop+2,0,100); note+='As aedile your games swell the mob (+2 pop). '; }
   if(G.parthiaPact){ G.coin+=6; note+='Silk-road tolls +6d. '; }
+  if(G.wife&&G.wife.vowed){ G.coin+=2; }
+  const dowTrade=(G.children||[]).reduce((s,c)=>s+(c.trade||0),0);
+  if(dowTrade>0){ G.coin+=dowTrade; note+='Your daughters’ courts send +'+dowTrade+'d. '; }
   FT.provisioned=false; G.provisioned=false;
   showResult(won,{glory,coin,popDelta,honorDelta,note,crowdLove,slaveCoin});
   saveQuiet();
@@ -2183,6 +2196,76 @@ function finishBattle(){
 }
 
 /* =====================================================================
+   THE FAMILY PORTRAIT — the whole house, painted in one gold frame
+   ===================================================================== */
+function drawHusbandFig(c,x,y,bond){
+  const P=(a,b2,w,h,col)=>{c.fillStyle=col;c.fillRect(Math.round(x+a),Math.round(y+b2),Math.round(w),Math.round(h));};
+  const skin=G.skin||'#caa06a', sSh=shade(skin,-30), sHi=shade(skin,22);
+  const tun=G.tunic||'#7a2f22', tSh=shade(tun,-32), tHi=shade(tun,24);
+  // legs + sandals
+  P(-6,-22,5,20,skin); P(1,-22,5,20,skin); P(-6,-22,1,20,sHi); P(5,-22,1,20,sSh);
+  P(-7,-2,7,2,'#6a4426'); P(0,-2,7,2,'#6a4426');
+  // tunic with a gold hem — a champion's colours
+  P(-9,-52,18,30,tun); P(-9,-52,18,3,tHi); P(7,-50,2,27,tSh);
+  P(-9,-24,18,2,'#e8c34a'); P(-2,-52,2,28,tSh);
+  P(-10,-46,4,16,tun); P(6,-46,4,16,tun);                          // sleeves
+  P(-11,-30,4,4,skin); P(7,-30,4,4,skin);                          // hands
+  // balteus + medal of the arena
+  P(-9,-40,18,2,'#5a3a22'); P(-1,-38,3,3,'#e8c34a');
+  // neck + head, proud and scarred
+  P(-2,-57,5,5,skin);
+  P(-6,-70,12,13,skin); P(-6,-70,12,2,sHi); P(4,-68,2,10,sSh);
+  P(-6,-72,12,4,'#3a2618'); P(-7,-68,2,5,'#3a2618'); P(5,-68,2,5,'#3a2618'); // hair
+  P(-4,-64,3,2,'#fff'); P(1,-64,3,2,'#fff'); P(-3,-64,2,2,'#241408'); P(2,-64,2,2,'#241408');
+  P(-4,-66,3,1,'#241408'); P(1,-66,3,1,'#241408');
+  P(-1,-61,2,1,sSh); P(-2,-59,5,1,'#8a4038');                       // nose + easy smile
+  P(3,-67,1,4,'#8a5a4a');                                            // the old scar he never hides
+  if(G.emperor){ P(-7,-73,14,2,'#e8c34a'); P(-1,-74,2,2,'#fff0b0'); } // the laurel of an emperor
+  if(bond>=90){ P(-11,-44,4,3,skin); }                               // his arm reaches round her waist
+}
+function drawKidFig(c,x,y,sex,age){
+  const P=(a,b2,w,h,col)=>{c.fillStyle=col;c.fillRect(Math.round(x+a),Math.round(y+b2),Math.round(w),Math.round(h));};
+  const h=Math.min(40, 22+Math.round(age/4));                        // they grow
+  const skin=G.skin||'#caa06a';
+  const cloth= sex==='m' ? shade(G.tunic||'#7a2f22',12) : shade((G.wife&&G.wife.dress)||'#8a2f5a',16);
+  P(-3,-h+9,7,h-11,cloth); P(-3,-h+9,7,2,shade(cloth,24));
+  P(-2,-2,3,2,'#6a4426'); P(1,-2,3,2,'#6a4426');
+  P(-3,-h,7,8,skin); P(-3,-h,7,1,shade(skin,22));
+  if(sex==='m'){ P(-3,-h-1,7,2,'#3a2618'); }
+  else { P(-3,-h-1,7,2,(G.wife&&G.wife.hair)||'#5a3a1e'); P(-5,-h+1,2,4,(G.wife&&G.wife.hair)||'#5a3a1e'); P(4,-h+1,2,4,(G.wife&&G.wife.hair)||'#5a3a1e'); }
+  P(-2,-h+3,2,1,'#241408'); P(1,-h+3,2,1,'#241408'); P(-1,-h+6,2,1,'#8a4038');   // bright eyes + grin
+  P(-4,-h+10,2,6,skin); P(3,-h+10,2,6,skin);
+}
+function openPortrait(){
+  state='menu'; show('scr-portrait');
+  const cv=$('portrait-cv'), c=cv.getContext('2d'); c.imageSmoothingEnabled=false;
+  // villa wall backdrop
+  const g2=c.createLinearGradient(0,0,0,250); g2.addColorStop(0,'#33203e'); g2.addColorStop(1,'#150c18');
+  c.fillStyle=g2; c.fillRect(0,0,480,250);
+  c.fillStyle='#cfc0a2'; c.fillRect(40,20,10,210); c.fillStyle='#e8dcc2'; c.fillRect(41,20,3,210);   // column
+  for(let i=0;i<8;i++){ c.fillStyle=shade('#5a2d6a',i*5); c.fillRect(408+i*2,20,3,210); }             // curtain
+  c.fillStyle='#3a2c1e'; c.fillRect(0,222,480,28); for(let fx=0;fx<480;fx+=24){c.fillStyle='#2c2014';c.fillRect(fx,222,1,28);}
+  // the family, gathered
+  const bond=G.wifeRel|0;
+  if(G.wife){ const wc=document.createElement('canvas'); wc.width=wc.height=148; drawBridePortrait(wc,G.wife,true);
+    c.drawImage(wc, 178,88, 148*0.9,148*0.9); }                                                       // the domina
+  c.save(); c.translate(312,222); c.scale(1.62,1.62); drawHusbandFig(c,0,0,bond); c.restore();         // the master — her equal in height
+  const kids=G.children.slice(0,6);
+  kids.forEach((k,i)=>{ c.save(); c.translate(168-i*34,222); c.scale(1.45,1.45); drawKidFig(c,0,0,k.sex,G.day-k.born); c.restore(); });
+  if(bond>=90){ c.fillStyle='#e26a8a'; c.font='14px monospace'; c.fillText('♥', 272, 96); }            // devoted
+  // painter's plate + grand gold frame
+  c.strokeStyle='#8a6f35'; c.lineWidth=6; c.strokeRect(6,6,468,238);
+  c.strokeStyle='#e8c34a'; c.lineWidth=2; c.strokeRect(11,11,458,228);
+  c.fillStyle='#e8c34a'; [[6,6],[468,6],[6,238],[468,238]].forEach(p=>c.fillRect(p[0]-2,p[1]-2,10,10));
+  c.fillStyle='#c8b060'; c.font='italic 11px Georgia,serif'; c.textAlign='center';
+  c.fillText('DOMUS  ·  '+(G.name||'').toUpperCase()+'  ·  ANNO CC', 240, 236);
+  $('portrait-caption').innerHTML =
+    `<b style="color:var(--gold)">${G.name}</b>${G.wife? ' & <b style="color:#e2a0b8">'+G.wife.name+'</b>':''}`+
+    (G.children.length? ' — with '+G.children.map(k=>k.name.split(' ')[0]).join(', ') : '')+
+    (bond>=90? ' <span style="color:#e26a8a">— a house built on devotion ♥</span>':'');
+}
+
+/* =====================================================================
    THE BEDCHAMBER — an implied scene: she runs, the toga flies, the door
    closes... and the lamps burn low. (All suggestion, nothing shown.)
    ===================================================================== */
@@ -2190,7 +2273,8 @@ let BC=null, BEDSPR=null;
 function startBedScene(mode){
   const cv=document.createElement('canvas'); cv.width=cv.height=148;
   drawBridePortrait(cv,G.wife,true); BEDSPR=cv;
-  BC={t:0, props:[], hearts:[], mode:mode||'heir'};
+  BC={t:0, props:[], hearts:[], mode:mode||'heir',
+      line:pick(['“Veni…”','“Te amo.”','“Nunc, mi gladiator…”','“Tarde venis…”'])};
   G.lastLoveDay=G.day;
   state='bed'; document.querySelectorAll('.screen').forEach(s=>s.classList.remove('on'));
   $('statbar').classList.add('hide');
@@ -2213,7 +2297,8 @@ function updateBed(dt){ const s=BC; s.t+=dt; const T=s.t;
   if(T>404&&T<406) s.props.push({kind:'msandal',x:368,y:166,vx:-3.2,vy:-2.2,r:0,vr:-0.2});
   // door + voice cues
   if(T>100&&T<102) sfx('creak');
-  if(T>448&&T<450) sfx('giggle');                                  // “Veni…”
+  if(T>448&&T<450) sfx('giggle');                                  // her word for it
+  if(T>452&&T<454) sfx('kiss');                                    // the first kiss, before the door
   if(T>460&&T<462) sfx('creak');
   // ...and then the sounds carry through the closed door
   if(T>500){
@@ -2328,7 +2413,9 @@ function drawBed(){
       px(dx+20,183,12,6,S2);                                                                  // her back low
       px(dx+31,176-jr,9,8,S2); px(dx+33,173-jr,6,4,S2);                                       // the raised rear, swaying
       px(dx+39,181,8,4,S2); px(dx+45,183,5,3,S2);                                             // folded legs
-      if(T>448 && T<470){ pixelText('“Veni…”',dx+dw/2,166,'#f0c8d4',1); }                     // «come»
+      if(T>448 && T<470){ pixelText(s.line,dx+dw/2,166,'#f0c8d4',1); }                        // her word for it
+      if(T>452 && T<462){ px(dx+18,168,6,6,'#17100a'); px(dx+25,167,6,6,'#1c130c');           // two shadows lean together
+        pixelText('♥',dx+25,160,'#e26a8a',1); }
     }
   }
   // the door leaf swings on its FAR hinge (right jamb), like a real door
@@ -3001,7 +3088,36 @@ function buildMarriageCard(b){
     bedF.disabled=cd<2;
     bedF.onclick=()=>startBedScene('fun');
     btns.appendChild(talk); btns.appendChild(bedH); btns.appendChild(bedF);
+    const port=document.createElement('button'); port.className='btn sm'; port.textContent='🖼 FAMILY PORTRAIT';
+    port.onclick=()=>openPortrait(); btns.appendChild(port);
     card.appendChild(btns);
+    // ---- DEVOTED (90+ ♥): the marriage the poets write about ----
+    if(rel>=90){
+      const dv=document.createElement('div'); dv.className='row gap6'; dv.style.marginTop='4px';
+      const dh=document.createElement('div'); dh.className='small'; dh.style.color='#e26a8a'; dh.style.width='100%';
+      dh.textContent='♥ DEVOTED — she never misses your fights now (always in the stands, greater fire in your arm):';
+      card.appendChild(dh);
+      const walk=document.createElement('button'); walk.className='btn sm'; walk.textContent= tcd<1?'🌹 (tonight, perhaps)':'🌹 MOONLIT WALK';
+      walk.disabled=tcd<1;
+      walk.onclick=()=>{ G.lastTalkDay=G.day; G.honor=clamp(G.honor+2,0,100); G.favor+=1;
+        toast('🌹 You walk the vineyard rows under the moon, her head on your shoulder. The household would die for her. (+2 honor, +1 favor)',3200);
+        refreshStatbar(); saveQuiet(); openVilla(); };
+      const dance=document.createElement('button'); dance.className='btn sm'; dance.textContent= tcd<1?'💃 (tonight, perhaps)':'💃 DANCE IN THE ATRIUM';
+      dance.disabled=tcd<1;
+      dance.onclick=()=>{ G.lastTalkDay=G.day; G.pop=clamp(G.pop+3,0,100);
+        toast('💃 A flute-girl plays and you dance like fools until the slaves applaud. Word spreads: the champion is HAPPY. (+3 pop)',3200);
+        refreshStatbar(); saveQuiet(); openVilla(); };
+      dv.appendChild(walk); dv.appendChild(dance);
+      if(!w.vowed){
+        const vow=document.createElement('button'); vow.className='btn sm gold'; vow.textContent='💍 RENEW YOUR VOWS (300d)';
+        vow.disabled=G.coin<300;
+        vow.onclick=()=>{ if(G.coin<300)return; G.coin-=300; w.vowed=true; G.approval=clamp(G.approval+10,0,100); G.honor=clamp(G.honor+5,0,100);
+          toast('💍 Before the lares and every guest you can feed, you swear it all again. Rome sighs. (+10 approval, +5 honor, +2d gifts each bout)',3600);
+          refreshStatbar(); saveQuiet(); openVilla(); };
+        dv.appendChild(vow);
+      }
+      card.appendChild(dv);
+    }
     // the children of your house (sons come of age at 40 days)
     if(G.children.length){
       const kids=document.createElement('div'); kids.className='small'; kids.style.marginTop='4px';
@@ -3062,6 +3178,7 @@ function marry(w){
   enterMap();
 }
 $('btn-marry-back').onclick=()=>enterMap();
+$('btn-portrait-back').onclick=()=>openVilla();
 
 // ---- INTRIGUE: Elite Siege, hidden guests, private army, grand plot ----
 $('btn-intrigue').onclick=()=>openIntrigue();
@@ -3084,6 +3201,8 @@ function openIntrigue(){
     bt.onclick=()=>startSiege(el,idx);
     card.appendChild(bt); b.appendChild(card);
   });
+  // ---- daughters of age broker alliances with the client kings ----
+  buildBetrothals(b);
   // ---- the political arena (senators, elites and emperors fight with words & coin) ----
   if(G.retired || G.socialClass==='elite' || G.emperor) buildPolitics(b);
   // ---- hidden guests ----
@@ -3347,6 +3466,46 @@ function buildCampaign(b){
   wait.onclick=()=>{ advanceDay(1); if(G.lastRaid){toast(G.lastRaid,3000); G.lastRaid=null;} openIntrigue(); };
   row.appendChild(send); if(G.detachments.length) row.appendChild(wait);
   card.appendChild(row); b.appendChild(card);
+}
+// ---- BETROTHALS: a daughter's hand seals what legions cannot ----
+const SUITOR_KINGS=[
+  {id:'bosporan', name:'Prince Sauromates of the Bosporus', gift:'+800d bride-price · +500 horse-archers', coin:800, troops:500, tt:'bosporan'},
+  {id:'armenian', name:'the heir of Great Armenia',          gift:'+600d · +2 favor · +2d/bout in eastern trade', coin:600, favor:2, trade:2},
+  {id:'nabataean',name:'Lord Obodas of Nabataea',            gift:'+500d · +3 favor · +3d/bout in spice tolls',  coin:500, favor:3, trade:3},
+  {id:'parthian', name:'a Parthian satrap of the border',    gift:'+700d · Parthia’s hostility −30',             coin:700, parthia:-30},
+];
+function buildBetrothals(b){
+  if(!G.married) return;
+  const eligible=G.children.filter(c=>c.sex==='f' && (G.day-c.born)>=40 && !c.wed);
+  if(!eligible.length) return;
+  const bh=document.createElement('div'); bh.className='small'; bh.style.color='var(--gold)'; bh.style.marginTop='6px';
+  bh.textContent='💍 BETROTHALS — client kings court your daughters:'; b.appendChild(bh);
+  eligible.forEach(dau=>{
+    const card=document.createElement('div'); card.className='shopcard';
+    card.innerHTML=`<div><b style="color:#e2a0b8">👧→👑 ${dau.name}</b> <span class="small muted">— of age; her hand is worth a treaty</span></div>`;
+    const row=document.createElement('div'); row.className='row gap6';
+    // two suitors present themselves per daughter (stable by birth-day)
+    const i1=((dau.born%SUITOR_KINGS.length)+SUITOR_KINGS.length)%SUITOR_KINGS.length;
+    const s1=SUITOR_KINGS[i1], s2=SUITOR_KINGS[(i1+2)%SUITOR_KINGS.length];
+    [s1,s2].filter((v,i,a)=>a.indexOf(v)===i).forEach(su=>{
+      const bt=document.createElement('button'); bt.className='btn sm gold'; bt.textContent='💍 WED HER TO '+su.name.split(' ')[0].toUpperCase()+'…';
+      bt.title=su.name+' offers: '+su.gift;
+      bt.onclick=()=>{
+        dau.wed=su.id; dau.trade=su.trade||0;
+        G.coin+=su.coin||0; if(su.favor)G.favor+=su.favor; if(su.troops)addTroops(su.tt||'levy',su.troops);
+        if(su.parthia)G.parthia=clamp(G.parthia+su.parthia,0,100);
+        G.approval=clamp(G.approval+4,0,100); G.honor=clamp(G.honor+2,0,100);
+        saveQuiet(); toast('💍 '+dau.name+' is wed to '+su.name+' amid seven days of feasting — '+su.gift+'. Your blood now sits in a foreign court.',3800);
+        refreshStatbar(); openIntrigue();
+      };
+      row.appendChild(bt);
+    });
+    const keep=document.createElement('button'); keep.className='btn sm'; keep.textContent='🏡 KEEP HER HOME';
+    keep.title='No treaty is worth her unhappiness — the choice stays open.';
+    keep.onclick=()=>{ toast('She stays at the villa, and seems glad of it.',1600); };
+    row.appendChild(keep);
+    card.appendChild(row); b.appendChild(card);
+  });
 }
 // ---- THE POLITICAL ARENA: the battles a toga demands ----
 function buildPolitics(b){
