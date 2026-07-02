@@ -752,6 +752,7 @@ function freshCareer(name,origin,arch,social){
     injury:null, lastDebateDay:-9,                   // wounds & Curia cooldown
     office:0, path:null,                             // cursus honorum rank + chosen road (politics|general)
     parthia:50, parthiaPact:false,                   // relations with the Parthian Empire
+    wifeRel:0, lastTalkDay:-9,                       // the bond with your wife (0-100) + talk cooldown
     wins:0, losses:0,
     hpBonus:0, dmgBonus:0,
     loadout:lo,
@@ -768,7 +769,7 @@ function freshCareer(name,origin,arch,social){
   };
 }
 // fill in any fields missing from older saves
-function migrate(g){ const d={honor:50,food:4,mount:0,slaves:0,hasVilla:false,boat:false,favor:0,soldiers:0,hidden:[],plotTier:0,emperor:false,approval:50,legions:0,rivals:0,retired:false,detachments:[],day:0,titles:{},clears:{},socialClass:'gladiator',army:{},armyGear:0,armyTrain:0,hasOrganizer:false,generals:[],wife:null,married:false,marryPrompted:false,children:[],pregnant:null,lastLoveDay:-9,injury:null,lastDebateDay:-9,office:0,path:null,parthia:50,parthiaPact:false}; for(const k in d){ if(g[k]===undefined) g[k]=d[k]; } if(!g.current) g.current='Italia'; return g; }
+function migrate(g){ const d={honor:50,food:4,mount:0,slaves:0,hasVilla:false,boat:false,favor:0,soldiers:0,hidden:[],plotTier:0,emperor:false,approval:50,legions:0,rivals:0,retired:false,detachments:[],day:0,titles:{},clears:{},socialClass:'gladiator',army:{},armyGear:0,armyTrain:0,hasOrganizer:false,generals:[],wife:null,married:false,marryPrompted:false,children:[],pregnant:null,lastLoveDay:-9,injury:null,lastDebateDay:-9,office:0,path:null,parthia:50,parthiaPact:false,wifeRel:50,lastTalkDay:-9}; for(const k in d){ if(g[k]===undefined) g[k]=d[k]; } if(!g.current) g.current='Italia'; return g; }
 function saveGame(){ try{ localStorage.setItem(SAVE_KEY, JSON.stringify(G)); toast('Saved.'); }catch(e){} }
 function hasSave(){ try{ return !!localStorage.getItem(SAVE_KEY); }catch(e){ return false; } }
 function loadGame(){ try{ G=migrate(JSON.parse(localStorage.getItem(SAVE_KEY))); return !!G; }catch(e){ return false; } }
@@ -1160,6 +1161,10 @@ function startFight(region, briefData){
     shake:0, particles:[], banners:[], decals:[], flash:0, hitstop:0,
   };
   if(G.injury){ p.maxHp*=0.85; p.hp=p.maxHp; p.dmgMul=(p.dmgMul||1)*0.85; }   // fighting wounded
+  // sometimes your wife slips into the stands — you fight harder under her eyes
+  FT.wifeWatch = !!(G.married && G.wife && !FT.siege && Math.random() < 0.2 + (G.wifeRel||50)/300);
+  if(FT.wifeWatch){ p.dmgMul=(p.dmgMul||1)*(1.05+(G.wifeRel||50)/1000); p.maxStamina+=15; p.stamina=p.maxStamina;
+    setTimeout(()=>{ if(FT&&FT.wifeWatch&&!FT.over) banner(FT.p.x, FT.p.y-56,'♥ SHE IS WATCHING','#e26a8a'); },700); }
   if(FT.rigged){ foe.maxHp*=0.45; foe.hp=foe.maxHp; foe.ai.aggr*=0.5; foe.ai.react*=2; }
   if(FT.ambush){ foe.hp=foe.maxHp*0.55; foe.hurt=20; foe.vx=-foe.facing*4; foe.vy=-3; foe.onGround=false; }  // you struck first
   if(FT.hired){ p.maxHp*=2.2; p.hp=p.maxHp; p.dmgMul=2.4; foe.ai.aggr*=0.7; }                                  // a brawny substitute
@@ -1500,6 +1505,7 @@ function finishFight(won){
       popDelta+=n; note+='You felled '+n+' men in the pits — the tale spreads like fire. '; }
     if(FT.emperor){ glory*=2; popDelta+=20; honorDelta+=6; note+='THE EMPEROR IS PLEASED. '; }
     if(FT.wager>0){ coin+=FT.wager; note+='🎲 Your wager pays double (+'+FT.wager+'d). '; }
+    if(FT.wifeWatch){ G.wifeRel=clamp((G.wifeRel||50)+3,0,100); popDelta+=1; note+='♥ She saw it all from the stands (+3 bond). '; }
     G.wins++; G.coin+=coin; G.glory+=glory; G.pop=clamp(G.pop+popDelta,0,100);
     G.cleared[reg.id]=true; G.clears[reg.id]=(G.clears[reg.id]||0)+1;
     // xp / level
@@ -1768,6 +1774,15 @@ function drawArena(){
   }
   else { px(0,GROUND,W,H-GROUND,'#d8b271'); px(0,GROUND,W,3,'#c79a55');
     for(let i=0;i<70;i++){ px((i*97)%W,GROUND+4+((i*53)%(H-GROUND-6)),1,1,'#c79a55'); } }
+  // your wife in the stands — dressed in her colours, waving as you fight
+  if(t.wifeWatch && G.wife){
+    const wfx = t.pit? 60 : W/2-86, wfy = t.pit? GROUND-44 : 13;
+    const wave=((t.time*0.13)|0)%2;
+    px(wfx-1,wfy+2,8,9,G.wife.dress); px(wfx-1,wfy+2,8,2,shade(G.wife.dress,26));   // her gown stands out
+    px(wfx+1,wfy-1,5,4,G.wife.skin); px(wfx+1,wfy-2,5,2,G.wife.hair);
+    px(wfx-2,wfy-3-(wave?2:0),2,5,G.wife.skin); px(wfx+6,wfy-3-(wave?0:2),2,5,G.wife.skin); // waving to you
+    if((t.time|0)%80<36) pixelText('♥',wfx+3,wfy-7,'#e26a8a',1);
+  }
   // blood decals soaked into the sand
   for(const d of t.decals){ ctx.globalAlpha=d.a; px(d.x,d.y,d.w,d.h,d.c); }
   ctx.globalAlpha=1;
@@ -1914,6 +1929,8 @@ function sfx(kind){
     else if(kind==='clap'){ noise(0.05,0.10,1100); tone(180,0.06,'square',0.025,120); }    // a rhythmic slap through the door
     else if(kind==='moan'){ if(Math.random()<0.5) tone(210,0.5,'sine',0.05,330); else tone(320,0.55,'sine',0.045,180); } // muffled... enjoyment
     else if(kind==='creak'){ tone(90,0.35,'sawtooth',0.02,140); }                          // the door swings
+    else if(kind==='kiss'){ noise(0.03,0.06,3200); tone(880,0.06,'sine',0.04,420); }       // a smack through the door
+    else if(kind==='giggle'){ [620,760,540].forEach((f,i)=>setTimeout(()=>{try{tone(f,0.07,'sine',0.03,f+80);}catch(e){}},i*70)); }
     else { tone(200,0.08,'square',0.05); }
   }catch(e){}
 }
@@ -2170,10 +2187,10 @@ function finishBattle(){
    closes... and the lamps burn low. (All suggestion, nothing shown.)
    ===================================================================== */
 let BC=null, BEDSPR=null;
-function startBedScene(){
+function startBedScene(mode){
   const cv=document.createElement('canvas'); cv.width=cv.height=148;
   drawBridePortrait(cv,G.wife,true); BEDSPR=cv;
-  BC={t:0, props:[], hearts:[]};
+  BC={t:0, props:[], hearts:[], mode:mode||'heir'};
   G.lastLoveDay=G.day;
   state='bed'; document.querySelectorAll('.screen').forEach(s=>s.classList.remove('on'));
   $('statbar').classList.add('hide');
@@ -2183,20 +2200,41 @@ function updateBed(dt){ const s=BC; s.t+=dt; const T=s.t;
     if(p.y>222){ p.y=222; p.vx*=0.5; p.vy=0; p.vr*=0.3; } }
   for(const h of s.hearts){ h.y-=h.vy*dt; h.x+=Math.sin(h.y*0.09)*0.4*dt; h.life-=dt; }
   s.hearts=s.hearts.filter(h=>h.life>0);
-  // her clothes come sailing out of the doorway, one by one
+  // HER clothes come sailing out of the doorway, one by one
   if(T>150&&T<152) s.props.push({kind:'toga',  x:368,y:146,vx:-2.8,vy:-2.6,r:0,vr:0.07});
   if(T>190&&T<192) s.props.push({kind:'breastband',x:368,y:152,vx:-2.3,vy:-3.0,r:0,vr:-0.1});
   if(T>218&&T<220) s.props.push({kind:'girdle',x:368,y:158,vx:-2.0,vy:-2.7,r:0,vr:-0.12});
   if(T>240&&T<242) s.props.push({kind:'sandal',x:368,y:166,vx:-3.1,vy:-2.1,r:0,vr:0.2});
   if(T>258&&T<260) s.props.push({kind:'sandal',x:368,y:166,vx:-2.3,vy:-3.2,r:0,vr:-0.16});
-  // the door creaks, then... sounds carry through it
+  // then HIS — tunic, sword-belt, subligaculum, sandals
+  if(T>360&&T<362) s.props.push({kind:'tunic', x:368,y:148,vx:-2.9,vy:-2.5,r:0,vr:-0.08});
+  if(T>378&&T<380) s.props.push({kind:'belt',  x:368,y:154,vx:-2.4,vy:-2.9,r:0,vr:0.12});
+  if(T>392&&T<394){ s.props.push({kind:'subligar',x:368,y:150,vx:-2.6,vy:-3.4,r:0,vr:0.18}); sfx('giggle'); }
+  if(T>404&&T<406) s.props.push({kind:'msandal',x:368,y:166,vx:-3.2,vy:-2.2,r:0,vr:-0.2});
+  // door + voice cues
   if(T>100&&T<102) sfx('creak');
-  if(T>330&&T<332) sfx('creak');
-  if(T>380){
-    if(!s.nextClap||T>=s.nextClap){ sfx('clap'); s.nextClap=T+30+Math.random()*14; }
-    if(!s.nextMoan||T>=s.nextMoan){ sfx('moan'); s.nextMoan=T+70+Math.random()*50; }
+  if(T>448&&T<450) sfx('giggle');                                  // “Veni…”
+  if(T>460&&T<462) sfx('creak');
+  // ...and then the sounds carry through the closed door
+  if(T>500){
+    if(!s.nextClap||T>=s.nextClap){ sfx('clap'); s.nextClap=T+28+Math.random()*14; }
+    if(!s.nextMoan||T>=s.nextMoan){ sfx('moan'); s.nextMoan=T+64+Math.random()*46; }
+    if(!s.nextKiss||T>=s.nextKiss){ sfx('kiss'); s.nextKiss=T+46+Math.random()*40; }
   }
-  if(T>=560) finishBed();
+  if(T>=700) finishBed();
+}
+// the master of the house, full height, striding to the door
+function drawShadowMale(fx,fy,ph){
+  const S='#1c130c', stride=Math.sin(ph);
+  px(fx-4,fy-78,10,11,S); px(fx-2,fy-80,7,3,S);                    // head + cropped hair
+  px(fx-1,fy-67,5,4,S);                                            // neck
+  px(fx-9,fy-63,19,6,S);                                           // broad shoulders
+  px(fx-7,fy-57,15,16,S); px(fx-5,fy-41,11,6,S);                   // torso tapering to the waist
+  px(fx-9+stride*2,fy-61,4,14,S); px(fx+6-stride*2,fy-61,4,14,S);  // swinging arms
+  px(fx-8+stride*2,fy-47,4,5,S); px(fx+5-stride*2,fy-47,4,5,S);    // forearms
+  px(fx-5,fy-35,5,18,S); px(fx+1,fy-35,5,18,S);                    // thighs
+  px(fx-5+stride*3,fy-17,5,15,S); px(fx+1-stride*3,fy-17,5,15,S);  // striding legs
+  px(fx-6+stride*3,fy-2,7,2,S); px(fx+0-stride*3,fy-2,7,2,S);      // feet
 }
 // undressed silhouette at the doorway — shape only, facing back into the room (left)
 function drawShadowFigure(fx,fy,ph,beckon,open){
@@ -2233,13 +2271,22 @@ function drawShadowFigure(fx,fy,ph,beckon,open){
   ctx.globalAlpha=1;
 }
 function finishBed(){
-  const w=G.wife, chance=0.32 + (G.honor/400) + (w&&w.build!=='slender'?0.06:0);
+  const mode=BC.mode, w=G.wife;
+  advanceDay(1);
+  if(mode==='fun'){
+    G.wifeRel=clamp(G.wifeRel+8+(G.wifeRel<40?3:0),0,100);
+    BC=null; state='menu'; saveQuiet(); openVilla();
+    toast('🍷 No heir tonight — only each other. She falls asleep on your chest. (+'+(G.wifeRel>=100?'MAX':'8')+' ♥ bond)',3200);
+    return;
+  }
+  const chance=0.32 + (G.honor/400) + (w&&w.build!=='slender'?0.06:0) + (G.wifeRel/500);
   const hit=Math.random()<chance;
   if(hit && !G.pregnant) G.pregnant={due:G.day+27};
-  advanceDay(1); saveQuiet();
+  G.wifeRel=clamp(G.wifeRel+4,0,100);
+  saveQuiet();
   BC=null; state='menu'; openVilla();
-  toast(hit? '🌙 …weeks later the word comes: SHE IS WITH CHILD! Nine months now.'
-           : '🌙 A night to remember — but the gods grant no child yet. Try again soon.', 3200);
+  toast(hit? '🌙 …weeks later the word comes: SHE IS WITH CHILD! Nine months now. (+4 ♥)'
+           : '🌙 A night to remember — but the gods grant no child yet. Try again soon. (+4 ♥)', 3200);
 }
 // wife sprite in 3 overlapping slices — bust & hips bounce WITHOUT the body splitting
 function drawJiggleSprite(spr,x,y,ph,alpha){
@@ -2269,9 +2316,21 @@ function drawBed(){
   // door frame at the right
   const dx=360, dw=56;
   px(dx-6,86,dw+12,138,'#5a4028'); px(dx-4,90,dw+8,134,'#2a1a10');
-  let open = T<100?0 : T<130? (T-100)/30 : T<330?1 : T<360? 1-(T-330)/30 : 0;
+  let open = T<100?0 : T<130? (T-100)/30 : T<460?1 : T<490? 1-(T-460)/30 : 0;
   if(open>0){ ctx.globalAlpha=0.35*open; px(dx-44,96,44+dw,128,'#ffb050'); ctx.globalAlpha=1;
-    px(dx,92,dw,130,'#c07830'); px(dx,92,dw,4,'#e8a050'); }
+    px(dx,92,dw,130,'#c07830'); px(dx,92,dw,4,'#e8a050');
+    // through the open door: the bed — and her waiting on it, that famous rear raised
+    if(T>340){
+      px(dx+6,196,44,6,'#5a3a22'); px(dx+6,190,44,7,'#7a2f4a'); px(dx+6,190,44,2,'#9a4a66'); // bed + covers
+      px(dx+8,186,8,5,'#c8b090');                                                            // pillow
+      const jr=Math.max(0,Math.sin(T*0.18))*1.2, S2='#17100a';
+      px(dx+12,182,9,6,S2); px(dx+10,180,4,4,S2);                                            // her head+hair on the pillow
+      px(dx+20,183,12,6,S2);                                                                  // her back low
+      px(dx+31,176-jr,9,8,S2); px(dx+33,173-jr,6,4,S2);                                       // the raised rear, swaying
+      px(dx+39,181,8,4,S2); px(dx+45,183,5,3,S2);                                             // folded legs
+      if(T>448 && T<470){ pixelText('“Veni…”',dx+dw/2,166,'#f0c8d4',1); }                     // «come»
+    }
+  }
   // the door leaf swings on its FAR hinge (right jamb), like a real door
   if(open<1){ const lw=Math.max(0,Math.round(dw*(1-open)));
     px(dx+dw-lw,92,lw,130,'#6a4a2c');
@@ -2284,14 +2343,22 @@ function drawBed(){
     const wx= 40 + Math.min(1,T/112)*(dx-66-40);
     drawJiggleSprite(spr, wx, 122-Math.abs(Math.sin(T*0.4))*2, T*0.55, 1);
     if((T|0)%8===0) px(wx+10,218,3,1,'#5a4630');                              // dust at her heels
-  } else if(T<334){
+  } else if(T<340){
     // the shadow-show: her clothes are OFF now — an undressed silhouette, shape only
     drawShadowFigure(dx+22+Math.sin(T*0.08)*1.2, 216, T*0.3, T>260, open);
     if(T>260 && (T|0)%28<1.5) s.hearts.push({x:dx-4,y:140,vy:0.6,life:52,c:'#e26a8a'});
-    // and the master of the house answers her curling finger
-    if(T>270){ const mx=110+Math.min(1,(T-270)/58)*(dx-36-110);
-      px(mx,178,12,36,'#2a1c12'); px(mx+2,170,8,9,'#3a281a'); px(mx+3,166,6,5,'#4a3422');
-      px(mx+10,188,7,3,'#2a1c12'); }
+  }
+  // the master of the house answers — FULL height, striding
+  if(T>280 && T<352){ const mx=90+Math.min(1,(T-280)/64)*(dx+16-90);
+    drawShadowMale(mx, 216, T*0.35); }
+  // ...he stands in the doorway a beat — and his own silhouette leaves nothing to guess
+  if(T>415 && T<448){
+    const gx=dx+16, S3='#1c130c';
+    px(gx-4,138,10,11,S3); px(gx-2,136,7,3,S3);                                // head
+    px(gx-8,149,18,6,S3); px(gx-6,155,14,18,S3);                               // shoulders, torso
+    px(gx-5,173,5,20,S3); px(gx+2,173,5,20,S3); px(gx-6,193,7,2,S3); px(gx+1,193,7,2,S3); // legs
+    px(gx-12,178,6,3,S3); px(gx-14,177,3,5,S3);                                // ...the shadow of the 🍆, briefly
+    if((T|0)%22<1.5) s.hearts.push({x:dx+30,y:150,vy:0.7,life:40,c:'#e26a8a'});
   }
   // flung clothes arc across the room and settle — full garments, not scraps
   for(const p of s.props){ ctx.save(); ctx.translate(p.x,p.y); ctx.rotate(p.r);
@@ -2303,18 +2370,25 @@ function drawBed(){
     }
     else if(p.kind==='breastband'){ px(-9,-2,18,5,'#e8d8c0'); px(-9,-2,18,1,'#f8ecd8'); px(-9,1,4,3,'#d0c0a8'); px(5,1,4,3,'#d0c0a8'); }
     else if(p.kind==='girdle'){ px(-10,-2,20,4,'#e8c34a'); px(-10,-2,20,1,'#ffe9a0'); px(-3,-4,5,8,'#b8912f'); px(-1,-3,2,2,'#c03a4a'); }
+    else if(p.kind==='tunic'){ px(-14,-8,28,16,'#7a2f22'); px(-14,-8,28,3,'#9a4433'); px(-11,-2,22,2,'#5a2318'); px(-4,-8,8,2,'#e8c34a'); }
+    else if(p.kind==='belt'){ px(-11,-2,22,4,'#5a3a22'); px(-11,-2,22,1,'#7a5634'); px(-2,-4,5,8,'#b9c0c8'); px(-1,-3,3,3,'#e8c34a'); }
+    else if(p.kind==='subligar'){ px(-7,-3,14,6,'#efe3c2'); px(-7,-3,14,2,'#fff8ea'); px(-7,3,5,3,'#d8ccb0'); px(2,3,5,3,'#d8ccb0'); }
+    else if(p.kind==='msandal'){ px(-8,-3,16,5,'#6a4426'); px(-8,-5,6,3,'#8a5c34'); px(-7,-2,14,1,'#8a5c34'); }
     else { px(-7,-3,14,5,'#8a5c34'); px(-7,-5,5,3,'#a8743e'); px(-6,-2,12,1,'#a8743e'); px(5,-4,2,6,'#6a4426'); }  // strappy sandal
     ctx.restore(); }
   // the door is shut: the lamps dim, the door rattles, love drifts upward
-  if(T>360){
-    const dim=clamp((T-360)/60,0,1)*0.55;
+  if(T>490){
+    const dim=clamp((T-490)/60,0,1)*0.55;
     ctx.globalAlpha=dim; px(-4,-4,W+8,H+8,'#0c0806'); ctx.globalAlpha=1;
-    const knock=Math.sin(T*0.35)*clamp((T-372)/40,0,1);
+    const knock=Math.sin(T*0.35)*clamp((T-502)/40,0,1);
     px(dx-3+knock*1.8,88,3,136,'#5a4028');                                     // the frame knocks
     if((T|0)%42<1.5) s.hearts.push({x:dx+dw/2+rnd(-12,12), y:118, vy:0.5, life:76, c:pick(['#e26a8a','#f090a8','#ffd0da'])});
     ctx.textAlign='center';
-    if(((T/24)|0)%2) pixelText('♥',dx+dw/2-16,102,'#e26a8a',1.5); else pixelText('♪',dx+dw/2+18,108,'#f0d0da',1.2);
-    if(T>430) pixelText('~ the lamps burn low ~',W/2,248,'rgba(232,195,74,.75)',1);
+    const beat=((T/24)|0)%3;
+    if(beat===0) pixelText('♥',dx+dw/2-16,102,'#e26a8a',1.5);
+    else if(beat===1) pixelText('♪',dx+dw/2+18,108,'#f0d0da',1.2);
+    else pixelText('✧',dx+dw/2+2,98,'#ffd0da',1);
+    if(T>560) pixelText(BC.mode==='fun'? '~ just the two of them ~':'~ the lamps burn low ~',W/2,248,'rgba(232,195,74,.75)',1);
   }
   ctx.textAlign='center';
   for(const h of s.hearts) pixelText('♥',h.x,h.y,h.c,1);
@@ -2887,24 +2961,54 @@ function buildMarriageCard(b){
     const w=G.wife; const row=document.createElement('div'); row.className='row gap'; row.style.alignItems='center';
     row.appendChild(briadeImg(w,84));
     const preg=G.pregnant, month=preg? Math.min(9, 9-Math.ceil((preg.due-G.day)/3)) : 0;
+    const rel=G.wifeRel|0, relC= rel>=75?'#e26a8a': rel>=45?'#e8c34a':'#8a6a4a';
+    const relWord= rel>=85?'devoted': rel>=65?'loving': rel>=45?'fond': rel>=25?'dutiful':'cold';
     const info=document.createElement('div'); info.innerHTML=
       `<div><b style="color:var(--gold)">⚭ ${w.name}</b> <span class="small muted">— your ${w.adj} ${w.rank} wife</span></div>
-       <div class="small muted">${w.perk}</div>
+       <div class="small">♥ Bond: <span style="display:inline-block;width:70px;height:7px;background:#241812;border:1px solid #000;vertical-align:middle"><span style="display:block;width:${rel}%;height:100%;background:${relC}"></span></span>
+         <b style="color:${relC}">${rel}</b>/100 <span class="muted">(${relWord})</span></div>
        <div class="small" style="color:var(--gold)">${marriageEffectsText(w)}</div>`+
       (preg? `<div class="small" style="color:#e2a0b8">🤰 She is with child — month <b>${Math.max(1,month)}</b> of 9.</div>`:'');
     row.appendChild(info); card.appendChild(row);
-    // the bedchamber — try for an heir (then nine months of waiting, then the roll)
-    const cd=G.day-(G.lastLoveDay||-9);
-    const bed=document.createElement('button'); bed.className='btn sm'; bed.style.marginTop='4px';
-    bed.textContent = preg? '🍆🍑 (she is with child)' : cd<2? '🍆🍑 (let her rest a day)' : '🍆🍑 RETIRE TO THE BEDCHAMBER';
-    bed.disabled=!!preg || cd<2;
-    bed.onclick=()=>startBedScene();
-    card.appendChild(bed);
-    // the children of your house
+    // talk · bedchamber for an heir · bedchamber for love
+    const cd=G.day-(G.lastLoveDay||-9), tcd=G.day-(G.lastTalkDay||-9);
+    const btns=document.createElement('div'); btns.className='row gap6'; btns.style.marginTop='4px';
+    const talk=document.createElement('button'); talk.className='btn sm'; talk.textContent= tcd<1? '💬 (you spoke today)':'💬 TALK WITH HER';
+    talk.disabled=tcd<1;
+    talk.onclick=()=>{
+      G.lastTalkDay=G.day;
+      const lines=[
+        ['She retells your last bout blow-by-blow — she was watching closer than you knew.',4],
+        ['You gossip about the senators. Her impression of the fat one is merciless.',3],
+        ['She oils and mends your gear herself, humming an old song of '+w.adj+' hills.',4],
+        ['You talk of the children you will raise, and the villa you will grow old in.',5],
+        ['She names every scar on your arms, and kisses the newest one.',5],
+        ['She asks for a silver comb from the forum (50d)…',0]];
+      const pickL=lines[ri(0,lines.length-1)];
+      if(pickL[1]===0){
+        if(G.coin>=50){ G.coin-=50; G.wifeRel=clamp(G.wifeRel+8,0,100); toast('💬 '+pickL[0]+' You buy it. Her eyes shine (+8 bond).',3000); }
+        else { G.wifeRel=clamp(G.wifeRel+1,0,100); toast('💬 '+pickL[0]+' Your purse is empty — she laughs and says your arm is gift enough (+1 bond).',3000); }
+      } else { G.wifeRel=clamp(G.wifeRel+pickL[1],0,100); toast('💬 '+pickL[0]+' (+'+pickL[1]+' bond)',2800); }
+      refreshStatbar(); saveQuiet(); openVilla();
+    };
+    const bedH=document.createElement('button'); bedH.className='btn sm gold';
+    bedH.textContent = preg? '🍆🍑 (she is with child)' : cd<2? '🍆🍑 (let her rest)' : '🍆🍑 FOR AN HEIR';
+    bedH.disabled=!!preg || cd<2;
+    bedH.onclick=()=>startBedScene('heir');
+    const bedF=document.createElement('button'); bedF.className='btn sm';
+    bedF.textContent = cd<2? '🍷 (let her rest)' : '🍷 FOR LOVE — just the two of you';
+    bedF.title='No heir tonight — only each other. The bond deepens (+8 ♥).';
+    bedF.disabled=cd<2;
+    bedF.onclick=()=>startBedScene('fun');
+    btns.appendChild(talk); btns.appendChild(bedH); btns.appendChild(bedF);
+    card.appendChild(btns);
+    // the children of your house (sons come of age at 40 days)
     if(G.children.length){
       const kids=document.createElement('div'); kids.className='small'; kids.style.marginTop='4px';
-      kids.innerHTML='<b style="color:var(--gold)">YOUR HOUSE:</b> '+G.children.map(c=>(c.sex==='m'?'👦 ':'👧 ')+c.name).join(' · ')+
-        (G.children.some(c=>c.sex==='m')? ' <span class="muted">— an heir secures your legacy (rivals hesitate).</span>':'');
+      kids.innerHTML='<b style="color:var(--gold)">YOUR HOUSE:</b> '+G.children.map(c=>{
+        const age=G.day-c.born;
+        return (c.sex==='m'?'👦 ':'👧 ')+c.name+' <span class="muted">('+age+'d'+(c.sex==='m'&&age>=40?(c.appointed?' · serves as your general':' · OF AGE — appoint him in INTRIGUE'):'')+')</span>';
+      }).join(' · ');
       card.appendChild(kids);
     }
   } else if(marriageUnlocked()){
@@ -2949,6 +3053,7 @@ function openMarry(forced){
 }
 function marry(w){
   G.wife=w; G.married=true;
+  G.wifeRel = w.rank==='peasant'? 62 : 50;   // a love-match starts warmer than an alliance
   G.coin+=w.dowryCoin||0; if(w.dowryFood) G.food+=w.dowryFood; if(w.dowrySoldiers) addTroops(w.eth==='roman'?'levy':w.eth, w.dowrySoldiers);
   G.approval=clamp(G.approval+(w.approval||0),0,100); G.favor+=w.favor||0;
   G.honor=clamp(G.honor+(w.honor||0),0,100); G.pop=clamp(G.pop+(w.pop||0),0,100);
@@ -3369,6 +3474,23 @@ let detPurpose='raid', detGeneral=0, genCandidates=null;
 function buildGenerals(b){
   const gh=document.createElement('div'); gh.className='small'; gh.style.color='var(--gold)'; gh.style.marginTop='6px';
   gh.textContent='GENERALS — appoint leaders for your conquests:'; b.appendChild(gh);
+  // sons of the house come of age at 40 days — blood that never betrays
+  G.children.filter(c=>c.sex==='m' && (G.day-c.born)>=40 && !c.appointed).forEach(son=>{
+    const sc=document.createElement('div'); sc.className='shopcard'; sc.style.borderColor='var(--gold)';
+    sc.innerHTML=`<div><b style="color:var(--gold)">👦→⚔ ${son.name}</b> <span class="small muted">— your firstborn blood has come of age</span></div>
+      <div class="small muted">Raised on your legend${G.wife&&G.wife.rank==='noble'?' and his mother’s statecraft':''} — he asks to carry your eagle.</div>`;
+    const sb=document.createElement('button'); sb.className='btn sm gold'; sb.textContent='⚔ GIVE HIM A COMMAND (free)';
+    sb.onclick=()=>{
+      const str=clamp(4+Math.round(G.level/2)+ri(0,2),4,10);
+      const smart=clamp((G.wife&&G.wife.rank==='noble'?6:4)+ri(0,3)+Math.round((G.wifeRel||50)/40),3,10);
+      G.generals.push({ name:son.name, fromSlave:false, str, smart,
+        power:0.8+(str*0.35+smart*0.85)/10, casualty:clamp(1.15-smart*0.06,0.55,1.2),
+        label:'Son of the House', note:'Your blood — he will never betray you, and never flees a lost field.',
+        look:'young, hungry, and yours', trait:'Son of the House', son:true });
+      son.appointed=true; saveQuiet(); toast('⚔ '+son.name+' takes his first command — the men cheer the young eagle.',2800); openIntrigue();
+    };
+    sc.appendChild(sb); b.appendChild(sc);
+  });
   // your generals
   G.generals.forEach(g=>{ const card=document.createElement('div'); card.className='shopcard';
     const bar=(v,c)=>`<span style="display:inline-block;width:52px;height:6px;background:#2a241c;border:1px solid #000;vertical-align:middle">`+
@@ -3447,8 +3569,8 @@ function launchConquest(toId,size,generalIdx){
     yourMen:size, enemyMen, general:gen,
     onWin:(yl)=>{ addTroops('levy', Math.max(0,size-yl)); G.titles[toId]=REGION_TITLES[toId]||('Dominus '+toId);
       G.pop=clamp(G.pop+5,0,100); saveQuiet(); toast('★ '+toId+' is YOURS — you are proclaimed '+G.titles[toId]+'! ('+fmt(yl)+' fallen)',3200); openIntrigue(); },
-    onLose:(yl)=>{ addTroops('levy', Math.max(0,size-yl)); if(Math.random()<0.4){ const gi=G.generals.indexOf(gen); if(gi>=0) G.generals.splice(gi,1); }
-      saveQuiet(); toast('The assault on '+toId+' is thrown back — '+fmt(yl)+' lost.',3000); openIntrigue(); } });
+    onLose:(yl)=>{ addTroops('levy', Math.max(0,size-yl)); if(!gen.son && Math.random()<0.4){ const gi=G.generals.indexOf(gen); if(gi>=0) G.generals.splice(gi,1); }
+      saveQuiet(); toast('The assault on '+toId+' is thrown back — '+fmt(yl)+' lost.'+(gen.son?' Your son cuts his way clear — blood does not break.':''),3000); openIntrigue(); } });
 }
 function startPlot(){
   const t=PLOT_TARGETS[G.plotTier];
