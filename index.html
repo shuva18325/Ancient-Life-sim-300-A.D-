@@ -120,8 +120,8 @@
   <div id="scr-title" class="screen center">
     <div class="col center gap" style="text-align:center;">
       <div class="panel pad col center gap" style="max-width:86%;">
-        <h1 style="font-size:clamp(18px,5vw,40px);color:var(--gold);">SAND &amp; STEEL</h1>
-        <div class="small" style="color:var(--blood);font-size:clamp(9px,2vw,15px)">GLADIATORS OF 200 A.D.</div>
+        <canvas id="logo-cv" width="320" height="72" style="position:static;width:min(84vw,440px);height:auto;image-rendering:pixelated;"></canvas>
+        <div class="small" style="color:var(--blood);font-size:clamp(9px,2vw,15px);letter-spacing:3px;">⚔ GLADIATORS OF 200 A.D. ⚔</div>
         <div class="small muted" style="max-width:420px;line-height:1.5;">
           The reign of Emperor Septimius Severus. Rise from a nameless tiro in a
           provincial ludus to a champion fighting before the Emperor in Roma.
@@ -399,7 +399,10 @@ const ri=(a,b)=>Math.floor(rnd(a,b+1));
 const clamp=(v,a,b)=>v<a?a:v>b?b:v;
 const lerp=(a,b,t)=>a+(b-a)*t;
 const pick=a=>a[Math.floor(Math.random()*a.length)];
-function px(x,y,w,h,c){ctx.fillStyle=c;ctx.fillRect(x|0,y|0,w|0,h|0);}
+let OUTL=false;   // outline pass: every sprite rect stamps an expanded dark silhouette
+function px(x,y,w,h,c){
+  if(OUTL){ ctx.fillStyle='#160e07'; ctx.fillRect((x-1)|0,(y-1)|0,(w+2)|0,(h+2)|0); return; }
+  ctx.fillStyle=c;ctx.fillRect(x|0,y|0,w|0,h|0);}
 function $(id){return document.getElementById(id);}
 function show(id){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('on'));
   if(id) $(id).classList.add('on');
@@ -797,6 +800,15 @@ function drawGladiator(f){
   ctx.scale(f.facing*1.35,1.35);
   ctx.rotate(lean);
   const C=paletteFor(f);
+  // pass 1: chunky dark outline (every rect stamped 1px larger) — pass 2: the sprite
+  OUTL=true;  drawGladBody(f,C);
+  OUTL=false; drawGladBody(f,C);
+  drawStuck(f);
+  // bright slash swoosh so the attack reads clearly
+  drawSlashFx(f,C);
+  ctx.restore();
+}
+function drawGladBody(f,C){
   const a=f.gear.armor.id;
   const ocrea=(a==='ocrea');
   const air=!f.onGround;
@@ -811,17 +823,23 @@ function drawGladiator(f){
   for(let i=-6;i<=4;i+=3){ px(i,-13,2,5,C.leather); px(i,-13,2,1,C.leatherHi); }
   px(-7,-21,14,3,C.leather); px(-7,-21,14,1,C.leatherHi);
   px(-4,-20,1,1,C.gold); px(0,-20,1,1,C.gold); px(4,-20,1,1,C.gold);
-  // torso
   drawTorso(f,C);
-  // head + helmet
   drawHead(f,C);
-  // shield raised in front of torso
   drawShield2(f,C);
-  // weapon arm
   drawArm2(f,C);
-  // bright slash swoosh so the attack reads clearly
-  drawSlashFx(f,C);
-  ctx.restore();
+}
+// arrows & broken blades lodged in a battered fighter (drawn in fighter space)
+function drawStuck(f){
+  if(!f.stuck || !f.stuck.length) return;
+  for(const s of f.stuck){
+    ctx.save(); ctx.translate(s.dx,s.dy); ctx.rotate(s.ang);
+    px(-1,-2,12,3,'#160e07');                            // outline
+    px(0,-1,9,1,'#8a6a44'); px(0,-1,9,1,'#8a6a44');      // shaft
+    px(8,-2,3,1,'#c03a3a'); px(8,0,3,1,'#c03a3a');       // fletching
+    px(-1,-1,2,1,'#9aa4ae');                             // buried head
+    px(0,0,3,1,'#7a1414');                               // blood at the wound
+    ctx.restore();
+  }
 }
 function drawSlashFx(f,C){
   if(!f.atk || f.atkType==='elbow') return;
@@ -888,18 +906,32 @@ function drawTorso(f,C){
     for(let ry=0;ry<6;ry++) px(-6,-33+ry*2,12,1,'#a8926c');                              // quilting rows
     px(-1,-34,1,13,'#a8926c');
   }
+  // blood soaking through as the fight turns against them
+  if(f.hp<f.maxHp*0.55){ px(-3,-29,2,4,'#7a1414'); px(3,-25,1,3,'#5a1010'); }
+  if(f.hp<f.maxHp*0.3){ px(1,-31,2,5,'#8a1d1d'); px(-5,-23,2,2,'#5a1010'); px(-1,-18,2,3,'#6a1010'); }
 }
 function drawHead(f,C){
   px(-2,-37,4,3,C.skinSh);
   const id=f.gear.helmet.id;
+  const fullFace = id==='galea_secutor'||id==='galea_aurea';
   px(-4,-46,8,9,C.skin); px(-4,-46,8,1,C.skinHi); px(3,-45,1,8,C.skinSh);
   if(id==='none'){
     px(-4,-47,8,3,'#3a2618'); px(-4,-47,8,1,'#241408'); px(-5,-44,1,4,'#3a2618');
-    px(-3,-42,1,1,C.skinSh); px(1,-42,1,1,C.skinSh); px(-2,-39,3,1,C.skinSh);
     px(4,-43,1,3,'#3a2618');
-    return;
+    // expressive face: whites + pupils, brows angle with fury when attacking
+    px(-3,-43,2,2,'#f2ead8'); px(1,-43,2,2,'#f2ead8');
+    px(-2,-43,1,2,'#1a1006'); px(2,-43,1,2,'#1a1006');
+    if(f.atk||f.hurt>0){ px(-3,-45,3,1,'#241408'); px(1,-44,3,1,'#241408'); } // furious brows
+    else { px(-3,-44,2,1,C.skinSh); px(1,-44,2,1,C.skinSh); }
+    px(-1,-39,3,1,f.hurt>0?'#5a1010':C.skinSh);                                // mouth (snarls when hit)
+  } else drawHelmet2(id,C);
+  // beard on the bare jaw (any helm that leaves the chin open)
+  if(f.beard && !fullFace){
+    px(-4,-40,8,3,f.beardC); px(-4,-40,8,1,shade(f.beardC,18));
+    px(-3,-37,6,1,f.beardC); px(-1,-39,3,1,'#1a1006');                         // beard + dark mouth line
   }
-  drawHelmet2(id,C);
+  // battle wounds: a bleeding cut over the brow when badly hurt
+  if(f.hp<f.maxHp*0.4){ px(2,-45,1,3,'#8a1d1d'); px(2,-42,1,1,'#b52a2a'); }
 }
 function drawHelmet2(id,C){
   const m=C.metal,mh=C.metalHi,ms=C.metalSh,gold=C.gold;
@@ -1049,6 +1081,8 @@ function makeFighter(opts){
     atk:false,atkT:0,atkDur:18,atkType:'slash',atkHit:false,
     hopCd:0, stanceCd:0, atkCd:0, hurt:0, blockFlash:0, netted:0,
     combo:0, knock:false, koTimer:0,
+    beard:Math.random()<0.45, beardC:pick(['#3a2618','#241408','#6a4a26','#8a5a2e']),
+    stuck:[],
     skin:SKIN[0], tunic:'#9a3b2a',
     gear:{weapon:gearOf('weapon','gladius'),shield:gearOf('shield','scutum'),
           helmet:gearOf('helmet','galea_murmillo'),armor:gearOf('armor','manica')},
@@ -1170,6 +1204,10 @@ function tryHit(att,def){
       def.hp-=dmg; def.hurt=16;
       def.vx += att.facing*(att.atkType==='thrust'?7.5:5.5);   // hefty knockback
       def.vy -= 3.4; def.onGround=false; def.rot += att.facing*0.25;
+      // heavy thrusts can leave steel lodged in the flesh
+      if(att.atkType==='thrust' && dmg>16 && def.stuck && def.stuck.length<4 && Math.random()<0.3){
+        def.stuck.push({dx:rnd(-5,3), dy:rnd(-32,-18), ang:(att.facing*def.facing>0? rnd(2.6,3.5):rnd(-0.5,0.4))});
+      }
       // blood: spray + ground decals
       bleed(def.x, def.y-24, 18, att.facing);
       FT.shake=Math.min(8,FT.shake+4);
@@ -1733,6 +1771,14 @@ function drawArena(){
   if(t.gauntlet){ ctx.textAlign='center';
     pixelText('1  vs  '+(t.gauntlet.left+1), W/2, 40, 'rgba(58,66,58,.9)', 2);
     pixelText('WAVE '+t.gauntlet.wave+' / '+t.gauntlet.total, W/2, 52, 'rgba(58,66,58,.7)', 1); }
+  // drifting dust motes catch the light
+  ctx.fillStyle='rgba(255,244,214,.35)';
+  for(let i=0;i<9;i++){ const mx=((i*53+t.time*0.35))%W, my=40+((i*97+t.time*0.11)%(GROUND-60));
+    ctx.globalAlpha=.10+.08*Math.sin(t.time*0.05+i); ctx.fillRect(mx|0,my|0,1,1); }
+  ctx.globalAlpha=1;
+  // cinematic edge shading
+  ctx.fillStyle='rgba(0,0,0,.16)';
+  ctx.fillRect(0,0,W,10); ctx.fillRect(0,H-8,W,8); ctx.fillRect(0,0,7,H); ctx.fillRect(W-7,0,7,H);
   // impact flash (full-screen red kiss on heavy hits)
   if(t.flash>0.02){ ctx.fillStyle='rgba(150,15,15,'+(t.flash*0.5)+')'; ctx.fillRect(0,0,W,H); }
   // verdict overlay
@@ -2159,7 +2205,8 @@ function drawBridePortrait(cnv,b){
   const bd = b.build==='ample'?11 : b.build==='curvy'?9 : 6;     // bust depth
   const bp = b.build==='ample'?6 : b.build==='curvy'?5 : 3;      // bust protrusion (front, +x)
   const hips = b.build==='ample'?15 : b.build==='curvy'?14 : 12; // hips shapely, never wide/fat
-  const rear = b.build==='ample'?6 : b.build==='curvy'?5 : 3;    // buttock projection
+  const rear = b.build==='ample'?8 : b.build==='curvy'?7 : 4;    // buttock projection — THICC
+  const thigh = b.build==='ample'?6 : b.build==='curvy'?6 : 4;   // thigh width matches the rear
   const waistW = b.build==='slender'?7 : b.build==='curvy'?6 : 7; // waist stays SLIM on all
   const bustTop=-47, bustBot=bustTop+bd, hipTop=-32, hipBot=-23;
   const noble=b.rank==='noble';
@@ -2173,40 +2220,45 @@ function drawBridePortrait(cnv,b){
     P(-9-rear+2,-5,13+rear,5,dress); P(-9-rear+2,-5,13+rear,1,dHi);         // pooling hem
     // slit edge + gold trim
     P(3,hipBot,1,18,dSh); P(4,hipBot,1,18,noble?gold:dHi);
-    // bared front leg: thigh → knee → calf → ankle
-    P(4,hipBot,4,8,skin); P(4,hipBot,1,8,sHi); P(7,hipBot,1,8,sSh);
-    P(4,-15,4,6,skin); P(7,-15,1,6,sSh);
-    P(4,-9,3,7,skin); P(6,-9,1,7,sSh);
-    P(3,-2,6,2,'#8a5c34'); P(4,-4,4,1,'#a8743e');                            // sandal
-    P(4,-8,3,1,'#8a5c34'); P(4,-12,4,1,'#8a5c34');                           // sandal straps
+    // bared front leg: FULL thigh → knee → calf → ankle
+    P(4,hipBot,thigh,9,skin); P(4,hipBot,1,9,sHi); P(3+thigh,hipBot,1,9,sSh);
+    P(4,hipBot+1,thigh-1,1,sGlow);                                            // thigh sheen
+    P(4,-14,thigh-1,5,skin); P(2+thigh,-14,1,5,sSh);                          // knee taper
+    P(4,-9,thigh-2,7,skin); P(2+thigh-1,-9,1,7,sSh);                          // calf
+    P(3,-2,thigh+2,2,'#8a5c34'); P(4,-4,thigh,1,'#a8743e');                   // sandal
+    P(4,-8,thigh-1,1,'#8a5c34'); P(4,-12,thigh,1,'#8a5c34');                  // sandal straps
   } else {
-    // knee-length fitted tunic, both legs bare
+    // knee-length fitted tunic, both bare legs THICK
     P(-7-rear+2,hipBot,11+rear,10,dress);
     P(-7-rear+2,hipBot,2,10,dSh); P(-1,hipBot,1,9,dMid); P(2,hipBot,1,9,dMid);
-    P(-8-rear+2,-13,13+rear,2,dSh);                                          // rough hem
-    P(-5,-11,4,9,sSh); P(-5,-3,4,1,shade(skin,-44));                          // back leg
-    P(1,-11,4,9,skin); P(1,-11,1,9,sHi); P(4,-11,1,9,sSh);                    // front leg
-    P(-6,-2,5,2,'#6a4828'); P(0,-2,6,2,'#8a5c34');                            // sandals
-    P(1,-6,4,1,'#8a5c34'); P(-5,-6,4,1,'#6a4828');                            // ankle laces
+    P(-8-rear+2,-13,13+rear,2,dSh);                                           // rough hem
+    P(-6,-11,thigh-1,9,sSh); P(-6,-3,thigh-1,1,shade(skin,-44));              // back leg (full)
+    P(1,-11,thigh,9,skin); P(1,-11,1,9,sHi); P(thigh,-11,1,9,sSh);            // front leg (full)
+    P(1,-10,thigh-1,1,sGlow);                                                  // thigh sheen
+    P(-7,-2,thigh+1,2,'#6a4828'); P(0,-2,thigh+2,2,'#8a5c34');                 // sandals
+    P(1,-6,thigh,1,'#8a5c34'); P(-6,-6,thigh-1,1,'#6a4828');                   // ankle laces
   }
   // ================= HIPS & REAR — two round cheeks split by a CENTRE cleft =================
   P(-6,hipTop,hips-2,hipBot-hipTop,dress);
   const bx0=-8-rear, bw2=rear+3, cleftX=bx0+((bw2/2)|0);                       // rear mass + its midline
-  P(bx0,hipTop+1,bw2,9,dress);                                                 // the full rear mass
-  P(bx0-1,hipTop+3,1,6,dress); P(bx0,hipTop+9,bw2,1,dress);                    // outer + lower rounding
+  P(bx0+1,hipTop,bw2-2,1,dress);                                               // rounded crown
+  P(bx0,hipTop+1,bw2,10,dress);                                                // the full rear mass (taller)
+  P(bx0-1,hipTop+3,1,7,dress); P(bx0+1,hipTop+11,bw2-2,1,dress);               // outer bulge + rounded base
   // THE CLEFT — dark line straight down the MIDDLE, splitting two clear cheeks
-  P(cleftX,hipTop+1,1,9,shade(dress,-54));
-  P(cleftX,hipTop+8,1,3,shade(dress,-44));                                     // flares as it meets the folds
-  P(cleftX-1,hipTop+1,1,2,shade(dress,-22)); P(cleftX+1,hipTop+1,1,2,shade(dress,-22)); // soft press at the top
-  // OUTER cheek: bright rim light on its curve
-  P(bx0,hipTop+2,1,6,dHi); P(bx0-1,hipTop+4,1,3,dHi); P(bx0+1,hipTop+2,1,2,shade(dress,16));
+  P(cleftX,hipTop,1,11,shade(dress,-54));
+  P(cleftX,hipTop+9,1,3,shade(dress,-44));                                     // flares as it meets the folds
+  P(cleftX-1,hipTop,1,2,shade(dress,-22)); P(cleftX+1,hipTop,1,2,shade(dress,-22)); // soft press at the crown
+  // OUTER cheek: bright rim light rolling round its curve
+  P(bx0,hipTop+2,1,7,dHi); P(bx0-1,hipTop+4,1,4,dHi); P(bx0+1,hipTop+1,2,2,shade(dress,16));
+  P(bx0+1,hipTop+9,2,1,shade(dress,-20));                                      // under-curve turn
   // INNER cheek: its own highlight + shadow toward the hip
-  P(cleftX+1,hipTop+2,1,4,shade(dress,14)); P(cleftX+2,hipTop+3,1,2,dHi);
-  P(bx0+bw2-1,hipTop+2,1,7,shade(dress,-16));
+  P(cleftX+1,hipTop+1,1,5,shade(dress,14)); P(cleftX+2,hipTop+2,2,2,dHi);
+  P(cleftX+1,hipTop+9,2,1,shade(dress,-20));
+  P(bx0+bw2-1,hipTop+2,1,8,shade(dress,-16));
   // separate gluteal fold under EACH cheek
-  P(bx0,hipTop+10,((bw2/2)|0),1,shade(dress,-48));
-  P(cleftX+1,hipTop+10,bw2-((bw2/2)|0)-1,1,shade(dress,-48));
-  P(bx0+1,hipTop+11,bw2-2,1,shade(dress,-54));                                 // deep shadow beneath both
+  P(bx0,hipTop+11,((bw2/2)|0),1,shade(dress,-48));
+  P(cleftX+1,hipTop+11,bw2-((bw2/2)|0)-1,1,shade(dress,-48));
+  P(bx0+1,hipTop+12,bw2-2,1,shade(dress,-54));                                 // deep shadow beneath both
   P(-5,hipTop+1,2,2,dHi);                                                      // hip sheen
   P(hips-8,hipTop,2,hipBot-hipTop,dSh);                                        // front hip shadow
   // girdle low on the hips
@@ -2233,6 +2285,8 @@ function drawBridePortrait(cnv,b){
     P(0,bustTop,1,2,sGlow); P(2,bustTop,1,2,sGlow);                            // lit inner swells
     P(0,bustTop+2,1,1,shade(skin,-8)); P(2,bustTop+2,1,1,shade(skin,-8));      // curves rolling inward
     c.fillStyle='rgba(220,110,110,.20)'; c.fillRect(-1,bustTop,1,3); c.fillRect(3,bustTop,1,3); // soft blush at the curves
+    P(-1,bustTop,1,2,shade(dress,-26)); P(3,bustTop,1,2,shade(dress,-26));     // cups press in against the V
+    P(1,bustBot-2,1,1,shade(skin,-20));                                        // sternum crease below
     P(1,bustTop+4,1,bd-5,dSh);                                                 // fabric cleavage continues
     P(-3,bustTop,3,2,dHi); P(3,bustTop+1,3,2,dHi); P(6,bustTop+2,2,1,dHi);    // sheen on the swell
     c.fillStyle='rgba(255,255,255,.35)'; c.fillRect(-3,bustTop+1,2,1); c.fillRect(4,bustTop+2,2,1); // silk shine
@@ -3603,6 +3657,65 @@ prevHelp='scr-title';
 $('btn-help').onclick=()=>{ prevHelp='scr-title'; show('scr-help'); };
 show('scr-title');
 // expose for screenshot tooling
+/* =====================================================================
+   PIXEL LOGO — "SAND ⛑ STEEL" on riveted crimson planks + favicon
+   ===================================================================== */
+const LOGO_F={
+  S:['01111','10000','10000','01110','00001','00001','11110'],
+  A:['01110','10001','10001','11111','10001','10001','10001'],
+  N:['10001','11001','10101','10011','10001','10001','10001'],
+  D:['11110','10001','10001','10001','10001','10001','11110'],
+  T:['11111','00100','00100','00100','00100','00100','00100'],
+  E:['11111','10000','10000','11110','10000','10000','11111'],
+  L:['10000','10000','10000','10000','10000','10000','11111'],
+};
+const LOGO_HELM=[   // crested gladiator helm, 9 wide
+  '....rr...','..rrrr...','.rrrrrr..','.mmmmmm..','mmmmmmmm.',
+  'mmdmmdmm.','mmmmmmmm.','.mm..mm..','.mm..mm..'];
+function drawLogoHelm(c,x,y,s){
+  const col={r0:'#e04a4a',r:'#c0392b',m:'#cfd6de',mh:'#eef4fa',d:'#160e07'};
+  for(let pass=0;pass<2;pass++)
+    for(let r=0;r<LOGO_HELM.length;r++) for(let k=0;k<9;k++){
+      const ch=LOGO_HELM[r][k]; if(ch==='.') continue;
+      if(pass===0){ c.fillStyle='#160e07'; c.fillRect(x+k*s-1,y+r*s-1,s+2,s+2); }
+      else { c.fillStyle= ch==='d'?col.d : ch==='r'?(r<1?col.r0:col.r) : (r===3?col.mh:col.m);
+        c.fillRect(x+k*s,y+r*s,s,s); }
+    }
+}
+function drawLogo(){
+  const cv=$('logo-cv'); if(!cv) return;
+  const c=cv.getContext('2d'); c.imageSmoothingEnabled=false;
+  c.clearRect(0,0,cv.width,cv.height);
+  const cell=4, y0=26;
+  function wordW(str){ return str.length*6*cell-cell; }
+  function word(str,x){
+    for(let pass=0;pass<2;pass++){ let cx=x;
+      for(const ch of str){ const g=LOGO_F[ch];
+        for(let r=0;r<7;r++) for(let k=0;k<5;k++){ if(g[r][k]!=='1') continue;
+          if(pass===0){ c.fillStyle='#160e07'; c.fillRect(cx+k*cell-1,y0+r*cell-1,cell+2,cell+2); }
+          else { c.fillStyle= r<2?'#ffe9a0': r<5?'#e8c34a':'#b8912f'; c.fillRect(cx+k*cell,y0+r*cell,cell,cell); } }
+        cx+=6*cell; } }
+  }
+  const sandW=wordW('SAND'), steelW=wordW('STEEL'), helmW=9*cell;
+  const total=sandW+3*cell+helmW+3*cell+steelW, x0=((cv.width-total)/2)|0;
+  // riveted crimson plank behind the letters
+  c.fillStyle='#4a0e0e'; c.fillRect(x0-8,y0-9,total+16,7*cell+18);
+  c.fillStyle='#6e1812'; c.fillRect(x0-8,y0-9,total+16,5);
+  c.fillStyle='#2e0808'; c.fillRect(x0-8,y0+7*cell+4,total+16,5);
+  c.strokeStyle='#e8c34a'; c.lineWidth=2; c.strokeRect(x0-6,y0-7,total+12,7*cell+14);
+  c.fillStyle='#ffe9a0'; [[x0-4,y0-5],[x0+total,y0-5],[x0-4,y0+7*cell+1],[x0+total,y0+7*cell+1]].forEach(p=>c.fillRect(p[0],p[1],3,3));
+  word('SAND',x0);
+  drawLogoHelm(c, x0+sandW+3*cell, y0-6, cell);
+  word('STEEL', x0+sandW+3*cell+helmW+3*cell);
+}
+drawLogo();
+// favicon: the helm emblem
+(function(){ try{
+  const f=document.createElement('canvas'); f.width=f.height=36; const fc=f.getContext('2d');
+  fc.fillStyle='#1c130c'; fc.fillRect(0,0,36,36); drawLogoHelm(fc,4,2,3.4);
+  const lk=document.createElement('link'); lk.rel='icon'; lk.href=f.toDataURL(); document.head.appendChild(lk);
+}catch(e){} })();
+
 window.__SS = {
   show, openCreate, enterMap, openShop, openBrief, openStable, openVilla, openIntrigue, startFight, FT:()=>FT,
   setG:(g)=>{G=g;}, newDemo:(name,origin,arch)=>{G=freshCareer(name||'Verus',origin||'Italia',arch||'Roman');},
