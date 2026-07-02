@@ -773,7 +773,8 @@ function freshCareer(name,origin,arch,social){
     isFemale:false, lineage:[],                      // succession: who you are, and who came before
     hygiene:70, wifePhys:45,                         // 🧼 how you smell · 🔥 the physical side of the marriage
     hasPool:false, hasWardrobe:false,                // villa renovations
-    loveDay:-1, loveQuick:0, loveLong:0, loveNight:0,// bedchamber sessions used today
+    loveDay:-1, loveQuick:0, loveLong:0, loveNight:0, loveVigil:0,  // bedchamber sessions used today
+    venusUntil:-1,                                   // blessed of Venus: +fire in the arena until this day
     lastWashDay:-9, lastPoolDay:-9, lastWardrobeDay:-9, lastKidsDay:-9, lastBathDay:-9,
     wins:0, losses:0,
     hpBonus:0, dmgBonus:0,
@@ -791,7 +792,7 @@ function freshCareer(name,origin,arch,social){
   };
 }
 // fill in any fields missing from older saves
-function migrate(g){ const d={honor:50,food:4,mount:0,slaves:0,hasVilla:false,boat:false,favor:0,soldiers:0,hidden:[],plotTier:0,emperor:false,approval:50,legions:0,rivals:0,retired:false,detachments:[],day:0,titles:{},clears:{},socialClass:'gladiator',army:{},armyGear:0,armyTrain:0,hasOrganizer:false,generals:[],wife:null,married:false,marryPrompted:false,children:[],pregnant:null,lastLoveDay:-9,injury:null,lastDebateDay:-9,office:0,path:null,parthia:50,parthiaPact:false,wifeRel:50,lastTalkDay:-9,isFemale:false,lineage:[],hygiene:70,wifePhys:45,hasPool:false,hasWardrobe:false,loveDay:-1,loveQuick:0,loveLong:0,loveNight:0,lastWashDay:-9,lastPoolDay:-9,lastWardrobeDay:-9,lastKidsDay:-9,lastBathDay:-9}; for(const k in d){ if(g[k]===undefined) g[k]=d[k]; } if(!g.current) g.current='Italia'; return g; }
+function migrate(g){ const d={honor:50,food:4,mount:0,slaves:0,hasVilla:false,boat:false,favor:0,soldiers:0,hidden:[],plotTier:0,emperor:false,approval:50,legions:0,rivals:0,retired:false,detachments:[],day:0,titles:{},clears:{},socialClass:'gladiator',army:{},armyGear:0,armyTrain:0,hasOrganizer:false,generals:[],wife:null,married:false,marryPrompted:false,children:[],pregnant:null,lastLoveDay:-9,injury:null,lastDebateDay:-9,office:0,path:null,parthia:50,parthiaPact:false,wifeRel:50,lastTalkDay:-9,isFemale:false,lineage:[],hygiene:70,wifePhys:45,hasPool:false,hasWardrobe:false,loveDay:-1,loveQuick:0,loveLong:0,loveNight:0,loveVigil:0,venusUntil:-1,lastWashDay:-9,lastPoolDay:-9,lastWardrobeDay:-9,lastKidsDay:-9,lastBathDay:-9}; for(const k in d){ if(g[k]===undefined) g[k]=d[k]; } if(!g.current) g.current='Italia'; return g; }
 function saveGame(){ try{ localStorage.setItem(SAVE_KEY, JSON.stringify(G)); toast('Saved.'); }catch(e){} }
 function hasSave(){ try{ return !!localStorage.getItem(SAVE_KEY); }catch(e){ return false; } }
 function loadGame(){ try{ G=migrate(JSON.parse(localStorage.getItem(SAVE_KEY))); return !!G; }catch(e){ return false; } }
@@ -1173,6 +1174,9 @@ function startFight(region, briefData){
     },
   });
   if(G.isFemale){ p.female=true; p.beard=false; }   // the gladiatrix fights bare-braided
+  // blessed of Venus: the vigil still burns in the blood
+  if(G.venusUntil!==undefined && G.day<G.venusUntil){ p.dmgMul=(p.dmgMul||1)*1.12; p.maxStamina+=15; p.stamina=p.maxStamina;
+    setTimeout(()=>{ if(FT&&!FT.over) banner(FT.p.x,FT.p.y-64,'💫 BLESSED OF VENUS','#ffd0da'); },1100); }
   // foe scales with tier + popularity (battle escalation)
   const esc = 1 + (G.pop/100)*0.5;
   const foe=makeArenaFoe(tier, esc, 1);
@@ -2307,7 +2311,7 @@ function startBedScene(mode,len,place){
   if(place==='pool'&&!G.hasPool) place='bed';
   if(place==='wardrobe'&&!G.hasWardrobe) place='bed';
   BC={t:0, props:[], hearts:[], mode:mode||'heir', len, place,
-      dur: len==='night'?3600 : len==='long'?1800 : 700,
+      dur: len==='vigil'?18000 : len==='night'?3600 : len==='long'?1800 : 700,
       line:pick(['“Veni…”','“Te amo.”','“Nunc, mi gladiator…”','“Tarde venis…”'])};
   G.lastLoveDay=G.day;
   state='bed'; document.querySelectorAll('.screen').forEach(s=>s.classList.remove('on'));
@@ -2344,19 +2348,23 @@ function updateBed(dt){ const s=BC; s.t+=dt; const T=s.t;
     s.props.push({kind:pick(['sandal','veil','breastband','msandal']),x:384,y:96,vx:rnd(-1.6,1.4),vy:-2.1,r:0,vr:rnd(-0.2,0.2)});
   if(s.place==='wardrobe' && T>600&&T<602) sfx('giggle');          // the small invader giggles
   if(s.place==='wardrobe' && T>642&&T<644) sfx('swing');           // ...and is scooped up
-  // the ALL-NIGHT intermission: silence... then a hand snakes out for the wine
-  const inter = s.len==='night' && T>1500 && T<1600;
-  if(s.len==='night'){
+  // intermissions: silence... then a hand snakes out for the wine (the Vigil takes several)
+  const night=s.len==='night', vigil=s.len==='vigil';
+  const inter = (night && T>1500 && T<1600) || (vigil && (T%3500)>1500 && (T%3500)<1600);
+  if(night||vigil){
     if(T>1556&&T<1558 && !s.wineTaken){ s.wineTaken=true; sfx('giggle'); }
-    if(T>1600&&T<1602) sfx('creak');
+    if(inter===false && T>1600&&T<1602) sfx('creak');
   }
   // ...and then the sounds carry through the closed door
   if(T>500 && !inter){
-    const pace = (s.len==='night' && T>1600)? 0.8 : 1;             // round two: bolder
+    const hour=1+(T/3500|0);
+    const pace = vigil? Math.max(0.55,1-0.09*hour) : (night && T>1600)? 0.8 : 1;   // each hour: bolder
     if(!s.nextClap||T>=s.nextClap){ sfx('clap'); s.nextClap=T+(28+Math.random()*14)*pace; }
     if(!s.nextMoan||T>=s.nextMoan){ sfx('moan'); s.nextMoan=T+(64+Math.random()*46)*pace; }
     if(!s.nextKiss||T>=s.nextKiss){ sfx('kiss'); s.nextKiss=T+(46+Math.random()*40)*pace; }
   }
+  // the discreet exit: once the door is shut, SPACE slips away to the morning
+  if(T>520 && consume('space')) s.t=Math.max(s.t,(s.dur||700)-2);
   if(T>=(s.dur||700)) finishBed();
 }
 // the master of the house, full height, striding to the door
@@ -2424,6 +2432,19 @@ function finishBed(){
   const mode=BC.mode, w=G.wife, len=BC.len||'quick';
   const emoF= len==='night'?9 : len==='long'?6 : 4;                 // fun-mode emotional gain
   const phys= len==='night'?12 : len==='long'?7 : 4;                // physical gain, always
+  if(len==='vigil'){
+    // THE VIGIL OF VENUS — perfection, rewarded
+    advanceDay(6);                                                  // TWO months pass; nobody regrets a single day
+    G.hygiene=clamp(G.hygiene-10,0,100);
+    G.venusUntil=G.day+9;
+    G.pop=clamp(G.pop+5,0,100); G.approval=clamp(G.approval+3,0,100); G.honor=clamp(G.honor+2,0,100);
+    const hit= mode==='heir'? Math.random()<0.98 : false;
+    if(hit && !G.pregnant) G.pregnant={due:G.day+27};
+    saveQuiet(); BC=null; state='menu'; openVilla();
+    toast('💫 THE VIGIL OF VENUS. Five hours. The slaves lit candles OUTSIDE the door in tribute. Venus blesses your arm for 9 days (+dmg, +stamina)'+
+      (hit?' — and a child is CERTAIN.':'.')+' (+5 pop, +3 approval, +2 honor)', 5200);
+    return;
+  }
   advanceDay(3);                                                    // a MONTH passes — the house moves on happily
   G.hygiene=clamp((G.hygiene===undefined?70:G.hygiene)-6,0,100);    // worth it
   G.wifePhys=clamp((G.wifePhys===undefined?45:G.wifePhys)+phys,0,100);
@@ -2630,7 +2651,16 @@ function drawBedAfterProps(s,T,dx,dw){
     if(beat===0) pixelText('♥',hx0-16,pool?160:102,'#e26a8a',1.5);
     else if(beat===1) pixelText('♪',hx0+18,pool?166:108,'#f0d0da',1.2);
     else pixelText('✧',hx0+2,pool?156:98,'#ffd0da',1);
+    if(T>600 && T<(s.dur||700)-160) pixelText('[SPACE] slip away to morning',W-72,26,'rgba(200,176,96,.55)',1);
     if(T>560 && T<1100) pixelText(BC.mode==='fun'? '~ just the two of them ~': pool?'~ the steam keeps its secrets ~':'~ the lamps burn low ~',W/2,248,'rgba(232,195,74,.75)',1);
+    // THE VIGIL: five hours, counted like a watch on the walls
+    if(s.len==='vigil'){
+      const hr=Math.min(5,1+(T/3500|0)), hp=(T%3500);
+      if(hp>600&&hp<1400) pixelText('~ the '+['FIRST','SECOND','THIRD','FOURTH','FIFTH'][hr-1]+' hour of Venus ~',W/2,248,'rgba(240,200,212,.85)',1);
+      if(T>16500){ const dawn=clamp((T-16500)/800,0,1);
+        ctx.globalAlpha=dawn*0.3; px(-4,-4,W+8,H+8,'#e8a050'); ctx.globalAlpha=1; }
+      if(T>17300) pixelText('~ the household will speak of this for a generation ~',W/2,248,'rgba(255,214,138,.9)',1);
+    }
     // LONG session: the encore
     if(s.len==='long' && T>1150 && T<1400) pixelText('“…again?”  “Again.”',W/2,248,'rgba(240,200,212,.8)',1);
     // ALL NIGHT: the intermission — a bare arm snakes out for the Falernian
@@ -2659,63 +2689,145 @@ function drawBedAfterProps(s,T,dx,dw){
 // THE SHADOW-THEATRE — the oil lamp throws the whole story on the wall,
 // vignette by vignette. Silhouettes only; the wall tells no lies.
 function drawShadowPlay(s,T){
-  const gx=96,gy=58,gw=190,gh=104, S='#2a180e';
+  const gx=84,gy=46,gw=216,gh=124, S='#241408', L='rgba(255,217,154,.5)';
   ctx.globalAlpha=.14; px(gx-10,gy-10,gw+20,gh+20,'#ffcf7a');
-  ctx.globalAlpha=.24; px(gx,gy,gw,gh,'#ffd99a'); ctx.globalAlpha=1;
+  ctx.globalAlpha=.27; px(gx,gy,gw,gh,'#ffd99a'); ctx.globalAlpha=1;
   px(gx,gy,gw,2,'rgba(120,70,20,.5)'); px(gx,gy+gh-2,gw,2,'rgba(120,70,20,.5)');
   const total= s.len==='quick'?6:8;
-  const vi=(((T-520)/130)|0)%total, vt=(T-520)%130, cx0=gx+gw/2, base=gy+gh-10;
-  const jB=Math.max(0,Math.sin(T*0.22))*1.6, jC=Math.max(0,Math.sin(T*0.22+1.1))*1.8;
-  if(vi===0){ // two profiles slide together — the kiss
-    const d=Math.max(0,26-vt*0.4);
-    px(cx0-24-d,base-58,13,13,S); px(cx0-14-d,base-52,5,3,S);                   // his head + nose toward her
-    px(cx0-26-d,base-45,16,35,S);
-    px(cx0+12+d,base-52,11,11,S); px(cx0+10+d,base-56,13,5,S); px(cx0+8+d,base-44,4,3,S); // her head, piled hair, lips
-    px(cx0+10+d,base-41,13,31,S); px(cx0+8+d,base-36+jB,4,7,S);                 // her profile — the bust bounces
-    if(d<=0 && (vt|0)%14<2) pixelText('♥',cx0-2,base-62,'#e26a8a',1.2);
-  } else if(vi===1){ // her seated profile — and his hand, fanning like a man near a fire
-    px(cx0-2,base-50,11,11,S); px(cx0-4,base-54,13,5,S);
-    px(cx0-4,base-39,13,22,S); px(cx0-8,base-34+jB,5,8,S);                      // the 🍒 profile, lively
-    px(cx0-10,base-17,20,8,S);
-    const fan=Math.sin(T*0.4)*4;
-    px(cx0+22,base-40+fan,10,4,S); px(cx0+30,base-42+fan,5,7,S);                // the awed hand
-    if((vt|0)%20<2) pixelText('✧',cx0+30,base-52,'#ffd0da',1);
-  } else if(vi===2){ // the 🍑 — two proud rounds, swaying like a censer at a triumph
-    const sw=Math.sin(T*0.18)*5;
-    px(cx0-12+sw,base-24,10,17,S); px(cx0+3+sw,base-22,10,15,S);                // thighs below, parted
-    px(cx0-15+sw,base-41+jC,14,15,S); px(cx0+1+sw,base-39+jC*0.6,14,13,S);      // the rounds — SEPARATE, and alive
-    px(cx0-5+sw,base-46+jC,10,5,S);                                             // the small of the back above
-    px(cx0-28,base-46,9,4,S); px(cx0-31,base-48,4,7,S);                         // two reverent hands hover
-    px(cx0+21,base-43,9,4,S); px(cx0+29,base-45,4,7,S);
-  } else if(vi===3){ // the sundial gag, act two — down, up, OVER-up, correct
-    px(cx0-6,base-62,12,13,S); px(cx0-8,base-49,16,34,S);                       // his profile
-    const ph2=(vt/32)|0;
-    if(ph2===0){ px(cx0-16,base-38,6,4,S); px(cx0-20,base-34,4,4,S); }          // down
-    else if(ph2===1){ px(cx0-18,base-42,8,4,S); }                                // level
-    else if(ph2===2){ px(cx0-15,base-48,5,4,S); px(cx0-18,base-53,4,5,S); px(cx0-19,base-56,3,3,S); pixelText('!',cx0-22,base-60,'#e8c34a',1); } // UP
-    else { px(cx0-16,base-46,6,4,S); px(cx0-19,base-50,4,4,S); if((vt|0)%12<2) pixelText('♥',cx0-22,base-56,'#e26a8a',1); }
-  } else if(vi===4){ // a pillow crosses the light at speed
-    const pxx=gx+10+vt*1.6;
-    if(pxx<gx+gw-16){ ctx.save(); ctx.translate(pxx,base-46); ctx.rotate(vt*0.1); px(-10,-5,20,10,S); px(-12,-2,3,4,S); px(9,-2,3,4,S); ctx.restore(); }
-    px(cx0-30,base-20,24,12,S); px(cx0+10,base-22,22,14,S);                     // two laughing lumps below
-  } else if(vi===5){ // four feet skyward — two of them wiggling
+  const vi=(((T-520)/150)|0)%total, vt=(T-520)%150, cx0=gx+gw/2, base=gy+gh-8;
+  const jB=Math.max(0,Math.sin(T*0.22))*1.6, jC=Math.max(0,Math.sin(T*0.22+1.1))*1.8, jC2=Math.max(0,Math.sin(T*0.22+0.6))*1.6;
+  // ---- a WOMAN in profile, facing left — nose, lips, bust, waist, both rounds, stepped leg ----
+  const femme=(fx,fy)=>{
+    px(fx-3,fy-76,10,4,S); px(fx+5,fy-74,4,4,S); px(fx+7,fy-71,2,3,S);   // piled bun + comb spray
+    px(fx-4,fy-73,10,9,S);                                               // skull
+    px(fx-6,fy-71,2,2,S); px(fx-8,fy-68,4,2,S);                          // brow ridge, the NOSE
+    px(fx-7,fy-66,3,2,S); px(fx-6,fy-64,2,2,S);                          // lips, chin
+    px(fx+4,fy-68,3,14,S); px(fx+6,fy-56,2,10,S);                        // loose locks down the back
+    px(fx-3,fy-62,4,5,S);                                                // neck
+    px(fx-5,fy-58,9,5,S);                                                // shoulder
+    px(fx-6,fy-55,3,10,S); px(fx-5,fy-45,3,6,S);                         // arm resting along her side
+    px(fx-9,fy-55+jB,5,5,S); px(fx-12,fy-53+jB,3,4,S); px(fx-13,fy-51+jB,1,2,S);  // the bust — out to its point
+    px(fx-5,fy-50,9,6,S);                                                // ribs
+    px(fx-3,fy-44,7,4,S);                                                // waist, pinched
+    px(fx-5,fy-40,11,5,S);                                               // hip flare
+    px(fx+3,fy-38+jC,6,7,S); px(fx+8,fy-36+jC,3,5,S);                    // 🍑 upper round
+    px(fx+2,fy-30+jC2,6,6,S); px(fx+7,fy-29+jC2,3,4,S);                  // 🍑 lower round, its own beat
+    px(fx-4,fy-35,6,14,S); px(fx-3,fy-21,5,15,S);                        // forward thigh + shin
+    px(fx+1,fy-28,5,13,S); px(fx+2,fy-15,4,10,S);                        // back leg
+    px(fx-6,fy-6,8,3,S); px(fx-9,fy-5,4,2,S);                            // forward foot + toes
+    px(fx+1,fy-5,7,3,S);                                                 // back foot
+  };
+  // ---- a MAN in profile, facing right — brow, jaw, chest, and the sundial (ang: -1 dn · 0 lvl · 1 up) ----
+  const sund=(sx,sy,ang)=>{
+    px(sx-1,sy+1,4,4,S); px(sx+2,sy+2,4,4,S);                            // the 🍒 pair, present and accounted for
+    if(ang<0){ px(sx+2,sy+3,4,3,S); px(sx+5,sy+6,4,3,S); px(sx+8,sy+9,3,3,S); px(sx+9,sy+12,3,3,S); }  // hanging low
+    else if(ang===0){ px(sx+3,sy+1,5,3,S); px(sx+7,sy,5,3,S); px(sx+11,sy-1,4,4,S); }                   // level
+    else { px(sx+3,sy-2,4,4,S); px(sx+5,sy-6,4,4,S); px(sx+6,sy-10,4,4,S); px(sx+5,sy-13,6,4,S); }      // UP, tip proud
+  };
+  const male=(fx,fy,ang)=>{
+    px(fx-3,fy-84,9,4,S);                                                // cropped crown
+    px(fx-4,fy-81,10,9,S);                                               // skull
+    px(fx+5,fy-79,2,2,S); px(fx+6,fy-77,4,2,S);                          // brow, NOSE
+    px(fx+5,fy-74,3,2,S); px(fx+4,fy-72,3,2,S);                          // lips, jaw
+    px(fx-1,fy-70,5,6,S); px(fx+3,fy-68,2,2,S);                          // neck + adam's apple
+    px(fx-8,fy-64,16,6,S);                                               // broad shoulders
+    px(fx-7,fy-58,14,10,S); px(fx-6,fy-48,12,6,S);                       // chest → lat taper
+    px(fx-8,fy-62,4,12,S); px(fx-8,fy-50,3,8,S); px(fx-9,fy-42,4,4,S);   // arm behind, fist at his hip
+    px(fx-5,fy-42,10,6,S);                                               // hips
+    sund(fx+4,fy-39,ang);
+    px(fx-5,fy-36,5,17,S); px(fx+1,fy-36,5,16,S);                        // thighs
+    px(fx-5,fy-19,4,16,S); px(fx+1,fy-20,4,16,S);                        // shins
+    px(fx-6,fy-4,8,3,S); px(fx+1,fy-4,9,3,S);                            // feet, toward her
+  };
+  if(vi===0){ // THE MEETING — both of them, head to toe, and the sundial answers
+    const d=Math.max(0,34-vt*0.4);
+    male(cx0-26-d,base, d<8? 1 : d<20? 0 : -1);
+    femme(cx0+26+d,base);
+    if(d<=0 && (vt|0)%14<2) pixelText('♥',cx0,base-90,'#e26a8a',1.3);
+  } else if(vi===1){ // THE KISS, close up — brows, noses, lips that finally meet
+    const d=Math.max(0,16-vt*0.3);
+    px(cx0-36-d,base-80,17,6,S); px(cx0-37-d,base-74,19,16,S);            // his crown + skull
+    px(cx0-19-d,base-72,3,3,S); px(cx0-17-d,base-68,5,3,S);               // heavy brow, nose
+    px(cx0-18-d,base-64,4,2,S); px(cx0-20-d,base-61,6,3,S);               // lips, strong jaw
+    px(cx0-34-d,base-58,15,26,S); px(cx0-21-d,base-54,7,22,S);            // neck into shoulder mass
+    px(cx0+19+d,base-78,15,5,S); px(cx0+30+d,base-75,7,7,S);              // her bun + jewelled comb
+    px(cx0+18+d,base-73,16,14,S);                                          // her skull
+    px(cx0+15+d,base-71,3,2,S); px(cx0+13+d,base-67,4,3,S);               // lash line, little nose
+    px(cx0+14+d,base-63,4,2,S); px(cx0+16+d,base-60,4,3,S);               // lips, soft chin
+    px(cx0+20+d,base-57,14,25,S);                                          // her neck + shoulder
+    px(cx0+13+d,base-50+jB,7,7,S); px(cx0+10+d,base-47+jB,3,4,S); px(cx0+9+d,base-45+jB,1,2,S); // the bust profile, to the point
+    if(d<=0){ px(cx0-14,base-64,28,6,S);                                   // the lips MEET
+      if((vt|0)%12<2) pixelText('♥',cx0,base-86,'#e26a8a',1.4); }
+  } else if(vi===2){ // THE 🍑, close up — dimples, cleft, underbutt creases, reverent hands
+    const sw=Math.sin(T*0.14)*4;
+    px(cx0-12+sw,base-66,24,6,S); px(cx0-9+sw,base-60,18,5,S);            // small of the back, waist dip
+    px(cx0-18+sw,base-55+jC,17,21,S); px(cx0-21+sw,base-49+jC,4,12,S);    // LEFT round — grand
+    px(cx0+3+sw,base-53+jC2,17,20,S); px(cx0+18+sw,base-47+jC2,4,11,S);   // RIGHT round — its own beat
+    px(cx0-1+sw,base-55,3,24,L);                                          // the cleft — lamplight through
+    px(cx0-10+sw,base-58,2,2,L); px(cx0+9+sw,base-58,2,2,L);              // the back dimples of Venus
+    px(cx0-15+sw,base-34+jC,13,2,L); px(cx0+5+sw,base-33+jC2,13,2,L);     // underbutt creases, carved in light
+    px(cx0-15+sw,base-31,12,22,S); px(cx0+4+sw,base-30,12,21,S);          // thighs, parted a hand's width
+    px(cx0-13+sw,base-9,9,5,S); px(cx0+6+sw,base-8,9,5,S);                // calves crop at the frame
+    const hd=Math.max(3,15-vt*0.35);
+    px(cx0-36-hd,base-49,10,9,S); for(let f=0;f<4;f++) px(cx0-26-hd,base-49+f*2,5,1,S); // left hand, fingers SPLAYED
+    px(cx0-34-hd,base-40,4,4,S);                                          // its thumb
+    px(cx0+26+hd,base-47,10,9,S); for(let f=0;f<4;f++) px(cx0+21+hd,base-47+f*2,5,1,S); // right hand
+    px(cx0+30+hd,base-38,4,4,S);
+  } else if(vi===3){ // THE SUNDIAL, close up — abs like a legion road, and the correction
+    px(cx0-12,base-84,16,10,S);                                           // chest mass cropping at the light's edge
+    px(cx0-10,base-74,14,6,S);                                            // pec shelf
+    px(cx0-9,base-68,12,5,S); px(cx0-8,base-63,11,5,S); px(cx0-7,base-58,10,5,S); // the abs, stepped
+    px(cx0-8,base-66,1,12,L);                                             // the center line, carved
+    px(cx0-7,base-53,11,9,S);                                             // hip block
+    px(cx0-7,base-44,6,30,S); px(cx0,base-42,5,28,S);                     // thighs crop at base
+    const ph2=(vt/38)|0, sy=base-49;
+    px(cx0+2,sy+2,5,5,S); px(cx0+6,sy+3,5,5,S);                           // the 🍒 pair, unmistakable
+    if(ph2===0){ px(cx0+7,sy+7,5,3,S); px(cx0+10,sy+10,5,3,S); px(cx0+13,sy+13,4,4,S); px(cx0+14,sy+16,4,4,S); }  // low — a long day
+    else if(ph2===1){ px(cx0+8,sy+4,6,4,S); px(cx0+13,sy+3,6,4,S); px(cx0+18,sy+2,5,5,S); }                        // rising to level
+    else if(ph2===2){ px(cx0+7,sy-1,5,4,S); px(cx0+10,sy-5,5,4,S); px(cx0+12,sy-9,5,4,S); px(cx0+11,sy-13,7,5,S);  // UP
+      pixelText('!',cx0+22,sy-16,'#e8c34a',1); }
+    else { const bo=Math.sin(vt*0.5)*2;                                    // the BOING — it quivers with purpose
+      px(cx0+7,sy-1+bo,5,4,S); px(cx0+10,sy-5+bo,5,4,S); px(cx0+12,sy-9+bo,5,4,S); px(cx0+11,sy-13+bo,7,5,S);
+      if((vt|0)%10<2) pixelText('♥',cx0+24,sy-18,'#e26a8a',1); }
+  } else if(vi===4){ // THE PILLOW — thrown with follow-through, ducked with experience
+    px(cx0-52,base-64,12,12,S); px(cx0-54,base-68,13,5,S);                // her head at the frame's edge
+    px(cx0-50,base-52,11,20,S); px(cx0-56,base-47+jB,6,6,S);              // her torso + bust in recoil
+    px(cx0-42,base-60,14,4,S); px(cx0-29,base-63,5,5,S); for(let f=0;f<3;f++) px(cx0-25,base-62+f*2,4,1,S); // the throwing arm, fingers open
+    const pxx=cx0-30+vt*1.7;
+    if(pxx<cx0+34){ ctx.save(); ctx.translate(pxx,base-56); ctx.rotate(vt*0.12);
+      px(-11,-6,22,12,S); px(-13,-3,3,5,S); px(10,-3,3,5,S); ctx.restore();
+      px(pxx-6,base-64,2,2,'#f2eee8'); px(pxx+4,base-50,2,2,'#f2eee8'); } // feathers fly
+    const duck=pxx>cx0+16? 8:0;
+    px(cx0+40,base-62+duck,13,12,S); px(cx0+38,base-66+duck,14,5,S);      // his head — ducking, seasoned
+    px(cx0+42,base-50,12,22,S);
+    if(duck && (vt|0)%12<2) pixelText('ha!',cx0-46,base-76,'#ffd0da',1);
+  } else if(vi===5){ // FOUR FEET SKYWARD — hers dancing, his flat as planks
+    px(cx0-34,base-16,70,12,S);                                           // the bed-lump they rise from
     const wig=Math.sin(T*0.5)*2;
-    px(cx0-22,base-34,6,26,S); px(cx0-13,base-38,6,30,S);
-    px(cx0-24,base-40+wig,9,6,S); px(cx0-15,base-44-wig,9,6,S);                 // her toes, dancing
-    px(cx0+6,base-30,7,22,S); px(cx0+16,base-33,7,25,S);
-    px(cx0+4,base-36,10,6,S); px(cx0+14,base-39,10,6,S);                        // his, flat as planks
-  } else if(vi===6){ // the toast — two cups meet above the sheets
+    px(cx0-24,base-40,6,26,S); px(cx0-14,base-46,6,32,S);                 // her calves
+    px(cx0-27,base-46+wig,9,7,S); px(cx0-17,base-52-wig,9,7,S);           // her feet — heels
+    for(let f=0;f<3;f++){ px(cx0-29+f*2,base-48+wig,2,2,S); px(cx0-19+f*2,base-54-wig,2,2,S); } // TOES, individually
+    px(cx0-25,base-42+wig,2,1,L); px(cx0-15,base-48-wig,2,1,L);           // her ankle chains catch the light
+    px(cx0+8,base-36,7,22,S); px(cx0+18,base-40,7,26,S);                  // his calves
+    px(cx0+5,base-42,11,7,S); px(cx0+15,base-46,11,7,S);                  // his feet — flat, content
+    for(let f=0;f<3;f++){ px(cx0+6+f*2,base-44,2,2,S); px(cx0+16+f*2,base-48,2,2,S); }
+  } else if(vi===6){ // THE TOAST — two cups above the sheets
     const cl=Math.max(0,10-vt*0.3);
-    px(cx0-18-cl,base-48,8,10,S); px(cx0-16-cl,base-38,4,8,S);
-    px(cx0+10+cl,base-48,8,10,S); px(cx0+12+cl,base-38,4,8,S);
-    if(cl<=0 && (vt|0)%16<2) pixelText('✦',cx0,base-54,'#ffe9a0',1);
-    px(cx0-26,base-24,52,14,S);                                                 // the shared lump of blankets
-  } else { // the fruit bowl — 🍒 knocked flying, as is tradition
-    px(cx0-8,base-18,20,6,S); px(cx0-4,base-12,12,4,S);                         // the bowl on a stool
-    const fy2=Math.min(26,vt*0.8), fx2=vt*0.9;
-    px(cx0-14-fx2*0.4,base-24-((26-fy2)*(fy2)/12),4,4,S); px(cx0-10-fx2*0.3,base-26-((24-fy2)*(fy2)/14),4,4,S); // two cherries aloft
-    px(cx0-12-fx2*0.35,base-22-((25-fy2)*(fy2)/13),1,3,S);                       // the shared stem
-    if(vt>60) pixelText('~ the bowl is avenged ~',cx0,base+6,'rgba(232,195,74,.6)',1);
+    px(cx0-24-cl,base-56,9,4,S); px(cx0-22-cl,base-52,5,8,S); px(cx0-24-cl,base-44,9,2,S);  // her cup on its stem
+    px(cx0-30-cl,base-46,8,4,S); px(cx0-34-cl,base-48,5,6,S);                                // her hand + wrist
+    px(cx0+15+cl,base-56,9,4,S); px(cx0+17+cl,base-52,5,8,S); px(cx0+15+cl,base-44,9,2,S);   // his
+    px(cx0+22+cl,base-46,8,4,S); px(cx0+29+cl,base-48,5,6,S);
+    if(cl<=0 && (vt|0)%16<2) pixelText('✦',cx0,base-62,'#ffe9a0',1);
+    px(cx0-30,base-28,60,16,S); px(cx0-22,base-34,14,8,S); px(cx0+10,base-36,14,10,S);       // the shared lump, two head-bumps
+  } else { // THE FRUIT BOWL — 🍒 knocked flying, as is tradition
+    px(cx0+2,base-20,20,7,S); px(cx0+6,base-13,12,5,S);                   // bowl on its stool
+    const kn=Math.min(12,vt*0.5);
+    px(cx0-26+kn,base-30,12,5,S); for(let f=0;f<3;f++) px(cx0-14+kn,base-30+f*2,4,1,S);      // the blundering hand arrives
+    if(vt>24){ const fy2=Math.min(28,(vt-24)*0.8), fx2=(vt-24)*0.9;
+      px(cx0-2-fx2*0.4,base-28-((28-fy2)*(fy2)/12),5,5,S); px(cx0+3-fx2*0.3,base-30-((26-fy2)*(fy2)/14),5,5,S); // the 🍒, aloft
+      px(cx0+1-fx2*0.35,base-25-((27-fy2)*(fy2)/13),1,4,S);                                   // the shared stem
+      px(cx0+4,base-20+Math.min(6,(vt-24)*0.3),20,7,S); }                                     // the bowl tips after them
+    if(vt>70) pixelText('~ the bowl is avenged ~',cx0,base+4,'rgba(232,195,74,.6)',1);
   }
 }
 
@@ -3596,6 +3708,20 @@ function openVilla(){
   }
   buildMarriageCard(b);
   buildSuccessionCard(b);
+  // ---- PASS THE TIME: watch the house grow ----
+  const tc=document.createElement('div'); tc.className='shopcard';
+  const preg2=G.pregnant? ' 🤰 month '+Math.max(1,Math.min(9,9-Math.ceil((G.pregnant.due-G.day)/3)))+'/9 ·' : '';
+  tc.innerHTML=`<div><b>⏳ PASS THE TIME</b> <span class="small muted">— day ${G.day} ·${preg2} let the children grow, the wounds knit, the plots ripen</span></div>`;
+  const tr=document.createElement('div'); tr.className='row gap6';
+  const mkSkip=(label,days,note)=>{ const bt2=document.createElement('button'); bt2.className='btn sm'; bt2.textContent=label; bt2.title=note;
+    bt2.onclick=()=>{ advanceDay(days); saveQuiet();
+      const msg=G.lastRaid? G.lastRaid : (days>1?'A month turns.':'A day passes.'); if(G.lastRaid) G.lastRaid=null;
+      toast('⏳ '+msg+(G.pregnant?' (🤰 month '+Math.max(1,Math.min(9,9-Math.ceil((G.pregnant.due-G.day)/3)))+'/9)':''),2800);
+      openVilla(); };
+    tr.appendChild(bt2); };
+  mkSkip('⏭ SKIP A DAY',1,'One sunrise. Wounds heal a little; the world moves a little.');
+  mkSkip('⏭ SKIP A MONTH',3,'Three days is a month in this life. Babies arrive, plots thicken.');
+  tc.appendChild(tr); b.appendChild(tc);
   if(!G.hasVilla){
     const card=document.createElement('div'); card.className='shopcard';
     card.innerHTML=`<div><b style="color:var(--gold)">🏡 Buy a country villa</b></div>
@@ -3715,12 +3841,13 @@ function marriageEffectsText(b){
   return bits.join(' · ');
 }
 // ---- bedchamber sessions: how long the lamps burn, and how often ----
-const LOVE_CAP={quick:3,long:2,night:1};
+const LOVE_CAP={quick:3,long:2,night:1,vigil:1};
 let bedLen='quick', bedPlace='bed';
 function loveLeft(len){ if(G.loveDay!==G.day) return LOVE_CAP[len];
-  return LOVE_CAP[len]-(len==='quick'?(G.loveQuick||0):len==='long'?(G.loveLong||0):(G.loveNight||0)); }
-function spendLove(len){ if(G.loveDay!==G.day){ G.loveDay=G.day; G.loveQuick=0; G.loveLong=0; G.loveNight=0; }
-  if(len==='quick')G.loveQuick++; else if(len==='long')G.loveLong++; else G.loveNight++; }
+  return LOVE_CAP[len]-(len==='quick'?(G.loveQuick||0):len==='long'?(G.loveLong||0):len==='night'?(G.loveNight||0):(G.loveVigil||0)); }
+function spendLove(len){ if(G.loveDay!==G.day){ G.loveDay=G.day; G.loveQuick=0; G.loveLong=0; G.loveNight=0; G.loveVigil=0; }
+  if(len==='quick')G.loveQuick++; else if(len==='long')G.loveLong++; else if(len==='night')G.loveNight++; else G.loveVigil++; }
+function vigilReady(){ return G.married && G.wifeRel>=100 && (G.wifePhys||0)>=100 && (G.hygiene|0)>=100; }
 function spouseWilling(){ return G.married && ((G.wifeRel+(G.wifePhys===undefined?45:G.wifePhys))/2)>=40; }
 // what the spouse tells her friends — two bars, two verdicts
 function wifeVerdict(){
@@ -3761,11 +3888,16 @@ function buildMarriageCard(b){
     // session length picker — the daily ration of ♥
     const lenRow=document.createElement('div'); lenRow.className='row gap6'; lenRow.style.marginTop='4px';
     const lh=document.createElement('span'); lh.className='small muted'; lh.textContent='Session:'; lenRow.appendChild(lh);
-    [['quick','🕯 QUICK 10s'],['long','🌙 LONG 30s'],['night','🌌 ALL NIGHT 1m']].forEach(([id,label])=>{
+    const lenOpts=[['quick','🕯 QUICK 10s'],['long','🌙 LONG 30s'],['night','🌌 ALL NIGHT 1m']];
+    if(vigilReady()) lenOpts.push(['vigil','💫 VIGIL OF VENUS 5m']);
+    else if(bedLen==='vigil') bedLen='quick';
+    lenOpts.forEach(([id,label])=>{
       const c2=document.createElement('button'); c2.className='btn sm'+(bedLen===id?' gold':'');
       const left=loveLeft(id);
       c2.textContent=label+' ('+left+'/'+LOVE_CAP[id]+')';
-      c2.title= id==='quick'?'A stolen hour. 3 a day.': id==='long'?'The lamps burn a while — more of the wardrobe ends up airborne. 2 a day.':'The WHOLE night unfolds behind that door — intermissions included. Once a day; you will both walk funny.';
+      c2.title= id==='quick'?'A stolen hour. 3 a day.': id==='long'?'The lamps burn a while — more of the wardrobe ends up airborne. 2 a day.':
+        id==='night'?'The WHOLE night unfolds behind that door — intermissions included. Once a day; you will both walk funny.':
+        'PERFECTION: ♥100 🔥100 🧼100. Five hours of Venus — TWO months pass, and she blesses your sword arm for nine days. Rome will hear about this.';
       c2.disabled=left<=0;
       c2.onclick=()=>{ bedLen=id; openVilla(); };
       lenRow.appendChild(c2);
