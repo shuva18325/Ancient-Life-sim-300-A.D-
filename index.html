@@ -580,6 +580,19 @@ const PLOT_TARGETS=[
   {name:'the Praetorian Prefect',    needSold:7000,  needFav:14, buff:2.0, reward:3000, glory:220, enemyArmy:6000},
   {name:'EMPEROR SEPTIMIUS SEVERUS', needSold:15000, needFav:24, buff:2.4, reward:8000, glory:600, enemyArmy:14000},
 ];
+/* ===== CURSUS HONORUM: the ladder of offices, won by ELECTION ===== */
+const OFFICES=[
+  {name:'Privatus',   cost:0,    needApproval:0,  perk:'—'},
+  {name:'Quaestor',   cost:300,  needApproval:35, perk:'+8d treasury skim after every bout'},
+  {name:'Aedile',     cost:700,  needApproval:45, perk:'you stage the games: +2 popularity per victory'},
+  {name:'Praetor',    cost:1400, needApproval:55, perk:'the courts are yours: prosecutions almost never fail'},
+  {name:'Consul',     cost:2600, needApproval:65, perk:'imperium: +12% army power — one step from the purple'},
+];
+// the provinces that make emperors — grain, gold and legions
+const KEY_PROVINCES={'Aegyptus':'the grain of the Nile','Asia Minor':'the tax gold of the East',
+  'Africa Proconsularis':'the second granary','Gallia':'the legions of the Rhine','Syria Palaestina':'the eastern army'};
+function keyCount(){ let n=0; for(const k in KEY_PROVINCES) if(G.titles&&G.titles[k]) n++; return n; }
+
 /* ===== GENERALS: appointed to lead armies. Rolled STRENGTH & SMARTS ===== */
 const GEN_NAMES=['Crixus','Gannicus','Oenomaus','Castus','Brennus','Vercingetorix','Arash','Bato','Ardashir',
   'Tarbus','Dacius','Memnon','Rufus','Vala','Zenobius','Odaenathus','Palfurius','Scaeva'];
@@ -732,6 +745,8 @@ function freshCareer(name,origin,arch,social){
     wife:null, married:false, marryPrompted:false,   // marriage / dynasty
     children:[], pregnant:null, lastLoveDay:-9,      // heirs of your house
     injury:null, lastDebateDay:-9,                   // wounds & Curia cooldown
+    office:0, path:null,                             // cursus honorum rank + chosen road (politics|general)
+    parthia:50, parthiaPact:false,                   // relations with the Parthian Empire
     wins:0, losses:0,
     hpBonus:0, dmgBonus:0,
     loadout:lo,
@@ -748,7 +763,7 @@ function freshCareer(name,origin,arch,social){
   };
 }
 // fill in any fields missing from older saves
-function migrate(g){ const d={honor:50,food:4,mount:0,slaves:0,hasVilla:false,boat:false,favor:0,soldiers:0,hidden:[],plotTier:0,emperor:false,approval:50,legions:0,rivals:0,retired:false,detachments:[],day:0,titles:{},clears:{},socialClass:'gladiator',army:{},armyGear:0,armyTrain:0,hasOrganizer:false,generals:[],wife:null,married:false,marryPrompted:false,children:[],pregnant:null,lastLoveDay:-9,injury:null,lastDebateDay:-9}; for(const k in d){ if(g[k]===undefined) g[k]=d[k]; } if(!g.current) g.current='Italia'; return g; }
+function migrate(g){ const d={honor:50,food:4,mount:0,slaves:0,hasVilla:false,boat:false,favor:0,soldiers:0,hidden:[],plotTier:0,emperor:false,approval:50,legions:0,rivals:0,retired:false,detachments:[],day:0,titles:{},clears:{},socialClass:'gladiator',army:{},armyGear:0,armyTrain:0,hasOrganizer:false,generals:[],wife:null,married:false,marryPrompted:false,children:[],pregnant:null,lastLoveDay:-9,injury:null,lastDebateDay:-9,office:0,path:null,parthia:50,parthiaPact:false}; for(const k in d){ if(g[k]===undefined) g[k]=d[k]; } if(!g.current) g.current='Italia'; return g; }
 function saveGame(){ try{ localStorage.setItem(SAVE_KEY, JSON.stringify(G)); toast('Saved.'); }catch(e){} }
 function hasSave(){ try{ return !!localStorage.getItem(SAVE_KEY); }catch(e){ return false; } }
 function loadGame(){ try{ G=migrate(JSON.parse(localStorage.getItem(SAVE_KEY))); return !!G; }catch(e){ return false; } }
@@ -1511,6 +1526,10 @@ function finishFight(won){
   // provinces you govern pay tribute
   const trib=provinceTribute();
   if(trib>0){ G.coin+=trib; note+='Your provinces render '+fmt(trib)+' denarii in tribute. '; }
+  // offices & pacts pay their dues
+  if(G.office>=1){ G.coin+=8; note+='The quaestorship skims +8d. '; }
+  if(G.office>=2 && won){ G.pop=clamp(G.pop+2,0,100); note+='As aedile your games swell the mob (+2 pop). '; }
+  if(G.parthiaPact){ G.coin+=6; note+='Silk-road tolls +6d. '; }
   FT.provisioned=false; G.provisioned=false;
   showResult(won,{glory,coin,popDelta,honorDelta,note,crowdLove,slaveCoin});
   saveQuiet();
@@ -1930,6 +1949,7 @@ function loop(now){
   dt=clamp(dt,0,3);
   if(state==='fight' && FT){ updateFight(dt); drawArena(); }
   else if(state==='battle' && BT){ updateBattle(dt); drawBattle(); }
+  else if(state==='bed' && BC){ updateBed(dt); if(BC) drawBed(); }
   else if(state==='map'||state==='travel'){ drawMapCanvas(); }
   else if(state==='title'||state==='create'||state==='help'){ drawMenuBg(now); }
   requestAnimationFrame(loop);
@@ -2138,6 +2158,117 @@ function finishBattle(){
 }
 
 /* =====================================================================
+   THE BEDCHAMBER — an implied scene: she runs, the toga flies, the door
+   closes... and the lamps burn low. (All suggestion, nothing shown.)
+   ===================================================================== */
+let BC=null, BEDSPR=null;
+function startBedScene(){
+  const cv=document.createElement('canvas'); cv.width=cv.height=148;
+  drawBridePortrait(cv,G.wife,true); BEDSPR=cv;
+  BC={t:0, props:[], hearts:[]};
+  G.lastLoveDay=G.day;
+  state='bed'; document.querySelectorAll('.screen').forEach(s=>s.classList.remove('on'));
+  $('statbar').classList.add('hide');
+}
+function updateBed(dt){ const s=BC; s.t+=dt; const T=s.t;
+  for(const p of s.props){ p.x+=p.vx*dt; p.y+=p.vy*dt; p.vy+=0.16*dt; p.r+=p.vr*dt;
+    if(p.y>226){ p.y=226; p.vx*=0.5; p.vy=0; p.vr=0; } }
+  for(const h of s.hearts){ h.y-=h.vy*dt; h.x+=Math.sin(h.y*0.09)*0.4*dt; h.life-=dt; }
+  s.hearts=s.hearts.filter(h=>h.life>0);
+  // her clothes come sailing out of the doorway, one by one
+  if(T>150&&T<152) s.props.push({kind:'toga',  x:372,y:150,vx:-2.6,vy:-2.4,r:0,vr:0.08});
+  if(T>190&&T<192) s.props.push({kind:'girdle',x:372,y:158,vx:-2.1,vy:-2.9,r:0,vr:-0.11});
+  if(T>222&&T<224) s.props.push({kind:'sandal',x:372,y:168,vx:-3.0,vy:-2.0,r:0,vr:0.2});
+  if(T>246&&T<248) s.props.push({kind:'sandal',x:372,y:168,vx:-2.2,vy:-3.1,r:0,vr:-0.16});
+  if(T>=560) finishBed();
+}
+function finishBed(){
+  const w=G.wife, chance=0.32 + (G.honor/400) + (w&&w.build!=='slender'?0.06:0);
+  const hit=Math.random()<chance;
+  if(hit && !G.pregnant) G.pregnant={due:G.day+27};
+  advanceDay(1); saveQuiet();
+  BC=null; state='menu'; openVilla();
+  toast(hit? '🌙 …weeks later the word comes: SHE IS WITH CHILD! Nine months now.'
+           : '🌙 A night to remember — but the gods grant no child yet. Try again soon.', 3200);
+}
+// wife sprite in 3 slices with independent bounce — bust & hips carry real jiggle
+function drawJiggleSprite(spr,x,y,ph,alpha){
+  const SC=0.62;
+  const H1=Math.round(spr.height*0.42), H2=Math.round(spr.height*0.2), H3=spr.height-H1-H2;
+  const jB=Math.sin(ph)*1.6, jC=Math.sin(ph+1.1)*2.1;
+  ctx.globalAlpha=alpha===undefined?1:alpha;
+  ctx.drawImage(spr, 0,0,spr.width,H1,        x, y,                        spr.width*SC, H1*SC);
+  ctx.drawImage(spr, 0,H1,spr.width,H2,       x, y+H1*SC-1+jB*0.6,         spr.width*SC, H2*SC);
+  ctx.drawImage(spr, 0,H1+H2,spr.width,H3,    x, y+(H1+H2)*SC-1+jC*0.6,    spr.width*SC, H3*SC);
+  ctx.globalAlpha=1;
+}
+function drawBed(){
+  const s=BC, T=s.t;
+  // the chamber
+  px(-4,-4,W+8,H+8,'#241812');
+  px(-4,-4,W+8,124,'#4a3626'); px(-4,118,W+8,4,'#2e2016');
+  for(let i=0;i<4;i++) px(-4,26+i*24,W+8,1,'#3e2c1e');
+  px(0,224,W,H-224,'#3a2c1e'); for(let fx=0;fx<W;fx+=26) px(fx,224,1,H-224,'#2c2014');
+  // furnishings: a couch, a small table with wine
+  px(40,196,64,18,'#5a3a22'); px(40,196,64,4,'#7a2f4a'); px(42,192,60,6,'#9a4a66');
+  px(150,202,26,4,'#6a4a2c'); px(154,206,4,16,'#5a3c22'); px(168,206,4,16,'#5a3c22');
+  px(158,194,6,8,'#8a2a3a'); px(159,192,4,2,'#c8c0b0');
+  // oil lamp
+  px(120,84,10,6,'#7a5c2e'); px(123,80,4,4,'#ffcf5a'); px(124,78,2,2,'#fff2b0');
+  ctx.globalAlpha=.08; px(96,70,60,150,'#ffcf7a'); ctx.globalAlpha=1;
+  // door frame at the right
+  const dx=360, dw=56;
+  px(dx-6,86,dw+12,138,'#5a4028'); px(dx-4,90,dw+8,134,'#2a1a10');
+  let open = T<100?0 : T<130? (T-100)/30 : T<330?1 : T<360? 1-(T-330)/30 : 0;
+  if(open>0){ ctx.globalAlpha=0.35*open; px(dx-44,96,44+dw,128,'#ffb050'); ctx.globalAlpha=1;
+    px(dx,92,dw,130,'#c07830'); px(dx,92,dw,4,'#e8a050'); }
+  if(open<1){ const lw=Math.max(0,dw*(1-open));
+    px(dx,92,lw,130,'#6a4a2c'); if(lw>8) px(dx+2,96,lw-6,122,'#7a5634'); if(lw>10) px(dx+lw-5,152,3,8,'#e8c34a'); }
+  const spr=BEDSPR;
+  if(T<130 && spr){
+    // she RUNS for the door — bust and hips bouncing with each stride
+    const wx= 40 + Math.min(1,T/112)*(dx-66-40);
+    drawJiggleSprite(spr, wx, 122-Math.abs(Math.sin(T*0.4))*2, T*0.55, 1);
+    if((T|0)%8===0) px(wx+10,218,3,1,'#5a4630');                              // dust at her heels
+  } else if(spr){
+    // the shadow-show: her figure in silhouette against the lamplight — nothing more
+    if(T<330){ ctx.save(); ctx.filter='brightness(16%)';
+      drawJiggleSprite(spr, dx+4+Math.sin(T*0.1)*1.5, 120, T*0.3, open);
+      ctx.filter='none'; ctx.restore(); }
+    // she beckons around the doorframe
+    if(T>260 && T<330){ const bk=Math.sin(T*0.25)*3;
+      px(dx-12+bk,140,12,3,'#160e07'); px(dx-15+bk,137,5,5,'#160e07');
+      if((T|0)%28<1.5) s.hearts.push({x:dx-6,y:132,vy:0.6,life:52,c:'#e26a8a'});
+    }
+    // and the master of the house answers
+    if(T>270 && T<334){ const mx=110+Math.min(1,(T-270)/58)*(dx-36-110);
+      px(mx,178,12,36,'#2a1c12'); px(mx+2,170,8,9,'#3a281a'); px(mx+3,166,6,5,'#4a3422');
+      px(mx+10,188,7,3,'#2a1c12'); }
+  }
+  // flung clothes arc across the room and settle
+  for(const p of s.props){ ctx.save(); ctx.translate(p.x,p.y); ctx.rotate(p.r);
+    if(p.kind==='toga'){ px(-9,-4,18,8,'#efe3c2'); px(-9,-4,18,2,'#fff8ea'); px(-7,3,14,2,'#d8ccb0'); }
+    else if(p.kind==='girdle'){ px(-6,-1,12,3,'#e8c34a'); px(-2,-2,3,5,'#b8912f'); }
+    else { px(-4,-2,8,3,'#8a5c34'); px(-4,-3,3,2,'#a8743e'); }
+    ctx.restore(); }
+  // the door is shut: the lamps dim, the door rattles, love drifts upward
+  if(T>360){
+    const dim=clamp((T-360)/60,0,1)*0.55;
+    ctx.globalAlpha=dim; px(-4,-4,W+8,H+8,'#0c0806'); ctx.globalAlpha=1;
+    const knock=Math.sin(T*0.35)*clamp((T-372)/40,0,1);
+    px(dx-3+knock*1.8,88,3,136,'#5a4028');                                     // the frame knocks
+    if((T|0)%42<1.5) s.hearts.push({x:dx+dw/2+rnd(-12,12), y:118, vy:0.5, life:76, c:pick(['#e26a8a','#f090a8','#ffd0da'])});
+    ctx.textAlign='center';
+    if(((T/24)|0)%2) pixelText('♥',dx+dw/2-16,102,'#e26a8a',1.5); else pixelText('♪',dx+dw/2+18,108,'#f0d0da',1.2);
+    if(T>430) pixelText('~ the lamps burn low ~',W/2,248,'rgba(232,195,74,.75)',1);
+  }
+  ctx.textAlign='center';
+  for(const h of s.hearts) pixelText('♥',h.x,h.y,h.c,1);
+  // cinematic letterbox
+  px(-4,-4,W+8,18,'#0a0705'); px(-4,H-14,W+8,18,'#0a0705');
+}
+
+/* =====================================================================
    META SCREENS WIRING
    ===================================================================== */
 // ---- title ----
@@ -2200,18 +2331,23 @@ function drawCardPortrait(cnv,A){
   c.restore();
 }
 // FULL-BODY portrait of a prospective wife — contrapposto pose, figure on show
-function drawBridePortrait(cnv,b){
+// pass bare=true for a transparent figure sprite (cutscenes)
+function drawBridePortrait(cnv,b,bare){
   const c=cnv.getContext('2d'); c.imageSmoothingEnabled=false;
   const CW=cnv.width,CH=cnv.height;
+  if(bare) c.clearRect(0,0,CW,CH);
+  else {
   // backdrop: noble = purple-draped marble alcove; peasant = plaster wall + window
   const bg=c.createLinearGradient(0,0,0,CH);
   if(b.rank==='noble'){ bg.addColorStop(0,'#33203e'); bg.addColorStop(.6,'#221430'); bg.addColorStop(1,'#120a18'); }
   else { bg.addColorStop(0,'#3a2c1c'); bg.addColorStop(.6,'#2a1e12'); bg.addColorStop(1,'#160f08'); }
   c.fillStyle=bg; c.fillRect(0,0,CW,CH);
+  }
   c.save(); c.translate(CW/2,CH-3); const s=Math.min(CW,CH)/74; c.scale(s,s);
   const P=(x,y,w,hh,col)=>{c.fillStyle=col;c.fillRect(Math.round(x),Math.round(y),Math.round(w),Math.round(hh));};
   // scenery
-  if(b.rank==='noble'){
+  if(bare){}
+  else if(b.rank==='noble'){
     P(-32,-70,8,70,'#cfc0a2'); P(-31,-70,2,70,'#e8dcc2'); P(-27,-70,2,70,'#a8997c'); P(-34,-72,12,3,'#e0d4b8'); // column
     for(let i=0;i<8;i++){ P(16+i*2,-70+i,3,68-i,shade('#5a2d6a',i*6)); }                                        // curtain
     P(14,-72,22,4,'#3c1d48'); P(15,-69,2,2,'#e8c34a');
@@ -2401,10 +2537,10 @@ function drawBridePortrait(cnv,b){
     P(0,-52,4,1,'#8a6a4a'); P(1,-51,2,2,'#6a8a6a');
   }
   // soft ground shadow
-  c.fillStyle='rgba(0,0,0,.35)'; c.fillRect(-10,0,24,2);
+  if(!bare){ c.fillStyle='rgba(0,0,0,.35)'; c.fillRect(-10,0,24,2); }
   c.restore();
   // painted-miniature frame
-  c.strokeStyle=b.jewel?'#8a6f35':'#4a3a26'; c.lineWidth=2; c.strokeRect(1,1,CW-2,CH-2);
+  if(!bare){ c.strokeStyle=b.jewel?'#8a6f35':'#4a3a26'; c.lineWidth=2; c.strokeRect(1,1,CW-2,CH-2); }
 }
 function openCreate(){
   show('scr-create');
@@ -2616,7 +2752,7 @@ $('btn-stable-back').onclick=()=>enterMap();
 function slaveCost(){ return 80 + G.slaves*45; }
 function villaIncome(){ let coin=G.slaves*12, food=Math.floor(G.slaves/2);
   if(G.wife){ coin+=G.wife.tradeCoin||0; food+=G.wife.tradeFood||0; } return {coin, food}; }
-function provinceTribute(){ let s=0; for(const id in (G.titles||{})){ const r=REGION_BY_ID[id]; if(r) s+=40+r.tier*45; } return s; }
+function provinceTribute(){ let s=0; for(const id in (G.titles||{})){ const r=REGION_BY_ID[id]; if(r){ let t=40+r.tier*45; if(KEY_PROVINCES[id]) t=Math.round(t*1.5); s+=t; } } return s; }
 function titlesCount(){ return Object.keys(G.titles||{}).length; }
 function claimReq(reg){ return 3+reg.tier; }   // wins needed to claim governance
 function canClaim(reg){ return !(G.titles&&G.titles[reg.id]) && (G.clears[reg.id]||0)>=claimReq(reg); }
@@ -2708,13 +2844,7 @@ function buildMarriageCard(b){
     const bed=document.createElement('button'); bed.className='btn sm'; bed.style.marginTop='4px';
     bed.textContent = preg? '🍆🍑 (she is with child)' : cd<2? '🍆🍑 (let her rest a day)' : '🍆🍑 RETIRE TO THE BEDCHAMBER';
     bed.disabled=!!preg || cd<2;
-    bed.onclick=()=>{
-      G.lastLoveDay=G.day; advanceDay(1);
-      const chance=0.32 + (G.honor/400) + (w.build!=='slender'?0.06:0);
-      if(Math.random()<chance){ G.pregnant={due:G.day+27}; toast('🌙 The lamps burn low… weeks later the word comes: SHE IS WITH CHILD! Nine months now.',3200); }
-      else toast('🌙 A tender night together — but the gods grant no child yet. Try again soon.',2400);
-      saveQuiet(); openVilla();
-    };
+    bed.onclick=()=>startBedScene();
     card.appendChild(bed);
     // the children of your house
     if(G.children.length){
@@ -2865,7 +2995,12 @@ function regionEthnicity(reg){ const id=reg?reg.id:''; if(id==='Britannia'||id==
 function addTroops(type,n){ n=Math.round(n); if(n<=0)return; if(!G.army)G.army={}; G.army[type]=(G.army[type]||0)+n; G.soldiers+=n; }
 function armyTotal(){ let s=0; for(const k in (G.army||{})) s+=G.army[k]; return s; }
 function syncArmy(){ if(!G.army)G.army={}; const tot=armyTotal(); if(G.soldiers<=0){ G.army={}; return; } if(tot<=0){ G.army={levy:G.soldiers}; return; } if(tot!==G.soldiers){ const f=G.soldiers/tot; let acc=0,keys=Object.keys(G.army); keys.forEach((k,i)=>{ if(i<keys.length-1){ G.army[k]=Math.round(G.army[k]*f); acc+=G.army[k]; } else G.army[k]=G.soldiers-acc; }); } }
-function armyPower(){ syncArmy(); let s=0; for(const k in G.army) s+=G.army[k]*(TROOP[k]?TROOP[k].str:0.8); return Math.round(s*(1+(G.armyGear||0)*0.15)*(1+(G.armyTrain||0)*0.12)); }
+function armyPower(){ syncArmy(); let s=0; for(const k in G.army) s+=G.army[k]*(TROOP[k]?TROOP[k].str:0.8);
+  let mult=(1+(G.armyGear||0)*0.15)*(1+(G.armyTrain||0)*0.12);
+  if(G.path==='general') mult*=1.15;                 // magister militum
+  if(G.office>=4) mult*=1.12;                        // consular imperium
+  mult*=1+keyCount()*0.08;                           // key provinces feed the legions
+  return Math.round(s*mult); }
 // ---- army detachments: cost/time scale with distance AND army size ----
 let detTargetId=null, detSize=2000;
 function detCost(fromId,toId,size){
@@ -2924,6 +3059,15 @@ function advanceDay(n){
           toast('👶 A daughter — '+nm+'. One day her marriage will seal an alliance. (+2 pop)',3200); }
       }
       saveQuiet();
+    }
+    // the King of Kings strikes back when hostility runs hot
+    if(G.parthia>70 && Math.random()<0.08){
+      const east=['Mesopotamia','Syria Palaestina','Asōristān','Asia Minor'].filter(k=>G.titles[k]);
+      if(east.length && G.soldiers>800){ const lost=Math.round(G.soldiers*rnd(0.05,0.12)); G.soldiers-=lost; syncArmy();
+        G.lastRaid='🐎 Parthian cataphracts raid '+pick(east)+'! Your garrisons drive them off — '+fmt(lost)+' men fall.'; }
+      else if(east.length){ const tribLoss=ri(120,320); G.coin=Math.max(0,G.coin-tribLoss);
+        G.lastRaid='🐎 Parthian riders burn the '+pick(east)+' countryside — '+tribLoss+'d of tribute goes up in smoke.'; }
+      G.parthia=clamp(G.parthia-8,0,100);
     }
     for(const d of G.detachments){ d.day++;
       if(d.day>=d.eta && d.phase==='out'){
@@ -3072,12 +3216,100 @@ function buildPolitics(b){
   }, G.coin<250);
   mk('⚖ PROSECUTE A PRAETOR (3 favor)','Drag a corrupt praetor before the courts — glory or a new enemy.',()=>{
     if(G.favor<3) return; G.favor-=3; G.lastDebateDay=G.day;
-    if(Math.random()<0.6){ const fine=ri(300,700); G.coin+=fine; G.honor=clamp(G.honor+6,0,100); G.approval=clamp(G.approval+4,0,100);
+    if(Math.random()<(G.office>=3?0.85:0.6)){ const fine=ri(300,700); G.coin+=fine; G.honor=clamp(G.honor+6,0,100); G.approval=clamp(G.approval+4,0,100);
       toast('⚖ GUILTY! The praetor is stripped of office — you claim '+fine+'d of his fines (+6 honor, +4 approval).',3200); }
     else { G.rivals++; toast('⚖ Acquitted! The praetor walks free — and now he wants your head (a new rival stirs).',3000); }
     refreshStatbar(); saveQuiet(); openIntrigue();
   }, G.favor<3);
   card.appendChild(row); b.appendChild(card);
+  // ---- THE ROAD TO THE PURPLE: choose your path once retired ----
+  if(G.retired && !G.path && !G.emperor){
+    const pc=document.createElement('div'); pc.className='shopcard'; pc.style.borderColor='var(--gold)';
+    pc.innerHTML=`<div><b style="color:var(--gold)">⚜ CHOOSE YOUR ROAD TO THE PURPLE</b></div>
+      <div class="small muted">A retired champion must pick his weapon: the toga or the sword. The choice is forever.</div>`;
+    const pr=document.createElement('div'); pr.className='row gap6';
+    const bp=document.createElement('button'); bp.className='btn sm gold'; bp.textContent='🏛 THE TOGA — cursus honorum';
+    bp.title='Climb the ladder of offices by election: Quaestor → Aedile → Praetor → Consul → acclaimed EMPEROR by the Senate itself.';
+    bp.onclick=()=>{ G.path='politics'; saveQuiet(); toast('You choose the toga. Win elections, climb the cursus honorum, and let the Senate hand you the purple.',3200); openIntrigue(); };
+    const bg2=document.createElement('button'); bg2.className='btn sm blood'; bg2.textContent='🗡 THE SWORD — magister militum';
+    bg2.title='Take supreme command: +15% army power, cheaper campaigns — and the purple seized by force.';
+    bg2.onclick=()=>{ G.path='general'; saveQuiet(); toast('You choose the sword. The legions hail you MAGISTER MILITUM (+15% army power) — take the purple by force.',3200); openIntrigue(); };
+    pr.appendChild(bp); pr.appendChild(bg2); pc.appendChild(pr); b.appendChild(pc);
+  }
+  // ---- SENATE ELECTIONS (the toga path) ----
+  if(G.path==='politics' && !G.emperor){
+    const oc=document.createElement('div'); oc.className='shopcard';
+    const cur=OFFICES[G.office], next=OFFICES[G.office+1];
+    let inner=`<div><b style="color:var(--gold)">🗳 CURSUS HONORUM</b> — you are <b>${cur.name}</b>${G.office>0?` <span class="small muted">(${cur.perk})</span>`:''}</div>`;
+    if(next){
+      const keyB=keyCount()*6, sonB=G.children.filter(c=>c.sex==='m').length*3;
+      const chance=clamp(Math.round(G.approval*0.6 + titlesCount()*4 + keyB + sonB + G.favor),5,95);
+      inner+=`<div class="small">Next: <b>${next.name}</b> — campaign chest <b>${next.cost}d</b> · needs ${next.needApproval} approval
+        · your odds ≈ <b style="color:var(--gold)">${chance}%</b>
+        <span class="muted">(approval ${G.approval} · provinces +${titlesCount()*4} · key provinces +${keyB} · sons +${sonB} · favor +${G.favor})</span></div>
+        <div class="small muted">${next.perk}</div>`;
+      oc.innerHTML=inner;
+      const eb=document.createElement('button'); eb.className='btn sm gold'; eb.textContent='🗳 STAND FOR '+next.name.toUpperCase()+' ('+next.cost+'d)';
+      eb.disabled=cool || G.coin<next.cost || G.approval<next.needApproval;
+      eb.title=G.approval<next.needApproval?'The people must approve of you first ('+next.needApproval+' approval needed).':'Campaign, canvass, and let the centuries vote.';
+      eb.onclick=()=>{ if(G.coin<next.cost)return; G.coin-=next.cost; G.lastDebateDay=G.day;
+        if(Math.random()*100<chance){ G.office++; G.approval=clamp(G.approval+5,0,100); G.glory+=40;
+          toast('🗳 ELECTED! The centuries proclaim you '+next.name.toUpperCase()+'! ('+next.perk+')',3400); }
+        else { G.approval=clamp(G.approval-3,0,100); toast('🗳 Defeat at the polls — your rival takes '+next.name+'. The chest is spent (−3 approval).',3000); }
+        refreshStatbar(); saveQuiet(); openIntrigue(); };
+      oc.appendChild(eb);
+    } else {
+      const keys=keyCount(), ready = G.approval>=75 && titlesCount()>=3;
+      inner+=`<div class="small" style="color:var(--gold)">You have reached the consulship. The purple is one acclamation away:</div>
+        <div class="small muted">Needs 75 approval (you: ${G.approval}) · 3 provinces governed (you: ${titlesCount()}) · key provinces held: ${keys} ${keys?'✓ the Senate fears your granaries':''}</div>`;
+      oc.innerHTML=inner;
+      const ab=document.createElement('button'); ab.className='btn sm gold'; ab.textContent='⚜ SENATE ACCLAMATION — TAKE THE PURPLE';
+      ab.disabled=!ready;
+      ab.onclick=()=>{ G.emperor=true; G.imperialDone=true; G.approval=clamp(G.approval+10,0,100); G.legions=Math.max(6,Math.round(G.soldiers/5000)+6); G.glory+=600;
+        saveQuiet(); toast('⚜ THE SENATE KNEELS — no war, no blood: IMPERATOR by acclamation! The purple is yours.',4000); openIntrigue(); };
+      oc.appendChild(ab);
+    }
+    b.appendChild(oc);
+  }
+  // ---- key provinces = raw power ----
+  if(keyCount()>0){
+    const kc=document.createElement('div'); kc.className='small'; kc.style.margin='2px 0';
+    kc.innerHTML='<span style="color:var(--gold)">⚜ KEY PROVINCES:</span> '+Object.keys(KEY_PROVINCES).filter(k=>G.titles[k]).map(k=>k+' <span class="muted">('+KEY_PROVINCES[k]+')</span>').join(' · ')+
+      ` <span class="muted">— +${keyCount()*8}% army power, +${keyCount()*6} election odds, tribute ×1.5</span>`;
+    b.appendChild(kc);
+  }
+  buildForeign(b);
+}
+// ---- FOREIGN POWERS: the Parthian Empire glowers across the Euphrates ----
+function buildForeign(b){
+  const fh=document.createElement('div'); fh.className='small'; fh.style.color='var(--gold)'; fh.style.marginTop='6px';
+  fh.textContent='🦅 FOREIGN POWERS — the Parthian Empire:'; b.appendChild(fh);
+  const card=document.createElement('div'); card.className='shopcard';
+  const host=G.parthia, mood= host>70?'<b style="color:var(--blood)">BAYING FOR WAR</b>': host>45?'wary':'<b style="color:#7ec27e">appeased</b>';
+  card.innerHTML=`<div class="small">The King of Kings watches the Euphrates. Hostility: <b>${host}</b>/100 — ${mood}.
+    ${G.parthiaPact?'<span style="color:#7ec27e">A silk-road pact flows (+6d after every bout).</span>':''}
+    ${host>70?'<span class="muted">At high hostility his cataphracts raid your eastern provinces.</span>':''}</div>`;
+  const row=document.createElement('div'); row.className='row gap6';
+  if(!G.parthiaPact){
+    const tp=document.createElement('button'); tp.className='btn sm gold'; tp.textContent='🐫 SILK-ROAD PACT (400d)';
+    tp.disabled=G.coin<400; tp.title='Buy peace and trade: +6d after every bout, hostility −20.';
+    tp.onclick=()=>{ if(G.coin<400)return; G.coin-=400; G.parthiaPact=true; G.parthia=clamp(G.parthia-20,0,100);
+      toast('🐫 Caravans cross the Euphrates — silk and silver flow (+6d per bout, Parthia cools).',2800); refreshStatbar(); saveQuiet(); openIntrigue(); };
+    row.appendChild(tp);
+  }
+  const rd=document.createElement('button'); rd.className='btn sm blood'; rd.textContent='⚔ RAID ACROSS THE EUPHRATES';
+  rd.disabled=G.soldiers<1000 || !G.generals.length;
+  rd.title='March 2,000+ men against the cataphracts — loot and glory, but the King of Kings will remember.';
+  rd.onclick=()=>{
+    const size=Math.min(G.soldiers, Math.max(2000, Math.round(G.soldiers*0.4))); const gen=G.generals[0];
+    G.soldiers-=size; syncArmy(); G.parthia=clamp(G.parthia+15,0,100); if(G.parthiaPact&&Math.random()<0.5){G.parthiaPact=false;}
+    armyBattle({ title:'RAID ACROSS THE EUPHRATES', sub:'led by '+gen.name, enemyName:'CATAPHRACTS', kind:'field',
+      yourMen:size, enemyMen:Math.round(size*rnd(0.8,1.2)), general:gen,
+      onWin:(yl)=>{ addTroops('levy',Math.max(0,size-yl)); const loot=ri(500,1200); G.coin+=loot; G.glory+=80;
+        saveQuiet(); toast('⚔ The cataphracts break! You carry off '+loot+'d in silk and silver (+80 glory). Parthia seethes.',3200); openIntrigue(); },
+      onLose:(yl)=>{ addTroops('levy',Math.max(0,size-yl)); saveQuiet(); toast('⚔ The horse-archers bleed you dry — the raid fails ('+fmt(yl)+' lost).',3000); openIntrigue(); } });
+  };
+  row.appendChild(rd); card.appendChild(row); b.appendChild(card);
 }
 let detPurpose='raid', detGeneral=0, genCandidates=null;
 function buildGenerals(b){
