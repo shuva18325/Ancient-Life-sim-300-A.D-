@@ -245,7 +245,7 @@
 
   <!-- ===== MARRIAGE (take a wife / dynastic alliance) ===== -->
   <div id="scr-marry" class="screen center">
-    <div class="panel pad col gap scrollbox" style="width:min(96%,700px);max-height:94%;">
+    <div class="panel pad col gap scrollbox" style="width:min(97%,900px);max-height:95%;">
       <h2 style="color:var(--gold)">⚭ TAKE A WIFE</h2>
       <div id="marry-intro" class="small muted"></div>
       <div id="marry-body" class="col gap"></div>
@@ -623,7 +623,13 @@ const BRIDE = {
              surn:['of the Cherusci','the Saxon','of the Marcomanni','of the Suebi'],
              skin:'#f0d0b4', hair:['#e6c860','#d8b84a','#c9a83e'], adj:'Germanic'},
 };
-const BRIDE_ETHS=['roman','persian','egyptian','celt','germanic'];
+BRIDE.greek={names:['Aspasia','Theodora','Kallista','Melissa','Phoebe','Xanthippe','Berenike','Thais'],
+  surn:['of Corinth','of Athens','the Athenian','of Rhodos','of Ephesus'],
+  skin:'#eac09a', hair:['#3a2a1a','#241a10','#5a3a20'], adj:'Greek'};
+BRIDE.numidian={names:['Sophonisba','Tanit','Kahina','Massiva','Zana','Cirta','Yzebel'],
+  surn:['of Cirta','of Numidia','the Massylian','of Leptis','of Carthago'],
+  skin:'#8a5a36', hair:['#141014','#2a1a12'], adj:'Numidian'};
+const BRIDE_ETHS=['roman','persian','egyptian','celt','germanic','greek','numidian'];
 // craft one bride of an ethnicity at a rank ('noble'|'peasant')
 function makeBride(eth, noble){
   const D=BRIDE[eth]||BRIDE.roman;
@@ -631,8 +637,9 @@ function makeBride(eth, noble){
   const roll=Math.random();
   const build = noble ? (roll<0.55?'ample':roll<0.9?'curvy':'slender')
                       : (roll<0.5?'curvy':roll<0.85?'slender':'ample');
-  const dressN = eth==='egyptian'?'#efe8d6' : eth==='persian'?'#2f6f8c' : eth==='celt'?'#3f6a44' : eth==='germanic'?'#7d5c38' : (Math.random()<0.5?'#8a2f5a':'#c07a1e');
-  const dressP = eth==='celt'?'#6b7a4a' : eth==='germanic'?'#9a7a52' : '#cbb489';
+  const dressN = eth==='egyptian'?'#efe8d6' : eth==='persian'?'#2f6f8c' : eth==='celt'?'#3f6a44' : eth==='germanic'?'#7d5c38'
+    : eth==='greek'?'#e8e2d2' : eth==='numidian'?'#c8862a' : (Math.random()<0.5?'#8a2f5a':'#c07a1e');
+  const dressP = eth==='celt'?'#6b7a4a' : eth==='germanic'?'#9a7a52' : eth==='greek'?'#d8d0ba' : eth==='numidian'?'#b08a4a' : '#cbb489';
   const b = {
     eth, adj:D.adj, rank: noble?'noble':'peasant', build,
     name: pick(D.names)+' '+pick(D.surn),
@@ -658,6 +665,12 @@ function makeBride(eth, noble){
   } else if(eth==='celt'){
     b.dowrySoldiers=Math.round(ri(220,520)*s); b.honor=6; b.pop=8; b.tradeCoin=noble?4:2;
     b.perk='A warrior-queen of the tribes — fierce kin-warriors and a crowd wild for the exotic.';
+  } else if(eth==='greek'){
+    b.dowryCoin=Math.round(ri(300,650)*s); b.honor=8; b.approval=noble?8:2; b.tradeCoin=noble?6:3;
+    b.perk='A philosopher’s daughter — Greek learning, honour, and the goodwill of the East.';
+  } else if(eth==='numidian'){
+    b.dowrySoldiers=Math.round(ri(280,620)*s); b.dowryCoin=Math.round(ri(120,300)*s); b.pop=7; b.tradeCoin=noble?5:2;
+    b.perk='A desert princess — the finest light cavalry in the world rides for your house.';
   } else { // germanic
     b.dowrySoldiers=Math.round(ri(260,560)*s); b.honor=5; b.pop=6; b.tradeCoin=noble?4:2;
     b.perk='A shield-maiden of the north — sworn spearmen and iron loyalty.';
@@ -670,8 +683,8 @@ function makeBride(eth, noble){
 function rollBrides(){
   const wealthy = G.socialClass==='elite'||G.socialClass==='upper'||G.coin>=1500||G.plotTier>=2||!!titlesCount&&titlesCount()>0;
   const eths=[...BRIDE_ETHS].sort(()=>Math.random()-0.5);
-  // always offer a Roman first, then two others
-  const order=['roman', ...eths.filter(e=>e!=='roman').slice(0,2)];
+  // always offer a Roman first, then three others
+  const order=['roman', ...eths.filter(e=>e!=='roman').slice(0,3)];
   return order.map((e,i)=>{
     // the Roman match mirrors your class; foreigners are noble alliances more often
     const noble = e==='roman' ? wealthy : (wealthy? true : Math.random()<0.6);
@@ -1534,28 +1547,50 @@ function drawArena(){
   const imperial=t.emperor;
   if(t.siege){ drawVillaBg(); }
   else {
-    // upper sky band above the seating
+    // sky band + VELARIUM: striped canvas awning stretched over the rim
     px(-4,-4,W+8,12,imperial?'#2a1d40':'#b88a4a');
+    for(let x=-4,i=0;x<W+4;x+=22,i++){ px(x,-4,22,9,i%2?'#c8b088':'#a52828'); px(x,3,22,2,i%2?'#a8926c':'#7a1414');
+      px(x,5,22,1,'rgba(0,0,0,.35)'); }                                  // stripes + awning shadow
+    for(let x=10;x<W;x+=48){ px(x,2,2,9,'#5a4028'); px(x,2,2,1,'#8a6a44'); } // rigging poles
     // crowd tiers (seating)
     drawCrowd();
     const seatBottom=10+4*14+3; // ~69
-    // arena facade wall (fills the middle): pilasters + arched openings
     const wallTop=seatBottom, wallH=GROUND-wallTop;
     const wallC=imperial?'#4a3a2e':'#8a6a46', wallSh=imperial?'#352a22':'#6b5236', wallHi=imperial?'#5a4636':'#a07a52';
     px(0,wallTop,W,wallH,wallC);
-    px(0,wallTop,W,3,wallHi);                      // cornice under seats
+    px(0,wallTop,W,3,wallHi);
     px(0,wallTop+3,W,2,wallSh);
     for(let x=6;x<W;x+=48){
-      px(x,wallTop+6,6,wallH-6,wallHi);            // column
-      px(x+1,wallTop+6,1,wallH-6,'#d8c089');       // column highlight
-      px(x+4,wallTop+6,2,wallH-6,wallSh);          // column shadow
+      px(x,wallTop+6,6,wallH-6,wallHi);
+      px(x+1,wallTop+6,1,wallH-6,'#d8c089');
+      px(x+4,wallTop+6,2,wallH-6,wallSh);
       const ax=x+12, ay=wallTop+14, aw=30, ah=wallH-24;
-      if(aw>0&&ah>0){ px(ax,ay,aw,ah,wallSh); px(ax,ay,aw,2,'#000'); px(ax+2,ay+3,aw-4,3,wallC); }
+      if(aw>0&&ah>0){ px(ax,ay,aw,ah,wallSh); px(ax,ay,aw,2,'#000'); px(ax+2,ay+3,aw-4,3,wallC);
+        // spectators peering from the arches
+        px(ax+5,ay+4,4,5,'#876'); px(ax+6,ay+2,3,3,pick(SKIN));
+        px(ax+aw-10,ay+4,4,5,'#765'); px(ax+aw-9,ay+2,3,3,pick(SKIN)); }
     }
-    // low podium barrier just above the sand (fighters stand in front of it)
+    // PORTA (the great arched gate the fighters enter by) at centre
+    const gx=W/2-14, gw=28, gTop=wallTop+8;
+    px(gx,gTop,gw,GROUND-gTop-14,'#241a10');
+    px(gx-3,gTop,3,GROUND-gTop-14,'#d8c089'); px(gx+gw,gTop,3,GROUND-gTop-14,'#d8c089');   // jambs
+    px(gx-3,gTop-4,gw+6,4,'#d8c089'); px(gx-3,gTop-4,gw+6,1,'#f2e2a4');                    // lintel
+    px(gx+2,gTop+4,2,GROUND-gTop-20,'#3c2c1a'); px(gx+gw-4,gTop+4,2,GROUND-gTop-20,'#3c2c1a'); // gate timbers
+    for(let gy=gTop+6;gy<GROUND-18;gy+=6) px(gx+6,gy,gw-12,2,'#171008');                    // portcullis bars
+    // marble statues in niches at the quarter points
+    for(const nx of [W/4-8, 3*W/4-8]){
+      px(nx,wallTop+10,16,wallH-22,wallSh); px(nx+1,wallTop+11,14,wallH-24,'#2e2418');
+      px(nx+5,wallTop+16,6,14,'#d8ccb4'); px(nx+5,wallTop+14,6,4,'#e8dfc9');               // torso+head
+      px(nx+3,wallTop+18,3,8,'#c8bca2'); px(nx+10,wallTop+18,3,8,'#c8bca2');               // arms
+      px(nx+4,wallTop+30,8,3,'#b8ac92');                                                    // plinth
+    }
+    // podium barrier with hanging banners
     px(0,GROUND-14,W,14,'#7a5a3a');
     px(0,GROUND-14,W,3,'#9a7a52');
     for(let x=0;x<W;x+=20){ px(x,GROUND-14,2,14,'#5a3f28'); }
+    for(let x=24;x<W;x+=96){ px(x,GROUND-13,14,10,imperial?'#5a2d8a':'#a52828');
+      px(x,GROUND-13,14,2,'#e8c34a'); px(x+2,GROUND-6,10,1,'#e8c34a');
+      px(x+5,GROUND-10,4,4,'#e8c34a'); }                                                    // SPQR-gold device
   }
   // floor (black-&-white mosaic for a villa siege, sand for the arena)
   if(t.siege){ px(0,GROUND,W,H-GROUND,'#e6ddc8'); px(0,GROUND,W,2,'#f2ead8');   // pale mosaic ground
@@ -1591,17 +1626,26 @@ function drawArena(){
   // verdict overlay
   if(t.over) drawVerdict();
 }
-function drawShadow(f){ ctx.globalAlpha=.28; px(f.x-9, GROUND+1, 18, 2, '#000'); ctx.globalAlpha=1; }
+function drawShadow(f){
+  const h=clamp((GROUND-f.y)/40,0,1), w=14-h*5;      // shadow tightens as they leap
+  ctx.globalAlpha=.30-h*.14; ctx.fillStyle='#000';
+  ctx.beginPath(); ctx.ellipse(f.x,GROUND+2,w,3,0,0,7); ctx.fill();
+  ctx.globalAlpha=.16-h*.08; ctx.beginPath(); ctx.ellipse(f.x,GROUND+2,w+5,4,0,0,7); ctx.fill();
+  ctx.globalAlpha=1;
+}
 function drawCrowd(){
   const crowdMood=FT.crowd;
   for(let row=0;row<4;row++){
     const y=10+row*14;
     px(0,y,W,14,row%2?'#6a5238':'#5a442e');
     for(let x=4+((row*7)%14);x<W;x+=12){
-      const c = crowdMood>60? pick(['#caa','#b97','#a86']) : pick(['#876','#765','#654']);
-      px(x,y+3,6,7,c); px(x+1,y+1,4,3,pick(SKIN)); // body + head
-      // raised arms when crowd hot
-      if(crowdMood>65 && Math.random()<0.15){ px(x,y-1,1,3,pick(SKIN)); px(x+5,y-1,1,3,pick(SKIN)); }
+      const c = crowdMood>60? pick(['#c8a24a','#a52828','#7d5aa0','#4a7a8c','#b97','#caa','#8a9a5a'])
+                            : pick(['#876','#765','#654','#585','#755']);
+      px(x,y+3,6,7,c); px(x,y+3,6,1,shade(c,26)); px(x+1,y+1,4,3,pick(SKIN)); // toga + head
+      if((x*7+row*13)%9===0) px(x+1,y,4,1,'#3a2a18');                          // dark hair
+      // raised waving arms when the crowd is hot
+      if(crowdMood>65 && Math.random()<0.18){ px(x-1,y-1,2,4,pick(SKIN)); px(x+5,y-2,2,4,pick(SKIN)); }
+      if(crowdMood>80 && Math.random()<0.05){ px(x,y-3,6,2,'#e8c34a'); }       // waved cloth
     }
   }
   px(0,10+4*14,W,3,'#3a2c20');
@@ -1784,30 +1828,88 @@ function updateBattle(dt){
   t.parts=t.parts.filter(b=>b.life>0);
   if(t.t>=t.dur && !t.ended){ t.ended=true; setTimeout(finishBattle,700); }
 }
-function drawBattleHost(x,men,maxMen,facing,col,crest,advance){
-  // draw a block of soldiers representing an army; icons scaled to men
-  const cols=10, rows=5, icons=Math.max(1,Math.min(cols*rows, Math.round(men/maxMen*cols*rows)));
-  for(let i=0;i<icons;i++){
+// one detailed mini-legionary (8px): helm, face, tunic, shield, spear; ranks bob as they march
+function drawBattleSoldier(sx,sy,facing,tunic,shieldC,crest,i){
+  const bob=Math.sin((BT.t*0.25)+i*1.7)*0.8;
+  sy+=bob;
+  px(sx,sy+4,1,3,'#6a4a2e'); px(sx+2,sy+4,1,3,'#5a3c24');            // legs
+  px(sx,sy,3,4,tunic); px(sx,sy,3,1,shade(tunic,24));                // tunic
+  px(sx,sy-3,3,3,'#caa06a'); px(sx+(facing>0?2:0),sy-3,1,1,'#241408'); // head + eye
+  px(sx-1,sy-4,5,2,'#b9c0c8'); px(sx-1,sy-5,5,1,crest);              // helm + crest
+  px(sx+facing*3,sy-7,1,10,'#8a6a44'); px(sx+facing*3,sy-7,1,2,'#dfe6ee'); // spear + point
+  px(sx-facing*1-1,sy-1,2,5,shieldC); px(sx-facing*1-1,sy-1,2,1,shade(shieldC,30)); // shield
+  px(sx-facing*1-1,sy+1,1,1,'#e8c34a');                              // boss
+}
+// a cavalry rider on the flank
+function drawBattleHorse(sx,sy,facing,col){
+  const bob=Math.sin(BT.t*0.4+sx)*1;
+  sy+=bob;
+  px(sx,sy,8,4,col); px(sx+(facing>0?7:-1),sy-2,2,3,col);            // horse body + neck
+  px(sx+(facing>0?8:-2),sy-3,2,2,shade(col,-20));                    // head
+  px(sx+1,sy+4,1,3,shade(col,-30)); px(sx+5,sy+4,1,3,shade(col,-30)); // legs
+  px(sx+3,sy-4,2,4,'#caa06a'); px(sx+2,sy-6,4,2,'#b9c0c8');          // rider + helm
+  px(sx+facing*6,sy-8,1,9,'#8a6a44');                                 // lance
+}
+function drawBattleHost(x,men,maxMen,facing,col,crest,advance,shieldC){
+  const cols=9, rows=5, icons=Math.max(1,Math.min(cols*rows, Math.round(men/maxMen*cols*rows)));
+  for(let i=icons-1;i>=0;i--){
     const cc=i%cols, rr=(i/cols)|0;
-    const sx=x + facing*(cc*7) + (advance)*facing;
-    const sy=150 - 22 + rr*9 + Math.sin((BT.t*0.2)+i)*0.6;
-    px(sx,sy,3,6,col); px(sx,sy-3,3,3,'#caa06a'); px(sx,sy-4,3,1,crest); // body, head, crest
-    px(sx+facing*3,sy-6,1,8,'#b9c0c8');                                   // spear
+    const sx=x + facing*(cc*8) + advance*facing + (rr%2)*2*facing;
+    const sy=132 + rr*11;
+    drawBattleSoldier(sx,sy,facing,col,shieldC,crest,i);
   }
+  // standard bearer at the front: tall pole + banner
+  const bx=x+advance*facing+facing*-6, by=126;
+  px(bx,by-18,2,30,'#5a4028'); px(bx,by-18,1,30,'#7a5a38');
+  px(bx+(facing>0?2:-9),by-18,9,7,crest); px(bx+(facing>0?2:-9),by-18,9,1,shade(crest,40));
+  px(bx+(facing>0?4:-7),by-16,5,3,shade(crest,-40));                  // device on the banner
+  px(bx-1,by-20,4,2,'#e8c34a');                                        // gilt finial
+  // cavalry wing behind
+  for(let k=0;k<3;k++) drawBattleHorse(x - facing*(18+k*14), 178+((k%2)*6), facing, facing>0?'#7a5a38':'#4a3a4e');
 }
 function drawBattle(){
   const t=BT, sx=(Math.random()-0.5)*t.shake, sy=(Math.random()-0.5)*t.shake;
+  const p=Math.min(1,t.t/t.dur), clash=clamp((p-0.28)/0.5,0,1);
   ctx.save(); ctx.translate(sx,sy);
-  // sky + field
-  px(-4,-4,W+8,86,t.cfg.night?'#2a2440':'#9ab6cf');
-  px(-4,80,W+8,H,'#7a6a44'); px(-4,80,W+8,4,'#8f7d50');
-  for(let i=0;i<120;i++) px((i*89)%W,86+((i*47)%(H-90)),1,1,'#6a5a38');
-  // banners
-  px(40,40,3,44,'#8a1d1d'); px(30,40,16,10,'#c0392b');
-  px(W-43,40,3,44,'#5a2d8a'); px(W-46,40,16,10,'#6a3aa0');
-  const p=Math.min(1,t.t/t.dur), adv=clamp((p)/0.3,0,1)*70;
-  drawBattleHost(70,  t.yourNow||t.yourMen,   t.yourMen,  1,  '#c8a24a','#e8c34a', adv);   // your army (gold)
-  drawBattleHost(W-70,t.enemyNow||t.enemyMen, t.enemyMen, -1, '#7d5aa0','#b070d0', adv);   // enemy (purple)
+  // ===== sky =====
+  const night=t.cfg.night;
+  for(let i=0;i<5;i++){ ctx.fillStyle=night?['#141225','#1c1830','#252040','#2e2850','#383060'][i]
+      :['#7fa8c8','#8fb4d0','#a2c2da','#b8d2e4','#cfe2ee'][i]; ctx.fillRect(-4,-4+i*20,W+8,20); }
+  if(night){ for(let i=0;i<40;i++) px((i*53)%W,(i*29)%70,1,1,i%4?'#4a4468':'#d8d2ee'); px(W-70,16,10,10,'#e9e7d2'); px(W-68,18,6,6,'#f7f5e6'); }
+  else { px(W-74,10,16,16,'#f7d67a'); ctx.fillStyle='rgba(247,214,122,.3)'; ctx.fillRect(W-80,4,28,28);
+    for(const [cx,cy,cw] of [[60,18,40],[190,10,30],[330,24,36]]){ px(cx,cy,cw,5,'#e8eef2'); px(cx+6,cy-3,cw-14,4,'#f4f8fa'); } }
+  // distant hills
+  ctx.fillStyle=night?'#1e1a30':'#8fa87c'; ctx.beginPath(); ctx.moveTo(-4,96);
+  for(let x=0;x<=W;x+=16) ctx.lineTo(x,88-10*Math.sin(x*0.02)-6*Math.sin(x*0.05));
+  ctx.lineTo(W+4,96); ctx.fill();
+  // ===== field =====
+  px(-4,96,W+8,H-96,night?'#3c3626':'#7e6f46'); px(-4,96,W+8,3,night?'#463f2c':'#8f7d50');
+  for(let i=0;i<160;i++){ const gy=102+((i*47)%(H-108)); px((i*89)%W,gy,1,2,night?'#332d1f':'#6a5a38'); }  // grass tufts
+  for(let i=0;i<40;i++) px((i*127)%W,120+((i*67)%80),2,1,night?'#2c2718':'#8a7448');
+  // trampled road across the middle
+  px(-4,150,W+8,16,night?'#352e1e':'#6e5e3a'); for(let i=0;i<30;i++)px((i*61)%W,152+((i*37)%12),3,1,night?'#2c2617':'#5e5030');
+  // ===== fallen men accumulate at the clash line =====
+  const bodies=Math.round((t.yourLoss+t.enemyLoss)/Math.max(1,(t.yourMen+t.enemyMen))*46*clash);
+  for(let i=0;i<bodies;i++){ const bx2=W/2+((i*37)%90)-45, by2=126+((i*53)%64);
+    px(bx2,by2,5,2,i%2?'#8a6a46':'#6a5a6e'); px(bx2+(i%2?4:-1),by2,1,1,'#caa06a'); px(bx2+2,by2+2,2,1,'#7a1414'); }
+  // ===== the two hosts =====
+  const adv=clamp(p/0.3,0,1)*74;
+  drawBattleHost(56,  t.yourNow||t.yourMen,   t.yourMen,  1,  '#a52828','#e8c34a', adv, '#c8a24a');  // your legion (red+gold)
+  drawBattleHost(W-56,t.enemyNow||t.enemyMen, t.enemyMen, -1, '#4a3a5e','#b070d0', adv, '#7d5aa0');  // enemy host (purple)
+  // ===== arrow volleys arc overhead during the clash =====
+  if(clash>0&&clash<1){
+    for(let i=0;i<7;i++){ const ph=(t.t*0.02+i*0.14)%1, from=i%2? W-80-adv:80+adv, to=i%2? 80+adv:W-80-adv;
+      const ax=from+(to-from)*ph, ay=118-Math.sin(ph*Math.PI)*46;
+      ctx.save(); ctx.translate(ax,ay); ctx.rotate((i%2?-1:1)*(ph-0.5)*1.2);
+      px(0,0,4,1,'#c8b088'); px(i%2?0:3,0,1,1,'#dfe6ee'); ctx.restore(); }
+  }
+  // dust cloud over the melee
+  if(clash>0){ ctx.globalAlpha=0.16+0.1*Math.sin(t.t*0.1);
+    ctx.fillStyle=night?'#57503a':'#b3a274';
+    ctx.beginPath(); ctx.ellipse(W/2,140,44+clash*20,18,0,0,7); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(W/2-20,152,30,12,0,0,7); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(W/2+24,150,30,12,0,0,7); ctx.fill(); ctx.globalAlpha=1; }
+  // sparks & blood at the line
   for(const b of t.parts) px(b.x,b.y,2,2,b.c);
   ctx.restore();
   // HUD banner (below the stat bar) for legible text
@@ -1889,118 +1991,163 @@ function drawCardPortrait(cnv,A){
   else { P(15,-44,4,40,m); P(13,-46,8,3,'#7a5630'); }
   c.restore();
 }
-// forward-facing bust portrait of a prospective wife (painted miniature style)
+// FULL-BODY portrait of a prospective wife — contrapposto pose, figure on show
 function drawBridePortrait(cnv,b){
   const c=cnv.getContext('2d'); c.imageSmoothingEnabled=false;
   const CW=cnv.width,CH=cnv.height;
-  // backdrop: noble = purple-draped alcove with column; peasant = warm mud-plaster wall
+  // backdrop: noble = purple-draped marble alcove; peasant = plaster wall + window
   const bg=c.createLinearGradient(0,0,0,CH);
   if(b.rank==='noble'){ bg.addColorStop(0,'#33203e'); bg.addColorStop(.6,'#221430'); bg.addColorStop(1,'#120a18'); }
   else { bg.addColorStop(0,'#3a2c1c'); bg.addColorStop(.6,'#2a1e12'); bg.addColorStop(1,'#160f08'); }
   c.fillStyle=bg; c.fillRect(0,0,CW,CH);
-  c.save(); c.translate(CW/2,CH-4); const s=Math.min(CW,CH)/64; c.scale(s,s);
+  c.save(); c.translate(CW/2,CH-3); const s=Math.min(CW,CH)/74; c.scale(s,s);
   const P=(x,y,w,hh,col)=>{c.fillStyle=col;c.fillRect(Math.round(x),Math.round(y),Math.round(w),Math.round(hh));};
-  // scenery behind the figure
+  // scenery
   if(b.rank==='noble'){
-    P(-30,-60,8,60,'#cfc0a2'); P(-29,-60,2,60,'#e8dcc2'); P(-25,-60,2,60,'#a8997c');   // marble column
-    P(-32,-62,12,3,'#e0d4b8');
-    for(let i=0;i<7;i++){ P(14+i*2,-60+i,3,58-i,shade('#5a2d6a', i*6)); }               // swagged curtain
-    P(12,-62,20,4,'#3c1d48'); c.fillStyle='#e8c34a'; c.fillRect(13,-59,2,2);
+    P(-32,-70,8,70,'#cfc0a2'); P(-31,-70,2,70,'#e8dcc2'); P(-27,-70,2,70,'#a8997c'); P(-34,-72,12,3,'#e0d4b8'); // column
+    for(let i=0;i<8;i++){ P(16+i*2,-70+i,3,68-i,shade('#5a2d6a',i*6)); }                                        // curtain
+    P(14,-72,22,4,'#3c1d48'); P(15,-69,2,2,'#e8c34a');
+    for(let fx=-34;fx<36;fx+=10){ P(fx,-2,9,2,'#b8a888'); P(fx,-2,9,1,'#d8ccb0'); }                             // marble floor
   } else {
-    for(let i=0;i<5;i++) P(-30,-56+i*11,60,1,'#4a3822');                                // plaster cracks
-    P(18,-46,10,14,'#6a5030'); P(19,-44,8,3,'#8a6a40'); P(19,-38,8,3,'#8a6a40');       // shuttered window
+    for(let i=0;i<6;i++) P(-32,-64+i*11,64,1,'#4a3822');
+    P(20,-52,11,15,'#6a5030'); P(21,-50,9,4,'#8a6a40'); P(21,-44,9,4,'#8a6a40');                                // window
+    P(-34,-2,70,3,'#5a4428'); for(let i=0;i<9;i++)P(-32+i*8,-1,3,1,'#3e2e18');                                  // dirt floor
   }
-  const skin=b.skin, sSh=shade(skin,-34), sHi=shade(skin,26), sGlow=shade(skin,14);
-  const dress=b.dress, dSh=shade(dress,-36), dHi=shade(dress,28), dMid=shade(dress,-14);
-  const hair=b.hair, hSh=shade(hair,-30), hHi=shade(hair,30), gold='#e8c34a', goldHi='#fff0b0';
-  // ---- body build ----
-  const bw = b.build==='ample'?13 : b.build==='curvy'?11 : 8;   // half-width at hips/bust
-  const wa = b.build==='slender'?6 : b.build==='curvy'?6 : 8;   // waist half-width (curvy = pinched waist)
-  const bust = b.build==='ample'?4 : b.build==='curvy'?3 : 2;
-  // ---- gown: hem → hips → pinched waist → bodice (hourglass silhouette) ----
-  P(-bw-3,-5,(bw+3)*2,5,dress); P(-bw-3,-5,(bw+3)*2,1,dHi);       // flaring hem
-  P(-bw-1,-12,(bw+1)*2,7,dress);                                   // hips
-  P(-wa-1,-17,(wa+1)*2,5,dress);                                   // waist
-  P(-bw+1,-23,(bw-1)*2,6,dress);                                   // bodice/bust
-  // vertical drape folds
-  for(let fx=-bw+2;fx<bw-1;fx+=4){ P(fx,-16,1,15,dMid); }
-  P(bw-2,-22,2,21,dSh); P(-bw+1,-22,2,20,dSh); P(-bw+3,-22,1,19,dHi);
-  // girdle knotted under the bust (Roman cingulum)
-  P(-wa-1,-18,(wa+1)*2,2,b.jewel?gold:shade(dress,-50)); if(b.jewel)P(-1,-18,2,2,goldHi);
-  // ---- shoulders, arms & neckline ----
-  if(b.neckline==='fine'){
-    // fine silk stola: bare shoulders, deep scooped décolletage
-    P(-bw+1,-26,(bw-1)*2,4,skin); P(-bw+1,-26,(bw-1)*2,1,sHi);            // bare shoulder line
-    P(-bw,-24,3,10,skin); P(bw-3,-24,3,10,skin);                           // upper arms
-    P(-bw,-16,3,1,sSh); P(bw-3,-16,3,1,sSh);
-    P(-4,-24,8,5,skin);                                                    // open scoop
-    P(-4,-20,8,2,sGlow);
-    // décolletage shading — the line between, and soft curves
-    P(-1,-21,1,3+bust-2,sSh);                                              // cleavage line
-    c.fillStyle=sSh; c.fillRect(-5,-20+bust,3,1); c.fillRect(2,-20+bust,3,1); // under-curve shadow
-    c.fillStyle=sHi; c.fillRect(-4,-22,2,1); c.fillRect(2,-22,2,1);        // highlight
-    // gown edge trim around the scoop
-    P(-5,-24,1,6,b.jewel?gold:dHi); P(4,-24,1,6,b.jewel?gold:dHi); P(-5,-19+bust,10,1,b.jewel?gold:dHi);
+  const skin=b.skin, sSh=shade(skin,-36), sHi=shade(skin,28), sGlow=shade(skin,12);
+  const dress=b.dress, dSh=shade(dress,-38), dHi=shade(dress,30), dMid=shade(dress,-16);
+  const hair=b.hair, hSh=shade(hair,-30), hHi=shade(hair,32), gold='#e8c34a', goldHi='#fff0b0';
+  // ---- figure metrics: bust depth & protrusion, hips & rear, waist pinch ----
+  const bd = b.build==='ample'?9 : b.build==='curvy'?7 : 5;      // bust depth
+  const bp = b.build==='ample'?5 : b.build==='curvy'?4 : 2;      // bust protrusion (front, +x)
+  const hips = b.build==='ample'?16 : b.build==='curvy'?15 : 11; // hip span
+  const rear = b.build==='ample'?5 : b.build==='curvy'?4 : 2;    // buttock bulge (back, -x)
+  const waistW = b.build==='slender'?8 : b.build==='curvy'?7 : 9;
+  const bustTop=-47, bustBot=bustTop+bd, hipTop=-32, hipBot=-23;
+  const noble=b.rank==='noble';
+  // ================= BACK ARM (her left, hanging behind) =================
+  P(-8,-50,3,9,sSh); P(-8,-41,3,7,sSh); P(-8,-34,3,3,shade(skin,-44));
+  // ================= LEGS / SKIRT =================
+  if(noble){
+    // floor-length clingy gown with a high slit baring the front leg
+    P(-7-rear+2,hipBot,10+rear,20,dress);                                   // skirt column (back/left mass)
+    P(-7-rear+2,hipBot,2,20,dSh); for(let fx=-4;fx<2;fx+=3)P(fx,hipBot,1,19,dMid); // folds
+    P(-9-rear+2,-5,13+rear,5,dress); P(-9-rear+2,-5,13+rear,1,dHi);         // pooling hem
+    // slit edge + gold trim
+    P(3,hipBot,1,18,dSh); P(4,hipBot,1,18,noble?gold:dHi);
+    // bared front leg: thigh → knee → calf → ankle
+    P(4,hipBot,4,8,skin); P(4,hipBot,1,8,sHi); P(7,hipBot,1,8,sSh);
+    P(4,-15,4,6,skin); P(7,-15,1,6,sSh);
+    P(4,-9,3,7,skin); P(6,-9,1,7,sSh);
+    P(3,-2,6,2,'#8a5c34'); P(4,-4,4,1,'#a8743e');                            // sandal
+    P(4,-8,3,1,'#8a5c34'); P(4,-12,4,1,'#8a5c34');                           // sandal straps
   } else {
-    // homespun peasant dress: clings to the figure, modest scoop, laced front
-    P(-bw+1,-26,(bw-1)*2,3,skin); P(-3,-24,6,3,skin); P(-3,-22,6,1,sGlow); // smaller scoop
-    P(-1,-22,1,2,sSh);                                                     // hint of cleavage
-    P(-bw,-24,3,9,dMid); P(bw-3,-24,3,9,dMid);                             // rough sleeves
-    for(let ly=-21;ly<-15;ly+=2){ P(-1,ly,2,1,shade(dress,-52)); }         // front lacing
-    P(-bw+2,-14,4,3,dSh); P(bw-6,-9,5,3,dSh);                              // patches
-    c.fillStyle=sSh; c.fillRect(-4,-19+bust,3,1); c.fillRect(1,-19+bust,3,1); // figure shows through cloth
+    // knee-length fitted tunic, both legs bare
+    P(-7-rear+2,hipBot,11+rear,10,dress);
+    P(-7-rear+2,hipBot,2,10,dSh); P(-1,hipBot,1,9,dMid); P(2,hipBot,1,9,dMid);
+    P(-8-rear+2,-13,13+rear,2,dSh);                                          // rough hem
+    P(-5,-11,4,9,sSh); P(-5,-3,4,1,shade(skin,-44));                          // back leg
+    P(1,-11,4,9,skin); P(1,-11,1,9,sHi); P(4,-11,1,9,sSh);                    // front leg
+    P(-6,-2,5,2,'#6a4828'); P(0,-2,6,2,'#8a5c34');                            // sandals
+    P(1,-6,4,1,'#8a5c34'); P(-5,-6,4,1,'#6a4828');                            // ankle laces
   }
-  // ---- neck + head ----
-  P(-3,-30,6,6,skin); P(-3,-26,6,1,sSh);
-  P(-7,-44,14,15,skin); P(-7,-44,14,2,sHi); P(5,-42,2,12,sSh);
-  P(-7,-33,14,3,skin); P(-4,-31,8,2,sSh);                                 // jaw + chin
-  c.fillStyle='rgba(214,92,92,.3)'; c.fillRect(-6,-35,3,2); c.fillRect(3,-35,3,2); // rouge
-  // ---- eyes / brows / lashes / lips ----
-  P(-5,-38,3,2,'#fff'); P(2,-38,3,2,'#fff');
-  P(-4,-38,2,2,b.eth==='celt'?'#3a6a4a':b.eth==='germanic'?'#3a5a7a':'#2a1a10');
-  P(3,-38,2,2,b.eth==='celt'?'#3a6a4a':b.eth==='germanic'?'#3a5a7a':'#2a1a10');
-  P(-4,-38,1,1,'#fff'); P(3,-38,1,1,'#fff');
-  P(-5,-39,3,1,hSh); P(2,-39,3,1,hSh);                                    // lashes/lids
-  P(-6,-41,4,1,hSh); P(2,-41,4,1,hSh);                                    // brows
-  if(b.eth==='egyptian'){ P(-6,-38,1,1,'#101014'); P(5,-38,1,1,'#101014'); P(-6,-37,2,1,'#101014'); P(4,-37,2,1,'#101014'); } // kohl wings
-  P(-1,-36,2,1,sSh);                                                       // nose
-  P(-2,-33,4,2,'#b0384a'); P(-1,-32,2,1,'#d8607a'); P(-2,-34,4,1,'#8a2536'); // full lips
-  // ---- hair by ethnicity (more elaborate) ----
+  // ================= HIPS & REAR (the S-curve) =================
+  P(-6,hipTop,hips-2,hipBot-hipTop,dress);
+  P(-6-rear,hipTop+2,rear+1,7,dress);                                        // buttock swell (back)
+  P(-6-rear,hipTop+3,1,4,dHi); P(-6-rear+1,hipTop+8,rear,1,dSh);             // rear highlight + under-crease
+  P(-5,hipTop+1,2,2,dHi);                                                     // hip sheen
+  P(hips-8,hipTop,2,hipBot-hipTop,dSh);                                       // front hip shadow
+  // girdle low on the hips
+  P(-6-rear+1,hipTop,hips+rear-2,2,noble?gold:shade(dress,-52)); if(noble)P(0,hipTop,2,2,goldHi);
+  // ================= WAIST =================
+  const wx=-(waistW/2)|0;
+  P(wx,bustBot+1,waistW,hipTop-bustBot-1,dress);
+  P(wx,bustBot+1,1,hipTop-bustBot-1,dSh); P(wx+waistW-1,bustBot+1,1,hipTop-bustBot-1,dSh);
+  P(wx+2,bustBot+1,1,hipTop-bustBot-1,dHi);
+  // cinched sash under the bust
+  P(wx-1,bustBot,waistW+2,2,noble?gold:shade(dress,-52)); if(noble)P(0,bustBot,2,2,goldHi);
+  // ================= BUST (large, unmistakable) =================
+  if(noble){
+    // low-scooped silk: bare shoulders/upper chest, gown cups the bust
+    P(-4,-52,10,3,skin); P(-4,-52,10,1,sHi);                                  // collar/upper chest
+    P(-3,bustTop-1,9,2,skin); P(-3,bustTop-1,9,1,sGlow);                      // exposed upper curve
+    P(-4,bustTop,5+bp,bd,dress);  P(2,bustTop,4+bp,bd,dress);                 // two cups
+    P(6,bustTop+1,bp+1,bd-2,dress);                                            // forward thrust
+    P(-3,bustTop,3,2,dHi); P(3,bustTop,3,2,dHi); P(6,bustTop+1,2,1,dHi);      // sheen on the curve
+    P(1,bustTop,1,bd,dSh);                                                     // deep cleavage line
+    P(1,bustTop-1,1,1,sSh);                                                    // skin cleavage above the silk
+    P(-4,bustBot,11+bp,1,dSh);                                                 // heavy under-bust shadow
+    P(-4,bustTop-2,1,bd+2,gold); P(6+bp,bustTop,1,bd,gold);                    // gilt neckline trim
+  } else {
+    // strained homespun — the figure fills the cloth
+    P(-4,-52,10,3,skin); P(-3,-50,8,2,sGlow);                                  // modest scoop
+    P(-4,bustTop,10+bp,bd,dress);
+    P(6,bustTop+1,bp,bd-2,dress);                                              // forward thrust
+    P(-3,bustTop,3,1,dHi); P(3,bustTop,3,1,dHi);
+    P(1,bustTop,1,bd-1,dSh);                                                   // cleavage shows through
+    P(-4,bustBot,10+bp,1,dSh);                                                 // under-shadow
+    for(let ly=bustTop+1;ly<bustBot;ly+=2) P(0,ly,2,1,shade(dress,-46));       // straining laces
+  }
+  // ================= FRONT ARM (akimbo — hand on hip) =================
+  P(4,-51,4,3,skin); P(4,-51,4,1,sHi);                                        // shoulder
+  P(6,-49,3,5,skin); P(8,-45,3,5,skin); P(8,-45,1,5,sHi);                      // upper arm angled out
+  P(8,-40,3,5,skin); P(7,-36,3,4,skin);                                        // forearm returning
+  P(5,-33,4,3,skin); P(5,-31,4,1,sSh);                                         // hand on the hip
+  if(noble){ P(6,-46,3,1,gold); P(7,-38,3,1,gold); }                           // armlet + bracelet
+  // ================= NECK & HEAD =================
+  P(-1,-56,5,5,skin); P(-1,-52,5,1,sSh);
+  P(-4,-66,10,11,skin); P(-4,-66,10,2,sHi); P(4,-64,2,8,sSh);                  // head (3/4 to her right)
+  P(-3,-55,8,2,skin); P(-1,-54,5,1,sSh);                                       // jaw
+  c.fillStyle='rgba(214,92,92,.32)'; c.fillRect(-3,-59,2,2); c.fillRect(3,-59,2,2);
+  // face (looking toward the viewer's right)
+  P(-1,-62,3,2,'#fff'); P(3,-62,2,2,'#fff');
+  const iris=b.eth==='celt'?'#3a6a4a':b.eth==='germanic'?'#3a5a7a':'#2a1a10';
+  P(0,-62,2,2,iris); P(4,-62,1,2,iris); P(0,-62,1,1,'#fff');
+  P(-1,-63,3,1,hSh); P(3,-63,2,1,hSh);                                         // lids
+  P(-2,-64,3,1,hSh); P(3,-64,2,1,hSh);                                         // brows
+  if(b.eth==='egyptian'){ P(-2,-62,1,1,'#101014'); P(5,-62,1,1,'#101014'); }
+  P(3,-60,2,1,sSh);                                                            // nose
+  P(1,-58,4,2,'#b0384a'); P(2,-57,2,1,'#d8607a');                              // lips
+  // ================= HAIR =================
   if(b.eth==='egyptian'){
-    P(-9,-48,18,8,hair); P(-10,-42,4,17,hair); P(6,-42,4,17,hair);
-    for(let i=-9;i<9;i+=2) P(i,-42,1,15,i%4?hSh:hair);                    // wig strands
-    P(-10,-27,4,2,gold); P(6,-27,4,2,gold);                                // gold-tipped locks
-    P(-9,-47,18,2,gold); P(-2,-50,4,4,'#2a6a5a'); P(-1,-49,2,2,'#4aa08a'); // band + scarab
+    P(-6,-68,13,8,hair); P(-7,-62,4,26,hair); for(let i=-6;i<6;i+=2)P(i,-62,1,10,i%4?hSh:hair);
+    P(-7,-38,4,2,gold);                                                        // gold-tipped wig fall
+    P(-6,-67,13,2,gold); P(0,-70,4,3,'#2a6a5a'); P(1,-69,2,2,'#4aa08a');       // band + scarab
   } else if(b.eth==='celt'||b.eth==='germanic'){
-    P(-9,-48,18,8,hair); P(-9,-48,18,2,hHi);
-    P(-12,-42,4,22,hair); P(8,-42,4,22,hair); P(-12,-42,2,22,hHi); P(10,-42,2,20,hSh);
-    for(let y=-40;y<-22;y+=3){ P(-12,y,4,1,hSh); P(8,y,4,1,hSh); }        // braid rungs
-    P(-12,-20,4,2,hSh); P(8,-22,4,2,hSh);                                  // braid ties
-    if(b.eth==='celt'){ P(-9,-49,4,2,'#4a7a44'); P(5,-49,4,2,'#4a7a44'); } // woad-dyed strands
+    P(-6,-68,13,8,hair); P(-6,-68,13,2,hHi);
+    P(-9,-62,4,30,hair); P(-9,-62,2,30,hHi); for(let y=-58;y<-36;y+=3)P(-9,y,4,1,hSh); // long braid down the back
+    P(-9,-32,4,2,hSh);
+    if(b.eth==='celt'){ P(-6,-69,4,2,'#4a7a44'); }
   } else if(b.eth==='persian'){
-    P(-10,-49,20,9,hair); P(-11,-44,3,18,hair); P(8,-44,3,18,hair);
-    for(let i=0;i<5;i++){ P(-11+i*5,-49,2,2,hHi); }                        // pearl-studded curls
-    P(-12,-42,24,4,shade(dress,16)); P(-12,-42,24,1,dHi); P(-12,-39,24,1,dSh); // silk veil
-    P(-10,-50,20,2,b.jewel?gold:dSh); if(b.jewel){P(-1,-52,2,3,goldHi); P(-4,-51,1,2,gold); P(3,-51,1,2,gold);} // tiered diadem
+    P(-7,-69,14,9,hair); for(let i=0;i<5;i++)P(-6+i*3,-69,2,2,hHi);
+    P(-8,-62,3,18,hair);
+    P(-9,-62,17,3,shade(dress,16)); P(-9,-62,17,1,dHi);                        // silk veil
+    P(-7,-70,14,2,noble?gold:dSh); if(noble){P(0,-72,2,3,goldHi);}
+  } else if(b.eth==='greek'){
+    P(-6,-68,13,8,hair); P(-6,-68,13,2,hHi);
+    P(-5,-70,10,4,hair); for(let i=-4;i<5;i+=2)P(i,-70,1,3,hSh);               // krobylos top-knot
+    P(-7,-62,3,10,hair); P(5,-62,2,8,hair);
+    P(-6,-67,12,1,'#7a9a5a'); P(-2,-68,2,1,'#9aba7a');                          // laurel fillet
+  } else if(b.eth==='numidian'){
+    for(let i=0;i<6;i++){ P(-7+i*2.4,-69,2,4,hair); P(-7+i*2.4,-69,1,2,hHi); }  // coiled crown
+    P(-7,-65,14,5,hair); P(-8,-61,3,12,hair); P(6,-61,2,10,hair);
+    P(-8,-49,3,2,gold); P(6,-51,2,2,gold);                                      // gold-cuffed locks
   } else {
-    // Roman: Severan-era stacked waves + braided crown bun
-    P(-9,-49,18,9,hair); P(-9,-49,18,2,hHi);
-    for(let i=0;i<4;i++){ P(-9,-47+i*2,9,1,hSh); P(0,-46+i*2,9,1,hSh); }   // finger waves
-    P(-10,-44,3,13,hair); P(7,-44,3,13,hair); P(-10,-44,1,13,hHi);
-    P(-6,-53,12,5,hair); P(-6,-53,12,1,hHi);
-    for(let i=-6;i<6;i+=2) P(i,-52,1,3,hSh);                               // braided bun texture
-    P(-8,-31,2,3,hSh); P(6,-31,2,3,hSh);                                   // loose ringlets at the neck
+    P(-6,-69,13,9,hair); P(-6,-69,13,2,hHi);
+    for(let i=0;i<4;i++){ P(-6,-67+i*2,6,1,hSh); P(1,-66+i*2,6,1,hSh); }        // stacked waves
+    P(-4,-73,9,5,hair); P(-4,-73,9,1,hHi); for(let i=-4;i<5;i+=2)P(i,-72,1,3,hSh); // braided crown bun
+    P(-7,-64,3,14,hair); P(5,-64,2,12,hair); P(-7,-50,3,2,hSh);                 // side falls
   }
-  // ---- jewellery ----
+  // ================= JEWELLERY =================
   if(b.jewel){
-    P(-6,-29,12,1,gold); P(-5,-28,10,1,goldHi);                            // choker
-    P(-4,-27,8,2,gold); P(-1,-25,2,3,gold); P(-1,-24,2,2,'#c03a4a'); P(0,-24,1,1,'#ff8090'); // garnet pendant on chain
-    P(-9,-36,2,3,gold); P(7,-36,2,3,gold); P(-9,-33,2,1,goldHi); P(7,-33,2,1,goldHi);        // drop earrings
-    if(b.eth!=='egyptian'&&b.eth!=='persian'){ P(-7,-51,14,2,gold); P(-1,-53,2,2,goldHi); }  // diadem
-    P(-bw,-15,3,1,gold); P(bw-3,-15,3,1,gold);                             // armlets
+    P(-2,-53,7,1,gold); P(-1,-52,5,1,goldHi);                                   // choker
+    P(-1,-51,5,1,gold); P(1,-50,2,2,'#c03a4a'); P(2,-50,1,1,'#ff8090');         // garnet pendant into the neckline
+    P(-6,-60,2,3,gold); P(5,-60,2,3,gold); P(-6,-57,2,1,goldHi); P(5,-57,2,1,goldHi); // drop earrings
+    if(b.eth!=='egyptian'&&b.eth!=='persian'){ P(-5,-71,11,2,gold); P(0,-72,2,2,goldHi); }
   } else {
-    P(-2,-27,4,1,'#8a6a4a'); P(-1,-26,2,2,'#6a8a6a');                      // simple cord + bead
+    P(0,-52,4,1,'#8a6a4a'); P(1,-51,2,2,'#6a8a6a');
   }
+  // soft ground shadow
+  c.fillStyle='rgba(0,0,0,.35)'; c.fillRect(-10,0,24,2);
   c.restore();
   // painted-miniature frame
   c.strokeStyle=b.jewel?'#8a6f35':'#4a3a26'; c.lineWidth=2; c.strokeRect(1,1,CW-2,CH-2);
@@ -2256,8 +2403,8 @@ function openVilla(){
 $('btn-villa-back').onclick=()=>enterMap();
 
 // ---- MARRIAGE ----
-function briadeImg(b,size){ const cv=document.createElement('canvas'); cv.width=cv.height=64; drawBridePortrait(cv,b);
-  const im=document.createElement('img'); im.src=cv.toDataURL(); im.width=im.height=size||64; im.style.cssText='image-rendering:pixelated;border:1px solid #000;border-radius:4px;flex:0 0 auto'; return im; }
+function briadeImg(b,size){ const cv=document.createElement('canvas'); cv.width=cv.height=148; drawBridePortrait(cv,b);
+  const im=document.createElement('img'); im.src=cv.toDataURL(); im.width=im.height=size||148; im.style.cssText='image-rendering:pixelated;border:1px solid #000;border-radius:4px;flex:0 0 auto'; return im; }
 function marriageEffectsText(b){
   const bits=[];
   if(b.dowryCoin) bits.push('+'+fmt(b.dowryCoin)+'d dowry');
@@ -2275,7 +2422,7 @@ function buildMarriageCard(b){
   const card=document.createElement('div'); card.className='shopcard';
   if(G.married && G.wife){
     const w=G.wife; const row=document.createElement('div'); row.className='row gap'; row.style.alignItems='center';
-    row.appendChild(briadeImg(w,56));
+    row.appendChild(briadeImg(w,84));
     const info=document.createElement('div'); info.innerHTML=
       `<div><b style="color:var(--gold)">⚭ ${w.name}</b> <span class="small muted">— your ${w.adj} ${w.rank} wife</span></div>
        <div class="small muted">${w.perk}</div>
@@ -2304,7 +2451,7 @@ function openMarry(forced){
   marryList.forEach((w)=>{
     const card=document.createElement('div'); card.className='shopcard';
     const row=document.createElement('div'); row.className='row gap'; row.style.alignItems='flex-start';
-    row.appendChild(briadeImg(w,72));
+    row.appendChild(briadeImg(w,132));
     const info=document.createElement('div'); info.style.flex='1'; info.innerHTML=
       `<div><b style="color:var(--gold)">${w.name}</b></div>
        <div class="small">${w.adj} ${w.rank} · <span class="muted">${w.build} of figure${w.jewel?', richly adorned':''}</span></div>
@@ -2793,10 +2940,12 @@ function drawMapCanvas(){
   ];
   const AFR=[
     [-9.5,30.5],[-8,33],[-5.5,35.9],[-2,35.6],[1,36.7],[5,37],[8,37.1],[10.2,37.3],[11,37],[11,34],[13,33],
-    [15,31.3],[18,30.6],[19.5,31],[21.5,32.7],[24,32.2],[27,31.4],[29.9,31.2],[31,31.5],[32.6,31.1],[33.6,28],
-    [34,24],[34,19],[-11,19],[-11,30.5]
+    [15,31.3],[18,30.6],[19.5,31],[21.5,32.7],[24,32.2],[27,31.4],[29.9,31.2],[31,31.5],[32.3,31.05],[32.65,30],
+    [33.4,27.5],[34.2,24],[34.5,19],[-11,19],[-11,30.5]
   ];
-  const EAS=[[56,44.5],[56,19],[34,19],[34,26],[35.3,29],[37,31],[39,33.5],[40.5,36],[42.5,38.5],[46,40.5],[51,41.5],[56,44.5]];
+  // east land: Red Sea east shore ↑ Aqaba, overland to Gaza, then the TRUE Levant coast ↑ to Anatolia
+  const EAS=[[56,44.5],[56,19],[38.5,19],[37.6,21.5],[36.4,24],[35.4,26.8],[34.9,29.3],[34.2,31.3],
+    [34.7,32.2],[35.1,33.2],[35.5,34.2],[35.9,35.5],[36.1,36.4],[38,37.2],[40.5,37.8],[44,39.8],[48,41],[52,42],[56,43]];
   const BRIT=[[-5.7,50],[-4.5,51.6],[-5.1,52.5],[-4.5,53.4],[-3,53.4],[-3.2,55],[-2,57],[-3.2,58.6],[-1.8,57.4],[-1.4,54.5],[0.6,53],[1.7,52.8],[1.3,51.4],[-0.3,50.7],[-3,50.2]];
   const HIB=[[-10,52],[-9.5,54.5],[-7,55.4],[-5.6,54.2],[-6.2,52.2],[-9,51.5]];
 
@@ -2813,16 +2962,20 @@ function drawMapCanvas(){
   fill([ [-11,32],[-6,33.4],[-1,34.1],[4,34],[9,33.4],[12,31],[16,29.6],[21,29.6],[26,28.6],[28.7,28.6],
     [29.6,24],[31.6,24],[32.6,27],[34,28],[37,30],[40,31],[41,19],[-11,19] ],LAND);                                  // Sahara + Arabia interior
   fill([ [42,41],[56,41],[56,48],[42,48] ],LAND);                                                                   // Caucasus / north-Caspian seam
+  // Sinai peninsula (Roman) — the triangle between the Red Sea's two gulfs
+  fill([[32.3,31.05],[34.2,31.3],[34.9,29.9],[34.35,27.7],[33.6,28.3],[32.7,30.0]],EMP);
 
   // ===== carve inland seas =====
   fill([[27,41],[31,41.3],[36,41],[40,41.6],[41.8,43],[40,45.2],[36,46.6],[31,46.6],[28,45.4],[26.7,43.4]],SEA); // Black Sea
   fill([[47,37.5],[49.5,37.5],[54,40.5],[54,47],[50,47],[47,44]],SEA);                                          // Caspian
-  fill([[32.6,30.2],[34,29],[38,21],[36.4,20],[33,26.8],[32,29.6]],SEA);                                        // Red Sea
+  // Red Sea — forked head: Gulf of Suez (west) + Gulf of Aqaba (east) around Sinai
+  fill([[32.7,30.1],[33.5,27.8],[34.3,24.5],[34.7,20],[36.9,20],[35.7,24.5],[35.05,27.2],[34.65,29.6],
+    [34.25,29.3],[34.4,27.9],[33.75,28.5],[33.05,29.7]],SEA);
   fill([[47,30.5],[50,29],[56,25],[56,23],[49,27.2],[47,29.3]],SEA);                                            // Persian Gulf
 
   // ===== CLIENT STATES (pale salmon) =====
   fill([[34,44.2],[37.5,45.6],[37.5,44],[34.6,43.6]],CLIENT);                    // Bosporan Kingdom (Crimea)
-  fill([[35.5,31],[39,30],[40,26.5],[37.5,25.5],[35.6,28]],CLIENT);             // Nabataea / Arabia Petraea
+  fill([[35.2,30.9],[37,30.5],[38.2,28.8],[37.2,26.8],[35.8,27.4],[35.1,29.2]],CLIENT); // Nabataea / Arabia Petraea (east of Aqaba)
   fill([[40,40.3],[44,40.2],[45.5,38.5],[42,38],[40,39]],CLIENT);               // Armenia (buffer)
 
   // ===== ISLANDS =====
@@ -2848,7 +3001,7 @@ function drawMapCanvas(){
 
   // ===== red imperial frontier (Rhine → Danube, and the Euphrates) =====
   stroke([[4.3,52],[6.5,50.5],[8,49],[10,48.5],[13,48.5],[17,48],[19,46],[22,45],[25,45],[28,45.3]],FRONT,1.4); // Rhine–Danube
-  stroke([[40,38],[40.5,36],[40,34],[40.5,31.5],[39,30],[37,31]],FRONT,1.4);                                    // Euphrates → desert
+  stroke([[40,38],[40.3,36.2],[39.6,34.4],[38.8,32.6],[37.6,31.2],[36,30.6]],FRONT,1.4);                        // Euphrates → desert
   stroke([[10.2,37.3],[13,32.5],[20,30.5],[27,29],[32,28.5],[34,28]],FRONT,1.1,[3,3]);                          // Sahara limit (dashed)
 
   // ===== mountain ranges (atlas hachures: little brown peaks along the crests) =====
