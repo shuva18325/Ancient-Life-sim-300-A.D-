@@ -310,6 +310,7 @@
       <div id="brief-forbidden" class="small"></div>
       <div class="row gap" style="margin-top:4px;flex-wrap:wrap;">
         <button class="btn blood" id="btn-fight-go">⚔ ENTER THE ARENA</button>
+        <button class="btn" id="btn-skirmish">🏴 PIT SKIRMISH</button>
         <button class="btn" id="btn-hire">🛡 HIRE A CHAMPION</button>
         <button class="btn" id="btn-ambush">🗡 AMBUSH (SHADY)</button>
         <button class="btn" id="btn-rig">🤝 RIG THE BOUT</button>
@@ -1044,6 +1045,22 @@ function makeFighter(opts){
 }
 
 let FT=null;   // active fight context
+// roll a fresh arena opponent (used for single bouts and each skirmish wave)
+function makeArenaFoe(tier, esc, mult){
+  const foeHp=(88 + tier*22) * esc * (mult||1);
+  const fc=CLASSES[pick(Object.keys(CLASSES))].start;
+  return makeFighter({
+    isPlayer:false, x:340, facing:-1,
+    maxHp:foeHp, hp:foeHp, name:pick(FOE_NAMES)+' '+pick(FOE_TITLES),
+    skin:pick(SKIN), tunic:pick(['#2f4a7a','#4a2f5a','#2f5a3a','#5a4a2f','#5a2f2f']),
+    gear:{
+      weapon:gearOf('weapon',fc.weapon),shield:gearOf('shield',fc.shield),
+      helmet:gearOf('helmet',fc.helmet),armor:gearOf('armor',fc.armor),
+    },
+    ai:{ react:clamp(0.5-tier*0.05,0.12,0.5), aggr:clamp(0.4+tier*0.12,0.4,0.95),
+         think:0, want:'approach', skill:tier },
+  });
+}
 function startFight(region, briefData){
   const tier=region.tier;
   // player fighter from career loadout
@@ -1062,21 +1079,7 @@ function startFight(region, briefData){
   });
   // foe scales with tier + popularity (battle escalation)
   const esc = 1 + (G.pop/100)*0.5;
-  const foeHp = (88 + tier*22) * esc;
-  const fname = pick(FOE_NAMES)+' '+pick(FOE_TITLES);
-  const foeClasses=Object.keys(CLASSES);
-  const fcls=pick(foeClasses); const fc=CLASSES[fcls].start;
-  const foe=makeFighter({
-    isPlayer:false, x:340, facing:-1,
-    maxHp:foeHp, hp:foeHp, name:fname,
-    skin:pick(SKIN), tunic:pick(['#2f4a7a','#4a2f5a','#2f5a3a','#5a4a2f','#5a2f2f']),
-    gear:{
-      weapon:gearOf('weapon',fc.weapon),shield:gearOf('shield',fc.shield),
-      helmet:gearOf('helmet',fc.helmet),armor:gearOf('armor',fc.armor),
-    },
-    ai:{ react:clamp(0.5-tier*0.05,0.12,0.5), aggr:clamp(0.4+tier*0.12,0.4,0.95),
-         think:0, want:'approach', skill:tier },
-  });
+  const foe=makeArenaFoe(tier, esc, 1);
   FT={
     region, brief:briefData, p, foe,
     crowd:50, time:0, over:false, result:null,
@@ -1084,6 +1087,9 @@ function startFight(region, briefData){
     hired:briefData.hired||false, ambush:briefData.ambush||false, provisioned:!!G.provisioned,
     upperHelp:!!briefData.upperHelp,
     siege:briefData.siege||null, plot:briefData.plot||null, rival:briefData.rival||false,
+    pit:!!briefData.pit || !!briefData.gauntlet,
+    gauntlet: briefData.gauntlet? {total:briefData.gauntlet, left:briefData.gauntlet-1, wave:1, corpses:[]} : null,
+    waveLock:false,
     emperor: (region.id==='Italia' && briefData.imperial) || (briefData.plot && briefData.plot.name.indexOf('EMPEROR')>=0) || briefData.rival,
     shake:0, particles:[], banners:[], decals:[], flash:0, hitstop:0,
   };
@@ -1301,7 +1307,7 @@ function updateFight(dt){
   FT.banners=FT.banners.filter(b=>b.life>0);
   FT.shake*=Math.pow(0.8,dt);
   // KO check
-  if(!FT.over){
+  if(!FT.over && !FT.waveLock){
     if(foe.hp<=0){ foe.hp=0; endFight(true); }
     else if(p.hp<=0){ p.hp=0; endFight(false); }
   }
@@ -1311,12 +1317,39 @@ function updateFight(dt){
   $('hud-p-st').style.width=clamp(p.stamina/p.maxStamina*100,0,100)+'%';
   $('hud-e-st').style.width=clamp(foe.stamina/foe.maxStamina*100,0,100)+'%';
   $('hud-p-stance').textContent='STANCE: '+p.stance.toUpperCase()+(FT.forbiddenEquipped?'  ⚠FORBIDDEN':'');
-  const cb=$('hud-crowd-box'); if(cb) cb.style.display = FT.siege? 'none':'block';
+  const cb=$('hud-crowd-box'); if(cb) cb.style.display = (FT.siege||FT.pit)? 'none':'block';
+  // live HP numbers on the plates, like a proper fight card
+  const pn=$('hud-p-name'), en=$('hud-e-name');
+  if(pn.dataset.base===undefined || pn.dataset.base!==p.name){ pn.dataset.base=p.name; }
+  pn.textContent=p.name.toUpperCase()+'  '+Math.ceil(p.hp)+' / '+Math.round(p.maxHp);
+  en.textContent=foe.name.toUpperCase()+'  '+Math.ceil(foe.hp)+' / '+Math.round(foe.maxHp);
   $('hud-crowd').style.width=FT.crowd+'%';
   if(performance.now()>toastT) $('hud-toast').style.display='none';
 }
 let endLock=false;
 function endFight(won){
+  const gt=FT.gauntlet;
+  if(won && gt && gt.left>0){
+    // ---- skirmish wave: this foe falls where he stands, the next steps in ----
+    const loser=FT.foe;
+    FT.waveLock=true;
+    loser.knock=true; loser.vy=-5; loser.vx=loser.facing*-3; loser.rot=loser.facing*0.5;
+    bleed(loser.x, loser.y-22, 22, -loser.facing);
+    for(let i=0;i<8;i++) FT.decals.push({x:loser.x+rnd(-12,12),y:GROUND+rnd(-1,3),w:ri(2,6),h:1,c:pick(BLOODS),a:0.6});
+    FT.shake=8; FT.flash=0.5; FT.hitstop=6; sfx('ko');
+    setTimeout(()=>{
+      if(!FT || state!=='fight') return;
+      gt.corpses.push({x:clamp(loser.x,26,W-26), skin:loser.skin, tunic:loser.tunic});
+      gt.left--; gt.wave++;
+      FT.foe=makeArenaFoe(FT.region.tier, 1+(G.pop/100)*0.5, 1+gt.wave*0.12);
+      FT.foe.x = FT.p.x<W/2? W-50 : 50; FT.foe.facing = FT.foe.x>FT.p.x?-1:1;
+      FT.p.hp=Math.min(FT.p.maxHp, FT.p.hp+FT.p.maxHp*0.16); FT.p.stamina=FT.p.maxStamina;
+      $('hud-e-name').textContent=FT.foe.name.toUpperCase();
+      FT.waveLock=false;
+      toast('Another steps onto the field!',1100);
+    }, 900);
+    return;
+  }
   FT.over=true; endLock=true;
   const {p,foe}=FT;
   const loser=won?foe:p;
@@ -1392,6 +1425,8 @@ function finishFight(won){
     if(FT.hired){ glory=Math.round(glory*0.2); popDelta=Math.max(0,popDelta-2); honorDelta=-14; note+='A hired champion bled for you — the coin is yours, but your name earns nothing. '; }
     else if(FT.rigged){ honorDelta=-12; note+='A fixed bout — little glory, and whispers spread. '; if(Math.random()<0.3){popDelta-=8; honorDelta-=6; note+='Some swear it was rigged! ';} }
     if(FT.ambush){ honorDelta-=10; note+='You struck from the shadows beforehand — effective, but dishonourable. '; }
+    if(FT.gauntlet){ const n=FT.gauntlet.total; glory=Math.round(glory*(1+n*0.45)); coin=Math.round(coin*(1+n*0.55));
+      popDelta+=n; note+='You felled '+n+' men in the pits — the tale spreads like fire. '; }
     if(FT.emperor){ glory*=2; popDelta+=20; honorDelta+=6; note+='THE EMPEROR IS PLEASED. '; }
     G.wins++; G.coin+=coin; G.glory+=glory; G.pop=clamp(G.pop+popDelta,0,100);
     G.cleared[reg.id]=true; G.clears[reg.id]=(G.clears[reg.id]||0)+1;
@@ -1538,6 +1573,42 @@ function drawVillaBg(){
     px(bx+11,by+6,3,2,'#f0d488'); px(bx+16,by+6,3,2,'#f0d488');
     const f=(flick*1.5)|0; px(bx+13,by+24,4,3,'#ff9a2a'); px(bx+14,by+22-f,2,3,'#ffd15a'); })();          // altar flame
 }
+// gnarled dead tree silhouette (for the pit battlefield)
+function drawDeadTree(x,y,h,c){
+  px(x-2,y-h,4,h,c);                                              // trunk
+  px(x-1,y-h-6,2,7,c);
+  px(x-8,y-h+6,7,2,c); px(x-11,y-h+2,4,2,c); px(x-8,y-h+4,2,4,c); // left limbs
+  px(x+2,y-h+3,8,2,c); px(x+9,y-h-2,2,6,c); px(x+7,y-h+1,4,2,c);  // right limbs
+  px(x-4,y-h-4,2,5,c); px(x+2,y-h-8,2,5,c);                        // crown twigs
+}
+// foggy outdoor pit battlefield (skirmish bouts) — dead trees, fog, a legion banner
+function drawPitBg(){
+  const tt=(FT&&FT.time)||0;
+  const skyC=['#8a958c','#93a094','#9caa9c','#a5b2a3','#adbaab','#b5c1b2'];
+  for(let i=0;i<6;i++) px(-4,-4+i*14,W+8,15,skyC[i]);
+  px(-4,86,W+8,GROUND-86,'#bcc7b8');                                   // hazy lowland fills to the ground
+  px(-4,GROUND-34,W+8,34,'#b0bcaa'); px(-4,GROUND-12,W+8,12,'#a3b09c'); // ground haze deepens
+  // distant tree line in the haze
+  ctx.globalAlpha=.35; for(let x=0;x<W;x+=34){ drawDeadTree(x+((x*7)%22),GROUND-46,14,'#7e8b7f'); } ctx.globalAlpha=1;
+  // near dead trees
+  drawDeadTree(64,GROUND-6,34,'#3f4a42');
+  drawDeadTree(W-70,GROUND-10,42,'#37423b');
+  drawDeadTree(W/2+40,GROUND-26,18,'#57645a');
+  // drifting fog banks
+  ctx.globalAlpha=.22; px(-4,64+Math.sin(tt*0.015)*6,W+8,20,'#c6cfc6');
+  ctx.globalAlpha=.16; px(-4,100+Math.cos(tt*0.011)*8,W+8,26,'#bcc7bc'); ctx.globalAlpha=1;
+  // legion standard planted at the left
+  px(30,GROUND-70,3,70,'#4a3a2a'); px(30,GROUND-70,1,70,'#6a5638');
+  px(33,GROUND-68,22,28,'#8a1d1d'); px(33,GROUND-68,22,3,'#a83030'); px(33,GROUND-42,22,2,'#5a1010');
+  px(39,GROUND-60,10,9,'#e8c34a'); px(42,GROUND-63,4,3,'#e8c34a');       // gold eagle device
+  px(28,GROUND-72,7,3,'#c8a24a');
+  // scattered wreckage of earlier bouts
+  px(150,GROUND-16,2,16,'#8a6a44'); px(146,GROUND-18,10,3,'#b9c0c8'); px(149,GROUND-20,4,3,'#b9c0c8'); // planted trident
+  ctx.save(); ctx.translate(210,GROUND-3); ctx.rotate(-.3);
+  for(let i=0;i<6;i++){ const w2=(8-Math.abs(2.5-i)*2)|0; px(-w2/2,-6+i*2,w2,2,i<3?'#a87a3e':'#8a5c2e'); } ctx.restore(); // dropped buckler
+  px(258,GROUND-4,7,4,'#cfc4ae'); px(259,GROUND-3,2,2,'#241c12'); px(263,GROUND-3,1,2,'#241c12');  // skull
+  px(320,GROUND-2,16,2,'#7a5630'); px(334,GROUND-4,5,3,'#9aa4ae');                                  // broken spear
+}
 function drawArena(){
   const t=FT;
   let sx=(Math.random()-0.5)*t.shake, sy=(Math.random()-0.5)*t.shake;
@@ -1546,6 +1617,7 @@ function drawArena(){
   const reg=t.region;
   const imperial=t.emperor;
   if(t.siege){ drawVillaBg(); }
+  else if(t.pit){ drawPitBg(); }
   else {
     // sky band + VELARIUM: striped canvas awning stretched over the rim
     px(-4,-4,W+8,12,imperial?'#2a1d40':'#b88a4a');
@@ -1604,11 +1676,26 @@ function drawArena(){
     // scattered coloured tesserae for richness
     for(let i=0;i<80;i++){ px((i*67)%W, GROUND+8+((i*41)%(H-GROUND-8)),1,1, i%3?'#b8956a':'#7a2f2a'); }
   }
+  else if(t.pit){ // trampled mud-and-grass field
+    px(0,GROUND,W,H-GROUND,'#6b7a5c'); px(0,GROUND,W,2,'#7e8f6a');
+    for(let i=0;i<90;i++){ px((i*97)%W,GROUND+3+((i*53)%(H-GROUND-5)),2,1,'#57664c'); }
+    for(let i=0;i<40;i++){ const gx=(i*127)%W, gy=GROUND+2+((i*71)%(H-GROUND-6));
+      px(gx,gy,1,3,'#7e8f6a'); px(gx+2,gy+1,1,2,'#8a9b74'); }                      // grass tufts
+    for(const [mx,mw] of [[80,50],[240,70],[390,44]]){ px(mx,GROUND+6,mw,5,'#75664c'); px(mx+4,GROUND+8,mw-10,2,'#665741'); } // mud patches
+  }
   else { px(0,GROUND,W,H-GROUND,'#d8b271'); px(0,GROUND,W,3,'#c79a55');
     for(let i=0;i<70;i++){ px((i*97)%W,GROUND+4+((i*53)%(H-GROUND-6)),1,1,'#c79a55'); } }
   // blood decals soaked into the sand
   for(const d of t.decals){ ctx.globalAlpha=d.a; px(d.x,d.y,d.w,d.h,d.c); }
   ctx.globalAlpha=1;
+  // fallen gladiators from earlier skirmish waves stay where they dropped
+  if(t.gauntlet) for(const cp of t.gauntlet.corpses){
+    ctx.globalAlpha=.45; px(cp.x-12,GROUND,26,3,'#5a1010'); ctx.globalAlpha=1;      // blood pool
+    px(cp.x-9,GROUND-4,16,4,cp.tunic); px(cp.x-9,GROUND-4,16,1,shade(cp.tunic,20)); // torso lying
+    px(cp.x+7,GROUND-4,4,3,cp.skin); px(cp.x+6,GROUND-6,6,2,'#9aa4ae');             // head + helm rolled off
+    px(cp.x-13,GROUND-3,4,2,cp.skin); px(cp.x-1,GROUND-6,5,2,cp.skin);              // sprawled arms
+    px(cp.x+13,GROUND-13,2,13,'#8a6a44'); px(cp.x+12,GROUND-15,4,3,'#b9c0c8');      // his blade planted beside him
+  }
   // emperor box
   if(t.emperor) drawEmperorBox();
   // fighters (draw far one first)
@@ -1621,6 +1708,10 @@ function drawArena(){
   ctx.textAlign='center';
   for(const b of t.banners){ pixelText(b.t,b.x,b.y,b.c,1); }
   ctx.restore();
+  // skirmish tally — "1 vs 3" like a pit fight card
+  if(t.gauntlet){ ctx.textAlign='center';
+    pixelText('1  vs  '+(t.gauntlet.left+1), W/2, 40, 'rgba(58,66,58,.9)', 2);
+    pixelText('WAVE '+t.gauntlet.wave+' / '+t.gauntlet.total, W/2, 52, 'rgba(58,66,58,.7)', 1); }
   // impact flash (full-screen red kiss on heavy hits)
   if(t.flash>0.02){ ctx.fillStyle='rgba(150,15,15,'+(t.flash*0.5)+')'; ctx.fillRect(0,0,W,H); }
   // verdict overlay
@@ -1802,16 +1893,21 @@ requestAnimationFrame(loop);
    ===================================================================== */
 let BT=null;
 function armyBattle(cfg){
-  // cfg: {title, sub, yourMen, enemyMen, general, night, onWin, onLose}
+  // cfg: {title, sub, yourMen, enemyMen, general, night, kind:'field'|'siege'|'ambush', onWin, onLose}
+  const kind=cfg.kind||'field';
   const gearMult=(1+G.armyGear*0.15)*(1+G.armyTrain*0.12);
   const gp = cfg.general? cfg.general.power : 1;
   const yourPower=Math.round(cfg.yourMen*gearMult*gp);
-  const enemyPower=Math.round(cfg.enemyMen*rnd(0.85,1.15));
+  let enemyPower=Math.round(cfg.enemyMen*rnd(0.85,1.15));
+  let lossMult=1;
+  if(kind==='siege'){ enemyPower=Math.round(enemyPower*((cfg.general&&cfg.general.smart>=8)?1.06:1.22)); lossMult=1.15; } // walls favour the defender — unless your general is a genius engineer
+  if(kind==='ambush'){ enemyPower=Math.round(enemyPower*0.76); lossMult=0.8; cfg.night=true; }                            // total surprise
   const win = yourPower>=enemyPower;
   const r = yourPower/(yourPower+enemyPower);
-  const yourLoss=Math.min(cfg.yourMen, Math.round(cfg.yourMen*(win?(0.10+(1-r)*0.5):(0.40+(1-r)*0.4))*(cfg.general?cfg.general.casualty:1)));
+  const yourLoss=Math.min(cfg.yourMen, Math.round(cfg.yourMen*(win?(0.10+(1-r)*0.5):(0.40+(1-r)*0.4))*(cfg.general?cfg.general.casualty:1)*lossMult));
   const enemyLoss=win? cfg.enemyMen : Math.round(cfg.enemyMen*r*0.8);
-  BT={cfg,win,yourPower,enemyPower,yourLoss,enemyLoss,yourMen:cfg.yourMen,enemyMen:cfg.enemyMen,
+  cfg.sub=(cfg.sub?cfg.sub+'   ·   ':'')+({field:'PITCHED BATTLE',siege:'SIEGE ASSAULT',ambush:'NIGHT AMBUSH'})[kind];
+  BT={cfg,kind,win,yourPower,enemyPower,yourLoss,enemyLoss,yourMen:cfg.yourMen,enemyMen:cfg.enemyMen,
       t:0,dur:170,parts:[],shake:0,ended:false};
   state='battle';
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('on'));
@@ -1888,6 +1984,28 @@ function drawBattle(){
   for(let i=0;i<40;i++) px((i*127)%W,120+((i*67)%80),2,1,night?'#2c2718':'#8a7448');
   // trampled road across the middle
   px(-4,150,W+8,16,night?'#352e1e':'#6e5e3a'); for(let i=0;i<30;i++)px((i*61)%W,152+((i*37)%12),3,1,night?'#2c2617':'#5e5030');
+  // ===== battle-kind scenery =====
+  if(t.kind==='siege'){
+    // the defenders' stone wall + gate + towers on the right
+    const wx=W-108, wTop=100;
+    px(wx,wTop,26,176-wTop,'#8a8a92');
+    px(wx,wTop,26,3,'#a2a2aa'); px(wx+22,wTop,4,176-wTop,'#6e6e76');
+    for(let cy=wTop+8;cy<170;cy+=9) for(let cx2=wx+2;cx2<wx+22;cx2+=8) px(cx2,cy,6,4,'#7a7a82');    // masonry
+    for(let cx2=wx-2;cx2<wx+28;cx2+=8) px(cx2,wTop-5,5,5,'#8a8a92');                                 // crenellations
+    px(wx-12,wTop-14,12,190-wTop,'#7e7e86'); px(wx-12,wTop-14,12,3,'#96969e');                       // tower
+    for(let cx2=wx-13;cx2<wx-1;cx2+=5) px(cx2,wTop-19,4,5,'#7e7e86');
+    px(wx+4,140,16,36,'#3a3026'); px(wx+6,144,12,30,'#241c12'); px(wx+4,140,16,3,'#a2a2aa');         // gate
+    // your ladders against the wall + a ram at the gate
+    ctx.save(); ctx.translate(wx-4,176); ctx.rotate(-1.05); px(0,0,3,60,'#8a6a44'); for(let ly=4;ly<56;ly+=7)px(-2,ly,7,2,'#a8875a'); ctx.restore();
+    ctx.save(); ctx.translate(wx-26,168); ctx.rotate(-1.05); px(0,0,3,52,'#8a6a44'); for(let ly=4;ly<48;ly+=7)px(-2,ly,7,2,'#a8875a'); ctx.restore();
+    px(wx-40,164,34,6,'#5a4028'); px(wx-40,162,6,4,'#6e5030'); px(wx-10,166,8,4,'#9aa4ae');          // battering ram
+  } else if(t.kind==='ambush'){
+    // dark pine forest closing in
+    for(let x=6;x<W;x+=42){ const th=26+((x*7)%14);
+      px(x+3,120-th,3,th+16,'#141a12');
+      for(let b2=0;b2<4;b2++){ const bw2=12-b2*2.6; px(x+4-bw2/2+1.5,124-th+b2*6,bw2,4,'#1c2618'); } }
+    ctx.globalAlpha=.24; px(-4,116,W+8,34,'#0e1410'); ctx.globalAlpha=1;                              // forest gloom
+  }
   // ===== fallen men accumulate at the clash line =====
   const bodies=Math.round((t.yourLoss+t.enemyLoss)/Math.max(1,(t.yourMen+t.enemyMen))*46*clash);
   for(let i=0;i<bodies;i++){ const bx2=W/2+((i*37)%90)-45, by2=126+((i*53)%64);
@@ -2017,11 +2135,11 @@ function drawBridePortrait(cnv,b){
   const dress=b.dress, dSh=shade(dress,-38), dHi=shade(dress,30), dMid=shade(dress,-16);
   const hair=b.hair, hSh=shade(hair,-30), hHi=shade(hair,32), gold='#e8c34a', goldHi='#fff0b0';
   // ---- figure metrics: bust depth & protrusion, hips & rear, waist pinch ----
-  const bd = b.build==='ample'?11 : b.build==='curvy'?9 : 6;     // bust depth (bigger)
+  const bd = b.build==='ample'?11 : b.build==='curvy'?9 : 6;     // bust depth
   const bp = b.build==='ample'?6 : b.build==='curvy'?5 : 3;      // bust protrusion (front, +x)
-  const hips = b.build==='ample'?18 : b.build==='curvy'?16 : 12; // hip span (wider)
-  const rear = b.build==='ample'?7 : b.build==='curvy'?5 : 3;    // buttock bulge (bigger)
-  const waistW = b.build==='slender'?7 : b.build==='curvy'?6 : 8; // waist stays SLIM
+  const hips = b.build==='ample'?15 : b.build==='curvy'?14 : 12; // hips shapely, never wide/fat
+  const rear = b.build==='ample'?6 : b.build==='curvy'?5 : 3;    // buttock projection
+  const waistW = b.build==='slender'?7 : b.build==='curvy'?6 : 7; // waist stays SLIM on all
   const bustTop=-47, bustBot=bustTop+bd, hipTop=-32, hipBot=-23;
   const noble=b.rank==='noble';
   // ================= BACK ARM (her left, hanging behind) =================
@@ -2050,13 +2168,23 @@ function drawBridePortrait(cnv,b){
     P(-6,-2,5,2,'#6a4828'); P(0,-2,6,2,'#8a5c34');                            // sandals
     P(1,-6,4,1,'#8a5c34'); P(-5,-6,4,1,'#6a4828');                            // ankle laces
   }
-  // ================= HIPS & REAR (the S-curve) =================
+  // ================= HIPS & REAR — TWO cheeks with a visible cleft =================
   P(-6,hipTop,hips-2,hipBot-hipTop,dress);
-  P(-6-rear,hipTop+1,rear+1,9,dress);                                        // buttock swell (bigger)
-  P(-7-rear,hipTop+3,1,6,dress);                                              // outermost curve
-  P(-6-rear,hipTop+2,1,6,dHi); P(-7-rear,hipTop+4,1,3,dHi);                  // rim light on the curve
-  P(-6-rear+1,hipTop+10,rear+2,1,dSh);                                        // under-crease
-  P(-6-rear+2,hipTop+11,rear,1,shade(dress,-52));                             // deep crease shadow
+  // far cheek (peeks out behind, slightly darker for depth)
+  P(-8-rear,hipTop+3,3,7,shade(dress,-10));
+  P(-9-rear,hipTop+5,1,4,shade(dress,-10));
+  P(-8-rear,hipTop+4,1,3,shade(dress,12));                                    // far-cheek rim light
+  // near cheek (the full round one)
+  P(-6-rear,hipTop+1,rear+1,9,dress);
+  P(-7-rear,hipTop+3,1,6,dress);
+  P(-6-rear,hipTop+2,1,6,dHi); P(-7-rear,hipTop+4,1,3,dHi);                  // bright rim on the curve
+  // THE CLEFT — dark separation line between the two cheeks
+  P(-7-rear,hipTop+2,1,9,shade(dress,-52));
+  P(-8-rear,hipTop+9,2,1,shade(dress,-40));                                   // cleft flares at the base
+  // gluteal folds — each cheek gets its own under-crease
+  P(-6-rear+1,hipTop+10,rear+2,1,dSh);
+  P(-8-rear,hipTop+10,3,1,shade(dress,-46));
+  P(-6-rear+2,hipTop+11,rear,1,shade(dress,-52));
   P(-5,hipTop+1,2,2,dHi);                                                     // hip sheen
   P(hips-8,hipTop,2,hipBot-hipTop,dSh);                                       // front hip shadow
   // girdle low on the hips
@@ -2075,14 +2203,20 @@ function drawBridePortrait(cnv,b){
     P(-4,bustTop-2,11,3,skin); P(-4,bustTop-2,11,1,sGlow);                    // wide exposed upper curve
     P(-4,bustTop,4,bd,dress);  P(3,bustTop,3+bp,bd,dress);                    // two cups, parted
     P(6,bustTop+1,bp+1,bd-2,dress);                                            // forward thrust
-    // the exposed skin V of the cleavage (deep)
+    // the exposed skin V of the cleavage — deep, with graded shading
+    P(-1,bustTop-1,5,1,sGlow);                                                 // sunlit brim of the V
     P(0,bustTop,3,1,skin); P(0,bustTop+1,3,1,skin); P(1,bustTop+2,2,1,skin); P(1,bustTop+3,1,1,skin);
-    P(1,bustTop,1,4,sSh);                                                      // shadowed centre line
-    P(0,bustTop,1,2,sGlow); P(2,bustTop,1,2,sGlow);                            // lit inner curves
+    P(1,bustTop,1,2,shade(skin,-16)); P(1,bustTop+2,1,3,sSh);                  // centre line darkens with depth
+    P(0,bustTop,1,2,sGlow); P(2,bustTop,1,2,sGlow);                            // lit inner swells
+    P(0,bustTop+2,1,1,shade(skin,-8)); P(2,bustTop+2,1,1,shade(skin,-8));      // curves rolling inward
+    c.fillStyle='rgba(220,110,110,.20)'; c.fillRect(-1,bustTop,1,3); c.fillRect(3,bustTop,1,3); // soft blush at the curves
     P(1,bustTop+4,1,bd-5,dSh);                                                 // fabric cleavage continues
     P(-3,bustTop,3,2,dHi); P(3,bustTop+1,3,2,dHi); P(6,bustTop+2,2,1,dHi);    // sheen on the swell
+    c.fillStyle='rgba(255,255,255,.35)'; c.fillRect(-3,bustTop+1,2,1); c.fillRect(4,bustTop+2,2,1); // silk shine
+    c.fillStyle='rgba(255,255,255,.18)'; c.fillRect(-2,bustTop+3,1,1); c.fillRect(5,bustTop+4,1,1);
     P(-4,bustBot,5,1,dSh); P(2,bustBot,5+bp,1,dSh);                            // twin under-bust shadows
     P(-3,bustBot+1,2,1,dSh); P(3,bustBot+1,3,1,dSh);                           // rounded under-curves
+    P(-2,bustBot-1,1,1,shade(dress,-26)); P(4,bustBot-1,2,1,shade(dress,-26)); // weight shading low on the cups
     P(-4,bustTop-3,1,bd+3,gold); P(6+bp,bustTop,1,bd,gold);                    // gilt neckline trim
   } else {
     // strained homespun — deep unlaced scoop, the figure fills the cloth
@@ -2819,6 +2953,7 @@ function launchConquest(toId,size,generalIdx){
   G.coin-=cost; G.soldiers-=size; syncArmy();
   const enemyMen=Math.round((1500+reg.tier*2200)*rnd(0.85,1.15));
   armyBattle({ title:'BATTLE FOR '+toId.toUpperCase(), sub:'led by '+gen.name+' — '+gen.label, enemyName:'GARRISON',
+    kind: reg.tier>=3? 'siege':'field',
     yourMen:size, enemyMen, general:gen,
     onWin:(yl)=>{ addTroops('levy', Math.max(0,size-yl)); G.titles[toId]=REGION_TITLES[toId]||('Dominus '+toId);
       G.pop=clamp(G.pop+5,0,100); saveQuiet(); toast('★ '+toId+' is YOURS — you are proclaimed '+G.titles[toId]+'! ('+fmt(yl)+' fallen)',3200); openIntrigue(); },
@@ -2830,6 +2965,7 @@ function startPlot(){
   const gen=G.generals[0]||null;
   const size=G.soldiers;
   armyBattle({ title:'OVERTHROW — '+t.name.toUpperCase(), sub:gen?('led by '+gen.name+' — '+gen.label):'you lead the assault yourself', enemyName:'LOYALISTS',
+    kind: G.plotTier===0? 'ambush' : (G.plotTier>=3? 'siege':'field'),
     yourMen:size, enemyMen:t.enemyArmy, general:gen,
     onWin:(yl)=>{ G.soldiers=Math.max(0,G.soldiers-yl); syncArmy(); G.coin+=t.reward; G.glory+=t.glory; G.pop=clamp(G.pop+15,0,100); G.honor=clamp(G.honor-8,0,100); G.plotTier++; G.wins++;
       const champ=G.plotTier>=PLOT_TARGETS.length; if(champ){ G.imperialDone=true; G.emperor=true; G.approval=60; G.legions=Math.max(6,Math.round(G.soldiers/5000)+6); G.rivals=2; }
@@ -3185,6 +3321,10 @@ function openBrief(reg,imperial){
   const hireCost=Math.round(180+tier*140);
   $('btn-fight-go').textContent = cantFight? '⚔ (ARENA CLOSED TO YOU)' : '⚔ ENTER THE ARENA';
   $('btn-fight-go').disabled = cantFight;
+  const skirN=2+tier;
+  $('btn-skirmish').textContent=`🏴 PIT SKIRMISH (1 v ${skirN})`;
+  $('btn-skirmish').title='An unsanctioned mass bout on the field outside the walls — face '+skirN+' men in a row for a far greater purse.';
+  $('btn-skirmish').disabled = cantFight || imperial;
   $('btn-rig').textContent=`🤝 RIG THE BOUT (${rigCost}d)`;
   $('btn-skip').textContent=`🪙 BUY YOUR WAY PAST (${skipCost}d)`;
   $('btn-hire').textContent=`🛡 HIRE A CHAMPION (${hireCost}d)`;
@@ -3204,6 +3344,11 @@ $('btn-brief-back').onclick=()=>enterMap();
 $('btn-fight-go').onclick=()=>{
   const b=briefCtx;
   startFight(b.reg,{forbiddenEquipped:b.eqForbidden, rigged:false, imperial:b.imperial, upperHelp:b.upperHelp});
+};
+$('btn-skirmish').onclick=()=>{
+  const b=briefCtx;
+  startFight(b.reg,{forbiddenEquipped:b.eqForbidden, gauntlet:2+b.tier, pit:true, upperHelp:b.upperHelp});
+  toast('You march out past the walls to the fighting pits…',1500);
 };
 $('btn-hire').onclick=()=>{
   const b=briefCtx; if(G.coin<b.hireCost) return;
