@@ -2770,145 +2770,146 @@ function drawShadowPlay(s,T){
   const total= s.len==='quick'?6:8;
   const vi=(((T-520)/160)|0)%total, vt=(T-520)%160;
   const celt=(G.wife&&G.wife.eth==='celt'), egy=(G.wife&&G.wife.eth==='egyptian');
-  // rounded silhouette block — corner-trimmed so nothing reads as a box
-  const B=(x,y,w,h)=>{ x=Math.round(x);y=Math.round(y);w=Math.round(w);h=Math.round(h);
-    if(w<3||h<3){ px(x,y,Math.max(1,w),Math.max(1,h),S); return; }
-    px(x+1,y,w-2,h,S); px(x,y+1,1,h-2,S); px(x+w-1,y+1,1,h-2,S); };
+  // ---- CURVE PRIMITIVES: silhouettes are one flat colour, so draw real curves ----
+  const ball=(x,y,r)=>{ ctx.fillStyle=S; ctx.beginPath(); ctx.arc(x,y,Math.max(0.5,r),0,7); ctx.fill(); };
+  const ell=(x,y,rx,ry,rot)=>{ ctx.fillStyle=S; ctx.beginPath(); ctx.ellipse(x,y,Math.max(0.5,rx),Math.max(0.5,ry),rot||0,0,7); ctx.fill(); };
+  const cap=(x1,y1,x2,y2,r1,r2)=>{ ctx.fillStyle=S; const a=Math.atan2(y2-y1,x2-x1);   // a smooth tapered capsule (round limb)
+    ctx.beginPath(); ctx.arc(x1,y1,Math.max(0.5,r1),a+1.5708,a-1.5708); ctx.arc(x2,y2,Math.max(0.5,r2),a-1.5708,a+1.5708); ctx.closePath(); ctx.fill(); };
+  const lit=(x1,y1,x2,y2,w)=>{ ctx.strokeStyle=L; ctx.lineWidth=w||1.4; ctx.lineCap='round'; ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke(); };
   const HB=(x,y,c)=>{ if((T|0)%(c||16)<2) s.hearts.push({x:x+rnd(-4,4),y,vy:0.6,life:46,c:'#e26a8a'}); };
-  const woad=(x,y)=>{ if(celt){ px(x,y,3,4,'rgba(70,130,205,.6)'); px(x-1,y-2,2,3,'rgba(70,130,205,.5)'); px(x+3,y-2,2,3,'rgba(70,130,205,.5)'); } };  // Celtic war-paint handprint
-  const kohl=(x,y)=>{ if(egy){ px(x,y,2,1,'#e8c34a'); px(x-2,y,2,1,'#e8c34a'); } };  // Egyptian kohl glint
+  const woad=(x,y)=>{ if(celt){ ctx.fillStyle='rgba(70,130,205,.6)'; ctx.beginPath(); ctx.arc(x,y,2.4,0,7); ctx.fill();
+    for(let a=0;a<4;a++){ ctx.beginPath(); ctx.arc(x+Math.cos(a*1.4-0.6)*3.4,y+Math.sin(a*1.4-0.6)*3.4,1,0,7); ctx.fill(); } } };  // Celtic war-paint handprint
+  const kohl=(x,y)=>{ if(egy){ ctx.strokeStyle='#e8c34a'; ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(x-3,y); ctx.lineTo(x+2,y-1); ctx.stroke(); } };  // Egyptian kohl wing
+  // a DETAILED phallus: rounded balls, a curved shaft, a full glans, a lit ridge (still silhouette)
+  const phallus=(x,y,dir,ang)=>{ ctx.fillStyle=S;
+    ball(x-dir*1.5,y+4,3.4); ball(x+dir*2.5,y+5,3.1);                       // the pair, two rounds
+    const len=16, lift=ang*12, tx=x+dir*len, ty=y-2-(ang>0?lift:lift*0.45);
+    const mx=x+dir*len*0.55, my=(y-2+ty)/2 - (ang<0?-2:2.5);               // the bow of the shaft
+    cap(x,y-1, mx,my, 3.7,3.5); cap(mx,my, tx,ty, 3.5,3.3);                // curved shaft in two arcs
+    ball(tx,ty,3.7);                                                       // the glans, full and round
+    lit(x+dir*3,y-2, tx-dir*2.5,ty-2, 1); };                              // the ridge catches the light
+  // a broad MAN, standing, facing right by default
+  const maleStand=(x,base,dir)=>{ dir=dir||1;
+    cap(x-4,base-32,x-5,base-16,5.5,4); cap(x-5,base-16,x-4,base-3,4,3); ell(x-5,base-2,5,2.6);   // legs
+    cap(x+4,base-32,x+4,base-16,5.5,4); cap(x+4,base-16,x+4,base-3,4,3); ell(x+4,base-2,5,2.6);
+    ell(x,base-34,8,6);                                                    // hips
+    cap(x,base-40,x,base-56,7,9); ell(x,base-57,10,4.5);                   // torso taper up to broad shoulders
+    cap(x,base-61,x,base-57,3.5,3.5); ball(x,base-67,6.8);                 // neck, head
+    ball(x+dir*6.5,base-66,1.8); kohl(x+dir*4,base-67);                    // nose
+    cap(x-dir*2,base-55,x-dir*3,base-42,3.5,3); };                         // arm
+  // a curvy WOMAN, standing, facing dir (-1 = left); sw = bounce; wrap = [x,y] to hook a leg round him
+  const femStand=(x,base,dir,sw,wrap)=>{ sw=sw||0;
+    cap(x+dir*3,base-32,x+dir*3,base-16,5,3.6); cap(x+dir*3,base-16,x+dir*3,base-3,3.6,2.6); ell(x+dir*3,base-2,4.5,2.5);  // back leg
+    if(wrap){ cap(x-dir*2,base-38+sw,wrap[0],wrap[1],5,4); cap(wrap[0],wrap[1],wrap[0]-dir*8,wrap[1]-6,4,3); }             // wrapping leg
+    else { cap(x-dir*3,base-33,x-dir*5,base-16,5,3.6); cap(x-dir*5,base-16,x-dir*4,base-3,3.6,2.6); ell(x-dir*6,base-2,4.5,2.5); }
+    ell(x,base-34,9.5,7);                                                  // hips
+    ball(x+dir*8,base-34+sw,7); ball(x+dir*9.5,base-28+sw,6); lit(x+dir*4.5,base-40+sw,x+dir*4.5,base-27+sw,1.5);          // the 🍑, cleft lit
+    cap(x,base-40,x,base-53,4,6);                                          // waist pinch → chest
+    ell(x-dir*6,base-50+sw,5,4.2); ball(x-dir*10,base-49+sw,1.7);          // bust + point
+    ell(x,base-54,7,4); cap(x,base-58,x,base-54,3,3);                      // shoulders, neck
+    ball(x,base-63,6.4); ball(x+dir*6.5,base-65,4.2); ball(x-dir*6,base-62,1.7); kohl(x-dir*4,base-63);  // head, bun, nose
+    cap(x+dir*3,base-52,x+dir*4,base-40,3,2.4); };                         // arm
+  // a MAN kneeling, facing left (for the pursuit)
+  const maleKneel=(x,base)=>{
+    ball(x+2,base-70,7.5); ball(x-4,base-68,1.8);                          // head, nose (left)
+    ell(x,base-58,10,5); cap(x,base-54,x-2,base-42,6.5,7); ell(x-2,base-40,9,6);   // shoulders, torso, hips
+    cap(x-2,base-38,x-6,base-24,5,4); cap(x-6,base-24,x-4,base-14,4,3.5); ell(x-6,base-12,5,3);   // near kneeling leg
+    cap(x+6,base-38,x+8,base-22,5,4); ell(x+8,base-14,5,3); };             // far leg
   const rock=Math.sin(T*0.34), rk2=Math.sin(T*0.34-0.55);
 
   if(vi===0){ // THE EMBRACE — standing, wound together, swaying as one
-    const sx=rock*3, hx=cx0-9+sx, wx=cx0+11+sx, sw=rk2*2;
-    // HIM (faces right)
-    B(hx-17,base-80,15,16);                                              // head
-    px(hx-3,base-72,3,3,S); px(hx-2,base-67,4,2,S); kohl(hx-2,base-71);  // nose, jaw
-    B(hx-14,base-64,8,6); B(hx-24,base-60,20,13);                        // neck, broad back
-    B(hx-21,base-47,17,21);                                              // torso
-    B(hx-19,base-27,8,19); B(hx-9,base-27,8,19);                         // thighs
-    B(hx-18,base-9,7,9); B(hx-9,base-9,7,9); px(hx-20,base-1,10,3,S); px(hx-10,base-1,10,3,S);  // shins, feet
-    px(hx-4,base-46,13,5,S);                                             // his arm around her waist
-    // HER (faces left, pressed close, rising on the sway)
-    B(wx+2,base-78+sw,15,15);                                            // head
-    px(wx+15,base-81+sw,7,8,S);                                          // bun
-    px(wx+1,base-70+sw,2,2,S); px(wx,base-66+sw,3,2,S); kohl(wx+2,base-70+sw);  // nose, lips
-    B(wx,base-61+sw,8,7); B(wx-2,base-54+sw,14,12);                      // neck, upper torso
-    px(wx-8,base-52+sw,7,8,S); px(wx-11,base-49+sw,3,4,S);               // bust jutting toward him
-    B(wx-1,base-43+sw,13,9); B(wx-3,base-34,16,13);                      // waist, hips 🍑
-    woad(wx+4,base-32);                                                  // a blue handprint on her hip
-    px(wx-9,base-31,15,6,S); px(wx-15,base-28,7,5,S);                    // her lifted thigh wrapping his hip
-    px(wx+5,base-22,7,17,S); px(wx+4,base-6,9,6,S);                      // standing leg + foot
-    px(wx-5,base-63+sw,13,4,S); px(wx-13,base-60+sw,6,3,S);             // her arm over his shoulder
-    HB(cx0,base-88,16);
-  } else if(vi===1){ // THE KISS — two big heads, a hand at the cheek, lips that meet
+    const sx=rock*3, hx=cx0-9+sx, wx=cx0+12+sx, sw=rk2*2;
+    maleStand(hx,base,1);
+    cap(hx+3,base-46,wx-3,base-42,3.5,3);                                // his arm around her waist
+    femStand(wx,base,-1,sw,[hx+4,base-37]);                             // her leg wraps his hip
+    cap(wx-2,base-58+sw,hx+3,base-56,3,2.5);                            // her arm over his shoulder
+    woad(wx+5,base-33);                                                  // blue handprint on her hip
+    HB(cx0,base-86,16);
+  } else if(vi===1){ // THE KISS — two big curved heads, a hand at the cheek, lips that meet
     const d=Math.max(0,14-vt*0.3), sw=Math.sin(T*0.3)*1.5;
-    // HIS head (left, faces right)
-    B(cx0-44-d,base-84,27,31); px(cx0-44-d,base-86,27,5,S);             // skull + cropped hair
-    px(cx0-18-d,base-70,3,4,S); px(cx0-16-d,base-65,5,3,S);             // brow, nose (inner edge)
-    px(cx0-17-d,base-59,5,3,S);                                          // lips
-    B(cx0-50-d,base-54,22,34);                                          // his neck → shoulder mass
-    // HER head (right, faces left)
-    B(cx0+17+d,base-82+sw,27,30); px(cx0+38+d,base-86+sw,10,10,S);      // skull + bun
-    px(cx0+15+d,base-68+sw,3,4,S); px(cx0+13+d,base-63+sw,5,3,S); kohl(cx0+18+d,base-70+sw);  // brow, nose
-    px(cx0+14+d,base-57+sw,5,3,S);                                       // lips
-    B(cx0+28+d,base-52+sw,22,32); px(cx0+22+d,base-46+sw,9,11,S);       // her shoulder + bust hint
-    // her hand cups his cheek
-    px(cx0-8,base-74+sw,9,5,S); for(let f=0;f<3;f++) px(cx0-10,base-74+sw+f*2,3,1,S);
-    if(d<=0){ px(cx0-15,base-60,30,7,S);                                 // the lips MEET
-      HB(cx0,base-90,12); }
-    woad(cx0-40,base-58);
+    ball(cx0-30-d,base-64,15);                                          // his head
+    ell(cx0-30-d,base-76,14,6);                                        // his hair
+    ball(cx0-16-d,base-60,3);                                          // his nose (points right)
+    cap(cx0-38-d,base-52,cx0-40-d,base-20,11,13);                      // his neck → shoulder mass
+    ball(cx0+16+d,base-64+sw,14);                                      // her head
+    ball(cx0+35+d,base-68+sw,8);                                       // her bun
+    ball(cx0+3+d,base-60+sw,3); kohl(cx0+8+d,base-64+sw);              // her nose (points left)
+    cap(cx0+26+d,base-52+sw,cx0+30+d,base-20+sw,11,13);                // her neck → shoulder
+    ell(cx0+18+d,base-44+sw,7,5.5);                                    // her bust
+    ball(cx0-6,base-62+sw,4); cap(cx0-6,base-62+sw,cx0-1,base-54+sw,2.5,2);  // her hand cups his cheek
+    if(d<=0){ ell(cx0,base-57,7,3.5); HB(cx0,base-88,12); }            // the lips MEET
+    woad(cx0-38,base-50);
   } else if(vi===2){ // THE 🍑 & HIM — her on all fours, him behind, the rhythm plain
-    const th=Math.max(0,Math.sin(T*0.5))*7, tb=Math.sin(T*0.5);          // the drive
-    // HER — on hands & knees, profile facing LEFT
-    B(cx0-58,base-38,17,15); px(cx0-60,base-30,2,2,S); px(cx0-49,base-44,8,8,S);  // head down, hair spill
-    B(cx0-46,base-34,32,12);                                            // her arched back
-    B(cx0-50,base-32,7,22); px(cx0-51,base-10,9,4,S);                   // supporting arm + hand
-    // her 🍑 — two full rounds, raised, at the right of her body
-    B(cx0-18,base-40,16,17); B(cx0-4,base-40,16,17);
-    px(cx0-3,base-38,3,17,L);                                           // lit cleft
-    px(cx0-12,base-25,26,3,L);                                          // underbutt light
-    woad(cx0-10,base-36);
-    px(cx0-17,base-24,9,15,S); px(cx0-2,base-24,9,15,S);                // her thighs to the knee
-    // HIM behind (right), kneeling, driving in rhythm
-    B(cx0+4+th,base-78,16,16); px(cx0+4+th,base-70,2,2,S);             // head (faces left)
-    B(cx0+1+th,base-63,19,8); B(cx0+3+th,base-55,16,18);              // shoulders, torso
-    px(cx0-3+th,base-46,8,6,S);                                        // his hand gripping her hip
-    B(cx0+1+th,base-40,18,14);                                         // his hips flush to her 🍑
-    B(cx0+5+th,base-26,8,22); B(cx0+15+th,base-26,8,20);              // his kneeling legs
-    px(cx0-22+th,base-32,8,1,L); px(cx0-20+th,base-27,7,1,L);          // motion lines
-    HB(cx0-6,base-84,10);
-  } else if(vi===3){ // THE RIDE — her astride him, rising & falling, hair & bust alive
+    const th=Math.max(0,Math.sin(T*0.5))*7;
+    ball(cx0-56,base-32,8); ball(cx0-62,base-30,2.4); ell(cx0-48,base-40,6,6);   // her head down, hair spill
+    cap(cx0-48,base-34,cx0-14,base-30,8,9);                             // her arched back
+    cap(cx0-50,base-30,cx0-50,base-12,5,3.5); ell(cx0-50,base-9,5,2.5); // supporting arm + hand
+    ball(cx0-12,base-34,10); ball(cx0+1,base-34,10);                    // the 🍑 — two full round cheeks
+    lit(cx0-5.5,base-42,cx0-5.5,base-25,1.6); lit(cx0-13,base-26,cx0+8,base-26,1.4);  // cleft + underbutt light
+    cap(cx0-13,base-28,cx0-16,base-12,7,4.5); cap(cx0-1,base-28,cx0+2,base-12,7,4.5); // thighs to the knee
+    woad(cx0-8,base-32);
+    maleKneel(cx0+6+th,base);                                          // HIM behind, driving
+    ball(cx0-4+th,base-40,4); cap(cx0-4+th,base-40,cx0-12+th,base-38,3,2.5);  // his hand gripping her hip
+    lit(cx0-24+th,base-32,cx0-16+th,base-32,1); lit(cx0-22+th,base-27,cx0-15+th,base-27,1);  // motion
+    HB(cx0-6,base-82,10);
+  } else if(vi===3){ // THE RIDE — her astride, rising & falling, hair & bust alive
     const bo=Math.max(0,Math.sin(T*0.42))*6, sw=Math.sin(T*0.42);
-    // HIM reclined (head left, propped on an elbow)
-    B(cx0-60,base-34,16,14); B(cx0-47,base-27,33,12);                  // his head, reclined torso
-    px(cx0-42,base-34,6,6,S);                                          // his propping arm
-    B(cx0-22,base-24,14,9);                                            // his hips beneath her
-    px(cx0-24,base-40+bo*0.3,7,4,S); px(cx0+2,base-40+bo*0.3,7,4,S);   // his hands on her hips
-    // HER astride, upright, front-on, riding
-    B(cx0-15,base-74-bo,18,17);                                        // head
-    px(cx0-18,base-78-bo,7,7,S); px(cx0+2,base-78-bo,7,7,S);           // hair falling both sides
-    B(cx0-14,base-57-bo,16,15);                                        // torso
-    px(cx0-17,base-55-bo+sw*1.5,6,7,S); px(cx0+9,base-55-bo-sw*1.5,6,7,S);  // bust, bouncing on the beat
-    B(cx0-16,base-43-bo*0.4,20,12);                                    // her hips settled on his
-    px(cx0-19,base-56-bo,5,13,S); px(cx0+9,base-56-bo,5,13,S);         // her arms
-    px(cx0-21,base-34,8,17,S); px(cx0+7,base-34,8,17,S);               // straddling thighs
-    HB(cx0-6,base-84,10);
+    ball(cx0-56,base-30,8); ell(cx0-40,base-24,17,7);                   // him reclined
+    cap(cx0-48,base-28,cx0-40,base-20,3,2.5); ell(cx0-20,base-22,9,6);  // his propping arm, hips
+    ball(cx0-22,base-38+bo*0.3,3.5); ball(cx0+4,base-38+bo*0.3,3.5);    // his hands on her hips
+    ball(cx0-10,base-66-bo,9);                                          // her head
+    ell(cx0-18,base-72-bo,4,7); ell(cx0-2,base-72-bo,4,7);             // hair both sides
+    cap(cx0-10,base-58-bo,cx0-9,base-46-bo,6,8);                        // torso, waist→hips
+    ell(cx0-16,base-52-bo+sw*1.5,5,4); ell(cx0-2,base-52-bo-sw*1.5,5,4);  // two breasts, bouncing
+    ell(cx0-9,base-42-bo*0.4,11,6);                                     // her hips on his
+    cap(cx0-16,base-56-bo,cx0-20,base-44-bo,3,2.5); cap(cx0-2,base-56-bo,cx0+2,base-44-bo,3,2.5);  // arms
+    cap(cx0-14,base-38,cx0-18,base-24,5,3.5); cap(cx0-4,base-38,cx0,base-24,5,3.5);  // straddling thighs
+    HB(cx0-8,base-82,10);
   } else if(vi===4){ // THE LIFT — he holds her to the wall, legs wrapped, bouncing
     const bo=Math.max(0,Math.sin(T*0.44))*4;
-    // HIM standing, braced (faces right)
-    B(cx0-32,base-78,16,15); B(cx0-38,base-62,20,22);                  // head, torso
-    B(cx0-36,base-38,9,22); B(cx0-26,base-38,9,22);                    // braced legs
-    px(cx0-38,base-2,10,3,S); px(cx0-28,base-2,10,3,S);
-    px(cx0-20,base-52,13,6,S); px(cx0-20,base-40,13,6,S);              // his arms under her
-    // HER lifted, wrapped (faces left)
-    B(cx0-10,base-76-bo,16,15); px(cx0+4,base-79-bo,7,7,S);            // head, bun
-    B(cx0-12,base-61-bo,15,14); px(cx0-16,base-59-bo,6,7,S);           // torso, bust toward him
-    B(cx0-12,base-48-bo,16,12);                                        // hips
-    px(cx0-18,base-46-bo,8,6,S); px(cx0-20,base-40-bo,7,11,S);         // near leg hooking his back
-    px(cx0+3,base-46-bo,7,6,S); px(cx0+5,base-40-bo,6,11,S);           // far leg
-    px(cx0-15,base-66-bo,11,4,S);                                      // arms round his neck
-    woad(cx0-6,base-46);
-    HB(cx0-8,base-86,10);
+    ball(cx0-26,base-72,8); ell(cx0-28,base-58,11,5); cap(cx0-28,base-54,cx0-28,base-40,7,8);   // his head, shoulders, torso
+    cap(cx0-31,base-38,cx0-32,base-22,5,4); cap(cx0-32,base-22,cx0-31,base-4,4,3); ell(cx0-31,base-3,5,2.6);  // his legs
+    cap(cx0-25,base-38,cx0-24,base-22,5,4); cap(cx0-24,base-22,cx0-23,base-4,4,3); ell(cx0-23,base-3,5,2.6);
+    cap(cx0-20,base-50,cx0-6,base-46,4,3); cap(cx0-20,base-40,cx0-6,base-40,4,3);   // his arms under her
+    ball(cx0-4,base-72-bo,8); ball(cx0+6,base-74-bo,4.5);               // her head, bun
+    cap(cx0-6,base-60-bo,cx0-6,base-48-bo,5,7); ell(cx0-12,base-56-bo,4.5,4);   // her torso, bust toward him
+    ell(cx0-6,base-46-bo,9,6);                                          // her hips
+    cap(cx0-12,base-44-bo,cx0-24,base-36-bo,4,3); cap(cx0-24,base-36-bo,cx0-30,base-44-bo,3,2.5);  // near leg wraps his back
+    cap(cx0+2,base-44-bo,cx0+8,base-36-bo,4,3); cap(cx0+8,base-36-bo,cx0+6,base-46-bo,3,2.5);      // far leg
+    cap(cx0-12,base-64-bo,cx0-24,base-60-bo,3,2.5);                     // arm round his neck
+    woad(cx0-4,base-46); HB(cx0-8,base-84,10);
   } else if(vi===5){ // THE SUNDIAL — she waits, hand to lips; the tribute rises
-    // HER seated left, watching
-    B(cx0-56,base-58,16,15); px(cx0-43,base-61,7,7,S);                 // head, bun
-    B(cx0-58,base-43,19,20); px(cx0-44,base-49,7,8,S);                 // torso, bust
-    px(cx0-42,base-54,5,4,S);                                          // hand to her mouth (anticipation)
-    B(cx0-58,base-23,18,17);                                           // folded legs
-    // HIM standing right, the tribute
-    B(cx0+8,base-82,16,15); B(cx0+4,base-67,21,23); px(cx0+3,base-63,1,17,L);  // head, torso, ab line
-    B(cx0+6,base-44,17,11);                                            // hips
-    const ph2=(vt/40)|0, sy=base-45;
-    px(cx0+12,sy+1,6,6,S); px(cx0+17,sy+2,6,6,S);                      // 🍒 pair
-    if(ph2===0){ px(cx0+18,sy+6,6,5,S); px(cx0+23,sy+11,6,4,S); px(cx0+27,sy+16,5,4,S); }        // low
-    else if(ph2===1){ px(cx0+19,sy+2,7,5,S); px(cx0+25,sy+1,7,5,S); px(cx0+31,sy,6,6,S); }        // level
-    else if(ph2===2){ px(cx0+18,sy-3,6,5,S); px(cx0+23,sy-8,6,5,S); px(cx0+26,sy-14,6,5,S); px(cx0+25,sy-19,8,6,S);
-      pixelText('!',cx0+40,sy-22,'#e8c34a',1); }                        // UP
-    else { const bq=Math.sin(vt*0.5)*2;
-      px(cx0+18,sy-3+bq,6,5,S); px(cx0+23,sy-8+bq,6,5,S); px(cx0+26,sy-14+bq,6,5,S); px(cx0+25,sy-19+bq,8,6,S);
-      HB(cx0+2,base-84,10); }
-    B(cx0+6,base-33,8,29); B(cx0+15,base-33,8,29);                    // his legs
+    ball(cx0-52,base-54,8); ball(cx0-44,base-57,4.5);                   // her head, bun
+    cap(cx0-52,base-46,cx0-52,base-30,5,7); ell(cx0-46,base-44,4.5,4);  // torso, bust
+    ball(cx0-42,base-52,2.5);                                           // hand to her mouth
+    ell(cx0-50,base-22,10,7);                                           // folded lap
+    ball(cx0+12,base-74,8); ell(cx0+10,base-60,11,5); cap(cx0+10,base-56,cx0+9,base-42,7,8);  // his head, shoulders, torso
+    lit(cx0+9,base-56,cx0+9,base-44,1); ell(cx0+9,base-40,9,6);         // ab line, hips
+    const ph2=(vt/40)|0;
+    phallus(cx0+14,base-42,1, ph2===0?-1: ph2===1?0: ph2===2?1: 1+Math.sin(vt*0.5)*0.12);
+    if(ph2===2) pixelText('!',cx0+42,base-64,'#e8c34a',1);
+    if(ph2===3) HB(cx0+4,base-80,10);
+    cap(cx0+6,base-36,cx0+5,base-6,5,3.5); cap(cx0+13,base-36,cx0+14,base-6,5,3.5); ell(cx0+5,base-5,5,2.6); ell(cx0+14,base-5,5,2.6);  // his legs
   } else if(vi===6){ // THE TANGLE — four feet skyward, hers dancing, his content
-    B(cx0-48,base-18,96,15);                                           // the shared bed-lump
-    px(cx0-32,base-24,22,9,S); px(cx0+12,base-26,24,11,S);             // two head-bumps beneath the blanket
+    ell(cx0,base-12,50,9);                                              // the shared bed-lump
+    ball(cx0-24,base-18,9); ball(cx0+16,base-20,10);                    // two head-bumps
     const wig=Math.sin(T*0.5)*2;
-    B(cx0-32,base-50,8,34); B(cx0-19,base-56,8,40);                    // her calves up
-    B(cx0-35,base-54+wig,12,8); B(cx0-22,base-60-wig,12,8);            // her heels
-    for(let f=0;f<3;f++){ px(cx0-37+f*2,base-56+wig,2,2,S); px(cx0-24+f*2,base-62-wig,2,2,S); }  // toes, dancing
-    px(cx0-31,base-48+wig,2,1,L); px(cx0-18,base-54-wig,2,1,L);        // ankle chains
-    B(cx0+12,base-46,8,30); B(cx0+25,base-50,8,34);                    // his calves, flat
-    B(cx0+9,base-50,12,8); B(cx0+22,base-54,12,8);
-    for(let f=0;f<3;f++){ px(cx0+10+f*2,base-52,2,2,S); px(cx0+23+f*2,base-56,2,2,S); }
-    HB(cx0,base-62,22);
+    cap(cx0-28,base-16,cx0-30,base-48,5,3.5); ell(cx0-31,base-52+wig,5.5,3.5);   // her calf + heel
+    cap(cx0-16,base-16,cx0-18,base-54,5,3.5); ell(cx0-19,base-58-wig,5.5,3.5);
+    for(let f=0;f<3;f++){ ball(cx0-33+f*2.2,base-54+wig,1.4); ball(cx0-21+f*2.2,base-60-wig,1.4); }  // toes, dancing
+    lit(cx0-30,base-46+wig,cx0-31,base-49+wig,1.2);                     // ankle-chain glint
+    cap(cx0+14,base-16,cx0+14,base-46,5,3.5); ell(cx0+14,base-49,5.5,3.5);   // his calves, flat
+    cap(cx0+26,base-16,cx0+27,base-50,5,3.5); ell(cx0+27,base-53,5.5,3.5);
+    for(let f=0;f<3;f++){ ball(cx0+12+f*2.2,base-50,1.4); ball(cx0+25+f*2.2,base-54,1.4); }
+    HB(cx0,base-58,22);
   } else { // THE FRUIT BOWL — 🍒 knocked flying, as is tradition
-    B(cx0-6,base-24,28,10); px(cx0-2,base-14,20,6,S);                  // bowl on its stool
+    ell(cx0+8,base-20,15,5); cap(cx0+8,base-16,cx0+8,base-6,4,4);       // bowl + stem
     const kn=Math.min(18,vt*0.5);
-    px(cx0-32+kn,base-38,18,6,S); for(let f=0;f<4;f++) px(cx0-14+kn,base-38+f*2,6,1,S);  // the blundering hand
+    cap(cx0-30+kn,base-36,cx0-14+kn,base-36,4,3); for(let f=0;f<4;f++) ball(cx0-14+kn+f*2,base-36,1.3);  // hand + fingers
     if(vt>26){ const fy2=Math.min(36,(vt-26)*0.8), fx2=(vt-26)*0.9;
-      px(cx0-3-fx2*0.4,base-34-((36-fy2)*(fy2)/12),7,7,S); px(cx0+5-fx2*0.3,base-36-((34-fy2)*(fy2)/14),7,7,S);  // the 🍒 aloft
-      px(cx0+1-fx2*0.35,base-30-((35-fy2)*(fy2)/13),1,5,S);                                                       // shared stem
-      px(cx0-4,base-24+Math.min(9,(vt-26)*0.3),28,10,S); }                                                        // the bowl tips after
+      ball(cx0-1-fx2*0.4,base-34-((36-fy2)*(fy2)/12),3.6); ball(cx0+6-fx2*0.3,base-36-((34-fy2)*(fy2)/14),3.6);  // the 🍒 aloft
+      lit(cx0+2-fx2*0.35,base-30-((35-fy2)*(fy2)/13),cx0+2-fx2*0.35,base-25-((35-fy2)*(fy2)/13),1);              // stem
+      ell(cx0+8,base-20+Math.min(9,(vt-26)*0.3),15,5); }                                                         // bowl tips after
     if(vt>80) pixelText('~ the bowl is avenged ~',cx0,base+4,'rgba(232,195,74,.6)',1);
   }
   // ---- water ripple / marble echo, painted OVER the figures ----
