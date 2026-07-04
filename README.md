@@ -49,6 +49,10 @@ publicly, leaving it off keeps the game safe for a general audience.
   and stat bars. No default — you must pick.
 - **Physics-hopper combat** — every step is a real hop with momentum and gravity; stance
   guards, thrusts, elbows, visible slash arcs, knockback and a live crowd meter.
+- **The pilum** — buy up to 15 Roman javelins in the armoury (with a damage-by-zone chart).
+  Left-click **hurls** one instead of swinging; your **stance is your aim** — a **head** strike
+  is near-lethal (red), a **body** hit solid (yellow), a **leg** hit barely troubles a hardened
+  man (green). Run out and left-click draws your blade again.
 - **A whole Roman life** beyond the arena: **travel** the 21-province map (mounts, rations,
   sea crossings), buy a **villa & farm**, take a **wife** and raise a **dynasty**, climb the
   **cursus honorum** by election, appoint **generals** and wage **army-vs-army war**, run

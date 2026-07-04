@@ -188,8 +188,8 @@
         </div>
         <div class="col gap6">
           <h3 style="color:var(--gold)">COMBAT</h3>
-          <div><span class="kbd">L-CLICK</span> attack (swing weapon)</div>
-          <div><span class="kbd">SPACE</span> change stance high / mid / low</div>
+          <div><span class="kbd">L-CLICK</span> hurl a pilum if you carry any, else swing your weapon</div>
+          <div><span class="kbd">SPACE</span> change stance high / mid / low — also your pilum aim (head / body / legs)</div>
           <div><span class="kbd">→</span> elbow strike (fast, close)</div>
           <div><span class="kbd">←</span> stab / thrust (lunge, long)</div>
         </div>
@@ -351,6 +351,7 @@
         <div class="bar"><i id="hud-p-hp" style="width:100%;background:linear-gradient(#e85b5b,#8a1d1d)"></i></div>
         <div class="bar" style="height:6px;margin-top:2px;"><i id="hud-p-st" style="width:100%;background:#e8c34a"></i></div>
         <div class="small" id="hud-p-stance">STANCE: MID</div>
+        <div class="small" id="hud-p-pilum" style="display:none"></div>
       </div>
       <div style="flex:1;max-width:46%;text-align:right">
         <div class="small" id="hud-e-name" style="color:var(--gold)">FOE</div>
@@ -530,6 +531,17 @@ const GEAR = {
   ],
 };
 function gearOf(slot,id){return GEAR[slot].find(g=>g.id===id)|| GEAR[slot][0];}
+
+// ---- PILUM: a thrown Roman javelin. Left-click hurls it; your STANCE sets the
+// aim height, and WHERE it lands decides the damage — a head strike is near-lethal,
+// a body hit solid, a leg hit barely troubles a hardened man. Consumable: buy up
+// to 15 and carry them between bouts; out of pila, left-click draws the blade. ----
+const PILUM = { cost:40, max:15, base:48, speed:7.2, stamina:14, cd:16,
+  zones:{ head:{mul:1.0,  col:'#e8433a', label:'HEAD'},
+          body:{mul:0.5,  col:'#e8c34a', label:'BODY'},
+          legs:{mul:0.18, col:'#5b9a44', label:'LEGS'} } };
+function aimZoneFor(stance){ return stance==='high'?'head': stance==='mid'?'body':'legs'; }
+function pilumDamage(zone){ return Math.round(PILUM.base*PILUM.zones[zone].mul*(1+(G.dmgBonus||0)*0.06)); }
 
 // Opponent name pools by cultural flavour (real-ish ancient names)
 const FOE_NAMES = ['Verus','Priscus','Flamma','Spiculus','Hermes','Tetraites','Crixus','Commodus',
@@ -834,6 +846,7 @@ function freshCareer(name,origin,arch,social){
     lastWashDay:-9, lastPoolDay:-9, lastWardrobeDay:-9, lastKidsDay:-9, lastBathDay:-9,
     wins:0, losses:0,
     hpBonus:0, dmgBonus:0,
+    pila:0,                // Roman javelins carried into the arena
     loadout:lo,
     owned:{
       weapon:[lo.weapon],
@@ -848,7 +861,7 @@ function freshCareer(name,origin,arch,social){
   };
 }
 // fill in any fields missing from older saves
-function migrate(g){ const d={honor:50,food:4,mount:0,slaves:0,hasVilla:false,boat:false,favor:0,soldiers:0,hidden:[],plotTier:0,emperor:false,approval:50,legions:0,rivals:0,retired:false,detachments:[],day:0,titles:{},clears:{},socialClass:'gladiator',army:{},armyGear:0,armyTrain:0,hasOrganizer:false,generals:[],wife:null,married:false,marryPrompted:false,children:[],pregnant:null,lastLoveDay:-9,injury:null,lastDebateDay:-9,office:0,path:null,parthia:50,parthiaPact:false,wifeRel:50,lastTalkDay:-9,isFemale:false,lineage:[],hygiene:70,wifePhys:45,hasPool:false,hasWardrobe:false,legacy:null,lastFeastDay:-9,loveDay:-1,loveQuick:0,loveLong:0,loveNight:0,loveVigil:0,venusUntil:-1,lastWashDay:-9,lastPoolDay:-9,lastWardrobeDay:-9,lastKidsDay:-9,lastBathDay:-9}; for(const k in d){ if(g[k]===undefined) g[k]=d[k]; } if(!g.current) g.current='Italia'; return g; }
+function migrate(g){ const d={honor:50,food:4,mount:0,slaves:0,hasVilla:false,boat:false,favor:0,soldiers:0,hidden:[],plotTier:0,emperor:false,approval:50,legions:0,rivals:0,retired:false,detachments:[],day:0,titles:{},clears:{},socialClass:'gladiator',army:{},armyGear:0,armyTrain:0,hasOrganizer:false,generals:[],wife:null,married:false,marryPrompted:false,children:[],pregnant:null,lastLoveDay:-9,injury:null,lastDebateDay:-9,office:0,path:null,parthia:50,parthiaPact:false,wifeRel:50,lastTalkDay:-9,isFemale:false,lineage:[],hygiene:70,wifePhys:45,hasPool:false,hasWardrobe:false,legacy:null,lastFeastDay:-9,loveDay:-1,loveQuick:0,loveLong:0,loveNight:0,loveVigil:0,venusUntil:-1,lastWashDay:-9,lastPoolDay:-9,lastWardrobeDay:-9,lastKidsDay:-9,lastBathDay:-9,pila:0}; for(const k in d){ if(g[k]===undefined) g[k]=d[k]; } if(!g.current) g.current='Italia'; return g; }
 function saveGame(){ try{ localStorage.setItem(SAVE_KEY, JSON.stringify(G)); toast('Saved.'); }catch(e){ toast('⚠ Could not save — browser storage is blocked or full.',3200); } }
 function hasSave(){ try{ return !!localStorage.getItem(SAVE_KEY); }catch(e){ return false; } }
 function loadGame(){ try{ G=migrate(JSON.parse(localStorage.getItem(SAVE_KEY))); return !!G; }catch(e){ return false; } }
@@ -946,11 +959,19 @@ function drawStuck(f){
   if(!f.stuck || !f.stuck.length) return;
   for(const s of f.stuck){
     ctx.save(); ctx.translate(s.dx,s.dy); ctx.rotate(s.ang);
-    px(-1,-2,12,3,'#160e07');                            // outline
-    px(0,-1,9,1,'#8a6a44'); px(0,-1,9,1,'#8a6a44');      // shaft
-    px(8,-2,3,1,'#c03a3a'); px(8,0,3,1,'#c03a3a');       // fletching
-    px(-1,-1,2,1,'#9aa4ae');                             // buried head
-    px(0,0,3,1,'#7a1414');                               // blood at the wound
+    if(s.pilum){                                         // a lodged pilum — long shaft, iron shank
+      px(-2,-2,20,3,'#160e07');                          // outline
+      px(-1,-1,13,1,'#9a6a3a'); px(-1,-1,13,1,'#b98a52');// wooden shaft
+      px(11,-1,3,2,s.gold?'#e8c34a':'#caa54a');          // collar
+      px(13,-1,4,1,'#dfe6ee');                           // iron head buried in him
+      px(-1,0,3,1,'#7a1414');                            // blood at the wound
+    } else {
+      px(-1,-2,12,3,'#160e07');                          // outline
+      px(0,-1,9,1,'#8a6a44'); px(0,-1,9,1,'#8a6a44');    // shaft
+      px(8,-2,3,1,'#c03a3a'); px(8,0,3,1,'#c03a3a');     // fletching
+      px(-1,-1,2,1,'#9aa4ae');                           // buried head
+      px(0,0,3,1,'#7a1414');                             // blood at the wound
+    }
     ctx.restore();
   }
 }
@@ -1258,7 +1279,7 @@ function startFight(region, briefData){
     gauntlet: briefData.gauntlet? {total:briefData.gauntlet, left:briefData.gauntlet-1, wave:1, corpses:[]} : null,
     waveLock:false, wager:briefData.wager||0,
     emperor: (region.id==='Italia' && briefData.imperial) || (briefData.plot && briefData.plot.name.indexOf('EMPEROR')>=0) || briefData.rival,
-    shake:0, particles:[], banners:[], decals:[], flash:0, hitstop:0,
+    shake:0, particles:[], banners:[], decals:[], flash:0, hitstop:0, pila:[],
   };
   if(G.injury){ p.maxHp*=0.85; p.hp=p.maxHp; p.dmgMul=(p.dmgMul||1)*0.85; }   // fighting wounded
   // sometimes your wife slips into the stands — you fight harder under her eyes
@@ -1361,6 +1382,76 @@ function sparks(x,y,n){
 }
 function banner(x,y,t,c){ FT.banners.push({x,y,t,c,life:40}); }
 
+/* ---------- PILUM: thrown javelin, damage decided by where it lands ---------- */
+function throwPilum(f){
+  if((G.pila|0)<=0){ doAttack(f,'slash'); return; }              // out of pila → draw the blade
+  if(f.atk || (f.pilumCd||0)>0) return;
+  if(f.stamina<PILUM.stamina){ banner(f.x,f.y-52,'WINDED','#cfe'); return; }
+  G.pila--; f.stamina-=PILUM.stamina; f.pilumCd=PILUM.cd; f.atkCd=8; f.throwT=9;
+  const zone=aimZoneFor(f.stance);
+  const targetY = zone==='head'? f.y-52 : zone==='body'? f.y-32 : f.y-12;
+  const sx=f.x+f.facing*12, sy=f.y-38, foe=FT.foe;
+  const frames=Math.max(6, Math.abs(foe.x-sx)/PILUM.speed);  // aim straight to the chosen height (no droop)
+  FT.pila.push({ x:sx, y:sy, vx:f.facing*PILUM.speed, vy:(targetY-sy)/frames,
+    facing:f.facing, aim:zone, gold:!!f.gear.weapon.gold, hit:false, life:130 });
+  sfx('swing');
+}
+function updatePila(dt){
+  const foe=FT.foe;
+  for(const pj of FT.pila){
+    if(pj.hit){ pj.life-=dt; continue; }
+    pj.x+=pj.vx*dt; pj.y+=pj.vy*dt; pj.life-=dt;
+    const reached = pj.vx>0? pj.x>=foe.x-6 : pj.x<=foe.x+6;
+    if(reached && Math.abs(pj.x-foe.x)<16 && !foe.knock){
+      const dy=pj.y-foe.y;                       // negative = above the feet
+      let zone=null;
+      if(dy>-66 && dy<=-44) zone='head';
+      else if(dy>-44 && dy<=-22) zone='body';
+      else if(dy>-22 && dy<=-2) zone='legs';
+      if(zone) pilumImpact(pj,zone);
+      else { pj.hit=true; pj.stuckWall=true; banner(pj.x,pj.y-8,'MISS','#9aa4ae'); FT.crowd=clamp(FT.crowd-1.5,0,100); sfx('thud'); }
+    }
+    if(pj.x<-12 || pj.x>W+12 || pj.y>GROUND+2){ pj.hit=true; pj.stuckWall=true; }
+  }
+  FT.pila=FT.pila.filter(pj=>pj.life>0);
+}
+function pilumImpact(pj,zone){
+  const foe=FT.foe; pj.hit=true;
+  const z=PILUM.zones[zone];
+  const yAt = zone==='head'?-50 : zone==='body'?-30 : -14;
+  // a raised shield can turn a pilum if the foe guards that height and faces the throw
+  const facingThrow = foe.facing===-pj.facing;
+  const guarded = facingThrow && foe.gear.shield.block>0 &&
+    ((zone==='head'&&foe.stance==='high')||(zone==='body'&&foe.stance==='mid')||(zone==='legs'&&foe.stance==='low'));
+  let dmg=pilumDamage(zone)*(FT.p.dmgMul||1);
+  // armour bites into head/body pila; legs mostly ignore it
+  const mit = zone==='head'? foe.gear.helmet.armor : zone==='body'? foe.gear.armor.armor*0.8 : 0;
+  dmg*=(1-clamp(mit,0,0.5));
+  if(guarded){ dmg*=(1-foe.gear.shield.block); sparks(foe.x+foe.facing*10, foe.y+yAt, 9); sfx('block'); banner(foe.x,foe.y-54,'SHIELD!','#cfe'); }
+  dmg=Math.max(1,Math.round(dmg));
+  foe.hp-=dmg; foe.hurt=16;
+  foe.vx+=pj.facing*(zone==='head'?6:zone==='body'?4:2); foe.vy-=zone==='head'?3:1.5; foe.onGround=false; foe.rot+=pj.facing*0.2;
+  bleed(foe.x, foe.y+yAt, zone==='legs'?8:20, pj.facing);
+  if(!foe.stuck) foe.stuck=[];
+  if(foe.stuck.length<5) foe.stuck.push({dx:rnd(-3,4), dy:yAt+2, ang:(pj.facing>0?rnd(2.7,3.4):rnd(-0.4,0.3)), pilum:true, gold:pj.gold});
+  FT.shake=Math.min(9,FT.shake+(zone==='head'?7:4)); FT.flash=Math.min(1,FT.flash+(zone==='head'?0.6:0.3));
+  FT.hitstop=Math.max(FT.hitstop, zone==='head'?6:4);
+  sfx(zone==='legs'?'thud':'hit'); if(zone==='head') setTimeout(()=>{try{sfx('cheer');}catch(e){}},120);
+  FT.crowd=clamp(FT.crowd+(zone==='head'?9:zone==='body'?4:1),0,100);
+  banner(foe.x, foe.y-58, (zone==='head'?'☠ HEADSHOT ':zone==='body'?'BODY ':'LEG ')+'−'+dmg, z.col);
+}
+function drawPilum(pj){
+  ctx.save(); ctx.translate(pj.x,pj.y); ctx.rotate(Math.atan2(pj.vy,pj.vx));
+  ctx.fillStyle='#160e07'; ctx.fillRect(-15,-2.5,34,5);                 // dark outline
+  ctx.fillStyle='#9a6a3a'; ctx.fillRect(-14,-1.5,17,3);                 // wooden shaft
+  ctx.fillStyle='#b98a52'; ctx.fillRect(-14,-1.5,17,1);                 // shaft highlight
+  ctx.fillStyle=pj.gold?'#e8c34a':'#caa54a'; ctx.fillRect(2,-1.5,3,3);  // bronze collar
+  ctx.fillStyle='#b9c0c8'; ctx.fillRect(5,-0.8,9,1.6);                  // long iron shank
+  ctx.fillStyle='#e6ecf2'; ctx.fillRect(5,-0.8,9,0.6);
+  ctx.fillStyle='#dfe6ee'; ctx.beginPath(); ctx.moveTo(14,-2.2); ctx.lineTo(19,0); ctx.lineTo(14,2.2); ctx.closePath(); ctx.fill(); // pyramidal head
+  ctx.restore();
+}
+
 /* ---------- AI ---------- */
 function aiUpdate(f,opp,dt){
   const ai=f.ai; ai.think-=dt;
@@ -1423,6 +1514,7 @@ function changeStance(f){
 function physics(f,dt){
   f.hopCd=Math.max(0,f.hopCd-dt); f.stanceCd=Math.max(0,f.stanceCd-dt);
   f.atkCd=Math.max(0,f.atkCd-dt); f.hurt=Math.max(0,f.hurt-dt);
+  if(f.pilumCd) f.pilumCd=Math.max(0,f.pilumCd-dt); if(f.throwT) f.throwT=Math.max(0,f.throwT-dt);
   f.blockFlash=Math.max(0,f.blockFlash-dt); f.stanceCd=Math.max(0,f.stanceCd-dt);
   if(f.netted>0) f.netted-=dt;
   if(f.atk){ f.atkT-=dt; if(f.atkT<=0){ f.atk=false; } }
@@ -1457,7 +1549,7 @@ function updateFight(dt){
     if(consume('d')) hop(p, 1);
     if(consume('w')) jump(p);
     if(consume('space')) changeStance(p);
-    if(consume('attack')) doAttack(p,'slash');
+    if(consume('attack')){ if((G.pila|0)>0) throwPilum(p); else doAttack(p,'slash'); }  // pilum throw replaces the swing while you carry pila
     if(consume('elbow')) doAttack(p,'elbow');
     if(consume('thrust')) doAttack(p,'thrust');
     // allow holding A/D to keep hopping
@@ -1469,6 +1561,8 @@ function updateFight(dt){
   physics(p,dt); physics(foe,dt);
   // hits
   tryHit(p,foe); tryHit(foe,p);
+  // thrown pila in flight
+  if(FT.pila.length) updatePila(dt);
   // crowd drift: passivity bores them
   const dist=Math.abs(p.x-foe.x);
   if(dist>120) FT.crowd=clamp(FT.crowd-0.08*dt,0,100);
@@ -1493,6 +1587,13 @@ function updateFight(dt){
   $('hud-p-st').style.width=clamp(p.stamina/p.maxStamina*100,0,100)+'%';
   $('hud-e-st').style.width=clamp(foe.stamina/foe.maxStamina*100,0,100)+'%';
   $('hud-p-stance').textContent='STANCE: '+p.stance.toUpperCase()+(FT.forbiddenEquipped?'  ⚠FORBIDDEN':'');
+  const pilEl=$('hud-p-pilum');
+  if(pilEl){ const n=G.pila|0;
+    if(n>0){ const z=aimZoneFor(p.stance), zc=PILUM.zones[z];
+      pilEl.style.display='block';
+      pilEl.innerHTML='🗡 PILA '+n+'  ·  AIM <b style="color:'+zc.col+'">'+zc.label+'</b> <span class="muted">−'+pilumDamage(z)+'</span>';
+    } else pilEl.style.display='none';
+  }
   const cb=$('hud-crowd-box'); if(cb) cb.style.display = (FT.siege||FT.pit)? 'none':'block';
   // live HP numbers on the plates, like a proper fight card
   const pn=$('hud-p-name'), en=$('hud-e-name');
@@ -1905,6 +2006,8 @@ function drawArena(){
   const order = t.p.x<t.foe.x? [t.p,t.foe]:[t.foe,t.p];
   drawShadow(t.p); drawShadow(t.foe);
   drawGladiator(order[0]); drawGladiator(order[1]);
+  // pila in flight (iron-headed javelins)
+  if(t.pila && t.pila.length) for(const pj of t.pila){ if(!pj.stuckWall) drawPilum(pj); }
   // particles (blood drops + sparks)
   for(const pa of t.particles){ const s=pa.sz||2; px(pa.x,pa.y,s,s,pa.c); }
   // banners
@@ -2794,6 +2897,16 @@ function drawShadowPlay(s,T){
     px(gx+gw+4,gy-8,11,gh+18,'#cfc0a2'); px(gx+gw+5,gy-8,3,gh+18,'#e8dcc2');
   }
   drawTheaterEthnic(G.wife&&G.wife.eth, gx,gy,gw,gh,T);
+  // a warm oil-lamp flicker across the projection + a fine pixel grain, so it
+  // reads as living lamplight thrown on the wall rather than a flat cut-out
+  const flick=0.5+0.5*Math.sin(T*0.7)+0.16*Math.sin(T*2.3);
+  ctx.globalAlpha=0.10+0.05*flick;
+  const gcx = style==='water'? '#bfe6f4' : style==='marble'? '#f4f0e0' : '#ffdf9a';
+  ctx.fillStyle=gcx; ctx.beginPath(); ctx.ellipse(cx0, gy+gh*0.42, gw*0.5, gh*0.5, 0, 0, 7); ctx.fill();
+  ctx.globalAlpha=1;
+  for(let i=0;i<48;i++){ const rx=gx+((i*53+((T*2)|0))%gw), ry=gy+((i*29+((T)|0))%gh);
+    ctx.globalAlpha=0.05; px(rx,ry,1,1,gcx); }
+  ctx.globalAlpha=1;
   const total= s.len==='quick'?6:8;
   const vi=(((T-520)/160)|0)%total, vt=(T-520)%160;
   const celt=(G.wife&&G.wife.eth==='celt'), egy=(G.wife&&G.wife.eth==='egyptian');
@@ -5465,6 +5578,38 @@ function openShop(){
   bathBt.onclick=()=>{ if(G.coin<15)return; G.coin-=15; G.lastBathDay=G.day; G.hygiene=100; G.pop=clamp(G.pop+1,0,100); refreshStatbar(); saveQuiet();
     toast('🏛 Steam, oil, and a merciless strigil. You emerge pink and glorious. 🧼 100 (+1 pop — you were SEEN)',3000); openShop(); };
   bathCard.appendChild(bathBt); grid.appendChild(bathCard);
+  // ---- PILA: thrown javelins, bought in a bundle; aim by stance, damage by zone ----
+  const pilCard=document.createElement('div'); pilCard.className='shopcard';
+  const pinfo=document.createElement('div');
+  pinfo.innerHTML=`<div><b style="color:var(--gold)">🗡 PILA — Roman Javelins</b> <span class="tag" style="background:#caa54a;color:#3a2400">THROWN</span></div>
+    <div class="small">Carried: <b>${G.pila|0}</b> / ${PILUM.max}  ·  ${PILUM.cost}d each</div>
+    <div class="small muted" style="line-height:1.4">Left-click <b>HURLS</b> a pilum instead of swinging. Your <b>stance</b> is your aim — the chart below shows a head / body / leg hit. Out of pila, left-click draws your blade again.</div>`;
+  pilCard.appendChild(pinfo);
+  // damage-by-zone chart (red head / yellow body / green legs) — plain HTML so it never breaks the grid
+  const pchart=document.createElement('div'); pchart.className='small';
+  pchart.style.cssText='margin-top:5px;border:2px solid #000;background:#160e07;padding:5px 6px';
+  pchart.innerHTML='<div style="color:#d8c089;letter-spacing:1px;margin-bottom:3px">🎯 DAMAGE BY ZONE — aim with your stance</div>'+
+    [['head','HEAD · stance HIGH'],['body','BODY · stance MID'],['legs','LEGS · stance LOW']].map(([z,lab])=>{
+      const zz=PILUM.zones[z];
+      return '<div style="display:flex;align-items:center;gap:6px;margin:2px 0">'+
+        '<span style="width:26px;height:9px;background:'+zz.col+';border:1px solid #000;display:inline-block;flex:0 0 auto"></span>'+
+        '<span style="color:'+zz.col+';flex:1">'+lab+'</span>'+
+        '<b style="color:#efe3c2">−'+pilumDamage(z)+'</b></div>';
+    }).join('');
+  pilCard.appendChild(pchart);
+  const prow=document.createElement('div'); prow.className='row gap6'; prow.style.marginTop='4px';
+  [['+1',1],['+5',5],['FILL',PILUM.max]].forEach(([lbl,q])=>{
+    const room=PILUM.max-(G.pila|0);
+    const buy=Math.min(q,room), cost=buy*PILUM.cost;
+    const bb=document.createElement('button'); bb.className='btn sm'+(lbl==='FILL'?' gold':'');
+    bb.textContent= lbl==='FILL'? 'FILL ('+cost+'d)' : 'BUY '+lbl+' ('+cost+'d)';
+    bb.disabled= room<=0 || buy<=0 || G.coin<cost;
+    bb.onclick=()=>{ const b2=Math.min(q,PILUM.max-(G.pila|0)); const c=b2*PILUM.cost; if(b2<=0||G.coin<c) return;
+      G.coin-=c; G.pila=(G.pila|0)+b2; refreshStatbar(); saveQuiet();
+      toast('🗡 '+b2+' pila to the rack. Aim with your stance — head strikes kill.',2400); openShop(); };
+    prow.appendChild(bb);
+  });
+  pilCard.appendChild(prow); grid.appendChild(pilCard);
   GEAR[shopTab].forEach(g=>{
     const owned=G.owned[shopTab].includes(g.id);
     const equipped=G.loadout[shopTab]===g.id;
