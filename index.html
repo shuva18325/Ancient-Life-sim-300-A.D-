@@ -188,8 +188,8 @@
         </div>
         <div class="col gap6">
           <h3 style="color:var(--gold)">COMBAT</h3>
-          <div><span class="kbd">L-CLICK</span> hurl a pilum if you carry any, else swing your weapon</div>
-          <div><span class="kbd">SPACE</span> change stance high / mid / low — also your pilum aim (head / body / legs)</div>
+          <div><span class="kbd">L-CLICK</span> loose an arrow (bow) or hurl a pilum if you carry any, else swing your weapon</div>
+          <div><span class="kbd">SPACE</span> change stance high / mid / low — also your ranged aim (head / body / legs)</div>
           <div><span class="kbd">→</span> elbow strike (fast, close)</div>
           <div><span class="kbd">←</span> stab / thrust (lunge, long)</div>
         </div>
@@ -541,7 +541,19 @@ const PILUM = { cost:40, max:15, base:48, speed:7.2, stamina:14, cd:16,
           body:{mul:0.5,  col:'#e8c34a', label:'BODY'},
           legs:{mul:0.18, col:'#5b9a44', label:'LEGS'} } };
 function aimZoneFor(stance){ return stance==='high'?'head': stance==='mid'?'body':'legs'; }
-function pilumDamage(zone){ return Math.round(PILUM.base*PILUM.zones[zone].mul*(1+(G.dmgBonus||0)*0.06)); }
+function rangedDamage(base,zone){ return Math.round(base*PILUM.zones[zone].mul*(1+(G.dmgBonus||0)*0.06)); }
+function pilumDamage(zone){ return rangedDamage(PILUM.base,zone); }
+
+// ---- BOWS: expensive ranged weapons that REPLACE the javelin. A bow never runs
+// dry (no ammo to buy), looses faster than a thrown pilum, and the Parthian draw
+// hits harder than any javelin. Same aim-by-stance, same damage-by-zone. ----
+const BOWS=[
+  {id:'steppe',   name:'Steppe Bow',   cost:380, base:40, cd:12, stamina:8, speed:9.5,
+     desc:'A horse-nomad’s recurve — looses fast and never runs dry. Arrows fly flat and quick.'},
+  {id:'parthian', name:'Parthian Bow', cost:640, base:56, cd:10, stamina:8, speed:10.5,
+     desc:'The composite bow that broke Crassus at Carrhae — the deadliest draw in the East.'},
+];
+function bowOf(id){ return BOWS.find(b=>b.id===id)||null; }
 
 // Opponent name pools by cultural flavour (real-ish ancient names)
 const FOE_NAMES = ['Verus','Priscus','Flamma','Spiculus','Hermes','Tetraites','Crixus','Commodus',
@@ -847,6 +859,7 @@ function freshCareer(name,origin,arch,social){
     wins:0, losses:0,
     hpBonus:0, dmgBonus:0,
     pila:0,                // Roman javelins carried into the arena
+    bow:null, bowsOwned:[],// ranged bows (steppe / parthian) — replace the javelin
     loadout:lo,
     owned:{
       weapon:[lo.weapon],
@@ -861,7 +874,7 @@ function freshCareer(name,origin,arch,social){
   };
 }
 // fill in any fields missing from older saves
-function migrate(g){ const d={honor:50,food:4,mount:0,slaves:0,hasVilla:false,boat:false,favor:0,soldiers:0,hidden:[],plotTier:0,emperor:false,approval:50,legions:0,rivals:0,retired:false,detachments:[],day:0,titles:{},clears:{},socialClass:'gladiator',army:{},armyGear:0,armyTrain:0,hasOrganizer:false,generals:[],wife:null,married:false,marryPrompted:false,children:[],pregnant:null,lastLoveDay:-9,injury:null,lastDebateDay:-9,office:0,path:null,parthia:50,parthiaPact:false,wifeRel:50,lastTalkDay:-9,isFemale:false,lineage:[],hygiene:70,wifePhys:45,hasPool:false,hasWardrobe:false,legacy:null,lastFeastDay:-9,loveDay:-1,loveQuick:0,loveLong:0,loveNight:0,loveVigil:0,venusUntil:-1,lastWashDay:-9,lastPoolDay:-9,lastWardrobeDay:-9,lastKidsDay:-9,lastBathDay:-9,pila:0}; for(const k in d){ if(g[k]===undefined) g[k]=d[k]; } if(!g.current) g.current='Italia'; return g; }
+function migrate(g){ const d={honor:50,food:4,mount:0,slaves:0,hasVilla:false,boat:false,favor:0,soldiers:0,hidden:[],plotTier:0,emperor:false,approval:50,legions:0,rivals:0,retired:false,detachments:[],day:0,titles:{},clears:{},socialClass:'gladiator',army:{},armyGear:0,armyTrain:0,hasOrganizer:false,generals:[],wife:null,married:false,marryPrompted:false,children:[],pregnant:null,lastLoveDay:-9,injury:null,lastDebateDay:-9,office:0,path:null,parthia:50,parthiaPact:false,wifeRel:50,lastTalkDay:-9,isFemale:false,lineage:[],hygiene:70,wifePhys:45,hasPool:false,hasWardrobe:false,legacy:null,lastFeastDay:-9,loveDay:-1,loveQuick:0,loveLong:0,loveNight:0,loveVigil:0,venusUntil:-1,lastWashDay:-9,lastPoolDay:-9,lastWardrobeDay:-9,lastKidsDay:-9,lastBathDay:-9,pila:0,bow:null,bowsOwned:[]}; for(const k in d){ if(g[k]===undefined) g[k]=d[k]; } if(!g.current) g.current='Italia'; return g; }
 function saveGame(){ try{ localStorage.setItem(SAVE_KEY, JSON.stringify(G)); toast('Saved.'); }catch(e){ toast('⚠ Could not save — browser storage is blocked or full.',3200); } }
 function hasSave(){ try{ return !!localStorage.getItem(SAVE_KEY); }catch(e){ return false; } }
 function loadGame(){ try{ G=migrate(JSON.parse(localStorage.getItem(SAVE_KEY))); return !!G; }catch(e){ return false; } }
@@ -959,7 +972,12 @@ function drawStuck(f){
   if(!f.stuck || !f.stuck.length) return;
   for(const s of f.stuck){
     ctx.save(); ctx.translate(s.dx,s.dy); ctx.rotate(s.ang);
-    if(s.pilum){                                         // a lodged pilum — long shaft, iron shank
+    if(s.arrow){                                         // a lodged arrow — thin shaft, fletching
+      px(-1,-1,11,2,'#160e07');                          // outline
+      px(0,-0.5,8,1,'#8a6a3a');                           // thin shaft
+      px(0,-1,2,1,'#c8b45a'); px(0,1,2,1,'#c8b45a');     // fletching
+      px(0,0,2,1,'#7a1414');                             // blood at the wound
+    } else if(s.pilum){                                  // a lodged pilum — long shaft, iron shank
       px(-2,-2,20,3,'#160e07');                          // outline
       px(-1,-1,13,1,'#9a6a3a'); px(-1,-1,13,1,'#b98a52');// wooden shaft
       px(11,-1,3,2,s.gold?'#e8c34a':'#caa54a');          // collar
@@ -1382,19 +1400,35 @@ function sparks(x,y,n){
 }
 function banner(x,y,t,c){ FT.banners.push({x,y,t,c,life:40}); }
 
-/* ---------- PILUM: thrown javelin, damage decided by where it lands ---------- */
-function throwPilum(f){
-  if((G.pila|0)<=0){ doAttack(f,'slash'); return; }              // out of pila → draw the blade
-  if(f.atk || (f.pilumCd||0)>0) return;
-  if(f.stamina<PILUM.stamina){ banner(f.x,f.y-52,'WINDED','#cfe'); return; }
-  G.pila--; f.stamina-=PILUM.stamina; f.pilumCd=PILUM.cd; f.atkCd=8; f.throwT=9;
+/* ---------- RANGED: bow (arrows) or pilum (javelin), damage decided by where it lands ---------- */
+// left-click routes here: a bow REPLACES the javelin, which replaces the blade
+function playerRanged(f){
+  if(G.bow && bowOf(G.bow)){ fireArrow(f, bowOf(G.bow)); return; }
+  if((G.pila|0)>0){ throwPilum(f); return; }
+  doAttack(f,'slash');
+}
+function launchProjectile(f, {type, base, speed, cd, stamina, gold}){
+  if(f.atk || (f.pilumCd||0)>0) return false;
+  if(f.stamina<stamina){ banner(f.x,f.y-52,'WINDED','#cfe'); return false; }
+  f.stamina-=stamina; f.pilumCd=cd; f.atkCd=8; f.throwT=9;
   const zone=aimZoneFor(f.stance);
   const targetY = zone==='head'? f.y-52 : zone==='body'? f.y-32 : f.y-12;
   const sx=f.x+f.facing*12, sy=f.y-38, foe=FT.foe;
-  const frames=Math.max(6, Math.abs(foe.x-sx)/PILUM.speed);  // aim straight to the chosen height (no droop)
-  FT.pila.push({ x:sx, y:sy, vx:f.facing*PILUM.speed, vy:(targetY-sy)/frames,
-    facing:f.facing, aim:zone, gold:!!f.gear.weapon.gold, hit:false, life:130 });
-  sfx('swing');
+  const frames=Math.max(6, Math.abs(foe.x-sx)/speed);        // aim straight to the chosen height (no droop)
+  FT.pila.push({ x:sx, y:sy, vx:f.facing*speed, vy:(targetY-sy)/frames,
+    facing:f.facing, aim:zone, type, base, gold:!!gold, hit:false, life:130 });
+  return true;
+}
+function throwPilum(f){
+  if((G.pila|0)<=0){ doAttack(f,'slash'); return; }              // out of pila → draw the blade
+  if(launchProjectile(f,{type:'pilum', base:PILUM.base, speed:PILUM.speed, cd:PILUM.cd, stamina:PILUM.stamina, gold:f.gear.weapon.gold})){
+    G.pila--; sfx('swing');
+  }
+}
+function fireArrow(f,bw){
+  if(launchProjectile(f,{type:'arrow', base:bw.base, speed:bw.speed, cd:bw.cd, stamina:bw.stamina, gold:false})){
+    sfx('swing');   // the twang of the string
+  }
 }
 function updatePila(dt){
   const foe=FT.foe;
@@ -1423,17 +1457,19 @@ function pilumImpact(pj,zone){
   const facingThrow = foe.facing===-pj.facing;
   const guarded = facingThrow && foe.gear.shield.block>0 &&
     ((zone==='head'&&foe.stance==='high')||(zone==='body'&&foe.stance==='mid')||(zone==='legs'&&foe.stance==='low'));
-  let dmg=pilumDamage(zone)*(FT.p.dmgMul||1);
-  // armour bites into head/body pila; legs mostly ignore it
+  const arrow = pj.type==='arrow';
+  let dmg=rangedDamage(pj.base||PILUM.base, zone)*(FT.p.dmgMul||1);
+  // armour bites into head/body shots; legs mostly ignore it
   const mit = zone==='head'? foe.gear.helmet.armor : zone==='body'? foe.gear.armor.armor*0.8 : 0;
   dmg*=(1-clamp(mit,0,0.5));
   if(guarded){ dmg*=(1-foe.gear.shield.block); sparks(foe.x+foe.facing*10, foe.y+yAt, 9); sfx('block'); banner(foe.x,foe.y-54,'SHIELD!','#cfe'); }
   dmg=Math.max(1,Math.round(dmg));
   foe.hp-=dmg; foe.hurt=16;
-  foe.vx+=pj.facing*(zone==='head'?6:zone==='body'?4:2); foe.vy-=zone==='head'?3:1.5; foe.onGround=false; foe.rot+=pj.facing*0.2;
-  bleed(foe.x, foe.y+yAt, zone==='legs'?8:20, pj.facing);
+  const kb = arrow?0.7:1;   // an arrow stings but shoves less than a heavy javelin
+  foe.vx+=pj.facing*(zone==='head'?6:zone==='body'?4:2)*kb; foe.vy-=(zone==='head'?3:1.5)*kb; foe.onGround=false; foe.rot+=pj.facing*0.2*kb;
+  bleed(foe.x, foe.y+yAt, zone==='legs'?8:(arrow?14:20), pj.facing);
   if(!foe.stuck) foe.stuck=[];
-  if(foe.stuck.length<5) foe.stuck.push({dx:rnd(-3,4), dy:yAt+2, ang:(pj.facing>0?rnd(2.7,3.4):rnd(-0.4,0.3)), pilum:true, gold:pj.gold});
+  if(foe.stuck.length<5) foe.stuck.push({dx:rnd(-3,4), dy:yAt+2, ang:(pj.facing>0?rnd(2.7,3.4):rnd(-0.4,0.3)), pilum:!arrow, arrow:arrow, gold:pj.gold});
   FT.shake=Math.min(9,FT.shake+(zone==='head'?7:4)); FT.flash=Math.min(1,FT.flash+(zone==='head'?0.6:0.3));
   FT.hitstop=Math.max(FT.hitstop, zone==='head'?6:4);
   sfx(zone==='legs'?'thud':'hit'); if(zone==='head') setTimeout(()=>{try{sfx('cheer');}catch(e){}},120);
@@ -1449,6 +1485,14 @@ function drawPilum(pj){
   ctx.fillStyle='#b9c0c8'; ctx.fillRect(5,-0.8,9,1.6);                  // long iron shank
   ctx.fillStyle='#e6ecf2'; ctx.fillRect(5,-0.8,9,0.6);
   ctx.fillStyle='#dfe6ee'; ctx.beginPath(); ctx.moveTo(14,-2.2); ctx.lineTo(19,0); ctx.lineTo(14,2.2); ctx.closePath(); ctx.fill(); // pyramidal head
+  ctx.restore();
+}
+function drawArrow(pj){
+  ctx.save(); ctx.translate(pj.x,pj.y); ctx.rotate(Math.atan2(pj.vy,pj.vx));
+  ctx.fillStyle='#160e07'; ctx.fillRect(-13,-1.5,26,3);                 // dark outline
+  ctx.fillStyle='#8a6a3a'; ctx.fillRect(-12,-0.5,20,1);                 // thin shaft
+  ctx.fillStyle='#c8b45a'; ctx.fillRect(-12,-1.5,4,1); ctx.fillRect(-12,0.5,4,1); // fletching
+  ctx.fillStyle='#e6ecf2'; ctx.beginPath(); ctx.moveTo(8,-1.8); ctx.lineTo(13,0); ctx.lineTo(8,1.8); ctx.closePath(); ctx.fill(); // arrowhead
   ctx.restore();
 }
 
@@ -1549,7 +1593,7 @@ function updateFight(dt){
     if(consume('d')) hop(p, 1);
     if(consume('w')) jump(p);
     if(consume('space')) changeStance(p);
-    if(consume('attack')){ if((G.pila|0)>0) throwPilum(p); else doAttack(p,'slash'); }  // pilum throw replaces the swing while you carry pila
+    if(consume('attack')) playerRanged(p);  // bow → pilum → blade, in that order
     if(consume('elbow')) doAttack(p,'elbow');
     if(consume('thrust')) doAttack(p,'thrust');
     // allow holding A/D to keep hopping
@@ -1588,10 +1632,11 @@ function updateFight(dt){
   $('hud-e-st').style.width=clamp(foe.stamina/foe.maxStamina*100,0,100)+'%';
   $('hud-p-stance').textContent='STANCE: '+p.stance.toUpperCase()+(FT.forbiddenEquipped?'  ⚠FORBIDDEN':'');
   const pilEl=$('hud-p-pilum');
-  if(pilEl){ const n=G.pila|0;
-    if(n>0){ const z=aimZoneFor(p.stance), zc=PILUM.zones[z];
-      pilEl.style.display='block';
-      pilEl.innerHTML='🗡 PILA '+n+'  ·  AIM <b style="color:'+zc.col+'">'+zc.label+'</b> <span class="muted">−'+pilumDamage(z)+'</span>';
+  if(pilEl){ const z=aimZoneFor(p.stance), zc=PILUM.zones[z], bw=G.bow&&bowOf(G.bow);
+    if(bw){ pilEl.style.display='block';
+      pilEl.innerHTML='🏹 '+bw.name.toUpperCase()+'  ·  AIM <b style="color:'+zc.col+'">'+zc.label+'</b> <span class="muted">−'+rangedDamage(bw.base,z)+'</span>';
+    } else if((G.pila|0)>0){ pilEl.style.display='block';
+      pilEl.innerHTML='🗡 PILA '+(G.pila|0)+'  ·  AIM <b style="color:'+zc.col+'">'+zc.label+'</b> <span class="muted">−'+pilumDamage(z)+'</span>';
     } else pilEl.style.display='none';
   }
   const cb=$('hud-crowd-box'); if(cb) cb.style.display = (FT.siege||FT.pit)? 'none':'block';
@@ -2006,8 +2051,8 @@ function drawArena(){
   const order = t.p.x<t.foe.x? [t.p,t.foe]:[t.foe,t.p];
   drawShadow(t.p); drawShadow(t.foe);
   drawGladiator(order[0]); drawGladiator(order[1]);
-  // pila in flight (iron-headed javelins)
-  if(t.pila && t.pila.length) for(const pj of t.pila){ if(!pj.stuckWall) drawPilum(pj); }
+  // projectiles in flight (arrows / iron-headed javelins)
+  if(t.pila && t.pila.length) for(const pj of t.pila){ if(!pj.stuckWall){ pj.type==='arrow'?drawArrow(pj):drawPilum(pj); } }
   // particles (blood drops + sparks)
   for(const pa of t.particles){ const s=pa.sz||2; px(pa.x,pa.y,s,s,pa.c); }
   // banners
@@ -2910,12 +2955,21 @@ function drawShadowPlay(s,T){
   const total= s.len==='quick'?6:8;
   const vi=(((T-520)/160)|0)%total, vt=(T-520)%160;
   const celt=(G.wife&&G.wife.eth==='celt'), egy=(G.wife&&G.wife.eth==='egyptian');
-  // ---- CURVE PRIMITIVES: silhouettes are one flat colour, so draw real curves ----
-  const ball=(x,y,r)=>{ ctx.fillStyle=S; ctx.beginPath(); ctx.arc(x,y,Math.max(0.5,r),0,7); ctx.fill(); };
-  const ell=(x,y,rx,ry,rot)=>{ ctx.fillStyle=S; ctx.beginPath(); ctx.ellipse(x,y,Math.max(0.5,rx),Math.max(0.5,ry),rot||0,0,7); ctx.fill(); };
-  const cap=(x1,y1,x2,y2,r1,r2)=>{ ctx.fillStyle=S; const a=Math.atan2(y2-y1,x2-x1);   // a smooth tapered capsule (round limb)
-    ctx.beginPath(); ctx.arc(x1,y1,Math.max(0.5,r1),a+1.5708,a-1.5708); ctx.arc(x2,y2,Math.max(0.5,r2),a-1.5708,a+1.5708); ctx.closePath(); ctx.fill(); };
-  const lit=(x1,y1,x2,y2,w)=>{ ctx.strokeStyle=L; ctx.lineWidth=w||1.4; ctx.lineCap='round'; ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke(); };
+  // ---- PIXEL-ART PRIMITIVES: the silhouettes are built from chunky blocks on a
+  // fixed pixel grid — a blocky pixel shadow thrown on the wall, NOT smooth curves ----
+  const PIX=2, snap=v=>Math.round(v/PIX)*PIX;
+  const ball=(x,y,r)=>{ ctx.fillStyle=S; const R=Math.max(0.6,r);
+    for(let yy=snap(y-R);yy<=snap(y+R);yy+=PIX)for(let xx=snap(x-R);xx<=snap(x+R);xx+=PIX){
+      const dx=xx+PIX/2-x,dy=yy+PIX/2-y; if(dx*dx+dy*dy<=R*R) ctx.fillRect(xx,yy,PIX,PIX);} };
+  const ell=(x,y,rx,ry,rot)=>{ ctx.fillStyle=S; const RX=Math.max(0.6,rx),RY=Math.max(0.6,ry),co=Math.cos(rot||0),si=Math.sin(rot||0),rad=Math.max(RX,RY);
+    for(let yy=snap(y-rad);yy<=snap(y+rad);yy+=PIX)for(let xx=snap(x-rad);xx<=snap(x+rad);xx+=PIX){
+      const dx=xx+PIX/2-x,dy=yy+PIX/2-y,u=dx*co+dy*si,v=-dx*si+dy*co; if((u*u)/(RX*RX)+(v*v)/(RY*RY)<=1) ctx.fillRect(xx,yy,PIX,PIX);} };
+  const cap=(x1,y1,x2,y2,r1,r2)=>{ ctx.fillStyle=S; const R=Math.max(r1,r2)+1,dx=x2-x1,dy=y2-y1,L2=dx*dx+dy*dy||1;
+    for(let yy=snap(Math.min(y1,y2)-R);yy<=snap(Math.max(y1,y2)+R);yy+=PIX)for(let xx=snap(Math.min(x1,x2)-R);xx<=snap(Math.max(x1,x2)+R);xx+=PIX){
+      const cxx=xx+PIX/2,cyy=yy+PIX/2; let t=((cxx-x1)*dx+(cyy-y1)*dy)/L2; t=t<0?0:t>1?1:t;
+      const ddx=cxx-(x1+dx*t),ddy=cyy-(y1+dy*t),rr=r1+(r2-r1)*t; if(ddx*ddx+ddy*ddy<=rr*rr) ctx.fillRect(xx,yy,PIX,PIX);} };
+  const lit=(x1,y1,x2,y2,w)=>{ ctx.fillStyle=L; const n=Math.max(1,Math.ceil(Math.hypot(x2-x1,y2-y1)/PIX));
+    for(let i=0;i<=n;i++){ const t=i/n; ctx.fillRect(snap(x1+(x2-x1)*t),snap(y1+(y2-y1)*t),PIX,PIX);} };
   const HB=(x,y,c)=>{ if((T|0)%(c||16)<2) s.hearts.push({x:x+rnd(-4,4),y,vy:0.6,life:46,c:'#e26a8a'}); };
   const woad=(x,y)=>{ if(celt){ ctx.fillStyle='rgba(70,130,205,.6)'; ctx.beginPath(); ctx.arc(x,y,2.4,0,7); ctx.fill();
     for(let a=0;a<4;a++){ ctx.beginPath(); ctx.arc(x+Math.cos(a*1.4-0.6)*3.4,y+Math.sin(a*1.4-0.6)*3.4,1,0,7); ctx.fill(); } } };  // Celtic war-paint handprint
@@ -2928,27 +2982,33 @@ function drawShadowPlay(s,T){
     cap(x,y-1, mx,my, 3.7,3.5); cap(mx,my, tx,ty, 3.5,3.3);                // curved shaft in two arcs
     ball(tx,ty,3.7);                                                       // the glans, full and round
     lit(x+dir*3,y-2, tx-dir*2.5,ty-2, 1); };                              // the ridge catches the light
-  // a broad MAN, standing, facing right by default
+  const blk=(x,y,w,h)=>{ ctx.fillStyle=S; ctx.fillRect(snap(x),snap(y),Math.max(PIX,snap(w)),Math.max(PIX,snap(h))); };
+  // a broad MAN as a clean BLOCKY PIXEL silhouette (head / torso / arms / legs), facing dir
   const maleStand=(x,base,dir)=>{ dir=dir||1;
-    cap(x-4,base-32,x-5,base-16,5.5,4); cap(x-5,base-16,x-4,base-3,4,3); ell(x-5,base-2,5,2.6);   // legs
-    cap(x+4,base-32,x+4,base-16,5.5,4); cap(x+4,base-16,x+4,base-3,4,3); ell(x+4,base-2,5,2.6);
-    ell(x,base-34,8,6);                                                    // hips
-    cap(x,base-40,x,base-56,7,9); ell(x,base-57,10,4.5);                   // torso taper up to broad shoulders
-    cap(x,base-61,x,base-57,3.5,3.5); ball(x,base-67,6.8);                 // neck, head
-    ball(x+dir*6.5,base-66,1.8); kohl(x+dir*4,base-67);                    // nose
-    cap(x-dir*2,base-55,x-dir*3,base-42,3.5,3); };                         // arm
-  // a curvy WOMAN, standing, facing dir (-1 = left); sw = bounce; wrap = [x,y] to hook a leg round him
-  const femStand=(x,base,dir,sw,wrap)=>{ sw=sw||0;
-    cap(x+dir*3,base-32,x+dir*3,base-16,5,3.6); cap(x+dir*3,base-16,x+dir*3,base-3,3.6,2.6); ell(x+dir*3,base-2,4.5,2.5);  // back leg
-    if(wrap){ cap(x-dir*2,base-38+sw,wrap[0],wrap[1],5,4); cap(wrap[0],wrap[1],wrap[0]-dir*8,wrap[1]-6,4,3); }             // wrapping leg
-    else { cap(x-dir*3,base-33,x-dir*5,base-16,5,3.6); cap(x-dir*5,base-16,x-dir*4,base-3,3.6,2.6); ell(x-dir*6,base-2,4.5,2.5); }
-    ell(x,base-34,9.5,7);                                                  // hips
-    ball(x+dir*8,base-34+sw,7); ball(x+dir*9.5,base-28+sw,6); lit(x+dir*4.5,base-40+sw,x+dir*4.5,base-27+sw,1.5);          // the 🍑, cleft lit
-    cap(x,base-40,x,base-53,4,6);                                          // waist pinch → chest
-    ell(x-dir*6,base-50+sw,5,4.2); ball(x-dir*10,base-49+sw,1.7);          // bust + point
-    ell(x,base-54,7,4); cap(x,base-58,x,base-54,3,3);                      // shoulders, neck
-    ball(x,base-63,6.4); ball(x+dir*6.5,base-65,4.2); ball(x-dir*6,base-62,1.7); kohl(x-dir*4,base-63);  // head, bun, nose
-    cap(x+dir*3,base-52,x+dir*4,base-40,3,2.4); };                         // arm
+    blk(x-6,base-16,5,15); blk(x+1,base-16,5,15);        // legs
+    blk(x-7,base-2,6,2);   blk(x+1,base-2,6,2);          // feet
+    blk(x-6,base-24,12,9);                               // hips
+    blk(x-7,base-42,14,18);                              // torso
+    blk(x-9,base-44,18,5);                               // broad shoulders
+    blk(x-10,base-43,3,16); blk(x+7,base-43,3,16);       // arms at the sides
+    blk(x-9,base-28,3,6);  blk(x+6,base-28,3,6);         // forearms / hands
+    blk(x-2,base-49,4,5);                                // neck
+    blk(x-5,base-60,10,11); blk(x-6,base-62,12,3);       // head + cropped hair
+    blk(x+dir*5,base-57,2,3); };                         // nose on the facing side
+  // a WOMAN as a clean BLOCKY PIXEL silhouette, facing dir; sw = sway; wrap = [x,y] hooks a leg round him
+  const femStand=(x,base,dir,sw,wrap)=>{ sw=sw||0; dir=dir||-1;
+    blk(x+1,base-15,4,14); blk(x+1,base-2,5,2);          // standing (back) leg + foot
+    if(wrap){ cap(x-2,base-26,wrap[0],wrap[1],3,2.6); }  // the raised, hooking leg (blocky capsule)
+    else { blk(x-6,base-15,4,14); blk(x-7,base-2,5,2); } // front leg + foot
+    blk(x-6,base-24,12,9);                               // hips
+    blk(x-4,base-34,8,10);                               // pinched waist
+    blk(x-6,base-42,12,8+(sw>0?1:0));                    // bust / chest
+    blk(x-6,base-45,12,3);                               // shoulders
+    blk(x-8,base-42,3,14); blk(x+5,base-42,3,14);        // arms
+    blk(x-2,base-48,4,3);                                // neck
+    blk(x-4,base-59,9,12); blk(x-5,base-61,11,3);        // head + hair
+    blk(x+3,base-57,3,9);                                // long hair lock down the side
+    blk(x+dir*5,base-56,2,3); };                         // nose on the facing side
   // a MAN kneeling, facing left (for the pursuit)
   const maleKneel=(x,base)=>{
     ball(x+2,base-70,7.5); ball(x-4,base-68,1.8);                          // head, nose (left)
@@ -5610,6 +5670,27 @@ function openShop(){
     prow.appendChild(bb);
   });
   pilCard.appendChild(prow); grid.appendChild(pilCard);
+  // ---- BOWS: premium ranged weapons that REPLACE the javelin and never run dry ----
+  BOWS.forEach(bw=>{
+    const owned=(G.bowsOwned||[]).includes(bw.id), equipped=G.bow===bw.id;
+    const card=document.createElement('div'); card.className='shopcard'+(equipped?' eq':'');
+    const info=document.createElement('div');
+    info.innerHTML=`<div><b style="color:var(--gold)">🏹 ${bw.name}</b> <span class="tag" style="background:#8a5a2a;color:#fff">RANGED</span>${equipped?' <span class="tag" style="background:var(--gold);color:#3a2400">SLUNG</span>':''}</div>
+      <div class="small">HEAD <b style="color:${PILUM.zones.head.col}">−${rangedDamage(bw.base,'head')}</b> · BODY <b style="color:${PILUM.zones.body.col}">−${rangedDamage(bw.base,'body')}</b> · LEGS <b style="color:${PILUM.zones.legs.col}">−${rangedDamage(bw.base,'legs')}</b> · <b style="color:var(--gold)">unlimited arrows</b></div>
+      <div class="small muted" style="line-height:1.4">${bw.desc} Left-click looses an arrow (aim with your stance); replaces the javelin while drawn.</div>`;
+    card.appendChild(info);
+    const row=document.createElement('div'); row.className='row gap6'; row.style.marginTop='4px';
+    if(equipped){ const e=document.createElement('span'); e.className='pill'; e.textContent='IN USE'; row.appendChild(e);
+      const u=document.createElement('button'); u.className='btn sm'; u.textContent='▸ SLING IT (back to pila / blade)';
+      u.onclick=()=>{ G.bow=null; saveQuiet(); toast('Bow slung — left-click throws pila (or swings) again.',2200); openShop(); }; row.appendChild(u);
+    } else if(owned){ const b=document.createElement('button'); b.className='btn sm gold'; b.textContent='DRAW THIS BOW';
+      b.onclick=()=>{ G.bow=bw.id; saveQuiet(); openShop(); }; row.appendChild(b);
+    } else { const b=document.createElement('button'); b.className='btn sm'; b.textContent='BUY '+bw.cost+'d';
+      b.disabled=G.coin<bw.cost;
+      b.onclick=()=>{ if(G.coin<bw.cost) return; G.coin-=bw.cost; (G.bowsOwned=G.bowsOwned||[]).push(bw.id); G.bow=bw.id; refreshStatbar(); saveQuiet();
+        toast('🏹 '+bw.name+' drawn — left-click looses arrows now. Aim with your stance.',2800); openShop(); }; row.appendChild(b); }
+    card.appendChild(row); grid.appendChild(card);
+  });
   GEAR[shopTab].forEach(g=>{
     const owned=G.owned[shopTab].includes(g.id);
     const equipped=G.loadout[shopTab]===g.id;
