@@ -14,11 +14,16 @@ historical content** from the period. No mythical content.
 
 ---
 
-## ▶ Play it — no setup
+## ▶ Play it — in your browser, no setup
 
-**Download `index.html` and double-click it.** That is the whole install. It opens in
-any modern browser, needs no server, no build step, and no internet connection. Progress
-auto-saves to your browser.
+**Play now (public link, opens in any tab):**
+**https://raw.githack.com/shuva18325/Ancient-Life-sim-300-A.D-/main/index.html**
+
+That link serves this repo's `index.html` straight from a CDN, so it just runs — no
+download, no server, no build step. Progress auto-saves to your browser.
+
+Prefer offline? **Download `index.html` and double-click it** — it opens in any modern
+browser with no internet connection at all.
 
 Click the game once to give it keyboard focus, then use the controls below.
 
