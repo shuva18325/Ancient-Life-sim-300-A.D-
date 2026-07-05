@@ -49,7 +49,7 @@ publicly, leaving it off keeps the game safe for a general audience.
 ---
 
 ## Feature highlights
-- **Fighter cards** — choose a champion (Roman Legionary, Celtic Warrior, Persian Immortal,
+- **Fighter cards** — choose a champion (Roman Legionary, Celtic Warrior, Parthian Cataphract,
   Pit Brawler, Blood Fanatic, Net-Fighter), each a real gladiator class with a drawn portrait
   and stat bars. No default — you must pick.
 - **Physics-hopper combat** — every step is a real hop with momentum and gravity; stance
@@ -190,8 +190,8 @@ Popularity rises (battle escalation). **All 21 regions, exactly as specified:**
 
 Gallia · Africa Proconsularis · Italia · Aegyptus · Syria Palaestina · Asia Minor · Achaea ·
 Illyricum · Dalmatia · Bosporan Kingdom · Germania Magna · Hispania Baetica ·
-Insulae Baleares &amp; Sicilia · Creta · Cyprus · Arabia Petraea · Asōristān · Mesopotamia ·
-Ērānshahr · Sogdiana · Britannia
+Insulae Baleares &amp; Sicilia · Creta · Cyprus · Arabia Petraea · Babylonia · Mesopotamia ·
+Persis · Sogdiana · Britannia
 
 ![World map](screenshots/04_map.png)
 
@@ -214,8 +214,12 @@ Insulae Baleares &amp; Sicilia · Creta · Cyprus · Arabia Petraea · Asōrist�
   Emperor in the imperial finale.
 - Arena cities are real: **Thysdrus** (El Djem, in modern Tunisia), **Alexandria**,
   **Caesarea** in Judaea, **Capua** (home of the most famous ludus), **Corduba**, **Ephesus**,
-  **Petra**, **Ctesiphon** on the Sasanian frontier, and so on.
+  **Petra**, **Ctesiphon** on the Parthian frontier, and so on.
 - Latin arena calls (*Missus!*, *Pollice verso*) and equipment names are used as they were.
+- **The East is Parthian, not Sasanian.** In 200 A.D. Rome's great eastern rival was the
+  **Parthian (Arsacid) Empire** — the Sasanians did not rise until Ardashir I (~224 A.D.).
+  So the eastern regions (**Babylonia**, **Persis**), titles (*Satrap*, *Great King*, *King of
+  Kings*), the frontier power, and the **Parthian Cataphract** fighter are all era-correct.
 
 This is an original work and does not reference, reuse, or depict any existing game.
 
