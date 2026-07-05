@@ -134,6 +134,10 @@
           <button class="btn" id="btn-help">HOW TO PLAY</button>
         </div>
         <div class="row center gap" style="margin-top:2px;">
+          <button class="btn" id="btn-settings">⚙ SETTINGS</button>
+          <button class="btn" id="btn-stats">🏆 STATS &amp; AWARDS</button>
+        </div>
+        <div class="row center gap" style="margin-top:2px;">
           <button class="btn" id="btn-adult" title="The marriage & heir system is always available. This only toggles the optional bedchamber cutscene and its suggestive art. Adults only.">🔞 MATURE CONTENT: OFF</button>
         </div>
         <div class="small muted" id="adult-note" style="max-width:420px;line-height:1.4;font-size:11px;">Marriage, heirs and succession play normally with mature content off — intimate scenes simply fade to black.</div>
@@ -205,6 +209,25 @@
         ground to recover.
       </div>
       <div class="row" style="justify-content:flex-end;"><button class="btn gold" id="btn-help-back">BACK</button></div>
+    </div>
+  </div>
+
+  <!-- ===== SETTINGS ===== -->
+  <div id="scr-settings" class="screen center">
+    <div class="panel pad col gap" style="width:min(92%,500px);max-height:92%;">
+      <h2 style="color:var(--gold)">⚙ SETTINGS</h2>
+      <div id="settings-body" class="col gap"></div>
+      <div class="small muted">Settings are remembered on this device.</div>
+      <div class="row" style="justify-content:flex-end;"><button class="btn gold" id="btn-settings-back">BACK</button></div>
+    </div>
+  </div>
+
+  <!-- ===== STATS & ACHIEVEMENTS ===== -->
+  <div id="scr-stats" class="screen center">
+    <div class="panel pad col gap scrollbox" style="width:min(94%,640px);max-height:92%;">
+      <h2 style="color:var(--gold)">🏆 STATS &amp; AWARDS</h2>
+      <div id="stats-body" class="col gap6 small" style="line-height:1.6"></div>
+      <div class="row" style="justify-content:flex-end;"><button class="btn gold" id="btn-stats-back">BACK</button></div>
     </div>
   </div>
 
@@ -891,6 +914,40 @@ const ADULT_KEY='SANDSTEEL_ADULT';
 let ADULT=(function(){ try{ return localStorage.getItem(ADULT_KEY)==='1'; }catch(e){ return false; } })();
 function setAdult(on){ ADULT=!!on; try{ localStorage.setItem(ADULT_KEY, on?'1':'0'); }catch(e){} }
 
+/* ---------- SETTINGS (sound · screen shake · difficulty), device-local ---------- */
+const SETTINGS_KEY='SANDSTEEL_SETTINGS';
+const SETTINGS=(function(){ const d={sound:true,shake:true,difficulty:'normal'};
+  try{ return Object.assign(d, JSON.parse(localStorage.getItem(SETTINGS_KEY)||'{}')); }catch(e){ return d; } })();
+function saveSettings(){ try{ localStorage.setItem(SETTINGS_KEY, JSON.stringify(SETTINGS)); }catch(e){} }
+const DIFF={ easy:{name:'Easy', foeHp:0.72, foeDmg:0.75}, normal:{name:'Normal', foeHp:1, foeDmg:1}, brutal:{name:'Brutal', foeHp:1.34, foeDmg:1.3} };
+function diffMul(){ return DIFF[SETTINGS.difficulty]||DIFF.normal; }
+
+/* ---------- STATS + ACHIEVEMENTS, account-wide (persist across careers) ---------- */
+const STATS_KEY='SANDSTEEL_STATS';
+const STATS=(function(){ const d={wins:0,losses:0,foes:0,beasts:0,beastKinds:{},headshots:0,bestCombo:0,coinEarned:0,imperial:0,emperors:0,dynasties:0,weddings:0,provinces:0};
+  try{ return Object.assign(d, JSON.parse(localStorage.getItem(STATS_KEY)||'{}')); }catch(e){ return d; } })();
+function saveStats(){ try{ localStorage.setItem(STATS_KEY, JSON.stringify(STATS)); }catch(e){} }
+function bumpStat(k,n){ STATS[k]=(STATS[k]||0)+(n===undefined?1:n); saveStats(); }
+const ACHIEVEMENTS=[
+  {id:'first_blood', icon:'🩸', name:'First Blood',            desc:'Win your first bout.'},
+  {id:'combo5',      icon:'⚔',  name:'Blood Rhythm',           desc:'Land a 5-hit combo.'},
+  {id:'combo10',     icon:'🌀', name:'Whirlwind',              desc:'Land a 10-hit combo.'},
+  {id:'headshot',    icon:'🎯', name:'Dead-Eye',               desc:'Fell a foe with a ranged headshot.'},
+  {id:'venator',     icon:'🐆', name:'Venator',                desc:'Slay your first beast in a venatio.'},
+  {id:'beastmaster', icon:'🦁', name:'Beastmaster',            desc:'Slay all four kinds of beast.'},
+  {id:'rich',        icon:'🪙', name:'Crassus',                desc:'Hold 5,000 denarii at once.'},
+  {id:'married',     icon:'💍', name:'Wed',                    desc:'Take a spouse.'},
+  {id:'governor',    icon:'♦',  name:'Dominus',                desc:'Govern a province.'},
+  {id:'dynasty',     icon:'👑', name:'Dynasty',                desc:'Play on as your heir.'},
+  {id:'emperor',     icon:'🏛', name:'Imperator',              desc:'Take the purple — become Emperor.'},
+  {id:'champion',    icon:'⭐', name:'Champion of the Empire', desc:'Win the Imperial Spectacle in Roma.'},
+];
+const ACH_KEY='SANDSTEEL_ACH';
+const ACH=(function(){ try{ return new Set(JSON.parse(localStorage.getItem(ACH_KEY)||'[]')); }catch(e){ return new Set(); } })();
+function saveAch(){ try{ localStorage.setItem(ACH_KEY, JSON.stringify([...ACH])); }catch(e){} }
+function unlock(id){ if(ACH.has(id)) return; const a=ACHIEVEMENTS.find(x=>x.id===id); if(!a) return;
+  ACH.add(id); saveAch(); toast('🏆 '+a.icon+' Achievement — '+a.name, 3200); try{ sfx('win'); }catch(e){} }
+
 /* =====================================================================
    UI: stat bar + toast
    ===================================================================== */
@@ -1304,10 +1361,11 @@ function makeFighter(opts){
 let FT=null;   // active fight context
 // roll a fresh arena opponent (used for single bouts and each skirmish wave)
 function makeArenaFoe(tier, esc, mult){
-  const foeHp=(88 + tier*22) * esc * (mult||1);
+  const dm=diffMul();
+  const foeHp=(88 + tier*22) * esc * (mult||1) * dm.foeHp;
   const fc=CLASSES[pick(Object.keys(CLASSES))].start;
   return makeFighter({
-    isPlayer:false, x:340, facing:-1,
+    isPlayer:false, x:340, facing:-1, dmgMul:dm.foeDmg,
     maxHp:foeHp, hp:foeHp, name:pick(FOE_NAMES)+' '+pick(FOE_TITLES),
     skin:pick(SKIN), tunic:pick(['#2f4a7a','#4a2f5a','#2f5a3a','#5a4a2f','#5a2f2f']),
     gear:{
@@ -1332,9 +1390,10 @@ function pickBeast(reg){
 }
 function makeBeast(reg, esc){
   const b=pickBeast(reg);
-  const hp=Math.round(b.hp*(esc||1));
+  const dm=diffMul();
+  const hp=Math.round(b.hp*(esc||1)*dm.foeHp);
   const f=makeFighter({
-    isPlayer:false, x:340, facing:-1, name:b.name,
+    isPlayer:false, x:340, facing:-1, name:b.name, dmgMul:dm.foeDmg,
     maxHp:hp, hp:hp, tunic:b.body,
     gear:{ weapon:{id:'claws', name:'claws', dmg:b.dmg, reach:b.reach, spd:1, gold:false},
            shield:{id:'none', block:0}, helmet:{id:'none', armor:0}, armor:{id:'hide', armor:b.armor} },
@@ -1431,6 +1490,7 @@ function tryHit(att,def){
     const guarded = facingAtt && def.stance===zone && (blockVal>0||def.gear.shield.id==='rete');
     let dmg=att.gear.weapon.dmg*8;
     if(att.isPlayer) dmg*=(1+G.dmgBonus*0.12+ (CLASSES[G.cls].trait==='+attack'?0.18:0))*(att.dmgMul||1);
+    else dmg*=(att.dmgMul||1);   // difficulty scales what foes & beasts hit for
     if(FT.forbiddenEquipped && att.isPlayer) dmg*=1.25; // forbidden gear hits harder
     // defender armor mitigation
     const armorMit = def.gear.helmet.armor + def.gear.armor.armor;
@@ -1465,7 +1525,9 @@ function tryHit(att,def){
       dmgNumber(def.x, def.y-40, Math.round(dmg), crit);
       if(crit){ FT.shake=Math.min(12,FT.shake+3); FT.flash=Math.min(1,FT.flash+0.15); banner(att.x,att.y-64,'SAVAGE!','#ff7a3a'); }
       // player combo meter: builds on a streak, breaks when you get struck
-      if(att.isPlayer){ FT.combo=att.combo; FT.comboT=95; FT.comboPulse=1.4; }
+      if(att.isPlayer){ FT.combo=att.combo; FT.comboT=95; FT.comboPulse=1.4;
+        if(att.combo>(STATS.bestCombo||0)){ STATS.bestCombo=att.combo; saveStats(); }
+        if(att.combo>=5) unlock('combo5'); if(att.combo>=10) unlock('combo10'); }
       if(def.isPlayer){ FT.combo=0; FT.comboT=0; }
       // crowd reaction
       const cr = (att.isPlayer? 2.4:-2.0) + (att.combo>2?1.5:0) + (att.atkType==='elbow'?1.2:0);
@@ -1555,6 +1617,9 @@ function pilumImpact(pj,zone){
   if(guarded){ dmg*=(1-foe.gear.shield.block); sparks(foe.x+foe.facing*10, foe.y+yAt, 9); sfx('block'); banner(foe.x,foe.y-54,'SHIELD!','#cfe'); }
   dmg=Math.max(1,Math.round(dmg));
   foe.hp-=dmg; foe.hurt=16;
+  // floating damage number for ranged hits too (juice), colour by zone
+  if(FT.dmgnums) dmgNumber(foe.x, foe.y+yAt-8, dmg, zone==='head');
+  if(zone==='head' && foe.hp<=0 && !foe.beast) unlock('headshot');   // a clean ranged kill
   const kb = arrow?0.7:1;   // an arrow stings but shoves less than a heavy javelin
   foe.vx+=pj.facing*(zone==='head'?6:zone==='body'?4:2)*kb; foe.vy-=(zone==='head'?3:1.5)*kb; foe.onGround=false; foe.rot+=pj.facing*0.2*kb;
   bleed(foe.x, foe.y+yAt, zone==='legs'?8:(arrow?14:20), pj.facing);
@@ -1831,7 +1896,7 @@ function finishFight(won){
       G.soldiers=Math.max(0,G.soldiers-yourLoss);
       G.coin+=t.reward; G.glory+=t.glory; G.pop=clamp(G.pop+15,0,100); G.honor=clamp(G.honor-8,0,100); G.plotTier++; G.wins++;
       const champ = G.plotTier>=PLOT_TARGETS.length;
-      if(champ){ G.imperialDone=true; G.emperor=true; G.approval=60; G.legions=Math.max(6,Math.round(G.soldiers/5000)+6); G.rivals=2; }
+      if(champ){ G.imperialDone=true; G.emperor=true; G.approval=60; G.legions=Math.max(6,Math.round(G.soldiers/5000)+6); G.rivals=2; bumpStat('emperors'); unlock('emperor'); }
       saveQuiet();
       showResult(true,{glory:t.glory,coin:t.reward,popDelta:15,honorDelta:-8,crowdLove:FT.crowd,battle:{yourLoss,theirLoss},
         note: champ? 'THE EMPEROR IS SLAIN. Your legions hail you Imperator — the purple is yours, Rome at your feet.'
@@ -1886,12 +1951,20 @@ function finishFight(won){
       popDelta+=6; honorDelta+=2; note+='🐆 You slew the '+bt.name+' before a roaring mob — a true venator! '; }
     G.wins++; G.coin+=coin; G.glory+=glory; G.pop=clamp(G.pop+popDelta,0,100);
     G.cleared[reg.id]=true; G.clears[reg.id]=(G.clears[reg.id]||0)+1;
+    // ---- lifetime stats + achievements ----
+    bumpStat('wins'); bumpStat('foes', FT.gauntlet? FT.gauntlet.total : 1); if(coin>0) bumpStat('coinEarned', coin);
+    unlock('first_blood');
+    if(FT.venatio){ const bt=FT.foe.beastType; bumpStat('beasts');
+      if(bt){ STATS.beastKinds[bt.id]=1; saveStats(); unlock('venator');
+        if(Object.keys(STATS.beastKinds).length>=BEASTS.length) unlock('beastmaster'); } }
+    if(FT.emperor){ bumpStat('imperial'); unlock('champion'); }
+    if(G.coin>=5000) unlock('rich');
     // xp / level
     G.xp+=glory; while(G.xp>=G.level*60){ G.xp-=G.level*60; G.level++; G.hpBonus++; if(G.level%2===0)G.dmgBonus++; note+='LEVEL UP! '; }
     if(FT.emperor){ G.imperialDone=true; }
   } else {
     const spared = crowdLove>=45 || Math.random()<crowdLove/100;
-    G.losses++;
+    G.losses++; bumpStat('losses');
     popDelta = spared? -3 : -10;
     honorDelta = spared? 1 : -2;
     G.pop=clamp(G.pop+popDelta,0,100);
@@ -2086,7 +2159,8 @@ function drawPitBg(){
 }
 function drawArena(){
   const t=FT;
-  let sx=(Math.random()-0.5)*t.shake, sy=(Math.random()-0.5)*t.shake;
+  const shk=SETTINGS.shake? t.shake : 0;
+  let sx=(Math.random()-0.5)*shk, sy=(Math.random()-0.5)*shk;
   ctx.save(); ctx.translate(sx,sy);
   // sky / awning by region flavour
   const reg=t.region;
@@ -2303,7 +2377,7 @@ function pixelText(t,x,y,c,scale=1){
 /* =====================================================================
    AUDIO (tiny WebAudio blips, guarded)
    ===================================================================== */
-let AC=null, muted=false, NOISE=null;
+let AC=null, muted=!SETTINGS.sound, NOISE=null;
 function noiseBuf(){ if(NOISE) return NOISE; const n=AC.sampleRate*0.5; const b=AC.createBuffer(1,n,AC.sampleRate); const d=b.getChannelData(0); for(let i=0;i<n;i++) d[i]=Math.random()*2-1; NOISE=b; return NOISE; }
 function tone(f,d,ty,vol,slideTo){ const o=AC.createOscillator(),g=AC.createGain(); o.connect(g);g.connect(AC.destination);
   o.type=ty||'square'; o.frequency.setValueAtTime(f,AC.currentTime); if(slideTo) o.frequency.exponentialRampToValueAtTime(slideTo,AC.currentTime+d);
@@ -2371,6 +2445,7 @@ function loop(now){
   dt=clamp(dt,0,3);
   if(state==='fight' && FT){ updateFight(dt); drawArena(); }
   else if(state==='battle' && BT){ updateBattle(dt); drawBattle(); }
+  else if(state==='wifehappy'){ updateWifeHappy(dt); if(state==='wifehappy') drawWifeHappy(); }
   else if(state==='bed' && BC){ updateBed(dt); if(BC) drawBed(); }
   else if(state==='domus' && DM){ updateDomus(dt); if(DM) drawDomus(); }
   else if(state==='map'||state==='travel'){ drawMapCanvas(); }
@@ -2497,7 +2572,7 @@ function drawBattleHost(x,men,maxMen,facing,col,crest,advance,shieldC){
   for(let k=0;k<3;k++) drawBattleHorse(x - facing*(18+k*14), 178+((k%2)*6), facing, facing>0?'#7a5a38':'#4a3a4e');
 }
 function drawBattle(){
-  const t=BT, sx=(Math.random()-0.5)*t.shake, sy=(Math.random()-0.5)*t.shake;
+  const t=BT, shk=SETTINGS.shake?t.shake:0, sx=(Math.random()-0.5)*shk, sy=(Math.random()-0.5)*shk;
   const p=Math.min(1,t.t/t.dur), clash=clamp((p-0.28)/0.5,0,1);
   ctx.save(); ctx.translate(sx,sy);
   // ===== sky =====
@@ -2663,9 +2738,19 @@ function openPortrait(){
    THE BEDCHAMBER — an implied scene: she runs, the toga flies, the door
    closes... and the lamps burn low. (All suggestion, nothing shown.)
    ===================================================================== */
-let BC=null, BEDSPR=null;
+let BC=null, BEDSPR=null, WH=null;
 function startBedScene(mode,len,place){
   len=len||'quick'; place=place||'bed';
+  // FIRST: your domina lights up — a wide, happy, blushing smile before anything else
+  // (plays in both modes; skipped when the spouse is a lord or you are the domina yourself)
+  if(WH!=='done' && G.wife && !G.wife.male && !G.isFemale){
+    WH={t:0, mode:mode||'heir', len, place};
+    state='wifehappy';
+    document.querySelectorAll('.screen').forEach(s=>s.classList.remove('on'));
+    $('statbar').classList.add('hide');
+    return;
+  }
+  WH=null;
   // Mature content OFF: fade to black. Apply the very same outcome (bond,
   // an heir, Venus' blessing) with a discreet line — no scene is drawn.
   if(!ADULT){
@@ -2683,6 +2768,30 @@ function startBedScene(mode,len,place){
   G.lastLoveDay=G.day;
   state='bed'; document.querySelectorAll('.screen').forEach(s=>s.classList.remove('on'));
   $('statbar').classList.add('hide');
+}
+// the happy-face beat: your domina lights up before the scene, then it proceeds
+function updateWifeHappy(dt){
+  if(!WH || WH==='done'){ return; }
+  WH.t+=dt;
+  if(WH.t>=78 || consume('space') || consume('attack')){
+    const w=WH; WH='done'; startBedScene(w.mode,w.len,w.place);
+  }
+}
+function drawWifeHappy(){
+  const w=G.wife; if(!w||!WH||WH==='done') return;
+  const g=ctx.createLinearGradient(0,0,0,H); g.addColorStop(0,'#3a2036'); g.addColorStop(1,'#160c14');
+  ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+  if(!WH.spr){ const cv=document.createElement('canvas'); cv.width=cv.height=148;
+    const ex=w._expr; w._expr='love'; drawBridePortrait(cv,w); if(ex!==undefined) w._expr=ex; else delete w._expr; WH.spr=cv; }
+  const s=Math.min(W,H)*0.64, sx=W/2-s/2, sy=H/2-s/2-4;
+  ctx.imageSmoothingEnabled=false; ctx.drawImage(WH.spr, sx, sy, s, s);
+  const T=WH.t;
+  for(let i=0;i<7;i++){ const hx=W/2+Math.sin(T*0.05+i*1.7)*(26+i*7), hy=H*0.72-((T*0.55+i*20)%(H*0.55));
+    ctx.globalAlpha=clamp(0.35+0.45*Math.sin(T*0.09+i),0,1); pixelText('♥',hx,hy,'#e26a8a',1+(i%2)); }
+  ctx.globalAlpha=1; ctx.textAlign='center';
+  pixelText(w.name.toUpperCase()+'  LIGHTS UP  ♥', W/2, 20, '#ffd0da', 1);
+  pixelText(ADULT?'“Veni, mi amor…”':'She smiles and takes your hand.', W/2, H-18, '#f0d4dc', 1);
+  pixelText('press SPACE', W/2, H-8, 'rgba(240,212,220,.7)', 1);
 }
 function updateBed(dt){ const s=BC; s.t+=dt; const T=s.t;
   for(const p of s.props){ p.x+=p.vx*dt; p.y+=p.vy*dt; p.vy+=0.16*dt; p.r+=p.vr*dt;
@@ -3644,6 +3753,57 @@ $('btn-help').onclick=()=>show('scr-help');
 $('btn-help-back').onclick=()=>show(prevHelp||'scr-title');
 let prevHelp=null;
 
+/* ---------- SETTINGS screen ---------- */
+function openSettings(){ show('scr-settings'); buildSettings(); }
+function buildSettings(){
+  const b=$('settings-body'); if(!b) return; b.innerHTML='';
+  const mkRow=(label,desc,valText,gold,onClick)=>{
+    const row=document.createElement('div'); row.className='row gap'; row.style.justifyContent='space-between'; row.style.alignItems='center';
+    const left=document.createElement('div'); left.style.textAlign='left';
+    left.innerHTML='<b>'+label+'</b><div class="small muted">'+desc+'</div>';
+    const btn=document.createElement('button'); btn.className='btn sm'+(gold?' gold':''); btn.textContent=valText; btn.style.minWidth='84px'; btn.onclick=onClick;
+    row.appendChild(left); row.appendChild(btn); b.appendChild(row);
+  };
+  mkRow('🔊 Sound','Combat &amp; UI sound effects.', SETTINGS.sound?'ON':'OFF', SETTINGS.sound,
+    ()=>{ SETTINGS.sound=!SETTINGS.sound; muted=!SETTINGS.sound; saveSettings(); buildSettings(); if(SETTINGS.sound){ try{ sfx('clap'); }catch(e){} } });
+  mkRow('📳 Screen shake','Camera shake on heavy hits.', SETTINGS.shake?'ON':'OFF', SETTINGS.shake,
+    ()=>{ SETTINGS.shake=!SETTINGS.shake; saveSettings(); buildSettings(); });
+  const order=['easy','normal','brutal'];
+  mkRow('⚔ Difficulty','Scales foe health &amp; damage.', DIFF[SETTINGS.difficulty].name, SETTINGS.difficulty==='brutal',
+    ()=>{ const i=order.indexOf(SETTINGS.difficulty); SETTINGS.difficulty=order[(i+1)%order.length]; saveSettings(); buildSettings(); });
+}
+$('btn-settings').onclick=()=>openSettings();
+$('btn-settings-back').onclick=()=>show('scr-title');
+
+/* ---------- STATS & ACHIEVEMENTS screen ---------- */
+function openStats(){ show('scr-stats'); buildStats(); }
+function buildStats(){
+  const b=$('stats-body'); if(!b) return;
+  const total=STATS.wins+STATS.losses, winRate= total>0? Math.round(STATS.wins/total*100):0;
+  const rows=[
+    ['⚔ Bouts won', fmt(STATS.wins)], ['💀 Bouts lost', fmt(STATS.losses)], ['🎯 Win rate', winRate+'%'],
+    ['🗡 Foes felled', fmt(STATS.foes)], ['🐆 Beasts slain', STATS.beasts+' ('+Object.keys(STATS.beastKinds||{}).length+'/'+BEASTS.length+' kinds)'],
+    ['🔥 Best combo', (STATS.bestCombo||0)+'×'], ['🪙 Denarii earned', fmt(STATS.coinEarned||0)],
+    ['♦ Provinces governed', STATS.provinces||0], ['💍 Weddings', STATS.weddings||0],
+    ['👑 Dynastic heirs', STATS.dynasties||0], ['🏛 Times Emperor', STATS.emperors||0],
+    ['⭐ Imperial spectacles won', STATS.imperial||0],
+  ];
+  let html='<div style="display:grid;grid-template-columns:1fr 1fr;gap:2px 16px">';
+  for(const [k,v] of rows) html+='<div class="row" style="justify-content:space-between"><span class="muted">'+k+'</span><b style="color:var(--gold)">'+v+'</b></div>';
+  html+='</div>';
+  const got=ACHIEVEMENTS.filter(a=>ACH.has(a.id)).length;
+  html+='<div style="margin-top:10px;color:var(--gold)"><b>AWARDS — '+got+' / '+ACHIEVEMENTS.length+'</b></div>';
+  html+='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(184px,1fr));gap:6px;margin-top:4px">';
+  for(const a of ACHIEVEMENTS){ const on=ACH.has(a.id);
+    html+='<div class="panel" style="padding:6px;border-color:'+(on?'var(--gold)':'#444')+';opacity:'+(on?1:0.5)+'">'
+        +'<b>'+(on?a.icon:'🔒')+' '+a.name+'</b><div class="small muted">'+a.desc+'</div></div>'; }
+  html+='</div>';
+  if(!total && !got) html+='<div class="small muted" style="margin-top:8px">No deeds yet — win a bout to begin your legend. Stats &amp; awards persist across every career on this device.</div>';
+  b.innerHTML=html;
+}
+$('btn-stats').onclick=()=>openStats();
+$('btn-stats-back').onclick=()=>show('scr-title');
+
 // ---- create ----
 let sel={origin:'Italia',arch:null,social:'gladiator'};
 const STAT_COL={STR:'#e0533a',SPD:'#e8c34a',DEF:'#6fa9d8',VIT:'#5b9a4a'};
@@ -4136,6 +4296,7 @@ function claimProvince(reg){
   if(!canClaim(reg)) return;
   G.titles[reg.id]=REGION_TITLES[reg.id]||('Dominus '+reg.id);
   G.pop=clamp(G.pop+6,0,100); G.honor=clamp(G.honor+3,0,100);
+  bumpStat('provinces'); unlock('governor');
   toast('You are proclaimed '+G.titles[reg.id]+' — '+reg.id+' now flies your colours!',2600);
   saveQuiet();
 }
@@ -4337,6 +4498,7 @@ function succession(ch){
   G.married=false; G.wife=null; G.wifeRel=0; G.wifePhys=45; G.pregnant=null;
   G.lastLoveDay=-9; G.lastTalkDay=-9; G.marryPrompted=false; G.hygiene=70;
   G.retired=false; G.path=null; G.office=0;
+  bumpStat('dynasties'); unlock('dynasty');
   refreshStatbar(); saveQuiet(); openVilla();
   toast((fem
     ? '🗡 '+heir+' takes the sand in DEFIANCE of the Emperor’s ban — the first GLADIATRIX of your house! The dynasty endures.'
@@ -4614,6 +4776,7 @@ function marry(w){
   G.approval=clamp(G.approval+(w.approval||0),0,100); G.favor+=w.favor||0;
   G.honor=clamp(G.honor+(w.honor||0),0,100); G.pop=clamp(G.pop+(w.pop||0),0,100);
   marryList=null; marryForced=false; refreshStatbar(); saveQuiet();
+  bumpStat('weddings'); unlock('married');
   toast('You wed '+w.name+'! '+(marriageEffectsText(w)||''),3200);
   enterMap();
 }
@@ -5071,6 +5234,7 @@ function buildPolitics(b){
       const ab=document.createElement('button'); ab.className='btn sm gold'; ab.textContent='⚜ SENATE ACCLAMATION — TAKE THE PURPLE';
       ab.disabled=!ready;
       ab.onclick=()=>{ G.emperor=true; G.imperialDone=true; G.approval=clamp(G.approval+10,0,100); G.legions=Math.max(6,Math.round(G.soldiers/5000)+6); G.glory+=600;
+        bumpStat('emperors'); unlock('emperor');
         saveQuiet(); toast('⚜ THE SENATE KNEELS — no war, no blood: IMPERATOR by acclamation! The purple is yours.',4000); openIntrigue(); };
       oc.appendChild(ab);
     }
@@ -5226,7 +5390,7 @@ function startPlot(){
     kind: G.plotTier===0? 'ambush' : (G.plotTier>=3? 'siege':'field'),
     yourMen:size, enemyMen:t.enemyArmy, general:gen,
     onWin:(yl)=>{ G.soldiers=Math.max(0,G.soldiers-yl); syncArmy(); G.coin+=t.reward; G.glory+=t.glory; G.pop=clamp(G.pop+15,0,100); G.honor=clamp(G.honor-8,0,100); G.plotTier++; G.wins++;
-      const champ=G.plotTier>=PLOT_TARGETS.length; if(champ){ G.imperialDone=true; G.emperor=true; G.approval=60; G.legions=Math.max(6,Math.round(G.soldiers/5000)+6); G.rivals=2; }
+      const champ=G.plotTier>=PLOT_TARGETS.length; if(champ){ G.imperialDone=true; G.emperor=true; G.approval=60; G.legions=Math.max(6,Math.round(G.soldiers/5000)+6); G.rivals=2; bumpStat('emperors'); unlock('emperor'); }
       saveQuiet(); toast(champ?'THE EMPEROR IS SLAIN — the purple is YOURS!':'You have toppled '+t.name+'! (+'+fmt(t.reward)+'d, +'+t.glory+' glory)',3400); openIntrigue(); },
     onLose:(yl)=>{ G.soldiers=Math.max(0,G.soldiers-yl); syncArmy(); G.honor=clamp(G.honor-6,0,100); G.losses++; saveQuiet(); toast('The overthrow of '+t.name+' is crushed — '+fmt(yl)+' lost.',3200); openIntrigue(); } });
 }
