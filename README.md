@@ -48,7 +48,14 @@ publicly, leaving it off keeps the game safe for a general audience.
   Pit Brawler, Blood Fanatic, Net-Fighter), each a real gladiator class with a drawn portrait
   and stat bars. No default — you must pick.
 - **Physics-hopper combat** — every step is a real hop with momentum and gravity; stance
-  guards, thrusts, elbows, visible slash arcs, knockback and a live crowd meter.
+  guards, thrusts, elbows, visible slash arcs, knockback and a live crowd meter. Hits land
+  with **screen-shake, hit-stop, floating damage numbers** and a **combo meter** that climbs
+  on a clean streak and breaks the moment you take a blow.
+- **Venatio (beast hunt)** — take the **🐆 BEAST HUNT** at any arena and face a wild beast
+  loosed on the sand, as the *venatores* did: a **Numidian leopard**, **Libyan lion**,
+  **Caledonian bear** or **Hispanic bull**, each drawn live with its own stalking, pouncing
+  AI. No fencing — only nerve, spear and blade. Rich glory if you kill it; a savaging if you
+  don't. Wilder frontier provinces loose the bigger game.
 - **Ranged weapons** — left-click throws instead of swinging, and your **stance is your aim**:
   a **head** strike is near-lethal (red), a **body** hit solid (yellow), a **leg** hit barely
   troubles a hardened man (green).

@@ -331,6 +331,7 @@
       <div id="brief-forbidden" class="small"></div>
       <div class="row gap" style="margin-top:4px;flex-wrap:wrap;">
         <button class="btn blood" id="btn-fight-go">⚔ ENTER THE ARENA</button>
+        <button class="btn" id="btn-venatio">🐆 BEAST HUNT</button>
         <button class="btn" id="btn-skirmish">🏴 PIT SKIRMISH</button>
         <button class="btn" id="btn-wager">🎲 WAGER: —</button>
         <button class="btn" id="btn-hire">🛡 HIRE A CHAMPION</button>
@@ -933,6 +934,7 @@ function paletteFor(f){
 }
 /* Detailed pixel gladiator. Local origin = feet; up is -y; faces +x. */
 function drawGladiator(f){
+  if(f.beast){ drawBeast(f); return; }
   ctx.save();
   const lean = clamp(f.vx*0.035,-0.45,0.45) + f.rot;
   ctx.translate(f.x, f.y);
@@ -945,6 +947,59 @@ function drawGladiator(f){
   drawStuck(f);
   // bright slash swoosh so the attack reads clearly
   drawSlashFx(f,C);
+  ctx.restore();
+}
+/* A wild beast for the venatio — a chunky pixel quadruped (leopard/lion/bear/bull).
+   Local origin = feet, up is -y, faces +x; two-pass dark outline like the gladiators. */
+function drawBeast(f){
+  const b=f.beastType;
+  ctx.save();
+  ctx.translate(f.x, f.y);
+  ctx.rotate(clamp(f.vx*0.02,-0.3,0.3) + (f.rot||0));
+  ctx.scale(f.facing*1.1, 1.1);
+  const P=(x,y,w,h,c)=>{ ctx.fillStyle=c; ctx.fillRect(Math.round(x),Math.round(y),Math.round(w),Math.round(h)); };
+  const hurt = f.hurt>0 && ((f.hurt|0)%4)<2;
+  const body = hurt? shade(b.body,70) : b.body;
+  const dk   = hurt? shade(b.dk,60)   : b.dk;
+  const lt   = shade(body,26);
+  const stride = Math.sin(f.legPhase), air=!f.onGround;
+  const sw = air? 4 : stride*4;                                   // gait swing
+  const fx = air? Math.sin((f.atk?(1-f.atkT/f.atkDur):0)*Math.PI)*6 : 0;  // front reach on a pounce
+  const tsw=Math.sin(f.legPhase*0.6+1)*3;                          // tail sway
+  const pounce = f.atk? Math.sin((1-f.atkT/f.atkDur)*Math.PI) : 0;
+  for(let pass=0; pass<2; pass++){
+    const O = pass===0, e = O?1:0;
+    const c = x=> O? '#160e07' : x;
+    // legs (feet stay planted; swing shifts them fore/aft)
+    P(-14-e+ (sw<0?sw:0), -13-e, 4+2*e, 14+2*e, c(dk));            // back hind
+    P(-8-e - (sw>0?sw:0), -13-e, 4+2*e, 14+2*e, c(body));         // front hind
+    P(8-e+fx+(sw>0?sw:0), -13-e, 4+2*e, 14+2*e, c(dk));           // back fore
+    P(13-e+fx-(sw<0?sw:0),-13-e, 4+2*e, 14+2*e, c(body));         // front fore
+    // tail
+    P(-23-e, -23-e+tsw, 10+2*e, 4+2*e, c(dk));
+    // torso, haunch, chest, neck
+    P(-18-e, -24-e, 33+2*e, 12+2*e, c(body));
+    P(-20-e, -22-e, 8+2*e, 11+2*e, c(dk));
+    P(12-e,  -25-e, 8+2*e, 12+2*e, c(body));
+    P(16-e,  -28-e, 8+2*e, 10+2*e, c(dk));
+    // head
+    const hx=22, hy=-29+pounce*3;
+    P(hx-e, hy-e, 11+2*e, 10+2*e, c(body));
+    if(O) continue;
+    // ---- sprite-only detail ----
+    P(-18,-24,33,3,lt); P(-18,-14,33,2,dk);                       // back highlight / belly shade
+    if(b.hump){ P(-4,-27,11,4,body); P(-4,-27,11,1,lt); }         // bear shoulder hump
+    if(b.id==='lion'){ P(-25,-24+tsw,4,5,'#3a2a12'); }            // lion tail tuft
+    if(b.mane){ P(15,-31,13,17,'#8a5a1e'); P(15,-31,13,3,'#a06a24'); P(14,-20,4,8,'#7a4e18'); }
+    P(hx,hy,11,2,lt);
+    P(hx+1,hy-2,3,3,dk); P(hx+6,hy-2,3,3,dk);                     // ears
+    P(hx+8,hy+3,5,5,body); P(hx+11,hy+5,2,2,dk);                  // muzzle + nose
+    P(hx+4,hy+3,2,2, hurt?'#fff':'#120a06');                     // eye
+    if(b.horns){ P(hx,hy-4,2,5,'#e8dfc9'); P(hx-2,hy-6,4,2,'#e8dfc9'); P(hx+9,hy-4,2,5,'#e8dfc9'); P(hx+9,hy-6,4,2,'#e8dfc9'); }
+    if(f.atk){ P(hx+8,hy+7,6,2,'#2a0808'); P(hx+9,hy+6,1,1,'#fff'); P(hx+12,hy+6,1,1,'#fff'); }  // open maw
+    if(b.spots){ for(const s of [[-13,-22],[-5,-20],[2,-22],[-9,-16],[6,-17],[-1,-18],[9,-21]]) P(s[0],s[1],2,2,dk); }
+  }
+  drawStuck(f);
   ctx.restore();
 }
 function drawGladBody(f,C){
@@ -1263,6 +1318,31 @@ function makeArenaFoe(tier, esc, mult){
          think:0, want:'approach', skill:tier },
   });
 }
+// ---- VENATIO: wild beasts loosed on the sand (the venatores' hunt) ----
+const BEASTS=[
+  {id:'leopard', name:'Numidian Leopard', body:'#c9962f', dk:'#7f5715', hp:110, dmg:2.0, speed:1.5, react:0.09, aggr:0.92, reach:22, armor:0,    spots:true, reward:1.35, blurb:'a spotted killer, quick as a flung pilum'},
+  {id:'lion',    name:'Libyan Lion',      body:'#c8a24a', dk:'#8a6a24', hp:165, dmg:2.7, speed:1.2, react:0.12, aggr:0.96, reach:24, armor:0.05, mane:true,  reward:1.6,  blurb:'the king of the sands, mane like a low sun'},
+  {id:'bear',    name:'Caledonian Bear',  body:'#6a4a2e', dk:'#40301c', hp:210, dmg:3.3, speed:0.8, react:0.22, aggr:0.7,  reach:26, armor:0.16, hump:true,  reward:1.55, blurb:'a mountain of fur and slow, crushing fury'},
+  {id:'bull',    name:'Hispanic Bull',    body:'#2e2620', dk:'#17120d', hp:180, dmg:3.1, speed:1.1, react:0.18, aggr:0.85, reach:24, armor:0.1,  horns:true, reward:1.4,  blurb:'a maddened bull, all horn and hate'},
+];
+function pickBeast(reg){
+  const t=reg?reg.tier:2;   // wilder frontiers loose the bigger game
+  const pool = t>=4? BEASTS : t>=3? BEASTS.filter(b=>b.id!=='bear') : BEASTS.filter(b=>b.id==='leopard'||b.id==='bull');
+  return pick(pool.length?pool:BEASTS);
+}
+function makeBeast(reg, esc){
+  const b=pickBeast(reg);
+  const hp=Math.round(b.hp*(esc||1));
+  const f=makeFighter({
+    isPlayer:false, x:340, facing:-1, name:b.name,
+    maxHp:hp, hp:hp, tunic:b.body,
+    gear:{ weapon:{id:'claws', name:'claws', dmg:b.dmg, reach:b.reach, spd:1, gold:false},
+           shield:{id:'none', block:0}, helmet:{id:'none', armor:0}, armor:{id:'hide', armor:b.armor} },
+    ai:{ react:b.react, aggr:b.aggr, think:0, want:'chase', skill:3 },
+  });
+  f.beast=true; f.beastType=b; f.beard=false; f.stuck=[];
+  return f;
+}
 function startFight(region, briefData){
   const tier=region.tier;
   // player fighter from career loadout
@@ -1285,7 +1365,7 @@ function startFight(region, briefData){
     setTimeout(()=>{ if(FT&&!FT.over) banner(FT.p.x,FT.p.y-64,'💫 BLESSED OF VENUS','#ffd0da'); },1100); }
   // foe scales with tier + popularity (battle escalation)
   const esc = 1 + (G.pop/100)*0.5;
-  const foe=makeArenaFoe(tier, esc, 1);
+  const foe = briefData.venatio ? makeBeast(region, esc) : makeArenaFoe(tier, esc, 1);
   FT={
     region, brief:briefData, p, foe,
     crowd:50, time:0, over:false, result:null,
@@ -1298,6 +1378,7 @@ function startFight(region, briefData){
     waveLock:false, wager:briefData.wager||0,
     emperor: (region.id==='Italia' && briefData.imperial) || (briefData.plot && briefData.plot.name.indexOf('EMPEROR')>=0) || briefData.rival,
     shake:0, particles:[], banners:[], decals:[], flash:0, hitstop:0, pila:[],
+    dmgnums:[], combo:0, comboT:0, comboPulse:0, venatio:!!briefData.venatio,
   };
   if(G.injury){ p.maxHp*=0.85; p.hp=p.maxHp; p.dmgMul=(p.dmgMul||1)*0.85; }   // fighting wounded
   // sometimes your wife slips into the stands — you fight harder under her eyes
@@ -1379,6 +1460,13 @@ function tryHit(att,def){
       FT.flash=Math.min(1,FT.flash+ (dmg>22?0.5:0.28));
       att.combo++;
       sfx(att.atkType==='elbow'?'thud':'hit');
+      // floating damage number, coloured & enlarged by how hard it bit
+      const crit = dmg>=26;
+      dmgNumber(def.x, def.y-40, Math.round(dmg), crit);
+      if(crit){ FT.shake=Math.min(12,FT.shake+3); FT.flash=Math.min(1,FT.flash+0.15); banner(att.x,att.y-64,'SAVAGE!','#ff7a3a'); }
+      // player combo meter: builds on a streak, breaks when you get struck
+      if(att.isPlayer){ FT.combo=att.combo; FT.comboT=95; FT.comboPulse=1.4; }
+      if(def.isPlayer){ FT.combo=0; FT.comboT=0; }
       // crowd reaction
       const cr = (att.isPlayer? 2.4:-2.0) + (att.combo>2?1.5:0) + (att.atkType==='elbow'?1.2:0);
       FT.crowd=clamp(FT.crowd+cr,0,100);
@@ -1386,6 +1474,8 @@ function tryHit(att,def){
     }
   }
 }
+// a floating damage number that drifts up and fades (juice)
+function dmgNumber(x,y,val,crit){ if(!FT||!FT.dmgnums) return; FT.dmgnums.push({x:x+rnd(-4,4), y, val, crit:!!crit, life:crit?26:20}); }
 function addParticles(x,y,n,c){
   for(let i=0;i<n;i++) FT.particles.push({x,y,vx:rnd(-2,2),vy:rnd(-3,0.5),life:rnd(10,22),c});
 }
@@ -1523,6 +1613,39 @@ function aiUpdate(f,opp,dt){
     else if(ai.want==='elbow'){ hop(f,f.facing); }
   }
 }
+/* ---------- beast AI: a beast does not fence — it stalks, pounces and bites ---------- */
+function beastHop(f,dir,spd){
+  if(!f.onGround||f.hopCd>0) return;
+  f.vx += dir*HOPVX*(spd||1); f.vy=HOPVY*0.9; f.onGround=false; f.hopCd=5; f.facing=dir; f.legPhase+=1.6;
+}
+function beastLunge(f,dir){
+  if(!f.onGround||f.hopCd>0) return;
+  f.vx += dir*HOPVX*2.1; f.vy=HOPVY*1.15; f.onGround=false; f.hopCd=7; f.facing=dir; f.legPhase+=2;
+}
+function beastBite(f){
+  if(f.atk||f.atkCd>0) return;
+  f.stance = Math.random()<0.7?'mid':(Math.random()<0.5?'high':'low');  // mostly a body maul, sometimes high/low
+  f.atk=true; f.atkType='slash'; f.atkHit=false; f.atkDur=14; f.atkT=f.atkDur; f.atkCd=f.atkDur+ri(8,16);
+  sfx('thud');
+}
+function beastAI(f,opp,dt){
+  const ai=f.ai; ai.think-=dt;
+  f.facing = opp.x<f.x? -1:1;
+  const dist=Math.abs(opp.x-f.x), reach=f.gear.weapon.reach, spd=f.beastType.speed;
+  if(ai.think<=0){
+    ai.think=ri(5,16)*(1.3-ai.aggr);
+    if(dist>reach+42) ai.want = Math.random()<0.5?'lunge':'chase';
+    else if(dist>reach) ai.want='chase';
+    else if(Math.random()<ai.aggr) ai.want='bite';
+    else ai.want = Math.random()<0.35?'back':'bite';
+  }
+  if(f.onGround && !f.atk){
+    if(ai.want==='chase'){ if(dist>reach-4) beastHop(f,f.facing,spd); }
+    else if(ai.want==='lunge'){ beastLunge(f,f.facing); ai.want='bite'; }
+    else if(ai.want==='back'){ if(dist<reach+50) beastHop(f,-f.facing,spd*0.7); }
+    else if(ai.want==='bite'){ if(dist<reach+8){ beastBite(f); ai.want='chase'; } else beastHop(f,f.facing,spd); }
+  }
+}
 
 /* ---------- fighter physics + state ---------- */
 const GRAV=0.42, HOPVX=2.4, HOPVY=-4.2, JUMPVY=-7.4, FRICT=0.80, AIRDRAG=0.985;
@@ -1601,7 +1724,7 @@ function updateFight(dt){
     if(held.d && p.onGround) hop(p, 1);
   }
   // AI
-  if(!foe.knock && !FT.over) aiUpdate(foe,p,dt);
+  if(!foe.knock && !FT.over){ if(foe.beast) beastAI(foe,p,dt); else aiUpdate(foe,p,dt); }
   physics(p,dt); physics(foe,dt);
   // hits
   tryHit(p,foe); tryHit(foe,p);
@@ -1619,6 +1742,12 @@ function updateFight(dt){
   FT.particles=FT.particles.filter(p=>p.life>0);
   for(const b of FT.banners){ b.y-=0.4*dt; b.life-=dt; }
   FT.banners=FT.banners.filter(b=>b.life>0);
+  // floating damage numbers drift up and fade
+  for(const d of FT.dmgnums){ d.y-=0.7*dt; d.life-=dt; }
+  FT.dmgnums=FT.dmgnums.filter(d=>d.life>0);
+  // combo meter cools down; a lull resets the streak
+  if(FT.comboT>0){ FT.comboT-=dt; if(FT.comboT<=0){ FT.combo=0; p.combo=0; } }
+  FT.comboPulse*=Math.pow(0.85,dt);
   FT.shake*=Math.pow(0.8,dt);
   // KO check
   if(!FT.over && !FT.waveLock){
@@ -1753,6 +1882,8 @@ function finishFight(won){
     if(FT.emperor){ glory*=2; popDelta+=20; honorDelta+=6; note+='THE EMPEROR IS PLEASED. '; }
     if(FT.wager>0){ coin+=FT.wager; note+='🎲 Your wager pays double (+'+FT.wager+'d). '; }
     if(FT.wifeWatch){ G.wifeRel=clamp((G.wifeRel||50)+3,0,100); popDelta+=1; note+='♥ She saw it all from the stands (+3 bond). '; }
+    if(FT.venatio){ const bt=FT.foe.beastType||{name:'beast'}; glory=Math.round(glory*1.5); coin=Math.round(coin*1.6);
+      popDelta+=6; honorDelta+=2; note+='🐆 You slew the '+bt.name+' before a roaring mob — a true venator! '; }
     G.wins++; G.coin+=coin; G.glory+=glory; G.pop=clamp(G.pop+popDelta,0,100);
     G.cleared[reg.id]=true; G.clears[reg.id]=(G.clears[reg.id]||0)+1;
     // xp / level
@@ -1770,6 +1901,10 @@ function finishFight(won){
     G.coin+=coin;
     note = wnote + (spared? 'The mob spares you — Mitte! You live to fight again.'
                  : 'Pollice verso… but the editor grants you mercy this once. Your name suffers.');
+    // a beast shows no mercy — you are dragged from the sand alive but savaged
+    if(FT.venatio){ note = wnote + 'The beast overpowers you — attendants drag you from the sand alive, but savaged, and the crowd falls silent.';
+      if(!G.injury){ G.injury={name:pick(['savaged shoulder','clawed flank','gored thigh','mauled arm']), daysLeft:ri(4,7)};
+        note+=' You bear a '+G.injury.name+' — rest, or see a medicus.'; } }
     // wounds taken in defeat linger
     if(!FT.hired && !G.injury && Math.random()<0.4){
       G.injury={name:pick(['torn shoulder','cracked ribs','gashed thigh','broken hand','split brow']), daysLeft:ri(3,6)};
@@ -2058,7 +2193,16 @@ function drawArena(){
   // banners
   ctx.textAlign='center';
   for(const b of t.banners){ pixelText(b.t,b.x,b.y,b.c,1); }
+  // floating damage numbers (rise with the fight so they shake on impact)
+  for(const d of t.dmgnums){ ctx.globalAlpha=clamp(d.life/12,0,1);
+    pixelText('-'+d.val, d.x, d.y, d.crit?'#ff4a3a':(d.val>=18?'#ffae3a':'#ffe6a0'), d.crit?2:1.4); }
+  ctx.globalAlpha=1;
   ctx.restore();
+  // combo meter — fixed on screen, swelling and pulsing as the streak grows
+  if(t.combo>=2){ const puls=1+(t.comboPulse||0)*0.35;
+    const sc=(1.4+Math.min(1.8,t.combo*0.12))*puls;
+    const col = t.combo>=8?'#ff4a3a': t.combo>=5?'#ff9a3a':'#ffcf4a';
+    ctx.textAlign='center'; pixelText(t.combo+'× HITS', W/2, H-14, col, sc); }
   // skirmish tally — "1 vs 3" like a pit fight card
   if(t.gauntlet){ ctx.textAlign='center';
     pixelText('1  vs  '+(t.gauntlet.left+1), W/2, 40, 'rgba(58,66,58,.9)', 2);
@@ -5480,6 +5624,9 @@ function openBrief(reg,imperial){
   $('btn-skirmish').textContent=`🏴 PIT SKIRMISH (1 v ${skirN})`;
   $('btn-skirmish').title='An unsanctioned mass bout on the field outside the walls — face '+skirN+' men in a row for a far greater purse.';
   $('btn-skirmish').disabled = cantFight || imperial;
+  $('btn-venatio').textContent='🐆 VENATIO (BEAST HUNT)';
+  $('btn-venatio').title='Face a wild beast loosed on the sand, as the venatores do — no fencing, only nerve, spear and blade. Rich glory, real danger (defeat leaves you savaged).';
+  $('btn-venatio').disabled = cantFight || imperial;
   briefCtx.wager=0;
   $('btn-wager').textContent='🎲 WAGER: —';
   $('btn-wager').title='Stake coin on your own blood: win and it pays double, lose and the bookmakers keep it.';
@@ -5509,6 +5656,11 @@ $('btn-skirmish').onclick=()=>{
   const b=briefCtx;
   startFight(b.reg,{forbiddenEquipped:b.eqForbidden, gauntlet:2+b.tier, pit:true, upperHelp:b.upperHelp, wager:b.wager||0});
   toast('You march out past the walls to the fighting pits…',1500);
+};
+$('btn-venatio').onclick=()=>{
+  const b=briefCtx;
+  startFight(b.reg,{venatio:true, upperHelp:b.upperHelp, wager:b.wager||0});
+  toast('The gates grind open — a beast is loosed onto the sand…',1700);
 };
 $('btn-wager').onclick=()=>{
   const steps=[0,50,200,500].filter(v=>v<=G.coin);
