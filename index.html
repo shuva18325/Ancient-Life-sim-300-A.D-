@@ -359,6 +359,7 @@
       <div class="row gap" style="margin-top:4px;flex-wrap:wrap;">
         <button class="btn blood" id="btn-fight-go">⚔ ENTER THE ARENA</button>
         <button class="btn" id="btn-venatio">🐆 BEAST HUNT</button>
+        <button class="btn" id="btn-naumachia">⚓ NAUMACHIA</button>
         <button class="btn" id="btn-skirmish">🏴 PIT SKIRMISH</button>
         <button class="btn" id="btn-wager">🎲 WAGER: —</button>
         <button class="btn" id="btn-hire">🛡 HIRE A CHAMPION</button>
@@ -1469,6 +1470,8 @@ function makeArenaFoe(tier, esc, mult){
          think:0, want:'approach', skill:tier },
   });
 }
+// ---- NAUMACHIA: the flooded-arena sea-fight — marines of the enemy fleet ----
+const NAVAL_NAMES=['Naukleros the Rhodian','Demarchos of Miletus','Piso the Liburnian','Glaukos the Boarder','Attalos of Tyre','Cassius Trierarch','Bostar the Punic','Hylas of Corcyra','Ravenna Marine','Menas the Pirate'];
 // ---- VENATIO: wild beasts loosed on the sand (the venatores' hunt) ----
 const BEASTS=[
   {id:'leopard', name:'Numidian Leopard', body:'#c9962f', dk:'#7f5715', hp:110, dmg:2.0, speed:1.5, react:0.09, aggr:0.92, reach:22, armor:0,    spots:true, reward:1.35, blurb:'a spotted killer, quick as a flung pilum'},
@@ -1610,7 +1613,7 @@ function startFight(region, briefData){
     waveLock:false, wager:briefData.wager||0,
     emperor: (region.id==='Italia' && briefData.imperial) || (briefData.plot && briefData.plot.name.indexOf('EMPEROR')>=0) || briefData.rival,
     shake:0, particles:[], banners:[], decals:[], flash:0, hitstop:0, pila:[],
-    dmgnums:[], combo:0, comboT:0, comboPulse:0, venatio:!!briefData.venatio,
+    dmgnums:[], combo:0, comboT:0, comboPulse:0, venatio:!!briefData.venatio, naumachia:!!briefData.naumachia,
   };
   if(G.injury){ p.maxHp*=0.85; p.hp=p.maxHp; p.dmgMul=(p.dmgMul||1)*0.85; }   // fighting wounded
   const agd=ageFactor(); if(agd>0){ p.maxHp*=(1-agd*0.5); p.hp=p.maxHp; p.dmgMul=(p.dmgMul||1)*(1-agd*0.4); p.maxStamina*=(1-agd*0.35); p.stamina=p.maxStamina; }  // the years slow the arm
@@ -1635,9 +1638,14 @@ function startFight(region, briefData){
     setTimeout(()=>{ if(FT&&!FT.over) banner(FT.foe.x,FT.foe.y-64,'⚔ GRUDGE MATCH','#e26a6a'); },800);
   }
   // an active nemesis stacks the deck against you in ordinary bouts
-  if(!FT.nemesis && !FT.venatio && G.nemesis && !G.nemesis.ready && Math.random()<0.26){
+  if(!FT.nemesis && !FT.venatio && !FT.naumachia && G.nemesis && !G.nemesis.ready && Math.random()<0.26){
     FT.nemInterf=true; foe.maxHp*=1.22; foe.hp=foe.maxHp; foe.ai.aggr=Math.min(0.95,(foe.ai.aggr||0.6)*1.2);
     setTimeout(()=>{ if(FT&&!FT.over) banner(FT.foe.x,FT.foe.y-58,'⚔ '+G.nemesis.name+' paid the editor','#c86ad0'); },900);
+  }
+  // NAUMACHIA — a marine of the enemy fleet, met on a pitching warship deck
+  if(FT.naumachia){ foe.name=pick(NAVAL_NAMES); foe.tunic=pick(['#1d3a5a','#26506e','#1a5a6a','#2a4a6a']);
+    foe.maxHp*=1.12; foe.hp=foe.maxHp; foe.ai.aggr=Math.min(0.95,(foe.ai.aggr||0.6)*1.08);
+    setTimeout(()=>{ if(FT&&!FT.over) banner(FT.foe.x,FT.foe.y-62,'⚓ NAUMACHIA','#7fd0ec'); },800);
   }
   state='fight';
   show('fight-hud');
@@ -2210,6 +2218,8 @@ function finishFight(won){
     if(FT.wifeWatch){ G.wifeRel=clamp((G.wifeRel||50)+3,0,100); popDelta+=1; note+='♥ She saw it all from the stands (+3 bond). '; }
     if(FT.venatio){ const bt=FT.foe.beastType||{name:'beast'}; glory=Math.round(glory*1.5); coin=Math.round(coin*1.6);
       popDelta+=6; honorDelta+=2; note+='🐆 You slew the '+bt.name+' before a roaring mob — a true venator! '; }
+    if(FT.naumachia){ glory=Math.round(glory*1.7); coin=Math.round(coin*1.55); popDelta+=9; honorDelta+=3;
+      note+='⚓ You held the pitching deck in the great sea-fight — a NAUMACHIA the mob will retell for years! '; }
     G.wins++; G.coin+=coin; G.glory+=glory; G.pop=clamp(G.pop+popDelta,0,100);
     G.cleared[reg.id]=true; G.clears[reg.id]=(G.clears[reg.id]||0)+1;
     // ---- lifetime stats + achievements ----
@@ -2423,6 +2433,7 @@ function drawArena(){
   const t=FT;
   const shk=SETTINGS.shake? t.shake : 0;
   let sx=(Math.random()-0.5)*shk, sy=(Math.random()-0.5)*shk;
+  if(t.naumachia){ sx+=Math.sin(t.time*0.03)*2.2; sy+=Math.sin(t.time*0.052)*1.6; }   // the deck pitches on the swell
   ctx.save(); ctx.translate(sx,sy);
   // sky / awning by region flavour
   const reg=t.region;
@@ -2494,8 +2505,23 @@ function drawArena(){
       px(gx,gy,1,3,'#7e8f6a'); px(gx+2,gy+1,1,2,'#8a9b74'); }                      // grass tufts
     for(const [mx,mw] of [[80,50],[240,70],[390,44]]){ px(mx,GROUND+6,mw,5,'#75664c'); px(mx+4,GROUND+8,mw-10,2,'#665741'); } // mud patches
   }
+  else if(t.naumachia){ // flooded arena: dark water below, a warship deck for the fighting floor
+    px(0,GROUND,W,H-GROUND,'#173e54'); px(0,GROUND+4,W,H-GROUND-4,'#12324a');
+    for(let yy=GROUND+4;yy<H;yy+=4){ ctx.globalAlpha=.10; px((Math.sin((yy+t.time)*0.12)*4)|0,yy,W,1,'#7fd0ec'); } ctx.globalAlpha=1;
+    px(-4,GROUND-2,W+8,4,'#7a5230'); px(-4,GROUND-2,W+8,1,'#9a6a3e');                    // deck edge plank
+    for(let x=0;x<W;x+=10) px(x,GROUND-1,1,3,'#5a3a20');                                  // planking seams
+    px(-4,GROUND+2,58,12,'#4a3018'); px(W-54,GROUND+2,58,12,'#4a3018');                   // hull sides dipping into the water
+    // enemy ship's ram/prow jutting in from the right
+    px(W-32,GROUND-26,36,24,'#3a2614'); px(W-32,GROUND-26,36,2,'#5a3f28');
+    px(W-6,GROUND-14,10,6,'#a08a5a'); px(W-6,GROUND-13,10,1,'#c8b488');                   // bronze ram beak
+  }
   else { px(0,GROUND,W,H-GROUND,'#d8b271'); px(0,GROUND,W,3,'#c79a55');
     for(let i=0;i<70;i++){ px((i*97)%W,GROUND+4+((i*53)%(H-GROUND-6)),1,1,'#c79a55'); } }
+  // NAUMACHIA rigging: a mast + yard + shroud lines rising over the deck
+  if(t.naumachia){ px(W/2-2,52,4,GROUND-52,'#6a4a2c'); px(W/2-2,52,1,GROUND-52,'#8a6a44');
+    px(W/2-42,66,84,3,'#5a3f28'); px(W/2-42,66,84,1,'#6e4a2c');
+    ctx.strokeStyle='rgba(70,50,32,.55)'; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(W/2,56); ctx.lineTo(W/2-72,GROUND-6); ctx.moveTo(W/2,56); ctx.lineTo(W/2+72,GROUND-6); ctx.stroke(); }
   // your wife in the stands — dressed in her colours, waving as you fight
   if(t.wifeWatch && G.wife){
     const wfx = t.pit? 60 : W/2-86, wfy = t.pit? GROUND-44 : 13;
@@ -3510,18 +3536,22 @@ function drawShadowPlay(s,T){
     for(let i=0;i<pts.length;i++){ const a=pts[i], b=pts[(i+1)%pts.length], md=m(a,b); ctx.quadraticCurveTo(a[0],a[1],md[0],md[1]); }
     ctx.closePath(); ctx.fill(); };
   // a broad MAN, standing, facing right — a solid, muscled shadow, a clear head TALLER than the woman
-  const maleStand=(x,base,dir)=>{ dir=dir||1;
+  // noArms: skip his own two arms (used when a scene draws exactly the arms it needs by hand)
+  const maleStand=(x,base,dir,noArms)=>{ dir=dir||1;
     cap(x-4,base-32,x-6,base-16,6.2,4.6); cap(x-6,base-16,x-5,base-2,4.6,3.2); ell(x-5,base-1,6.6,3);   // left leg thigh→calf→foot
     cap(x+4,base-32,x+6,base-16,6.2,4.6); cap(x+6,base-16,x+5,base-2,4.6,3.2); ell(x+5,base-1,6.6,3);   // right leg
     blob([[x-13,base-58],[x-10,base-47],[x-9,base-36],[x-8,base-30],[x+8,base-30],[x+9,base-36],[x+10,base-47],[x+13,base-58],[x,base-63]]);  // broad V-trunk
     ell(x,base-52,12,7);                                                   // chest slab
-    cap(x-12,base-57,x-13,base-44,4.4,3.5); cap(x-13,base-44,x-11,base-34,3.5,2.9);   // left arm upper+fore
-    cap(x+12,base-57,x+13,base-44,4.4,3.5); cap(x+13,base-44,x+11,base-34,3.5,2.9);   // right arm
+    if(!noArms){
+      cap(x-12,base-57,x-13,base-44,4.4,3.5); cap(x-13,base-44,x-11,base-34,3.5,2.9);   // left arm upper+fore
+      cap(x+12,base-57,x+13,base-44,4.4,3.5); cap(x+13,base-44,x+11,base-34,3.5,2.9);   // right arm
+    }
     cap(x,base-62,x,base-58,4.2,4.2); ball(x,base-71,7.4); ell(x,base-76,7.8,3.6);    // neck, head, cropped hair (tall)
     ball(x+dir*7.5,base-70,2); kohl(x+dir*4,base-71); };                    // nose
   // a curvy WOMAN, standing, facing dir (-1 = left); sw = bounce; wrap = [x,y] to hook a leg round him
   // shorter than the man, a clean hourglass — wide hips, cinched waist, soft bust, long hair
-  const femStand=(x,base,dir,sw,wrap)=>{ sw=sw||0;
+  // noArms: skip her own one arm (used when a scene draws exactly the arms it needs by hand)
+  const femStand=(x,base,dir,sw,wrap,noArms)=>{ sw=sw||0;
     cap(x+dir*3,base-30,x+dir*3,base-15,5,3.5); cap(x+dir*3,base-15,x+dir*3,base-2,3.5,2.5); ell(x+dir*3,base-1,4.8,2.5);   // back leg
     if(wrap){ cap(x-dir*2,base-35+sw,wrap[0],wrap[1],5,4); cap(wrap[0],wrap[1],wrap[0]-dir*8,wrap[1]-6,4,3); }             // wrapping leg
     else { cap(x-dir*4,base-31,x-dir*6,base-15,5.2,3.7); cap(x-dir*6,base-15,x-dir*5,base-2,3.7,2.5); ell(x-dir*6,base-1,4.8,2.5); }  // front leg
@@ -3530,7 +3560,7 @@ function drawShadowPlay(s,T){
     ell(x-dir*7,base-46+sw,5.2,4.6); ball(x-dir*11,base-45+sw,1.8);        // soft bust curve + point
     cap(x,base-53,x,base-50,2.8,2.8); ball(x,base-59,6.2);                // slim neck, head
     ell(x+dir*5,base-63,4,5.2); ball(x-dir*5.5,base-58,1.6);              // long hair sweep + nose
-    cap(x+dir*4,base-47,x+dir*5,base-38,3,2.5); cap(x+dir*5,base-38,x+dir*3,base-31,2.5,2.1);   // arm upper+fore
+    if(!noArms) cap(x+dir*4,base-47,x+dir*5,base-38,3,2.5); if(!noArms) cap(x+dir*5,base-38,x+dir*3,base-31,2.5,2.1);   // arm upper+fore
     kohl(x-dir*4,base-59); };
   // a MAN kneeling, facing left — a solid mass
   const maleKneel=(x,base)=>{
@@ -3540,13 +3570,16 @@ function drawShadowPlay(s,T){
     cap(x+6,base-40,x+8,base-22,5.2,4); ell(x+8,base-13,5.6,3); };         // far leg
   const rock=Math.sin(T*0.34), rk2=Math.sin(T*0.34-0.55);
 
-  if(vi===0){ // THE EMBRACE — standing side by side, arms around each other, swaying (spaced, not merged)
+  if(vi===0){ // THE EMBRACE — standing side by side, exactly two arms each, no limb-pileup
     const sx=rock*3, hx=cx0-15+sx, wx=cx0+16+sx, sw=rk2*2;
-    maleStand(hx,base,1);
-    femStand(wx,base,-1,sw);                                            // she stands to his side — her own full figure
-    cap(hx+9,base-44,wx-5,base-40,3.6,3);                               // his arm reaches around her waist, bridging the gap
-    cap(wx-5,base-55+sw,hx+3,base-60,3,2.5);                            // her arm up over his (taller) shoulder
-    woad(wx+6,base-32);                                                  // blue handprint on her hip
+    maleStand(hx,base,1,true);                                          // him — armless base
+    femStand(wx,base,-1,sw,null,true);                                  // her — armless base, her own full figure
+    // his two arms: outer hangs at his side, inner rests on her far shoulder
+    cap(hx-12,base-57,hx-13,base-38,4,3.2);
+    cap(hx+11,base-56,wx-4,base-52+sw,3.6,3);                           // reaches across to her shoulder (up high — kept wholesome)
+    // her two arms: inner up onto his shoulder, outer hangs at her side
+    cap(wx-5,base-50+sw,hx+4,base-60,3,2.5);
+    cap(wx+7,base-47+sw,wx+8,base-34+sw,3,2.4);
     HB(cx0+1,base-92,16);
   } else if(vi===1){ // THE KISS — two big curved heads, a hand at the cheek, lips that meet
     const d=Math.max(0,14-vt*0.3), sw=Math.sin(T*0.3)*1.5;
@@ -6114,6 +6147,9 @@ function openBrief(reg,imperial){
   $('btn-venatio').textContent='🐆 VENATIO (BEAST HUNT)';
   $('btn-venatio').title='Face a wild beast loosed on the sand, as the venatores do — no fencing, only nerve, spear and blade. Rich glory, real danger (defeat leaves you savaged).';
   $('btn-venatio').disabled = cantFight || imperial;
+  $('btn-naumachia').textContent='⚓ NAUMACHIA (SEA-FIGHT)';
+  $('btn-naumachia').title='The arena is flooded and a warship deck laid over the water — fight an enemy marine on the pitching deck as the mob roars. A prestigious spectacle: richer glory, coin and popularity.';
+  $('btn-naumachia').disabled = cantFight || imperial;
   briefCtx.wager=0;
   $('btn-wager').textContent='🎲 WAGER: —';
   $('btn-wager').title='Stake coin on your own blood: win and it pays double, lose and the bookmakers keep it.';
@@ -6148,6 +6184,11 @@ $('btn-venatio').onclick=()=>{
   const b=briefCtx;
   startFight(b.reg,{venatio:true, upperHelp:b.upperHelp, wager:b.wager||0});
   toast('The gates grind open — a beast is loosed onto the sand…',1700);
+};
+$('btn-naumachia').onclick=()=>{
+  const b=briefCtx;
+  startFight(b.reg,{naumachia:true, forbiddenEquipped:b.eqForbidden, upperHelp:b.upperHelp, wager:b.wager||0});
+  toast('⚓ Sluice-gates thunder open — the arena floods, and the warships are loosed…',2000);
 };
 $('btn-wager').onclick=()=>{
   const steps=[0,50,200,500].filter(v=>v<=G.coin);
