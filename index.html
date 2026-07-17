@@ -116,6 +116,7 @@
     <span class="stat">🧼 <b id="s-hyg">70</b></span>
     <span class="stat">🐎 <b id="s-mount">—</b></span>
     <span class="stat">⚔ Lv <b id="s-lvl">1</b></span>
+    <span class="stat">🎂 <b id="s-age">19</b></span>
     <span class="stat">🩸 <b id="s-rec">0–0</b></span>
     <span class="stat" id="s-injury" style="display:none;border-color:var(--blood)">🩹 <b id="s-inj-name"></b></span>
   </div>
@@ -938,10 +939,11 @@ function freshCareer(name,origin,arch,social){
     imperialDone:false,
     rigsUsed:0,
     nemesis:null, trophies:[], nemesisCount:0,   // the rival who rises against you + crushed-rival trophies
+    age:19, ageBase:0, pendingDeath:false,       // LIVING YEARS: age = 19 + (day-ageBase)/36; the body slows, and one day the end comes
   };
 }
 // fill in any fields missing from older saves
-function migrate(g){ const d={honor:50,food:4,mount:0,slaves:0,hasVilla:false,boat:false,favor:0,soldiers:0,hidden:[],plotTier:0,emperor:false,approval:50,legions:0,rivals:0,retired:false,detachments:[],day:0,titles:{},clears:{},socialClass:'gladiator',army:{},armyGear:0,armyTrain:0,hasOrganizer:false,generals:[],wife:null,married:false,marryPrompted:false,children:[],pregnant:null,lastLoveDay:-9,injury:null,lastDebateDay:-9,office:0,path:null,parthia:50,parthiaPact:false,wifeRel:50,lastTalkDay:-9,isFemale:false,lineage:[],hygiene:70,wifePhys:45,hasPool:false,hasWardrobe:false,legacy:null,lastFeastDay:-9,loveDay:-1,loveQuick:0,loveLong:0,loveNight:0,loveVigil:0,venusUntil:-1,lastWashDay:-9,lastPoolDay:-9,lastWardrobeDay:-9,lastKidsDay:-9,lastBathDay:-9,pila:0,bow:null,bowsOwned:[],nemesis:null,trophies:[],nemesisCount:0}; for(const k in d){ if(g[k]===undefined) g[k]=d[k]; } if(!g.current) g.current='Italia'; return g; }
+function migrate(g){ const d={honor:50,food:4,mount:0,slaves:0,hasVilla:false,boat:false,favor:0,soldiers:0,hidden:[],plotTier:0,emperor:false,approval:50,legions:0,rivals:0,retired:false,detachments:[],day:0,titles:{},clears:{},socialClass:'gladiator',army:{},armyGear:0,armyTrain:0,hasOrganizer:false,generals:[],wife:null,married:false,marryPrompted:false,children:[],pregnant:null,lastLoveDay:-9,injury:null,lastDebateDay:-9,office:0,path:null,parthia:50,parthiaPact:false,wifeRel:50,lastTalkDay:-9,isFemale:false,lineage:[],hygiene:70,wifePhys:45,hasPool:false,hasWardrobe:false,legacy:null,lastFeastDay:-9,loveDay:-1,loveQuick:0,loveLong:0,loveNight:0,loveVigil:0,venusUntil:-1,lastWashDay:-9,lastPoolDay:-9,lastWardrobeDay:-9,lastKidsDay:-9,lastBathDay:-9,pila:0,bow:null,bowsOwned:[],nemesis:null,trophies:[],nemesisCount:0,pendingDeath:false,ageBase:0}; for(const k in d){ if(g[k]===undefined) g[k]=d[k]; } if(!g.current) g.current='Italia'; if(g.age===undefined) g.age=19+Math.floor(((g.day||0)-(g.ageBase||0))/36); return g; }
 function saveGame(){ try{ localStorage.setItem(SAVE_KEY, JSON.stringify(G)); toast('Saved.'); }catch(e){ toast('⚠ Could not save — browser storage is blocked or full.',3200); } }
 function hasSave(){ try{ return !!localStorage.getItem(SAVE_KEY); }catch(e){ return false; } }
 function loadGame(){ try{ G=migrate(JSON.parse(localStorage.getItem(SAVE_KEY))); return !!G; }catch(e){ return false; } }
@@ -1004,6 +1006,7 @@ function refreshStatbar(){
   $('s-food').textContent=G.food;
   $('s-mount').textContent=MOUNTS[G.mount].short;
   $('s-lvl').textContent=G.level;
+  { const ag=$('s-age'); if(ag){ ag.textContent=(G.age||19); ag.style.color=(G.age||19)>=50?'#d0a0e0':(G.age||19)>=40?'#e8c34a':''; } }
   $('s-rec').textContent=G.wins+'–'+G.losses;
   const hy=$('s-hyg'); if(hy){ hy.textContent=(G.hygiene===undefined?70:G.hygiene)|0;
     hy.style.color=G.hygiene<30?'var(--blood)':G.hygiene>=85?'#8ad48a':''; }
@@ -1518,7 +1521,34 @@ function nemesisAfterWin(){
     toast('⚔ '+nemFull(n)+' has CALLED YOU OUT — a grudge match to the death. Face him from any pre-fight brief.',4400); }
   else if(Math.random()<0.5){ toast('🗡 '+nemFull(n)+': '+pick(NEM_TAUNTS)+'  (grudge '+Math.round(n.grudge)+'%)',3200); }
 }
-// the nemesis panel drawn on the pre-fight brief (grudge meter + call-out + trophies)
+// a menacing helmeted gladiator bust for the nemesis — drawn from his own colours
+function drawNemesisPortrait(cnv,n){
+  const c=cnv.getContext('2d'); c.imageSmoothingEnabled=false;
+  const W=cnv.width, H=cnv.height; c.clearRect(0,0,W,H); c.save(); c.scale(W/44,H/44);
+  const P=(x,y,w,h,col)=>{ c.fillStyle=col; c.fillRect(x,y,w,h); };
+  const tunic=n.tunic||'#5a2d8a', skin=n.skin||'#b07a4a';
+  const g=c.createLinearGradient(0,0,0,44); g.addColorStop(0,'#2a1e12'); g.addColorStop(1,'#0c0906'); c.fillStyle=g; c.fillRect(0,0,44,44);
+  // shoulders — armour trimmed in his colours
+  P(4,36,36,8,'#3a3128'); P(6,35,32,3,tunic); P(9,37,26,5,'#4a4038'); P(4,36,36,1,'#000');
+  P(12,36,20,1,'#6a6152');
+  // neck
+  P(19,31,6,5,skin);
+  // helmet dome
+  c.fillStyle='#565049'; c.beginPath(); c.ellipse(22,19,11,12,0,0,7); c.fill();
+  c.fillStyle='#6a6358'; c.beginPath(); c.ellipse(19,15,6,7,0,0,7); c.fill();      // sheen
+  c.strokeStyle='#2f2820'; c.lineWidth=1; c.beginPath(); c.ellipse(22,19,11,12,0,0,7); c.stroke();
+  P(10,18,24,2,'#2f2820');                                                          // brow band
+  // the round eye-holes — secutor menace, a red glint deep inside
+  c.fillStyle='#070503'; c.beginPath(); c.arc(17,21,2.6,0,7); c.fill(); c.beginPath(); c.arc(27,21,2.6,0,7); c.fill();
+  c.fillStyle='#d24328'; c.beginPath(); c.arc(17,21,1,0,7); c.fill(); c.beginPath(); c.arc(27,21,1,0,7); c.fill();
+  // face grille + chin
+  P(15,26,14,6,'#3a332a'); for(let i=0;i<5;i++) P(16+i*3,26,1,6,'#161009'); P(15,26,14,1,'#4a4038');
+  // crest — a blood-red plume arching over the dome
+  for(let i=0;i<9;i++){ const px2=13+i*2, hy=Math.sin(i/8*Math.PI)*7; P(px2,10-hy,2,6+hy, i%2?'#9a2028':'#6a1018'); }
+  P(21,6,2,7,'#7a1520');
+  c.restore();
+}
+// the nemesis panel drawn on the pre-fight brief (portrait + grudge meter + call-out + trophies)
 function nemesisBriefBlock(){
   const n=G.nemesis;
   if(!n){ return (G.trophies||[]).length
@@ -1526,9 +1556,14 @@ function nemesisBriefBlock(){
     : ''; }
   const col=n.ready?'var(--blood)':'#8a5cc0', txt=n.ready?'#ffb0b0':'#c89af0';
   return `<div class="panel" style="padding:8px;margin-top:6px;border-color:${col}">
-    <b style="color:${txt}">⚔ NEMESIS — ${n.name} ${n.epithet}</b>
-    <div class="small muted">Your rival — ${n.wins} wins to his name. Grudge <b>${Math.round(n.grudge)}%</b>${(G.trophies||[]).length?' · 🏆 '+G.trophies.length+' crushed':''}</div>
-    <div style="height:7px;background:#2a1f16;border-radius:4px;margin-top:5px;overflow:hidden"><div style="height:100%;width:${Math.round(n.grudge)}%;background:${col}"></div></div>
+    <div style="display:flex;gap:10px;align-items:center">
+      <canvas id="nem-portrait" width="88" height="88" style="width:70px;height:70px;image-rendering:pixelated;border:2px solid ${col};border-radius:4px;background:#0c0906;flex:0 0 auto"></canvas>
+      <div style="flex:1 1 auto;min-width:0">
+        <b style="color:${txt}">⚔ NEMESIS — ${n.name} ${n.epithet}</b>
+        <div class="small muted">Your rival — ${n.wins} wins to his name. Grudge <b>${Math.round(n.grudge)}%</b>${(G.trophies||[]).length?' · 🏆 '+G.trophies.length+' crushed':''}</div>
+        <div style="height:7px;background:#2a1f16;border-radius:4px;margin-top:5px;overflow:hidden"><div style="height:100%;width:${Math.round(n.grudge)}%;background:${col}"></div></div>
+      </div>
+    </div>
     ${n.ready
       ? `<button id="btn-grudge" class="btn" style="margin-top:7px;width:100%;border-color:var(--blood);color:#ffb0b0">⚔ FACE ${n.name.toUpperCase()} — GRUDGE MATCH TO THE DEATH</button>`
       : `<div class="small muted" style="margin-top:3px">Keep winning honest bouts and he will call you out.</div>`}
@@ -1572,6 +1607,7 @@ function startFight(region, briefData){
     dmgnums:[], combo:0, comboT:0, comboPulse:0, venatio:!!briefData.venatio,
   };
   if(G.injury){ p.maxHp*=0.85; p.hp=p.maxHp; p.dmgMul=(p.dmgMul||1)*0.85; }   // fighting wounded
+  const agd=ageFactor(); if(agd>0){ p.maxHp*=(1-agd*0.5); p.hp=p.maxHp; p.dmgMul=(p.dmgMul||1)*(1-agd*0.4); p.maxStamina*=(1-agd*0.35); p.stamina=p.maxStamina; }  // the years slow the arm
   // sometimes your wife slips into the stands — you fight harder under her eyes
   FT.wifeWatch = !!(G.married && G.wife && !FT.siege && Math.random() < ((G.wifeRel||50)>=90? 1 : 0.2 + (G.wifeRel||50)/300));
   if(FT.wifeWatch){ p.dmgMul=(p.dmgMul||1)*(1.05+(G.wifeRel||50)/1000+((G.wifeRel||50)>=90?0.05:0)); p.maxStamina+=15; p.stamina=p.maxStamina;
@@ -4379,6 +4415,7 @@ $('btn-create-go').onclick=()=>{
 
 // ---- map ----
 function enterMap(){
+  if(checkOldAgeDeath()) return;                 // the years may have come due
   // those born to rank must first secure a dynastic marriage
   if(marriageRequired()){ openMarry(true); return; }
   state='map'; show('scr-map'); $('statbar').classList.remove('hide');
@@ -4556,6 +4593,7 @@ function govBlock(reg){
   return `<div class="small muted" style="margin-top:2px">Dominate this province — win here ${need} times (${got}/${need}) to claim a grand title and govern it.</div>`;
 }
 function openVilla(){
+  if(checkOldAgeDeath()) return;                 // the years may have come due
   state='villa'; show('scr-villa'); $('statbar').classList.remove('hide'); refreshStatbar();
   const b=$('villa-body'); b.innerHTML='';
   // the medicus treats wounds for coin
@@ -4740,6 +4778,7 @@ function succession(ch){
   G.married=false; G.wife=null; G.wifeRel=0; G.wifePhys=45; G.pregnant=null;
   G.lastLoveDay=-9; G.lastTalkDay=-9; G.marryPrompted=false; G.hygiene=70;
   G.retired=false; G.path=null; G.office=0;
+  G.ageBase=G.day; G.age=19; G.pendingDeath=false;   // the heir takes up the sword young — a fresh span of years
   bumpStat('dynasties'); unlock('dynasty');
   refreshStatbar(); saveQuiet(); openVilla();
   toast((fem
@@ -5253,7 +5292,31 @@ function advanceDay(n){
       G.rivals++; G.lastRaid='A jealous rival raises troops to contest your power — face him in the Intrigue hall.';
     }
   }
+  // --- LIVING YEARS: age with the calendar (36 day-units ≈ 1 year), slow with the decades, and one day, the end ---
+  const na=19+Math.floor((G.day-(G.ageBase||0))/36);
+  if(na>(G.age||19)){
+    G.age=na;
+    if(state!=='fight' && state!=='battle'){
+      if(na===30) toast('🎂 You turn 30 — the prime of a fighting life.',2600);
+      else if(na===40) toast('🎂 Forty winters. The young bloods call you “old man” now, and your body is slower to answer the sand.',3600);
+      else if(na===50) toast('🎂 Fifty — few gladiators ever see it. Think on passing the house to an heir.',3600);
+      else toast('🎂 A year turns — you are now '+na+'.',2000);
+    }
+    if(na>=55 && Math.random() < 0.16+(na-55)*0.09) G.pendingDeath=true;   // age itself comes for every man
+  }
   refreshStatbar();
+}
+// the body's decline with age — nothing before 35, mild after, real past 50
+function ageFactor(){ const a=(G&&G.age)||19; return a<=35? 0 : clamp((a-35)*0.014, 0, 0.34); }
+// the end of a life: pass the sword to an heir, or close the legend
+function checkOldAgeDeath(){
+  if(!G || !G.pendingDeath) return false;
+  G.pendingDeath=false;
+  const kids=(G.children||[]).slice().sort((a,b)=>a.born-b.born);
+  if(kids.length){ toast('🕯 Age claims '+G.name+' at '+(G.age||60)+'. The house gathers — and the sword passes on.',4600); succession(kids[0]); return true; }
+  G.retired=true; saveQuiet();
+  toast('🕯 '+G.name+' dies of old age at '+(G.age||60)+', with no heir to lift the sword. The legend is complete — you may begin a new career from the title screen.',6500);
+  return true;
 }
 function buildOrganizer(b){
   const oh=document.createElement('div'); oh.className='small'; oh.style.color='var(--gold)'; oh.style.marginTop='6px';
@@ -6001,6 +6064,7 @@ function openBrief(reg,imperial){
      ${govBlock(reg)}${nemesisBriefBlock()}`;
   const gb=$('brief-claim'); if(gb) gb.onclick=()=>{ claimProvince(reg); openBrief(reg,imperial); refreshStatbar(); };
   const gbn=$('btn-grudge'); if(gbn) gbn.onclick=()=>{ startFight(briefCtx.reg,{nemesis:true}); toast('The crowd falls silent — this one is personal…',1600); };
+  const npc=$('nem-portrait'); if(npc && G.nemesis) drawNemesisPortrait(npc,G.nemesis);
   // forbidden gear notice
   // social standing / governance rules
   const isElite=G.socialClass==='elite', isUpper=G.socialClass==='upper', isGovernor=!!G.titles[reg.id];
