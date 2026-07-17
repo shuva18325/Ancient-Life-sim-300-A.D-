@@ -23,6 +23,8 @@
     box-shadow:inset 0 0 90px rgba(0,0,0,.55);z-index:1;}
   canvas{position:absolute;inset:0;width:100%;height:100%;
     image-rendering:pixelated;image-rendering:crisp-edges;display:block;}
+  /* high-res, SMOOTH text overlay — crisp scene captions instead of pixel-blurred ones */
+  #gtext{image-rendering:auto;pointer-events:none;z-index:2;}
   /* DOM UI overlays use the same pixel aesthetic as the canvas */
   .screen{position:absolute;inset:0;display:none;flex-direction:column;
     color:var(--bone);text-shadow:2px 2px 0 #000;letter-spacing:1px;}
@@ -101,6 +103,7 @@
 <body>
 <div id="wrap"><div id="stage">
   <canvas id="game" width="480" height="270"></canvas>
+  <canvas id="gtext" width="1920" height="1080"></canvas>
 
   <!-- ===== TOP STAT BAR (visible on meta screens) ===== -->
   <div id="statbar" class="hide">
@@ -429,6 +432,10 @@
 const cv = document.getElementById('game');
 const ctx = cv.getContext('2d');
 ctx.imageSmoothingEnabled = false;
+// crisp text overlay: a smooth, high-res canvas over the pixelated game canvas
+const tcv = document.getElementById('gtext');
+const tctx = tcv.getContext('2d');
+const TS = tcv.width/480;                    // overlay scale vs the internal 480-wide game canvas
 const W = cv.width, H = cv.height;          // 480 x 270 internal
 const GROUND = 210;                         // floor y (sand line)
 const WALL_L = 18, WALL_R = W-18;
@@ -2578,13 +2585,18 @@ function drawVerdict(){
 }
 
 /* simple pixel text using canvas font but snapped */
+// crisp scene text — drawn on the smooth high-res overlay, bold with a clean
+// outline, honouring any fade the caller set on the main ctx.globalAlpha
 function pixelText(t,x,y,c,scale=1){
-  ctx.save();
-  ctx.font=`${6*scale}px "Courier New", monospace`;
-  ctx.textAlign='center'; ctx.textBaseline='middle';
-  ctx.fillStyle='#000'; ctx.fillText(t,(x|0)+1,(y|0)+1);
-  ctx.fillStyle=c; ctx.fillText(t,x|0,y|0);
-  ctx.restore();
+  const fs=Math.round(6.4*scale*TS);
+  tctx.save();
+  tctx.globalAlpha=ctx.globalAlpha;
+  tctx.font=`bold ${fs}px "Trebuchet MS","Segoe UI",Verdana,sans-serif`;
+  tctx.textAlign='center'; tctx.textBaseline='middle'; tctx.lineJoin='round';
+  tctx.strokeStyle='rgba(0,0,0,0.85)'; tctx.lineWidth=Math.max(2,fs*0.18);
+  tctx.strokeText(t, x*TS, y*TS);
+  tctx.fillStyle=c; tctx.fillText(t, x*TS, y*TS);
+  tctx.restore();
 }
 
 /* =====================================================================
@@ -2656,6 +2668,7 @@ let last=performance.now();
 function loop(now){
   let dt=(now-last)/16.6667; last=now;
   dt=clamp(dt,0,3);
+  tctx.clearRect(0,0,tcv.width,tcv.height);   // wipe last frame's crisp text
   if(state==='fight' && FT){ updateFight(dt); drawArena(); }
   else if(state==='battle' && BT){ updateBattle(dt); drawBattle(); }
   else if(state==='wifehappy'){ updateWifeHappy(dt); if(state==='wifehappy') drawWifeHappy(); }
@@ -3059,8 +3072,8 @@ function updateBed(dt){ const s=BC; s.t+=dt; const T=s.t;
 // the master of the house, full height, striding to the door
 function drawShadowMale(fx,fy,ph,gag){
   const S='#1c130c', stride=Math.sin(ph);
-  px(fx-4,fy-83,10,11,S); px(fx-2,fy-85,7,3,S);                    // head + cropped hair — a head above the domina
-  px(fx-1,fy-72,5,9,S);                                            // neck
+  px(fx-4,fy-88,10,11,S); px(fx-2,fy-90,7,3,S);                    // head + cropped hair — clearly a head TALLER than the domina
+  px(fx-1,fy-77,5,14,S);                                           // longer neck bridges the greater height
   px(fx-9,fy-63,19,6,S);                                           // broad shoulders
   px(fx-7,fy-57,15,16,S); px(fx-5,fy-41,11,6,S);                   // torso tapering to the waist
   px(fx-9+stride*2,fy-61,4,14,S); px(fx+6-stride*2,fy-61,4,14,S);  // swinging arms
@@ -3444,27 +3457,29 @@ function drawShadowPlay(s,T){
     const m=(a,b)=>[(a[0]+b[0])/2,(a[1]+b[1])/2]; const p0=m(pts[pts.length-1],pts[0]); ctx.moveTo(p0[0],p0[1]);
     for(let i=0;i<pts.length;i++){ const a=pts[i], b=pts[(i+1)%pts.length], md=m(a,b); ctx.quadraticCurveTo(a[0],a[1],md[0],md[1]); }
     ctx.closePath(); ctx.fill(); };
-  // a broad MAN, standing, facing right by default — a solid, muscled shadow
+  // a broad MAN, standing, facing right — a solid, muscled shadow, a clear head TALLER than the woman
   const maleStand=(x,base,dir)=>{ dir=dir||1;
-    cap(x-4,base-30,x-6,base-15,6,4.5); cap(x-6,base-15,x-5,base-2,4.5,3.2); ell(x-5,base-1,6.5,3);   // left leg thigh→calf→foot
-    cap(x+4,base-30,x+6,base-15,6,4.5); cap(x+6,base-15,x+5,base-2,4.5,3.2); ell(x+5,base-1,6.5,3);   // right leg
-    blob([[x-12,base-55],[x-9,base-45],[x-9,base-34],[x-8,base-28],[x+8,base-28],[x+9,base-34],[x+9,base-45],[x+12,base-55],[x,base-60]]);  // V-taper trunk
-    ell(x,base-50,11,6.5);                                                 // chest slab
-    cap(x-11,base-54,x-12,base-42,4.2,3.4); cap(x-12,base-42,x-10,base-33,3.4,2.8);   // left arm upper+fore
-    cap(x+11,base-54,x+12,base-42,4.2,3.4); cap(x+12,base-42,x+10,base-33,3.4,2.8);   // right arm
-    cap(x,base-59,x,base-55,4,4); ball(x,base-67,7.2); ell(x,base-72,7.6,3.4);        // neck, head, cropped hair
-    ball(x+dir*7,base-66,1.9); kohl(x+dir*4,base-67); };                    // nose
+    cap(x-4,base-32,x-6,base-16,6.2,4.6); cap(x-6,base-16,x-5,base-2,4.6,3.2); ell(x-5,base-1,6.6,3);   // left leg thigh→calf→foot
+    cap(x+4,base-32,x+6,base-16,6.2,4.6); cap(x+6,base-16,x+5,base-2,4.6,3.2); ell(x+5,base-1,6.6,3);   // right leg
+    blob([[x-13,base-58],[x-10,base-47],[x-9,base-36],[x-8,base-30],[x+8,base-30],[x+9,base-36],[x+10,base-47],[x+13,base-58],[x,base-63]]);  // broad V-trunk
+    ell(x,base-52,12,7);                                                   // chest slab
+    cap(x-12,base-57,x-13,base-44,4.4,3.5); cap(x-13,base-44,x-11,base-34,3.5,2.9);   // left arm upper+fore
+    cap(x+12,base-57,x+13,base-44,4.4,3.5); cap(x+13,base-44,x+11,base-34,3.5,2.9);   // right arm
+    cap(x,base-62,x,base-58,4.2,4.2); ball(x,base-71,7.4); ell(x,base-76,7.8,3.6);    // neck, head, cropped hair (tall)
+    ball(x+dir*7.5,base-70,2); kohl(x+dir*4,base-71); };                    // nose
   // a curvy WOMAN, standing, facing dir (-1 = left); sw = bounce; wrap = [x,y] to hook a leg round him
+  // shorter than the man, a clean hourglass — wide hips, cinched waist, soft bust, long hair
   const femStand=(x,base,dir,sw,wrap)=>{ sw=sw||0;
-    cap(x+dir*3,base-31,x+dir*3,base-15,5.2,3.6); cap(x+dir*3,base-15,x+dir*3,base-2,3.6,2.6); ell(x+dir*3,base-1,5,2.6);   // back leg
-    if(wrap){ cap(x-dir*2,base-36+sw,wrap[0],wrap[1],5.2,4); cap(wrap[0],wrap[1],wrap[0]-dir*8,wrap[1]-6,4,3); }            // wrapping leg
-    else { cap(x-dir*4,base-32,x-dir*6,base-15,5.4,3.8); cap(x-dir*6,base-15,x-dir*5,base-2,3.8,2.6); ell(x-dir*6,base-1,5,2.6); }  // front leg
-    blob([[x-8,base-53],[x-6,base-45],[x-9,base-38],[x-11,base-32],[x-8,base-27],[x+8,base-27],[x+11,base-32],[x+9,base-38],[x+6,base-45],[x+8,base-53],[x,base-56]]);  // hourglass trunk
-    ball(x+dir*8,base-32+sw,6.4);                                          // rounded hip/rear (implied, smooth)
-    ell(x-dir*7,base-48+sw,5.4,4.4); ball(x-dir*11,base-47+sw,1.8);        // bust faces dir + point
-    cap(x,base-56,x,base-53,3,3); ball(x,base-62,6.4); ball(x+dir*6,base-64,4.2);   // neck, head, bun
-    ball(x-dir*6,base-61,1.7); kohl(x-dir*4,base-62);                      // nose
-    cap(x+dir*4,base-50,x+dir*5,base-40,3.2,2.6); cap(x+dir*5,base-40,x+dir*3,base-33,2.6,2.2); };  // arm upper+fore
+    cap(x+dir*3,base-30,x+dir*3,base-15,5,3.5); cap(x+dir*3,base-15,x+dir*3,base-2,3.5,2.5); ell(x+dir*3,base-1,4.8,2.5);   // back leg
+    if(wrap){ cap(x-dir*2,base-35+sw,wrap[0],wrap[1],5,4); cap(wrap[0],wrap[1],wrap[0]-dir*8,wrap[1]-6,4,3); }             // wrapping leg
+    else { cap(x-dir*4,base-31,x-dir*6,base-15,5.2,3.7); cap(x-dir*6,base-15,x-dir*5,base-2,3.7,2.5); ell(x-dir*6,base-1,4.8,2.5); }  // front leg
+    blob([[x-7,base-50],[x-5,base-43],[x-9,base-37],[x-11,base-31],[x-8,base-26],[x+8,base-26],[x+11,base-31],[x+9,base-37],[x+5,base-43],[x+7,base-50],[x,base-53]]);  // hourglass: wide hips, cinched waist
+    ball(x+dir*8.5,base-31+sw,6.6);                                        // rounded rear (smooth, implied)
+    ell(x-dir*7,base-46+sw,5.2,4.6); ball(x-dir*11,base-45+sw,1.8);        // soft bust curve + point
+    cap(x,base-53,x,base-50,2.8,2.8); ball(x,base-59,6.2);                // slim neck, head
+    ell(x+dir*5,base-63,4,5.2); ball(x-dir*5.5,base-58,1.6);              // long hair sweep + nose
+    cap(x+dir*4,base-47,x+dir*5,base-38,3,2.5); cap(x+dir*5,base-38,x+dir*3,base-31,2.5,2.1);   // arm upper+fore
+    kohl(x-dir*4,base-59); };
   // a MAN kneeling, facing left — a solid mass
   const maleKneel=(x,base)=>{
     ball(x+2,base-70,7.4); ell(x+2,base-75,7.8,3.2); ball(x-4,base-68,1.8);          // head, hair, nose (left)
@@ -3473,14 +3488,14 @@ function drawShadowPlay(s,T){
     cap(x+6,base-40,x+8,base-22,5.2,4); ell(x+8,base-13,5.6,3); };         // far leg
   const rock=Math.sin(T*0.34), rk2=Math.sin(T*0.34-0.55);
 
-  if(vi===0){ // THE EMBRACE — standing, wound together, swaying as one
-    const sx=rock*3, hx=cx0-9+sx, wx=cx0+12+sx, sw=rk2*2;
+  if(vi===0){ // THE EMBRACE — standing side by side, arms around each other, swaying (spaced, not merged)
+    const sx=rock*3, hx=cx0-15+sx, wx=cx0+16+sx, sw=rk2*2;
     maleStand(hx,base,1);
-    cap(hx+3,base-46,wx-3,base-42,3.5,3);                                // his arm around her waist
-    femStand(wx,base,-1,sw,[hx+4,base-37]);                             // her leg wraps his hip
-    cap(wx-2,base-58+sw,hx+3,base-56,3,2.5);                            // her arm over his shoulder
-    woad(wx+5,base-33);                                                  // blue handprint on her hip
-    HB(cx0,base-86,16);
+    femStand(wx,base,-1,sw);                                            // she stands to his side — her own full figure
+    cap(hx+9,base-44,wx-5,base-40,3.6,3);                               // his arm reaches around her waist, bridging the gap
+    cap(wx-5,base-55+sw,hx+3,base-60,3,2.5);                            // her arm up over his (taller) shoulder
+    woad(wx+6,base-32);                                                  // blue handprint on her hip
+    HB(cx0+1,base-92,16);
   } else if(vi===1){ // THE KISS — two big curved heads, a hand at the cheek, lips that meet
     const d=Math.max(0,14-vt*0.3), sw=Math.sin(T*0.3)*1.5;
     ball(cx0-30-d,base-64,15);                                          // his head
@@ -3558,15 +3573,21 @@ function drawShadowPlay(s,T){
     cap(cx0+26,base-16,cx0+27,base-50,5,3.5); ell(cx0+27,base-53,5.5,3.5);
     for(let f=0;f<3;f++){ ball(cx0+12+f*2.2,base-50,1.4); ball(cx0+25+f*2.2,base-54,1.4); }
     HB(cx0,base-58,22);
-  } else { // THE FRUIT BOWL — 🍒 knocked flying, as is tradition
-    ell(cx0+8,base-20,15,5); cap(cx0+8,base-16,cx0+8,base-6,4,4);       // bowl + stem
-    const kn=Math.min(18,vt*0.5);
-    cap(cx0-30+kn,base-36,cx0-14+kn,base-36,4,3); for(let f=0;f<4;f++) ball(cx0-14+kn+f*2,base-36,1.3);  // hand + fingers
-    if(vt>26){ const fy2=Math.min(36,(vt-26)*0.8), fx2=(vt-26)*0.9;
-      ball(cx0-1-fx2*0.4,base-34-((36-fy2)*(fy2)/12),3.6); ball(cx0+6-fx2*0.3,base-36-((34-fy2)*(fy2)/14),3.6);  // the 🍒 aloft
-      lit(cx0+2-fx2*0.35,base-30-((35-fy2)*(fy2)/13),cx0+2-fx2*0.35,base-25-((35-fy2)*(fy2)/13),1);              // stem
-      ell(cx0+8,base-20+Math.min(9,(vt-26)*0.3),15,5); }                                                         // bowl tips after
-    if(vt>80) pixelText('~ the bowl is avenged ~',cx0,base+4,'rgba(232,195,74,.6)',1);
+  } else { // THE FRUIT BOWL — the couple at rest; a stray reach topples the 🍒 (now clearly grounded)
+    ell(cx0-6,base-9,46,11);                                            // the shared bed lump
+    ball(cx0-26,base-17,8.4); ell(cx0-28,base-24,9.5,4);               // HIS head + hair (bigger, higher)
+    ball(cx0-7,base-14,6.4); ell(cx0-3,base-18,4.4,5.2);              // HER head + long hair, nestled lower
+    cap(cx0-18,base-13,cx0-1,base-15,3,2.6);                           // an arm draped across
+    HB(cx0-10,base-30,20);                                             // hearts over the pair
+    // the side table + bowl, and the lazy reach that sends it flying
+    ell(cx0+27,base-22,11,4.6); cap(cx0+27,base-18,cx0+27,base-8,3.6,3.6);   // bowl + stem
+    const kn=Math.min(13,vt*0.5);
+    cap(cx0+6+kn,base-30,cx0+19+kn,base-28,3.5,2.8); for(let f=0;f<4;f++) ball(cx0+19+kn+f*2,base-28,1.3);  // reaching hand
+    if(vt>26){ const fy2=Math.min(30,(vt-26)*0.8), fx2=(vt-26)*0.7;
+      ball(cx0+24+fx2*0.2,base-30-((30-fy2)*(fy2)/12),3.4); ball(cx0+31+fx2*0.3,base-33-((30-fy2)*(fy2)/14),3.4);  // 🍒 aloft
+      lit(cx0+27,base-26-((30-fy2)*(fy2)/13),cx0+27,base-21-((30-fy2)*(fy2)/13),1);                               // stem
+      ell(cx0+27,base-22+Math.min(8,(vt-26)*0.3),11,4.6); }                                                       // bowl tips after
+    if(vt>70) pixelText('~ just the two of them ~',cx0,base+6,'rgba(240,216,180,.9)',1.1);
   }
   // ---- water ripple / marble echo, painted OVER the figures ----
   if(style==='water'){ for(let yy=gy+4;yy<gy+gh;yy+=5){ ctx.globalAlpha=.08; px(gx,Math.round(yy+Math.sin((yy+T)*0.2)),gw,1,'#bfeaff'); } ctx.globalAlpha=1;
