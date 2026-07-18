@@ -941,10 +941,27 @@ function freshCareer(name,origin,arch,social){
     rigsUsed:0,
     nemesis:null, trophies:[], nemesisCount:0,   // the rival who rises against you + crushed-rival trophies
     age:19, ageBase:0, pendingDeath:false,       // LIVING YEARS: age = 19 + (day-ageBase)/36; the body slows, and one day the end comes
+    wonProvinceByFight:false,                     // governed a province by PURE fighting → the Warrior-Queen path opens
   };
 }
+// raise the domina to NOBLE (by wealth) or WARRIOR QUEEN (by pure conquest of the sand)
+function elevateWife(rank){
+  const w=G.wife; if(!w || w.male) return;
+  if(rank==='noble'){
+    if(G.coin<2000 || w.rank==='noble') return;
+    G.coin-=2000; w.rank='noble'; w.jewel=true; w.warrior=false; w.dress='#5a2d8a';   // Tyrian-purple noble gown
+    w.tradeCoin=(w.tradeCoin||0)+6; G.approval=clamp(G.approval+4,0,100);
+    toast('👑 '+w.name.split(' ')[0]+' is raised to NOBLE rank — Tyrian silks and gold, a place among the great houses. (+6d/bout, +4 approval)',4200);
+  } else if(rank==='warrior'){
+    if(!G.wonProvinceByFight || w.rank==='warrior') return;
+    w.rank='warrior'; w.jewel=true; w.warrior=true; w.dress='#8a2020';                 // deep war-red
+    w.tradeCoin=(w.tradeCoin||0)+3; G.pop=clamp(G.pop+6,0,100); G.honor=clamp(G.honor+4,0,100);
+    toast('🗡 '+w.name.split(' ')[0]+' takes up spear and circlet — a WARRIOR QUEEN at your side, crowned by the sword alone. (+6 pop, +4 honor)',4400);
+  }
+  refreshStatbar(); saveQuiet(); openVilla();
+}
 // fill in any fields missing from older saves
-function migrate(g){ const d={honor:50,food:4,mount:0,slaves:0,hasVilla:false,boat:false,favor:0,soldiers:0,hidden:[],plotTier:0,emperor:false,approval:50,legions:0,rivals:0,retired:false,detachments:[],day:0,titles:{},clears:{},socialClass:'gladiator',army:{},armyGear:0,armyTrain:0,hasOrganizer:false,generals:[],wife:null,married:false,marryPrompted:false,children:[],pregnant:null,lastLoveDay:-9,injury:null,lastDebateDay:-9,office:0,path:null,parthia:50,parthiaPact:false,wifeRel:50,lastTalkDay:-9,isFemale:false,lineage:[],hygiene:70,wifePhys:45,hasPool:false,hasWardrobe:false,legacy:null,lastFeastDay:-9,loveDay:-1,loveQuick:0,loveLong:0,loveNight:0,loveVigil:0,venusUntil:-1,lastWashDay:-9,lastPoolDay:-9,lastWardrobeDay:-9,lastKidsDay:-9,lastBathDay:-9,pila:0,bow:null,bowsOwned:[],nemesis:null,trophies:[],nemesisCount:0,pendingDeath:false,ageBase:0}; for(const k in d){ if(g[k]===undefined) g[k]=d[k]; } if(!g.current) g.current='Italia'; if(g.age===undefined) g.age=19+Math.floor(((g.day||0)-(g.ageBase||0))/36); return g; }
+function migrate(g){ const d={honor:50,food:4,mount:0,slaves:0,hasVilla:false,boat:false,favor:0,soldiers:0,hidden:[],plotTier:0,emperor:false,approval:50,legions:0,rivals:0,retired:false,detachments:[],day:0,titles:{},clears:{},socialClass:'gladiator',army:{},armyGear:0,armyTrain:0,hasOrganizer:false,generals:[],wife:null,married:false,marryPrompted:false,children:[],pregnant:null,lastLoveDay:-9,injury:null,lastDebateDay:-9,office:0,path:null,parthia:50,parthiaPact:false,wifeRel:50,lastTalkDay:-9,isFemale:false,lineage:[],hygiene:70,wifePhys:45,hasPool:false,hasWardrobe:false,legacy:null,lastFeastDay:-9,loveDay:-1,loveQuick:0,loveLong:0,loveNight:0,loveVigil:0,venusUntil:-1,lastWashDay:-9,lastPoolDay:-9,lastWardrobeDay:-9,lastKidsDay:-9,lastBathDay:-9,pila:0,bow:null,bowsOwned:[],nemesis:null,trophies:[],nemesisCount:0,pendingDeath:false,ageBase:0,wonProvinceByFight:false}; for(const k in d){ if(g[k]===undefined) g[k]=d[k]; } if(!g.current) g.current='Italia'; if(g.age===undefined) g.age=19+Math.floor(((g.day||0)-(g.ageBase||0))/36); return g; }
 function saveGame(){ try{ localStorage.setItem(SAVE_KEY, JSON.stringify(G)); toast('Saved.'); }catch(e){ toast('⚠ Could not save — browser storage is blocked or full.',3200); } }
 function hasSave(){ try{ return !!localStorage.getItem(SAVE_KEY); }catch(e){ return false; } }
 function loadGame(){ try{ G=migrate(JSON.parse(localStorage.getItem(SAVE_KEY))); return !!G; }catch(e){ return false; } }
@@ -2955,50 +2972,66 @@ function finishBattle(){
 function drawHusbandFig(c,x,y,bond,skinOv,tunOv){
   const P=(a,b2,w,h,col)=>{c.fillStyle=col;c.fillRect(Math.round(x+a),Math.round(y+b2),Math.round(w),Math.round(h));};
   const skin=skinOv||G.skin||'#caa06a', sSh=shade(skin,-30), sHi=shade(skin,22);
-  const tun=tunOv||G.tunic||'#7a2f22', tSh=shade(tun,-32), tHi=shade(tun,24);
-  // legs + sandals
-  P(-6,-22,5,20,skin); P(1,-22,5,20,skin); P(-6,-22,1,20,sHi); P(5,-22,1,20,sSh);
-  P(-7,-2,7,2,'#6a4426'); P(0,-2,7,2,'#6a4426');
-  // tunic with a gold hem — a champion's colours
-  P(-9,-52,18,30,tun); P(-9,-52,18,3,tHi); P(7,-50,2,27,tSh);
-  P(-9,-24,18,2,'#e8c34a'); P(-2,-52,2,28,tSh);
-  P(-10,-46,4,16,tun); P(6,-46,4,16,tun);                          // sleeves
-  P(-11,-30,4,4,skin); P(7,-30,4,4,skin);                          // hands
-  // balteus + medal of the arena
-  P(-9,-40,18,2,'#5a3a22'); P(-1,-38,3,3,'#e8c34a');
-  // neck + head, proud and scarred
-  P(-2,-57,5,5,skin);
-  P(-6,-70,12,13,skin); P(-6,-70,12,2,sHi); P(4,-68,2,10,sSh);
-  P(-6,-72,12,4,'#3a2618'); P(-7,-68,2,5,'#3a2618'); P(5,-68,2,5,'#3a2618'); // hair
-  P(-4,-64,3,2,'#fff'); P(1,-64,3,2,'#fff'); P(-3,-64,2,2,'#241408'); P(2,-64,2,2,'#241408');
-  P(-4,-66,3,1,'#241408'); P(1,-66,3,1,'#241408');
-  P(-1,-61,2,1,sSh); P(-2,-59,5,1,'#8a4038');                       // nose + easy smile
-  P(3,-67,1,4,'#8a5a4a');                                            // the old scar he never hides
-  if(G.emperor && !skinOv){ P(-7,-73,14,2,'#e8c34a'); P(-1,-74,2,2,'#fff0b0'); } // the laurel of an emperor
-  if(bond>=90){ P(-11,-44,4,3,skin); }                               // his arm reaches round her waist
+  const tun=tunOv||G.tunic||'#7a2f22', tSh=shade(tun,-32), tHi=shade(tun,24), tMid=shade(tun,-14);
+  // legs — shaped, with a calf line and strapped sandals
+  P(-6,-22,5,20,skin); P(1,-22,5,20,skin); P(-6,-22,1,20,sHi); P(5,-22,1,20,sSh); P(-1,-22,1,20,sSh);
+  P(-6,-9,5,1,sSh); P(1,-9,5,1,sSh);
+  P(-7,-2,7,2,'#6a4426'); P(0,-2,7,2,'#6a4426'); P(-6,-3,2,1,'#3a2414'); P(1,-3,2,1,'#3a2414');
+  // tunic — draped with folds, side modelling, a gold hem
+  P(-9,-52,18,30,tun); P(-9,-52,18,3,tHi);
+  P(-9,-52,2,30,tHi); P(7,-52,2,30,tSh);
+  for(const fx of [-5,-1,3]) P(fx,-49,1,25,tMid);                   // vertical drape folds
+  P(-3,-40,1,16,tSh); P(2,-38,1,14,tSh);
+  P(-9,-24,18,2,'#e8c34a'); P(-9,-24,18,1,'#fff0b0');              // gold hem
+  // sleeves + forearms
+  P(-11,-49,5,15,tun); P(9,-49,5,15,tun); P(-11,-49,1,15,tHi); P(13,-49,1,15,tSh);
+  P(-12,-34,4,5,skin); P(9,-34,4,5,skin); P(-12,-34,1,5,sHi); P(12,-34,1,5,sSh);
+  // balteus (sword-belt) + arena medal
+  P(-9,-41,18,2,'#5a3a22'); P(-9,-41,18,1,'#7a5232'); P(-1,-39,4,4,'#e8c34a'); P(-1,-39,4,1,'#fff0b0');
+  // neck + head, modelled
+  P(-2,-57,5,6,skin); P(-2,-57,1,6,sHi); P(2,-57,1,6,sSh);
+  P(-6,-70,12,14,skin); P(-6,-70,12,2,sHi); P(4,-68,2,12,sSh); P(-6,-70,1,14,sHi);
+  P(-5,-57,10,1,sSh);                                               // jaw shadow
+  P(-6,-72,12,4,'#3a2618'); P(-7,-69,2,7,'#3a2618'); P(5,-69,2,7,'#3a2618'); P(-6,-72,12,1,'#4a3320'); // hair
+  P(-4,-66,3,1,'#241408'); P(1,-66,3,1,'#241408');                 // brows
+  P(-4,-64,3,2,'#f2ead8'); P(1,-64,3,2,'#f2ead8'); P(-3,-64,2,2,'#241408'); P(2,-64,2,2,'#241408'); // eyes
+  P(-1,-62,2,2,sSh); P(-1,-61,1,1,sHi);                            // nose
+  P(-3,-59,6,1,'#8a4038'); P(-3,-59,1,1,sSh); P(2,-59,1,1,sSh);    // easy smile
+  P(3,-67,1,5,'#8a5a4a');                                           // the old scar
+  if(G.emperor && !skinOv){ P(-7,-73,14,2,'#e8c34a'); P(-1,-75,2,2,'#fff0b0'); }  // emperor's laurel
+  if(bond>=90){ P(-13,-40,3,3,skin); }                              // his hand reaches toward her
 }
 function drawKidFig(c,x,y,sex,age){
   const P=(a,b2,w,h,col)=>{c.fillStyle=col;c.fillRect(Math.round(x+a),Math.round(y+b2),Math.round(w),Math.round(h));};
   const h=Math.min(40, 22+Math.round(age/4));                        // they grow
-  const skin=G.skin||'#caa06a';
+  const skin=G.skin||'#caa06a', sSh=shade(skin,-28), sHi=shade(skin,20);
   const boy = sex==='m';
   const cloth= boy ? shade(G.tunic||'#7a2f22',12) : shade((G.wife&&G.wife.dress)||'#8a2f5a',16);
-  const hairC = boy ? '#3a2618' : ((G.wife&&G.wife.hair)||'#5a3a1e');
-  if(boy){                                                           // a son: a plain tunic
-    P(-3,-h+9,7,h-11,cloth); P(-3,-h+9,7,2,shade(cloth,24));
-  } else {                                                           // a daughter: a cinched bodice flaring into a little stola
-    P(-3,-h+9,7,4,cloth); P(-3,-h+9,7,2,shade(cloth,24));            // bodice
-    P(-2,-h+13,5,1,shade(cloth,-14));                                // cinched waist
-    const top=-h+14, bot=-2;                                        // flared skirt sweeping to her feet
-    for(let yy=top; yy<bot; yy++){ const f=(yy-top)/Math.max(1,bot-top); const wdt=6+Math.round(f*6); P(-Math.round(wdt/2),yy,wdt,1,cloth); }
-    P(-Math.round((6+6)/2),bot-1,12,1,shade(cloth,-10));            // hem
+  const clSh=shade(cloth,-22), clHi=shade(cloth,24);
+  const hairC = boy ? '#3a2618' : ((G.wife&&G.wife.hair)||'#5a3a1e'), hairHi=shade(hairC,22);
+  // legs + little sandals
+  P(-2,-9,2,7,skin); P(1,-9,2,7,skin); P(-2,-9,1,7,sHi); P(2,-9,1,7,sSh);
+  P(-3,-2,3,2,'#6a4426'); P(1,-2,3,2,'#6a4426');
+  if(boy){                                                           // a son: a belted tunic, modelled
+    P(-4,-h+9,8,h-16,cloth); P(-4,-h+9,8,2,clHi); P(3,-h+9,1,h-16,clSh); P(-4,-h+9,1,h-16,clHi);
+    P(-4,-14,8,1,'#6a4426');                                        // belt
+    for(let yy=-h+13;yy<-15;yy+=3) P(-1,yy,1,2,clSh);              // a drape fold
+  } else {                                                           // a daughter: bodice → flared stola
+    P(-4,-h+9,8,4,cloth); P(-4,-h+9,8,2,clHi); P(3,-h+9,1,4,clSh);
+    P(-3,-h+13,6,1,clSh);                                            // cinched waist
+    const top=-h+14, bot=-2;
+    for(let yy=top; yy<bot; yy++){ const f=(yy-top)/Math.max(1,bot-top); const wdt=6+Math.round(f*6); P(-Math.round(wdt/2),yy,wdt,1,cloth); if(yy%3===0) P(1,yy,1,1,clSh); }
+    P(-6,bot-1,12,1,clSh);                                          // hem
   }
-  P(-2,-2,3,2,'#6a4426'); P(1,-2,3,2,'#6a4426');                     // little feet
-  P(-3,-h,7,8,skin); P(-3,-h,7,1,shade(skin,22));                    // head
-  if(boy){ P(-3,-h-1,7,2,hairC); }                                   // short crop
-  else { P(-3,-h-1,7,2,hairC); P(-5,-h+1,2,8,hairC); P(4,-h+1,2,8,hairC); P(-4,-h+8,1,2,hairC); P(3,-h+8,1,2,hairC); }  // long framing hair
-  P(-2,-h+3,2,1,'#241408'); P(1,-h+3,2,1,'#241408'); P(-1,-h+6,2,1,'#8a4038');   // bright eyes + grin
-  P(-4,-h+10,2,6,skin); P(3,-h+10,2,6,skin);                         // arms
+  // arms, shaded
+  P(-6,-h+10,2,7,skin); P(4,-h+10,2,7,skin); P(-6,-h+10,1,7,sHi); P(5,-h+10,1,7,sSh);
+  // head, modelled
+  P(-3,-h,7,8,skin); P(-3,-h,7,1,sHi); P(3,-h,1,8,sSh); P(-3,-h+7,7,1,sSh);
+  if(boy){ P(-3,-h-1,7,2,hairC); P(-3,-h-1,7,1,hairHi); }            // short crop
+  else { P(-3,-h-1,7,2,hairC); P(-3,-h-1,7,1,hairHi); P(-5,-h+1,2,8,hairC); P(4,-h+1,2,8,hairC); P(-4,-h+8,1,2,hairC); P(3,-h+8,1,2,hairC); }  // long framing hair
+  // face — whites + pupils, tiny nose, grin
+  P(-2,-h+3,2,2,'#f2ead8'); P(1,-h+3,2,2,'#f2ead8'); P(-2,-h+3,1,2,'#241408'); P(1,-h+3,1,2,'#241408');
+  P(0,-h+5,1,1,sSh); P(-1,-h+6,3,1,'#8a4038');                      // nose + grin
 }
 function openPortrait(){
   state='menu'; show('scr-portrait');
@@ -4191,7 +4224,8 @@ function drawBridePortrait(cnv,b,bare){
   else {
   // backdrop: noble = purple-draped marble alcove; peasant = plaster wall + window
   const bg=c.createLinearGradient(0,0,0,CH);
-  if(b.rank==='noble'){ bg.addColorStop(0,'#33203e'); bg.addColorStop(.6,'#221430'); bg.addColorStop(1,'#120a18'); }
+  if(b.rank==='warrior'){ bg.addColorStop(0,'#3a1620'); bg.addColorStop(.6,'#2a1016'); bg.addColorStop(1,'#14080a'); }
+  else if(b.rank==='noble'){ bg.addColorStop(0,'#33203e'); bg.addColorStop(.6,'#221430'); bg.addColorStop(1,'#120a18'); }
   else { bg.addColorStop(0,'#3a2c1c'); bg.addColorStop(.6,'#2a1e12'); bg.addColorStop(1,'#160f08'); }
   c.fillStyle=bg; c.fillRect(0,0,CW,CH);
   }
@@ -4199,7 +4233,7 @@ function drawBridePortrait(cnv,b,bare){
   const P=(x,y,w,hh,col)=>{c.fillStyle=col;c.fillRect(Math.round(x),Math.round(y),Math.round(w),Math.round(hh));};
   // scenery
   if(bare){}
-  else if(b.rank==='noble'){
+  else if(b.rank==='noble'||b.rank==='warrior'){
     P(-32,-70,8,70,'#cfc0a2'); P(-31,-70,2,70,'#e8dcc2'); P(-27,-70,2,70,'#a8997c'); P(-34,-72,12,3,'#e0d4b8'); // column
     for(let i=0;i<8;i++){ P(16+i*2,-70+i,3,68-i,shade('#5a2d6a',i*6)); }                                        // curtain
     P(14,-72,22,4,'#3c1d48'); P(15,-69,2,2,'#e8c34a');
@@ -4220,7 +4254,8 @@ function drawBridePortrait(cnv,b,bare){
   const thigh = b.build==='ample'?5 : b.build==='curvy'?5 : 4;   // firm full thigh
   const waistW = b.build==='slender'?7 : b.build==='curvy'?6 : 7; // waist stays SLIM on all
   const bustTop=-47, bustBot=bustTop+bd, hipTop=-32, hipBot=-23;
-  const noble=b.rank==='noble';
+  const warrior=b.rank==='warrior';
+  const noble=b.rank==='noble'||warrior;   // both wear an elevated gown (warrior's is martial in colour)
   // ================= BACK ARM (her left, hanging behind) =================
   P(-8,-50,3,9,sSh); P(-8,-41,3,7,sSh); P(-8,-34,3,3,shade(skin,-44));
   // ================= LEGS / SKIRT =================
@@ -4400,6 +4435,13 @@ function drawBridePortrait(cnv,b,bare){
     if(b.eth!=='egyptian'&&b.eth!=='persian'){ P(-5,-71,11,2,gold); P(0,-72,2,2,goldHi); }
   } else {
     P(0,-52,4,1,'#8a6a4a'); P(1,-51,2,2,'#6a8a6a');
+  }
+  // ================= WARRIOR QUEEN regalia =================
+  if(warrior && !bare){
+    P(-6,-72,12,2,'#b8912f'); P(-6,-72,12,1,'#e8c34a'); P(-1,-74,2,3,'#e8c34a'); P(-2,-75,4,1,'#fff0b0');   // bronze war-circlet + boss
+    P(4,-50,6,5,'#8a6a2a'); P(4,-50,6,1,'#c8a24a'); P(4,-45,6,1,'#5a4018'); P(9,-49,1,4,'#3a2a10');           // shoulder pauldron
+    P(-6,-46,12,2,'#5a1414'); P(-6,-46,12,1,'#7a2020');                                                        // martial baldric across the torso
+    P(-12,-68,1,66,'#6a4a2c'); P(-12,-68,1,1,'#8a6a44'); P(-13,-72,3,5,'#c8c0b0'); P(-12,-75,1,4,'#e8e0d0');  // a spear planted at her side
   }
   // soft ground shadow
   if(!bare){ c.fillStyle='rgba(0,0,0,.35)'; c.fillRect(-10,0,24,2); }
@@ -4625,6 +4667,7 @@ function canClaim(reg){ return !(G.titles&&G.titles[reg.id]) && (G.clears[reg.id
 function claimProvince(reg){
   if(!canClaim(reg)) return;
   G.titles[reg.id]=REGION_TITLES[reg.id]||('Dominus '+reg.id);
+  G.wonProvinceByFight=true;                       // governed by PURE fighting — the Warrior-Queen path opens
   G.pop=clamp(G.pop+6,0,100); G.honor=clamp(G.honor+3,0,100);
   bumpStat('provinces'); unlock('governor');
   toast('You are proclaimed '+G.titles[reg.id]+' — '+reg.id+' now flies your colours!',2600);
@@ -4643,6 +4686,31 @@ function govBlock(reg){
   }
   return `<div class="small muted" style="margin-top:2px">Dominate this province — win here ${need} times (${got}/${need}) to claim a grand title and govern it.</div>`;
 }
+// the two paths to elevate your wife once you've made a name: wealth → NOBLE, pure conquest → WARRIOR QUEEN
+function buildElevateWifeCard(b){
+  const w=G.wife;
+  if(!G.married || !w || w.male || G.isFemale) return;
+  const hasName = G.glory>=150 || (G.titles && Object.keys(G.titles).length>0);
+  if(!hasName) return;                            // "after you've made a name for yourself"
+  const was = w.rank==='warrior'?'a WARRIOR QUEEN' : w.rank==='noble'?'NOBLE rank' : 'humble beginnings';
+  const card=document.createElement('div'); card.className='shopcard';
+  card.innerHTML=`<div><b style="color:var(--gold)">⚜ ELEVATE THE DOMINA</b> <span class="small muted">— ${w.name.split(' ')[0]} came from ${was}. Two paths to raise her:</span></div>`;
+  const row=document.createElement('div'); row.className='row gap6';
+  const nobleBtn=document.createElement('button');
+  if(w.rank==='noble'){ nobleBtn.className='btn sm gold'; nobleBtn.textContent='👑 NOBLE ✓'; nobleBtn.disabled=true; }
+  else { nobleBtn.className='btn sm'; nobleBtn.textContent='👑 MAKE NOBLE (2000d)'; nobleBtn.disabled=G.coin<2000;
+    nobleBtn.title='Buy her a place among the great houses — Tyrian silks, gold, a noble gown. The path of WEALTH.';
+    nobleBtn.onclick=()=>elevateWife('noble'); }
+  row.appendChild(nobleBtn);
+  const warBtn=document.createElement('button');
+  if(w.rank==='warrior'){ warBtn.className='btn sm gold'; warBtn.textContent='🗡 WARRIOR QUEEN ✓'; warBtn.disabled=true; }
+  else if(!G.wonProvinceByFight){ warBtn.className='btn sm'; warBtn.textContent='🗡 WARRIOR QUEEN 🔒'; warBtn.disabled=true;
+    warBtn.title='Won by PURE fighting only — dominate and govern a province in the ARENA (not through intrigue) to crown her by the sword.'; }
+  else { warBtn.className='btn sm'; warBtn.textContent='🗡 MAKE WARRIOR QUEEN'; warBtn.title='Crown her by the sword — spear, war-circlet and martial red. Earned by governing a province you took by fighting.';
+    warBtn.onclick=()=>elevateWife('warrior'); }
+  row.appendChild(warBtn);
+  card.appendChild(row); b.appendChild(card);
+}
 function openVilla(){
   if(checkOldAgeDeath()) return;                 // the years may have come due
   state='villa'; show('scr-villa'); $('statbar').classList.remove('hide'); refreshStatbar();
@@ -4656,6 +4724,7 @@ function openVilla(){
     mc.appendChild(mb); b.appendChild(mc);
   }
   buildMarriageCard(b);
+  buildElevateWifeCard(b);
   buildSuccessionCard(b);
   buildLegacyCard(b);
   // ---- PASS THE TIME: watch the house grow ----
@@ -6472,7 +6541,7 @@ window.__SS = {
   cheat:(o)=>{ Object.assign(G,o); refreshStatbar(); }, regionById:id=>REGION_BY_ID[id], get state(){return state;},
   press:(k)=>setEdge(k), hold:(k,v)=>{held[k]=v;},
   armyBattle, launchConquest, makeGeneral, get G(){return G;},
-  finishFight, nemesisAfterWin, makeNemesis, openBrief,
+  finishFight, nemesisAfterWin, makeNemesis, openBrief, elevateWife, claimProvince,
   openMarry, marry, rollBrides, makeBride, get marryList(){return marryList;},
   advanceDay, openVilla,
   succession, openPortrait, startBedScene,
