@@ -942,7 +942,64 @@ function freshCareer(name,origin,arch,social){
     nemesis:null, trophies:[], nemesisCount:0,   // the rival who rises against you + crushed-rival trophies
     age:19, ageBase:0, pendingDeath:false,       // LIVING YEARS: age = 19 + (day-ageBase)/36; the body slows, and one day the end comes
     wonProvinceByFight:false,                     // governed a province by PURE fighting → the Warrior-Queen path opens
+    familyMan:false,                              // wife maxed on every stat + every child adoring → the FAMILY MAN title
+    infamy:0, gladiatrixStage:0, pardoned:false,  // THE GLADIATRIX ARC — scandal → sensation → legend → the Emperor's pardon
   };
+}
+/* =====================================================================
+   THE GLADIATRIX — a woman fights in DEFIANCE of the Emperor's ban. The
+   scandal inflames the mob; infamy rises through the stages until the
+   Emperor himself is forced to pardon her — the first legitimate gladiatrix.
+   ===================================================================== */
+const GLADIATRIX_EVENTS=[
+  'The Senate is scandalised — a WOMAN on the sand! The mob only roars the louder.',
+  'Matrons gasp, husbands stare, and the ticket-sellers grow fat on your name.',
+  'A poet nails verses to the arena gate — “Venus with a gladius” — and the crowd chants them.',
+  'Provincial editors bid against one another to book the famed gladiatrix.',
+  'A senator demands you be banned; the Emperor, amused, waves him down.',
+  'Girls in the stands braid their hair like yours. You are a sensation.',
+  'They whisper you were sired by Mars himself. You do not deny it.'];
+function gladiatrixStageFrom(inf){ return inf>=100?3 : inf>=60?2 : inf>=25?1 : 0; }
+function gladiatrixAfterWin(){
+  if(!G.isFemale || G.retired) return {pop:0, honor:0, note:''};
+  const before=G.gladiatrixStage||0;
+  G.infamy=clamp((G.infamy||0) + ri(6,12), 0, 100);
+  let bonusPop = 3 + before*2, bonusHonor=0;      // the forbidden spectacle inflames the mob
+  let note='🗡 '+pick(GLADIATRIX_EVENTS)+' (infamy '+Math.round(G.infamy)+'/100) ';
+  const stage=gladiatrixStageFrom(G.infamy);
+  if(stage>before && stage<3){ G.gladiatrixStage=stage;
+    note+='— '+['','⚔ YOU ARE A SENSATION','⭐ A LEGEND OF THE SAND'][stage]+'! '; }
+  if(G.infamy>=100 && !G.pardoned){
+    G.pardoned=true; G.gladiatrixStage=3; bonusHonor=15; bonusPop=15;
+    note='👑 THE EMPEROR PARDONS YOU! Septimius Severus proclaims you the first LEGITIMATE gladiatrix of Rome — the ban lifted, your name carved beside the men. (+15 honor, +15 pop) ';
+    try{ unlock('gladiatrix'); }catch(e){}
+  }
+  return {pop:bonusPop, honor:bonusHonor, note};
+}
+// the gladiatrix arc panel for the pre-fight brief
+function gladiatrixBriefBlock(){
+  if(!G.isFemale) return '';
+  const stg=G.gladiatrixStage||0, inf=Math.round(G.infamy||0);
+  const label=['SCANDAL — a woman on the sand','SENSATION — all Rome talks of you','LEGEND OF THE SAND','PARDONED — the first legitimate gladiatrix'][stg];
+  const col = stg>=3?'var(--gold)':stg>=2?'#e0b0f0':'#c89af0';
+  return `<div class="panel" style="padding:8px;margin-top:6px;border-color:${col}">
+    <b style="color:${col}">🗡 THE GLADIATRIX — ${label}</b>
+    <div class="small muted">${G.pardoned?'You fight now by the Emperor’s own leave — legitimate at last.':'You fight in DEFIANCE of the Emperor’s ban — and the mob adores the scandal.'} Infamy ${inf}/100.</div>
+    <div style="height:7px;background:#2a1f16;border-radius:4px;margin-top:5px;overflow:hidden"><div style="height:100%;width:${inf}%;background:${col}"></div></div>
+  </div>`;
+}
+// PATERFAMILIAS — a wife at 100 ♥/🔥 and every child adoring earns the FAMILY MAN title (far more honour per bout)
+function checkFamilyMan(){
+  if(!G || G.familyMan) return false;
+  if(!G.married || !G.wife || G.wife.male) return false;
+  if((G.wifeRel||0)<100 || (G.wifePhys||0)<100) return false;
+  const kids=G.children||[];
+  if(kids.length<1 || !kids.every(c=> (c.rel===undefined?55:c.rel)>=100)) return false;
+  G.familyMan=true; G.honor=clamp(G.honor+10,0,100);
+  try{ unlock('familyman'); }catch(e){}
+  saveQuiet();
+  toast('👨‍👩‍👧‍👦 PATERFAMILIAS! A wife who adores you (100 ♥ · 100 🔥) and children who worship you — every heart in the house full. You are hailed FAMILY MAN. Every bout now earns you far more honour.',7000);
+  return true;
 }
 // raise the domina to NOBLE (by wealth) or WARRIOR QUEEN (by pure conquest of the sand)
 function elevateWife(rank){
@@ -961,7 +1018,7 @@ function elevateWife(rank){
   refreshStatbar(); saveQuiet(); openVilla();
 }
 // fill in any fields missing from older saves
-function migrate(g){ const d={honor:50,food:4,mount:0,slaves:0,hasVilla:false,boat:false,favor:0,soldiers:0,hidden:[],plotTier:0,emperor:false,approval:50,legions:0,rivals:0,retired:false,detachments:[],day:0,titles:{},clears:{},socialClass:'gladiator',army:{},armyGear:0,armyTrain:0,hasOrganizer:false,generals:[],wife:null,married:false,marryPrompted:false,children:[],pregnant:null,lastLoveDay:-9,injury:null,lastDebateDay:-9,office:0,path:null,parthia:50,parthiaPact:false,wifeRel:50,lastTalkDay:-9,isFemale:false,lineage:[],hygiene:70,wifePhys:45,hasPool:false,hasWardrobe:false,legacy:null,lastFeastDay:-9,loveDay:-1,loveQuick:0,loveLong:0,loveNight:0,loveVigil:0,venusUntil:-1,lastWashDay:-9,lastPoolDay:-9,lastWardrobeDay:-9,lastKidsDay:-9,lastBathDay:-9,pila:0,bow:null,bowsOwned:[],nemesis:null,trophies:[],nemesisCount:0,pendingDeath:false,ageBase:0,wonProvinceByFight:false}; for(const k in d){ if(g[k]===undefined) g[k]=d[k]; } if(!g.current) g.current='Italia'; if(g.age===undefined) g.age=19+Math.floor(((g.day||0)-(g.ageBase||0))/36); return g; }
+function migrate(g){ const d={honor:50,food:4,mount:0,slaves:0,hasVilla:false,boat:false,favor:0,soldiers:0,hidden:[],plotTier:0,emperor:false,approval:50,legions:0,rivals:0,retired:false,detachments:[],day:0,titles:{},clears:{},socialClass:'gladiator',army:{},armyGear:0,armyTrain:0,hasOrganizer:false,generals:[],wife:null,married:false,marryPrompted:false,children:[],pregnant:null,lastLoveDay:-9,injury:null,lastDebateDay:-9,office:0,path:null,parthia:50,parthiaPact:false,wifeRel:50,lastTalkDay:-9,isFemale:false,lineage:[],hygiene:70,wifePhys:45,hasPool:false,hasWardrobe:false,legacy:null,lastFeastDay:-9,loveDay:-1,loveQuick:0,loveLong:0,loveNight:0,loveVigil:0,venusUntil:-1,lastWashDay:-9,lastPoolDay:-9,lastWardrobeDay:-9,lastKidsDay:-9,lastBathDay:-9,pila:0,bow:null,bowsOwned:[],nemesis:null,trophies:[],nemesisCount:0,pendingDeath:false,ageBase:0,wonProvinceByFight:false,familyMan:false,infamy:0,gladiatrixStage:0,pardoned:false}; for(const k in d){ if(g[k]===undefined) g[k]=d[k]; } if(!g.current) g.current='Italia'; if(g.age===undefined) g.age=19+Math.floor(((g.day||0)-(g.ageBase||0))/36); return g; }
 function saveGame(){ try{ localStorage.setItem(SAVE_KEY, JSON.stringify(G)); toast('Saved.'); }catch(e){ toast('⚠ Could not save — browser storage is blocked or full.',3200); } }
 function hasSave(){ try{ return !!localStorage.getItem(SAVE_KEY); }catch(e){ return false; } }
 function loadGame(){ try{ G=migrate(JSON.parse(localStorage.getItem(SAVE_KEY))); return !!G; }catch(e){ return false; } }
@@ -2233,6 +2290,8 @@ function finishFight(won){
     if(FT.emperor){ glory*=2; popDelta+=20; honorDelta+=6; note+='THE EMPEROR IS PLEASED. '; }
     if(FT.wager>0){ coin+=FT.wager; note+='🎲 Your wager pays double (+'+FT.wager+'d). '; }
     if(FT.wifeWatch){ G.wifeRel=clamp((G.wifeRel||50)+3,0,100); popDelta+=1; note+='♥ She saw it all from the stands (+3 bond). '; }
+    if(G.familyMan){ honorDelta+=8; note+='👨‍👩‍👧 A family man fights for more than glory — Rome honours it deeply. (+8 honor) '; }
+    if(G.isFemale){ const gx=gladiatrixAfterWin(); popDelta+=gx.pop; honorDelta+=gx.honor; note+=gx.note; }
     if(FT.venatio){ const bt=FT.foe.beastType||{name:'beast'}; glory=Math.round(glory*1.5); coin=Math.round(coin*1.6);
       popDelta+=6; honorDelta+=2; note+='🐆 You slew the '+bt.name+' before a roaring mob — a true venator! '; }
     if(FT.naumachia){ glory=Math.round(glory*1.7); coin=Math.round(coin*1.55); popDelta+=9; honorDelta+=3;
@@ -3055,6 +3114,8 @@ function openPortrait(){
   const kids=G.children.slice(0,6);
   kids.forEach((k,i)=>{ c.save(); c.translate(168-i*34,222); c.scale(1.45,1.45); drawKidFig(c,0,0,k.sex,G.day-k.born); c.restore(); });
   if(bond>=90){ c.fillStyle='#e26a8a'; c.font='14px monospace'; c.fillText('♥', 272, 96); }            // devoted
+  if(G.familyMan){ c.fillStyle='#e8c34a'; c.font='bold 10px Georgia,serif'; c.textAlign='center';
+    c.fillText('· FAMILY MAN OF THE HOUSE ·', 240, 20); }                                                // the earned title, in gold
   // painter's plate + grand gold frame
   c.strokeStyle='#8a6f35'; c.lineWidth=6; c.strokeRect(6,6,468,238);
   c.strokeStyle='#e8c34a'; c.lineWidth=2; c.strokeRect(11,11,458,228);
@@ -4858,6 +4919,7 @@ function buildLegacyCard(b){
     fb.onclick=()=>{ if(G.coin<fcost) return; G.coin-=fcost; G.lastFeastDay=G.day;
       if(G.married) G.wifeRel=clamp(G.wifeRel+5,0,100);
       (G.children||[]).forEach(c=>{ if(!c.wed) c.rel=clamp((c.rel===undefined?55:c.rel)+5,0,100); });
+      checkFamilyMan();
       G.pop=clamp(G.pop+inf.w,0,100); G.approval=clamp(G.approval+2,0,100); refreshStatbar(); saveQuiet();
       toast('🍇 The legacy house blazes with lamps and laughter — the whole family closer, half the province talking. (+5 ♥ to all, +pop)',3800); openVilla(); };
     row.appendChild(fb);
@@ -4903,7 +4965,7 @@ function succession(ch){
   G.married=false; G.wife=null; G.wifeRel=0; G.wifePhys=45; G.pregnant=null;
   G.lastLoveDay=-9; G.lastTalkDay=-9; G.marryPrompted=false; G.hygiene=70;
   G.retired=false; G.path=null; G.office=0;
-  G.ageBase=G.day; G.age=19; G.pendingDeath=false;   // the heir takes up the sword young — a fresh span of years
+  G.ageBase=G.day; G.age=19; G.pendingDeath=false; G.familyMan=false; G.infamy=0; G.gladiatrixStage=0; G.pardoned=false;   // the heir takes up the sword young — a fresh span of years, a fresh house to build
   bumpStat('dynasties'); unlock('dynasty');
   refreshStatbar(); saveQuiet(); openVilla();
   toast((fem
@@ -5429,6 +5491,7 @@ function advanceDay(n){
     }
     if(na>=55 && Math.random() < 0.16+(na-55)*0.09) G.pendingDeath=true;   // age itself comes for every man
   }
+  checkFamilyMan();                              // the house may have reached perfect harmony
   refreshStatbar();
 }
 // the body's decline with age — nothing before 35, mild after, real past 50
@@ -6186,7 +6249,7 @@ function openBrief(reg,imperial){
        <span class="pill">Crowd: ${escDesc}</span>
        <span class="pill">Purse ≈ ${purse} denarii</span></div>
      <div class="small muted">Battle escalation: foes scale with your Popularity (${G.pop}/100).</div>
-     ${govBlock(reg)}${nemesisBriefBlock()}`;
+     ${govBlock(reg)}${gladiatrixBriefBlock()}${nemesisBriefBlock()}`;
   const gb=$('brief-claim'); if(gb) gb.onclick=()=>{ claimProvince(reg); openBrief(reg,imperial); refreshStatbar(); };
   const gbn=$('btn-grudge'); if(gbn) gbn.onclick=()=>{ startFight(briefCtx.reg,{nemesis:true}); toast('The crowd falls silent — this one is personal…',1600); };
   const npc=$('nem-portrait'); if(npc && G.nemesis) drawNemesisPortrait(npc,G.nemesis);
