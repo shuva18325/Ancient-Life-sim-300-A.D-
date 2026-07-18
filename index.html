@@ -58,6 +58,17 @@
     padding:2px 7px;border:1px solid #6b4e2a;border-radius:3px;box-shadow:0 1px 2px rgba(0,0,0,.5);}
   .stat b{color:var(--gold);}
   .scrollbox{overflow:auto;scrollbar-width:thin;scrollbar-color:var(--gold) #000;}
+  /* a wax tablet (tabula) — the ancient text message */
+  .tabula{background:linear-gradient(#c9a866,#a8874a);border:4px solid #6b4a26;border-radius:2px;
+    box-shadow:inset 0 0 0 2px #eaceA0,inset 0 2px 12px rgba(0,0,0,.35),0 3px 6px rgba(0,0,0,.5);
+    padding:10px;position:relative;}
+  .tabula::before{content:'';position:absolute;inset:6px;border:1px dashed rgba(90,60,20,.35);pointer-events:none;}
+  .tabula textarea{width:100%;min-height:64px;background:transparent;border:none;resize:vertical;
+    color:#2a1c0c;font-family:Georgia,'Times New Roman',serif;font-style:italic;font-size:13px;line-height:1.4;outline:none;text-shadow:none;}
+  .tabula textarea::placeholder{color:rgba(90,60,20,.55);}
+  .tabula-reply{color:#2a1c0c;font-family:Georgia,'Times New Roman',serif;font-style:italic;font-size:13px;line-height:1.5;
+    background:linear-gradient(#d9c090,#b89a5e);min-height:20px;text-shadow:none;}
+  .tabula-reply::before{content:none;}   /* the fixed-inset dashed border cuts through short/wrapped reply text — drop it here */
   /* world map regions */
   .region{position:absolute;cursor:pointer;border:1px solid #000;border-radius:3px;
     background:linear-gradient(#2a1f16ee,#160e08ee);box-shadow:0 1px 3px rgba(0,0,0,.6),inset 0 0 0 1px rgba(232,195,74,.25);
@@ -251,6 +262,7 @@
       <button class="btn" id="btn-shop">🛒 ARMOURY</button>
       <button class="btn" id="btn-stable">🐎 STABLE</button>
       <button class="btn" id="btn-villa">🏡 VILLA</button>
+      <button class="btn" id="btn-note-map">✍ WRITE HOME</button>
       <button class="btn" id="btn-intrigue">🗡 INTRIGUE</button>
       <button class="btn" id="btn-train">🏋 TRAIN</button>
       <button class="btn sm" id="btn-save">💾 SAVE</button>
@@ -298,6 +310,26 @@
       <div id="marry-intro" class="small muted"></div>
       <div id="marry-body" class="col gap"></div>
       <div class="row" style="justify-content:flex-end;"><button class="btn gold" id="btn-marry-back">◀ BACK</button></div>
+    </div>
+  </div>
+
+  <!-- ===== THE TABULA (a wax-tablet note to your spouse, ancient texting) ===== -->
+  <div id="scr-note" class="screen center">
+    <div class="panel pad col gap scrollbox" style="width:min(94%,620px);max-height:95%;">
+      <h2 style="color:var(--gold)" id="note-title">✍ A TABULA TO HER</h2>
+      <div class="small muted">Wax and stylus, carried by courier — write what's in your heart. She writes back.</div>
+      <div class="tabula"><textarea id="note-input" maxlength="180" placeholder="Scratch your words into the wax…"></textarea></div>
+      <div class="small muted" id="note-presets-label">Or press the stylus to a line already worn smooth:</div>
+      <div class="row gap6" id="note-presets" style="flex-wrap:wrap"></div>
+      <div class="row gap6" style="align-items:center;flex-wrap:wrap">
+        <button class="btn gold" id="btn-note-send">📜 SEND BY COURIER</button>
+        <span class="small muted" id="note-cd"></span>
+      </div>
+      <div id="note-reply-wrap" style="display:none">
+        <div class="small" style="color:var(--gold);margin-top:6px" id="note-reply-head"></div>
+        <div class="tabula tabula-reply" id="note-reply"></div>
+      </div>
+      <div class="row" style="justify-content:flex-end;margin-top:4px"><button class="btn gold" id="btn-note-back">◀ BACK</button></div>
     </div>
   </div>
 
@@ -944,6 +976,7 @@ function freshCareer(name,origin,arch,social){
     wonProvinceByFight:false,                     // governed a province by PURE fighting → the Warrior-Queen path opens
     familyMan:false,                              // wife maxed on every stat + every child adoring → the FAMILY MAN title
     infamy:0, gladiatrixStage:0, pardoned:false,  // THE GLADIATRIX ARC — scandal → sensation → legend → the Emperor's pardon
+    lastNoteDay:-9, lastNoteReply:'',             // THE TABULA — a written note home + her last reply
   };
 }
 /* =====================================================================
@@ -1018,7 +1051,7 @@ function elevateWife(rank){
   refreshStatbar(); saveQuiet(); openVilla();
 }
 // fill in any fields missing from older saves
-function migrate(g){ const d={honor:50,food:4,mount:0,slaves:0,hasVilla:false,boat:false,favor:0,soldiers:0,hidden:[],plotTier:0,emperor:false,approval:50,legions:0,rivals:0,retired:false,detachments:[],day:0,titles:{},clears:{},socialClass:'gladiator',army:{},armyGear:0,armyTrain:0,hasOrganizer:false,generals:[],wife:null,married:false,marryPrompted:false,children:[],pregnant:null,lastLoveDay:-9,injury:null,lastDebateDay:-9,office:0,path:null,parthia:50,parthiaPact:false,wifeRel:50,lastTalkDay:-9,isFemale:false,lineage:[],hygiene:70,wifePhys:45,hasPool:false,hasWardrobe:false,legacy:null,lastFeastDay:-9,loveDay:-1,loveQuick:0,loveLong:0,loveNight:0,loveVigil:0,venusUntil:-1,lastWashDay:-9,lastPoolDay:-9,lastWardrobeDay:-9,lastKidsDay:-9,lastBathDay:-9,pila:0,bow:null,bowsOwned:[],nemesis:null,trophies:[],nemesisCount:0,pendingDeath:false,ageBase:0,wonProvinceByFight:false,familyMan:false,infamy:0,gladiatrixStage:0,pardoned:false}; for(const k in d){ if(g[k]===undefined) g[k]=d[k]; } if(!g.current) g.current='Italia'; if(g.age===undefined) g.age=19+Math.floor(((g.day||0)-(g.ageBase||0))/36); return g; }
+function migrate(g){ const d={honor:50,food:4,mount:0,slaves:0,hasVilla:false,boat:false,favor:0,soldiers:0,hidden:[],plotTier:0,emperor:false,approval:50,legions:0,rivals:0,retired:false,detachments:[],day:0,titles:{},clears:{},socialClass:'gladiator',army:{},armyGear:0,armyTrain:0,hasOrganizer:false,generals:[],wife:null,married:false,marryPrompted:false,children:[],pregnant:null,lastLoveDay:-9,injury:null,lastDebateDay:-9,office:0,path:null,parthia:50,parthiaPact:false,wifeRel:50,lastTalkDay:-9,isFemale:false,lineage:[],hygiene:70,wifePhys:45,hasPool:false,hasWardrobe:false,legacy:null,lastFeastDay:-9,loveDay:-1,loveQuick:0,loveLong:0,loveNight:0,loveVigil:0,venusUntil:-1,lastWashDay:-9,lastPoolDay:-9,lastWardrobeDay:-9,lastKidsDay:-9,lastBathDay:-9,pila:0,bow:null,bowsOwned:[],nemesis:null,trophies:[],nemesisCount:0,pendingDeath:false,ageBase:0,wonProvinceByFight:false,familyMan:false,infamy:0,gladiatrixStage:0,pardoned:false,lastNoteDay:-9,lastNoteReply:''}; for(const k in d){ if(g[k]===undefined) g[k]=d[k]; } if(!g.current) g.current='Italia'; if(g.age===undefined) g.age=19+Math.floor(((g.day||0)-(g.ageBase||0))/36); return g; }
 function saveGame(){ try{ localStorage.setItem(SAVE_KEY, JSON.stringify(G)); toast('Saved.'); }catch(e){ toast('⚠ Could not save — browser storage is blocked or full.',3200); } }
 function hasSave(){ try{ return !!localStorage.getItem(SAVE_KEY); }catch(e){ return false; } }
 function loadGame(){ try{ G=migrate(JSON.parse(localStorage.getItem(SAVE_KEY))); return !!G; }catch(e){ return false; } }
@@ -4683,6 +4716,7 @@ $('btn-fightcur').onclick=()=>{ const r=REGION_BY_ID[G.current]; if(!regionUnloc
 $('btn-shop').onclick=()=>openShop();
 $('btn-stable').onclick=()=>openStable();
 $('btn-villa').onclick=()=>openVilla();
+$('btn-note-map').onclick=()=>openNote();
 $('btn-train').onclick=()=>trainScreen();
 
 // ---- STABLE & LARDER ----
@@ -4966,6 +5000,7 @@ function succession(ch){
   G.wins=0; G.losses=0; G.injury=null;
   G.married=false; G.wife=null; G.wifeRel=0; G.wifePhys=45; G.pregnant=null;
   G.lastLoveDay=-9; G.lastTalkDay=-9; G.marryPrompted=false; G.hygiene=70;
+  G.lastNoteDay=-9; G.lastNoteReply='';
   G.retired=false; G.path=null; G.office=0;
   G.ageBase=G.day; G.age=19; G.pendingDeath=false; G.familyMan=false; G.infamy=0; G.gladiatrixStage=0; G.pardoned=false;   // the heir takes up the sword young — a fresh span of years, a fresh house to build
   bumpStat('dynasties'); unlock('dynasty');
@@ -5029,6 +5064,114 @@ function wifeVerdict(){
   if(hy<30) ew=ew.slice(0,-1)+' — but by Jupiter, '+s2+' SMELLS of the arena.”';
   else if(hy>=85) ew=ew.slice(0,-1)+' — and '+s2+' smells of rose oil.”';
   return {pw,ew,p,e,hy};
+}
+/* =====================================================================
+   THE TABULA — a wax-tablet note home, ancient texting. Her reply is
+   generated, not fixed: it reads your bond, whether you were together
+   last night, and the tone of what you actually wrote.
+   ===================================================================== */
+const NOTE_PRESETS=[
+  ['💕 Thinking of you','I think of you more than I let on, even out here.'],
+  ['🌹 Missing home','The camp is loud and the food is worse. I miss our table.'],
+  ['🙏 Sorry for my silence','Forgive my silence — the road left no time for letters.'],
+  ['😏 A little tease','Keep your side of the bed warm for me.'],
+  ['⚔ Just alive and well','Word so you don’t worry: I am whole, and winning.']];
+const NOTE_WORDS={
+  loving:['love','miss','heart','dear','sweet','forever','adore','cherish','beautiful','soul'],
+  flirty:['warm','bed','skin','kiss','tonight','desire','crave','tease','wardrobe','woohoo'],
+  apology:['sorry','forgive','apolog','regret','fault','silence'],
+  cold:['busy','later','duty','fine','whatever',"can't talk",'cant talk','nothing to say']};
+function noteSentiment(text){
+  const t=(text||'').toLowerCase(); let s=0, apology=false;
+  for(const w of NOTE_WORDS.loving) if(t.includes(w)) s+=2;
+  for(const w of NOTE_WORDS.flirty) if(t.includes(w)) s+=2;
+  for(const w of NOTE_WORDS.apology) if(t.includes(w)){ s+=1; apology=true; }
+  for(const w of NOTE_WORDS.cold) if(t.includes(w)) s-=2;
+  return {s, apology};
+}
+// base tone 0..3 (cold→flirty) from the bond itself, boosted a tier the morning after
+function noteBaseTier(){
+  const e=G.wifeRel|0;
+  let tier = e>=75?3 : e>=50?2 : e>=25?1 : 0;
+  const afterglow = (G.day-(G.lastLoveDay===undefined?-9:G.lastLoveDay))<=1 && G.lastLoveDay!==undefined && G.lastLoveDay>=0;
+  if(afterglow) tier=Math.min(3,tier+1);
+  return {tier, afterglow};
+}
+const NOTE_REPLIES={
+  0:['Your letter reached me. The house runs itself, as it has learned to.',
+     'A slave read it aloud. I said little worth writing back. Come home, if you remember the way.',
+     'Rome is full of husbands who write more than once a season. I manage well enough.',
+     'I am well. The children ask after you more than I do, these days.'],
+  1:['Your note arrived with the grain shipment — good company, at least.',
+     'I am glad you are well. Come home with fewer scars than you left with.',
+     'The children ask after you daily. I tell them you are winning. Are you?',
+     'I read it once, by the window, and thought of you longer than I meant to.'],
+  2:['I read your letter twice, then a third time by lamplight. Come home to me soon.',
+     'The bed is cold on your side of it. Hurry back, my love.',
+     'I press your words flat under a jar of oil so they don’t curl. Foolish, I know.',
+     'Come home. Everything here is only half as bright without you.'],
+  3:['I lit the lamp early tonight, thinking of you. Don’t make me wait too long.',
+     'The wardrobe still remembers you. So do I — every night since.',
+     'Hurry home. I have plans for you that ink shouldn’t describe.',
+     'I dreamed of you last night. I am not sorry, and neither will you be.']
+};
+const NOTE_AFTERGLOW=[
+  'Still smiling from last night, if you must know. Hurry back and give me a reason for another.',
+  'I am still warm from you. Come back before the memory fades — or don’t, and I’ll remind you myself.',
+  'You left in such a hurry this morning. Come back the same way tonight.'];
+const NOTE_APOLOGY_SOFT=[
+  'You needn’t grovel in ink. Just come home, and grovel properly.',
+  'Apology accepted, love — though a gift wouldn’t hurt your case.',
+  'Silence forgiven. This time.'];
+function craftWifeReply(text){
+  const {tier,afterglow}=noteBaseTier();
+  const {s,apology}=noteSentiment(text);
+  let useTier=tier;
+  if(s>=3) useTier=Math.min(3,useTier+1);
+  else if(s<=-2) useTier=Math.max(0,useTier-1);
+  let pool=NOTE_REPLIES[useTier].slice();
+  if(afterglow && Math.random()<0.6) pool=pool.concat(NOTE_AFTERGLOW);
+  if(apology && useTier<=1 && Math.random()<0.7) pool=pool.concat(NOTE_APOLOGY_SOFT);
+  const line=pick(pool);
+  const gain=[0,1,2,4][useTier] + (apology?1:0);
+  return {line, gain, useTier};
+}
+let noteReturn='map';
+function openNote(){
+  if(!G.wife){ toast('You have no one to write to yet — take a wife first.',2200); return; }
+  noteReturn=(state==='villa')?'villa':'map';
+  const w=G.wife;
+  state='note'; show('scr-note'); $('statbar').classList.remove('hide');
+  $('note-title').textContent='✍ A TABULA TO '+(w.male?'HIM':w.name.split(' ')[0].toUpperCase());
+  $('note-input').value='';
+  const pr=$('note-presets'); pr.innerHTML='';
+  NOTE_PRESETS.forEach(([label,txt])=>{ const bt=document.createElement('button'); bt.className='btn sm'; bt.textContent=label;
+    bt.onclick=()=>{ $('note-input').value=txt; }; pr.appendChild(bt); });
+  const tcd=G.day-(G.lastNoteDay===undefined?-9:G.lastNoteDay);
+  $('btn-note-send').disabled = tcd<1;
+  $('note-cd').textContent = tcd<1? 'A courier already rides today — try again tomorrow.' : 'One tabula a day reaches her in time.';
+  if(tcd<1 && G.lastNoteReply){
+    $('note-reply-wrap').style.display='';
+    $('note-reply-head').textContent=(w.male?'His':'Her')+' reply, waxed and sealed:';
+    $('note-reply').textContent=G.lastNoteReply;
+  } else { $('note-reply-wrap').style.display='none'; }
+}
+function sendNote(){
+  const w=G.wife; if(!w) return;
+  const tcd=G.day-(G.lastNoteDay===undefined?-9:G.lastNoteDay);
+  if(tcd<1) return;
+  const text=($('note-input').value||'').trim();
+  if(!text){ toast('Scratch a few words into the wax first.',1800); return; }
+  const {line,gain}=craftWifeReply(text);
+  G.wifeRel=clamp(G.wifeRel+gain,0,100);
+  G.lastNoteDay=G.day; G.lastNoteReply=line;
+  refreshStatbar(); saveQuiet();
+  $('btn-note-send').disabled=true;
+  $('note-cd').textContent='A courier already rides today — try again tomorrow.';
+  $('note-reply-wrap').style.display='';
+  $('note-reply-head').textContent=(w.male?'His':'Her')+' reply, waxed and sealed:';
+  $('note-reply').textContent=line;
+  toast('📜 Your words ride out with the courier'+(gain>0?' (+'+gain+' ♥)':'')+'.',2600);
 }
 function buildMarriageCard(b){
   const card=document.createElement('div'); card.className='shopcard';
@@ -5095,6 +5238,8 @@ function buildMarriageCard(b){
     // talk (4 questions) · bedchamber for an heir · bedchamber for love
     const btns=document.createElement('div'); btns.className='row gap6'; btns.style.marginTop='4px';
     const talk=document.createElement('button'); talk.className='btn sm'; talk.textContent='💬 TALK WITH '+(w.male?'HIM':'HER');
+    const noteBtn=document.createElement('button'); noteBtn.className='btn sm'; noteBtn.textContent='✍ WRITE A NOTE';
+    noteBtn.title='Send a wax tablet by courier — she writes back.'; noteBtn.onclick=()=>openNote();
     const qrow=document.createElement('div'); qrow.className='row gap6'; qrow.style.display='none'; qrow.style.marginTop='4px';
     talk.onclick=()=>{ qrow.style.display = qrow.style.display==='none'?'flex':'none'; };
     const q=(label,title,dis,fn)=>{ const bq=document.createElement('button'); bq.className='btn sm'; bq.textContent=label; bq.title=title||''; bq.disabled=!!dis; bq.onclick=fn; qrow.appendChild(bq); };
@@ -5139,7 +5284,7 @@ function buildMarriageCard(b){
     bedF.title='No heir tonight — only each other. The bond deepens.';
     bedF.disabled=loveLeft(bedLen)<=0;
     bedF.onclick=()=>launch('fun');
-    btns.appendChild(talk); btns.appendChild(bedH); btns.appendChild(bedF);
+    btns.appendChild(talk); btns.appendChild(noteBtn); btns.appendChild(bedH); btns.appendChild(bedF);
     const port=document.createElement('button'); port.className='btn sm'; port.textContent='🖼 FAMILY PORTRAIT';
     port.onclick=()=>openPortrait(); btns.appendChild(port);
     card.appendChild(btns);
@@ -5251,6 +5396,8 @@ function marry(w){
   enterMap();
 }
 $('btn-marry-back').onclick=()=>enterMap();
+$('btn-note-send').onclick=()=>sendNote();
+$('btn-note-back').onclick=()=>{ if(noteReturn==='villa') openVilla(); else enterMap(); };
 $('btn-portrait-back').onclick=()=>openVilla();
 
 // ---- INTRIGUE: Elite Siege, hidden guests, private army, grand plot ----
@@ -6612,6 +6759,8 @@ window.__SS = {
   press:(k)=>setEdge(k), hold:(k,v)=>{held[k]=v;},
   armyBattle, launchConquest, makeGeneral, get G(){return G;},
   finishFight, nemesisAfterWin, makeNemesis, openBrief, elevateWife, claimProvince,
+  openNote, sendNote, craftWifeReply, noteBaseTier, setNoteInput:(t)=>{ const el=document.getElementById('note-input'); if(el) el.value=t; },
+  checkFamilyMan, gladiatrixAfterWin,
   openMarry, marry, rollBrides, makeBride, get marryList(){return marryList;},
   advanceDay, openVilla,
   succession, openPortrait, startBedScene,
