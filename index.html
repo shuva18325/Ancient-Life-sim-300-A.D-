@@ -263,6 +263,7 @@
       <button class="btn" id="btn-stable">🐎 STABLE</button>
       <button class="btn" id="btn-villa">🏡 VILLA</button>
       <button class="btn" id="btn-note-map">✍ WRITE HOME</button>
+      <button class="btn" id="btn-circus">🏇 CIRCUS</button>
       <button class="btn" id="btn-intrigue">🗡 INTRIGUE</button>
       <button class="btn" id="btn-train">🏋 TRAIN</button>
       <button class="btn sm" id="btn-save">💾 SAVE</button>
@@ -330,6 +331,17 @@
         <div class="tabula tabula-reply" id="note-reply"></div>
       </div>
       <div class="row" style="justify-content:flex-end;margin-top:4px"><button class="btn gold" id="btn-note-back">◀ BACK</button></div>
+    </div>
+  </div>
+
+  <!-- ===== THE CIRCUS MAXIMUS (chariot racing — faction pick) ===== -->
+  <div id="scr-circus" class="screen center">
+    <div class="panel pad col gap center" style="width:min(94%,600px);">
+      <h2 style="color:var(--gold)">🏇 THE CIRCUS MAXIMUS</h2>
+      <div class="small muted" style="text-align:center;max-width:460px">Race the biga round the spina before a hundred thousand throats. Choose your
+        faction — its fans are your fans. <b>Hold W</b> to whip the team (it drains the horses), <b>↑/↓</b> to change lane and overtake or dodge a wreck. Five laps.</div>
+      <div id="circus-body" class="row gap6 center" style="flex-wrap:wrap;justify-content:center"></div>
+      <button class="btn gold" id="btn-circus-back">◀ BACK</button>
     </div>
   </div>
 
@@ -2816,27 +2828,31 @@ function sfx(kind){
 /* =====================================================================
    INPUT  (exact scheme required)
    ===================================================================== */
-const held={a:false,d:false,w:false};
+const held={a:false,d:false,w:false,s:false,up:false,down:false};
 const edge={}; // edge-triggered actions to consume
 function setEdge(k){ edge[k]=true; }
 function consume(k){ if(edge[k]){ edge[k]=false; return true; } return false; }
-function resetInputEdges(){ for(const k in edge) edge[k]=false; held.a=held.d=held.w=false; }
+function resetInputEdges(){ for(const k in edge) edge[k]=false; held.a=held.d=held.w=held.s=held.up=held.down=false; }
 let isTouch = ('ontouchstart' in window) || navigator.maxTouchPoints>0;
 
 window.addEventListener('keydown',e=>{
   const k=e.key.toLowerCase();
-  if(['a','d','w',' ','arrowleft','arrowright'].includes(k)) e.preventDefault();
+  if(['a','d','w','s',' ','arrowleft','arrowright','arrowup','arrowdown'].includes(k)) e.preventDefault();
   if(k==='a'){ if(!held.a) setEdge('a'); held.a=true; }
   else if(k==='d'){ if(!held.d) setEdge('d'); held.d=true; }
   else if(k==='w'){ setEdge('w'); held.w=true; }
+  else if(k==='s'){ held.s=true; }
   else if(k===' '){ setEdge('space'); }
   else if(k==='arrowright'){ setEdge('elbow'); }
   else if(k==='arrowleft'){ setEdge('thrust'); }
+  else if(k==='arrowup'){ setEdge('up'); held.up=true; }
+  else if(k==='arrowdown'){ setEdge('down'); held.down=true; }
   else if(k==='m'){ muted=!muted; toast(muted?'Muted':'Sound on'); }
 },{passive:false});
 window.addEventListener('keyup',e=>{
   const k=e.key.toLowerCase();
   if(k==='a')held.a=false; else if(k==='d')held.d=false; else if(k==='w')held.w=false;
+  else if(k==='s')held.s=false; else if(k==='arrowup')held.up=false; else if(k==='arrowdown')held.down=false;
 });
 // Left-click anywhere during a bout = attack (more reliable than canvas-only)
 document.addEventListener('mousedown',e=>{ if(e.button===0 && state==='fight'){ setEdge('attack'); } });
@@ -2852,6 +2868,7 @@ function loop(now){
   dt=clamp(dt,0,3);
   tctx.clearRect(0,0,tcv.width,tcv.height);   // wipe last frame's crisp text
   if(state==='fight' && FT){ updateFight(dt); drawArena(); }
+  else if(state==='race' && RC){ updateRace(dt); drawRace(); }
   else if(state==='battle' && BT){ updateBattle(dt); drawBattle(); }
   else if(state==='wifehappy'){ updateWifeHappy(dt); if(state==='wifehappy') drawWifeHappy(); }
   else if(state==='bed' && BC){ updateBed(dt); if(BC) drawBed(); }
@@ -3061,6 +3078,182 @@ function finishBattle(){
   const t=BT; state='menu';
   if(t.win && t.cfg.onWin) t.cfg.onWin(t.yourLoss,t.enemyLoss);
   else if(!t.win && t.cfg.onLose) t.cfg.onLose(t.yourLoss,t.enemyLoss);
+}
+
+/* =====================================================================
+   THE CIRCUS MAXIMUS — chariot racing, an entirely separate game.
+   Hold W to WHIP the team (fast, but drains the horses); ↑/↓ to change
+   lane and overtake or dodge a pile-up. Seven laps... well, five. Win the
+   mob and a purse; wreck, and eat the sand.
+   ===================================================================== */
+const FACTIONS={
+  blue: {name:'BLUES',  col:'#2f5a9a', col2:'#6a9ae0', fan:'the Blues'},
+  green:{name:'GREENS', col:'#2f7a3a', col2:'#6ac878', fan:'the Greens'},
+  red:  {name:'REDS',   col:'#9a2f2f', col2:'#e06a6a', fan:'the Reds'},
+  white:{name:'WHITES', col:'#b8b0a0', col2:'#f0ead8', fan:'the Whites'},
+};
+const RACER_NAMES=['Scorpus','Diocles','Crescens','Musclosus','Porphyrius','Calpurnianus','Euprepes','Fuscus','Polynices','Thallus'];
+const RACE_LAPS=5, LAP_LEN=900;
+const LANE_Y=[GROUND-56, GROUND-38, GROUND-20, GROUND-2];
+let RC=null;
+function startRace(faction){
+  const mk=(isPlayer,lane,fac)=>({ isPlayer, name:isPlayer?(G.name.split(' ')[0]):pick(RACER_NAMES),
+    faction:fac, lane, y:LANE_Y[lane], dist:0, speed:0,
+    maxBase:2.7+rnd(-0.12,0.18)+(isPlayer?0.05:0), stamina:100, whip:false, spin:0, aiLaneT:rnd(0,15),
+    finished:false, place:0, phase:0 });
+  const others=Object.keys(FACTIONS).filter(f=>f!==faction);
+  RC={ faction, laps:RACE_LAPS, lap:1, time:0, countdown:130, over:false, resultShown:false, sparks:[],
+    cars:[ mk(true,1,faction), mk(false,0,others[0]), mk(false,2,others[1]), mk(false,3,others[2]) ] };
+  RC.you=RC.cars[0];
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('on'));
+  $('statbar').classList.add('hide'); $('touch').classList.add('hide');
+  state='race';
+  toast('🏇 THE CIRCUS MAXIMUS — hold W to WHIP, ↑/↓ to change lane. Five laps. Race!',3400);
+}
+function aiRace(c,dt){
+  if(c.stamina>28 && Math.random()<0.55) c.whip=true; else if(c.stamina<14) c.whip=false;
+  c.aiLaneT-=dt;
+  if(c.aiLaneT<=0){
+    const ahead=RC.cars.find(o=>o!==c && o.lane===c.lane && o.dist>c.dist && o.dist-c.dist<44);
+    if(ahead){ c.lane=clamp(c.lane + (c.lane>0?-1:1),0,3); c.aiLaneT=18; }
+    else if(Math.random()<0.5){ c.lane=clamp(c.lane+(Math.random()<0.5?-1:1),0,3); c.aiLaneT=26; }
+    else c.aiLaneT=14;
+  }
+}
+function updateRace(dt){
+  const r=RC, you=r.you;
+  r.time+=dt;
+  if(r.countdown>0){ r.countdown-=dt; if((r.countdown|0)%43===0) try{sfx('clap');}catch(e){} return; }
+  // ---- player control ----
+  if(!you.finished && you.spin<=0){
+    if(held.w && you.stamina>0){ you.whip=true; you.stamina=clamp(you.stamina-26*dt,0,100); }
+    else { you.whip=false; you.stamina=clamp(you.stamina+11*dt,0,100); }
+    if(consume('up')) you.lane=clamp(you.lane-1,0,3);
+    if(consume('down')) you.lane=clamp(you.lane+1,0,3);
+    if(consume('space') && you.stamina>20){ you.speed+=1.1; you.stamina=clamp(you.stamina-16,0,100); }  // a crack of the whip — a burst
+  }
+  // ---- every chariot ----
+  for(const c of r.cars){
+    if(c.finished){ c.speed*=Math.pow(0.9,dt); c.dist+=c.speed*dt*6; continue; }
+    if(!c.isPlayer){ aiRace(c,dt); if(c.whip) c.stamina=clamp(c.stamina-22*dt,0,100); else c.stamina=clamp(c.stamina+9*dt,0,100); }
+    let tgt=c.maxBase;
+    if(c.whip && c.stamina>0) tgt+=1.5;
+    if(c.stamina<=0) tgt*=0.68;                              // blown horses
+    if(c.spin>0){ tgt=0.25; c.spin-=dt; }
+    c.speed += (tgt-c.speed)*Math.min(1,dt*0.09);
+    c.dist += c.speed*dt*6;
+    c.phase += (c.speed*0.5+0.3)*dt;
+    const ty=LANE_Y[c.lane]; c.y += (ty-c.y)*Math.min(1,dt*0.22);
+  }
+  // ---- collisions: same lane + close = jostle, sometimes a wreck ----
+  for(let i=0;i<r.cars.length;i++) for(let j=i+1;j<r.cars.length;j++){
+    const a=r.cars[i], b=r.cars[j];
+    if(a.finished||b.finished) continue;
+    if(Math.abs(a.dist-b.dist)<15 && Math.abs(a.y-b.y)<11){
+      a.speed*=0.92; b.speed*=0.92;
+      const mx=(a.dist>b.dist? (140):(150)); r.sparks.push({x:120+rnd(-6,6),y:(a.y+b.y)/2,life:12,vx:rnd(-1,1),vy:rnd(-1.5,0)});
+      if(Math.random()<0.03*dt*10){ const loser=(a.dist<b.dist?a:b); if(loser.spin<=0){ loser.spin=10; loser.speed*=0.4; if(loser.isPlayer) toast('💥 Your wheel clips his axle — you slew and lose ground!',2000); } }
+    }
+  }
+  for(const s of r.sparks){ s.x+=s.vx*dt; s.y+=s.vy*dt; s.life-=dt; } r.sparks=r.sparks.filter(s=>s.life>0);
+  // ---- lap + finish ----
+  const nl=Math.min(r.laps, Math.floor(you.dist/LAP_LEN)+1);
+  if(nl>r.lap){ r.lap=nl; try{sfx('cheer');}catch(e){} }
+  for(const c of r.cars){ if(!c.finished && c.dist>=r.laps*LAP_LEN){ c.finished=true; c.place=r.cars.filter(x=>x.finished).length; } }
+  if(you.finished && !r.over){ r.over=true; setTimeout(()=>{ if(RC) finishRace(); }, 1600); }
+}
+function racePosition(c){ return 1 + RC.cars.filter(o=>o!==c && (o.finished? true : o.dist>c.dist)).length; }
+function drawRaceHorse(x,y,ph,col){
+  const g=Math.sin(ph)*2, g2=Math.sin(ph+2)*2;
+  px(x,y-6,9,4,col); px(x+8,y-8,3,4,col); px(x+9,y-10,3,3,col);        // body, neck, head
+  px(x+11,y-9,1,2,shade(col,-20));                                     // muzzle
+  px(x+1,y-2,2,4+g,shade(col,-16)); px(x+6,y-2,2,4+g2,shade(col,-16)); // near legs
+  px(x+3,y-2,2,4+g2,col); px(x+8,y-2,2,4+g,col);                       // far legs
+  px(x-1,y-9,3,4,shade(col,14));                                       // mane/tail hint
+}
+function drawChariot(x,y,c){
+  const F=FACTIONS[c.faction]||FACTIONS.white;
+  const tilt = c.spin>0? Math.sin(c.spin*2)*3 : 0;
+  drawRaceHorse(x-2,y+tilt,c.phase,'#6a4a30'); drawRaceHorse(x+3,y+2+tilt,c.phase+1.4,'#4a3524');  // the pair
+  px(x+9,y-3+tilt,10,1,'#2a1c10');                                     // traces to the cart
+  // the biga (cart)
+  px(x+17,y-9+tilt,11,9,'#5a3a1e'); px(x+17,y-9+tilt,11,2,'#7a5230'); px(x+18,y-8+tilt,9,6,F.col);
+  px(x+18,y-8+tilt,9,1,F.col2);
+  // wheel
+  ctx.strokeStyle='#2a1c10'; ctx.lineWidth=1.4; ctx.beginPath(); ctx.arc(x+22,y+1+tilt,5,0,7); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(x+17,y+1+tilt); ctx.lineTo(x+27,y+1+tilt); ctx.moveTo(x+22,y-4+tilt); ctx.lineTo(x+22,y+6+tilt); ctx.stroke();
+  // driver, in his colours
+  px(x+20,y-18+tilt,4,9,F.col2); px(x+20,y-20+tilt,4,3,c.isPlayer?'#e8c34a':'#caa06a'); // body + head
+  px(x+23,y-16+tilt,4,1,'#3a2a18');                                    // the reins/whip arm
+  if(c.whip) px(x+26,y-19+tilt,3,1,'#2a1c10');                         // the whip cracks forward
+}
+function drawRace(){
+  const r=RC, you=r.you, c=ctx;
+  // sky
+  const g=c.createLinearGradient(0,0,0,H); g.addColorStop(0,'#5b7bb0'); g.addColorStop(.55,'#a9b6c8'); g.addColorStop(1,'#d8c79a');
+  c.fillStyle=g; c.fillRect(0,0,W,H);
+  // stacked crowd tiers along the top
+  for(let ty=0;ty<3;ty++) for(let x=-((r.time*0.3)%8);x<W;x+=8){ px(x,4+ty*7,7,6, ((x/8|0)+ty)%2?'#6a5a48':'#4a3d30'); px(x+2,5+ty*7,3,3, pick(['#8a7','#a86','#997','#b76'])); }
+  px(0,25,W,4,'#7a5a3a'); px(0,25,W,1,'#9a7a52');                       // podium wall
+  // the sanded track
+  px(0,GROUND-64,W,H-(GROUND-64),'#d8b271'); px(0,GROUND-64,W,3,'#c79a55');
+  const scroll=(you.dist*0.5)%40;
+  for(let x=-scroll;x<W;x+=40){ px(x,GROUND-64,2,H,'rgba(150,110,60,.25)'); }  // raked sand lines scrolling by
+  // the SPINA — the central barrier down the middle of the arena
+  px(0,GROUND-70,W,7,'#8a6a44'); px(0,GROUND-70,W,2,'#a8865a'); px(0,GROUND-64,W,2,'#5a4028');
+  for(let x=-((you.dist*0.5)%120);x<W;x+=120){ px(x+52,GROUND-84,6,16,'#c8bca0'); px(x+53,GROUND-92,4,8,'#e0d4b8'); }  // turning-post statues
+  // the lap dolphins/eggs marker on the spina
+  for(let i=0;i<r.laps;i++){ px(14+i*12,GROUND-79,8,5, i<r.lap?'#e8c34a':'#5a4028'); }
+  // sparks from jostles
+  for(const s of r.sparks){ c.globalAlpha=clamp(s.life/12,0,1); px(s.x,s.y,2,2,'#e8c34a'); } c.globalAlpha=1;
+  // chariots — player fixed, rivals offset by relative distance
+  const order=[...r.cars].sort((a,b)=>a.y-b.y);   // draw back (higher on screen) first
+  for(const car of order){ const sx = car.isPlayer? 120 : 120 + (car.dist-you.dist)*0.55; if(sx>-40 && sx<W+40) drawChariot(sx, car.y, car); }
+  // ---- HUD ----
+  const pos=racePosition(you), ord=['','1st','2nd','3rd','4th'][pos]||pos+'th';
+  pixelText('LAP '+Math.min(r.lap,r.laps)+' / '+r.laps, 52, 40, '#fff', 1.4);
+  pixelText(ord+' PLACE', W-60, 40, pos===1?'#e8c34a':'#fff', 1.6);
+  // stamina bar
+  px(40,48,120,8,'#241812'); px(40,48,Math.round(you.stamina*1.2),8, you.stamina>30?'#5ac06a':'#e05b5b'); px(40,48,120,1,'#000');
+  pixelText('HORSES', 100, 52, you.stamina>15?'#eee':'#e05b5b', 0.9);
+  if(you.stamina<=0) pixelText('BLOWN — EASE OFF THE WHIP', W/2, 66, '#e05b5b', 1.1);
+  // countdown / GO
+  if(r.countdown>0){ const n=Math.ceil(r.countdown/43); pixelText(n>0?(''+n):'', W/2, H/2-10, '#e8c34a', 5); if(n<=0) pixelText('GO!', W/2, H/2-10, '#5ac06a', 5); }
+  if(r.countdown>0 && r.countdown<8) pixelText('GO!', W/2, H/2-10, '#5ac06a', 5);
+  if(you.finished){ pixelText(pos===1?'🏆 YOU WIN THE RACE!':ord+' — the race is run', W/2, H/2-6, pos===1?'#e8c34a':'#fff', 2.4); }
+}
+function finishRace(){
+  const r=RC, pos=racePosition(r.you); RC=null; state='menu';
+  const F=FACTIONS[r.faction];
+  let glory=0, coin=0, pop=0, note='';
+  if(pos===1){ glory=90; coin=500; pop=12; note='🏆 A CHARIOT CHAMPION! You take the Circus Maximus and '+F.fan+' carry you shoulder-high. The mob is drunk on you.'; try{unlock('charioteer');}catch(e){} }
+  else if(pos===2){ glory=40; coin=200; pop=5; note='🥈 Second by half a wheel — '+F.fan+' groan, then cheer. A fine showing.'; }
+  else if(pos===3){ glory=20; coin=90; pop=2; note='🥉 Third place. Respectable in the greatest circus in the world.'; }
+  else { glory=5; coin=0; pop=-3; note='You eat the dust of the field. '+F.fan+' find someone new to love — for now.'; }
+  G.glory+=glory; G.coin+=coin; G.pop=clamp(G.pop+pop,0,100);
+  G.xp+=glory; while(G.xp>=G.level*60){ G.xp-=G.level*60; G.level++; G.hpBonus++; if(G.level%2===0)G.dmgBonus++; }
+  bumpStat('coinEarned', Math.max(0,coin)); advanceDay(1); saveQuiet();
+  show('scr-result');
+  $('res-head').textContent = pos===1?'CHARIOT CHAMPION':'THE RACE IS RUN';
+  $('res-head').style.color = pos===1?'var(--gold)':'var(--bone)';
+  $('res-body').innerHTML = `<div>${note}</div>
+    <div class="row center gap" style="margin-top:6px;flex-wrap:wrap">
+      <span class="pill">🏁 ${['','1st','2nd','3rd','4th'][pos]||pos+'th'} place</span>
+      <span class="pill">⭐ +${glory} Glory</span>
+      <span class="pill">🪙 +${coin} denarii</span>
+      <span class="pill">🔥 ${pop>=0?'+':''}${pop} Pop</span>
+    </div>`;
+}
+// faction picker → the race
+function openCircus(){
+  if(G.retired){ toast('A senator does not race for the mob.',2200); return; }
+  state='circus'; show('scr-circus');
+  const b=$('circus-body'); b.innerHTML='';
+  Object.entries(FACTIONS).forEach(([id,F])=>{
+    const card=document.createElement('button'); card.className='btn'; card.style.borderColor=F.col; card.style.color=F.col2;
+    card.textContent=F.name; card.onclick=()=>startRace(id);
+    b.appendChild(card);
+  });
 }
 
 /* =====================================================================
@@ -4723,6 +4916,7 @@ $('btn-shop').onclick=()=>openShop();
 $('btn-stable').onclick=()=>openStable();
 $('btn-villa').onclick=()=>openVilla();
 $('btn-note-map').onclick=()=>openNote();
+$('btn-circus').onclick=()=>openCircus();
 $('btn-train').onclick=()=>trainScreen();
 
 // ---- STABLE & LARDER ----
@@ -5404,6 +5598,7 @@ function marry(w){
 $('btn-marry-back').onclick=()=>enterMap();
 $('btn-note-send').onclick=()=>sendNote();
 $('btn-note-back').onclick=()=>{ if(noteReturn==='villa') openVilla(); else enterMap(); };
+$('btn-circus-back').onclick=()=>enterMap();
 $('btn-portrait-back').onclick=()=>openVilla();
 
 // ---- INTRIGUE: Elite Siege, hidden guests, private army, grand plot ----
@@ -6767,6 +6962,7 @@ window.__SS = {
   finishFight, nemesisAfterWin, makeNemesis, openBrief, elevateWife, claimProvince,
   openNote, sendNote, craftWifeReply, noteBaseTier, setNoteInput:(t)=>{ const el=document.getElementById('note-input'); if(el) el.value=t; },
   checkFamilyMan, gladiatrixAfterWin,
+  openCircus, startRace, finishRace, get RC(){return RC;}, updateRace, drawRace,
   openMarry, marry, rollBrides, makeBride, get marryList(){return marryList;},
   advanceDay, openVilla,
   succession, openPortrait, startBedScene,
