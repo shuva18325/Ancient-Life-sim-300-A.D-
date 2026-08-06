@@ -265,6 +265,7 @@
       <button class="btn" id="btn-villa">🏡 VILLA</button>
       <button class="btn" id="btn-note-map">✍ WRITE HOME</button>
       <button class="btn" id="btn-tree">🌳 THE HOUSE</button>
+      <button class="btn" id="btn-trophies">🏆 TROPHIES</button>
       <button class="btn" id="btn-circus">🏇 CIRCUS</button>
       <button class="btn" id="btn-forum" style="display:none">⚖ THE COURTS</button>
       <button class="btn" id="btn-legion" style="display:none">🦅 THE LEGIONS</button>
@@ -312,7 +313,7 @@
   <!-- ===== MARRIAGE (take a wife / dynastic alliance) ===== -->
   <div id="scr-marry" class="screen center">
     <div class="panel pad col gap scrollbox" style="width:min(97%,900px);max-height:95%;">
-      <h2 style="color:var(--gold)">⚭ TAKE A WIFE</h2>
+      <h2 style="color:var(--gold)" id="marry-title">⚭ TAKE A SPOUSE</h2>
       <div id="marry-intro" class="small muted"></div>
       <div id="marry-body" class="col gap"></div>
       <div class="row" style="justify-content:flex-end;"><button class="btn gold" id="btn-marry-back">◀ BACK</button></div>
@@ -336,6 +337,16 @@
         <div class="tabula tabula-reply" id="note-reply"></div>
       </div>
       <div class="row" style="justify-content:flex-end;margin-top:4px"><button class="btn gold" id="btn-note-back">◀ BACK</button></div>
+    </div>
+  </div>
+
+  <!-- ===== THE TROPHY HALL — every rival you have put in the sand ===== -->
+  <div id="scr-trophies" class="screen center">
+    <div class="panel pad col gap scrollbox" style="width:min(96%,760px);max-height:95%;">
+      <h2 style="color:var(--gold)">🏆 THE TROPHY HALL</h2>
+      <div id="trophy-head" class="small muted"></div>
+      <div id="trophy-body" style="display:grid;gap:10px;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));"></div>
+      <div class="row" style="justify-content:flex-end;"><button class="btn gold" id="btn-trophies-back">◀ BACK</button></div>
     </div>
   </div>
 
@@ -1231,6 +1242,60 @@ function drawBodyMap(cnv,w,view){
   const legR  = 1.3 + lg*0.26;
   const headR = 4.2 + fa*0.16;
   const male=!!(w&&w.male);
+  if(view==='secret' && male && secretUnlocked()){
+    // A MEASURED CHART — the one thing the other ledger records, on the same scale as everything else.
+    const sv=gv('secret'), imp=sv>=IMPOSSIBLE_V;
+    const tier=partTier('secret',sv,true);
+    c.restore();                                     // this view draws in screen space, not figure space
+    const cx=(W2-150)/2, top=42;
+    // the rule the measure is taken against
+    c.fillStyle='rgba(255,255,255,.06)'; c.fillRect(cx-64,top-12,128,168);
+    c.strokeStyle='rgba(220,180,240,.35)'; c.lineWidth=1;
+    c.beginPath(); c.moveTo(cx-52,top+124); c.lineTo(cx+52,top+124); c.stroke();
+    // graduations, one per tier of the ladder
+    const marks=['Short','Modest','Average','Long','Immense'];
+    for(let i=0;i<=10;i++){
+      const gx2=cx-52+(i/10)*104, big=(i%2===0);
+      c.strokeStyle= i<=sv? heatColor(i||1) : 'rgba(255,255,255,.18)';
+      c.lineWidth= big?2:1; c.beginPath(); c.moveTo(gx2,top+124); c.lineTo(gx2,top+124-(big?9:5)); c.stroke();
+    }
+    // only the ends are labelled on the rule — the reading itself sits under the marker
+    c.font='bold 8px Georgia,serif'; c.fillStyle='rgba(230,210,240,.5)';
+    c.textAlign='left';  c.fillText('SHORT',   cx-52, top+138);
+    c.textAlign='right'; c.fillText('IMMENSE', cx+52, top+138);
+    { const mx=clamp(cx-52+(sv/10)*104, cx-40, cx+40);
+      c.textAlign='center'; c.fillStyle= imp? '#ff7ae0' : heatColor(sv);
+      c.fillText('▲ '+tier.toUpperCase(), mx, top+152); }
+    // THE MEASURE ITSELF — a heat-shaded bar grown to the score, capped by a rounded head
+    const len = 12 + (sv/10)*88, th = 9 + (sv/10)*7;
+    const col = imp? '#ff7ae0' : heatColor(sv);
+    c.fillStyle=col;
+    c.beginPath(); c.roundRect? c.roundRect(cx-52,top+96-th/2,len,th,th/2) : c.rect(cx-52,top+96-th/2,len,th);
+    c.fill();
+    c.beginPath(); c.arc(cx-52+len, top+96, th*0.62, 0, 7); c.fill();
+    c.fillStyle='rgba(0,0,0,.22)'; c.beginPath(); c.arc(cx-52+6, top+96+th*0.32, th*0.42,0,7); c.fill();
+    c.beginPath(); c.arc(cx-52+16, top+96+th*0.34, th*0.40,0,7); c.fill();
+    // the reading
+    c.textAlign='center'; c.fillStyle=col; c.font='bold 20px Georgia,serif';
+    c.fillText(imp?'IMPOSSIBLE':tier.toUpperCase(), cx, top+22);
+    c.fillStyle='#efe3c2'; c.font='bold 10px Georgia,serif';
+    c.fillText('THE OTHER LEDGER — measured '+(imp?'beyond the rule':sv+' of 10'), cx, top+40);
+    c.fillStyle='rgba(230,210,240,.6)'; c.font='italic 9px Georgia,serif';
+    c.fillText(imp?'“No rule in Rome is long enough.”':'“'+partPhrase('secret',sv,true)+'”', cx, top+58);
+    // the same right-hand readout as the other views, for consistency
+    c.textAlign='left';
+    partsFor(w).forEach((P,i)=>{
+      const y=24+i*21, v=gv(P.id), isImp=v>=IMPOSSIBLE_V, isSec=P.id==='secret';
+      c.fillStyle=isImp?'#ff7ae0':heatColor(v); c.fillRect(W2-146,y-9,11,11);
+      c.strokeStyle=isSec?'rgba(255,122,224,.9)':'rgba(0,0,0,.6)'; c.lineWidth=1; c.strokeRect(W2-146,y-9,11,11);
+      c.fillStyle=isSec?'#ff7ae0':'#efe3c2'; c.font='bold 9px Georgia,serif'; c.textAlign='left'; c.fillText(P.name,W2-131,y);
+      c.fillStyle=isImp?'#ff7ae0':heatColor(v); c.textAlign='right'; c.fillText(partTier(P.id,v,true).toUpperCase(),W2-8,y); c.textAlign='left';
+    });
+    c.fillStyle='#efe3c2'; c.font='bold 9px Georgia,serif'; c.textAlign='left';
+    c.fillText('LEAST',6,H2-16); c.textAlign='right'; c.fillText('FINEST',W2-6,H2-16); c.textAlign='left';
+    for(let i=0;i<10;i++){ c.fillStyle=heatColor(i+1); c.fillRect(6+i*((W2-12)/10),H2-12,(W2-12)/10,7); }
+    return;
+  }
   if(male){
     // ---- A MAN: shoulders and chest carry the silhouette, the waist narrows ----
     const shW = 5.0 + be*0.80, chR = 3.4 + bu*0.62, wR = 8.4 - wa*0.44, lR = 1.9 + lg*0.24;
@@ -1365,7 +1430,10 @@ function openBodyMap(w,back){
   }
   // view switcher
   const vr=$('bodymap-views'); vr.innerHTML='';
-  [['front','◧ FRONT'],['side','◐ SIDE'],['back','◨ BACK']].forEach(([id,label])=>{
+  const views=[['front','◧ FRONT'],['side','◐ SIDE'],['back','◨ BACK']];
+  if(w.male && secretUnlocked()) views.push(['secret','🕯 SECRET GRAPH']);
+  if(bodyMapView==='secret' && !(w.male && secretUnlocked())) bodyMapView='front';
+  views.forEach(([id,label])=>{
     const bt=document.createElement('button'); bt.className='btn sm'+(bodyMapView===id?' gold':''); bt.textContent=label;
     bt.onclick=()=>{ bodyMapView=id; openBodyMap(w,bodyMapBack); }; vr.appendChild(bt);
   });
@@ -1520,7 +1588,7 @@ function freshCareer(name,origin,arch,social){
     current:origin,        // current location
     imperialDone:false,
     rigsUsed:0,
-    nemesis:null, trophies:[], nemesisCount:0,   // the rival who rises against you + crushed-rival trophies
+    nemesis:null, rivalsList:[], trophies:[], nemesisCount:0,   // the rival who rises against you + crushed-rival trophies
     age:19, ageBase:0, pendingDeath:false,       // LIVING YEARS: age = 19 + (day-ageBase)/36; the body slows, and one day the end comes
     wonProvinceByFight:false,                     // governed a province by PURE fighting → the Warrior-Queen path opens
     familyMan:false,                              // wife maxed on every stat + every child adoring → the FAMILY MAN title
@@ -1531,7 +1599,7 @@ function freshCareer(name,origin,arch,social){
     jealousy:0, lastJealousDay:-9,                // WIFE JEALOUSY — neglect and wandering eyes have a price
     traits:[], flaws:[], looks:5, smarts:5,       // YOUR OWN blood (an heir inherits from both parents)
     // ---- THE DAUGHTER'S PATH: the courts, not the sand ----
-    advocate:false, tutorialDone:false, oratory:1, casesWon:0, casesLost:0, renown:0, senate:false, royal:false, lastCaseDay:-9,
+    advocate:false, tutorialDone:false, patrons:[], rivalAdv:null, landmarks:[], faction:null, oratory:1, casesWon:0, casesLost:0, renown:0, senate:false, royal:false, lastCaseDay:-9,
     // ---- THE LUDUS: drilled skills, lasting scars, a body that wears out ----
     skills:{footwork:0,guard:0,blade:0,wind:0,throwing:0}, scars:[], fatigue:0, lastTrainDay:-9,
     // ---- THE SON'S PATH: the legions instead of the sand ----
@@ -1610,7 +1678,7 @@ function elevateWife(rank){
   refreshStatbar(); saveQuiet(); openVilla();
 }
 // fill in any fields missing from older saves
-function migrate(g){ const d={honor:50,food:4,mount:0,slaves:0,hasVilla:false,boat:false,favor:0,soldiers:0,hidden:[],plotTier:0,emperor:false,approval:50,legions:0,rivals:0,retired:false,detachments:[],day:0,titles:{},clears:{},socialClass:'gladiator',army:{},armyGear:0,armyTrain:0,hasOrganizer:false,generals:[],wife:null,married:false,marryPrompted:false,children:[],pregnant:null,lastLoveDay:-9,injury:null,lastDebateDay:-9,office:0,path:null,parthia:50,parthiaPact:false,wifeRel:50,lastTalkDay:-9,isFemale:false,lineage:[],hygiene:70,wifePhys:45,hasPool:false,hasWardrobe:false,legacy:null,lastFeastDay:-9,loveDay:-1,loveQuick:0,loveLong:0,loveNight:0,loveVigil:0,venusUntil:-1,lastWashDay:-9,lastPoolDay:-9,lastWardrobeDay:-9,lastKidsDay:-9,lastBathDay:-9,pila:0,bow:null,bowsOwned:[],nemesis:null,trophies:[],nemesisCount:0,pendingDeath:false,ageBase:0,wonProvinceByFight:false,familyMan:false,infamy:0,gladiatrixStage:0,pardoned:false,lastNoteDay:-9,lastNoteReply:'',marryRolls:0,hasBodyMap:false,hasSecretMap:false,jealousy:0,lastJealousDay:-9,traits:[],flaws:[],looks:5,smarts:5,advocate:false,tutorialDone:false,oratory:1,casesWon:0,casesLost:0,renown:0,senate:false,royal:false,lastCaseDay:-9,skills:{footwork:0,guard:0,blade:0,wind:0,throwing:0},scars:[],fatigue:0,lastTrainDay:-9,tribune:false,rank:0,campaigns:0,legionRep:0,lastCampaignDay:-9}; for(const k in d){ if(g[k]===undefined) g[k]=d[k]; } if(!g.current) g.current='Italia'; if(g.age===undefined) g.age=19+Math.floor(((g.day||0)-(g.ageBase||0))/36); return g; }
+function migrate(g){ const d={honor:50,food:4,mount:0,slaves:0,hasVilla:false,boat:false,favor:0,soldiers:0,hidden:[],plotTier:0,emperor:false,approval:50,legions:0,rivals:0,retired:false,detachments:[],day:0,titles:{},clears:{},socialClass:'gladiator',army:{},armyGear:0,armyTrain:0,hasOrganizer:false,generals:[],wife:null,married:false,marryPrompted:false,children:[],pregnant:null,lastLoveDay:-9,injury:null,lastDebateDay:-9,office:0,path:null,parthia:50,parthiaPact:false,wifeRel:50,lastTalkDay:-9,isFemale:false,lineage:[],hygiene:70,wifePhys:45,hasPool:false,hasWardrobe:false,legacy:null,lastFeastDay:-9,loveDay:-1,loveQuick:0,loveLong:0,loveNight:0,loveVigil:0,venusUntil:-1,lastWashDay:-9,lastPoolDay:-9,lastWardrobeDay:-9,lastKidsDay:-9,lastBathDay:-9,pila:0,bow:null,bowsOwned:[],nemesis:null,rivalsList:[],trophies:[],nemesisCount:0,pendingDeath:false,ageBase:0,wonProvinceByFight:false,familyMan:false,infamy:0,gladiatrixStage:0,pardoned:false,lastNoteDay:-9,lastNoteReply:'',marryRolls:0,hasBodyMap:false,hasSecretMap:false,jealousy:0,lastJealousDay:-9,traits:[],flaws:[],looks:5,smarts:5,advocate:false,tutorialDone:false,patrons:[],rivalAdv:null,landmarks:[],faction:null,oratory:1,casesWon:0,casesLost:0,renown:0,senate:false,royal:false,lastCaseDay:-9,skills:{footwork:0,guard:0,blade:0,wind:0,throwing:0},scars:[],fatigue:0,lastTrainDay:-9,tribune:false,rank:0,campaigns:0,legionRep:0,lastCampaignDay:-9}; for(const k in d){ if(g[k]===undefined) g[k]=d[k]; } if(!g.current) g.current='Italia'; if(g.age===undefined) g.age=19+Math.floor(((g.day||0)-(g.ageBase||0))/36); return g; }
 function saveGame(){ try{ localStorage.setItem(slotKey(saveSlot), JSON.stringify(G)); toast('Saved to slot '+saveSlot+'.'); }catch(e){ toast('⚠ Could not save — browser storage is blocked or full.',3200); } }
 function hasSave(n){ try{ return !!localStorage.getItem(slotKey(n||saveSlot)); }catch(e){ return false; } }
 function loadGame(n){ try{ if(n) setSlot(n); G=migrate(JSON.parse(localStorage.getItem(slotKey(saveSlot)))); return !!G; }catch(e){ return false; } }
@@ -2180,6 +2248,9 @@ function makeNemesis(tier){
 // called after every honest arena win: raise a rival, or feed the grudge
 function nemesisAfterWin(){
   if(G.retired) return;
+  G.rivalsList=G.rivalsList||[];
+  // ---- the pack: once you are famous, more than one man wants you dead ----
+  const maxRivals = (G.pop>=70||(G.nemesisCount||0)>=2)? 3 : (G.pop>=45?2:1);
   const n=G.nemesis;
   if(!n){
     if(G.wins>=3 && G.pop>=18 && Math.random()<0.55){
@@ -2187,6 +2258,20 @@ function nemesisAfterWin(){
       G.nemesis=makeNemesis(tier);
       toast('⚔ A RIVAL EMERGES — '+nemFull(G.nemesis)+' spits at the mention of your name.',3800);
     }
+    return;
+  }
+  // background rivals climb alongside the main one
+  if(G.rivalsList.length < maxRivals-1 && G.pop>=45 && Math.random()<0.18){
+    const r2=makeNemesis(Math.min(4,2+(G.nemesisCount||0)));
+    G.rivalsList.push(r2);
+    toast('⚔ ANOTHER rises — '+nemFull(r2)+' is climbing the same ladder you are.',3800);
+  }
+  G.rivalsList.forEach(r2=>{ r2.grudge=clamp((r2.grudge||0)+ri(4,10),0,100); r2.wins=(r2.wins||0)+1; });
+  // a background rival can overtake and become the main nemesis
+  const hot=G.rivalsList.find(r2=>r2.grudge>=100);
+  if(hot && !n.ready){
+    G.rivalsList=G.rivalsList.filter(r2=>r2!==hot); G.rivalsList.push(n); G.nemesis=hot; hot.ready=true;
+    toast('⚔ '+nemFull(hot)+' pushes past the rest — HE is the one calling you out now.',4600);
     return;
   }
   if(n.ready) return;
@@ -2239,6 +2324,8 @@ function nemesisBriefBlock(){
         <div style="height:7px;background:#2a1f16;border-radius:4px;margin-top:5px;overflow:hidden"><div style="height:100%;width:${Math.round(n.grudge)}%;background:${col}"></div></div>
       </div>
     </div>
+    ${(G.rivalsList&&G.rivalsList.length)? `<div class="small muted" style="margin-top:4px">Also climbing: ${G.rivalsList.map(r=>r.name+' '+r.epithet+' ('+Math.round(r.grudge||0)+'%)').join(' · ')}</div>`:''}
+    ${n.bloodDebt? `<div class="small" style="color:#e0705b;margin-top:3px">🩸 BLOOD DEBT — he killed ${n.victim||'your child'}. This one is not about glory.</div>`:''}
     ${n.ready
       ? `<button id="btn-grudge" class="btn" style="margin-top:7px;width:100%;border-color:var(--blood);color:#ffb0b0">⚔ FACE ${n.name.toUpperCase()} — GRUDGE MATCH TO THE DEATH</button>`
       : `<div class="small muted" style="margin-top:3px">Keep winning honest bouts and he will call you out.</div>`}
@@ -2852,10 +2939,13 @@ function finishFight(won){
   if(FT.nemesis){
     const n=G.nemesis||{name:'The Rival',epithet:'',tier:2};
     if(won){
-      const gl=180+n.tier*60, cn=300+n.tier*120;
+      const gl=(180+n.tier*60)*(n.bloodDebt?2:1), cn=300+n.tier*120;
       G.glory+=gl; G.coin+=cn; G.pop=clamp(G.pop+16,0,100); G.honor=clamp(G.honor+8,0,100); G.wins++;
       bumpStat('wins'); bumpStat('foes',1); if(cn>0) bumpStat('coinEarned',cn);
-      G.trophies=G.trophies||[]; G.trophies.push({name:n.name,epithet:n.epithet,day:G.day});
+      G.trophies=G.trophies||[]; G.trophies.push({name:n.name,epithet:n.epithet,day:G.day,tier:n.tier,
+        tunic:n.tunic,skin:n.skin,bloodDebt:!!n.bloodDebt,victim:n.victim||null,wins:n.wins||0});
+      if(n.bloodDebt){ G.honor=clamp(G.honor+10,0,100); G.pop=clamp(G.pop+10,0,100);
+        setTimeout(()=>toast('🩸 The blood debt is PAID. '+(n.victim||'your child')+' is avenged, and Rome knows it. (+10 honor, +10 pop)',6000),900); }
       G.nemesisCount=(G.nemesisCount||0)+1; G.nemesis=null;
       G.xp+=gl; while(G.xp>=G.level*60){ G.xp-=G.level*60; G.level++; G.hpBonus++; if(G.level%2===0)G.dmgBonus++; }
       saveQuiet();
@@ -2864,7 +2954,16 @@ function finishFight(won){
     } else {
       G.losses++; bumpStat('losses'); G.pop=clamp(G.pop-16,0,100); G.honor=clamp(G.honor-6,0,100);
       if(!G.injury) G.injury=makeWound(3);
-      if(G.nemesis){ G.nemesis.ready=false; G.nemesis.grudge=55; }                        // he spares you — the grudge simmers on
+      if(G.nemesis){ G.nemesis.ready=false; G.nemesis.grudge=55;
+        // ---- REVENGE ARC: sometimes he does not stop at you ----
+        const kids=(G.children||[]).filter(k=>!k.wed);
+        if(kids.length && Math.random()<0.22){
+          const victim=pick(kids);
+          G.children=G.children.filter(k=>k!==victim);
+          G.nemesis.bloodDebt=true; G.nemesis.victim=victim.name;
+          G.honor=clamp(G.honor+4,0,100);
+          setTimeout(()=>toast('🩸 BLOOD DEBT — '+nemFull(G.nemesis)+' did not stop at you. '+victim.name.split(' ')[0]+' is dead. This is no longer about glory.',8000),1200);
+        } }
       saveQuiet();
       showResult(false,{glory:0,coin:0,popDelta:-16,honorDelta:-6,crowdLove:FT.crowd,
         note:nemFull(n)+' beats you into the sand — then spares you, laughing, so all the world sees your shame. The grudge is not done.'});
@@ -3875,12 +3974,43 @@ const ARGUMENTS=[
   {id:'pathos',    name:'Move them to pity',       icon:'💧', desc:'Rome is sentimental. Give the jury a reason to weep.'},
   {id:'bribe',     name:'Reach the jury quietly',  icon:'🪙', desc:'Costs coin and honour — but juries are human.'},
 ];
+// ---- RECURRING CLIENTS: patrons who come back, and pay better each time ----
+const PATRONS=[
+  {id:'widow',  name:'Antonia, a shipowner’s widow', blurb:'Her late husband’s partners keep finding new ways to rob her.'},
+  {id:'guild',  name:'The Fullers’ Guild',           blurb:'Sued constantly, and constantly in the right.'},
+  {id:'freed',  name:'Hermes, a freedman of means',  blurb:'Rich, hated for it, and litigated against on principle.'},
+  {id:'eques',  name:'Sextus Varro, an eques',       blurb:'A knight with land disputes in three provinces.'},
+];
+// ---- THE ARCH-RIVAL OF THE BAR ----
+const RIVAL_ADVOCATES=['Quintus Hortensius','Lucius Crassipes','Gaius Silo','Marcus Regulus'];
+// ---- LANDMARK CASES: rare, hard, and they change Rome ----
+const LANDMARKS=[
+  {id:'grain', title:'THE GRAIN FLEET SCANDAL', diff:4, blurb:'A praetor stands accused of selling the city’s grain reserve to speculators while the poor queued for bread.',
+   strong:['law','witness'], winNote:'The praetor is condemned and the reserve restored. The plebs chant your name in the Subura.'},
+  {id:'manumit', title:'THE FREEDOM OF THREE HUNDRED', diff:4, blurb:'A dead magnate’s will frees three hundred slaves. His heirs argue he was of unsound mind.',
+   strong:['pathos','precedent'], winNote:'Three hundred walk out of the basilica free. It will be argued about for a century.'},
+  {id:'treason2',title:'THE TRIBUNE ACCUSED', diff:5, blurb:'A tribune of the plebs is charged with maiestas — treason against the Emperor himself. Everyone expects a conviction.',
+   strong:['precedent','witness'], winNote:'You win an acquittal on a treason charge. Rome has not seen the like in a generation.'},
+];
 let CASE=null;
 function caseDifficulty(){ const r=G.renown||0; return r>=60?3 : r>=25?2 : 1; }
-function startCase(){
-  const t=pick(CASE_TYPES), diff=caseDifficulty();
-  CASE={ t, diff, round:1, rounds:3, score:0, need:3, log:[], over:false,
-    fee: 60+diff*70 + Math.round((G.renown||0)*2) };
+function startCase(landmark){
+  const diff = landmark? landmark.diff : caseDifficulty();
+  const t = landmark? {id:landmark.id,title:landmark.title,desc:landmark.blurb,strong:landmark.strong} : pick(CASE_TYPES);
+  // a returning patron pays better and is glad to see you
+  let patron=null;
+  if(!landmark && (G.patrons||[]).length && Math.random()<0.45) patron=pick(G.patrons);
+  else if(!landmark && Math.random()<0.30){
+    const fresh=PATRONS.filter(p=>!(G.patrons||[]).some(q=>q.id===p.id));
+    if(fresh.length){ patron=Object.assign({},pick(fresh),{cases:0}); G.patrons=(G.patrons||[]).concat([patron]); }
+  }
+  // your rival at the bar may take the other side
+  let rival=null;
+  if(G.rivalAdv && Math.random()< (landmark?0.9:0.35)) rival=G.rivalAdv;
+  CASE={ t, diff, round:1, rounds: landmark?4:3, score:0, need: landmark?3:3, log:[], over:false,
+    patron, rival, landmark: landmark||null,
+    fee: (landmark? 600+landmark.diff*260 : 60+diff*70) + Math.round((G.renown||0)*2)
+       + (patron? (patron.cases||0)*45 : 0) };
   state='case'; show('scr-case'); $('statbar').classList.remove('hide');
   renderCase();
 }
@@ -3892,7 +4022,11 @@ function renderCase(){
   const insight = sm>=7 ? t.strong.map(s=>ARGUMENTS.find(a=>a.id===s).name).join(' or ')
                : sm>=4 ? 'something in the '+ (Math.random()<0.5?t.strong[0]:'record')+' will serve'
                : null;
-  $('case-desc').innerHTML = t.desc + (insight? `<div class="small" style="color:#6ac8e0;margin-top:4px">🧠 Your wits (${sm}/10) read the court: <b>${insight}</b> should land here.</div>`
+  const extraTop =
+      (c.landmark? `<div class="small" style="color:var(--gold);margin-bottom:3px">★ A LANDMARK CASE — Rome is watching. Four rounds, and the fee is enormous.</div>`:'')
+    + (c.patron? `<div class="small" style="color:#8ad48a">🤝 For your patron <b>${c.patron.name}</b>${(c.patron.cases||0)>0?` — your ${(c.patron.cases||0)+1}${((c.patron.cases||0)+1)===2?'nd':((c.patron.cases||0)+1)===3?'rd':'th'} brief for them (fee +${(c.patron.cases||0)*45}d)`:' — a new client'}</div>`:'')
+    + (c.rival? `<div class="small" style="color:#e0705b">⚔ Opposing you: <b>${c.rival.name}</b> — ${c.rival.wins||0} wins against you. He will undo what he can.</div>`:'');
+  $('case-desc').innerHTML = extraTop + t.desc + (insight? `<div class="small" style="color:#6ac8e0;margin-top:4px">🧠 Your wits (${sm}/10) read the court: <b>${insight}</b> should land here.</div>`
     : `<div class="small muted" style="margin-top:4px">🧠 Your wits (${sm}/10) are too dull to read which way this jury leans.</div>`);
   const pct=Math.round(clamp(c.score/c.need,0,1)*100);
   $('case-meter').innerHTML=`<div class="small">Jury persuaded: <b style="color:${pct>=100?'#5ac06a':'var(--gold)'}">${c.score}</b> / ${c.need} · round ${Math.min(c.round,c.rounds)} of ${c.rounds} · fee if won: <b style="color:var(--gold)">${c.fee}d</b></div>
@@ -3938,6 +4072,11 @@ function playArgument(id){
   }
   c.score += good?1:0;
   c.log.push({good,text});
+  // ---- THE ARCH-RIVAL ANSWERS ----
+  if(c.rival && good && Math.random() < 0.34){
+    c.score=Math.max(0,c.score-1);
+    c.log.push({good:false,text:c.rival.name+' rises and turns your own point against you. The jury wavers back.'});
+  }
   c.round++;
   if(c.score>=c.need || c.round>c.rounds){ c.over=true; c.won = c.score>=c.need; }
   renderCase();
@@ -3953,6 +4092,16 @@ function finishCase(){
       : '🎓 “Adequate. You will lose better than most.” The lesson still counts — match the argument to the CASE, and your wits will show you which. ORATORY '+G.oratory+'. The Basilica is open to you now.',
       7000);
     openForum(); return;
+  }
+  if(c.rival){ c.rival.wins=(c.rival.wins||0)+(won?0:1); c.rival.losses=(c.rival.losses||0)+(won?1:0); }
+  if(c.patron && won){ c.patron.cases=(c.patron.cases||0)+1; }
+  if(c.landmark && won){ G.landmarks=(G.landmarks||[]).concat([c.landmark.id]);
+    G.renown=(G.renown||0)+40; G.honor=clamp(G.honor+8,0,100); G.pop=clamp(G.pop+10,0,100);
+    setTimeout(()=>toast('★ '+c.landmark.winNote,6000),900); }
+  // once you are known, a rival of the bar appears to make your life difficult
+  if(!G.rivalAdv && (G.casesWon||0)>=3 && Math.random()<0.6){
+    G.rivalAdv={name:pick(RIVAL_ADVOCATES), wins:0, losses:0};
+    setTimeout(()=>toast('⚔ '+G.rivalAdv.name+' has begun taking briefs against you on purpose. You have an enemy at the bar.',5200),1400);
   }
   if(won){
     const fee=c.fee, ren=8+c.diff*6;
@@ -4003,6 +4152,15 @@ function openForum(){
        <div style="height:100%;width:${Math.min(100,Math.round((G.renown||0)/140*100))}%;background:${G.royal?'#c89af0':G.senate?'var(--gold)':'#6ac8e0'}"></div></div>
      <div class="small muted">${G.royal?'You sit within the imperial house itself.':G.senate?'Reach 140 renown to enter the royal circle.':'Reach 60 renown for a seat in the Senate.'}</div>`;
   const b=$('forum-body'); b.innerHTML='';
+  // ---- your standing at the bar: patrons, and the man who hates you ----
+  if((G.patrons||[]).length || G.rivalAdv){
+    const sc=document.createElement('div'); sc.className='shopcard';
+    sc.innerHTML=`<div><b style="color:var(--gold)">📖 YOUR PRACTICE</b></div>
+      ${(G.patrons||[]).length? '<div class="small" style="color:#8ad48a">🤝 Clients who come back: '+G.patrons.map(p=>p.name+' ('+(p.cases||0)+')').join(' · ')+'</div>':''}
+      ${G.rivalAdv? `<div class="small" style="color:#e0705b">⚔ Your rival at the bar: <b>${G.rivalAdv.name}</b> — he has beaten you ${G.rivalAdv.wins||0}× , you have beaten him ${G.rivalAdv.losses||0}×</div>`:''}
+      ${(G.landmarks||[]).length? '<div class="small" style="color:var(--gold)">★ Landmark victories: '+G.landmarks.length+'</div>':''}`;
+    b.appendChild(sc);
+  }
   const cd=G.day-(G.lastCaseDay===undefined?-9:G.lastCaseDay);
   if(!G.tutorialDone){
     const tc=document.createElement('div'); tc.className='shopcard'; tc.style.borderColor='#6ac8e0';
@@ -4018,13 +4176,46 @@ function openForum(){
   bt.disabled=!G.tutorialDone;
   bt.onclick=()=>{ G.lastCaseDay=G.day; startCase(); };
   card.appendChild(bt); b.appendChild(card);
+  // ---- LANDMARK CASES: offered once you are a name ----
+  {
+    const avail=LANDMARKS.filter(L=>!(G.landmarks||[]).includes(L.id));
+    if(G.tutorialDone && (G.renown||0)>=40 && avail.length){
+      const L=avail[(G.casesWon||0)%avail.length];
+      const lc=document.createElement('div'); lc.className='shopcard'; lc.style.borderColor='var(--gold)';
+      lc.innerHTML=`<div><b style="color:var(--gold)">★ ${L.title}</b> <span class="small muted">— a LANDMARK brief. Four rounds, difficulty ${'★'.repeat(L.diff)}, and the whole city watching.</span></div>
+        <div class="small muted">${L.blurb}</div>`;
+      const lb=document.createElement('button'); lb.className='btn sm gold'; lb.textContent='★ TAKE THE LANDMARK BRIEF';
+      lb.onclick=()=>{ G.lastCaseDay=G.day; startCase(L); };
+      lc.appendChild(lb); b.appendChild(lc);
+    }
+  }
   if(G.senate){
+    // ---- SENATE FACTIONS ----
+    const fc=document.createElement('div'); fc.className='shopcard';
+    const FACS=[{id:'optimates',name:'THE OPTIMATES',col:'#c89af0',desc:'The old families. Order, property, and the Senate’s ancient rights.',perk:'+honour and approval from the great houses'},
+                {id:'populares',name:'THE POPULARES',col:'#e8a04a',desc:'The people’s men. Grain, land, and the crowd’s roar.',perk:'+popularity with the mob'}];
+    fc.innerHTML=`<div><b style="color:var(--gold)">🏛 THE FACTIONS</b> <span class="small muted">— the house does not vote as one. Stand with someone.</span></div>`;
+    const fr=document.createElement('div'); fr.className='row gap6';
+    FACS.forEach(F=>{
+      const bt=document.createElement('button'); bt.className='btn sm'+(G.faction===F.id?' gold':'');
+      bt.textContent=(G.faction===F.id?'✔ ':'')+F.name; bt.title=F.desc+' — '+F.perk;
+      bt.onclick=()=>{ G.faction=F.id;
+        if(F.id==='optimates'){ G.honor=clamp(G.honor+6,0,100); G.approval=clamp(G.approval+6,0,100); }
+        else { G.pop=clamp(G.pop+8,0,100); }
+        saveQuiet(); toast('🏛 You rise and cross the floor to '+F.name+'. Half the house nods; the other half remembers.',3600); openForum(); };
+      fr.appendChild(bt);
+    });
+    fc.appendChild(fr);
+    if(G.faction){ const d=document.createElement('div'); d.className='small muted';
+      d.textContent = G.faction==='optimates'? 'The optimates back your motions — the great houses listen.' : 'The populares back your motions — the crowd is yours.';
+      fc.appendChild(d); }
+    b.appendChild(fc);
     const sc=document.createElement('div'); sc.className='shopcard';
     sc.innerHTML=`<div><b style="color:var(--gold)">🏛 SPEAK IN THE SENATE</b> <span class="small muted">— move the house on a matter of state. Costs a day; pays renown and approval.</span></div>`;
     const sb=document.createElement('button'); sb.className='btn sm'; sb.textContent='🏛 ADDRESS THE HOUSE';
     sb.onclick=()=>{
       const sm2=G.smarts===undefined?5:G.smarts;
-      const win=Math.random() < clamp(0.3+sm2*0.05+(G.oratory||1)*0.04,0.15,0.9);
+      const win=Math.random() < clamp(0.3+sm2*0.05+(G.oratory||1)*0.04+(G.faction?0.12:0),0.15,0.94);
       if(win){ G.renown+=12; G.approval=clamp(G.approval+5,0,100); G.coin+=150;
         toast('🏛 The house divides your way — the motion carries. (+12 renown, +5 approval, +150d)',3600); }
       else { G.renown=Math.max(0,G.renown-4);
@@ -6214,6 +6405,7 @@ function succession(ch, path){
   G.legionRep = (path==='legion' && wasRoyal)? 20 : 0;      // a governor's son is already known to the legions
   G.skills={footwork:0,guard:0,blade:0,wind:0,throwing:0}; G.scars=[]; G.fatigue=0;
   G.oratory=1; G.casesWon=0; G.casesLost=0; G.lastCaseDay=-9; G.tutorialDone=false;
+  G.patrons=[]; G.rivalAdv=null; G.landmarks=[]; G.faction=null;
   G.renown = wasRoyal? 20 : 0;              // a governor's daughter is already known in the Forum
   G.senate=false; G.royal=false;
   bumpStat('dynasties'); unlock('dynasty');
@@ -6333,6 +6525,29 @@ function personRow(name,sub,looks,smarts,traits,flaws,extra){
     <div class="small">${(traits&&traits.length)?traits.map(t=>`<span style="color:#7ad48a">${traitLabel(t)}</span>`).join(' · '):'<span class="muted">no gifts</span>'}
       ${(flaws&&flaws.length)?' · '+flaws.map(t=>`<span style="color:#e0705b">${flawLabel(t)}</span>`).join(' · '):''}</div>
     ${extra?`<div class="small muted">${extra}</div>`:''}</div>`;
+}
+function openTrophies(){
+  state='trophies'; show('scr-trophies'); $('statbar').classList.remove('hide'); refreshStatbar();
+  const tr=G.trophies||[];
+  $('trophy-head').innerHTML = tr.length
+    ? `Every rival who called you out and lost. <b style="color:var(--gold)">${tr.length}</b> crushed${tr.some(t=>t.bloodDebt)?' · <span style="color:#e0705b">including a blood debt paid</span>':''}.`
+    : 'Empty. No rival has yet called you out and lost. Win honest bouts and one will.';
+  const b=$('trophy-body'); b.innerHTML='';
+  tr.slice().reverse().forEach(t=>{
+    const card=document.createElement('div'); card.className='shopcard';
+    if(t.bloodDebt) card.style.borderColor='#e0705b';
+    const cv=document.createElement('canvas'); cv.width=cv.height=88;
+    // the global canvas rule is position:absolute — these must sit in the flow
+    cv.style.cssText='position:static;width:84px;height:84px;image-rendering:pixelated;align-self:center;'
+      +'border:2px solid '+(t.bloodDebt?'#e0705b':'var(--gold)')+';border-radius:4px;flex:0 0 auto;';
+    drawNemesisPortrait(cv,{tunic:t.tunic||'#5a2d8a',skin:t.skin||'#caa06a'});
+    card.appendChild(cv);
+    const info=document.createElement('div');
+    info.innerHTML=`<div class="small"><b style="color:var(--gold)">${t.name} ${t.epithet}</b></div>
+      <div class="small muted">tier ${t.tier||2} · ${t.wins||0} wins to his name · fell on day ${t.day||0}</div>
+      ${t.bloodDebt?`<div class="small" style="color:#e0705b">🩸 killed ${t.victim||'your child'} — avenged</div>`:''}`;
+    card.appendChild(info); b.appendChild(card);
+  });
 }
 function openTree(){
   state='tree'; show('scr-tree'); $('statbar').classList.remove('hide'); refreshStatbar();
@@ -6913,9 +7128,11 @@ function openMarry(forced){
   state='marry'; show('scr-marry'); $('statbar').classList.remove('hide'); refreshStatbar();
   marryForced=!!forced; G.marryPrompted=true;
   if(!marryList) marryList=rollBrides();
+  { const t=$('marry-title'); if(t) t.textContent = G.isFemale? '⚭ TAKE A HUSBAND' : '⚭ TAKE A WIFE'; }
   $('marry-intro').innerHTML = forced
     ? 'As one born to rank, custom <b>demands</b> you wed. Choose the alliance that will define your house — a Roman patrician for politics, a foreign noble for armies or grain, or a love-match for honour.'
-    : 'Suitors and their fathers present themselves. Each match brings a different dowry and advantage. Choose well — you may wed but once.';
+    : (G.isFemale?'Suitors and their fathers present themselves — lords, soldiers and merchant princes. Each match brings a different dowry and advantage. Choose well — you may wed but once.'
+       :'Suitors and their fathers present themselves. Each match brings a different dowry and advantage. Choose well — you may wed but once.');
   const body=$('marry-body'); body.innerHTML='';
   marryList.forEach((w)=>{
     const card=document.createElement('div'); card.className='shopcard';
@@ -7013,6 +7230,8 @@ $('btn-cheats').onclick=()=>openCheats();
 $('btn-cheats-back').onclick=()=>enterMap();
 $('btn-ludus-back').onclick=()=>enterMap();
 $('btn-tree').onclick=()=>openTree();
+$('btn-trophies').onclick=()=>openTrophies();
+$('btn-trophies-back').onclick=()=>enterMap();
 $('btn-tree-back').onclick=()=>enterMap();
 $('btn-legion').onclick=()=>openLegion();
 $('btn-legion-back').onclick=()=>enterMap();
@@ -8465,7 +8684,7 @@ window.__SS = {
   openNote, sendNote, craftWifeReply, noteBaseTier, setNoteInput:(t)=>{ const el=document.getElementById('note-input'); if(el) el.value=t; },
   checkFamilyMan, gladiatrixAfterWin,
   openCircus, startRace, finishRace, get RC(){return RC;}, updateRace, drawRace,
-  openForum, openTree, openSlots, saveGame, hasSave, loadGame, slotInfo, setSlot, syncTouchPads, startCase, startTutorial, playArgument, finishCase, partsFor, partTier, get CASE(){return CASE;}, checkAdvocateRank,
+  openForum, openTree, openTrophies, openSlots, saveGame, hasSave, loadGame, slotInfo, setSlot, syncTouchPads, startCase, startTutorial, playArgument, finishCase, partsFor, partTier, get CASE(){return CASE;}, checkAdvocateRank,
   offerDaughterPath, inheritDNA, rollTraits, hasTrait,
   openCheats, openBodyMap, drawBodyMap, lookStage, drawWifeFigTest:drawWifeFig, trainScreen, openLegion, runCampaign, milRank, checkMilRank, makeWound, rollFlaws, traitsHtml, offerSonPath, bodyBlurb, rollBody, heatColor, drawBridePortraitTest:drawBridePortrait, makeImpossibleBody, partTier, bodyTierLine, get marryList(){return marryList;}, set marryList(v){ marryList=v; },
   openMarry, marry, rollBrides, makeBride, get marryList(){return marryList;},
