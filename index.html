@@ -267,6 +267,7 @@
       <button class="btn" id="btn-forum" style="display:none">⚖ THE COURTS</button>
       <button class="btn" id="btn-intrigue">🗡 INTRIGUE</button>
       <button class="btn" id="btn-train">🏋 TRAIN</button>
+      <button class="btn sm" id="btn-cheats" style="border-color:#c89af0;color:#c89af0">☠ CHEATS</button>
       <button class="btn sm" id="btn-save">💾 SAVE</button>
       <button class="btn sm" id="btn-quit">QUIT</button>
       <span id="map-hint" class="small muted grow" style="text-align:right;">Pick a region to travel &amp; fight.</span>
@@ -332,6 +333,27 @@
         <div class="tabula tabula-reply" id="note-reply"></div>
       </div>
       <div class="row" style="justify-content:flex-end;margin-top:4px"><button class="btn gold" id="btn-note-back">◀ BACK</button></div>
+    </div>
+  </div>
+
+  <!-- ===== THE BODY MAP (bought once, 200d) ===== -->
+  <div id="scr-bodymap" class="screen center">
+    <div class="panel pad col center gap" style="width:min(94%,620px);max-height:95%;">
+      <h2 style="color:var(--gold)" id="bodymap-title">🗺 BODY MAP</h2>
+      <div id="bodymap-verdict" class="small" style="text-align:center"></div>
+      <canvas id="bodymap-cv" width="440" height="260" style="position:static;width:min(94%,440px);height:auto;image-rendering:auto;border:2px solid var(--gold);border-radius:4px;"></canvas>
+      <div class="small muted" style="text-align:center">Pale pink is poorest · deep purple is finest. The chart never flatters.</div>
+      <button class="btn gold" id="btn-bodymap-back">◀ BACK</button>
+    </div>
+  </div>
+
+  <!-- ===== CHEATS / DOMINUS CONSOLE ===== -->
+  <div id="scr-cheats" class="screen center">
+    <div class="panel pad col gap scrollbox" style="width:min(96%,700px);max-height:95%;border-color:#c89af0;">
+      <h2 style="color:#c89af0">☠ THE DOMINUS CONSOLE <span class="small muted">— cheats</span></h2>
+      <div class="small muted">The gods look the other way. Nothing here is earned — use it to test, to play, or to rule outright.</div>
+      <div id="cheats-body" class="col gap"></div>
+      <div class="row" style="justify-content:flex-end;"><button class="btn gold" id="btn-cheats-back">◀ BACK</button></div>
     </div>
   </div>
 
@@ -846,6 +868,44 @@ const GROOM_NAMES={roman:['Gaius','Marcus','Lucius','Quintus','Titus','Decimus']
    argues in the courts when the house passes to her.
    ===================================================================== */
 const BUILDS=['slight','slender','shapely','curvy','ample','statuesque'];
+// ---- THE LOOKS LADDER: a score of 1-10 lands on one of six named stages ----
+const LOOK_STAGES=[
+  {min:1, name:'NO LOOKS',      col:'#8a8a7a', blurb:'plain as a clay lamp'},
+  {min:3, name:'GOOD LOOKS',    col:'#c8b070', blurb:'pleasant to look upon'},
+  {min:5, name:'CURVY',         col:'#e8a04a', blurb:'a figure that turns heads in the market'},
+  {min:7, name:'GOOD LOOKING',  col:'#e8688a', blurb:'genuinely beautiful — men lose their words'},
+  {min:9, name:'ABSOLUTE FIRE', col:'#e0407a', blurb:'the kind of beauty poets ruin themselves over'},
+  {min:10,name:'SPICY (MAX)',   col:'#a83ad0', blurb:'a face and figure the sculptors will copy for centuries'},
+];
+function lookStage(v){ let s=LOOK_STAGES[0]; for(const st of LOOK_STAGES) if(v>=st.min) s=st; return s; }
+// ---- the parts that make up the whole ----
+const BODY_PARTS=[
+  {id:'face',   name:'Face',    good:['a face like a temple statue','striking, clean-featured','lovely, open-faced'], bad:['a plain, forgettable face','sharp and sour-featured']},
+  {id:'hairq',  name:'Hair',    good:['heavy, glossy hair to the waist','thick dark hair worth a poem'],            bad:['thin, dull hair','lank hair she keeps covered']},
+  {id:'bust',   name:'Bust',    good:['CURVY UP TOP — generously built','full and high-set','a very fine bust'],     bad:['flat through the chest','slight up top']},
+  {id:'waist',  name:'Waist',   good:['a waist you could ring with your hands','cinched, hourglass-tight'],          bad:['thick through the middle','no waist to speak of']},
+  {id:'behind', name:'Behind',  good:['a GOOD BEHIND — round and high','famously good from behind','heavy-hipped and round'], bad:['a BAD BEHIND — flat as a board','nothing behind at all']},
+  {id:'legs',   name:'Legs',    good:['long, strong dancer’s legs','fine legs, well turned'],                        bad:['short, heavy legs','thin, knock-kneed legs']},
+];
+// a phrase for one part, given its 1-10 score
+function partPhrase(pid,v){
+  const P=BODY_PARTS.find(p=>p.id===pid); if(!P) return '';
+  if(v>=7) return pick(P.good);
+  if(v<=3) return pick(P.bad);
+  return null;                                    // middling parts aren't worth remarking on
+}
+// the honest, specific summary a matchmaker would give
+function bodyBlurb(w){
+  const b=w.body||{}; const notes=[];
+  for(const P of BODY_PARTS){ const ph=partPhrase(P.id, b[P.id]===undefined?5:b[P.id]); if(ph) notes.push(ph); }
+  if(!notes.length) return 'nothing remarkable either way — an ordinary figure';
+  return notes.slice(0,3).join('; ');
+}
+function rollBody(quality){
+  const b={};
+  for(const P of BODY_PARTS) b[P.id]=clamp(Math.round(quality + rnd(-2.6,2.6)),1,10);
+  return b;
+}
 const WIFE_TRAITS=[
   {id:'smart',    name:'Smart',      icon:'🧠', min:6, desc:'A quick, ordered mind — her children argue like advocates.'},
   {id:'beauty',   name:'Beautiful',  icon:'🌹', min:6, desc:'Rome turns to look. The mob loves a beautiful house.'},
@@ -856,6 +916,15 @@ const WIFE_TRAITS=[
   {id:'noble',    name:'Noble-blood',icon:'👑', min:7, desc:'Old blood — doors open for her children.'},
   {id:'wealthy',  name:'Wealthy',    icon:'💰', min:6, desc:'Her family sends coin, and keeps sending it.'},
 ];
+// ---- how great a house she comes from ----
+const TIERS={
+  common:  {name:'COMMON',            icon:'🏚', col:'#a8977a', mult:1,   desc:'an ordinary family'},
+  rich:    {name:'RICH',              icon:'💰', col:'#e8c34a', mult:2.2, desc:'a wealthy merchant house'},
+  elite:   {name:'ELITE',             icon:'🏛', col:'#c89af0', mult:4,   desc:'a great senatorial family'},
+  imperial:{name:'EMPEROR’S DAUGHTER',icon:'👑', col:'#ff8ad0', mult:9,   desc:'the imperial house itself'},
+};
+function tierBadge(t){ const T=TIERS[t]||TIERS.common;
+  return `<span class="pill" style="border-color:${T.col};color:${T.col};font-size:10px">${T.icon} ${T.name}</span>`; }
 function traitById(id){ return WIFE_TRAITS.find(t=>t.id===id); }
 function traitLabel(id){ const t=traitById(id); return t? t.icon+' '+t.name : id; }
 // quality 0..10 → how many traits, how good the body/mind
@@ -885,7 +954,9 @@ function makeBride(eth, noble, quality){
   const D=BRIDE[eth]||BRIDE.roman;
   // QUALITY 0-10 drives looks, wits and traits. Nobles skew higher; paid matches are guaranteed high.
   if(quality===undefined) quality = clamp(Math.round((noble? rnd(3,8) : rnd(1,6)) + (G&&G.marryRolls? Math.min(2.5,G.marryRolls*0.18):0)), 0, 10);
-  const looks = clamp(Math.round(quality + rnd(-1.2,1.2)),1,10);
+  const bodyRoll = rollBody(quality);
+  // LOOKS is the sum of her parts — so the body map always matches the verdict
+  const looks = clamp(Math.round(BODY_PARTS.reduce((a,P)=>a+bodyRoll[P.id],0)/BODY_PARTS.length),1,10);
   const smarts= clamp(Math.round(quality + rnd(-2,2)),1,10);
   // build follows looks — the finest matches are the shapeliest
   const build = looks>=9? pick(['curvy','ample','statuesque'])
@@ -895,8 +966,14 @@ function makeBride(eth, noble, quality){
   const dressN = eth==='egyptian'?'#efe8d6' : eth==='persian'?'#2f6f8c' : eth==='celt'?'#3f6a44' : eth==='germanic'?'#7d5c38'
     : eth==='greek'?'#e8e2d2' : eth==='numidian'?'#c8862a' : (Math.random()<0.5?'#8a2f5a':'#c07a1e');
   const dressP = eth==='celt'?'#6b7a4a' : eth==='germanic'?'#9a7a52' : eth==='greek'?'#d8d0ba' : eth==='numidian'?'#b08a4a' : '#cbb489';
+  // ---- her house's standing: common → rich → elite → the Emperor's own daughter ----
+  let tier='common';
+  if(quality>=10 && Math.random()<0.22) tier='imperial';
+  else if(quality>=8) tier= Math.random()<0.45?'elite':'rich';
+  else if(quality>=6) tier= Math.random()<0.5?'rich':'common';
+  const body=bodyRoll;
   const b = {
-    eth, adj:D.adj, rank: noble?'noble':'peasant', build,
+    eth, adj:D.adj, rank: noble?'noble':'peasant', build, tier, body,
     quality, looks, smarts, traits: rollTraits(quality),
     name: pick(D.names)+' '+pick(D.surn),
     skin: D.skin, hair: pick(D.hair),
@@ -931,6 +1008,13 @@ function makeBride(eth, noble, quality){
     b.dowrySoldiers=Math.round(ri(260,560)*s); b.honor=5; b.pop=6; b.tradeCoin=noble?4:2;
     b.perk='A shield-maiden of the north — sworn spearmen and iron loyalty.';
   }
+  // ---- the house's wealth multiplies what she brings with her ----
+  const TM=TIERS[b.tier]||TIERS.common;
+  b.dowryCoin=Math.round((b.dowryCoin||0)*TM.mult); b.dowrySoldiers=Math.round((b.dowrySoldiers||0)*TM.mult);
+  b.tradeCoin=Math.round((b.tradeCoin||0)*TM.mult);
+  if(b.tier==='imperial'){ b.approval=(b.approval||0)+20; b.honor=(b.honor||0)+10; b.favor=(b.favor||0)+6;
+    b.perk='THE EMPEROR’S OWN DAUGHTER — the purple itself marries into your house. Nothing in Rome opens more doors.'; }
+  else if(b.tier==='elite'){ b.approval=(b.approval||0)+8; b.perk='Of a great senatorial house — '+b.perk; }
   b.dowryCoin=b.dowryCoin||0; b.dowryFood=b.dowryFood||0; b.dowrySoldiers=b.dowrySoldiers||0;
   b.approval=b.approval||0; b.favor=b.favor||0; b.honor=b.honor||0; b.pop=b.pop||0; b.tradeCoin=b.tradeCoin||0; b.tradeFood=b.tradeFood||0;
   if(G && G.isFemale){ b.male=true; b.name=pick(GROOM_NAMES[eth]||GROOM_NAMES.roman)+' '+pick(D.surn); }
@@ -941,6 +1025,84 @@ function makeBride(eth, noble, quality){
 const NOBLE_PRICE={roman:900, greek:900, celt:500, germanic:500, numidian:650, persian:1800, egyptian:2200};
 function allianceTier(){ return G.coin + G.glory*4 + titlesCount()*800 +
   (G.socialClass==='elite'?2200:G.socialClass==='upper'?1100:0) + (G.office||0)*400; }
+/* =====================================================================
+   THE BODY MAP — a matchmaker's chart, bought once for 200d. Every region
+   of her figure is shaded by how fine it is: pale pink is poor, deep
+   purple is perfection. No more guessing what "beautiful" means.
+   ===================================================================== */
+// pale pink (1) → deep purple (10)
+function heatColor(v){
+  const t=clamp((v-1)/9,0,1);
+  const stops=[[255,214,232],[247,168,206],[233,112,178],[198,66,168],[142,42,150],[86,26,120]];
+  const f=t*(stops.length-1), i=Math.floor(f), frac=f-i;
+  const a=stops[i], b=stops[Math.min(stops.length-1,i+1)];
+  const c=k=>Math.round(a[k]+(b[k]-a[k])*frac);
+  return `rgb(${c(0)},${c(1)},${c(2)})`;
+}
+function drawBodyMap(cnv,w){
+  const c=cnv.getContext('2d'); c.imageSmoothingEnabled=false;
+  const W2=cnv.width, H2=cnv.height;
+  const g=c.createLinearGradient(0,0,0,H2); g.addColorStop(0,'#241a2e'); g.addColorStop(1,'#120a18');
+  c.fillStyle=g; c.fillRect(0,0,W2,H2);
+  const b=w.body||{}, gv=id=>b[id]===undefined?5:b[id];
+  c.save(); c.translate(W2*0.34,14); const s=Math.min(W2/150,H2/170)*1.45; c.scale(s,s);
+  const ell=(x,y,rx,ry,col)=>{ c.fillStyle=col; c.beginPath(); c.ellipse(x,y,rx,ry,0,0,7); c.fill();
+    c.strokeStyle='rgba(0,0,0,.4)'; c.lineWidth=0.5; c.stroke(); };
+  const cap=(x1,y1,x2,y2,r1,r2,col)=>{ c.fillStyle=col; const a=Math.atan2(y2-y1,x2-x1);
+    c.beginPath(); c.arc(x1,y1,r1,a+1.5708,a-1.5708); c.arc(x2,y2,r2,a-1.5708,a+1.5708); c.closePath(); c.fill();
+    c.strokeStyle='rgba(0,0,0,.4)'; c.lineWidth=0.5; c.stroke(); };
+  // scores also SHAPE the figure — a fine bust/behind/waist visibly reads as one
+  const bu=gv('bust'), wa=gv('waist'), be=gv('behind'), lg=gv('legs'), fa=gv('face'), ha=gv('hairq');
+  const bustR=3.6+bu*0.42, hipR=5.2+be*0.46, waistR=6.4-wa*0.30, legR=2.1+lg*0.16;
+  // hair falls behind the head and shoulders
+  ell(0,5,7.2+ha*0.22,8.4+ha*0.20, heatColor(ha));
+  // face
+  ell(0,5,4.9,5.9, heatColor(fa));
+  // neck
+  cap(0,10.5,0,13.5,1.8,2.2, heatColor((fa+bu)/2));
+  // shoulders + bust
+  cap(-6.6,16,6.6,16,3.0,3.0, heatColor((bu+wa)/2));
+  ell(-bustR*0.62,18.4,bustR,bustR*0.86, heatColor(bu));
+  ell( bustR*0.62,18.4,bustR,bustR*0.86, heatColor(bu));
+  // torso tapering to the waist
+  cap(0,20,0,29,7.4,waistR, heatColor(wa));
+  // hips / behind
+  ell(0,34,hipR,hipR*0.74, heatColor(be));
+  // legs
+  cap(-hipR*0.44,38,-hipR*0.40,54,legR,legR*0.72, heatColor(lg));
+  cap( hipR*0.44,38, hipR*0.40,54,legR,legR*0.72, heatColor(lg));
+  cap(-hipR*0.40,54,-hipR*0.38,66,legR*0.72,legR*0.55, heatColor(lg));
+  cap( hipR*0.40,54, hipR*0.38,66,legR*0.72,legR*0.55, heatColor(lg));
+  c.fillStyle='#3a2a18'; c.fillRect(-hipR*0.40-2.4,66,4.8,2.4); c.fillRect(hipR*0.40-2.4,66,4.8,2.4);
+  // arms
+  cap(-8.2,17,-9.4,30,2.0,1.6, heatColor((bu+wa)/2));
+  cap( 8.2,17, 9.4,30,2.0,1.6, heatColor((bu+wa)/2));
+  c.restore();
+  // labels down the right-hand side
+  c.textAlign='left'; c.font='bold 10px Georgia,serif';
+  BODY_PARTS.forEach((P,i)=>{
+    const y=18+i*20, v=gv(P.id);
+    c.fillStyle=heatColor(v); c.fillRect(W2-92,y-8,12,12);
+    c.strokeStyle='rgba(0,0,0,.6)'; c.lineWidth=1; c.strokeRect(W2-92,y-8,12,12);
+    c.fillStyle='#efe3c2'; c.fillText(P.name,W2-76,y+1);
+    c.fillStyle=heatColor(v); c.font='bold 11px Georgia,serif'; c.fillText(String(v),W2-22,y+1);
+    c.font='bold 10px Georgia,serif';
+  });
+  // the scale
+  c.fillStyle='#efe3c2'; c.font='bold 9px Georgia,serif'; c.textAlign='left';
+  c.fillText('LEAST',6,H2-16); c.textAlign='right'; c.fillText('FINEST',W2-6,H2-16); c.textAlign='left';
+  for(let i=0;i<10;i++){ c.fillStyle=heatColor(i+1); c.fillRect(6+i*((W2-12)/10),H2-12,(W2-12)/10,7); }
+}
+function openBodyMap(w,back){
+  bodyMapSubject=w; bodyMapBack=back||'marry';
+  state='bodymap'; show('scr-bodymap');
+  const st=lookStage(w.looks===undefined?5:w.looks);
+  $('bodymap-title').textContent='🗺 BODY MAP — '+w.name.split(' ')[0].toUpperCase();
+  $('bodymap-verdict').innerHTML=`<b style="color:${st.col}">${st.name}</b> <span class="muted">— ${st.blurb}</span>
+    <div class="small muted" style="margin-top:2px">${bodyBlurb(w)}</div>`;
+  drawBodyMap($('bodymap-cv'), w);
+}
+let bodyMapSubject=null, bodyMapBack='marry';
 // a small pip bar for looks / wits, so a fine match is obvious at a glance
 function statPips(w){
   const bar=(val,col,icon,label)=>{ let s='';
@@ -1075,6 +1237,7 @@ function freshCareer(name,origin,arch,social){
     familyMan:false,                              // wife maxed on every stat + every child adoring → the FAMILY MAN title
     infamy:0, gladiatrixStage:0, pardoned:false,  // THE GLADIATRIX ARC — scandal → sensation → legend → the Emperor's pardon
     lastNoteDay:-9, lastNoteReply:'',             // THE TABULA — a written note home + her last reply
+    hasBodyMap:false,                             // the matchmaker's figure-chart, bought once
     marryRolls:0,                                 // suitors seen — keep looking and finer matches present themselves
     jealousy:0, lastJealousDay:-9,                // WIFE JEALOUSY — neglect and wandering eyes have a price
     traits:[], looks:5, smarts:5,                 // YOUR OWN blood (an heir inherits from both parents)
@@ -1154,7 +1317,7 @@ function elevateWife(rank){
   refreshStatbar(); saveQuiet(); openVilla();
 }
 // fill in any fields missing from older saves
-function migrate(g){ const d={honor:50,food:4,mount:0,slaves:0,hasVilla:false,boat:false,favor:0,soldiers:0,hidden:[],plotTier:0,emperor:false,approval:50,legions:0,rivals:0,retired:false,detachments:[],day:0,titles:{},clears:{},socialClass:'gladiator',army:{},armyGear:0,armyTrain:0,hasOrganizer:false,generals:[],wife:null,married:false,marryPrompted:false,children:[],pregnant:null,lastLoveDay:-9,injury:null,lastDebateDay:-9,office:0,path:null,parthia:50,parthiaPact:false,wifeRel:50,lastTalkDay:-9,isFemale:false,lineage:[],hygiene:70,wifePhys:45,hasPool:false,hasWardrobe:false,legacy:null,lastFeastDay:-9,loveDay:-1,loveQuick:0,loveLong:0,loveNight:0,loveVigil:0,venusUntil:-1,lastWashDay:-9,lastPoolDay:-9,lastWardrobeDay:-9,lastKidsDay:-9,lastBathDay:-9,pila:0,bow:null,bowsOwned:[],nemesis:null,trophies:[],nemesisCount:0,pendingDeath:false,ageBase:0,wonProvinceByFight:false,familyMan:false,infamy:0,gladiatrixStage:0,pardoned:false,lastNoteDay:-9,lastNoteReply:'',marryRolls:0,jealousy:0,lastJealousDay:-9,traits:[],looks:5,smarts:5,advocate:false,oratory:1,casesWon:0,casesLost:0,renown:0,senate:false,royal:false,lastCaseDay:-9}; for(const k in d){ if(g[k]===undefined) g[k]=d[k]; } if(!g.current) g.current='Italia'; if(g.age===undefined) g.age=19+Math.floor(((g.day||0)-(g.ageBase||0))/36); return g; }
+function migrate(g){ const d={honor:50,food:4,mount:0,slaves:0,hasVilla:false,boat:false,favor:0,soldiers:0,hidden:[],plotTier:0,emperor:false,approval:50,legions:0,rivals:0,retired:false,detachments:[],day:0,titles:{},clears:{},socialClass:'gladiator',army:{},armyGear:0,armyTrain:0,hasOrganizer:false,generals:[],wife:null,married:false,marryPrompted:false,children:[],pregnant:null,lastLoveDay:-9,injury:null,lastDebateDay:-9,office:0,path:null,parthia:50,parthiaPact:false,wifeRel:50,lastTalkDay:-9,isFemale:false,lineage:[],hygiene:70,wifePhys:45,hasPool:false,hasWardrobe:false,legacy:null,lastFeastDay:-9,loveDay:-1,loveQuick:0,loveLong:0,loveNight:0,loveVigil:0,venusUntil:-1,lastWashDay:-9,lastPoolDay:-9,lastWardrobeDay:-9,lastKidsDay:-9,lastBathDay:-9,pila:0,bow:null,bowsOwned:[],nemesis:null,trophies:[],nemesisCount:0,pendingDeath:false,ageBase:0,wonProvinceByFight:false,familyMan:false,infamy:0,gladiatrixStage:0,pardoned:false,lastNoteDay:-9,lastNoteReply:'',marryRolls:0,hasBodyMap:false,jealousy:0,lastJealousDay:-9,traits:[],looks:5,smarts:5,advocate:false,oratory:1,casesWon:0,casesLost:0,renown:0,senate:false,royal:false,lastCaseDay:-9}; for(const k in d){ if(g[k]===undefined) g[k]=d[k]; } if(!g.current) g.current='Italia'; if(g.age===undefined) g.age=19+Math.floor(((g.day||0)-(g.ageBase||0))/36); return g; }
 function saveGame(){ try{ localStorage.setItem(SAVE_KEY, JSON.stringify(G)); toast('Saved.'); }catch(e){ toast('⚠ Could not save — browser storage is blocked or full.',3200); } }
 function hasSave(){ try{ return !!localStorage.getItem(SAVE_KEY); }catch(e){ return false; } }
 function loadGame(){ try{ G=migrate(JSON.parse(localStorage.getItem(SAVE_KEY))); return !!G; }catch(e){ return false; } }
@@ -3488,6 +3651,62 @@ function openForum(){
     sc.appendChild(sb); b.appendChild(sc);
   }
 }
+/* =====================================================================
+   THE DOMINUS CONSOLE — cheats. Coin, glory, provinces, the purple.
+   ===================================================================== */
+function openCheats(){
+  state='cheats'; show('scr-cheats'); $('statbar').classList.remove('hide'); refreshStatbar();
+  const b=$('cheats-body'); b.innerHTML='';
+  const card=(title,desc)=>{ const c=document.createElement('div'); c.className='shopcard';
+    c.innerHTML=`<div><b style="color:#c89af0">${title}</b> <span class="small muted">${desc||''}</span></div>`;
+    const r=document.createElement('div'); r.className='row gap6'; r.style.flexWrap='wrap'; c.appendChild(r); b.appendChild(c); return r; };
+  const btn=(row,label,fn)=>{ const x=document.createElement('button'); x.className='btn sm'; x.textContent=label;
+    x.onclick=()=>{ fn(); refreshStatbar(); saveQuiet(); openCheats(); }; row.appendChild(x); };
+  // ---- coin & fame ----
+  let r=card('🪙 COIN & FAME','— fill the strongbox and the record');
+  btn(r,'+1,000d',()=>G.coin+=1000); btn(r,'+10,000d',()=>G.coin+=10000); btn(r,'+100,000d',()=>G.coin+=100000);
+  btn(r,'+500 Glory',()=>G.glory+=500); btn(r,'POP 100',()=>G.pop=100); btn(r,'HONOR 100',()=>G.honor=100);
+  btn(r,'+10 Levels',()=>{ for(let i=0;i<10;i++){ G.level++; G.hpBonus++; if(G.level%2===0)G.dmgBonus++; } });
+  // ---- provinces ----
+  r=card('🗺 GOVERN THE PROVINCES','— take the titles without the wars');
+  btn(r,'👑 GOVERN ALL 21 REGIONS',()=>{ REGIONS.forEach(rg=>{ G.titles[rg.id]=REGION_TITLES[rg.id]||('Dominus '+rg.id); G.cleared[rg.id]=true; G.clears[rg.id]=99; });
+    G.wonProvinceByFight=true; toast('🗺 Every province in the empire flies your colours.',3000); });
+  btn(r,'GOVERN THIS REGION',()=>{ const rg=REGION_BY_ID[G.current]; if(rg){ G.titles[rg.id]=REGION_TITLES[rg.id]||('Dominus '+rg.id); G.cleared[rg.id]=true; G.clears[rg.id]=99; G.wonProvinceByFight=true; } });
+  btn(r,'UNLOCK ALL REGIONS',()=>{ REGIONS.forEach(rg=>{ G.cleared[rg.id]=true; }); G.pop=100; });
+  btn(r,'CLEAR ALL TITLES',()=>{ G.titles={}; });
+  // ---- power ----
+  r=card('👑 POWER','— the army, the purple, the Senate');
+  btn(r,'+50,000 SOLDIERS',()=>{ addTroops('roman',50000); });
+  btn(r,'BECOME EMPEROR',()=>{ G.emperor=true; G.approval=100; G.imperialDone=true; G.legions=20; toast('👑 You wear the purple.',2600); });
+  btn(r,'+100 FAVOR',()=>G.favor+=100);
+  btn(r,'RETIRE TO THE SENATE',()=>{ G.retired=true; G.socialClass='elite'; });
+  // ---- the house ----
+  r=card('🏡 THE HOUSE','— family, blood and the bedchamber');
+  btn(r,'PERFECT SPOUSE (all 10s)',()=>{ if(!G.wife){ toast('Wed someone first.',1800); return; }
+    G.wife.looks=10; G.wife.smarts=10; G.wife.quality=10; G.wife.tier='imperial'; G.wife.build='statuesque';
+    G.wife.body={}; BODY_PARTS.forEach(P=>G.wife.body[P.id]=10);
+    G.wife.traits=['smart','beauty','devoted','fertile','cunning','wealthy'];
+    G.wifeRel=100; G.wifePhys=100; G.hygiene=100; G.jealousy=0; });
+  btn(r,'MAX BOND (♥/🔥/🧼 100)',()=>{ G.wifeRel=100; G.wifePhys=100; G.hygiene=100; });
+  btn(r,'JEALOUSY 0',()=>G.jealousy=0); btn(r,'JEALOUSY 100',()=>G.jealousy=100);
+  btn(r,'UNLOCK BODY MAP',()=>{ G.hasBodyMap=true; });
+  btn(r,'+1 CHILD',()=>{ const son=Math.random()<0.5;
+    G.children.push(Object.assign({name:(son?pick(['Titus','Lucius','Gaius']):pick(['Julia','Livia','Aurelia']))+' '+G.name.split(' ')[0]+(son?'i filius':'a'), sex:son?'m':'f', born:G.day, rel:100}, inheritDNA())); });
+  btn(r,'FAMILY MAN TITLE',()=>{ G.familyMan=true; });
+  // ---- the courts (daughter's path) ----
+  r=card('⚖ THE COURTS','— the advocate’s road');
+  btn(r,'BECOME AN ADVOCATE',()=>{ G.advocate=true; G.smarts=10; });
+  btn(r,'+100 RENOWN',()=>{ G.renown=(G.renown||0)+100; checkAdvocateRank(); });
+  btn(r,'ENTER THE SENATE',()=>{ G.renown=Math.max(G.renown||0,60); G.senate=true; });
+  btn(r,'BECOME ROYAL',()=>{ G.renown=Math.max(G.renown||0,140); G.senate=true; G.royal=true; });
+  // ---- body & health ----
+  r=card('⚔ THE FIGHTER','— your own flesh');
+  btn(r,'HEAL INJURY',()=>{ G.injury=null; });
+  btn(r,'AGE 19 (reset the years)',()=>{ G.age=19; G.ageBase=G.day; G.pendingDeath=false; });
+  btn(r,'MY LOOKS/WITS 10',()=>{ G.looks=10; G.smarts=10; });
+  btn(r,'+30 RATIONS · CHARIOT',()=>{ G.food+=30; G.mount=3; G.boat=true; });
+  btn(r,'ALL GEAR OWNED',()=>{ for(const cat of ['weapon','shield','helmet','armor']) GEAR[cat].forEach(g2=>{ if(!G.owned[cat].includes(g2.id)) G.owned[cat].push(g2.id); }); G.pila=15; });
+}
 // faction picker → the race
 function openCircus(){
   if(G.retired){ toast('A senator does not race for the mob.',2200); return; }
@@ -5759,7 +5978,8 @@ function buildMarriageCard(b){
     const eC= v.e>=75?'#e26a8a': v.e>=45?'#e8c34a':'#8a6a4a';
     const pC= v.p>=75?'#e0533a': v.p>=45?'#d88a3a':'#8a6a4a';
     const info=document.createElement('div'); info.innerHTML=
-      `<div><b style="color:var(--gold)">⚭ ${w.name}</b> <span class="small muted">— your ${w.adj} ${w.rank} ${w.male?'husband':'wife'}</span></div>
+      `<div><b style="color:var(--gold)">⚭ ${w.name}</b> ${tierBadge(w.tier)} <span class="small muted">— your ${w.adj} ${w.rank} ${w.male?'husband':'wife'}</span></div>
+       ${(()=>{const st=lookStage(w.looks===undefined?5:w.looks); return `<div class="small"><b style="color:${st.col}">${st.name}</b> <span class="muted">— ${st.blurb}</span></div>`;})()}
        <div class="small">♥ Emotional: ${mkbar(v.e,eC)} <b style="color:${eC}">${v.e}</b>/100 <span class="muted">${v.ew}</span></div>
        <div class="small">${ADULT?'🔥 Physical':'🔥 Devotion'}: ${mkbar(v.p,pC)} <b style="color:${pC}">${v.p}</b>/100 <span class="muted">${v.pw}</span></div>
        ${(w.traits&&w.traits.length)? '<div class="small" style="color:#c89af0">'+w.traits.map(traitLabel).join(' · ')+'</div>':''}
@@ -5824,6 +6044,10 @@ function buildMarriageCard(b){
     const talk=document.createElement('button'); talk.className='btn sm'; talk.textContent='💬 TALK WITH '+(w.male?'HIM':'HER');
     const noteBtn=document.createElement('button'); noteBtn.className='btn sm'; noteBtn.textContent='✍ WRITE A NOTE';
     noteBtn.title='Send a wax tablet by courier — she writes back.'; noteBtn.onclick=()=>openNote();
+    const mapBtn=document.createElement('button'); mapBtn.className='btn sm';
+    if(G.hasBodyMap){ mapBtn.textContent='🗺 BODY MAP'; mapBtn.onclick=()=>openBodyMap(w,'villa'); }
+    else { mapBtn.textContent='🗺 BODY MAP (200d)'; mapBtn.disabled=G.coin<200;
+      mapBtn.onclick=()=>{ if(G.coin<200) return; G.coin-=200; G.hasBodyMap=true; refreshStatbar(); saveQuiet(); openBodyMap(w,'villa'); }; }
     const qrow=document.createElement('div'); qrow.className='row gap6'; qrow.style.display='none'; qrow.style.marginTop='4px';
     talk.onclick=()=>{ qrow.style.display = qrow.style.display==='none'?'flex':'none'; };
     const q=(label,title,dis,fn)=>{ const bq=document.createElement('button'); bq.className='btn sm'; bq.textContent=label; bq.title=title||''; bq.disabled=!!dis; bq.onclick=fn; qrow.appendChild(bq); };
@@ -5868,7 +6092,7 @@ function buildMarriageCard(b){
     bedF.title='No heir tonight — only each other. The bond deepens.';
     bedF.disabled=loveLeft(bedLen)<=0;
     bedF.onclick=()=>launch('fun');
-    btns.appendChild(talk); btns.appendChild(noteBtn); btns.appendChild(bedH); btns.appendChild(bedF);
+    btns.appendChild(talk); btns.appendChild(noteBtn); btns.appendChild(mapBtn); btns.appendChild(bedH); btns.appendChild(bedF);
     const port=document.createElement('button'); port.className='btn sm'; port.textContent='🖼 FAMILY PORTRAIT';
     port.onclick=()=>openPortrait(); btns.appendChild(port);
     card.appendChild(btns);
@@ -5952,16 +6176,27 @@ function openMarry(forced){
     const card=document.createElement('div'); card.className='shopcard';
     const row=document.createElement('div'); row.className='row gap'; row.style.alignItems='flex-start';
     row.appendChild(briadeImg(w,132));
+    const st=lookStage(w.looks===undefined?5:w.looks);
     const info=document.createElement('div'); info.style.flex='1'; info.innerHTML=
-      `<div><b style="color:var(--gold)">${w.name}</b></div>
+      `<div><b style="color:var(--gold)">${w.name}</b> ${tierBadge(w.tier)}</div>
        <div class="small">${w.adj} ${w.rank} · <span class="muted">${w.male? 'a lord of his people'+(w.jewel?', gold-ringed':'') : w.build+' of figure'+(w.jewel?', richly adorned':'')}</span></div>
+       <div class="small" style="margin:2px 0"><b style="color:${st.col}">${st.name}</b> <span class="muted">— ${st.blurb}</span></div>
+       ${G.hasBodyMap? `<div class="small muted" style="font-style:italic">${bodyBlurb(w)}</div>` : '<div class="small muted" style="font-style:italic">buy the BODY MAP to see exactly what you are getting</div>'}
        ${statPips(w)}
        ${(w.traits&&w.traits.length)? '<div class="small" style="color:#c89af0">'+w.traits.map(traitLabel).join(' · ')+'</div>' : '<div class="small muted">no notable gifts</div>'}
        <div class="small muted" style="margin:2px 0">${w.perk}</div>
        <div class="small" style="color:var(--gold)">${marriageEffectsText(w)}</div>`;
     row.appendChild(info); card.appendChild(row);
-    const bt=document.createElement('button'); bt.className='btn sm gold'; bt.style.marginTop='4px'; bt.textContent='⚭ WED '+w.name.split(' ')[0];
-    bt.onclick=()=>marry(w); card.appendChild(bt);
+    const brow=document.createElement('div'); brow.className='row gap6'; brow.style.marginTop='4px';
+    const bt=document.createElement('button'); bt.className='btn sm gold'; bt.textContent='⚭ WED '+w.name.split(' ')[0];
+    bt.onclick=()=>marry(w); brow.appendChild(bt);
+    const mp=document.createElement('button'); mp.className='btn sm';
+    if(G.hasBodyMap){ mp.textContent='🗺 BODY MAP'; mp.onclick=()=>openBodyMap(w,'marry'); }
+    else { mp.textContent='🗺 BUY THE BODY MAP (200d)'; mp.disabled=G.coin<200;
+      mp.title='A matchmaker’s chart: every region of her figure shaded pale pink (poor) to deep purple (perfect). Bought once, used for every match thereafter.';
+      mp.onclick=()=>{ if(G.coin<200) return; G.coin-=200; G.hasBodyMap=true; refreshStatbar(); saveQuiet();
+        toast('🗺 The matchmaker unrolls her charts. You will never be surprised on a wedding night again.',3400); openBodyMap(w,'marry'); }; }
+    brow.appendChild(mp); card.appendChild(brow);
     body.appendChild(card);
   });
   // ---- KEEP LOOKING: every set of suitors seen makes the next a little finer ----
@@ -5978,6 +6213,20 @@ function openMarry(forced){
   mkRoll('↻ Other suitors (20d)',20,0,'Ordinary matches — but each viewing nudges your luck upward.');
   mkRoll('💰 SEND FOR FINER FAMILIES (300d)',300,6,'Guaranteed good matches: handsome, clever, and gifted.');
   mkRoll('👑 THE MATCHMAKER’S FINEST (1000d)',1000,9,'The greatest match in the empire — near-perfect looks and wits, three gifts of blood.');
+  // the rarest match of all — bought outright rather than waited for
+  const impBt=document.createElement('button'); impBt.className='btn sm gold'; impBt.style.borderColor='#ff8ad0';
+  impBt.textContent='💜 PETITION THE IMPERIAL HOUSE (1500d)';
+  impBt.title='Ask the Emperor himself for a daughter of the purple. Guaranteed SPICY (MAX) looks, brilliant wits, four gifts of blood, and a dowry that beggars description.';
+  impBt.disabled=G.coin<1500;
+  impBt.onclick=()=>{ if(G.coin<1500) return; G.coin-=1500; G.marryRolls=(G.marryRolls||0)+1;
+    marryList=rollBrides(10).map(w=>{ w.tier='imperial'; w.quality=10; w.looks=10;
+      w.body={}; BODY_PARTS.forEach(P=>w.body[P.id]=ri(9,10)); w.build='statuesque';
+      w.smarts=Math.max(w.smarts,9); w.jewel=true; w.rank='noble';
+      w.traits=[...new Set([...(w.traits||[]),'noble','beauty','wealthy','smart'])].slice(0,4);
+      w.approval=(w.approval||0)+20; w.honor=(w.honor||0)+10; w.dowryCoin=(w.dowryCoin||0)+4000;
+      w.perk='THE EMPEROR’S OWN DAUGHTER — the purple itself marries into your house.'; return w; });
+    refreshStatbar(); saveQuiet(); openMarry(marryForced); };
+  rrow.appendChild(impBt);
   rr.appendChild(rrow); body.appendChild(rr);
   // when marriage is a duty, there is no walking away
   $('btn-marry-back').style.display = marryForced? 'none':'';
@@ -6007,6 +6256,9 @@ $('btn-marry-back').onclick=()=>enterMap();
 $('btn-note-send').onclick=()=>sendNote();
 $('btn-note-back').onclick=()=>{ if(noteReturn==='villa') openVilla(); else enterMap(); };
 $('btn-circus-back').onclick=()=>enterMap();
+$('btn-cheats').onclick=()=>openCheats();
+$('btn-cheats-back').onclick=()=>enterMap();
+$('btn-bodymap-back').onclick=()=>{ if(bodyMapBack==='villa') openVilla(); else openMarry(marryForced); };
 $('btn-forum').onclick=()=>openForum();
 $('btn-forum-back').onclick=()=>enterMap();
 $('btn-portrait-back').onclick=()=>openVilla();
@@ -7385,6 +7637,7 @@ window.__SS = {
   openCircus, startRace, finishRace, get RC(){return RC;}, updateRace, drawRace,
   openForum, startCase, playArgument, finishCase, get CASE(){return CASE;}, checkAdvocateRank,
   offerDaughterPath, inheritDNA, rollTraits, hasTrait,
+  openCheats, openBodyMap, drawBodyMap, lookStage, bodyBlurb, rollBody, heatColor, get marryList(){return marryList;}, set marryList(v){ marryList=v; },
   openMarry, marry, rollBrides, makeBride, get marryList(){return marryList;},
   advanceDay, openVilla,
   succession, openPortrait, startBedScene,
