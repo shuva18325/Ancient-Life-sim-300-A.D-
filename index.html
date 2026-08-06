@@ -1138,9 +1138,18 @@ function drawBodyMap(cnv,w,view){
   view=view||'front';
   const c=cnv.getContext('2d'); c.imageSmoothingEnabled=true;
   const W2=cnv.width, H2=cnv.height;
-  const g=c.createLinearGradient(0,0,0,H2); g.addColorStop(0,'#241a2e'); g.addColorStop(1,'#120a18');
+  const g=c.createLinearGradient(0,0,0,H2); g.addColorStop(0,'#2a1e36'); g.addColorStop(.6,'#1a1024'); g.addColorStop(1,'#100813');
   c.fillStyle=g; c.fillRect(0,0,W2,H2);
   const b=w.body||{}, gv=id=>b[id]===undefined?5:b[id];
+  // survey grid, so it reads as a chart rather than a drawing
+  c.strokeStyle='rgba(200,150,220,.07)'; c.lineWidth=1;
+  for(let gx2=0;gx2<W2-140;gx2+=16){ c.beginPath(); c.moveTo(gx2,0); c.lineTo(gx2,H2-20); c.stroke(); }
+  for(let gy2=0;gy2<H2-20;gy2+=16){ c.beginPath(); c.moveTo(0,gy2); c.lineTo(W2-140,gy2); c.stroke(); }
+  // a soft aura behind the figure, brighter the finer she is
+  { const avg=BODY_PARTS.reduce((a,P)=>a+gv(P.id),0)/BODY_PARTS.length;
+    const gg=c.createRadialGradient((W2-146)*0.5,H2*0.45,4,(W2-146)*0.5,H2*0.45,86);
+    gg.addColorStop(0, heatColor(avg).replace('rgb','rgba').replace(')',',0.20)'));
+    gg.addColorStop(1,'rgba(0,0,0,0)'); c.fillStyle=gg; c.fillRect(0,0,W2-140,H2-20); }
   const bu=gv('bust'), wa=gv('waist'), be=gv('booty'), lg=gv('legs'), fa=gv('face'), ha=gv('hairq');
   const imp = BODY_PARTS.some(P=>gv(P.id)>=IMPOSSIBLE_V);
   c.save(); c.translate((W2-146)*0.5,14); const s=Math.min(W2/150,H2/172)*1.5; c.scale(s,s);
@@ -1198,6 +1207,7 @@ function drawBodyMap(cnv,w,view){
     cap(-8.4,17,-9.8,31,2.0,1.6, heatColor((bu+wa)/2));
     cap( 8.4,17, 9.8,31,2.0,1.6, heatColor((bu+wa)/2));
   }
+  c.fillStyle='rgba(0,0,0,.30)'; c.beginPath(); c.ellipse(0,69,hipR*0.95,2.4,0,0,7); c.fill();   // she stands on something
   c.fillStyle='#3a2a18';
   if(view==='side'){ c.fillRect(-1.6,66,6,2.4); } else { c.fillRect(-hipR*0.40-2.4,66,4.8,2.4); c.fillRect(hipR*0.40-2.4,66,4.8,2.4); }
   c.restore();
@@ -4797,26 +4807,98 @@ function openDomus(){
 }
 function domusExit(){ DM=null; $('statbar').classList.remove('hide'); openVilla(); }
 // a dressed lady of the house, in miniature
-function drawWifeFig(c,x,y,w,ph){
+// THE DOMINA, drawn from her actual measurements. mode: idle | walk | run | god
+// Her BODY SCORES drive the sprite — a FLAT 1 is visibly flat, a COLOSSAL 10 is not.
+// A fine figure also gets real jiggle on the step.
+function drawWifeFig(c,x,y,w,ph,mode){
+  mode=mode||'idle'; ph=ph||0;
   const P=(a,b2,ww,h,col)=>{c.fillStyle=col;c.fillRect(Math.round(x+a),Math.round(y+b2),Math.round(ww),Math.round(h));};
-  const skin=w.skin||'#e6bd94', dress=w.dress||'#8a2f5a', hair=w.hair||'#5a3a1e';
-  const yy=-Math.abs(Math.sin(ph||0))*1.2;
-  P(-8,yy-26,16,26,dress); P(-8,yy-26,16,2,shade(dress,26)); P(-9,yy-6,18,6,shade(dress,-20));   // gown to the floor
-  P(-9,yy-30,18,8,dress); P(-9,yy-30,18,1,shade(dress,20));                                       // hips flare
-  P(-4,yy-36,8,6,shade(dress,-10));                                                               // cinched waist
-  P(-6,yy-46,12,10,dress); P(-6,yy-46,12,2,shade(dress,26));                                      // bodice
-  P(-7,yy-44,4,6,shade(dress,14)); P(3,yy-44,4,6,shade(dress,14)); P(-1,yy-44,2,5,shade(dress,-24)); // the bust, unmistakable
-  P(-2,yy-49,5,4,skin);                                                                           // neck + décolleté
-  P(-8,yy-45,3,12,skin); P(5,yy-45,3,12,skin);                                                    // arms
-  P(-4,yy-58,9,9,skin); P(-4,yy-58,9,1,shade(skin,20));                                           // head
-  P(-5,yy-61,11,5,hair); P(-6,yy-57,2,7,hair); P(5,yy-57,2,9,hair);                               // piled hair + falls
-  P(-2,yy-54,2,2,'#241408'); P(1,yy-54,2,2,'#241408'); P(-1,yy-51,3,1,'#a84a52');                 // eyes + lips
-  if(w.jewel) P(-1,yy-48,2,2,'#e8c34a');
+  const skin=w.skin||'#e6bd94', sSh=shade(skin,-26), dress=w.dress||'#8a2f5a', hair=w.hair||'#5a3a1e';
+  const dSh=shade(dress,-22), dHi=shade(dress,26);
+  const B=w.body||{}, gv=(id,d)=>B[id]===undefined?d:B[id];
+  const bu=gv('bust',6), be=gv('booty',6), wa=gv('waist',6), lg=gv('legs',6);
+  // ---- measurements → pixels ----
+  const bustW = Math.round(2 + bu*0.62);          // 2.6 flat → 8.2 huge
+  const bustH = Math.round(3 + bu*0.42);
+  const hipW  = Math.round(6 + be*0.62);          // how far the gown flares
+  const waistW= Math.round(7 - wa*0.34);          // high waist score = tiny waist
+  const legLen= Math.round(9 + lg*0.55);
+  // ---- gait ----
+  const running = mode==='run';
+  const walking = mode==='walk' || running;
+  const stride = walking? Math.sin(ph)*(running?5.5:3.2) : 0;
+  const bob    = walking? -Math.abs(Math.sin(ph))*(running?2.4:1.2) : -Math.abs(Math.sin(ph*0.5))*0.35;
+  const lean   = running? 2 : 0;                  // she leans into a run
+  // JIGGLE — only a figure worth jiggling does. Peaks on the footfall.
+  const jig    = walking? Math.sin(ph*2)* (running?1.0:0.55) : 0;
+  const bJig   = jig * clamp((bu-4)/6,0,1) * 2.2;   // bust bounce, scaled by how much there is
+  const hJig   = jig * clamp((be-4)/6,0,1) * 1.8;   // hips
+  const yy=bob;
+  const top = yy-26-legLen;                         // where the gown's hem sits above the feet
+  // ================= LEGS (a real walk cycle, visible under the hem) =================
+  const lF=stride, lB=-stride;
+  P(-3+lF*0.5, yy-legLen, 4, legLen, skin);         // front leg
+  P(-3+lF*0.5, yy-2, 5, 2, '#8a5c34');              // sandal
+  P( 0+lB*0.5, yy-legLen, 4, legLen, sSh);          // back leg (shaded)
+  P( 0+lB*0.5, yy-2, 5, 2, '#6a4426');
+  // ================= GOWN =================
+  if(mode==='god'){
+    // THE GOD WALK — she gathers the stola in one fist and sweeps, formal and unhurried
+    P(-hipW, top, hipW*2, 16, dress); P(-hipW, top, hipW*2, 2, dHi);
+    // the gathered fall of cloth, lifted on her right
+    for(let i=0;i<7;i++){ const t=i/6; P(-hipW+2+i*2, top+14, 2, Math.round(10-t*9), dress); }
+    P(hipW-3, top+8, 5, 12, dHi);                   // the lifted fold catching the light
+    P(-hipW-1, top+14, 3, 8, dSh);
+  } else {
+    P(-hipW, top, hipW*2, 18+ (running?-2:0), dress);         // skirt of the gown
+    P(-hipW, top, hipW*2, 2, dHi);
+    P(-hipW-1+hJig*0.5, top+8, 2, 10, dSh);                    // side folds sway with the hips
+    P( hipW-1+hJig*0.5, top+8, 2, 10, dSh);
+    if(walking){ P(-2+stride*0.6, top+12, 4, 8, dSh); }        // the hem parts as she steps
+  }
+  // ================= HIPS =================
+  P(-hipW+1+hJig*0.4, top-6, (hipW-1)*2, 7, dress);
+  P(-hipW+1+hJig*0.4, top-6, (hipW-1)*2, 1, dHi);
+  // ================= WAIST (cinched) =================
+  P(-waistW/2, top-13, waistW, 8, shade(dress,-8));
+  // ================= BODICE + BUST =================
+  P(-6+lean*0.4, top-24, 12, 12, dress); P(-6+lean*0.4, top-24, 12, 2, dHi);
+  // the bust itself — width, depth and bounce all from her score
+  P(-bustW-1+lean*0.4, top-23+bJig, bustW, bustH, shade(dress,14));
+  P( 1+lean*0.4,       top-23+bJig, bustW, bustH, shade(dress,14));
+  P(-1+lean*0.4,       top-23+bJig, 2, bustH-1, shade(dress,-26));      // the line between
+  if(bu>=8){ P(-bustW-1+lean*0.4, top-24+bJig, bustW*2+2, 1, shade(dress,34)); }  // a fine bust catches the light
+  // ================= NECK / ARMS =================
+  P(-2+lean*0.5, top-28, 5, 5, skin);
+  const armSw = walking? stride*0.7 : 0;
+  if(mode==='god'){
+    P(-8, top-23, 3, 11, skin);                      // one arm hangs
+    P( 5, top-20, 3, 8, skin); P(7, top-13, 3, 3, skin);   // the other holds the gathered cloth
+  } else {
+    P(-8-armSw*0.4, top-23, 3, 12, skin);
+    P( 5+armSw*0.4, top-23, 3, 12, skin);
+  }
+  // ================= HEAD =================
+  P(-4+lean*0.6, top-38, 9, 10, skin); P(-4+lean*0.6, top-38, 9, 1, shade(skin,20));
+  P(-5+lean*0.6, top-41, 11, 5, hair); P(-6+lean*0.6, top-37, 2, 7, hair);
+  P( 5+lean*0.6, top-37, 2, 9+(running?3:0), hair);          // her hair streams when she runs
+  P(-2+lean*0.6, top-34, 2, 2, '#241408'); P(1+lean*0.6, top-34, 2, 2, '#241408');
+  P(-1+lean*0.6, top-31, 3, 1, '#a84a52');
+  if(w.jewel) P(-1+lean*0.6, top-27, 2, 2, '#e8c34a');
 }
 // the same lady, robe left on the rim — the steam does the censoring
 function drawUndressedFig(c,x,y,w){
   const P=(a,b2,ww,h,col)=>{c.fillStyle=col;c.fillRect(Math.round(x+a),Math.round(y+b2),Math.round(ww),Math.round(h));};
   const skin=w.skin||'#e6bd94', hair=w.hair||'#5a3a1e', sh=shade(skin,-24);
+  if(w.male){                                                     // a lord of the house, robe on the rim
+    P(-4,-32,4,16,skin); P(1,-32,4,16,skin); P(-5,-2,6,2,'#8a5c34'); P(1,-2,6,2,'#8a5c34');
+    P(-6,-42,12,11,skin); P(-6,-42,12,1,shade(skin,20));           // hips/thighs
+    P(-7,-56,14,15,skin); P(-7,-56,14,2,shade(skin,22)); P(5,-54,2,12,sh);   // broad chest + shading
+    P(-2,-60,5,5,skin);                                            // neck
+    P(-10,-55,3,13,skin); P(7,-55,3,13,skin);                      // arms
+    P(-5,-70,10,10,skin); P(-5,-72,11,4,hair);                     // head + cropped hair
+    return;
+  }
   P(-3,-32,7,15,skin); P(-4,-17,4,15,skin); P(1,-17,4,15,skin); P(-4,-2,5,2,'#8a5c34'); P(0,-2,5,2,'#8a5c34'); // legs
   P(-6,-40,12,10,skin); P(-6,-40,12,1,shade(skin,20)); P(4,-38,2,8,sh);                            // hips
   P(-3,-44,7,5,skin);                                                                              // waist
@@ -4825,9 +4907,19 @@ function drawUndressedFig(c,x,y,w){
   P(-8,-52,3,11,skin); P(5,-52,3,11,skin);                                                         // arms
   P(-4,-66,9,9,skin); P(-5,-69,11,5,hair); P(5,-65,2,10,hair);                                     // head + hair down
 }
-function drawDomusPlayer(x,y,ph){
-  if(G.isFemale) drawWifeFig(ctx,x,y,{skin:G.skin,dress:G.tunic,hair:'#3a2618',jewel:true},ph);
-  else { ctx.save(); ctx.translate(x,y-Math.abs(Math.sin(ph||0))*1.5); drawHusbandFig(ctx,0,0,G.wifeRel|0); ctx.restore(); }
+function drawDomusPlayer(x,y,ph,mode){
+  mode=mode||'idle';
+  if(G.isFemale) drawWifeFig(ctx,x,y,{skin:G.skin,dress:G.tunic,hair:'#3a2618',jewel:true,
+      body:{bust:6,booty:6,waist:6,legs:6,face:6,hairq:6}},ph,mode);
+  else { const run=mode==='run', lean=run?2:0;
+    ctx.save(); ctx.translate(x+lean, y-Math.abs(Math.sin(ph||0))*(run?2.6:1.5));
+    if(run) ctx.rotate(0.06);
+    drawHusbandFig(ctx,0,0,G.wifeRel|0);
+    // legs swing under him so a run reads as a run
+    const st=Math.sin(ph||0)*(run?6:3.4);
+    ctx.fillStyle=shade(G.skin||'#caa06a',-18); ctx.fillRect(Math.round(-6+st*0.6),-22,5,20);
+    ctx.fillStyle=G.skin||'#caa06a';            ctx.fillRect(Math.round(1-st*0.6),-22,5,20);
+    ctx.restore(); }
 }
 function tryPoolInvite(){
   if(!G.married||!G.wife){ toast('You have no one to invite — the steam rises alone.',2200); return; }
@@ -4853,7 +4945,7 @@ function updateDomus(dt){
   for(const sp of D.splash){ sp.x+=sp.vx*dt; sp.y+=sp.vy*dt; sp.vy+=0.2*dt; sp.life-=dt; }
   D.splash=D.splash.filter(s2=>s2.life>0);
   if(D.scene){ updateDomusScene(dt); return; }
-  const sp2=1.5*dt;
+  const sp2=(held.s? 3.0 : 1.5)*dt;        // hold S to RUN
   if(held.a){ D.x-=sp2; D.face=-1; } if(held.d){ D.x+=sp2; D.face=1; }
   D.x=clamp(D.x, 24, 470);
   if(G.married && G.wife){
@@ -4959,16 +5051,19 @@ function drawDomus(){
   for(const p of D.props) drawFlungProp(p);
   for(const sp of D.splash) px(sp.x,sp.y,2,2,'#8ac4e0');
   // letterbox first, so prompts print on top of it
-  px(-4,-4,W+8,16,'#0a0705'); ctx.textAlign='center'; pixelText('VILLA RUSTICA — your halls · A/D walk · SPACE act',W/2,8,'#c8b060',1);
+  px(-4,-4,W+8,16,'#0a0705'); ctx.textAlign='center'; pixelText('VILLA RUSTICA — your halls · A/D walk · S run · SPACE act',W/2,8,'#c8b060',1);
   px(-4,H-14,W+8,18,'#0a0705');
   // actors
   const sc=D.scene, w=G.wife;
   if(!sc){
     if(G.married && w){
       if(w.male){ ctx.save(); ctx.translate(D.wifeX,FY); drawHusbandFig(ctx,0,0,G.wifeRel|0,w.skin,w.dress); ctx.restore(); }
-      else drawWifeFig(ctx,D.wifeX,FY,w,D.wifePause>0?0:D.t*0.2);
+      else { const moving=D.wifePause<=0;
+        const godly = (w.looks===undefined?5:w.looks)>=8 || (w.tier==='imperial'||w.tier==='impossible');
+        drawWifeFig(ctx,D.wifeX,FY,w, moving? D.t*0.22 : D.t*0.05, moving? (godly?'god':'walk') : 'idle'); }
     }
-    drawDomusPlayer(D.x,FY,(held.a||held.d)?D.t*0.35:0);
+    { const mv=(held.a||held.d), run=mv&&held.s;
+      drawDomusPlayer(D.x,FY, mv? D.t*(run?0.6:0.35) : 0, run?'run':(mv?'walk':'idle')); }
     let prompt='';
     if(D.x>452) prompt='SPACE: LEAVE THE HALLS';
     else if(G.hasPool&&Math.abs(D.x-86)<36) prompt='SPACE: BATHE'+(G.married?'  ·  W: INVITE '+(w&&w.male?'HIM':'HER'):'');
@@ -4990,11 +5085,21 @@ function drawDomus(){
       if(w.male){ ctx.save(); ctx.translate(wx2,FY); drawHusbandFig(ctx,0,0,G.wifeRel|0,w.skin,w.dress); ctx.restore(); }
       else drawWifeFig(ctx,wx2,FY,w,T2*0.25); }
     else if(T2<262){                                                                   // the robe drops — steam is a gentleman
-      if(w.male){ ctx.save(); ctx.translate(124,FY); drawHusbandFig(ctx,0,0,G.wifeRel|0,w.skin,w.dress); ctx.restore(); }
-      else drawUndressedFig(ctx,124,FY,w);
+      drawUndressedFig(ctx,124,FY,w);                                                  // works for either spouse now
       ctx.globalAlpha=.85; px(115,FY-52,19,11,'#efeae2'); px(114,FY-38,21,13,'#efeae2'); ctx.globalAlpha=1;  // two stubborn clouds
     }
-    else if(T2>290){                                                                   // full silhouettes in the shallows
+    else if(T2<292){                                                                   // THE DIVE — was a blank 28 frames; now it plays
+      const k=(T2-262)/30;                                                             // 0..1 through the plunge
+      const dx=124-k*30, dy=FY-k*26;
+      ctx.globalAlpha=clamp(1-k*0.85,0,1);
+      drawUndressedFig(ctx,dx,dy,w);                                                   // she arcs down into the water
+      ctx.globalAlpha=1;
+      for(let i=0;i<3;i++){ const rr=6+k*26+i*7; ctx.strokeStyle='rgba(150,214,238,'+clamp(0.5-k*0.35,0,1)+')';
+        ctx.lineWidth=1; ctx.beginPath(); ctx.ellipse(100,203,rr,rr*0.28,0,0,7); ctx.stroke(); }   // rings spread out
+      ctx.globalAlpha=.8; px(96,FY-40,20,10,'#efeae2'); ctx.globalAlpha=1;
+      ctx.textAlign='center'; pixelText('~ a clean dive ~',W/2,H-6,'#c8b060',1);
+    }
+    else {                                                                             // full silhouettes in the shallows
       drawWaterCouple(80,202,T2+210,D);
       ctx.textAlign='center'; pixelText('~ the steam keeps its secrets ~',W/2,H-6,'#c8b060',1);
     }
@@ -5009,7 +5114,18 @@ function drawDomus(){
       if(w.male){ ctx.save(); ctx.translate(284,FY); drawHusbandFig(ctx,0,0,G.wifeRel|0,w.skin,w.dress); ctx.restore(); }
       else drawWifeFig(ctx,284,FY,w,0);
       ctx.globalAlpha=1; }
-    else if(T2<900){ ctx.textAlign='center'; pixelText('~ sturdy craftsmanship ~',W/2,H-6,'#c8b060',1); }
+    else if(T2<900){
+      // two silhouettes pressed against the cedar doors, and the whole thing working
+      const k=(T2-180)/720, rock=Math.sin(T2*0.9);
+      ctx.globalAlpha=0.30+0.10*Math.sin(T2*0.5);
+      px(296+rock*1.4,150,12,44,'#1c130c'); px(310+rock*1.4,146,12,48,'#1c130c');       // the pair, shadowed on the doors
+      ctx.globalAlpha=1;
+      px(292+rock*1.6,132,34,3,'#8a6640');                                              // the cornice knocking loose
+      if((T2|0)%9<1) D.props.push({kind:'sandal',x:300,y:206,vx:rnd(-1.4,-0.4),vy:rnd(-1.6,-0.6),r:0,vr:0.2});
+      const line = k<0.3? '~ sturdy craftsmanship ~' : k<0.6? '~ the cedar is being TESTED ~'
+                 : k<0.85? '~ a hinge gives up ~' : '~ they are not coming out yet ~';
+      ctx.textAlign='center'; pixelText(line,W/2,H-6,'#c8b060',1);
+    }
   }
   // steam veils all — drawn last on purpose
   for(const st of D.steam){ ctx.globalAlpha=clamp(st.life/50,0,1)*0.55; px(st.x-4,st.y-8,9,7,'#e8e2da'); px(st.x-2,st.y-13,6,5,'#f2eee8'); ctx.globalAlpha=1; }
@@ -8012,7 +8128,7 @@ window.__SS = {
   openCircus, startRace, finishRace, get RC(){return RC;}, updateRace, drawRace,
   openForum, startCase, playArgument, finishCase, get CASE(){return CASE;}, checkAdvocateRank,
   offerDaughterPath, inheritDNA, rollTraits, hasTrait,
-  openCheats, openBodyMap, drawBodyMap, lookStage, trainScreen, openLegion, runCampaign, milRank, checkMilRank, makeWound, rollFlaws, traitsHtml, offerSonPath, bodyBlurb, rollBody, heatColor, drawBridePortraitTest:drawBridePortrait, makeImpossibleBody, partTier, bodyTierLine, get marryList(){return marryList;}, set marryList(v){ marryList=v; },
+  openCheats, openBodyMap, drawBodyMap, lookStage, drawWifeFigTest:drawWifeFig, trainScreen, openLegion, runCampaign, milRank, checkMilRank, makeWound, rollFlaws, traitsHtml, offerSonPath, bodyBlurb, rollBody, heatColor, drawBridePortraitTest:drawBridePortrait, makeImpossibleBody, partTier, bodyTierLine, get marryList(){return marryList;}, set marryList(v){ marryList=v; },
   openMarry, marry, rollBrides, makeBride, get marryList(){return marryList;},
   advanceDay, openVilla,
   succession, openPortrait, startBedScene,
