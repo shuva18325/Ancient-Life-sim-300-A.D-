@@ -263,6 +263,7 @@
       <button class="btn" id="btn-stable">🐎 STABLE</button>
       <button class="btn" id="btn-villa">🏡 VILLA</button>
       <button class="btn" id="btn-note-map">✍ WRITE HOME</button>
+      <button class="btn" id="btn-tree">🌳 THE HOUSE</button>
       <button class="btn" id="btn-circus">🏇 CIRCUS</button>
       <button class="btn" id="btn-forum" style="display:none">⚖ THE COURTS</button>
       <button class="btn" id="btn-legion" style="display:none">🦅 THE LEGIONS</button>
@@ -334,6 +335,15 @@
         <div class="tabula tabula-reply" id="note-reply"></div>
       </div>
       <div class="row" style="justify-content:flex-end;margin-top:4px"><button class="btn gold" id="btn-note-back">◀ BACK</button></div>
+    </div>
+  </div>
+
+  <!-- ===== THE FAMILY TREE — DNA across the generations ===== -->
+  <div id="scr-tree" class="screen center">
+    <div class="panel pad col gap scrollbox" style="width:min(96%,760px);max-height:95%;">
+      <h2 style="color:var(--gold)">🌳 THE HOUSE — BLOOD &amp; GENERATIONS</h2>
+      <div id="tree-body" class="col gap"></div>
+      <div class="row" style="justify-content:flex-end;"><button class="btn gold" id="btn-tree-back">◀ BACK</button></div>
     </div>
   </div>
 
@@ -918,21 +928,41 @@ const BODY_PARTS=[
   {id:'legs',   name:'Legs',   tiers:['Short','Plain','Shapely','Long','Statuesque'],
    good:['long, strong dancer’s legs','fine legs, well turned'],                        bad:['short, heavy legs','thin, knock-kneed legs']},
 ];
+// ---- the MALE equivalents, for when the head of the house is a woman ----
+const BODY_PARTS_M=[
+  {id:'face',   name:'Face',      tiers:['Plain','Rough','Handsome','Striking','Godlike'],
+   good:['a jaw you could break a fist on','handsome in the old Roman way'], bad:['a plain, weathered face','a face like a dropped amphora']},
+  {id:'hairq',  name:'Hair',      tiers:['Balding','Thin','Full','Thick','Leonine'],
+   good:['thick dark curls','a full leonine head of hair'],                  bad:['thinning badly','all but bald']},
+  {id:'bust',   name:'Chest',     tiers:['Sunken','Flat','Solid','Broad','MASSIVE'],
+   good:['a BROAD chest like a shield','massive through the chest'],         bad:['sunken-chested','narrow through the shoulders']},
+  {id:'waist',  name:'Midriff',   tiers:['Soft','Plain','Firm','Cut','CHISELLED'], invert:true,
+   good:['a CHISELLED midriff','flat and hard through the middle'],          bad:['gone SOFT around the middle','a proper wine-belly']},
+  {id:'booty',  name:'Shoulders', tiers:['Narrow','Plain','Square','Wide','COLOSSAL'],
+   good:['shoulders that fill a doorway','wide, square shoulders'],          bad:['narrow, sloping shoulders','no shoulders to speak of']},
+  {id:'legs',   name:'Legs',      tiers:['Spindly','Plain','Strong','Powerful','Titanic'],
+   good:['a horseman’s powerful legs','strong, tireless legs'],              bad:['spindly legs','thin-shanked']},
+];
+function partsFor(w){ return (w&&w.male)? BODY_PARTS_M : BODY_PARTS; }
 const IMPOSSIBLE_V=11;                       // beyond the human scale — cheats only
 // the NAMED tier for one part at one score
-function partTier(pid,v){
-  const P=BODY_PARTS.find(p=>p.id===pid); if(!P) return '';
+function partTier(pid,v,male){
+  const P=(male?BODY_PARTS_M:BODY_PARTS).find(p=>p.id===pid); if(!P) return '';
   if(v>=IMPOSSIBLE_V) return 'IMPOSSIBLE';
   const i=clamp(Math.floor((v-1)/2),0,P.tiers.length-1);
   return P.tiers[i];
 }
 // a phrase for one part, given its score
-function partPhrase(pid,v){
-  const P=BODY_PARTS.find(p=>p.id===pid); if(!P) return '';
+function partPhrase(pid,v,male){
+  const P=(male?BODY_PARTS_M:BODY_PARTS).find(p=>p.id===pid); if(!P) return '';
   if(v>=IMPOSSIBLE_V){
-    return {bust:'a bust that should not be physically possible', booty:'an IMPOSSIBLE boot-y — it enters the room first',
-            waist:'a waist so tiny it defies anatomy', face:'a face no mortal has', hairq:'hair out of a myth',
-            legs:'legs that go on past reason'}[pid] || 'impossible';
+    return (male
+      ? {bust:'a chest that should not be physically possible', booty:'shoulders wider than the doorway itself',
+         waist:'a midriff carved out of marble', face:'a face no mortal has', hairq:'hair out of a myth',
+         legs:'legs like siege engines'}
+      : {bust:'a bust that should not be physically possible', booty:'an IMPOSSIBLE booty — it enters the room first',
+         waist:'a waist so tiny it defies anatomy', face:'a face no mortal has', hairq:'hair out of a myth',
+         legs:'legs that go on past reason'})[pid] || 'impossible';
   }
   if(v>=7) return pick(P.good);
   if(v<=3) return pick(P.bad);
@@ -940,16 +970,16 @@ function partPhrase(pid,v){
 }
 // the honest, specific summary a matchmaker would give
 function bodyBlurb(w){
-  const b=w.body||{}; const notes=[];
-  for(const P of BODY_PARTS){ const ph=partPhrase(P.id, b[P.id]===undefined?5:b[P.id]); if(ph) notes.push(ph); }
+  const b=w.body||{}; const notes=[], male=!!(w&&w.male);
+  for(const P of partsFor(w)){ const ph=partPhrase(P.id, b[P.id]===undefined?5:b[P.id], male); if(ph) notes.push(ph); }
   if(!notes.length) return 'nothing remarkable either way — an ordinary figure';
   return notes.slice(0,3).join('; ');
 }
 // the short named readout: "Bust BIG · Boot-y FAT · Waist TINY"
 function bodyTierLine(w){
-  const b=w.body||{};
-  return BODY_PARTS.map(P=>{ const v=b[P.id]===undefined?5:b[P.id];
-    const t=partTier(P.id,v), imp=v>=IMPOSSIBLE_V;
+  const b=w.body||{}, male=!!(w&&w.male);
+  return partsFor(w).map(P=>{ const v=b[P.id]===undefined?5:b[P.id];
+    const t=partTier(P.id,v,male), imp=v>=IMPOSSIBLE_V;
     return `<span style="color:${imp?'#ff7ae0':heatColor(v)}">${P.name} <b>${t}</b></span>`; }).join(' · ');
 }
 function rollBody(quality){
@@ -1146,7 +1176,7 @@ function drawBodyMap(cnv,w,view){
   for(let gx2=0;gx2<W2-140;gx2+=16){ c.beginPath(); c.moveTo(gx2,0); c.lineTo(gx2,H2-20); c.stroke(); }
   for(let gy2=0;gy2<H2-20;gy2+=16){ c.beginPath(); c.moveTo(0,gy2); c.lineTo(W2-140,gy2); c.stroke(); }
   // a soft aura behind the figure, brighter the finer she is
-  { const avg=BODY_PARTS.reduce((a,P)=>a+gv(P.id),0)/BODY_PARTS.length;
+  { const _ps=partsFor(w); const avg=_ps.reduce((a,P)=>a+gv(P.id),0)/_ps.length;
     const gg=c.createRadialGradient((W2-146)*0.5,H2*0.45,4,(W2-146)*0.5,H2*0.45,86);
     gg.addColorStop(0, heatColor(avg).replace('rgb','rgba').replace(')',',0.20)'));
     gg.addColorStop(1,'rgba(0,0,0,0)'); c.fillStyle=gg; c.fillRect(0,0,W2-140,H2-20); }
@@ -1165,7 +1195,45 @@ function drawBodyMap(cnv,w,view){
   const waistR= 9.4 - wa*0.72;                 // 8.7 thick → 2.2 TINY
   const legR  = 1.3 + lg*0.26;
   const headR = 4.2 + fa*0.16;
-  if(view==='front'){
+  const male=!!(w&&w.male);
+  if(male){
+    // ---- A MAN: shoulders and chest carry the silhouette, the waist narrows ----
+    const shW = 5.0 + be*0.80, chR = 3.4 + bu*0.62, wR = 8.4 - wa*0.44, lR = 1.9 + lg*0.24;
+    if(view==='front'){
+      ell(0,5,5.6+ha*0.20,6.8+ha*0.16, heatColor(ha));
+      ell(0,5,headR*0.84,headR, heatColor(fa));
+      cap(0,10.5,0,14,2.6,3.0, heatColor((fa+bu)/2));
+      cap(-shW,17,shW,17,3.6,3.6, heatColor(be));                          // the great shoulder yoke
+      ell(0,21,chR*1.5,chR*0.86, heatColor(bu));                           // chest slab
+      cap(0,24,0,32,shW*0.72,wR*0.62, heatColor(wa));                      // V down to the waist
+      ell(0,35,wR*0.72,4.4, heatColor(wa));
+      cap(-4.4,39,-4.6,54,lR,lR*0.76, heatColor(lg)); cap(4.4,39,4.6,54,lR,lR*0.76, heatColor(lg));
+      cap(-4.6,54,-4.6,66,lR*0.76,lR*0.58, heatColor(lg)); cap(4.6,54,4.6,66,lR*0.76,lR*0.58, heatColor(lg));
+      cap(-shW-1.4,19,-shW-2.6,33,2.5,2.0, heatColor(be)); cap(shW+1.4,19,shW+2.6,33,2.5,2.0, heatColor(be));
+    } else if(view==='side'){
+      ell(-2.2,5,5.4+ha*0.18,6.8+ha*0.16, heatColor(ha));
+      ell(0.6,5,headR*0.74,headR, heatColor(fa)); ell(headR*0.60,5.4,1.5,1.2, heatColor(fa));
+      cap(0,10.5,0,14,2.6,3.0, heatColor((fa+bu)/2));
+      ell(chR*0.52,20,chR*0.88,chR*0.92, heatColor(bu));                   // chest in profile
+      cap(0,17,0,32,3.8,wR*0.44, heatColor(wa));
+      ell(-shW*0.30,34,3.6,4.2, heatColor(be));
+      cap(0,39,0.4,54,lR*1.05,lR*0.78, heatColor(lg)); cap(0.4,54,0.6,66,lR*0.78,lR*0.6, heatColor(lg));
+      cap(1.8,19,2.8,33,2.4,1.9, heatColor(be));
+    } else {
+      ell(0,5,5.8+ha*0.22,7.2+ha*0.18, heatColor(ha));
+      cap(-shW,17,shW,17,3.8,3.8, heatColor(be));                          // the back, all shoulder
+      cap(0,22,0,32,shW*0.74,wR*0.60, heatColor(wa));
+      c.strokeStyle='rgba(0,0,0,.32)'; c.lineWidth=0.7; c.beginPath(); c.moveTo(0,19); c.lineTo(0,33); c.stroke();
+      ell(0,35,wR*0.74,4.6, heatColor(wa));
+      cap(-4.6,39,-4.8,54,lR,lR*0.76, heatColor(lg)); cap(4.6,39,4.8,54,lR,lR*0.76, heatColor(lg));
+      cap(-4.8,54,-4.8,66,lR*0.76,lR*0.58, heatColor(lg)); cap(4.8,54,4.8,66,lR*0.76,lR*0.58, heatColor(lg));
+      cap(-shW-1.4,19,-shW-2.6,33,2.5,2.0, heatColor(be)); cap(shW+1.4,19,shW+2.6,33,2.5,2.0, heatColor(be));
+    }
+    c.fillStyle='rgba(0,0,0,.30)'; c.beginPath(); c.ellipse(0,69,shW*0.9,2.4,0,0,7); c.fill();
+    c.fillStyle='#3a2a18';
+    if(view==='side') c.fillRect(-1.6,66,6,2.4); else { c.fillRect(-7,66,5,2.4); c.fillRect(2,66,5,2.4); }
+    c.restore();
+  } else if(view==='front'){
     ell(0,5,6.6+ha*0.30,8.0+ha*0.26, heatColor(ha));                       // hair behind
     ell(0,5,headR*0.86,headR, heatColor(fa));                              // face
     cap(0,10.5,0,13.5,1.8,2.2, heatColor((fa+bu)/2));                      // neck
@@ -1207,21 +1275,23 @@ function drawBodyMap(cnv,w,view){
     cap(-8.4,17,-9.8,31,2.0,1.6, heatColor((bu+wa)/2));
     cap( 8.4,17, 9.8,31,2.0,1.6, heatColor((bu+wa)/2));
   }
-  c.fillStyle='rgba(0,0,0,.30)'; c.beginPath(); c.ellipse(0,69,hipR*0.95,2.4,0,0,7); c.fill();   // she stands on something
-  c.fillStyle='#3a2a18';
-  if(view==='side'){ c.fillRect(-1.6,66,6,2.4); } else { c.fillRect(-hipR*0.40-2.4,66,4.8,2.4); c.fillRect(hipR*0.40-2.4,66,4.8,2.4); }
-  c.restore();
+  if(!male){
+    c.fillStyle='rgba(0,0,0,.30)'; c.beginPath(); c.ellipse(0,69,hipR*0.95,2.4,0,0,7); c.fill();   // she stands on something
+    c.fillStyle='#3a2a18';
+    if(view==='side'){ c.fillRect(-1.6,66,6,2.4); } else { c.fillRect(-hipR*0.40-2.4,66,4.8,2.4); c.fillRect(hipR*0.40-2.4,66,4.8,2.4); }
+    c.restore();
+  }
   // ---- the readout down the right, with each part's NAMED tier ----
   c.textAlign='left';
   const GUT=146;                                    // label gutter on the right
-  BODY_PARTS.forEach((P,i)=>{
+  partsFor(w).forEach((P,i)=>{
     const y=24+i*21, v=gv(P.id), isImp=v>=IMPOSSIBLE_V;
     c.fillStyle=isImp?'#ff7ae0':heatColor(v); c.fillRect(W2-GUT,y-9,11,11);
     c.strokeStyle='rgba(0,0,0,.6)'; c.lineWidth=1; c.strokeRect(W2-GUT,y-9,11,11);
     c.fillStyle='#efe3c2'; c.font='bold 9px Georgia,serif'; c.textAlign='left';
     c.fillText(P.name,W2-GUT+15,y);
     c.fillStyle=isImp?'#ff7ae0':heatColor(v); c.font='bold 9px Georgia,serif'; c.textAlign='right';
-    c.fillText(partTier(P.id,v).toUpperCase(),W2-8,y); c.textAlign='left';
+    c.fillText(partTier(P.id,v,male).toUpperCase(),W2-8,y); c.textAlign='left';
   });
   if(imp){ c.fillStyle='#ff7ae0'; c.font='bold 11px Georgia,serif'; c.textAlign='center';
     c.fillText('⛧ NOT PHYSICALLY POSSIBLE ⛧',W2/2,H2-26); c.textAlign='left'; }
@@ -1317,7 +1387,13 @@ function wifeLegacyAdvice(){
   return '💬 “Advice? NOW you ask. Fine — somewhere RICH, '+pick3[0]+' or '+pick3[1]+', so at least the coin makes up for the company. Bury it in Britannia and you’ll have earned the mud. That’s all you get from me today.”';
 }
 function wifeLegacyVerdict(){
-  const rel=G.wifeRel|0, w=G.wife, inf=legacyInfo(G.legacy.prov), home=legacyHomeProvince(w);
+  const rel=G.wifeRel|0, w=G.wife;
+  if(!w) return '💬 There is no one to ask.';
+  // no house planted yet — she has an opinion about THAT, too (this used to throw)
+  if(!G.legacy) return '💬 '+(rel>=70
+    ? '“A verdict on a house we have not built? Plant the legacy house first, my love — then I shall have plenty to say.”'
+    : '“You want my judgement on a house that does not exist. Build it, and I will tell you exactly what I think of it.”');
+  const inf=legacyInfo(G.legacy.prov), home=legacyHomeProvince(w);
   const good=inf.w>=4, homey=G.legacy.prov===home, bad=inf.w<=1;
   if(homey) return '💬 '+(rel>=70?'“You built it in '+G.legacy.prov+' — my own country. You listened. I could kiss you.”':'“'+G.legacy.prov+'. My people’s land. …A fair choice. Thank you.”');
   if(good) return '💬 '+(rel>=70?'“'+G.legacy.prov+' — rich, safe, and worthy of us. The children will thank you, and so do I. ♥”':'“'+G.legacy.prov+' is a shrewd seat. The coin flows and the neighbours are jealous. Good.”');
@@ -1388,7 +1464,7 @@ function freshCareer(name,origin,arch,social){
     jealousy:0, lastJealousDay:-9,                // WIFE JEALOUSY — neglect and wandering eyes have a price
     traits:[], flaws:[], looks:5, smarts:5,       // YOUR OWN blood (an heir inherits from both parents)
     // ---- THE DAUGHTER'S PATH: the courts, not the sand ----
-    advocate:false, oratory:1, casesWon:0, casesLost:0, renown:0, senate:false, royal:false, lastCaseDay:-9,
+    advocate:false, tutorialDone:false, oratory:1, casesWon:0, casesLost:0, renown:0, senate:false, royal:false, lastCaseDay:-9,
     // ---- THE LUDUS: drilled skills, lasting scars, a body that wears out ----
     skills:{footwork:0,guard:0,blade:0,wind:0,throwing:0}, scars:[], fatigue:0, lastTrainDay:-9,
     // ---- THE SON'S PATH: the legions instead of the sand ----
@@ -1467,7 +1543,7 @@ function elevateWife(rank){
   refreshStatbar(); saveQuiet(); openVilla();
 }
 // fill in any fields missing from older saves
-function migrate(g){ const d={honor:50,food:4,mount:0,slaves:0,hasVilla:false,boat:false,favor:0,soldiers:0,hidden:[],plotTier:0,emperor:false,approval:50,legions:0,rivals:0,retired:false,detachments:[],day:0,titles:{},clears:{},socialClass:'gladiator',army:{},armyGear:0,armyTrain:0,hasOrganizer:false,generals:[],wife:null,married:false,marryPrompted:false,children:[],pregnant:null,lastLoveDay:-9,injury:null,lastDebateDay:-9,office:0,path:null,parthia:50,parthiaPact:false,wifeRel:50,lastTalkDay:-9,isFemale:false,lineage:[],hygiene:70,wifePhys:45,hasPool:false,hasWardrobe:false,legacy:null,lastFeastDay:-9,loveDay:-1,loveQuick:0,loveLong:0,loveNight:0,loveVigil:0,venusUntil:-1,lastWashDay:-9,lastPoolDay:-9,lastWardrobeDay:-9,lastKidsDay:-9,lastBathDay:-9,pila:0,bow:null,bowsOwned:[],nemesis:null,trophies:[],nemesisCount:0,pendingDeath:false,ageBase:0,wonProvinceByFight:false,familyMan:false,infamy:0,gladiatrixStage:0,pardoned:false,lastNoteDay:-9,lastNoteReply:'',marryRolls:0,hasBodyMap:false,jealousy:0,lastJealousDay:-9,traits:[],flaws:[],looks:5,smarts:5,advocate:false,oratory:1,casesWon:0,casesLost:0,renown:0,senate:false,royal:false,lastCaseDay:-9,skills:{footwork:0,guard:0,blade:0,wind:0,throwing:0},scars:[],fatigue:0,lastTrainDay:-9,tribune:false,rank:0,campaigns:0,legionRep:0,lastCampaignDay:-9}; for(const k in d){ if(g[k]===undefined) g[k]=d[k]; } if(!g.current) g.current='Italia'; if(g.age===undefined) g.age=19+Math.floor(((g.day||0)-(g.ageBase||0))/36); return g; }
+function migrate(g){ const d={honor:50,food:4,mount:0,slaves:0,hasVilla:false,boat:false,favor:0,soldiers:0,hidden:[],plotTier:0,emperor:false,approval:50,legions:0,rivals:0,retired:false,detachments:[],day:0,titles:{},clears:{},socialClass:'gladiator',army:{},armyGear:0,armyTrain:0,hasOrganizer:false,generals:[],wife:null,married:false,marryPrompted:false,children:[],pregnant:null,lastLoveDay:-9,injury:null,lastDebateDay:-9,office:0,path:null,parthia:50,parthiaPact:false,wifeRel:50,lastTalkDay:-9,isFemale:false,lineage:[],hygiene:70,wifePhys:45,hasPool:false,hasWardrobe:false,legacy:null,lastFeastDay:-9,loveDay:-1,loveQuick:0,loveLong:0,loveNight:0,loveVigil:0,venusUntil:-1,lastWashDay:-9,lastPoolDay:-9,lastWardrobeDay:-9,lastKidsDay:-9,lastBathDay:-9,pila:0,bow:null,bowsOwned:[],nemesis:null,trophies:[],nemesisCount:0,pendingDeath:false,ageBase:0,wonProvinceByFight:false,familyMan:false,infamy:0,gladiatrixStage:0,pardoned:false,lastNoteDay:-9,lastNoteReply:'',marryRolls:0,hasBodyMap:false,jealousy:0,lastJealousDay:-9,traits:[],flaws:[],looks:5,smarts:5,advocate:false,tutorialDone:false,oratory:1,casesWon:0,casesLost:0,renown:0,senate:false,royal:false,lastCaseDay:-9,skills:{footwork:0,guard:0,blade:0,wind:0,throwing:0},scars:[],fatigue:0,lastTrainDay:-9,tribune:false,rank:0,campaigns:0,legionRep:0,lastCampaignDay:-9}; for(const k in d){ if(g[k]===undefined) g[k]=d[k]; } if(!g.current) g.current='Italia'; if(g.age===undefined) g.age=19+Math.floor(((g.day||0)-(g.ageBase||0))/36); return g; }
 function saveGame(){ try{ localStorage.setItem(SAVE_KEY, JSON.stringify(G)); toast('Saved.'); }catch(e){ toast('⚠ Could not save — browser storage is blocked or full.',3200); } }
 function hasSave(){ try{ return !!localStorage.getItem(SAVE_KEY); }catch(e){ return false; } }
 function loadGame(){ try{ G=migrate(JSON.parse(localStorage.getItem(SAVE_KEY))); return !!G; }catch(e){ return false; } }
@@ -3760,6 +3836,15 @@ function playArgument(id){
 function finishCase(){
   const c=CASE; CASE=null;
   const won=!!c.won;
+  if(c.tutorial){
+    G.tutorialDone=true; G.oratory=(G.oratory||1)+1;
+    saveQuiet();
+    toast(won
+      ? '🎓 Your tutor nods once — high praise. You have the shape of it: match the argument to the case. ORATORY '+G.oratory+'. The real Basilica is open to you now.'
+      : '🎓 “Adequate. You will lose better than most.” The lesson still counts — match the argument to the CASE, and your wits will show you which. ORATORY '+G.oratory+'. The Basilica is open to you now.',
+      7000);
+    openForum(); return;
+  }
   if(won){
     const fee=c.fee, ren=8+c.diff*6;
     G.coin+=fee; G.renown=(G.renown||0)+ren; G.casesWon=(G.casesWon||0)+1;
@@ -3786,6 +3871,17 @@ function advocateTitle(){
   const r=G.renown||0;
   return r>=25? 'ADVOCATE OF THE BASILICA' : r>=8? 'JUNIOR ADVOCATE' : 'UNKNOWN AT THE BAR';
 }
+// THE SCHOOL OF RHETORIC — a practice case with no stakes, so she learns the craft first
+function startTutorial(){
+  CASE={ t:{id:'tutorial', title:'THE SCHOOL OF RHETORIC — A PRACTICE DECLAMATION',
+      strong:['law','precedent'],
+      desc:'Your tutor sets the classic exercise: a farmer’s son claims the estate his father promised aloud but never wrote down. '+
+           'No one will hang on this; the only thing at stake is whether you learn.'},
+    diff:1, round:1, rounds:3, score:0, need:2, log:[], over:false, fee:0, tutorial:true };
+  state='case'; show('scr-case'); $('statbar').classList.remove('hide');
+  renderCase();
+  toast('🎓 THE SCHOOL OF RHETORIC — try each line of attack. Your WITS tell you which will land; matching the case is worth more than anything else. Nothing here can hurt you.',7000);
+}
 function openForum(){
   if(checkOldAgeDeath()) return;
   state='forum'; show('scr-forum'); $('statbar').classList.remove('hide'); refreshStatbar();
@@ -3799,9 +3895,18 @@ function openForum(){
      <div class="small muted">${G.royal?'You sit within the imperial house itself.':G.senate?'Reach 140 renown to enter the royal circle.':'Reach 60 renown for a seat in the Senate.'}</div>`;
   const b=$('forum-body'); b.innerHTML='';
   const cd=G.day-(G.lastCaseDay===undefined?-9:G.lastCaseDay);
+  if(!G.tutorialDone){
+    const tc=document.createElement('div'); tc.className='shopcard'; tc.style.borderColor='#6ac8e0';
+    tc.innerHTML=`<div><b style="color:#6ac8e0">🎓 THE SCHOOL OF RHETORIC</b> <span class="small muted">— before you stand before a real jury, learn the craft. A practice declamation with nothing at stake.</span></div>
+      <div class="small muted">You will meet all five lines of attack: cite the statute, cite a precedent, break the witness, move them to pity, and reach the jury quietly. Your <b>wits</b> tell you which fits the case — matching the case matters more than anything else.</div>`;
+    const tb=document.createElement('button'); tb.className='btn sm gold'; tb.textContent='🎓 BEGIN THE TRAINING CASE';
+    tb.onclick=()=>startTutorial(); tc.appendChild(tb); b.appendChild(tc);
+  }
   const card=document.createElement('div'); card.className='shopcard';
-  card.innerHTML=`<div><b style="color:var(--gold)">📜 TAKE A BRIEF</b> <span class="small muted">— argue a case before the jury. Your wits read the court; your oratory wins it.</span></div>`;
-  const bt=document.createElement('button'); bt.className='btn sm gold'; bt.textContent='⚖ ENTER THE BASILICA';
+  card.innerHTML=`<div><b style="color:var(--gold)">📜 TAKE A BRIEF</b> <span class="small muted">— argue a real case before the jury. Your wits read the court; your oratory wins it.</span></div>`;
+  const bt=document.createElement('button'); bt.className='btn sm gold';
+  bt.textContent = G.tutorialDone? '⚖ ENTER THE BASILICA' : '⚖ ENTER THE BASILICA (finish the school first)';
+  bt.disabled=!G.tutorialDone;
   bt.onclick=()=>{ G.lastCaseDay=G.day; startCase(); };
   card.appendChild(bt); b.appendChild(card);
   if(G.senate){
@@ -5942,7 +6047,8 @@ function succession(ch, path){
   if(!path){ if(fem) offerDaughterPath(ch); else offerSonPath(ch); return; }
   const prestige=legacyScore();                       // the legacy house's standing passes down
   G.lineage=G.lineage||[];
-  G.lineage.push({name:G.name, glory:G.glory, wins:G.wins, losses:G.losses, day:G.day, emperor:!!G.emperor});
+  G.lineage.push({name:G.name, glory:G.glory, wins:G.wins, losses:G.losses, day:G.day, emperor:!!G.emperor,
+    looks:G.looks, smarts:G.smarts, traits:(G.traits||[]).slice(), flaws:(G.flaws||[]).slice()});
   // the appointed son gives up his command to take the family name
   G.generals=(G.generals||[]).filter(g=>!(g.son && g.name===ch.name));
   G.children=G.children.filter(c=>c!==ch);
@@ -5968,7 +6074,7 @@ function succession(ch, path){
   G.rank=0; G.campaigns=0; G.lastCampaignDay=-9;
   G.legionRep = (path==='legion' && wasRoyal)? 20 : 0;      // a governor's son is already known to the legions
   G.skills={footwork:0,guard:0,blade:0,wind:0,throwing:0}; G.scars=[]; G.fatigue=0;
-  G.oratory=1; G.casesWon=0; G.casesLost=0; G.lastCaseDay=-9;
+  G.oratory=1; G.casesWon=0; G.casesLost=0; G.lastCaseDay=-9; G.tutorialDone=false;
   G.renown = wasRoyal? 20 : 0;              // a governor's daughter is already known in the Forum
   G.senate=false; G.royal=false;
   bumpStat('dynasties'); unlock('dynasty');
@@ -6077,6 +6183,55 @@ function checkMilRank(){
     toast('🦅 PROMOTED — you are raised to '+R.name+', '+R.desc+'. You now command '+fmt(R.men)+' men. (+8 honor)',5200);
     if(idx>=MIL_RANKS.length-1){ try{unlock('magister');}catch(e){} }
   }
+}
+// ---- THE FAMILY TREE: every generation, and the blood that flows through it ----
+function dnaBar(v,col){ let out=''; for(let i=1;i<=10;i++) out+=`<span style="display:inline-block;width:5px;height:8px;margin-right:1px;background:${i<=v?col:'#2f2418'}"></span>`; return out; }
+function personRow(name,sub,looks,smarts,traits,flaws,extra){
+  return `<div class="shopcard">
+    <div><b style="color:var(--gold)">${name}</b> <span class="small muted">${sub||''}</span></div>
+    <div class="small">🌹 ${dnaBar(looks===undefined?5:looks,'#e26a8a')} <b>${looks===undefined?'?':looks}</b>
+      &nbsp; 🧠 ${dnaBar(smarts===undefined?5:smarts,'#6ac8e0')} <b>${smarts===undefined?'?':smarts}</b></div>
+    <div class="small">${(traits&&traits.length)?traits.map(t=>`<span style="color:#7ad48a">${traitLabel(t)}</span>`).join(' · '):'<span class="muted">no gifts</span>'}
+      ${(flaws&&flaws.length)?' · '+flaws.map(t=>`<span style="color:#e0705b">${flawLabel(t)}</span>`).join(' · '):''}</div>
+    ${extra?`<div class="small muted">${extra}</div>`:''}</div>`;
+}
+function openTree(){
+  state='tree'; show('scr-tree'); $('statbar').classList.remove('hide'); refreshStatbar();
+  const b=$('tree-body'); b.innerHTML='';
+  const H=(t)=>{ const d=document.createElement('div'); d.className='small'; d.style.color='var(--gold)'; d.style.marginTop='6px'; d.innerHTML=t; b.appendChild(d); };
+  const add=(html)=>{ const d=document.createElement('div'); d.innerHTML=html; b.appendChild(d.firstElementChild); };
+  // ancestors
+  const lin=G.lineage||[];
+  if(lin.length){
+    H('⏳ THOSE WHO CAME BEFORE — '+lin.length+' generation'+(lin.length===1?'':'s'));
+    lin.forEach((a,i)=>add(personRow(a.name, '— generation '+(i+1)+(a.emperor?' · wore the purple':''), a.looks, a.smarts, a.traits, a.flaws,
+      `${a.wins||0} wins · ${a.losses||0} losses · ${fmt(a.glory||0)} glory`)));
+  } else H('⏳ You are the FIRST of your house. What follows begins with you.');
+  // you
+  H('👤 THE HEAD OF THE HOUSE');
+  const myPath = G.advocate? 'advocate of the Basilica' : G.tribune? 'of the legions' : 'of the sand';
+  add(personRow(G.name+(G.isFemale?' ♀':' ♂'), '— '+myPath+' · age '+(G.age||19), G.looks, G.smarts, G.traits, G.flaws,
+    `${G.wins||0} wins · ${G.losses||0} losses · ${fmt(G.glory||0)} glory${(G.scars||[]).length?' · '+G.scars.length+' scars':''}`));
+  // spouse
+  if(G.married && G.wife){
+    H('⚭ THE SPOUSE');
+    const w=G.wife, st=lookStage(w.looks===undefined?5:w.looks);
+    add(personRow(w.name, '— '+w.adj+' '+w.rank+' · '+(TIERS[w.tier]||TIERS.common).name, w.looks, w.smarts, w.traits, w.flaws,
+      `<span style="color:${st.col}">${st.name}</span> · ♥ ${G.wifeRel|0} · 🔥 ${(G.wifePhys===undefined?45:G.wifePhys)|0} · 💢 ${Math.round(G.jealousy||0)}`));
+  }
+  // children
+  const kids=G.children||[];
+  H('👶 THE NEXT GENERATION — '+kids.length+' child'+(kids.length===1?'':'ren'));
+  if(!kids.length){ const d=document.createElement('div'); d.className='small muted'; d.textContent='No children yet. The bedchamber is where dynasties are actually built.'; b.appendChild(d); }
+  kids.forEach(c=>{
+    const age=Math.floor((G.day-(c.born||0))/3);
+    add(personRow(c.name+(c.sex==='m'?' ♂':' ♀'), '— '+age+' months old'+(c.wed?' · wed abroad':'')+(c.kids?' · '+c.kids+' of their own':''),
+      c.looks, c.smarts, c.traits, c.flaws,
+      // show which parent each gift came from — the DNA actually flowing
+      (()=>{ const mine=G.traits||[], theirs=(G.wife&&G.wife.traits)||[];
+        const src=(c.traits||[]).map(t=> mine.includes(t)&&theirs.includes(t)?traitLabel(t)+' (both)' : mine.includes(t)?traitLabel(t)+' (you)' : theirs.includes(t)?traitLabel(t)+' (spouse)' : traitLabel(t)+' (new)');
+        return src.length? 'inherited: '+src.join(', ') : 'no gifts inherited'; })()));
+  });
 }
 // the fork in the road for an heir
 function offerSonPath(ch){
@@ -6459,23 +6614,66 @@ function buildMarriageCard(b){
     const qrow=document.createElement('div'); qrow.className='row gap6'; qrow.style.display='none'; qrow.style.marginTop='4px';
     talk.onclick=()=>{ qrow.style.display = qrow.style.display==='none'?'flex':'none'; };
     const q=(label,title,dis,fn)=>{ const bq=document.createElement('button'); bq.className='btn sm'; bq.textContent=label; bq.title=title||''; bq.disabled=!!dis; bq.onclick=fn; qrow.appendChild(bq); };
-    q(tcd<1?'💬 (you spoke today)':'💬 “How was your day?”','Listen. Actually listen.',tcd<1,()=>{
-      G.lastTalkDay=G.day;
+    // ---- FOUR KINDS OF CONVERSATION, each with its own reactions ----
+    const talkDone=(txt,gain,ease)=>{ G.lastTalkDay=G.day;
+      G.wifeRel=clamp(G.wifeRel+gain,0,100); if(ease) easeJealousy(ease);
+      toast(txt+(gain>0?' (+'+gain+' ♥)':gain<0?' ('+gain+' ♥)':''),3200);
+      refreshStatbar(); saveQuiet(); openVilla(); };
+    const S1=w.male?'He':'She', s1=w.male?'he':'she', hisher=w.male?'his':'her';
+    // 1 ── NORMAL: the ordinary business of a marriage
+    q(tcd<1?'💬 (you spoke today)':'💬 NORMAL TALK','The day, the house, the children. The unglamorous glue of a marriage.',tcd<1,()=>{
       const lines=[
-        ['She retells your last bout blow-by-blow — she was watching closer than you knew.',4],
-        ['You gossip about the senators. Her impression of the fat one is merciless.',3],
-        ['She oils and mends your gear herself, humming an old song of '+w.adj+' hills.',4],
+        [S1+' retells your last bout blow-by-blow — '+s1+' was watching closer than you knew.',4],
+        ['You gossip about the senators. '+S1+'r impression of the fat one is merciless.'.replace('Her r','He'),3],
+        [S1+' oils and mends your gear, humming an old song of '+w.adj+' hills.',4],
         ['You talk of the children you will raise, and the villa you will grow old in.',5],
-        ['She names every scar on your arms, and kisses the newest one.',5]];
-      const pickL=lines[ri(0,lines.length-1)];
-      G.wifeRel=clamp(G.wifeRel+pickL[1],0,100); easeJealousy(6); toast('💬 '+pickL[0]+' (+'+pickL[1]+' ♥)',2800);
-      refreshStatbar(); saveQuiet(); openVilla();
+        [S1+' names every scar on your arms, and kisses the newest one.',5]];
+      if(hasTrait('literate')) lines.push([S1+' reads you Greek verse until you fall asleep on '+hisher+' shoulder.',6]);
+      if(hasFlaw('shrill')) lines.push(['The conversation becomes a list of your failings, delivered at volume.',-2]);
+      if((G.children||[]).length) lines.push(['You talk of nothing but the children for an hour, and neither of you minds.',5]);
+      const L=pick(lines); talkDone('💬 '+L[0],L[1],6);
     });
-    q(tcd<1?'🌹 (you spoke today)':'🌹 “You look beautiful tonight.”','Flattery: the oldest weapon in the house.',tcd<1,()=>{
-      G.lastTalkDay=G.day;
-      if(rel<25){ G.wifeRel=clamp(G.wifeRel+1,0,100); toast('🌹 One raised eyebrow: “What do you want.” (+1 ♥)',2600); }
-      else { G.wifeRel=clamp(G.wifeRel+3,0,100); toast('🌹 '+(w.male?'He grins like a recruit.':'She hides a smile behind her cup — badly.')+' (+3 ♥)',2600); }
-      refreshStatbar(); saveQuiet(); openVilla();
+    // 2 ── FINANCIAL: coin, the estate, the will
+    q(tcd<1?'🪙 (you spoke today)':'🪙 FINANCIAL TALK','The accounts, the estate, the dowry, the will. Some spouses are very good at this.',tcd<1,()=>{
+      const thrifty=hasTrait('thrifty'), smartW=hasTrait('smart'), spend=hasFlaw('spendthrift'), dim=hasFlaw('dim');
+      if(spend){ const c=ri(60,180); G.coin=Math.max(0,G.coin-c);
+        return talkDone('🪙 You raise the accounts. '+S1+' raises a new order of Tyrian silk. You lose '+c+'d and the argument.',-1,0); }
+      if(thrifty){ const gain=ri(120,300); G.coin+=gain;
+        return talkDone('🪙 '+S1+' walks you through the ledgers line by line and finds '+gain+'d you were being cheated of. You feel foolish and rich.',4,4); }
+      if(smartW){ G.tradeBoost=true; const gain=ri(80,190); G.coin+=gain;
+        return talkDone('🪙 '+S1+' proposes a shrewd arrangement with a grain factor. It nets +'+gain+'d before the month is out.',4,4); }
+      if(dim) return talkDone('🪙 You explain the estate’s accounts twice. '+S1+' nods warmly at all the wrong moments.',1,3);
+      const gain=ri(30,90); G.coin+=gain;
+      return talkDone('🪙 You go through the accounts together over wine. Dull, useful, oddly companionable. (+'+gain+'d)',3,5);
+    });
+    // 3 ── SPICY: flirtation, and it can absolutely misfire
+    q(tcd<1?'😏 (you spoke today)':'😏 SPICY TALK','Flirt. Read the room first — this one can go badly.',tcd<1,()=>{
+      const jl=jealousyLevel(), phys=(G.wifePhys===undefined?45:G.wifePhys), hy=(G.hygiene|0);
+      if(jl>=3) return talkDone('😏 You try something suggestive. '+S1+' looks at you like a magistrate at a forged will. “Not TONIGHT.”',-2,0);
+      if(hy<30) return talkDone('😏 You lean in close. '+S1+' leans further back. “Bathe. Then say that again.”',0,0);
+      if(hasFlaw('cold')) return talkDone('😏 Your best line lands on '+hisher+' like rain on marble. “Mm,” '+s1+' says, and returns to the ledger.',0,0);
+      if(rel>=75 && phys>=60){ G.wifePhys=clamp(phys+4,0,100);
+        return talkDone('😏🔥 One murmured line and '+s1+' has already dismissed the household staff for the evening.',5,10); }
+      if(rel>=40) return talkDone('😏 '+S1+' laughs, calls you shameless, and does not move away.',4,8);
+      return talkDone('😏 “Charming.” '+S1+' is not yet charmed. Build the heart first.',1,2);
+    });
+    // 4 ── BODY TALK: compliment what she actually HAS. Specific praise lands; generic doesn't.
+    q(tcd<1?'💃 (you spoke today)':'💃 BODY TALK','Compliment '+hisher+' figure — and be SPECIFIC. The chart does not lie, and neither should you.',tcd<1,()=>{
+      const B=w.body||{}, male=!!w.male;
+      const best=partsFor(w).slice().sort((x,y)=>(B[y.id]===undefined?5:B[y.id])-(B[x.id]===undefined?5:B[x.id]))[0];
+      const worst=partsFor(w).slice().sort((x,y)=>(B[x.id]===undefined?5:B[x.id])-(B[y.id]===undefined?5:B[y.id]))[0];
+      const bv=B[best.id]===undefined?5:B[best.id], wv=B[worst.id]===undefined?5:B[worst.id];
+      const bTier=partTier(best.id,bv,male);
+      if(!G.hasBodyMap && Math.random()<0.45){
+        // no chart? you're guessing — and you can guess wrong
+        return talkDone('💃 You compliment '+hisher+' '+worst.name.toLowerCase()+'. It is, in fact, '+partTier(worst.id,wv,male).toUpperCase()+'. A long silence follows. (buy the BODY MAP so you know what you are praising)',-2,0);
+      }
+      if(bv>=IMPOSSIBLE_V) return talkDone('💃 You tell '+hisher+' the truth: nothing about '+hisher+' '+best.name.toLowerCase()+' should be physically possible. '+S1+' agrees, smugly.',7,12);
+      if(bv>=8){ G.wifePhys=clamp((G.wifePhys===undefined?45:G.wifePhys)+3,0,100);
+        return talkDone('💃 You praise '+hisher+' '+best.name.toLowerCase()+' — '+bTier.toUpperCase()+' — in specific, unmistakable detail. '+S1+' pretends to be scandalised and is not.',6,12); }
+      if(bv>=5) return talkDone('💃 You say '+hisher+' '+best.name.toLowerCase()+' is '+bTier.toLowerCase()+'. Honest, and warmly received.',4,8);
+      if(hasFlaw('cold')) return talkDone('💃 You compliment '+hisher+' figure. “I know what I look like,” '+s1+' says, evenly.',0,0);
+      return talkDone('💃 You reach for a compliment about '+hisher+' figure and find only kind vagueness. '+S1+' notices the effort, at least.',2,4);
     });
     q('🎁 A gift from the forum (50d)','A silver comb, Tyrian ribbon, honeyed figs — 50 denarii of pure strategy.',G.coin<50,()=>{
       G.coin-=50; G.wifeRel=clamp(G.wifeRel+8,0,100); easeJealousy(14);
@@ -6675,6 +6873,8 @@ $('btn-circus-back').onclick=()=>enterMap();
 $('btn-cheats').onclick=()=>openCheats();
 $('btn-cheats-back').onclick=()=>enterMap();
 $('btn-ludus-back').onclick=()=>enterMap();
+$('btn-tree').onclick=()=>openTree();
+$('btn-tree-back').onclick=()=>enterMap();
 $('btn-legion').onclick=()=>openLegion();
 $('btn-legion-back').onclick=()=>enterMap();
 $('btn-bodymap-back').onclick=()=>{ if(bodyMapBack==='villa') openVilla(); else openMarry(marryForced); };
@@ -8126,7 +8326,7 @@ window.__SS = {
   openNote, sendNote, craftWifeReply, noteBaseTier, setNoteInput:(t)=>{ const el=document.getElementById('note-input'); if(el) el.value=t; },
   checkFamilyMan, gladiatrixAfterWin,
   openCircus, startRace, finishRace, get RC(){return RC;}, updateRace, drawRace,
-  openForum, startCase, playArgument, finishCase, get CASE(){return CASE;}, checkAdvocateRank,
+  openForum, openTree, startCase, startTutorial, playArgument, finishCase, partsFor, partTier, get CASE(){return CASE;}, checkAdvocateRank,
   offerDaughterPath, inheritDNA, rollTraits, hasTrait,
   openCheats, openBodyMap, drawBodyMap, lookStage, drawWifeFigTest:drawWifeFig, trainScreen, openLegion, runCampaign, milRank, checkMilRank, makeWound, rollFlaws, traitsHtml, offerSonPath, bodyBlurb, rollBody, heatColor, drawBridePortraitTest:drawBridePortrait, makeImpossibleBody, partTier, bodyTierLine, get marryList(){return marryList;}, set marryList(v){ marryList=v; },
   openMarry, marry, rollBrides, makeBride, get marryList(){return marryList;},
