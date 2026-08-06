@@ -341,6 +341,7 @@
     <div class="panel pad col center gap" style="width:min(94%,620px);max-height:95%;">
       <h2 style="color:var(--gold)" id="bodymap-title">🗺 BODY MAP</h2>
       <div id="bodymap-verdict" class="small" style="text-align:center"></div>
+      <div id="bodymap-views" class="row gap6" style="justify-content:center"></div>
       <canvas id="bodymap-cv" width="440" height="260" style="position:static;width:min(94%,440px);height:auto;image-rendering:auto;border:2px solid var(--gold);border-radius:4px;"></canvas>
       <div class="small muted" style="text-align:center">Pale pink is poorest · deep purple is finest. The chart never flatters.</div>
       <button class="btn gold" id="btn-bodymap-back">◀ BACK</button>
@@ -876,20 +877,41 @@ const LOOK_STAGES=[
   {min:7, name:'GOOD LOOKING',  col:'#e8688a', blurb:'genuinely beautiful — men lose their words'},
   {min:9, name:'ABSOLUTE FIRE', col:'#e0407a', blurb:'the kind of beauty poets ruin themselves over'},
   {min:10,name:'SPICY (MAX)',   col:'#a83ad0', blurb:'a face and figure the sculptors will copy for centuries'},
+  {min:11,name:'⛧ IMPOSSIBLE',  col:'#ff7ae0', blurb:'NOT PHYSICALLY POSSIBLE — huge up top, huge behind, a waist like a wasp. The gods themselves stare.'},
 ];
 function lookStage(v){ let s=LOOK_STAGES[0]; for(const st of LOOK_STAGES) if(v>=st.min) s=st; return s; }
-// ---- the parts that make up the whole ----
+// ---- the parts that make up the whole. Each has its OWN named ladder, so a
+//      score is never vague: a 2 bust is FLAT, an 8 is BIG, an 11 is IMPOSSIBLE.
 const BODY_PARTS=[
-  {id:'face',   name:'Face',    good:['a face like a temple statue','striking, clean-featured','lovely, open-faced'], bad:['a plain, forgettable face','sharp and sour-featured']},
-  {id:'hairq',  name:'Hair',    good:['heavy, glossy hair to the waist','thick dark hair worth a poem'],            bad:['thin, dull hair','lank hair she keeps covered']},
-  {id:'bust',   name:'Bust',    good:['CURVY UP TOP — generously built','full and high-set','a very fine bust'],     bad:['flat through the chest','slight up top']},
-  {id:'waist',  name:'Waist',   good:['a waist you could ring with your hands','cinched, hourglass-tight'],          bad:['thick through the middle','no waist to speak of']},
-  {id:'behind', name:'Behind',  good:['a GOOD BEHIND — round and high','famously good from behind','heavy-hipped and round'], bad:['a BAD BEHIND — flat as a board','nothing behind at all']},
-  {id:'legs',   name:'Legs',    good:['long, strong dancer’s legs','fine legs, well turned'],                        bad:['short, heavy legs','thin, knock-kneed legs']},
+  {id:'face',   name:'Face',   tiers:['Plain','Fair','Pretty','Lovely','Stunning'],
+   good:['a face like a temple statue','striking, clean-featured','lovely, open-faced'], bad:['a plain, forgettable face','sharp and sour-featured']},
+  {id:'hairq',  name:'Hair',   tiers:['Thin','Plain','Full','Glossy','Magnificent'],
+   good:['heavy, glossy hair to the waist','thick dark hair worth a poem'],            bad:['thin, dull hair','lank hair she keeps covered']},
+  {id:'bust',   name:'Bust',   tiers:['Flat','Raised','Good','Big','Huge'],
+   good:['CURVY UP TOP — generously built','full and high-set','a very fine bust'],     bad:['FLAT through the chest','barely raised up top']},
+  {id:'waist',  name:'Waist',  tiers:['Thick','Plain','Trim','Slim','TINY'], invert:true,
+   good:['a TINY waist you could ring with your hands','cinched, hourglass-tight'],     bad:['THICK through the middle','no waist to speak of']},
+  {id:'booty',  name:'Boot-y', tiers:['Flat','Raised','Elevated','Fat','Colossal'],
+   good:['a FAT boot-y — round, high and heavy','ELEVATED and unmissable from behind','famously good from behind'], bad:['a FLAT boot-y — nothing there at all','barely raised behind']},
+  {id:'legs',   name:'Legs',   tiers:['Short','Plain','Shapely','Long','Statuesque'],
+   good:['long, strong dancer’s legs','fine legs, well turned'],                        bad:['short, heavy legs','thin, knock-kneed legs']},
 ];
-// a phrase for one part, given its 1-10 score
+const IMPOSSIBLE_V=11;                       // beyond the human scale — cheats only
+// the NAMED tier for one part at one score
+function partTier(pid,v){
+  const P=BODY_PARTS.find(p=>p.id===pid); if(!P) return '';
+  if(v>=IMPOSSIBLE_V) return 'IMPOSSIBLE';
+  const i=clamp(Math.floor((v-1)/2),0,P.tiers.length-1);
+  return P.tiers[i];
+}
+// a phrase for one part, given its score
 function partPhrase(pid,v){
   const P=BODY_PARTS.find(p=>p.id===pid); if(!P) return '';
+  if(v>=IMPOSSIBLE_V){
+    return {bust:'a bust that should not be physically possible', booty:'an IMPOSSIBLE boot-y — it enters the room first',
+            waist:'a waist so tiny it defies anatomy', face:'a face no mortal has', hairq:'hair out of a myth',
+            legs:'legs that go on past reason'}[pid] || 'impossible';
+  }
   if(v>=7) return pick(P.good);
   if(v<=3) return pick(P.bad);
   return null;                                    // middling parts aren't worth remarking on
@@ -901,10 +923,21 @@ function bodyBlurb(w){
   if(!notes.length) return 'nothing remarkable either way — an ordinary figure';
   return notes.slice(0,3).join('; ');
 }
+// the short named readout: "Bust BIG · Boot-y FAT · Waist TINY"
+function bodyTierLine(w){
+  const b=w.body||{};
+  return BODY_PARTS.map(P=>{ const v=b[P.id]===undefined?5:b[P.id];
+    const t=partTier(P.id,v), imp=v>=IMPOSSIBLE_V;
+    return `<span style="color:${imp?'#ff7ae0':heatColor(v)}">${P.name} <b>${t}</b></span>`; }).join(' · ');
+}
 function rollBody(quality){
   const b={};
   for(const P of BODY_PARTS) b[P.id]=clamp(Math.round(quality + rnd(-2.6,2.6)),1,10);
   return b;
+}
+// THE IMPOSSIBLE — every measure past the human maximum. Cheats only.
+function makeImpossibleBody(){
+  const b={}; for(const P of BODY_PARTS) b[P.id]=IMPOSSIBLE_V; return b;
 }
 const WIFE_TRAITS=[
   {id:'smart',    name:'Smart',      icon:'🧠', min:6, desc:'A quick, ordered mind — her children argue like advocates.'},
@@ -922,6 +955,7 @@ const TIERS={
   rich:    {name:'RICH',              icon:'💰', col:'#e8c34a', mult:2.2, desc:'a wealthy merchant house'},
   elite:   {name:'ELITE',             icon:'🏛', col:'#c89af0', mult:4,   desc:'a great senatorial family'},
   imperial:{name:'EMPEROR’S DAUGHTER',icon:'👑', col:'#ff8ad0', mult:9,   desc:'the imperial house itself'},
+  impossible:{name:'IMPOSSIBLE',    icon:'⛧', col:'#ff7ae0', mult:20,  desc:'a being that should not exist (cheats only)'},
 };
 function tierBadge(t){ const T=TIERS[t]||TIERS.common;
   return `<span class="pill" style="border-color:${T.col};color:${T.col};font-size:10px">${T.icon} ${T.name}</span>`; }
@@ -1039,68 +1073,108 @@ function heatColor(v){
   const c=k=>Math.round(a[k]+(b[k]-a[k])*frac);
   return `rgb(${c(0)},${c(1)},${c(2)})`;
 }
-function drawBodyMap(cnv,w){
-  const c=cnv.getContext('2d'); c.imageSmoothingEnabled=false;
+function drawBodyMap(cnv,w,view){
+  view=view||'front';
+  const c=cnv.getContext('2d'); c.imageSmoothingEnabled=true;
   const W2=cnv.width, H2=cnv.height;
   const g=c.createLinearGradient(0,0,0,H2); g.addColorStop(0,'#241a2e'); g.addColorStop(1,'#120a18');
   c.fillStyle=g; c.fillRect(0,0,W2,H2);
   const b=w.body||{}, gv=id=>b[id]===undefined?5:b[id];
-  c.save(); c.translate(W2*0.34,14); const s=Math.min(W2/150,H2/170)*1.45; c.scale(s,s);
-  const ell=(x,y,rx,ry,col)=>{ c.fillStyle=col; c.beginPath(); c.ellipse(x,y,rx,ry,0,0,7); c.fill();
-    c.strokeStyle='rgba(0,0,0,.4)'; c.lineWidth=0.5; c.stroke(); };
-  const cap=(x1,y1,x2,y2,r1,r2,col)=>{ c.fillStyle=col; const a=Math.atan2(y2-y1,x2-x1);
-    c.beginPath(); c.arc(x1,y1,r1,a+1.5708,a-1.5708); c.arc(x2,y2,r2,a-1.5708,a+1.5708); c.closePath(); c.fill();
-    c.strokeStyle='rgba(0,0,0,.4)'; c.lineWidth=0.5; c.stroke(); };
-  // scores also SHAPE the figure — a fine bust/behind/waist visibly reads as one
-  const bu=gv('bust'), wa=gv('waist'), be=gv('behind'), lg=gv('legs'), fa=gv('face'), ha=gv('hairq');
-  const bustR=3.6+bu*0.42, hipR=5.2+be*0.46, waistR=6.4-wa*0.30, legR=2.1+lg*0.16;
-  // hair falls behind the head and shoulders
-  ell(0,5,7.2+ha*0.22,8.4+ha*0.20, heatColor(ha));
-  // face
-  ell(0,5,4.9,5.9, heatColor(fa));
-  // neck
-  cap(0,10.5,0,13.5,1.8,2.2, heatColor((fa+bu)/2));
-  // shoulders + bust
-  cap(-6.6,16,6.6,16,3.0,3.0, heatColor((bu+wa)/2));
-  ell(-bustR*0.62,18.4,bustR,bustR*0.86, heatColor(bu));
-  ell( bustR*0.62,18.4,bustR,bustR*0.86, heatColor(bu));
-  // torso tapering to the waist
-  cap(0,20,0,29,7.4,waistR, heatColor(wa));
-  // hips / behind
-  ell(0,34,hipR,hipR*0.74, heatColor(be));
-  // legs
-  cap(-hipR*0.44,38,-hipR*0.40,54,legR,legR*0.72, heatColor(lg));
-  cap( hipR*0.44,38, hipR*0.40,54,legR,legR*0.72, heatColor(lg));
-  cap(-hipR*0.40,54,-hipR*0.38,66,legR*0.72,legR*0.55, heatColor(lg));
-  cap( hipR*0.40,54, hipR*0.38,66,legR*0.72,legR*0.55, heatColor(lg));
-  c.fillStyle='#3a2a18'; c.fillRect(-hipR*0.40-2.4,66,4.8,2.4); c.fillRect(hipR*0.40-2.4,66,4.8,2.4);
-  // arms
-  cap(-8.2,17,-9.4,30,2.0,1.6, heatColor((bu+wa)/2));
-  cap( 8.2,17, 9.4,30,2.0,1.6, heatColor((bu+wa)/2));
+  const bu=gv('bust'), wa=gv('waist'), be=gv('booty'), lg=gv('legs'), fa=gv('face'), ha=gv('hairq');
+  const imp = BODY_PARTS.some(P=>gv(P.id)>=IMPOSSIBLE_V);
+  c.save(); c.translate((W2-146)*0.5,14); const s=Math.min(W2/150,H2/172)*1.5; c.scale(s,s);
+  const ell=(x,y,rx,ry,col,rot)=>{ c.fillStyle=col; c.beginPath(); c.ellipse(x,y,Math.max(0.4,rx),Math.max(0.4,ry),rot||0,0,7); c.fill();
+    c.strokeStyle='rgba(0,0,0,.42)'; c.lineWidth=0.5; c.stroke(); };
+  const cap=(x1,y1,x2,y2,r1,r2,col)=>{ c.fillStyle=col; const a2=Math.atan2(y2-y1,x2-x1);
+    c.beginPath(); c.arc(x1,y1,Math.max(0.4,r1),a2+1.5708,a2-1.5708); c.arc(x2,y2,Math.max(0.4,r2),a2-1.5708,a2+1.5708); c.closePath(); c.fill();
+    c.strokeStyle='rgba(0,0,0,.42)'; c.lineWidth=0.5; c.stroke(); };
+  // every score physically shapes the figure — a FLAT 1 really is flat, an IMPOSSIBLE 11 is absurd
+  const bustR = 1.6 + bu*0.62;                 // 2.2 at flat → 8.4 at huge → 8.4+ impossible
+  const hipR  = 3.2 + be*0.62;
+  const waistR= 8.2 - wa*0.52;                 // high waist score = TINY waist
+  const legR  = 1.7 + lg*0.19;
+  const headR = 4.4 + fa*0.14;
+  if(view==='front'){
+    ell(0,5,6.6+ha*0.30,8.0+ha*0.26, heatColor(ha));                       // hair behind
+    ell(0,5,headR*0.86,headR, heatColor(fa));                              // face
+    cap(0,10.5,0,13.5,1.8,2.2, heatColor((fa+bu)/2));                      // neck
+    cap(-6.6,16,6.6,16,3.0,3.0, heatColor((bu+wa)/2));                     // shoulders
+    ell(-bustR*0.58,18.6,bustR,bustR*0.84, heatColor(bu));                 // bust, both sides
+    ell( bustR*0.58,18.6,bustR,bustR*0.84, heatColor(bu));
+    cap(0,21,0,29,7.6,waistR, heatColor(wa));                              // torso → waist
+    ell(0,34,hipR,hipR*0.72, heatColor(be));                               // hips
+    cap(-hipR*0.42,38,-hipR*0.38,54,legR,legR*0.72, heatColor(lg));        // legs
+    cap( hipR*0.42,38, hipR*0.38,54,legR,legR*0.72, heatColor(lg));
+    cap(-hipR*0.38,54,-hipR*0.36,66,legR*0.72,legR*0.54, heatColor(lg));
+    cap( hipR*0.38,54, hipR*0.36,66,legR*0.72,legR*0.54, heatColor(lg));
+    cap(-8.2,17,-9.6,31,2.0,1.6, heatColor((bu+wa)/2));                    // arms
+    cap( 8.2,17, 9.6,31,2.0,1.6, heatColor((bu+wa)/2));
+  } else if(view==='side'){
+    // PROFILE — bust juts forward (+x), boot-y juts back (−x). The silhouette tells the whole story.
+    ell(-2.4,5,6.2+ha*0.26,8.0+ha*0.24, heatColor(ha));                    // hair falls down the back
+    ell(0.6,5,headR*0.76,headR, heatColor(fa));                            // profile of the face
+    ell(headR*0.62,5.4,1.5,1.2, heatColor(fa));                            // nose
+    cap(0,10.5,0,13.5,1.9,2.2, heatColor((fa+bu)/2));                      // neck
+    cap(0,16,0,29,3.4,waistR*0.52, heatColor(wa));                         // the trunk seen edge-on
+    ell(bustR*0.72,18.8,bustR*0.94,bustR*0.74, heatColor(bu), -0.25);      // BUST thrust forward
+    ell(-hipR*0.80,33.5,hipR*0.96,hipR*0.76, heatColor(be), 0.22);         // BOOT-Y thrust back
+    ell(0,34,hipR*0.60,hipR*0.66, heatColor(be));                          // hip mass
+    cap(0,38,0.4,54,legR*1.05,legR*0.74, heatColor(lg));                   // leg (profile)
+    cap(0.4,54,0.6,66,legR*0.74,legR*0.56, heatColor(lg));
+    cap(1.6,17,2.6,31,1.9,1.5, heatColor((bu+wa)/2));                      // near arm
+  } else {                                                                  // BACK view
+    ell(0,6,6.8+ha*0.34,9.4+ha*0.30, heatColor(ha));                       // the fall of hair dominates
+    cap(-6.8,16,6.8,16,3.1,3.1, heatColor((bu+wa)/2));                     // shoulders/back
+    cap(0,20,0,29,7.4,waistR, heatColor(wa));                              // back tapering to the waist
+    ell(-hipR*0.52,34,hipR*0.72,hipR*0.80, heatColor(be));                 // BOOT-Y — two full curves
+    ell( hipR*0.52,34,hipR*0.72,hipR*0.80, heatColor(be));
+    c.strokeStyle='rgba(0,0,0,.35)'; c.lineWidth=0.7; c.beginPath(); c.moveTo(0,29); c.lineTo(0,40); c.stroke();
+    cap(-hipR*0.44,40,-hipR*0.40,54,legR,legR*0.72, heatColor(lg));
+    cap( hipR*0.44,40, hipR*0.40,54,legR,legR*0.72, heatColor(lg));
+    cap(-hipR*0.40,54,-hipR*0.38,66,legR*0.72,legR*0.54, heatColor(lg));
+    cap( hipR*0.40,54, hipR*0.38,66,legR*0.72,legR*0.54, heatColor(lg));
+    cap(-8.4,17,-9.8,31,2.0,1.6, heatColor((bu+wa)/2));
+    cap( 8.4,17, 9.8,31,2.0,1.6, heatColor((bu+wa)/2));
+  }
+  c.fillStyle='#3a2a18';
+  if(view==='side'){ c.fillRect(-1.6,66,6,2.4); } else { c.fillRect(-hipR*0.40-2.4,66,4.8,2.4); c.fillRect(hipR*0.40-2.4,66,4.8,2.4); }
   c.restore();
-  // labels down the right-hand side
-  c.textAlign='left'; c.font='bold 10px Georgia,serif';
+  // ---- the readout down the right, with each part's NAMED tier ----
+  c.textAlign='left';
+  const GUT=146;                                    // label gutter on the right
   BODY_PARTS.forEach((P,i)=>{
-    const y=18+i*20, v=gv(P.id);
-    c.fillStyle=heatColor(v); c.fillRect(W2-92,y-8,12,12);
-    c.strokeStyle='rgba(0,0,0,.6)'; c.lineWidth=1; c.strokeRect(W2-92,y-8,12,12);
-    c.fillStyle='#efe3c2'; c.fillText(P.name,W2-76,y+1);
-    c.fillStyle=heatColor(v); c.font='bold 11px Georgia,serif'; c.fillText(String(v),W2-22,y+1);
-    c.font='bold 10px Georgia,serif';
+    const y=24+i*21, v=gv(P.id), isImp=v>=IMPOSSIBLE_V;
+    c.fillStyle=isImp?'#ff7ae0':heatColor(v); c.fillRect(W2-GUT,y-9,11,11);
+    c.strokeStyle='rgba(0,0,0,.6)'; c.lineWidth=1; c.strokeRect(W2-GUT,y-9,11,11);
+    c.fillStyle='#efe3c2'; c.font='bold 9px Georgia,serif'; c.textAlign='left';
+    c.fillText(P.name,W2-GUT+15,y);
+    c.fillStyle=isImp?'#ff7ae0':heatColor(v); c.font='bold 9px Georgia,serif'; c.textAlign='right';
+    c.fillText(partTier(P.id,v).toUpperCase(),W2-8,y); c.textAlign='left';
   });
+  if(imp){ c.fillStyle='#ff7ae0'; c.font='bold 11px Georgia,serif'; c.textAlign='center';
+    c.fillText('⛧ NOT PHYSICALLY POSSIBLE ⛧',W2/2,H2-26); c.textAlign='left'; }
   // the scale
   c.fillStyle='#efe3c2'; c.font='bold 9px Georgia,serif'; c.textAlign='left';
   c.fillText('LEAST',6,H2-16); c.textAlign='right'; c.fillText('FINEST',W2-6,H2-16); c.textAlign='left';
   for(let i=0;i<10;i++){ c.fillStyle=heatColor(i+1); c.fillRect(6+i*((W2-12)/10),H2-12,(W2-12)/10,7); }
 }
+let bodyMapView='front';
 function openBodyMap(w,back){
   bodyMapSubject=w; bodyMapBack=back||'marry';
   state='bodymap'; show('scr-bodymap');
-  const st=lookStage(w.looks===undefined?5:w.looks);
+  const lk=w.looks===undefined?5:w.looks;
+  const st=lookStage(lk);
   $('bodymap-title').textContent='🗺 BODY MAP — '+w.name.split(' ')[0].toUpperCase();
   $('bodymap-verdict').innerHTML=`<b style="color:${st.col}">${st.name}</b> <span class="muted">— ${st.blurb}</span>
-    <div class="small muted" style="margin-top:2px">${bodyBlurb(w)}</div>`;
-  drawBodyMap($('bodymap-cv'), w);
+    <div class="small" style="margin-top:3px">${bodyTierLine(w)}</div>
+    <div class="small muted" style="margin-top:2px;font-style:italic">${bodyBlurb(w)}</div>`;
+  // view switcher
+  const vr=$('bodymap-views'); vr.innerHTML='';
+  [['front','◧ FRONT'],['side','◐ SIDE'],['back','◨ BACK']].forEach(([id,label])=>{
+    const bt=document.createElement('button'); bt.className='btn sm'+(bodyMapView===id?' gold':''); bt.textContent=label;
+    bt.onclick=()=>{ bodyMapView=id; openBodyMap(w,bodyMapBack); }; vr.appendChild(bt);
+  });
+  drawBodyMap($('bodymap-cv'), w, bodyMapView);
 }
 let bodyMapSubject=null, bodyMapBack='marry';
 // a small pip bar for looks / wits, so a fine match is obvious at a glance
@@ -3084,7 +3158,16 @@ function consume(k){ if(edge[k]){ edge[k]=false; return true; } return false; }
 function resetInputEdges(){ for(const k in edge) edge[k]=false; held.a=held.d=held.w=held.s=held.up=held.down=false; }
 let isTouch = ('ontouchstart' in window) || navigator.maxTouchPoints>0;
 
+// typing in a text field must never reach the game controls (this silently
+// ate every a/d/w/s/space/arrow keystroke in the tabula, and 'm' muted the game)
+function typingInField(e){
+  const t=e.target;
+  if(!t) return false;
+  const tag=(t.tagName||'').toLowerCase();
+  return tag==='input' || tag==='textarea' || tag==='select' || t.isContentEditable;
+}
 window.addEventListener('keydown',e=>{
+  if(typingInField(e)) return;
   const k=e.key.toLowerCase();
   if(['a','d','w','s',' ','arrowleft','arrowright','arrowup','arrowdown'].includes(k)) e.preventDefault();
   if(k==='a'){ if(!held.a) setEdge('a'); held.a=true; }
@@ -3099,6 +3182,7 @@ window.addEventListener('keydown',e=>{
   else if(k==='m'){ muted=!muted; toast(muted?'Muted':'Sound on'); }
 },{passive:false});
 window.addEventListener('keyup',e=>{
+  if(typingInField(e)) return;
   const k=e.key.toLowerCase();
   if(k==='a')held.a=false; else if(k==='d')held.d=false; else if(k==='w')held.w=false;
   else if(k==='s')held.s=false; else if(k==='arrowup')held.up=false; else if(k==='arrowdown')held.down=false;
@@ -3690,6 +3774,12 @@ function openCheats(){
   btn(r,'MAX BOND (♥/🔥/🧼 100)',()=>{ G.wifeRel=100; G.wifePhys=100; G.hygiene=100; });
   btn(r,'JEALOUSY 0',()=>G.jealousy=0); btn(r,'JEALOUSY 100',()=>G.jealousy=100);
   btn(r,'UNLOCK BODY MAP',()=>{ G.hasBodyMap=true; });
+  btn(r,'⛧ IMPOSSIBLE SPOUSE',()=>{ if(!G.wife){ toast('Wed someone first.',1800); return; }
+    const w=G.wife; w.tier='impossible'; w.quality=11; w.looks=IMPOSSIBLE_V; w.smarts=10; w.build='statuesque';
+    w.body=makeImpossibleBody(); w.jewel=true; w.rank='noble';
+    w.traits=WIFE_TRAITS.map(t=>t.id);
+    G.wifeRel=100; G.wifePhys=100; G.hygiene=100; G.jealousy=0; G.hasBodyMap=true;
+    toast('⛧ SHE IS NOT PHYSICALLY POSSIBLE. Huge above, huge behind, a waist like a wasp — and every gift of blood at once.',5200); });
   btn(r,'+1 CHILD',()=>{ const son=Math.random()<0.5;
     G.children.push(Object.assign({name:(son?pick(['Titus','Lucius','Gaius']):pick(['Julia','Livia','Aurelia']))+' '+G.name.split(' ')[0]+(son?'i filius':'a'), sex:son?'m':'f', born:G.day, rel:100}, inheritDNA())); });
   btn(r,'FAMILY MAN TITLE',()=>{ G.familyMan=true; });
@@ -5007,14 +5097,20 @@ function drawBridePortrait(cnv,b,bare){
   const dress=b.dress, dSh=shade(dress,-38), dHi=shade(dress,30), dMid=shade(dress,-16);
   const hair=b.hair, hSh=shade(hair,-30), hHi=shade(hair,32), gold='#e8c34a', goldHi='#fff0b0';
   // ---- figure metrics: bust depth & protrusion, hips & rear, waist pinch ----
-  // BUILD LADDER: slight → slender → shapely → curvy → ample → statuesque
-  const bIdx = Math.max(0, BUILDS.indexOf(b.build||'curvy'));    // 0..5 (unknown → shapely-ish)
-  const bd = [5,6,8,9,11,12][bIdx];                              // bust depth
-  const bp = [2,3,4,5,6,7][bIdx];                                // bust protrusion (front, +x)
-  const hips = [11,12,13,14,15,16][bIdx];                        // hips shapely, never wide/fat
-  const rear = [2,3,4,5,6,7][bIdx];                              // thicc but tight — hourglass, never fat
-  const thigh = [4,4,5,5,5,6][bIdx];                             // firm full thigh
-  const waistW = [7,7,6,6,7,7][bIdx];                            // waist stays SLIM on all
+  // ---- THE FIGURE IS HER SCORES. A FLAT 1 draws flat; an IMPOSSIBLE 11 draws absurd. ----
+  const bIdx = Math.max(0, BUILDS.indexOf(b.build||'curvy'));    // 0..5 fallback for old saves
+  const _bod = b.body||{};
+  const sc = (id,fallback)=> _bod[id]===undefined? fallback : _bod[id];
+  const busV = sc('bust',  [2,3,5,6,8,9][bIdx]);
+  const waiV = sc('waist', [3,4,6,6,4,4][bIdx]);
+  const booV = sc('booty', [2,3,5,6,8,9][bIdx]);
+  const legV = sc('legs',  [3,4,5,6,6,8][bIdx]);
+  const bd = Math.round(3 + busV*1.05);                          // bust depth   (4 flat → 14 huge → 15 impossible)
+  const bp = Math.round(1 + busV*0.62);                          // bust protrusion forward
+  const hips = Math.round(9 + booV*0.72);                        // hips
+  const rear = Math.round(1 + booV*0.62);                        // how far the boot-y projects
+  const thigh = Math.round(3 + legV*0.26);                       // firm full thigh
+  const waistW = clamp(Math.round(9 - waiV*0.62),3,9);           // HIGH waist score = TINY waist
   const bustTop=-47, bustBot=bustTop+bd, hipTop=-32, hipBot=-23;
   const warrior=b.rank==='warrior';
   const noble=b.rank==='noble'||warrior;   // both wear an elevated gown (warrior's is martial in colour)
@@ -7637,7 +7733,7 @@ window.__SS = {
   openCircus, startRace, finishRace, get RC(){return RC;}, updateRace, drawRace,
   openForum, startCase, playArgument, finishCase, get CASE(){return CASE;}, checkAdvocateRank,
   offerDaughterPath, inheritDNA, rollTraits, hasTrait,
-  openCheats, openBodyMap, drawBodyMap, lookStage, bodyBlurb, rollBody, heatColor, get marryList(){return marryList;}, set marryList(v){ marryList=v; },
+  openCheats, openBodyMap, drawBodyMap, lookStage, bodyBlurb, rollBody, heatColor, drawBridePortraitTest:drawBridePortrait, makeImpossibleBody, partTier, bodyTierLine, get marryList(){return marryList;}, set marryList(v){ marryList=v; },
   openMarry, marry, rollBrides, makeBride, get marryList(){return marryList;},
   advanceDay, openVilla,
   succession, openPortrait, startBedScene,
