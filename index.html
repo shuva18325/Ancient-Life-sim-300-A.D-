@@ -264,6 +264,7 @@
       <button class="btn" id="btn-villa">🏡 VILLA</button>
       <button class="btn" id="btn-note-map">✍ WRITE HOME</button>
       <button class="btn" id="btn-circus">🏇 CIRCUS</button>
+      <button class="btn" id="btn-forum" style="display:none">⚖ THE COURTS</button>
       <button class="btn" id="btn-intrigue">🗡 INTRIGUE</button>
       <button class="btn" id="btn-train">🏋 TRAIN</button>
       <button class="btn sm" id="btn-save">💾 SAVE</button>
@@ -331,6 +332,28 @@
         <div class="tabula tabula-reply" id="note-reply"></div>
       </div>
       <div class="row" style="justify-content:flex-end;margin-top:4px"><button class="btn gold" id="btn-note-back">◀ BACK</button></div>
+    </div>
+  </div>
+
+  <!-- ===== THE FORUM / BASILICA — the daughter's path: court cases & the Senate ===== -->
+  <div id="scr-forum" class="screen center">
+    <div class="panel pad col gap scrollbox" style="width:min(96%,760px);max-height:95%;">
+      <h2 style="color:var(--gold)">⚖ THE BASILICA — COURTS OF ROME</h2>
+      <div id="forum-standing" class="small"></div>
+      <div id="forum-body" class="col gap"></div>
+      <div class="row" style="justify-content:flex-end;"><button class="btn gold" id="btn-forum-back">◀ BACK</button></div>
+    </div>
+  </div>
+
+  <!-- ===== A CASE IN PROGRESS ===== -->
+  <div id="scr-case" class="screen center">
+    <div class="panel pad col gap scrollbox" style="width:min(96%,760px);max-height:95%;">
+      <h2 style="color:var(--gold)" id="case-title">THE CASE</h2>
+      <div id="case-desc" class="small muted"></div>
+      <div id="case-meter"></div>
+      <div id="case-log" class="col gap6" style="max-height:170px;overflow:auto"></div>
+      <div id="case-actions" class="col gap6"></div>
+      <div class="row" style="justify-content:flex-end;"><button class="btn gold" id="btn-case-back" style="display:none">◀ LEAVE THE COURT</button></div>
     </div>
   </div>
 
@@ -817,17 +840,64 @@ const GROOM_NAMES={roman:['Gaius','Marcus','Lucius','Quintus','Titus','Decimus']
   germanic:['Arminius','Segimer','Chariovald','Theudebald'],greek:['Alexandros','Demetrios','Lysandros','Nikias'],
   numidian:['Juba','Massinissa','Gauda','Adherbal']};
 // craft one bride of an ethnicity at a rank ('noble'|'peasant')
-function makeBride(eth, noble){
+/* =====================================================================
+   BLOODLINE — every spouse carries LOOKS, SMARTS and TRAITS. Children
+   inherit them (DNA), and a daughter's inherited wits decide how well she
+   argues in the courts when the house passes to her.
+   ===================================================================== */
+const BUILDS=['slight','slender','shapely','curvy','ample','statuesque'];
+const WIFE_TRAITS=[
+  {id:'smart',    name:'Smart',      icon:'🧠', min:6, desc:'A quick, ordered mind — her children argue like advocates.'},
+  {id:'beauty',   name:'Beautiful',  icon:'🌹', min:6, desc:'Rome turns to look. The mob loves a beautiful house.'},
+  {id:'fierce',   name:'Fierce',     icon:'🔥', min:5, desc:'Steel in her spine — she breeds fighters.'},
+  {id:'devoted',  name:'Devoted',    icon:'💞', min:4, desc:'Her heart does not wander; the bond grows faster.'},
+  {id:'cunning',  name:'Cunning',    icon:'🗝', min:6, desc:'She hears everything in Rome before you do.'},
+  {id:'fertile',  name:'Fertile',    icon:'🌾', min:3, desc:'The house will not want for heirs.'},
+  {id:'noble',    name:'Noble-blood',icon:'👑', min:7, desc:'Old blood — doors open for her children.'},
+  {id:'wealthy',  name:'Wealthy',    icon:'💰', min:6, desc:'Her family sends coin, and keeps sending it.'},
+];
+function traitById(id){ return WIFE_TRAITS.find(t=>t.id===id); }
+function traitLabel(id){ const t=traitById(id); return t? t.icon+' '+t.name : id; }
+// quality 0..10 → how many traits, how good the body/mind
+function rollTraits(quality){
+  const out=[];
+  const pool=WIFE_TRAITS.filter(t=>quality>=t.min);
+  const n = quality>=9?3 : quality>=7?2 : quality>=5?1 : (Math.random()<0.35?1:0);
+  const shuffled=[...pool].sort(()=>Math.random()-0.5);
+  for(let i=0;i<n && i<shuffled.length;i++) out.push(shuffled[i].id);
+  return out;
+}
+// DNA — a child draws looks, wits and traits from BOTH parents, with a little chance of its own
+function inheritDNA(){
+  const w=G.wife||{}, mine={looks:G.looks===undefined?5:G.looks, smarts:G.smarts===undefined?5:G.smarts, traits:G.traits||[]};
+  const wl=w.looks===undefined?5:w.looks, ws=w.smarts===undefined?5:w.smarts, wt=w.traits||[];
+  const mix=(a,b)=>clamp(Math.round((a+b)/2 + rnd(-1.4,1.6)),1,10);   // averages, drifts a little either way
+  const pool=[...new Set([...mine.traits, ...wt])];
+  const traits=[];
+  for(const t of pool){                                              // each parent trait has a good chance to carry
+    const both = mine.traits.includes(t) && wt.includes(t);
+    if(Math.random() < (both?0.92:0.5)) traits.push(t);
+  }
+  if(!traits.length && Math.random()<0.25) traits.push(pick(WIFE_TRAITS).id);   // a trait of its own
+  return {looks:mix(mine.looks,wl), smarts:mix(mine.smarts,ws), traits};
+}
+function makeBride(eth, noble, quality){
   const D=BRIDE[eth]||BRIDE.roman;
-  // build/curves — nobles are well-fed (fuller); peasants leaner but shapely
-  const roll=Math.random();
-  const build = noble ? (roll<0.55?'ample':roll<0.9?'curvy':'slender')
-                      : (roll<0.5?'curvy':roll<0.85?'slender':'ample');
+  // QUALITY 0-10 drives looks, wits and traits. Nobles skew higher; paid matches are guaranteed high.
+  if(quality===undefined) quality = clamp(Math.round((noble? rnd(3,8) : rnd(1,6)) + (G&&G.marryRolls? Math.min(2.5,G.marryRolls*0.18):0)), 0, 10);
+  const looks = clamp(Math.round(quality + rnd(-1.2,1.2)),1,10);
+  const smarts= clamp(Math.round(quality + rnd(-2,2)),1,10);
+  // build follows looks — the finest matches are the shapeliest
+  const build = looks>=9? pick(['curvy','ample','statuesque'])
+              : looks>=7? pick(['shapely','curvy','ample'])
+              : looks>=5? pick(['slender','shapely','curvy'])
+              : pick(['slight','slender','shapely']);
   const dressN = eth==='egyptian'?'#efe8d6' : eth==='persian'?'#2f6f8c' : eth==='celt'?'#3f6a44' : eth==='germanic'?'#7d5c38'
     : eth==='greek'?'#e8e2d2' : eth==='numidian'?'#c8862a' : (Math.random()<0.5?'#8a2f5a':'#c07a1e');
   const dressP = eth==='celt'?'#6b7a4a' : eth==='germanic'?'#9a7a52' : eth==='greek'?'#d8d0ba' : eth==='numidian'?'#b08a4a' : '#cbb489';
   const b = {
     eth, adj:D.adj, rank: noble?'noble':'peasant', build,
+    quality, looks, smarts, traits: rollTraits(quality),
     name: pick(D.names)+' '+pick(D.surn),
     skin: D.skin, hair: pick(D.hair),
     dress: noble?dressN:dressP,
@@ -871,7 +941,15 @@ function makeBride(eth, noble){
 const NOBLE_PRICE={roman:900, greek:900, celt:500, germanic:500, numidian:650, persian:1800, egyptian:2200};
 function allianceTier(){ return G.coin + G.glory*4 + titlesCount()*800 +
   (G.socialClass==='elite'?2200:G.socialClass==='upper'?1100:0) + (G.office||0)*400; }
-function rollBrides(){
+// a small pip bar for looks / wits, so a fine match is obvious at a glance
+function statPips(w){
+  const bar=(val,col,icon,label)=>{ let s='';
+    for(let i=1;i<=10;i++) s+=`<span style="display:inline-block;width:5px;height:8px;margin-right:1px;background:${i<=val?col:'#2f2418'}"></span>`;
+    return `<span class="small" style="margin-right:8px">${icon} ${label} ${s} <b style="color:${col}">${val}</b></span>`; };
+  const lk=w.looks===undefined?5:w.looks, sm=w.smarts===undefined?5:w.smarts;
+  return `<div style="margin:3px 0">${bar(lk,'#e26a8a','🌹','Looks')}${bar(sm,'#6ac8e0','🧠','Wits')}</div>`;
+}
+function rollBrides(minQ){
   const tier=allianceTier();
   const eths=[...BRIDE_ETHS].sort(()=>Math.random()-0.5);
   // always offer a Roman first, then three others
@@ -879,7 +957,10 @@ function rollBrides(){
   return order.map(e=>{
     const price=NOBLE_PRICE[e]||800;
     // a poor man weds a poor man's daughter; grand houses open only to the great
-    const noble = tier>=price || (tier>=price*0.6 && Math.random()<0.2);
+    let noble = tier>=price || (tier>=price*0.6 && Math.random()<0.2);
+    if(minQ>=6) noble=true;                                     // paid matches are always of good family
+    if(minQ){ const q=clamp(Math.round(rnd(minQ, Math.min(10,minQ+1.5))),1,10);
+      return makeBride(e, noble, q); }
     return makeBride(e, noble);
   });
 }
@@ -994,6 +1075,11 @@ function freshCareer(name,origin,arch,social){
     familyMan:false,                              // wife maxed on every stat + every child adoring → the FAMILY MAN title
     infamy:0, gladiatrixStage:0, pardoned:false,  // THE GLADIATRIX ARC — scandal → sensation → legend → the Emperor's pardon
     lastNoteDay:-9, lastNoteReply:'',             // THE TABULA — a written note home + her last reply
+    marryRolls:0,                                 // suitors seen — keep looking and finer matches present themselves
+    jealousy:0, lastJealousDay:-9,                // WIFE JEALOUSY — neglect and wandering eyes have a price
+    traits:[], looks:5, smarts:5,                 // YOUR OWN blood (an heir inherits from both parents)
+    // ---- THE DAUGHTER'S PATH: the courts, not the sand ----
+    advocate:false, oratory:1, casesWon:0, casesLost:0, renown:0, senate:false, royal:false, lastCaseDay:-9,
   };
 }
 /* =====================================================================
@@ -1068,7 +1154,7 @@ function elevateWife(rank){
   refreshStatbar(); saveQuiet(); openVilla();
 }
 // fill in any fields missing from older saves
-function migrate(g){ const d={honor:50,food:4,mount:0,slaves:0,hasVilla:false,boat:false,favor:0,soldiers:0,hidden:[],plotTier:0,emperor:false,approval:50,legions:0,rivals:0,retired:false,detachments:[],day:0,titles:{},clears:{},socialClass:'gladiator',army:{},armyGear:0,armyTrain:0,hasOrganizer:false,generals:[],wife:null,married:false,marryPrompted:false,children:[],pregnant:null,lastLoveDay:-9,injury:null,lastDebateDay:-9,office:0,path:null,parthia:50,parthiaPact:false,wifeRel:50,lastTalkDay:-9,isFemale:false,lineage:[],hygiene:70,wifePhys:45,hasPool:false,hasWardrobe:false,legacy:null,lastFeastDay:-9,loveDay:-1,loveQuick:0,loveLong:0,loveNight:0,loveVigil:0,venusUntil:-1,lastWashDay:-9,lastPoolDay:-9,lastWardrobeDay:-9,lastKidsDay:-9,lastBathDay:-9,pila:0,bow:null,bowsOwned:[],nemesis:null,trophies:[],nemesisCount:0,pendingDeath:false,ageBase:0,wonProvinceByFight:false,familyMan:false,infamy:0,gladiatrixStage:0,pardoned:false,lastNoteDay:-9,lastNoteReply:''}; for(const k in d){ if(g[k]===undefined) g[k]=d[k]; } if(!g.current) g.current='Italia'; if(g.age===undefined) g.age=19+Math.floor(((g.day||0)-(g.ageBase||0))/36); return g; }
+function migrate(g){ const d={honor:50,food:4,mount:0,slaves:0,hasVilla:false,boat:false,favor:0,soldiers:0,hidden:[],plotTier:0,emperor:false,approval:50,legions:0,rivals:0,retired:false,detachments:[],day:0,titles:{},clears:{},socialClass:'gladiator',army:{},armyGear:0,armyTrain:0,hasOrganizer:false,generals:[],wife:null,married:false,marryPrompted:false,children:[],pregnant:null,lastLoveDay:-9,injury:null,lastDebateDay:-9,office:0,path:null,parthia:50,parthiaPact:false,wifeRel:50,lastTalkDay:-9,isFemale:false,lineage:[],hygiene:70,wifePhys:45,hasPool:false,hasWardrobe:false,legacy:null,lastFeastDay:-9,loveDay:-1,loveQuick:0,loveLong:0,loveNight:0,loveVigil:0,venusUntil:-1,lastWashDay:-9,lastPoolDay:-9,lastWardrobeDay:-9,lastKidsDay:-9,lastBathDay:-9,pila:0,bow:null,bowsOwned:[],nemesis:null,trophies:[],nemesisCount:0,pendingDeath:false,ageBase:0,wonProvinceByFight:false,familyMan:false,infamy:0,gladiatrixStage:0,pardoned:false,lastNoteDay:-9,lastNoteReply:'',marryRolls:0,jealousy:0,lastJealousDay:-9,traits:[],looks:5,smarts:5,advocate:false,oratory:1,casesWon:0,casesLost:0,renown:0,senate:false,royal:false,lastCaseDay:-9}; for(const k in d){ if(g[k]===undefined) g[k]=d[k]; } if(!g.current) g.current='Italia'; if(g.age===undefined) g.age=19+Math.floor(((g.day||0)-(g.ageBase||0))/36); return g; }
 function saveGame(){ try{ localStorage.setItem(SAVE_KEY, JSON.stringify(G)); toast('Saved.'); }catch(e){ toast('⚠ Could not save — browser storage is blocked or full.',3200); } }
 function hasSave(){ try{ return !!localStorage.getItem(SAVE_KEY); }catch(e){ return false; } }
 function loadGame(){ try{ G=migrate(JSON.parse(localStorage.getItem(SAVE_KEY))); return !!G; }catch(e){ return false; } }
@@ -3108,6 +3194,7 @@ function startRace(faction){
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('on'));
   $('statbar').classList.add('hide'); $('touch').classList.add('hide');
   state='race';
+  if(G.married && Math.random()<0.5) addJealousy(4,'the faction girls who mob a winning charioteer');
   toast('🏇 THE CIRCUS MAXIMUS — hold W to WHIP, ↑/↓ to change lane. Five laps. Race!',3400);
 }
 function aiRace(c,dt){
@@ -3243,6 +3330,163 @@ function finishRace(){
       <span class="pill">🪙 +${coin} denarii</span>
       <span class="pill">🔥 ${pop>=0?'+':''}${pop} Pop</span>
     </div>`;
+}
+/* =====================================================================
+   THE DAUGHTER'S PATH — THE COURTS. An heiress may refuse the sand and
+   take the Forum instead: real cases argued before a jury, won with wits
+   and rhetoric rather than steel. Renown carries her to the Senate, and
+   a royal father's name carries her further still.
+   ===================================================================== */
+const CASE_TYPES=[
+  {id:'property', title:'A DISPUTE OVER LAND',   strong:['law','precedent'],
+   desc:'Two neighbours in Ostia both claim the same olive grove. The boundary stones have been moved — by whom, no one will say.'},
+  {id:'inherit',  title:'A CONTESTED WILL',      strong:['precedent','law'],
+   desc:'A merchant is dead and two families claim his estate. The will names a son nobody has ever seen.'},
+  {id:'murder',   title:'A CHARGE OF MURDER',    strong:['witness','pathos'],
+   desc:'A freedman is accused of poisoning his patron. The only witness is the patron’s jealous nephew.'},
+  {id:'debt',     title:'A RUINOUS DEBT',        strong:['law','pathos'],
+   desc:'A widow faces bondage over her late husband’s debts. The creditor is a senator’s client.'},
+  {id:'treason',  title:'A WHISPER OF TREASON',  strong:['witness','precedent'],
+   desc:'A tribune is accused of writing to the Parthian court. The letters may well be forgeries.'},
+  {id:'freedom',  title:'A SUIT FOR FREEDOM',    strong:['pathos','law'],
+   desc:'A slave says her master promised her manumission before he died. His heirs deny every word of it.'},
+];
+const ARGUMENTS=[
+  {id:'law',       name:'Cite the statute',        icon:'📜', desc:'Cold, exact law. Unanswerable when it fits.'},
+  {id:'precedent', name:'Cite a precedent',        icon:'🏛', desc:'“In the matter of Gracchus, the divine Trajan ruled…”'},
+  {id:'witness',   name:'Break the witness',       icon:'🗣', desc:'Take his testimony apart in front of the jury.'},
+  {id:'pathos',    name:'Move them to pity',       icon:'💧', desc:'Rome is sentimental. Give the jury a reason to weep.'},
+  {id:'bribe',     name:'Reach the jury quietly',  icon:'🪙', desc:'Costs coin and honour — but juries are human.'},
+];
+let CASE=null;
+function caseDifficulty(){ const r=G.renown||0; return r>=60?3 : r>=25?2 : 1; }
+function startCase(){
+  const t=pick(CASE_TYPES), diff=caseDifficulty();
+  CASE={ t, diff, round:1, rounds:3, score:0, need:3, log:[], over:false,
+    fee: 60+diff*70 + Math.round((G.renown||0)*2) };
+  state='case'; show('scr-case'); $('statbar').classList.remove('hide');
+  renderCase();
+}
+function renderCase(){
+  const c=CASE, t=c.t;
+  $('case-title').textContent=t.title;
+  const sm=G.smarts===undefined?5:G.smarts;
+  // a sharp mind reads the court: she SEES which lines of attack will land
+  const insight = sm>=7 ? t.strong.map(s=>ARGUMENTS.find(a=>a.id===s).name).join(' or ')
+               : sm>=4 ? 'something in the '+ (Math.random()<0.5?t.strong[0]:'record')+' will serve'
+               : null;
+  $('case-desc').innerHTML = t.desc + (insight? `<div class="small" style="color:#6ac8e0;margin-top:4px">🧠 Your wits (${sm}/10) read the court: <b>${insight}</b> should land here.</div>`
+    : `<div class="small muted" style="margin-top:4px">🧠 Your wits (${sm}/10) are too dull to read which way this jury leans.</div>`);
+  const pct=Math.round(clamp(c.score/c.need,0,1)*100);
+  $('case-meter').innerHTML=`<div class="small">Jury persuaded: <b style="color:${pct>=100?'#5ac06a':'var(--gold)'}">${c.score}</b> / ${c.need} · round ${Math.min(c.round,c.rounds)} of ${c.rounds} · fee if won: <b style="color:var(--gold)">${c.fee}d</b></div>
+    <div style="height:8px;background:#2a1f16;border-radius:4px;margin-top:4px;overflow:hidden"><div style="height:100%;width:${pct}%;background:${pct>=100?'#5ac06a':'var(--gold)'}"></div></div>`;
+  const lg=$('case-log'); lg.innerHTML='';
+  c.log.forEach(l=>{ const d=document.createElement('div'); d.className='small'; d.style.color=l.good?'#8ad48a':'#e0907a'; d.textContent=(l.good?'✔ ':'✘ ')+l.text; lg.appendChild(d); });
+  const act=$('case-actions'); act.innerHTML='';
+  if(c.over){ $('btn-case-back').style.display=''; $('btn-case-back').onclick=()=>finishCase(); return; }
+  ARGUMENTS.forEach(a=>{
+    const bt=document.createElement('button'); bt.className='btn sm'; bt.style.textAlign='left';
+    const isBribe=a.id==='bribe';
+    bt.textContent=a.icon+' '+a.name+(isBribe?' ('+(80+c.diff*60)+'d, −honour)':'');
+    bt.title=a.desc;
+    if(isBribe && G.coin<80+c.diff*60) bt.disabled=true;
+    bt.onclick=()=>playArgument(a.id);
+    act.appendChild(bt);
+  });
+}
+function playArgument(id){
+  const c=CASE, t=c.t, sm=G.smarts===undefined?5:G.smarts, or=G.oratory||1;
+  const a=ARGUMENTS.find(x=>x.id===id);
+  let good=false, text='';
+  if(id==='bribe'){
+    const cost=80+c.diff*60;
+    if(G.coin<cost) return;
+    G.coin-=cost; G.honor=clamp(G.honor-6,0,100);
+    good = Math.random()<0.8;
+    text = good? 'A purse changes hands in the colonnade. Two jurors will not meet your eye — but they will vote your way.'
+               : 'Your man is seen passing the purse. A juror rises in fury; the court mutters.';
+    if(!good) G.honor=clamp(G.honor-4,0,100);
+  } else {
+    const fits=t.strong.includes(id);
+    // wits + practised oratory carry the day; the right line of attack is worth far more
+    const chance = clamp(0.18 + (fits?0.42:0) + sm*0.045 + or*0.03 - c.diff*0.06, 0.08, 0.94);
+    good = Math.random()<chance;
+    const lines={
+      law:      [good?'You read the statute aloud, slowly, twice. The jury understands.':'The magistrate observes, drily, that the statute says no such thing.'],
+      precedent:[good?'You produce a ruling of the divine Trajan. Heads nod along the benches.':'Your precedent is a century stale; opposing counsel says so, loudly.'],
+      witness:  [good?'Three questions and the witness contradicts himself. The court hears it.':'The witness holds firm, and looks the more honest for your attack.'],
+      pathos:   [good?'You turn to the jury and speak of her children. A senator openly weeps.':'You reach for their pity and find none. The performance falls flat.'],
+    };
+    text=lines[id][0];
+  }
+  c.score += good?1:0;
+  c.log.push({good,text});
+  c.round++;
+  if(c.score>=c.need || c.round>c.rounds){ c.over=true; c.won = c.score>=c.need; }
+  renderCase();
+}
+function finishCase(){
+  const c=CASE; CASE=null;
+  const won=!!c.won;
+  if(won){
+    const fee=c.fee, ren=8+c.diff*6;
+    G.coin+=fee; G.renown=(G.renown||0)+ren; G.casesWon=(G.casesWon||0)+1;
+    G.honor=clamp(G.honor+3,0,100); G.pop=clamp(G.pop+2,0,100);
+    if(G.casesWon%3===0){ G.oratory=(G.oratory||1)+1; toast('🗣 Your oratory sharpens with practice — ORATORY '+G.oratory,3000); }
+    toast('⚖ THE VERDICT IS YOURS! '+fee+'d in fees, +'+ren+' renown.',3400);
+  } else {
+    G.casesLost=(G.casesLost||0)+1; G.renown=Math.max(0,(G.renown||0)-5); G.honor=clamp(G.honor-2,0,100);
+    toast('⚖ The verdict goes against you. Rome remembers a losing advocate. (−5 renown)',3200);
+  }
+  advanceDay(1); checkAdvocateRank(); saveQuiet(); openForum();
+}
+// renown carries an advocate up: the Senate, then the purple circle of the royal house
+function checkAdvocateRank(){
+  const r=G.renown||0;
+  if(!G.senate && r>=60){ G.senate=true; G.honor=clamp(G.honor+10,0,100); G.approval=clamp(G.approval+10,0,100);
+    toast('🏛 THE SENATE ADMITS YOU. By your voice alone you take a seat few women in history have held. (+10 honor, +10 approval)',6000); try{unlock('senator');}catch(e){} }
+  if(!G.royal && r>=140 && G.senate){ G.royal=true; G.approval=clamp(G.approval+15,0,100);
+    toast('👑 THE ROYAL CIRCLE. Your father’s name and your own voice raise you into the imperial house itself — you are ROYALTY of Rome.',7000); try{unlock('royal');}catch(e){} }
+}
+function advocateTitle(){
+  if(G.royal) return 'ROYAL OF THE IMPERIAL HOUSE';
+  if(G.senate) return 'SENATOR-ADVOCATE';
+  const r=G.renown||0;
+  return r>=25? 'ADVOCATE OF THE BASILICA' : r>=8? 'JUNIOR ADVOCATE' : 'UNKNOWN AT THE BAR';
+}
+function openForum(){
+  if(checkOldAgeDeath()) return;
+  state='forum'; show('scr-forum'); $('statbar').classList.remove('hide'); refreshStatbar();
+  const sm=G.smarts===undefined?5:G.smarts;
+  const inherited = (G.royalFather? ' Your father governed and his name still opens doors.' : '');
+  $('forum-standing').innerHTML=
+    `<div><b style="color:var(--gold)">⚖ ${advocateTitle()}</b></div>
+     <div class="small muted">Renown <b style="color:var(--gold)">${G.renown||0}</b> · cases won <b>${G.casesWon||0}</b> / lost <b>${G.casesLost||0}</b> · 🧠 wits <b style="color:#6ac8e0">${sm}/10</b> · 🗣 oratory <b>${G.oratory||1}</b>${inherited}</div>
+     <div style="height:8px;background:#2a1f16;border-radius:4px;margin-top:5px;overflow:hidden">
+       <div style="height:100%;width:${Math.min(100,Math.round((G.renown||0)/140*100))}%;background:${G.royal?'#c89af0':G.senate?'var(--gold)':'#6ac8e0'}"></div></div>
+     <div class="small muted">${G.royal?'You sit within the imperial house itself.':G.senate?'Reach 140 renown to enter the royal circle.':'Reach 60 renown for a seat in the Senate.'}</div>`;
+  const b=$('forum-body'); b.innerHTML='';
+  const cd=G.day-(G.lastCaseDay===undefined?-9:G.lastCaseDay);
+  const card=document.createElement('div'); card.className='shopcard';
+  card.innerHTML=`<div><b style="color:var(--gold)">📜 TAKE A BRIEF</b> <span class="small muted">— argue a case before the jury. Your wits read the court; your oratory wins it.</span></div>`;
+  const bt=document.createElement('button'); bt.className='btn sm gold'; bt.textContent='⚖ ENTER THE BASILICA';
+  bt.onclick=()=>{ G.lastCaseDay=G.day; startCase(); };
+  card.appendChild(bt); b.appendChild(card);
+  if(G.senate){
+    const sc=document.createElement('div'); sc.className='shopcard';
+    sc.innerHTML=`<div><b style="color:var(--gold)">🏛 SPEAK IN THE SENATE</b> <span class="small muted">— move the house on a matter of state. Costs a day; pays renown and approval.</span></div>`;
+    const sb=document.createElement('button'); sb.className='btn sm'; sb.textContent='🏛 ADDRESS THE HOUSE';
+    sb.onclick=()=>{
+      const sm2=G.smarts===undefined?5:G.smarts;
+      const win=Math.random() < clamp(0.3+sm2*0.05+(G.oratory||1)*0.04,0.15,0.9);
+      if(win){ G.renown+=12; G.approval=clamp(G.approval+5,0,100); G.coin+=150;
+        toast('🏛 The house divides your way — the motion carries. (+12 renown, +5 approval, +150d)',3600); }
+      else { G.renown=Math.max(0,G.renown-4);
+        toast('🏛 You are shouted down by the old guard. (−4 renown)',3000); }
+      advanceDay(1); checkAdvocateRank(); saveQuiet(); openForum();
+    };
+    sc.appendChild(sb); b.appendChild(sc);
+  }
 }
 // faction picker → the race
 function openCircus(){
@@ -3565,7 +3809,7 @@ function finishBed(){
     return;
   }
   const base= len==='night'?0.55 : len==='long'?0.42 : 0.32;        // the gods favour the thorough
-  const chance=base + (G.honor/400) + (w&&w.build!=='slender'?0.06:0) + (G.wifeRel/500);
+  const chance=base + (G.honor/400) + (w&&w.build!=='slender'&&w.build!=='slight'?0.06:0) + (G.wifeRel/500) + (hasTrait('fertile')?0.22:0);
   const hit=Math.random()<chance;
   if(hit && !G.pregnant) G.pregnant={due:G.day+27};
   G.wifeRel=clamp(G.wifeRel+(len==='night'?4:len==='long'?3:2),0,100);
@@ -3927,22 +4171,19 @@ function drawShadowPlay(s,T){
     // the lips MEET in the centre once the gap closes
     if(d<=1.5){ ell(cx0-1,base-58,4.5,2.6); lit(cx0-3,base-58,cx0+3,base-58,1.4); HB(cx0,base-84,9); }
     woad(cx0-30,base-44);
-  } else if(vi===2){ // THE 🍑 & HIM — she braced on all fours (two arms, two full legs), him behind, clear of her
-    const th=Math.max(0,Math.sin(T*0.5))*6;
-    ball(cx0-58,base-33,7.6); ball(cx0-64,base-31,2.2); ell(cx0-50,base-41,6,6);      // her head down, hair spill
-    cap(cx0-50,base-35,cx0-16,base-30,7.5,8.5);                                       // her arched back
-    cap(cx0-52,base-31,cx0-53,base-13,4.6,3.4); ell(cx0-53,base-10,5,2.6);            // far supporting arm → hand
-    cap(cx0-44,base-29,cx0-45,base-13,4.4,3.2); ell(cx0-45,base-10,4.8,2.5);          // near supporting arm → hand
-    ball(cx0-13,base-33,9.6); ball(cx0-1,base-33,9.6);                                // hips — two full curves
-    lit(cx0-7,base-40,cx0-7,base-24,1.5); lit(cx0-15,base-25,cx0+6,base-25,1.3);      // cleft + underlight
-    cap(cx0-15,base-27,cx0-17,base-13,6.6,4.6); cap(cx0-17,base-13,cx0-15,base-2,4.6,3.2); ell(cx0-15,base-1,5.4,2.6);  // near leg → the foot
-    cap(cx0-1,base-27,cx0+2,base-13,6.4,4.4); cap(cx0+2,base-13,cx0,base-2,4.4,3); ell(cx0,base-1,5.2,2.6);            // far leg → the foot
-    woad(cx0-8,base-33);
-    phallus(cx0+8+th, base-31, -1, 0.06);                                            // he ENTERS her on the thrust — points left, into her (restored)
-    maleKneel(cx0+15+th,base);                                                        // HIM behind, driving — close, but his legs stay clear of hers
-    ball(cx0+6+th,base-42,4.2); cap(cx0+6+th,base-42,cx0-1,base-39,3,2.4);            // his hand gripping her hip
-    lit(cx0-16+th,base-33,cx0-7+th,base-33,1); lit(cx0-14+th,base-28,cx0-6+th,base-28,1);  // motion
-    HB(cx0-6,base-84,10);
+  } else if(vi===2){ // THE 🍑 & HIM — her on all fours, him behind, the rhythm plain
+    const th=Math.max(0,Math.sin(T*0.5))*7;
+    ball(cx0-56,base-32,8); ball(cx0-62,base-30,2.4); ell(cx0-48,base-40,6,6);   // her head down, hair spill
+    cap(cx0-48,base-34,cx0-14,base-30,8,9);                             // her arched back
+    cap(cx0-50,base-30,cx0-50,base-12,5,3.5); ell(cx0-50,base-9,5,2.5); // supporting arm + hand
+    ball(cx0-12,base-34,10); ball(cx0+1,base-34,10);                    // the 🍑 — two full round cheeks
+    lit(cx0-5.5,base-42,cx0-5.5,base-25,1.6); lit(cx0-13,base-26,cx0+8,base-26,1.4);  // cleft + underbutt light
+    cap(cx0-13,base-28,cx0-16,base-12,7,4.5); cap(cx0-1,base-28,cx0+2,base-12,7,4.5); // thighs to the knee
+    woad(cx0-8,base-32);
+    maleKneel(cx0+6+th,base);                                          // HIM behind, driving
+    ball(cx0-4+th,base-40,4); cap(cx0-4+th,base-40,cx0-12+th,base-38,3,2.5);  // his hand gripping her hip
+    lit(cx0-24+th,base-32,cx0-16+th,base-32,1); lit(cx0-22+th,base-27,cx0-15+th,base-27,1);  // motion
+    HB(cx0-6,base-82,10);
   } else if(vi===3){ // THE RIDE — her astride, rising & falling, hair & bust alive
     const bo=Math.max(0,Math.sin(T*0.42))*6, sw=Math.sin(T*0.42);
     ball(cx0-56,base-30,8); ell(cx0-40,base-24,17,7);                   // him reclined
@@ -4547,12 +4788,14 @@ function drawBridePortrait(cnv,b,bare){
   const dress=b.dress, dSh=shade(dress,-38), dHi=shade(dress,30), dMid=shade(dress,-16);
   const hair=b.hair, hSh=shade(hair,-30), hHi=shade(hair,32), gold='#e8c34a', goldHi='#fff0b0';
   // ---- figure metrics: bust depth & protrusion, hips & rear, waist pinch ----
-  const bd = b.build==='ample'?11 : b.build==='curvy'?9 : 6;     // bust depth
-  const bp = b.build==='ample'?6 : b.build==='curvy'?5 : 3;      // bust protrusion (front, +x)
-  const hips = b.build==='ample'?15 : b.build==='curvy'?14 : 12; // hips shapely, never wide/fat
-  const rear = b.build==='ample'?6 : b.build==='curvy'?5 : 3;    // thicc but tight — hourglass, never fat
-  const thigh = b.build==='ample'?5 : b.build==='curvy'?5 : 4;   // firm full thigh
-  const waistW = b.build==='slender'?7 : b.build==='curvy'?6 : 7; // waist stays SLIM on all
+  // BUILD LADDER: slight → slender → shapely → curvy → ample → statuesque
+  const bIdx = Math.max(0, BUILDS.indexOf(b.build||'curvy'));    // 0..5 (unknown → shapely-ish)
+  const bd = [5,6,8,9,11,12][bIdx];                              // bust depth
+  const bp = [2,3,4,5,6,7][bIdx];                                // bust protrusion (front, +x)
+  const hips = [11,12,13,14,15,16][bIdx];                        // hips shapely, never wide/fat
+  const rear = [2,3,4,5,6,7][bIdx];                              // thicc but tight — hourglass, never fat
+  const thigh = [4,4,5,5,5,6][bIdx];                             // firm full thigh
+  const waistW = [7,7,6,6,7,7][bIdx];                            // waist stays SLIM on all
   const bustTop=-47, bustBot=bustTop+bd, hipTop=-32, hipBot=-23;
   const warrior=b.rank==='warrior';
   const noble=b.rank==='noble'||warrior;   // both wear an elevated gown (warrior's is martial in colour)
@@ -4812,6 +5055,7 @@ function enterMap(){
   // those born to rank must first secure a dynastic marriage
   if(marriageRequired()){ openMarry(true); return; }
   state='map'; show('scr-map'); $('statbar').classList.remove('hide');
+  { const fb=$('btn-forum'); if(fb) fb.style.display = G.advocate? '' : 'none'; }   // the courts, for an advocate
   refreshStatbar(); buildRegions();
 }
 function regionUnlocked(r){
@@ -5185,8 +5429,10 @@ function buildSuccessionCard(b){
   });
   card.appendChild(row); b.appendChild(card);
 }
-function succession(ch){
+// a daughter chooses her weapon: the sand, or the Forum
+function succession(ch, path){
   const fem=ch.sex==='f', heir=ch.name;
+  if(fem && !path){ offerDaughterPath(ch); return; }
   const prestige=legacyScore();                       // the legacy house's standing passes down
   G.lineage=G.lineage||[];
   G.lineage.push({name:G.name, glory:G.glory, wins:G.wins, losses:G.losses, day:G.day, emperor:!!G.emperor});
@@ -5203,12 +5449,53 @@ function succession(ch){
   G.lastNoteDay=-9; G.lastNoteReply='';
   G.retired=false; G.path=null; G.office=0;
   G.ageBase=G.day; G.age=19; G.pendingDeath=false; G.familyMan=false; G.infamy=0; G.gladiatrixStage=0; G.pardoned=false;   // the heir takes up the sword young — a fresh span of years, a fresh house to build
+  // ---- DNA: the heir carries the blood of both parents into her own life ----
+  G.looks = ch.looks===undefined?5:ch.looks;
+  G.smarts= ch.smarts===undefined?5:ch.smarts;
+  G.traits= ch.traits||[];
+  // ---- the daughter's chosen road ----
+  const wasRoyal = !!(G.emperor || (G.titles && Object.keys(G.titles).length));
+  G.royalFather = wasRoyal;
+  G.advocate = (path==='forum');
+  G.oratory=1; G.casesWon=0; G.casesLost=0; G.lastCaseDay=-9;
+  G.renown = wasRoyal? 20 : 0;              // a governor's daughter is already known in the Forum
+  G.senate=false; G.royal=false;
   bumpStat('dynasties'); unlock('dynasty');
-  refreshStatbar(); saveQuiet(); openVilla();
+  refreshStatbar(); saveQuiet();
+  if(G.advocate){
+    openForum();
+    toast('⚖ '+heir+' refuses the sand and takes up the FORUM — an advocate of Rome. Win cases, build renown, and rise to the Senate'+(wasRoyal?' — your father’s name already opens doors (+20 renown).':'.')
+      + (G.traits.length? ' Her blood carries: '+G.traits.map(traitLabel).join(', ')+'.':''), 7000);
+    return;
+  }
+  openVilla();
   toast((fem
     ? '🗡 '+heir+' takes the sand in DEFIANCE of the Emperor’s ban — the first GLADIATRIX of your house! The dynasty endures.'
     : '⚔ The sword passes to '+heir+'. The dynasty endures — now win a glory of your own.')
-    + (prestige>0? ' The legacy house grants a head start: +'+Math.round(prestige*0.4)+' glory, +'+Math.round(prestige*2)+'d.':''), 5000);
+    + (prestige>0? ' The legacy house grants a head start: +'+Math.round(prestige*0.4)+' glory, +'+Math.round(prestige*2)+'d.':'')
+    + (G.traits.length? ' Blood: '+G.traits.map(traitLabel).join(', ')+'.':''), 5000);
+}
+// the fork in the road for an heiress
+function offerDaughterPath(ch){
+  const sm=ch.smarts===undefined?5:ch.smarts;
+  const wasRoyal = !!(G.emperor || (G.titles && Object.keys(G.titles).length));
+  state='menu'; show('scr-villa'); $('statbar').classList.remove('hide');
+  const b=$('villa-body'); b.innerHTML='';
+  const head=document.createElement('div'); head.className='shopcard'; head.style.borderColor='var(--gold)';
+  head.innerHTML=`<div><b style="color:var(--gold)">⚜ THE HOUSE PASSES TO ${ch.name.split(' ')[0].toUpperCase()}</b></div>
+    <div class="small muted">Your daughter inherits the family name — and must choose how she will make it great.
+    ${(ch.traits&&ch.traits.length)?'Her blood carries <b style="color:#c89af0">'+ch.traits.map(traitLabel).join(', ')+'</b>.':''}
+    🧠 wits <b style="color:#6ac8e0">${sm}/10</b>${wasRoyal?' · her father governed — the Forum already knows the name':''}</div>`;
+  b.appendChild(head);
+  const mk=(title,desc,label,path,col)=>{
+    const c=document.createElement('div'); c.className='shopcard'; c.style.borderColor=col;
+    c.innerHTML=`<div><b style="color:${col}">${title}</b></div><div class="small muted">${desc}</div>`;
+    const bt=document.createElement('button'); bt.className='btn sm gold'; bt.textContent=label;
+    bt.onclick=()=>succession(ch,path); c.appendChild(bt); b.appendChild(c);
+  };
+  mk('🗡 THE SAND — take up the sword','Fight as a GLADIATRIX in defiance of the Emperor’s ban. Infamy, scandal, and the roar of the mob. The arena, the beasts, the sea-fights — all of it.','🗡 TAKE THE SAND','arena','#e0907a');
+  mk('⚖ THE FORUM — take up the law','Refuse the arena. Argue real cases before Roman juries, win renown by wits and rhetoric, take a seat in the SENATE, and rise into the ROYAL house. No blood — only words.'
+     +(sm>=7?' <b style="color:#6ac8e0">Her mind is sharp; she would be formidable here.</b>':''),'⚖ TAKE THE FORUM','forum','#6ac8e0');
 }
 
 // ---- MARRIAGE ----
@@ -5265,6 +5552,40 @@ function wifeVerdict(){
   else if(hy>=85) ew=ew.slice(0,-1)+' — and '+s2+' smells of rose oil.”';
   return {pw,ew,p,e,hy};
 }
+/* =====================================================================
+   JEALOUSY — she notices. Neglect, other women, and a wandering
+   reputation build resentment; attention, gifts and letters cool it.
+   ===================================================================== */
+function jealousyLevel(){ const j=G.jealousy||0; return j>=75?3 : j>=45?2 : j>=20?1 : 0; }
+function jealousyLabel(){ return ['calm','watchful','jealous','FURIOUS'][jealousyLevel()]; }
+function addJealousy(n,why){
+  if(!G.married || !G.wife) return;
+  if(hasTrait('devoted')) n*=0.45;                       // a devoted heart is slower to burn
+  const before=jealousyLevel();
+  G.jealousy=clamp((G.jealousy||0)+n,0,100);
+  const after=jealousyLevel();
+  if(after>before && why){
+    const S=G.wife.male?'He':'She';
+    toast('💢 '+S+' has heard about '+why+'. '+(after>=3?S+' is FURIOUS.':after===2?S+' is jealous.':S+' is watching you closely.')+' (jealousy '+Math.round(G.jealousy)+')',3600);
+  }
+}
+function easeJealousy(n){ G.jealousy=clamp((G.jealousy||0)-n,0,100); }
+// jealousy bites: she withholds the bedchamber, drains the bond, and makes scenes
+function jealousyEffects(){
+  const lv=jealousyLevel(); if(!lv || !G.married) return;
+  const S=G.wife.male?'He':'She', s=G.wife.male?'he':'she';
+  if(lv>=2 && Math.random()<0.35){
+    const r=Math.random();
+    if(r<0.34){ const c=ri(60,220); G.coin=Math.max(0,G.coin-c);
+      G.lastRaid='💢 JEALOUSY — '+S+' spends '+c+'d on silks and jewels "since you clearly have coin for OTHER amusements."'; }
+    else if(r<0.67){ G.wifeRel=clamp(G.wifeRel-4,0,100);
+      G.lastRaid='💢 JEALOUSY — a cold silence at dinner that the whole household can feel. (−4 ♥)'; }
+    else { G.honor=clamp(G.honor-3,0,100);
+      G.lastRaid='💢 JEALOUSY — '+S+' makes a scene in the colonnade before guests. Rome enjoys it enormously. (−3 honor)'; }
+  }
+  if(lv>=3 && Math.random()<0.5){ G.wifeRel=clamp(G.wifeRel-3,0,100); }
+}
+function jealousyBlocksBed(){ return jealousyLevel()>=3 && Math.random()<0.6; }
 /* =====================================================================
    THE TABULA — a wax-tablet note home, ancient texting. Her reply is
    generated, not fixed: it reads your bond, whether you were together
@@ -5323,17 +5644,71 @@ const NOTE_APOLOGY_SOFT=[
   'You needn’t grovel in ink. Just come home, and grovel properly.',
   'Apology accepted, love — though a gift wouldn’t hurt your case.',
   'Silence forgiven. This time.'];
+// she asks about what you actually wrote — questions get answers
+const NOTE_QUESTION=[
+  ['when','As to when you return — I have stopped counting, which is its own kind of answer.'],
+  ['home','Home is where I am keeping your side of the bed. Do not test my patience with it.'],
+  ['child','The child is well, loud, and entirely your fault in temperament.'],
+  ['money','The accounts hold. I am better with them than you are, and we both know it.'],
+  ['love','You ask if I love you. Read the length of this letter and decide.'],
+];
+// SECOND SENTENCE — she reports on the actual state of the house and of you
+function noteHouseNews(){
+  const w=G.wife||{}, out=[];
+  const kids=(G.children||[]).filter(c=>!c.wed);
+  if(G.pregnant){ const m=Math.max(1,Math.min(9,9-Math.ceil((G.pregnant.due-G.day)/3)));
+    out.push('The child is in its '+['','first','second','third','fourth','fifth','sixth','seventh','eighth','ninth'][m]+' month now and kicks like a legionary.'); }
+  if(kids.length===1) out.push(kids[0].name.split(' ')[0]+' asks after you every single evening.');
+  else if(kids.length>1) out.push('The children are wild — '+kids[0].name.split(' ')[0]+' has taught the others to fence with kitchen spoons.');
+  if(G.injury) out.push('Word reached me of your '+G.injury.name+'. Do not pretend it is nothing; I know you.');
+  if((G.wins||0)>0 && Math.random()<0.5) out.push('They are singing about your last bout in the wine shops. I pretend not to listen, then I listen.');
+  if((G.titles&&Object.keys(G.titles).length) && Math.random()<0.5) out.push('The province is quiet and your name is spoken well in it.');
+  if((G.jealousy||0)>=45 && jealousyLevel()<3) out.push('I hear things about how you pass your evenings. I would rather hear them from you.');
+  if((G.hygiene|0)<30) out.push('Also — bathe. I can smell the arena in the wax of your letter.');
+  if(G.emperor) out.push('The whole house bows when your name is read aloud. I still do not.');
+  if((G.coin||0)>4000 && Math.random()<0.4) out.push('The strongbox is fat. I have plans for it you will hear about later.');
+  if(!out.length) out.push('The house is well. The oil jars are full. Nothing here changes but the season.');
+  return pick(out);
+}
+// her SIGN-OFF, coloured by her own blood and how she feels
+function noteSignoff(tier){
+  const w=G.wife||{}, tr=w.traits||[];
+  const opts=[];
+  if(tier>=3){ opts.push('Come home. — yours, and impatient about it'); opts.push('Do not keep me waiting. — V.'); }
+  else if(tier===2){ opts.push('Come home safe. — yours'); opts.push('Write again sooner. — yours'); }
+  else if(tier===1){ opts.push('Keep well. — L.'); opts.push('Write when you can.'); }
+  else { opts.push('— the mistress of your house'); opts.push('Sent by the same courier who waited an hour for a reply.'); }
+  if(tr.includes('smart') && Math.random()<0.4) opts.push('P.S. Your last letter had three errors of grammar. I have corrected them and kept it anyway.');
+  if(tr.includes('fierce') && Math.random()<0.4) opts.push('P.S. If any man there troubles you, send me his name.');
+  if(tr.includes('cunning') && Math.random()<0.4) opts.push('P.S. I know what the senator’s wife said about you. I have already dealt with it.');
+  if(tr.includes('devoted') && Math.random()<0.4) opts.push('P.S. I lit a lamp for you at the shrine. I do it every night, and you never knew.');
+  return pick(opts);
+}
 function craftWifeReply(text){
   const {tier,afterglow}=noteBaseTier();
   const {s,apology}=noteSentiment(text);
   let useTier=tier;
   if(s>=3) useTier=Math.min(3,useTier+1);
   else if(s<=-2) useTier=Math.max(0,useTier-1);
+  // jealousy drags her tone down hard, whatever the bond
+  const jl=jealousyLevel();
+  if(jl>=3) useTier=0; else if(jl===2) useTier=Math.max(0,useTier-1);
   let pool=NOTE_REPLIES[useTier].slice();
   if(afterglow && Math.random()<0.6) pool=pool.concat(NOTE_AFTERGLOW);
   if(apology && useTier<=1 && Math.random()<0.7) pool=pool.concat(NOTE_APOLOGY_SOFT);
-  const line=pick(pool);
-  const gain=[0,1,2,4][useTier] + (apology?1:0);
+  if(jl>=3) pool=['I received your letter. I also received word of how you spend your evenings. Write to me about THAT.',
+                  'You write very prettily for a man with so much to explain.',
+                  'A letter. How generous. I had begun to think you had forgotten the address.'];
+  let line=pick(pool);
+  // ---- ANSWER A DIRECT QUESTION if the note asked one ----
+  const t=(text||'').toLowerCase();
+  if(t.includes('?')){ for(const [kw,ans] of NOTE_QUESTION){ if(t.includes(kw)){ line+=' '+ans; break; } } }
+  // ---- NEWS OF THE HOUSE + a sign-off in her own voice ----
+  if(Math.random()<0.85) line+=' '+noteHouseNews();
+  line+='  '+noteSignoff(useTier);
+  let gain=[0,1,2,4][useTier] + (apology?1:0);
+  if(apology && jl>=2){ easeJealousy(10); gain+=1; }         // a written apology genuinely helps
+  else if(useTier>=2) easeJealousy(4);
   return {line, gain, useTier};
 }
 let noteReturn='map';
@@ -5387,6 +5762,9 @@ function buildMarriageCard(b){
       `<div><b style="color:var(--gold)">⚭ ${w.name}</b> <span class="small muted">— your ${w.adj} ${w.rank} ${w.male?'husband':'wife'}</span></div>
        <div class="small">♥ Emotional: ${mkbar(v.e,eC)} <b style="color:${eC}">${v.e}</b>/100 <span class="muted">${v.ew}</span></div>
        <div class="small">${ADULT?'🔥 Physical':'🔥 Devotion'}: ${mkbar(v.p,pC)} <b style="color:${pC}">${v.p}</b>/100 <span class="muted">${v.pw}</span></div>
+       ${(w.traits&&w.traits.length)? '<div class="small" style="color:#c89af0">'+w.traits.map(traitLabel).join(' · ')+'</div>':''}
+       ${(()=>{ const j=Math.round(G.jealousy||0), lv=jealousyLevel(); const jc=['#8a8a6a','#e8c34a','#e08a3a','#e05b5b'][lv];
+          return `<div class="small">💢 Jealousy: ${mkbar(j,jc)} <b style="color:${jc}">${j}</b>/100 <span class="muted">— ${w.male?'he is':'she is'} ${jealousyLabel()}${lv>=3?'; the bedchamber door may well be barred':lv>=2?'; make time for '+(w.male?'him':'her'):''}</span></div>`; })()}
        <div class="small" style="color:var(--gold)">${marriageEffectsText(w)}</div>`+
       (preg? `<div class="small" style="color:#e2a0b8">🤰 ${G.isFemale?'You are':'She is'} with child — month <b>${Math.max(1,month)}</b> of 9.</div>`:'');
     row.appendChild(info); card.appendChild(row);
@@ -5428,6 +5806,12 @@ function buildMarriageCard(b){
     } else bedPlace='bed';
     // the launcher: her face changes FIRST — lovingly, excitedly — then the scene
     const launch=(mode)=>{
+      // a furious spouse bars the door — make peace first
+      if(jealousyBlocksBed()){
+        const S=w.male?'He':'She';
+        toast('🚪 The bedchamber door is barred from the inside. “'+(w.male?'Go ask one of THEM.':'Go and find one of THEM, then.')+'” — '+S+' is furious with you. Talk, write, or bring a gift.',4200);
+        easeJealousy(4); openVilla(); return;
+      }
       spendLove(bedLen); saveQuiet();
       if(!w.male){ w._expr='love'; const cv=document.createElement('canvas'); cv.width=cv.height=148;
         drawBridePortrait(cv,w); portImg.src=cv.toDataURL(); delete w._expr; }
@@ -5452,7 +5836,7 @@ function buildMarriageCard(b){
         ['You talk of the children you will raise, and the villa you will grow old in.',5],
         ['She names every scar on your arms, and kisses the newest one.',5]];
       const pickL=lines[ri(0,lines.length-1)];
-      G.wifeRel=clamp(G.wifeRel+pickL[1],0,100); toast('💬 '+pickL[0]+' (+'+pickL[1]+' ♥)',2800);
+      G.wifeRel=clamp(G.wifeRel+pickL[1],0,100); easeJealousy(6); toast('💬 '+pickL[0]+' (+'+pickL[1]+' ♥)',2800);
       refreshStatbar(); saveQuiet(); openVilla();
     });
     q(tcd<1?'🌹 (you spoke today)':'🌹 “You look beautiful tonight.”','Flattery: the oldest weapon in the house.',tcd<1,()=>{
@@ -5462,7 +5846,7 @@ function buildMarriageCard(b){
       refreshStatbar(); saveQuiet(); openVilla();
     });
     q('🎁 A gift from the forum (50d)','A silver comb, Tyrian ribbon, honeyed figs — 50 denarii of pure strategy.',G.coin<50,()=>{
-      G.coin-=50; G.wifeRel=clamp(G.wifeRel+8,0,100);
+      G.coin-=50; G.wifeRel=clamp(G.wifeRel+8,0,100); easeJealousy(14);
       toast('🎁 You present it with terrible ceremony. '+(w.male?'His':'Her')+' eyes shine. (+8 ♥)',2800);
       refreshStatbar(); saveQuiet(); openVilla();
     });
@@ -5571,6 +5955,8 @@ function openMarry(forced){
     const info=document.createElement('div'); info.style.flex='1'; info.innerHTML=
       `<div><b style="color:var(--gold)">${w.name}</b></div>
        <div class="small">${w.adj} ${w.rank} · <span class="muted">${w.male? 'a lord of his people'+(w.jewel?', gold-ringed':'') : w.build+' of figure'+(w.jewel?', richly adorned':'')}</span></div>
+       ${statPips(w)}
+       ${(w.traits&&w.traits.length)? '<div class="small" style="color:#c89af0">'+w.traits.map(traitLabel).join(' · ')+'</div>' : '<div class="small muted">no notable gifts</div>'}
        <div class="small muted" style="margin:2px 0">${w.perk}</div>
        <div class="small" style="color:var(--gold)">${marriageEffectsText(w)}</div>`;
     row.appendChild(info); card.appendChild(row);
@@ -5578,15 +5964,37 @@ function openMarry(forced){
     bt.onclick=()=>marry(w); card.appendChild(bt);
     body.appendChild(card);
   });
-  const rf=document.createElement('button'); rf.className='btn sm'; rf.textContent='↻ Other suitors (20d)';
-  rf.disabled=G.coin<20; rf.onclick=()=>{ if(G.coin<20)return; G.coin-=20; marryList=rollBrides(); refreshStatbar(); openMarry(marryForced); };
-  body.appendChild(rf);
+  // ---- KEEP LOOKING: every set of suitors seen makes the next a little finer ----
+  const rr=document.createElement('div'); rr.className='shopcard';
+  rr.innerHTML=`<div><b style="color:var(--gold)">🔎 THE MATCHMAKER</b> <span class="small muted">— suitors seen: <b>${G.marryRolls||0}</b>. Word spreads; the longer you look, the finer the families that present themselves.</span></div>`;
+  const rrow=document.createElement('div'); rrow.className='row gap6'; rrow.style.flexWrap='wrap';
+  const mkRoll=(label,cost,minQ,title)=>{
+    const bt=document.createElement('button'); bt.className='btn sm'+(minQ?' gold':''); bt.textContent=label; bt.title=title||'';
+    bt.disabled=G.coin<cost;
+    bt.onclick=()=>{ if(G.coin<cost) return; G.coin-=cost; G.marryRolls=(G.marryRolls||0)+1;
+      marryList=rollBrides(minQ); refreshStatbar(); saveQuiet(); openMarry(marryForced); };
+    rrow.appendChild(bt);
+  };
+  mkRoll('↻ Other suitors (20d)',20,0,'Ordinary matches — but each viewing nudges your luck upward.');
+  mkRoll('💰 SEND FOR FINER FAMILIES (300d)',300,6,'Guaranteed good matches: handsome, clever, and gifted.');
+  mkRoll('👑 THE MATCHMAKER’S FINEST (1000d)',1000,9,'The greatest match in the empire — near-perfect looks and wits, three gifts of blood.');
+  rr.appendChild(rrow); body.appendChild(rr);
   // when marriage is a duty, there is no walking away
   $('btn-marry-back').style.display = marryForced? 'none':'';
 }
+function hasTrait(id){ return !!(G.wife && G.wife.traits && G.wife.traits.includes(id)); }
 function marry(w){
   G.wife=w; G.married=true;
   G.wifeRel = w.rank==='peasant'? 62 : 50;   // a love-match starts warmer than an alliance
+  // ---- gifts of blood pay out at once, and keep paying ----
+  const tr=w.traits||[];
+  if(tr.includes('beauty')){ w.pop=(w.pop||0)+8; }
+  if(tr.includes('wealthy')){ w.dowryCoin=(w.dowryCoin||0)+700; w.tradeCoin=(w.tradeCoin||0)+8; }
+  if(tr.includes('noble')){ w.approval=(w.approval||0)+10; w.honor=(w.honor||0)+5; }
+  if(tr.includes('cunning')){ w.favor=(w.favor||0)+4; }
+  if(tr.includes('fierce')){ w.dowrySoldiers=(w.dowrySoldiers||0)+400; }
+  if(tr.includes('devoted')){ G.wifeRel=clamp(G.wifeRel+12,0,100); }
+  if(tr.includes('smart')){ w.tradeCoin=(w.tradeCoin||0)+4; }
   G.coin+=w.dowryCoin||0; if(w.dowryFood) G.food+=w.dowryFood; if(w.dowrySoldiers) addTroops(w.eth==='roman'?'levy':w.eth, w.dowrySoldiers);
   G.approval=clamp(G.approval+(w.approval||0),0,100); G.favor+=w.favor||0;
   G.honor=clamp(G.honor+(w.honor||0),0,100); G.pop=clamp(G.pop+(w.pop||0),0,100);
@@ -5599,6 +6007,8 @@ $('btn-marry-back').onclick=()=>enterMap();
 $('btn-note-send').onclick=()=>sendNote();
 $('btn-note-back').onclick=()=>{ if(noteReturn==='villa') openVilla(); else enterMap(); };
 $('btn-circus-back').onclick=()=>enterMap();
+$('btn-forum').onclick=()=>openForum();
+$('btn-forum-back').onclick=()=>enterMap();
 $('btn-portrait-back').onclick=()=>openVilla();
 
 // ---- INTRIGUE: Elite Siege, hidden guests, private army, grand plot ----
@@ -5756,7 +6166,7 @@ function advanceDay(n){
         const son=Math.random()<0.5;
         const nm= son? (pick(['Titus','Lucius','Gaius','Marcus','Quintus','Decimus'])+' '+(G.name.split(' ')[0])+'i filius')
                      : pick(['Julia','Livia','Antonia','Claudia','Valeria','Aurelia'])+' '+(G.wife?G.wife.name.split(' ')[0]:'');
-        G.children.push({name:nm, sex:son?'m':'f', born:G.day});
+        G.children.push(Object.assign({name:nm, sex:son?'m':'f', born:G.day}, inheritDNA()));
         G.pregnant=null;
         if(son){ G.approval=clamp(G.approval+3,0,100); G.pop=clamp(G.pop+3,0,100);
           toast('👶 A SON! '+nm+' — an heir for your house! (+3 approval, +3 pop)',3400); }
@@ -5840,6 +6250,16 @@ function advanceDay(n){
       else toast('🎂 A year turns — you are now '+na+'.',2000);
     }
     if(na>=55 && Math.random() < 0.16+(na-55)*0.09) G.pendingDeath=true;   // age itself comes for every man
+  }
+  // ---- JEALOUSY: neglect festers; attention cools it ----
+  if(G.married && G.wife){
+    const since=G.day-(G.lastTalkDay===undefined?-9:G.lastTalkDay);
+    const sinceNote=G.day-(G.lastNoteDay===undefined?-9:G.lastNoteDay);
+    if(since>6 && sinceNote>6) addJealousy(2.2,'how long you have been silent');
+    else if(since<=2 || sinceNote<=2) easeJealousy(1.6);
+    if((G.pop||0)>75 && Math.random()<0.10) addJealousy(2.5,'the women who chant your name in the stands');
+    if((G.hidden||[]).length>0 && Math.random()<0.12) addJealousy(3,'the guests you keep hidden in the house');
+    jealousyEffects();
   }
   checkFamilyMan();                              // the house may have reached perfect harmony
   refreshStatbar();
@@ -6963,6 +7383,8 @@ window.__SS = {
   openNote, sendNote, craftWifeReply, noteBaseTier, setNoteInput:(t)=>{ const el=document.getElementById('note-input'); if(el) el.value=t; },
   checkFamilyMan, gladiatrixAfterWin,
   openCircus, startRace, finishRace, get RC(){return RC;}, updateRace, drawRace,
+  openForum, startCase, playArgument, finishCase, get CASE(){return CASE;}, checkAdvocateRank,
+  offerDaughterPath, inheritDNA, rollTraits, hasTrait,
   openMarry, marry, rollBrides, makeBride, get marryList(){return marryList;},
   advanceDay, openVilla,
   succession, openPortrait, startBedScene,
