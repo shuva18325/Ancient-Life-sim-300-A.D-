@@ -146,6 +146,7 @@
         <div class="row center gap" style="margin-top:6px;">
           <button class="btn gold" id="btn-new">▶ NEW CAREER</button>
           <button class="btn" id="btn-continue">CONTINUE</button>
+          <button class="btn" id="btn-slots">💾 CAREERS</button>
           <button class="btn" id="btn-help">HOW TO PLAY</button>
         </div>
         <div class="row center gap" style="margin-top:2px;">
@@ -338,6 +339,16 @@
     </div>
   </div>
 
+  <!-- ===== SAVE SLOTS ===== -->
+  <div id="scr-slots" class="screen center">
+    <div class="panel pad col gap" style="width:min(94%,620px);max-height:94%;">
+      <h2 style="color:var(--gold)">💾 CAREERS</h2>
+      <div class="small muted">Three separate dynasties. Each keeps its own house, blood and history.</div>
+      <div id="slots-body" class="col gap"></div>
+      <div class="row" style="justify-content:flex-end;"><button class="btn gold" id="btn-slots-back">◀ BACK</button></div>
+    </div>
+  </div>
+
   <!-- ===== THE FAMILY TREE — DNA across the generations ===== -->
   <div id="scr-tree" class="screen center">
     <div class="panel pad col gap scrollbox" style="width:min(96%,760px);max-height:95%;">
@@ -372,6 +383,7 @@
     <div class="panel pad col center gap" style="width:min(94%,620px);max-height:95%;">
       <h2 style="color:var(--gold)" id="bodymap-title">🗺 BODY MAP</h2>
       <div id="bodymap-verdict" class="small" style="text-align:center"></div>
+      <div id="bodymap-secret" class="col gap6" style="width:100%"></div>
       <div id="bodymap-views" class="row gap6" style="justify-content:center"></div>
       <canvas id="bodymap-cv" width="440" height="260" style="position:static;width:min(94%,440px);height:auto;image-rendering:auto;border:2px solid var(--gold);border-radius:4px;"></canvas>
       <div class="small muted" style="text-align:center">Pale pink is poorest · deep purple is finest. The chart never flatters.</div>
@@ -525,6 +537,21 @@
       <div class="row center gap" style="margin-top:6px;">
         <button class="btn gold" id="btn-res-continue">CONTINUE ▶</button>
       </div>
+    </div>
+  </div>
+
+  <!-- touch controls for the NEW screens: the race (whip/lanes) and the villa (walk/run/act) -->
+  <div id="touch2" class="hide" style="position:absolute;inset:0;z-index:9;pointer-events:none;">
+    <div style="position:absolute;left:8px;bottom:8px;display:flex;gap:8px;pointer-events:auto;">
+      <button class="btn t2" data-k2="a" style="width:56px;height:56px">◀</button>
+      <button class="btn t2" data-k2="d" style="width:56px;height:56px">▶</button>
+    </div>
+    <div style="position:absolute;right:8px;bottom:8px;display:flex;gap:8px;align-items:flex-end;pointer-events:auto;">
+      <button class="btn t2" data-k2="up" style="width:52px;height:52px">▲</button>
+      <button class="btn t2" data-k2="down" style="width:52px;height:52px">▼</button>
+      <button class="btn t2" data-k2="s" style="width:56px;height:56px">RUN</button>
+      <button class="btn t2 gold" data-k2="w" style="width:66px;height:66px">WHIP</button>
+      <button class="btn t2 blood" data-k2="space" style="width:56px;height:56px">ACT</button>
     </div>
   </div>
 
@@ -943,18 +970,26 @@ const BODY_PARTS_M=[
   {id:'legs',   name:'Legs',      tiers:['Spindly','Plain','Strong','Powerful','Titanic'],
    good:['a horseman’s powerful legs','strong, tireless legs'],              bad:['spindly legs','thin-shanked']},
 ];
-function partsFor(w){ return (w&&w.male)? BODY_PARTS_M : BODY_PARTS; }
+const SECRET_PART={id:'secret', name:'The Rest', tiers:['Short','Modest','Average','Long','Immense'],
+  good:['gifted, frankly','a matter of some renown in the baths'], bad:['modest','nothing the poets will mention']};
+// the chart only ever shows this if mature content is ON *and* the secret chart was bought
+function secretUnlocked(){ return !!(ADULT && G && G.hasSecretMap); }
+function partsFor(w){
+  const base=(w&&w.male)? BODY_PARTS_M : BODY_PARTS;
+  if(w&&w.male&&secretUnlocked()) return base.concat([SECRET_PART]);
+  return base;
+}
 const IMPOSSIBLE_V=11;                       // beyond the human scale — cheats only
 // the NAMED tier for one part at one score
 function partTier(pid,v,male){
-  const P=(male?BODY_PARTS_M:BODY_PARTS).find(p=>p.id===pid); if(!P) return '';
+  const P=(pid==='secret')?SECRET_PART:(male?BODY_PARTS_M:BODY_PARTS).find(p=>p.id===pid); if(!P) return '';
   if(v>=IMPOSSIBLE_V) return 'IMPOSSIBLE';
   const i=clamp(Math.floor((v-1)/2),0,P.tiers.length-1);
   return P.tiers[i];
 }
 // a phrase for one part, given its score
 function partPhrase(pid,v,male){
-  const P=(male?BODY_PARTS_M:BODY_PARTS).find(p=>p.id===pid); if(!P) return '';
+  const P=(pid==='secret')?SECRET_PART:(male?BODY_PARTS_M:BODY_PARTS).find(p=>p.id===pid); if(!P) return '';
   if(v>=IMPOSSIBLE_V){
     return (male
       ? {bust:'a chest that should not be physically possible', booty:'shoulders wider than the doorway itself',
@@ -1096,7 +1131,7 @@ function makeBride(eth, noble, quality){
   if(quality>=10 && Math.random()<0.22) tier='imperial';
   else if(quality>=8) tier= Math.random()<0.45?'elite':'rich';
   else if(quality>=6) tier= Math.random()<0.5?'rich':'common';
-  const body=bodyRoll;
+  const body=bodyRoll; body.secret=clamp(Math.round(quality + rnd(-3,3)),1,10);
   const b = {
     eth, adj:D.adj, rank: noble?'noble':'peasant', build, tier, body,
     quality, looks, smarts, traits: rollTraits(quality), flaws: rollFlaws(quality),
@@ -1310,12 +1345,31 @@ function openBodyMap(w,back){
   $('bodymap-verdict').innerHTML=`<b style="color:${st.col}">${st.name}</b> <span class="muted">— ${st.blurb}</span>
     <div class="small" style="margin-top:3px">${bodyTierLine(w)}</div>
     <div class="small muted" style="margin-top:2px;font-style:italic">${bodyBlurb(w)}</div>`;
+  // ---- THE OTHER CHART: a discreet trader, and only if you already deal in charts ----
+  const sm=$('bodymap-secret'); sm.innerHTML='';
+  if(w.male && ADULT && !G.hasSecretMap){
+    const d=document.createElement('div'); d.className='shopcard'; d.style.borderColor='#8a5cc0';
+    d.innerHTML=`<div><b style="color:#c89af0">🕯 A WOMAN IN A PLAIN CLOAK</b> <span class="small muted">— she waits by the colonnade until the others have gone.</span></div>
+      <div class="small muted" style="font-style:italic">“The matchmakers sell you shoulders and jawlines. I keep the other ledger — the one the wives compare over wine and never write down.
+      Four hundred, and you will never wonder about a man again.”</div>`;
+    const bt=document.createElement('button'); bt.className='btn sm'; bt.style.borderColor='#8a5cc0'; bt.style.color='#c89af0';
+    bt.textContent='🕯 THE OTHER LEDGER (400d)'; bt.disabled=G.coin<400;
+    bt.title='She will not say what is on it. She says you will know it when you see it.';
+    bt.onclick=()=>{ if(G.coin<400) return; G.coin-=400; G.hasSecretMap=true; refreshStatbar(); saveQuiet();
+      toast('🕯 She hands over a second chart, rolled tight, and is gone before you unroll it. It measures rather more than shoulders.',5200);
+      openBodyMap(w,bodyMapBack); };
+    d.appendChild(bt); sm.appendChild(d);
+  } else if(w.male && ADULT && G.hasSecretMap){
+    const d=document.createElement('div'); d.className='small'; d.style.color='#c89af0';
+    d.textContent='🕯 The other ledger is unrolled beside the chart.'; sm.appendChild(d);
+  }
   // view switcher
   const vr=$('bodymap-views'); vr.innerHTML='';
   [['front','◧ FRONT'],['side','◐ SIDE'],['back','◨ BACK']].forEach(([id,label])=>{
     const bt=document.createElement('button'); bt.className='btn sm'+(bodyMapView===id?' gold':''); bt.textContent=label;
     bt.onclick=()=>{ bodyMapView=id; openBodyMap(w,bodyMapBack); }; vr.appendChild(bt);
   });
+  try{sfx('scroll');}catch(e){}
   drawBodyMap($('bodymap-cv'), w, bodyMapView);
 }
 let bodyMapSubject=null, bodyMapBack='marry';
@@ -1406,6 +1460,19 @@ let legacyPick=null;
    GAME STATE / SAVE
    ===================================================================== */
 const SAVE_KEY='sand_and_steel_save_v1';
+const SLOT_KEY='SANDSTEEL_SLOT';
+const NSLOTS=3;
+let saveSlot=(function(){ try{ const v=parseInt(localStorage.getItem(SLOT_KEY),10); return (v>=1&&v<=NSLOTS)?v:1; }catch(e){ return 1; } })();
+function slotKey(n){ return n===1? SAVE_KEY : SAVE_KEY+'_s'+n; }     // slot 1 keeps the original key, so old careers survive
+function setSlot(n){ saveSlot=clamp(n,1,NSLOTS); try{ localStorage.setItem(SLOT_KEY,String(saveSlot)); }catch(e){} }
+function slotInfo(n){
+  try{ const raw=localStorage.getItem(slotKey(n)); if(!raw) return null;
+    const g=JSON.parse(raw);
+    return {name:g.name||'—', level:g.level||1, glory:g.glory||0, day:g.day||0, age:g.age||19,
+            wins:g.wins||0, losses:g.losses||0, female:!!g.isFemale,
+            path: g.advocate?'Advocate' : g.tribune?'Legions' : g.emperor?'EMPEROR' : 'Arena'};
+  }catch(e){ return null; }
+}
 let G = null;  // player career
 function freshCareer(name,origin,arch,social){
   const A=ARCHETYPES[arch]||ARCHETYPES.Roman;
@@ -1459,7 +1526,7 @@ function freshCareer(name,origin,arch,social){
     familyMan:false,                              // wife maxed on every stat + every child adoring → the FAMILY MAN title
     infamy:0, gladiatrixStage:0, pardoned:false,  // THE GLADIATRIX ARC — scandal → sensation → legend → the Emperor's pardon
     lastNoteDay:-9, lastNoteReply:'',             // THE TABULA — a written note home + her last reply
-    hasBodyMap:false,                             // the matchmaker's figure-chart, bought once
+    hasBodyMap:false, hasSecretMap:false,         // the matchmaker's figure-chart · and the OTHER chart
     marryRolls:0,                                 // suitors seen — keep looking and finer matches present themselves
     jealousy:0, lastJealousDay:-9,                // WIFE JEALOUSY — neglect and wandering eyes have a price
     traits:[], flaws:[], looks:5, smarts:5,       // YOUR OWN blood (an heir inherits from both parents)
@@ -1543,10 +1610,10 @@ function elevateWife(rank){
   refreshStatbar(); saveQuiet(); openVilla();
 }
 // fill in any fields missing from older saves
-function migrate(g){ const d={honor:50,food:4,mount:0,slaves:0,hasVilla:false,boat:false,favor:0,soldiers:0,hidden:[],plotTier:0,emperor:false,approval:50,legions:0,rivals:0,retired:false,detachments:[],day:0,titles:{},clears:{},socialClass:'gladiator',army:{},armyGear:0,armyTrain:0,hasOrganizer:false,generals:[],wife:null,married:false,marryPrompted:false,children:[],pregnant:null,lastLoveDay:-9,injury:null,lastDebateDay:-9,office:0,path:null,parthia:50,parthiaPact:false,wifeRel:50,lastTalkDay:-9,isFemale:false,lineage:[],hygiene:70,wifePhys:45,hasPool:false,hasWardrobe:false,legacy:null,lastFeastDay:-9,loveDay:-1,loveQuick:0,loveLong:0,loveNight:0,loveVigil:0,venusUntil:-1,lastWashDay:-9,lastPoolDay:-9,lastWardrobeDay:-9,lastKidsDay:-9,lastBathDay:-9,pila:0,bow:null,bowsOwned:[],nemesis:null,trophies:[],nemesisCount:0,pendingDeath:false,ageBase:0,wonProvinceByFight:false,familyMan:false,infamy:0,gladiatrixStage:0,pardoned:false,lastNoteDay:-9,lastNoteReply:'',marryRolls:0,hasBodyMap:false,jealousy:0,lastJealousDay:-9,traits:[],flaws:[],looks:5,smarts:5,advocate:false,tutorialDone:false,oratory:1,casesWon:0,casesLost:0,renown:0,senate:false,royal:false,lastCaseDay:-9,skills:{footwork:0,guard:0,blade:0,wind:0,throwing:0},scars:[],fatigue:0,lastTrainDay:-9,tribune:false,rank:0,campaigns:0,legionRep:0,lastCampaignDay:-9}; for(const k in d){ if(g[k]===undefined) g[k]=d[k]; } if(!g.current) g.current='Italia'; if(g.age===undefined) g.age=19+Math.floor(((g.day||0)-(g.ageBase||0))/36); return g; }
-function saveGame(){ try{ localStorage.setItem(SAVE_KEY, JSON.stringify(G)); toast('Saved.'); }catch(e){ toast('⚠ Could not save — browser storage is blocked or full.',3200); } }
-function hasSave(){ try{ return !!localStorage.getItem(SAVE_KEY); }catch(e){ return false; } }
-function loadGame(){ try{ G=migrate(JSON.parse(localStorage.getItem(SAVE_KEY))); return !!G; }catch(e){ return false; } }
+function migrate(g){ const d={honor:50,food:4,mount:0,slaves:0,hasVilla:false,boat:false,favor:0,soldiers:0,hidden:[],plotTier:0,emperor:false,approval:50,legions:0,rivals:0,retired:false,detachments:[],day:0,titles:{},clears:{},socialClass:'gladiator',army:{},armyGear:0,armyTrain:0,hasOrganizer:false,generals:[],wife:null,married:false,marryPrompted:false,children:[],pregnant:null,lastLoveDay:-9,injury:null,lastDebateDay:-9,office:0,path:null,parthia:50,parthiaPact:false,wifeRel:50,lastTalkDay:-9,isFemale:false,lineage:[],hygiene:70,wifePhys:45,hasPool:false,hasWardrobe:false,legacy:null,lastFeastDay:-9,loveDay:-1,loveQuick:0,loveLong:0,loveNight:0,loveVigil:0,venusUntil:-1,lastWashDay:-9,lastPoolDay:-9,lastWardrobeDay:-9,lastKidsDay:-9,lastBathDay:-9,pila:0,bow:null,bowsOwned:[],nemesis:null,trophies:[],nemesisCount:0,pendingDeath:false,ageBase:0,wonProvinceByFight:false,familyMan:false,infamy:0,gladiatrixStage:0,pardoned:false,lastNoteDay:-9,lastNoteReply:'',marryRolls:0,hasBodyMap:false,hasSecretMap:false,jealousy:0,lastJealousDay:-9,traits:[],flaws:[],looks:5,smarts:5,advocate:false,tutorialDone:false,oratory:1,casesWon:0,casesLost:0,renown:0,senate:false,royal:false,lastCaseDay:-9,skills:{footwork:0,guard:0,blade:0,wind:0,throwing:0},scars:[],fatigue:0,lastTrainDay:-9,tribune:false,rank:0,campaigns:0,legionRep:0,lastCampaignDay:-9}; for(const k in d){ if(g[k]===undefined) g[k]=d[k]; } if(!g.current) g.current='Italia'; if(g.age===undefined) g.age=19+Math.floor(((g.day||0)-(g.ageBase||0))/36); return g; }
+function saveGame(){ try{ localStorage.setItem(slotKey(saveSlot), JSON.stringify(G)); toast('Saved to slot '+saveSlot+'.'); }catch(e){ toast('⚠ Could not save — browser storage is blocked or full.',3200); } }
+function hasSave(n){ try{ return !!localStorage.getItem(slotKey(n||saveSlot)); }catch(e){ return false; } }
+function loadGame(n){ try{ if(n) setSlot(n); G=migrate(JSON.parse(localStorage.getItem(slotKey(saveSlot)))); return !!G; }catch(e){ return false; } }
 
 /* =====================================================================
    MATURE-CONTENT GATE
@@ -2885,7 +2952,7 @@ function finishFight(won){
   showResult(won,{glory,coin,popDelta,honorDelta,note,crowdLove,slaveCoin});
   saveQuiet();
 }
-function saveQuiet(){ try{ localStorage.setItem(SAVE_KEY, JSON.stringify(G)); }catch(e){} }
+function saveQuiet(){ try{ localStorage.setItem(slotKey(saveSlot), JSON.stringify(G)); }catch(e){} }
 
 function showResult(won,r){
   if(won) advanceDay(2);   // victory feasts eat the calendar — a month per triumph (with the road home)
@@ -3305,6 +3372,19 @@ function sfx(kind){
     else if(kind==='creak'){ tone(90,0.35,'sawtooth',0.02,140); }                          // the door swings
     else if(kind==='kiss'){ noise(0.03,0.06,3200); tone(880,0.06,'sine',0.04,420); }       // a smack through the door
     else if(kind==='giggle'){ [620,760,540].forEach((f,i)=>setTimeout(()=>{try{tone(f,0.07,'sine',0.03,f+80);}catch(e){}},i*70)); }
+    // ---- new cues for the systems added since ----
+    else if(kind==='coin'){ [1180,1560].forEach((f,i)=>setTimeout(()=>{try{tone(f,0.07,'triangle',0.05,f+300);}catch(e){}},i*55)); }  // purse
+    else if(kind==='gavel'){ noise(0.06,0.10,700); tone(150,0.16,'square',0.07,70); }                    // the court rules
+    else if(kind==='verdictWin'){ [392,523,659].forEach((f,i)=>setTimeout(()=>{try{tone(f,0.16,'triangle',0.055);}catch(e){}},i*95)); }
+    else if(kind==='verdictLose'){ [392,330,247].forEach((f,i)=>setTimeout(()=>{try{tone(f,0.2,'sine',0.05);}catch(e){}},i*110)); }
+    else if(kind==='hoof'){ noise(0.04,0.07,320); tone(110,0.06,'square',0.035,70); }                     // a chariot horse
+    else if(kind==='whip'){ noise(0.03,0.05,5200); tone(1400,0.04,'sawtooth',0.03,300); }                 // the crack
+    else if(kind==='wreck'){ noise(0.30,0.22,420); tone(80,0.35,'sawtooth',0.09,40); }                    // a chariot goes over
+    else if(kind==='drill'){ noise(0.05,0.07,1500); tone(260,0.07,'square',0.035,180); }                  // wood on wood in the ludus
+    else if(kind==='horn'){ [196,262].forEach((f,i)=>setTimeout(()=>{try{tone(f,0.42,'sawtooth',0.05,f);}catch(e){}},i*180)); }  // the legion's cornu
+    else if(kind==='promote'){ [523,659,784,1046,1318].forEach((f,i)=>setTimeout(()=>{try{tone(f,0.15,'triangle',0.05);}catch(e){}},i*80)); }
+    else if(kind==='scroll'){ noise(0.10,0.05,2200); }                                                    // a chart unrolling
+    else if(kind==='ui'){ tone(660,0.04,'triangle',0.025,760); }                                          // a soft click
     else { tone(200,0.08,'square',0.05); }
   }catch(e){}
 }
@@ -3350,7 +3430,34 @@ window.addEventListener('keyup',e=>{
 });
 // Left-click anywhere during a bout = attack (more reliable than canvas-only)
 document.addEventListener('mousedown',e=>{ if(e.button===0 && state==='fight'){ setEdge('attack'); } });
-// (on-screen touch buttons removed per request — keyboard + mouse only)
+// ---- touch pad for the race / villa: hold-to-move, tap-to-act ----
+(function(){
+  const HELD={a:1,d:1,w:1,s:1,up:1,down:1};
+  document.querySelectorAll('#touch2 [data-k2]').forEach(btn=>{
+    const k=btn.getAttribute('data-k2');
+    const down=e=>{ e.preventDefault(); if(HELD[k]) held[k]=true; setEdge(k==='space'?'space':k); try{sfx('ui');}catch(e2){} };
+    const up  =e=>{ e.preventDefault(); if(HELD[k]) held[k]=false; };
+    btn.addEventListener('touchstart',down,{passive:false});
+    btn.addEventListener('touchend',up,{passive:false});
+    btn.addEventListener('touchcancel',up,{passive:false});
+    btn.addEventListener('mousedown',down); btn.addEventListener('mouseup',up); btn.addEventListener('mouseleave',up);
+  });
+})();
+// show the right pad for the screen we're on
+function syncTouchPads(){
+  const t2=$('touch2'); if(!t2) return;
+  const wantRace = (state==='race');
+  const wantVilla= (state==='domus');
+  const show2 = isTouch && (wantRace||wantVilla);
+  t2.classList.toggle('hide', !show2);
+  if(show2){
+    // the race needs whip + lanes; the villa needs run + act
+    t2.querySelectorAll('[data-k2="w"]').forEach(b=>b.style.display=wantRace?'':'none');
+    t2.querySelectorAll('[data-k2="up"],[data-k2="down"]').forEach(b=>b.style.display=wantRace?'':'none');
+    t2.querySelectorAll('[data-k2="s"]').forEach(b=>b.style.display=wantVilla?'':'none');
+    t2.querySelectorAll('[data-k2="space"]').forEach(b=>b.style.display=wantVilla?'':'none');
+  }
+}
 
 /* =====================================================================
    MAIN LOOP
@@ -3361,6 +3468,7 @@ function loop(now){
   let dt=(now-last)/16.6667; last=now;
   dt=clamp(dt,0,3);
   tctx.clearRect(0,0,tcv.width,tcv.height);   // wipe last frame's crisp text
+  syncTouchPads();
   if(state==='fight' && FT){ updateFight(dt); drawArena(); }
   else if(state==='race' && RC){ updateRace(dt); drawRace(); }
   else if(state==='battle' && BT){ updateBattle(dt); drawBattle(); }
@@ -3619,13 +3727,14 @@ function updateRace(dt){
   const r=RC, you=r.you;
   r.time+=dt;
   if(r.countdown>0){ r.countdown-=dt; if((r.countdown|0)%43===0) try{sfx('clap');}catch(e){} return; }
+  if((r.time|0)%7===0 && !r.over) try{sfx('hoof');}catch(e){}   // the field thunders on
   // ---- player control ----
   if(!you.finished && you.spin<=0){
     if(held.w && you.stamina>0){ you.whip=true; you.stamina=clamp(you.stamina-26*dt,0,100); }
     else { you.whip=false; you.stamina=clamp(you.stamina+11*dt,0,100); }
     if(consume('up')) you.lane=clamp(you.lane-1,0,3);
     if(consume('down')) you.lane=clamp(you.lane+1,0,3);
-    if(consume('space') && you.stamina>20){ you.speed+=1.1; you.stamina=clamp(you.stamina-16,0,100); }  // a crack of the whip — a burst
+    if(consume('space') && you.stamina>20){ you.speed+=1.1; you.stamina=clamp(you.stamina-16,0,100); try{sfx('whip');}catch(e){} }  // a crack of the whip — a burst
   }
   // ---- every chariot ----
   for(const c of r.cars){
@@ -3647,7 +3756,7 @@ function updateRace(dt){
     if(Math.abs(a.dist-b.dist)<15 && Math.abs(a.y-b.y)<11){
       a.speed*=0.92; b.speed*=0.92;
       const mx=(a.dist>b.dist? (140):(150)); r.sparks.push({x:120+rnd(-6,6),y:(a.y+b.y)/2,life:12,vx:rnd(-1,1),vy:rnd(-1.5,0)});
-      if(Math.random()<0.03*dt*10){ const loser=(a.dist<b.dist?a:b); if(loser.spin<=0){ loser.spin=10; loser.speed*=0.4; if(loser.isPlayer) toast('💥 Your wheel clips his axle — you slew and lose ground!',2000); } }
+      if(Math.random()<0.03*dt*10){ const loser=(a.dist<b.dist?a:b); if(loser.spin<=0){ loser.spin=10; loser.speed*=0.4; try{sfx('wreck');}catch(e){} if(loser.isPlayer) toast('💥 Your wheel clips his axle — you slew and lose ground!',2000); } }
     }
   }
   for(const s of r.sparks){ s.x+=s.vx*dt; s.y+=s.vy*dt; s.life-=dt; } r.sparks=r.sparks.filter(s=>s.life>0);
@@ -3850,10 +3959,10 @@ function finishCase(){
     G.coin+=fee; G.renown=(G.renown||0)+ren; G.casesWon=(G.casesWon||0)+1;
     G.honor=clamp(G.honor+3,0,100); G.pop=clamp(G.pop+2,0,100);
     if(G.casesWon%3===0){ G.oratory=(G.oratory||1)+1; toast('🗣 Your oratory sharpens with practice — ORATORY '+G.oratory,3000); }
-    toast('⚖ THE VERDICT IS YOURS! '+fee+'d in fees, +'+ren+' renown.',3400);
+    try{sfx('verdictWin');}catch(e){} toast('⚖ THE VERDICT IS YOURS! '+fee+'d in fees, +'+ren+' renown.',3400);
   } else {
     G.casesLost=(G.casesLost||0)+1; G.renown=Math.max(0,(G.renown||0)-5); G.honor=clamp(G.honor-2,0,100);
-    toast('⚖ The verdict goes against you. Rome remembers a losing advocate. (−5 renown)',3200);
+    try{sfx('verdictLose');}catch(e){} toast('⚖ The verdict goes against you. Rome remembers a losing advocate. (−5 renown)',3200);
   }
   advanceDay(1); checkAdvocateRank(); saveQuiet(); openForum();
 }
@@ -3964,6 +4073,7 @@ function openCheats(){
   btn(r,'MAX BOND (♥/🔥/🧼 100)',()=>{ G.wifeRel=100; G.wifePhys=100; G.hygiene=100; });
   btn(r,'JEALOUSY 0',()=>G.jealousy=0); btn(r,'JEALOUSY 100',()=>G.jealousy=100);
   btn(r,'UNLOCK BODY MAP',()=>{ G.hasBodyMap=true; });
+  btn(r,'UNLOCK THE OTHER LEDGER',()=>{ G.hasBodyMap=true; G.hasSecretMap=true; });
   btn(r,'⛧ IMPOSSIBLE SPOUSE',()=>{ if(!G.wife){ toast('Wed someone first.',1800); return; }
     const w=G.wife; w.tier='impossible'; w.quality=11; w.looks=IMPOSSIBLE_V; w.smarts=10; w.build='statuesque';
     w.body=makeImpossibleBody(); w.jewel=true; w.rank='noble';
@@ -5243,7 +5353,36 @@ function drawDomus(){
    ===================================================================== */
 // ---- title ----
 $('btn-new').onclick=()=>openCreate();
-$('btn-continue').onclick=()=>{ if(loadGame()){ enterMap(); } else toast('No saved career.'); };
+function openSlots(){
+  state='slots'; show('scr-slots');
+  const b=$('slots-body'); b.innerHTML='';
+  for(let n=1;n<=NSLOTS;n++){
+    const info=slotInfo(n), active=(n===saveSlot);
+    const card=document.createElement('div'); card.className='shopcard'+(active?' eq':'');
+    card.innerHTML= info
+      ? `<div><b style="color:var(--gold)">SLOT ${n}${active?' · ACTIVE':''}</b> — <b>${info.name}</b> ${info.female?'♀':'♂'}
+           <span class="small muted">· ${info.path} · Lv ${info.level} · age ${info.age} · ${fmt(info.glory)} glory · ${info.wins}–${info.losses}</span></div>`
+      : `<div><b style="color:var(--gold)">SLOT ${n}${active?' · ACTIVE':''}</b> <span class="small muted">— empty</span></div>`;
+    const row=document.createElement('div'); row.className='row gap6';
+    if(info){
+      const lb=document.createElement('button'); lb.className='btn sm gold'; lb.textContent='▶ CONTINUE';
+      lb.onclick=()=>{ if(loadGame(n)) enterMap(); else toast('That career could not be read.',2400); };
+      row.appendChild(lb);
+      const db=document.createElement('button'); db.className='btn sm'; db.textContent='🗑 ERASE';
+      db.onclick=()=>{ if(db.dataset.sure){ try{ localStorage.removeItem(slotKey(n)); }catch(e){}
+          toast('Slot '+n+' erased.',1800); openSlots(); }
+        else { db.dataset.sure='1'; db.textContent='🗑 ERASE — SURE?'; setTimeout(()=>{ if(db.dataset){ delete db.dataset.sure; db.textContent='🗑 ERASE'; } },3000); } };
+      row.appendChild(db);
+    }
+    const nb=document.createElement('button'); nb.className='btn sm'; nb.textContent= info? '＋ NEW HERE (overwrites)' : '＋ NEW CAREER';
+    nb.onclick=()=>{ setSlot(n); show('scr-create'); openCreate(); };
+    row.appendChild(nb);
+    card.appendChild(row); b.appendChild(card);
+  }
+}
+$('btn-slots').onclick=()=>openSlots();
+$('btn-slots-back').onclick=()=>{ show('scr-title'); state='title'; $('btn-continue').disabled=!hasSave(); };
+$('btn-continue').onclick=()=>{ if(loadGame()){ enterMap(); } else toast('No saved career in slot '+saveSlot+'.'); };
 $('btn-continue').disabled=!hasSave();
 function refreshAdultBtn(){ const b=$('btn-adult'); if(!b) return;
   b.textContent='🔞 MATURE CONTENT: '+(ADULT?'ON':'OFF');
@@ -6180,7 +6319,7 @@ function checkMilRank(){
   if(G.rank===undefined) G.rank=0;
   if(idx>G.rank){ G.rank=idx; const R=MIL_RANKS[idx];
     G.honor=clamp(G.honor+8,0,100); G.approval=clamp(G.approval+6,0,100);
-    toast('🦅 PROMOTED — you are raised to '+R.name+', '+R.desc+'. You now command '+fmt(R.men)+' men. (+8 honor)',5200);
+    try{sfx('promote');}catch(e){} toast('🦅 PROMOTED — you are raised to '+R.name+', '+R.desc+'. You now command '+fmt(R.men)+' men. (+8 honor)',5200);
     if(idx>=MIL_RANKS.length-1){ try{unlock('magister');}catch(e){} }
   }
 }
@@ -8222,7 +8361,7 @@ function trainScreen(){
       let hurt='';
       if((G.fatigue||0)>78 && !G.injury && Math.random()<0.35){ G.injury=makeWound(1); hurt=' You pull something — a '+G.injury.name+'.'; }
       G.lastTrainDay=G.day; advanceDay(1); refreshStatbar(); saveQuiet();
-      toast(`${S2.icon} ${S2.name} drilled to ${lv+1}/10.${hurt}`,2600); trainScreen(); };
+      try{sfx('drill');}catch(e){} toast(`${S2.icon} ${S2.name} drilled to ${lv+1}/10.${hurt}`,2600); trainScreen(); };
     card.appendChild(bt); b.appendChild(card);
   });
   // ---- rest & the medicus ----
@@ -8326,7 +8465,7 @@ window.__SS = {
   openNote, sendNote, craftWifeReply, noteBaseTier, setNoteInput:(t)=>{ const el=document.getElementById('note-input'); if(el) el.value=t; },
   checkFamilyMan, gladiatrixAfterWin,
   openCircus, startRace, finishRace, get RC(){return RC;}, updateRace, drawRace,
-  openForum, openTree, startCase, startTutorial, playArgument, finishCase, partsFor, partTier, get CASE(){return CASE;}, checkAdvocateRank,
+  openForum, openTree, openSlots, saveGame, hasSave, loadGame, slotInfo, setSlot, syncTouchPads, startCase, startTutorial, playArgument, finishCase, partsFor, partTier, get CASE(){return CASE;}, checkAdvocateRank,
   offerDaughterPath, inheritDNA, rollTraits, hasTrait,
   openCheats, openBodyMap, drawBodyMap, lookStage, drawWifeFigTest:drawWifeFig, trainScreen, openLegion, runCampaign, milRank, checkMilRank, makeWound, rollFlaws, traitsHtml, offerSonPath, bodyBlurb, rollBody, heatColor, drawBridePortraitTest:drawBridePortrait, makeImpossibleBody, partTier, bodyTierLine, get marryList(){return marryList;}, set marryList(v){ marryList=v; },
   openMarry, marry, rollBrides, makeBride, get marryList(){return marryList;},
