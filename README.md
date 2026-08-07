@@ -104,6 +104,19 @@ publicly, leaving it off keeps the game safe for a general audience.
   title). A husband is rated on **his own parts and his own length**, not hers.
 - **Your own rung** — the mirror names your stage on the same ladder, and it drives how often
   Rome shouts about you and how often unasked gifts turn up.
+- **The Herbarius** — a real Roman apothecary, ten plants a physician of 200 A.D. actually
+  carried, each with its own drawn icon: garlic & honey, willow bark (*"seventeen centuries later
+  they will call it aspirin"*), wormwood, betony, opium poppy, mandrake root, and **Theriac of
+  Galen** — sixty-four ingredients, compounded for the Emperor himself. They close wounds, lift
+  fatigue and hold the years back.
+- **A night for love alone is not a night without consequence** — the fun-mode bedchamber now
+  carries a real risk of a child you did not plan for. **Rue** (60d, rough on her) leaves ~26%,
+  **pennyroyal** ~13%, and **silphium of Cyrene** — the contraceptive Rome harvested to
+  extinction — ~2%, for 950d. Nothing on the shelf and a poor house runs ~43%; a rich one can at
+  least send for a physician. The villa states the odds before you commit.
+- **The husband is built from his own scores too** — his silhouette is a taper: a chiselled man
+  is a V, a soft one widens toward the hem, and a great chest moves when he walks. Both spouses
+  and you now **walk, run and turn** in the villa halls.
 - **Sibling politics** — send a gift, marry a sister off for an alliance, give a brother a command
   (grateful, and now armed), or have a rival prince quietly removed — which works, and which
   people sometimes find out about.
