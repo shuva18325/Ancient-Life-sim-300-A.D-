@@ -869,6 +869,34 @@ const SOCIAL={
 SOCIAL.imperial={name:'Emperor’s Kin', coin:12000, honor:80, purse:0.4,
   note:'Born of the purple. Every province in the empire already answers to your house — but the arena is far beneath you, and half of Rome would like you dead.'};
 const SOCIAL_ORDER=['gladiator','citizen','upper','elite','imperial'];
+/* =====================================================================
+   THE OTHER LEDGER'S SELLER — who you go to for it depends entirely on
+   who you already are. A poor man deals with a stranger in a cloak,
+   because a poor man's dealings must stay hidden. Anyone with a NAME
+   already has somebody discreet in their own circle for exactly this.
+   ===================================================================== */
+const SECRET_SELLERS={
+  gladiator:{ name:'A WOMAN IN A PLAIN CLOAK', blurb:'she waits by the colonnade until the others have gone.', cost:400,
+    quote:'“The matchmakers sell you shoulders and jawlines. I keep the other ledger — the one the wives compare over wine and never write down. Four hundred, and you will never wonder about a man again.”',
+    title:'She will not say what is on it. She says you will know it when you see it.',
+    gotIt:'🕯 She hands over a second chart, rolled tight, and is gone before you unroll it. It measures rather more than shoulders.' },
+  citizen:{ name:'THE MATRON THREE DOORS DOWN', blurb:'she has kept the whole street’s business for twenty years and never once repeated a word of it.', cost:380,
+    quote:'“You want to know before you agree to the match, and you’re right to. Three-eighty, and I’ll tell you what my own daughters compare notes on.”',
+    title:'A neighbour, not a stranger — which is exactly why she can be trusted.',
+    gotIt:'🕯 She presses a folded chart into your hand over the garden wall, the way she has for half the insula.' },
+  upper:{ name:'A SENATOR’S WIFE, OVER WINE', blurb:'she brings it up herself, laughing, before you can find a delicate way to ask.', cost:350,
+    quote:'“Oh, darling, EVERY house of any standing keeps one of these — how else do you think dowries get negotiated? Consider it a welcome gift to the Eques.”',
+    title:'Money does not need to hide. It only needs to ask the right dinner guest.',
+    gotIt:'🕯 She has it sent round the very next morning, tied with a ribbon, as though it were nothing at all — to her, it isn’t.' },
+  elite:{ name:'YOUR OWN ADVOCATE', blurb:'the man who already handles everything you would rather not put your own name to.', cost:300,
+    quote:'“You retain me for exactly this kind of discretion, domine. Consider the other ledger simply another matter of the estate.”',
+    title:'A patrician does not go looking for secrets. A patrician already employs someone who does.',
+    gotIt:'🕯 It arrives with the rest of your correspondence, unremarked upon, filed precisely where an advocate files such things.' },
+  imperial:{ name:'A LADY OF THE BEDCHAMBER', blurb:'the palace has kept this particular ledger since before you were born — it simply changes hands.', cost:250,
+    quote:'“The imperial household has always known these things about itself, domina. It is, if anything, a surprise nobody has shown you sooner.”',
+    title:'When your own house is the one everybody else already gossips about, the ledger finds you.',
+    gotIt:'🕯 It is already waiting on your writing table by the time you think to ask for it — the palace anticipated you, as the palace always does.' },
+};
 
 /* ===== INTRIGUE: Elite Siege targets ===== */
 const ELITE_MEN=['Senator Gaius Metellus','Legate Aulus Varro','Publican Titus Rufus','Magnate Lucius Balbus',
@@ -2120,15 +2148,15 @@ function openBodyMap(w,back){
     d.textContent='🕯 Your own measure needs no ledger — you have one. Only your SPOUSE may read this graph; if the Forum ever does, something has gone very wrong.';
     sm.appendChild(d);
   } else if(w.male && ADULT && G && !G.hasSecretMap){
+    const SS=SECRET_SELLERS[G.socialClass]||SECRET_SELLERS.gladiator;
     const d=document.createElement('div'); d.className='shopcard'; d.style.borderColor='#8a5cc0';
-    d.innerHTML=`<div><b style="color:#c89af0">🕯 A WOMAN IN A PLAIN CLOAK</b> <span class="small muted">— she waits by the colonnade until the others have gone.</span></div>
-      <div class="small muted" style="font-style:italic">“The matchmakers sell you shoulders and jawlines. I keep the other ledger — the one the wives compare over wine and never write down.
-      Four hundred, and you will never wonder about a man again.”</div>`;
+    d.innerHTML=`<div><b style="color:#c89af0">🕯 ${SS.name}</b> <span class="small muted">— ${SS.blurb}</span></div>
+      <div class="small muted" style="font-style:italic">${SS.quote}</div>`;
     const bt=document.createElement('button'); bt.className='btn sm'; bt.style.borderColor='#8a5cc0'; bt.style.color='#c89af0';
-    bt.textContent='🕯 THE OTHER LEDGER (400d)'; bt.disabled=G.coin<400;
-    bt.title='She will not say what is on it. She says you will know it when you see it.';
-    bt.onclick=()=>{ if(G.coin<400) return; G.coin-=400; G.hasSecretMap=true; refreshStatbar(); saveQuiet();
-      toast('🕯 She hands over a second chart, rolled tight, and is gone before you unroll it. It measures rather more than shoulders.',5200);
+    bt.textContent='🕯 THE OTHER LEDGER ('+SS.cost+'d)'; bt.disabled=G.coin<SS.cost;
+    bt.title=SS.title;
+    bt.onclick=()=>{ if(G.coin<SS.cost) return; G.coin-=SS.cost; G.hasSecretMap=true; refreshStatbar(); saveQuiet();
+      toast(SS.gotIt,5200);
       openBodyMap(w,bodyMapBack); };
     d.appendChild(bt); sm.appendChild(d);
   } else if(w.male && ADULT && G && G.hasSecretMap){
@@ -2354,6 +2382,7 @@ function freshCareer(name,origin,arch,social){
     body:null, family:null,                       // the roll you made, and the house you were born into
     provinces:{}, complaints:[], leniency:50,     // provincial management · petitions · how forgiving you are
     lastCalloutDay:-9, lastGiftDay:-9, giftsTaken:0, calloutWins:0,
+    crownWorn:false,                               // THE WARDROBE OF RANK — pre-set free on elite houses and the purple
   };
 }
 /* =====================================================================
@@ -2428,7 +2457,7 @@ function elevateWife(rank){
   refreshStatbar(); saveQuiet(); openVilla();
 }
 // fill in any fields missing from older saves
-function migrate(g){ const d={honor:50,food:4,mount:0,slaves:0,hasVilla:false,boat:false,favor:0,soldiers:0,hidden:[],plotTier:0,emperor:false,approval:50,legions:0,rivals:0,retired:false,detachments:[],day:0,titles:{},clears:{},socialClass:'gladiator',army:{},armyGear:0,armyTrain:0,hasOrganizer:false,generals:[],wife:null,married:false,marryPrompted:false,children:[],pregnant:null,lastLoveDay:-9,injury:null,lastDebateDay:-9,office:0,path:null,parthia:50,parthiaPact:false,wifeRel:50,lastTalkDay:-9,isFemale:false,lineage:[],hygiene:70,wifePhys:45,hasPool:false,hasWardrobe:false,legacy:null,lastFeastDay:-9,loveDay:-1,loveQuick:0,loveLong:0,loveNight:0,loveVigil:0,venusUntil:-1,lastWashDay:-9,lastPoolDay:-9,lastWardrobeDay:-9,lastKidsDay:-9,lastBathDay:-9,pila:0,bow:null,bowsOwned:[],nemesis:null,rivalsList:[],trophies:[],nemesisCount:0,pendingDeath:false,ageBase:0,wonProvinceByFight:false,familyMan:false,infamy:0,gladiatrixStage:0,pardoned:false,lastNoteDay:-9,lastNoteReply:'',regalia:[],marryRolls:0,hasBodyMap:false,hasSecretMap:false,jealousy:0,lastJealousDay:-9,traits:[],flaws:[],looks:5,smarts:5,advocate:false,tutorialDone:false,patrons:[],rivalAdv:null,landmarks:[],faction:null,oratory:1,casesWon:0,casesLost:0,renown:0,senate:false,royal:false,lastCaseDay:-9,skills:{footwork:0,guard:0,blade:0,wind:0,throwing:0},scars:[],fatigue:0,lastTrainDay:-9,tribune:false,rank:0,campaigns:0,legionRep:0,lastCampaignDay:-9,units:{legionary:0,auxilia:0,cavalry:0,archers:0,engineers:0},supply:0,sieges:0,body:null,family:null,provinces:{},complaints:[],leniency:50,lastCalloutDay:-9,lastGiftDay:-9,giftsTaken:0,calloutWins:0}; for(const k in d){ if(g[k]===undefined) g[k]=d[k]; } if(!g.current) g.current='Italia'; if(g.age===undefined) g.age=19+Math.floor(((g.day||0)-(g.ageBase||0))/36);
+function migrate(g){ const d={honor:50,food:4,mount:0,slaves:0,hasVilla:false,boat:false,favor:0,soldiers:0,hidden:[],plotTier:0,emperor:false,approval:50,legions:0,rivals:0,retired:false,detachments:[],day:0,titles:{},clears:{},socialClass:'gladiator',army:{},armyGear:0,armyTrain:0,hasOrganizer:false,generals:[],wife:null,married:false,marryPrompted:false,children:[],pregnant:null,lastLoveDay:-9,injury:null,lastDebateDay:-9,office:0,path:null,parthia:50,parthiaPact:false,wifeRel:50,lastTalkDay:-9,isFemale:false,lineage:[],hygiene:70,wifePhys:45,hasPool:false,hasWardrobe:false,legacy:null,lastFeastDay:-9,loveDay:-1,loveQuick:0,loveLong:0,loveNight:0,loveVigil:0,venusUntil:-1,lastWashDay:-9,lastPoolDay:-9,lastWardrobeDay:-9,lastKidsDay:-9,lastBathDay:-9,pila:0,bow:null,bowsOwned:[],nemesis:null,rivalsList:[],trophies:[],nemesisCount:0,pendingDeath:false,ageBase:0,wonProvinceByFight:false,familyMan:false,infamy:0,gladiatrixStage:0,pardoned:false,lastNoteDay:-9,lastNoteReply:'',regalia:[],marryRolls:0,hasBodyMap:false,hasSecretMap:false,jealousy:0,lastJealousDay:-9,traits:[],flaws:[],looks:5,smarts:5,advocate:false,tutorialDone:false,patrons:[],rivalAdv:null,landmarks:[],faction:null,oratory:1,casesWon:0,casesLost:0,renown:0,senate:false,royal:false,lastCaseDay:-9,skills:{footwork:0,guard:0,blade:0,wind:0,throwing:0},scars:[],fatigue:0,lastTrainDay:-9,tribune:false,rank:0,campaigns:0,legionRep:0,lastCampaignDay:-9,units:{legionary:0,auxilia:0,cavalry:0,archers:0,engineers:0},supply:0,sieges:0,body:null,family:null,provinces:{},complaints:[],leniency:50,lastCalloutDay:-9,lastGiftDay:-9,giftsTaken:0,calloutWins:0,crownWorn:false}; for(const k in d){ if(g[k]===undefined) g[k]=d[k]; } if(!g.current) g.current='Italia'; if(g.age===undefined) g.age=19+Math.floor(((g.day||0)-(g.ageBase||0))/36);
   // older saves predate the roll and the family — give them both, matched to who they already are
   if(!g.body){ const male=!g.isFemale, q=clamp(g.looks===undefined?5:g.looks,1,10);
     g.body=rollPlayerBody(male,q,false);
@@ -6467,13 +6496,17 @@ let sel={origin:'Italia',arch:null,social:'gladiator',sex:'m',roll:null,rolls:0}
    girl hopes for a waist and everything either side of it. Roll as many
    times as you like — but the IMPOSSIBLE only ever comes to the purple.
    ===================================================================== */
+// ⛧ THE IMPOSSIBLE, by birth. Rare everywhere, but not EQUALLY rare — a
+// patrician house is one accident of blood away from the purple; a gladiator
+// pit is a much longer way from it. Still possible. Just don't expect it.
+const IMPOSSIBLE_CHANCE={gladiator:0.004, citizen:0.010, upper:0.030, elite:0.080, imperial:0.14};
 function rollCreation(force){
   const male = sel.sex!=='f';
   const S=SOCIAL[sel.social]||SOCIAL.gladiator;
-  // rank does not guarantee a fine body, but it feeds you better
-  const q = {gladiator:4.4, citizen:4.8, upper:5.4, elite:5.9, imperial:6.6}[sel.social] || 5;
-  // ⛧ THE IMPOSSIBLE — reserved for the imperial house, and vanishingly rare
-  const impChance = sel.social==='imperial'? 0.05 : 0;
+  // rank does not guarantee a fine body, but it feeds you FAR better the higher you sit —
+  // a patrician table and an imperial one are barely different tables at all
+  const q = {gladiator:4.4, citizen:5.0, upper:6.2, elite:7.4, imperial:7.9}[sel.social] || 5;
+  const impChance = IMPOSSIBLE_CHANCE[sel.social] || 0;
   const impossible = force==='impossible' || (Math.random()<impChance);
   const body=rollPlayerBody(male, q, impossible);
   const ps = male? BODY_PARTS_M : BODY_PARTS;
@@ -6506,7 +6539,7 @@ function rollBanner(){
 }
 const STAT_COL={STR:'#e0533a',SPD:'#e8c34a',DEF:'#6fa9d8',VIT:'#5b9a4a'};
 // draw a forward-facing bust portrait of an archetype onto a small canvas
-function drawCardPortrait(cnv,A,sex){
+function drawCardPortrait(cnv,A,sex,rank){
   const fem = (sex==='f');
   const c=cnv.getContext('2d'); c.imageSmoothingEnabled=false;
   const W=cnv.width,H=cnv.height;
@@ -6578,6 +6611,21 @@ function drawCardPortrait(cnv,A,sex){
     P(-6,-40,4,3,'#100c08'); P(2,-40,4,3,'#100c08'); P(-5,-40,1,1,'#cfe'); P(3,-40,1,1,'#cfe');
     P(-7,-43,4,1,sSh); P(3,-43,4,1,sSh); // brow
     if(hid!=='none'){ P(-9,-44,18,1,'#000'); } // helm eye-line shadow
+  }
+  // ---- THE WARDROBE OF RANK: a Prince's/Princess's crown and an expensive
+  //      robe, PRE-SET on elite houses and the whole imperial line. No
+  //      purchase, no ceremony — you were simply born already wearing it. ----
+  if(rank==='elite' || rank==='imperial'){
+    const purple = rank==='imperial'? '#7a2da8' : '#5a2d8a', purpleHi=shade(purple,26), purpleSh=shade(purple,-30);
+    // the expensive robe — a sash of Tyrian purple, gold-trimmed, draped shoulder to hip over whatever armour is already worn
+    const sx = fem? 9 : 10;
+    P(sx,-21,6,32,purple); P(sx,-21,6,2,purpleHi); P(sx,9,6,2,purpleSh);
+    P(sx,-21,1,32,gold); P(sx+5,-21,1,32,gold);
+    // the crown — a thin gold circlet worn low across the brow, a single gem at its centre
+    const bw = fem?16:18, bx=-bw/2;
+    P(bx,-45,bw,2,gold); P(bx,-45,bw,1,'#fff0b0');
+    P(-1,-47,3,3, rank==='imperial'?'#e0405a':'#4a7ac0');       // a ruby for the purple, a sapphire for a patrician
+    P(bx+2,-45,1,2,gold); P(bx+bw-3,-45,1,2,gold);
   }
   // crest by helmet
   if(hid==='galea_praetoria'){ for(let i=0;i<5;i++) P(-12+i*5,-56,4,8,gold); P(-12,-57,24,2,'#fff0b0'); }
@@ -6877,13 +6925,16 @@ function openCreate(){
       : 'Roll for shoulders, chest, reach — and the measure nobody admits to caring about. Roll as often as you like.';
     rb.onclick=()=>{ rollCreation(); try{sfx('coin');}catch(e){} openCreate(); };
     head.appendChild(rb);
-    if(sel.social==='imperial'){
-      const note=document.createElement('span'); note.className='small'; note.style.color='#ff7ae0';
-      note.textContent='⛧ Born in the purple — 1 roll in 20 comes back IMPOSSIBLE.';
-      head.appendChild(note);
-    } else {
-      const note=document.createElement('span'); note.className='small muted';
-      note.textContent='Only the imperial house rolls the IMPOSSIBLE.';
+    { const ic=IMPOSSIBLE_CHANCE[sel.social]||0, pct=Math.round(ic*1000)/10;
+      const note=document.createElement('span'); note.className='small';
+      note.style.color = ic>=0.08?'#ff7ae0' : ic>=0.02?'#e8c34a' : 'inherit';
+      if(!note.style.color || note.style.color==='inherit') note.className+=' muted';
+      const odds = sel.social==='imperial'? '1 roll in '+Math.round(1/ic)+' comes back IMPOSSIBLE — born to it.'
+                 : sel.social==='elite'?    '1 roll in '+Math.round(1/ic)+' comes back IMPOSSIBLE — a patrician table is a short step from the purple.'
+                 : sel.social==='upper'?    '1 roll in '+Math.round(1/ic)+' comes back IMPOSSIBLE — rare, but Eques money buys good blood.'
+                 : sel.social==='citizen'?  'about 1 roll in '+Math.round(1/ic)+' comes back IMPOSSIBLE — it happens, just not to your neighbours.'
+                 :                          'about 1 roll in '+Math.round(1/ic)+' comes back IMPOSSIBLE — a beauty born in the gutter. It happens. Rarely.';
+      note.textContent='⛧ '+pct+'% · '+odds;
       head.appendChild(note);
     }
     rp.appendChild(head);
@@ -6911,7 +6962,7 @@ function openCreate(){
     card.innerHTML=`<div style="color:var(--gold);font-size:11px;letter-spacing:1px;margin-bottom:4px;min-height:26px;">${A.name}</div>`;
     // render portrait to a static image so it lays out reliably inside the card
     const cv=document.createElement('canvas'); cv.width=88; cv.height=104;
-    drawCardPortrait(cv,A,sel.sex);
+    drawCardPortrait(cv,A,sel.sex,sel.social);
     const img=document.createElement('img'); img.src=cv.toDataURL();
     img.style.cssText='width:80px;height:94px;image-rendering:pixelated;border:2px solid #000;background:#000;display:block;margin:0 auto 5px;';
     card.appendChild(img);
@@ -6941,6 +6992,9 @@ $('btn-create-go').onclick=()=>{
   G.traits = sel.roll.traits.slice(); G.flaws = sel.roll.flaws.slice();
   G.family = makeFamily(sel.social, G.isFemale);
   G.current = REGION_BY_ID[origin] && REGION_BY_ID[origin].tier===1 ? origin : 'Italia';
+  // ---- THE WARDROBE OF RANK: an elite house or the imperial line needs no
+  //      purchase and no ceremony — the crown and the robe are already yours ----
+  if(sel.social==='elite' || sel.social==='imperial') G.crownWorn=true;
   // ---- EMPEROR'S KIN: you begin holding the whole empire, and the arena is closed ----
   if(sel.social==='imperial'){
     REGIONS.forEach(r=>{ G.titles[r.id]=REGION_TITLES[r.id]||('Dominus '+r.id); G.cleared[r.id]=true; });
@@ -6949,14 +7003,17 @@ $('btn-create-go').onclick=()=>{
     if(G.isFemale) G.advocate=true;                       // a princess's power is argued, not fought
     else G.tribune=true;                                   // a prince takes a commission
     enterMap();
-    toast('👑 BORN OF THE PURPLE — every province in the empire already flies your colours. '
+    toast('👑 BORN OF THE PURPLE — every province in the empire already flies your colours, and '
+      + (G.isFemale? 'a Princess’s crown and robe are already on you. ' : 'a Prince’s crown and robe are already on you. ')
       + (G.isFemale? 'As a woman of the imperial house your weapon is the FORUM and the court. '
                    : 'As a prince you hold a commission with THE LEGIONS. ')
-      + 'The arena is beneath you. Rome is already yours to lose.',8000);
+      + 'The arena is beneath you. Rome is already yours to lose.',8400);
     return;
   }
   enterMap();
-  toast('Swear by the sand — fight well, '+nm+'!'+(G.isFemale?' They will not make it easy.':''),2400);
+  toast('Swear by the sand — fight well, '+nm+'!'
+    + (sel.social==='elite'? ' A patrician’s crown and robe are already yours, whether the sand respects them or not.' : '')
+    + (G.isFemale?' They will not make it easy.':''),2600);
 };
 
 // ---- map ----
@@ -7257,6 +7314,28 @@ function openVilla(){
     rr.appendChild(wsh);
   }
   rrow.appendChild(rr); b.appendChild(rrow);
+  // ---- THE WARDROBE OF RANK — pre-set free on elite houses and the purple ----
+  { const eligible = (G.socialClass==='elite' || G.socialClass==='imperial' || G.emperor || G.royal);
+    const wh=document.createElement('div'); wh.className='small'; wh.style.color='var(--gold)'; wh.style.marginTop='6px';
+    wh.textContent='👑 THE WARDROBE OF RANK'; b.appendChild(wh);
+    const wcard=document.createElement('div'); wcard.className='shopcard'; wcard.style.borderColor=eligible?'#e8c34a':'#4a3a26';
+    if(eligible){
+      wcard.innerHTML=`<div><b style="color:var(--gold)">👑 ${G.isFemale?'A PRINCESS’S':'A PRINCE’S'} CROWN, ALREADY YOURS</b>
+          <span class="small muted">— no purchase, no ceremony. An elite house and the imperial line simply own one.</span></div>
+        <div class="small muted" style="font-style:italic">A thin gold circlet, a single gem, and a sash of Tyrian purple with gold trim. It was on you before you could walk.</div>
+        <div class="small" style="margin-top:3px">Currently: <b style="color:${G.crownWorn?'#7ad48a':'#e0705b'}">${G.crownWorn?'WORN':'PUT AWAY'}</b></div>`;
+      const wbt=document.createElement('button'); wbt.className='btn sm'+(G.crownWorn?' gold':'');
+      wbt.textContent = G.crownWorn? '📦 PUT IT AWAY' : '👑 WEAR IT';
+      wbt.title = G.crownWorn? 'Some days the sand does not care whose son you are.' : 'Let Rome see exactly whose son you are.';
+      wbt.onclick=()=>{ G.crownWorn=!G.crownWorn; toast(G.crownWorn?'👑 You put on the crown and the robe. Rome notices immediately.':'📦 You set the crown aside for a plainer day.',2600); openVilla(); };
+      wcard.appendChild(wbt);
+    } else {
+      wcard.innerHTML=`<div><b style="color:#8a7a5a">👑 RESERVED FOR ELITE HOUSES AND THE IMPERIAL LINE</b></div>
+        <div class="small muted">A patrician family or the purple itself simply already owns one of these — it is not sold, and no amount of coin here buys it.
+        Rise to the Senate, seize the throne, or begin your next life born to it.</div>`;
+    }
+    b.appendChild(wcard);
+  }
 }
 $('btn-villa-back').onclick=()=>enterMap();
 
@@ -7836,8 +7915,9 @@ function openTree(){
   // you
   H('👤 THE HEAD OF THE HOUSE');
   const myPath = G.advocate? 'advocate of the Basilica' : G.tribune? 'of the legions' : 'of the sand';
-  add(personRow(G.name+(G.isFemale?' ♀':' ♂'), '— '+myPath+' · age '+(G.age||19), G.looks, G.smarts, G.traits, G.flaws,
-    `${G.wins||0} wins · ${G.losses||0} losses · ${fmt(G.glory||0)} glory${(G.scars||[]).length?' · '+G.scars.length+' scars':''}`));
+  add(personRow(G.name+(G.isFemale?' ♀':' ♂')+(G.crownWorn?' 👑':''), '— '+myPath+' · age '+(G.age||19), G.looks, G.smarts, G.traits, G.flaws,
+    `${G.wins||0} wins · ${G.losses||0} losses · ${fmt(G.glory||0)} glory${(G.scars||[]).length?' · '+G.scars.length+' scars':''}`
+    + (G.crownWorn? ' · <span style="color:#e8c34a">👑 crown &amp; robe worn</span>' : '')));
   // spouse
   if(G.married && G.wife){
     H('⚭ THE SPOUSE');
@@ -10296,6 +10376,7 @@ window.__SS = {
   setBodyMapView:(v)=>{ bodyMapView=v; }, get bodyMapView(){return bodyMapView;},
   setBodyMapWalk:(v)=>{ bodyMapWalk=v; }, get bodyMapSubject(){return bodyMapSubject;},
   ARCHETYPES, ARCH_ORDER, BODY_PARTS, BODY_PARTS_M, IMPOSSIBLE_V,
+  IMPOSSIBLE_CHANCE, SECRET_SELLERS,
 };
 })();
 </script>

@@ -76,8 +76,17 @@ publicly, leaving it off keeps the game safe for a general audience.
 - **Succession** — when your gladiator's day is done, **play on as your son or daughter**,
   inheriting the family's standing.
 - **Choose your sex, and roll for your blood** — pick ♂ or ♀ at the enrolment table (the champion
-  cards are drawn for both), then **roll your own body and traits** as many times as you like.
-  Only the **Emperor's Kin** can roll the ⛧ IMPOSSIBLE.
+  cards are drawn for both), then **roll your own body and traits** as many times as you like. The
+  ⛧ IMPOSSIBLE can land for anyone, but the odds climb steeply with rank: a gladiator's odds are a
+  rounding error, a patrician's are real, and the **Emperor's Kin** roll it more often than not
+  everyone else combined.
+- **The wardrobe of rank** — an elite house or the imperial line starts with a **crown and an
+  expensive robe already on them**, no purchase required (toggle it on or off from the villa).
+  Everyone else sees exactly what it would take to earn one.
+- **The other ledger has a different seller for every class** — a poor man buys it from a stranger
+  in a cloak because his dealings must stay hidden; everyone above him already has someone
+  discreet in their own circle for it (a neighbour, a senator's wife, your own advocate, a lady of
+  the palace) — and pays less for the convenience.
 - **The house you were born into** — a father, a mother and siblings with real occupations and
   real opinions of you. A **prince** sees whether his sister has been married off yet; a
   **daughter of the purple** sees whether her brother is the heir — and whether *she* could
