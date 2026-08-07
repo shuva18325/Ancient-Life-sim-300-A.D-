@@ -423,8 +423,8 @@
       <div id="bodymap-verdict" class="small" style="text-align:center"></div>
       <div id="bodymap-subject" class="row gap6" style="justify-content:center;align-items:center;flex-wrap:wrap"></div>
       <div id="bodymap-secret" class="col gap6" style="width:100%"></div>
-      <div id="bodymap-views" class="row gap6" style="justify-content:center;flex-wrap:wrap"></div>
-      <div id="bodymap-subviews" class="row gap6" style="justify-content:center;flex-wrap:wrap;min-height:26px"></div>
+      <div id="bodymap-views" class="row gap6" style="justify-content:center;flex-wrap:nowrap;overflow-x:auto;min-height:30px;width:100%"></div>
+      <div id="bodymap-subviews" class="row gap6" style="justify-content:center;flex-wrap:nowrap;overflow-x:auto;min-height:30px;width:100%"></div>
       <canvas id="bodymap-cv" width="460" height="300" style="position:static;width:min(96%,460px);height:auto;image-rendering:auto;border:2px solid var(--gold);border-radius:4px;"></canvas>
       <div class="small muted" style="text-align:center">Pale pink is poorest · deep purple is finest. The chart never flatters.</div>
       <button class="btn gold" id="btn-bodymap-back">◀ BACK</button>
@@ -1125,7 +1125,9 @@ function rollBody(quality){
 }
 // THE IMPOSSIBLE — every measure past the human maximum. Cheats only.
 function makeImpossibleBody(){
-  const b={}; for(const P of BODY_PARTS) b[P.id]=IMPOSSIBLE_V; return b;
+  const b={}; for(const P of BODY_PARTS) b[P.id]=IMPOSSIBLE_V;
+  b.secret=IMPOSSIBLE_V;                       // a male spouse's ledger goes past the rule too
+  return b;
 }
 
 /* =====================================================================
@@ -1615,11 +1617,15 @@ function calloutDue(){
    The public reading, and the one that only your spouse sees.
    ===================================================================== */
 const GAZE_BASE_F={face:20, hairq:8, bust:26, waist:10, booty:24, legs:12};
-const GAZE_BASE_M={face:20, hairq:6, bust:24, waist:16, booty:22, legs:12};
+const GAZE_BASE_M={face:20, hairq:6, bust:24, waist:16, booty:22, legs:12, secret:22};
 function gazeWeights(w, mode, viewer){
   const male=!!(w&&w.male), b=(w&&w.body)||{};
   const base= male? GAZE_BASE_M : GAZE_BASE_F;
-  const parts= male? BODY_PARTS_M : BODY_PARTS;
+  // THE PUBLIC never counts the other ledger. Your SPOUSE very much does —
+  // that is the one pair of eyes the secret graph was ever meant for.
+  const parts = (mode==='spouse' && male && secretAllowed(w))
+    ? (male? BODY_PARTS_M : BODY_PARTS).concat([SECRET_PART])
+    : (male? BODY_PARTS_M : BODY_PARTS);
   const out={};
   parts.forEach(P=>{
     const v = b[P.id]===undefined?5:b[P.id];
@@ -1638,6 +1644,7 @@ function gazeWeights(w, mode, viewer){
     if(tr.includes('fertile')) { bump('booty',1.4); bump('bust',1.3); }
     if(fl.includes('cold')) bump('face',0.7);
     if(fl.includes('jealous')) { bump('bust',1.25); bump('booty',1.25); }
+    if(out.secret!==undefined){ bump('secret', 1.3 + (tr.includes('devoted')?0.4:0) + (fl.includes('cold')?-0.5:0)); }
     // and their own private preference, fixed for life
     const pref = viewer._gazePref || (viewer._gazePref = pick(parts).id);
     bump(pref, 1.9);
@@ -2169,10 +2176,10 @@ function drawGazeOverlay(c,w,mode,W2,H2,GUT,F){
   const FW=W2-GUT;
   // anchors on the figure, in figure space
   const A = male
-    ? {face:[0,5], hairq:[0,-3], bust:[0,21], waist:[0,33], booty:[0,17], legs:[0,54]}
+    ? {face:[0,5], hairq:[0,-3], bust:[0,21], waist:[0,33], booty:[0,17], legs:[0,54], secret:[0,39]}
     : {face:[0,5], hairq:[0,-4], bust:[0,18.6], waist:[0,29], booty:[0,34], legs:[0,54]};
-  // three eyes down each side, so nothing ever sits on the figure or on another eye
-  const SIDE = {hairq:-1, bust:-1, legs:-1, face:1, waist:1, booty:1};
+  // eyes down each side, so nothing ever sits on the figure or on another eye
+  const SIDE = {hairq:-1, bust:-1, legs:-1, face:1, waist:1, booty:1, secret:-1};
   const LX=34, RX=FW-36;
   // spread each column evenly down its own side — no two eyes ever share a row
   const cols={'-1':[], '1':[]};
@@ -2190,7 +2197,7 @@ function drawGazeOverlay(c,w,mode,W2,H2,GUT,F){
     const ex = side<0? LX : RX;
     const ey = slotY[r.id]===undefined? clamp(ay,56,H2-80) : slotY[r.id];
     const isTop = (r===top);
-    const col = isTop? '#ffce7a' : '#c9a4ef';
+    const col = r.id==='secret'? '#ff7ae0' : isTop? '#ffce7a' : '#c9a4ef';
     const sz = 8 + (r.pct/100)*26;
     c.strokeStyle= isTop? 'rgba(255,200,110,.8)' : 'rgba(210,170,240,.32)';
     c.lineWidth= isTop?1.8:1;
@@ -2216,8 +2223,8 @@ function drawGazeOverlay(c,w,mode,W2,H2,GUT,F){
   c.textAlign='left';
   rank.forEach((r,i)=>{
     const y=26+i*22, isTop=i===0;
-    c.fillStyle= isTop? '#ffd27a' : '#efe3c2'; c.font='bold 9px Georgia,serif';
-    c.fillText((i+1)+'. '+r.name, W2-GUT, y);
+    c.fillStyle= r.id==='secret'? '#ff7ae0' : isTop? '#ffd27a' : '#efe3c2'; c.font='bold 9px Georgia,serif';
+    c.fillText((i+1)+'. '+r.name+(r.id==='secret'?' 🕯':''), W2-GUT, y);
     c.textAlign='right'; c.fillStyle= isTop? '#ffd27a' : heatColor(clamp(r.pct/4,1,10));
     c.fillText(r.pct.toFixed(1)+'%', W2-8, y); c.textAlign='left';
     const bw=(GUT-16)*(r.pct/(rank[0].pct||1));
@@ -2275,7 +2282,18 @@ function openBodyMap(w,back){
   $('bodymap-verdict').innerHTML=`<b style="color:${lk>=11?'#ff7ae0':st.col}">${lk>=11?'⛧ IMPOSSIBLE':st.name}</b> <span class="muted">— ${st.blurb}</span>
     <div class="small" style="margin-top:3px">${bodyTierLine(w)}</div>
     <div class="small muted" style="margin-top:2px;font-style:italic">${bodyBlurb(w)}</div>
-    ${bp? `<div class="small" style="margin-top:3px;color:#e8c34a">⚖ ${bp.title} — ${bp.opinion>=0?'+':''}${bp.opinion} public opinion · ${bp.tolerance>=0?'+':''}${bp.tolerance} political tolerance${bp.gifts?' · gifts arrive unasked':''}</div>`:''}`;
+    ${bp? `<div class="small" style="margin-top:3px;color:#e8c34a">⚖ ${bp.title} — ${bp.opinion>=0?'+':''}${bp.opinion} public opinion · ${bp.tolerance>=0?'+':''}${bp.tolerance} political tolerance${bp.gifts?' · gifts arrive unasked':''}</div>`:''}
+    ${(()=>{ // THE YEARS: what age is doing to this body, and how hard the house is fighting it
+      const age = w.self? (G.age||19) : (w.age===undefined? (G.age||19) : w.age);
+      const up = upkeepScore(), imp=(w.looks||0)>=IMPOSSIBLE_V;
+      const dir = imp? 'frozen' : age<30? 'rising' : 'falling';
+      const col = imp? '#ff7ae0' : dir==='rising'? '#7ad48a' : up>=60? '#e8c34a' : '#e0705b';
+      return `<div class="small" style="margin-top:3px;color:${col}">⏳ age ${age} — ${
+        imp? 'BEYOND THE YEARS. An impossible body does not age.'
+        : dir==='rising'? 'still coming in; the scores drift UP until thirty'
+        : 'past thirty the scores drift DOWN — upkeep '+up+'/100 '+(up>=60?'is holding most of it back'
+            : up>=35? 'is slowing it' : 'is not slowing it. Bathe, build the lagoon, keep coin in the box.')}</div>`;
+    })()}`;
   // ---- WHOSE chart: yourself, or the person you married ----
   const subjRow=$('bodymap-subject');
   if(subjRow){
@@ -2552,7 +2570,7 @@ function freshCareer(name,origin,arch,social){
     provinces:{}, complaints:[], leniency:50,     // provincial management · petitions · how forgiving you are
     lastCalloutDay:-9, lastGiftDay:-9, giftsTaken:0, calloutWins:0,
     crownWorn:false,                               // THE WARDROBE OF RANK — pre-set free on elite houses and the purple
-    court:null,                                    // the Praetorian Prefect and the palace, for those born to the purple
+    court:null, lastCoupDay:-99,                   // the Praetorian Prefect and the palace, for those born to the purple
   };
 }
 /* =====================================================================
@@ -2627,7 +2645,7 @@ function elevateWife(rank){
   refreshStatbar(); saveQuiet(); openVilla();
 }
 // fill in any fields missing from older saves
-function migrate(g){ const d={honor:50,food:4,mount:0,slaves:0,hasVilla:false,boat:false,favor:0,soldiers:0,hidden:[],plotTier:0,emperor:false,approval:50,legions:0,rivals:0,retired:false,detachments:[],day:0,titles:{},clears:{},socialClass:'gladiator',army:{},armyGear:0,armyTrain:0,hasOrganizer:false,generals:[],wife:null,married:false,marryPrompted:false,children:[],pregnant:null,lastLoveDay:-9,injury:null,lastDebateDay:-9,office:0,path:null,parthia:50,parthiaPact:false,wifeRel:50,lastTalkDay:-9,isFemale:false,lineage:[],hygiene:70,wifePhys:45,hasPool:false,hasWardrobe:false,legacy:null,lastFeastDay:-9,loveDay:-1,loveQuick:0,loveLong:0,loveNight:0,loveVigil:0,venusUntil:-1,lastWashDay:-9,lastPoolDay:-9,lastWardrobeDay:-9,lastKidsDay:-9,lastBathDay:-9,pila:0,bow:null,bowsOwned:[],nemesis:null,rivalsList:[],trophies:[],nemesisCount:0,pendingDeath:false,ageBase:0,wonProvinceByFight:false,familyMan:false,infamy:0,gladiatrixStage:0,pardoned:false,lastNoteDay:-9,lastNoteReply:'',regalia:[],marryRolls:0,hasBodyMap:false,hasSecretMap:false,jealousy:0,lastJealousDay:-9,traits:[],flaws:[],looks:5,smarts:5,advocate:false,tutorialDone:false,patrons:[],rivalAdv:null,landmarks:[],faction:null,oratory:1,casesWon:0,casesLost:0,renown:0,senate:false,royal:false,lastCaseDay:-9,skills:{footwork:0,guard:0,blade:0,wind:0,throwing:0},scars:[],fatigue:0,lastTrainDay:-9,tribune:false,rank:0,campaigns:0,legionRep:0,lastCampaignDay:-9,units:{legionary:0,auxilia:0,cavalry:0,archers:0,engineers:0},supply:0,sieges:0,body:null,family:null,provinces:{},complaints:[],leniency:50,lastCalloutDay:-9,lastGiftDay:-9,giftsTaken:0,calloutWins:0,crownWorn:false,court:null}; for(const k in d){ if(g[k]===undefined) g[k]=d[k]; } if(!g.current) g.current='Italia'; if(g.age===undefined) g.age=19+Math.floor(((g.day||0)-(g.ageBase||0))/36);
+function migrate(g){ const d={honor:50,food:4,mount:0,slaves:0,hasVilla:false,boat:false,favor:0,soldiers:0,hidden:[],plotTier:0,emperor:false,approval:50,legions:0,rivals:0,retired:false,detachments:[],day:0,titles:{},clears:{},socialClass:'gladiator',army:{},armyGear:0,armyTrain:0,hasOrganizer:false,generals:[],wife:null,married:false,marryPrompted:false,children:[],pregnant:null,lastLoveDay:-9,injury:null,lastDebateDay:-9,office:0,path:null,parthia:50,parthiaPact:false,wifeRel:50,lastTalkDay:-9,isFemale:false,lineage:[],hygiene:70,wifePhys:45,hasPool:false,hasWardrobe:false,legacy:null,lastFeastDay:-9,loveDay:-1,loveQuick:0,loveLong:0,loveNight:0,loveVigil:0,venusUntil:-1,lastWashDay:-9,lastPoolDay:-9,lastWardrobeDay:-9,lastKidsDay:-9,lastBathDay:-9,pila:0,bow:null,bowsOwned:[],nemesis:null,rivalsList:[],trophies:[],nemesisCount:0,pendingDeath:false,ageBase:0,wonProvinceByFight:false,familyMan:false,infamy:0,gladiatrixStage:0,pardoned:false,lastNoteDay:-9,lastNoteReply:'',regalia:[],marryRolls:0,hasBodyMap:false,hasSecretMap:false,jealousy:0,lastJealousDay:-9,traits:[],flaws:[],looks:5,smarts:5,advocate:false,tutorialDone:false,patrons:[],rivalAdv:null,landmarks:[],faction:null,oratory:1,casesWon:0,casesLost:0,renown:0,senate:false,royal:false,lastCaseDay:-9,skills:{footwork:0,guard:0,blade:0,wind:0,throwing:0},scars:[],fatigue:0,lastTrainDay:-9,tribune:false,rank:0,campaigns:0,legionRep:0,lastCampaignDay:-9,units:{legionary:0,auxilia:0,cavalry:0,archers:0,engineers:0},supply:0,sieges:0,body:null,family:null,provinces:{},complaints:[],leniency:50,lastCalloutDay:-9,lastGiftDay:-9,giftsTaken:0,calloutWins:0,crownWorn:false,court:null,lastCoupDay:-99}; for(const k in d){ if(g[k]===undefined) g[k]=d[k]; } if(!g.current) g.current='Italia'; if(g.age===undefined) g.age=19+Math.floor(((g.day||0)-(g.ageBase||0))/36);
   // older saves predate the roll and the family — give them both, matched to who they already are
   if(!g.body){ const male=!g.isFemale, q=clamp(g.looks===undefined?5:g.looks,1,10);
     g.body=rollPlayerBody(male,q,false);
@@ -5259,6 +5277,49 @@ function openCheats(){
     const r=document.createElement('div'); r.className='row gap6'; r.style.flexWrap='wrap'; c.appendChild(r); b.appendChild(c); return r; };
   const btn=(row,label,fn)=>{ const x=document.createElement('button'); x.className='btn sm'; x.textContent=label;
     x.onclick=()=>{ fn(); refreshStatbar(); saveQuiet(); openCheats(); }; row.appendChild(x); };
+  // ---- ⛧ THE IMPOSSIBLE: right at the top, because it is what everyone comes here for ----
+  { const c=document.createElement('div'); c.className='shopcard'; c.style.borderColor='#ff7ae0';
+    const bp=beautyPower();
+    c.innerHTML=`<div><b style="color:#ff7ae0">⛧ THE IMPOSSIBLE — A BODY THAT SHOULD NOT EXIST</b></div>
+      <div class="small muted">Every measure past the human maximum: <b>11 of 10</b> on every part.
+        Legitimately it only comes from the <b>🎲 roll at the enrolment table</b>, and the odds are set by your birth —
+        gladiator <b>0.4%</b> · citizen <b>1%</b> · Eques <b>3%</b> · Patrician <b>8%</b> · <b style="color:#ff7ae0">Emperor’s Kin 14%</b>.
+        Pick EMPEROR’S KIN and keep pressing 🎲 ROLL AGAIN — it is roughly 1 roll in 7.</div>
+      <div class="small" style="margin-top:2px">You are currently <b style="color:${bp.beauty>=10.5?'#ff7ae0':'#e8c34a'}">${bp.title}</b>.</div>`;
+    const r0=document.createElement('div'); r0.className='row gap6'; r0.style.flexWrap='wrap'; r0.style.marginTop='4px';
+    const big=(label,title,fn)=>{ const x=document.createElement('button'); x.className='btn'; x.textContent=label;
+      x.style.borderColor='#ff7ae0'; x.style.color='#ff7ae0'; x.title=title||'';
+      x.onclick=()=>{ fn(); refreshStatbar(); saveQuiet(); }; r0.appendChild(x); };
+    big('⛧ MAKE **ME** IMPOSSIBLE','Every part of your own body past the human maximum — and it shows on every chart and every scene.',()=>{
+      G.body=rollPlayerBody(!G.isFemale, 10, true); G.smarts=10; G.traits=WIFE_TRAITS.map(t=>t.id); G.flaws=[];
+      G.hasBodyMap=true; syncPlayerLooks();
+      toast(G.isFemale
+        ? '⛧ A WAIST THAT DEFIES ANATOMY, huge above, and a boot-y that enters the room first. Nobody has ever looked like this.'
+        : '⛧ THE BIGGEST, THE BROADEST, THE STRONGEST — and a measure no rule in Rome is long enough for.',5200);
+      openBodyMap(selfSubject(),'map');           // and SEE it, immediately
+    });
+    big('⛧ MAKE MY **SPOUSE** IMPOSSIBLE','If you have no spouse, one is provided. Cheats should not lecture you about marriage.',()=>{
+      if(!G.wife){                                  // no spouse? then one is conjured — this is a cheat menu
+        G.wife=makeBride('roman',true,10); G.married=true; G.marryPrompted=true;
+        G.wifeRel=100; G.wifePhys=100;
+      }
+      const w=G.wife; w.tier='impossible'; w.quality=11; w.looks=IMPOSSIBLE_V; w.smarts=10; w.build='statuesque';
+      w.body=makeImpossibleBody(); w.jewel=true; w.rank='noble';
+      w.traits=WIFE_TRAITS.map(t=>t.id); w.flaws=[];
+      G.wifeRel=100; G.wifePhys=100; G.hygiene=100; G.jealousy=0; G.hasBodyMap=true; G.hasSecretMap=true;
+      toast('⛧ '+(w.male?'HE':'SHE')+' IS NOT PHYSICALLY POSSIBLE. Every measure past the rule, every gift of blood at once.',5200);
+      openBodyMap(w,'map');
+    });
+    big('⛧ BOTH OF US','The pair of you, past the rule. The shadow-play will not know what to do with itself.',()=>{
+      G.body=rollPlayerBody(!G.isFemale, 10, true); G.smarts=10; G.traits=WIFE_TRAITS.map(t=>t.id); G.flaws=[]; syncPlayerLooks();
+      if(!G.wife){ G.wife=makeBride('roman',true,10); G.married=true; G.marryPrompted=true; }
+      const w=G.wife; w.tier='impossible'; w.quality=11; w.looks=IMPOSSIBLE_V; w.smarts=10; w.build='statuesque';
+      w.body=makeImpossibleBody(); w.jewel=true; w.rank='noble'; w.traits=WIFE_TRAITS.map(t=>t.id); w.flaws=[];
+      G.wifeRel=100; G.wifePhys=100; G.hygiene=100; G.jealousy=0; G.hasBodyMap=true; G.hasSecretMap=true;
+      toast('⛧ BOTH OF YOU, past the rule. Rome has no words and the sculptors have no chisels.',5600);
+      openBodyMap(selfSubject(),'map');
+    });
+    c.appendChild(r0); b.appendChild(c); }
   // ---- coin & fame ----
   let r=card('🪙 COIN & FAME','— fill the strongbox and the record');
   btn(r,'+1,000d',()=>G.coin+=1000); btn(r,'+10,000d',()=>G.coin+=10000); btn(r,'+100,000d',()=>G.coin+=100000);
@@ -5317,7 +5378,12 @@ function openCheats(){
   btn(r,'+3 PETITIONS',()=>{ for(let i=0;i<3;i++) pendingComplaints().push(rollComplaint()); });
   btn(r,'CLEAR ALL PETITIONS',()=>{ G.complaints=[]; });
   btn(r,'MAX LOYALTY & TOLERANCE',()=>{ G.favor=(G.favor||0)+40; G.renown=(G.renown||0)+400; G.legionRep=100; G.leniency=70; G.approval=100; });
-  btn(r,'📣 A CALL-OUT, NOW',()=>{ G.lastCalloutDay=-99; setTimeout(()=>openCallout(),120); });
+  btn(r,'📣 A CALL-OUT, NOW',()=>{ G.lastCalloutDay=-99; const st0=state; setTimeout(()=>{ if(state===st0) openCallout(); },120); });
+  btn(r,'🗡 THE GUARD COMES TONIGHT',()=>{ G.socialClass='imperial'; G.royal=true; G.lastCoupDay=-99;
+    const st0=state; setTimeout(()=>{ if(state===st0) openCoup(); },120); });
+  btn(r,'🗡 PREFECT LOYALTY 100',()=>{ if(!G.court) G.court=makeCourt(); G.court.prefect.loyal=100; });
+  btn(r,'🗡 PREFECT LOYALTY 10',()=>{ if(!G.court) G.court=makeCourt(); G.court.prefect.loyal=10; });
+  btn(r,'⏳ AGE +10 YEARS',()=>{ G.ageBase=(G.ageBase||0)-360; G.age=(G.age||19)+10; for(let i=0;i<8;i++) ageBodies(); });
   // ---- the courts (daughter's path) ----
   r=card('⚖ THE COURTS','— the advocate’s road');
   btn(r,'BECOME AN ADVOCATE',()=>{ G.advocate=true; G.smarts=10; });
@@ -5621,10 +5687,97 @@ function drawShadowFigure(fx,fy,ph,beckon,open){
   }
   ctx.globalAlpha=1;
 }
+// ---- WHAT THE TIER IS ACTUALLY WORTH -----------------------------------
+// The shadow-play names a tier; the tier now has to pay for itself. A SPICY
+// or IMPOSSIBLE match burns hotter, breeds easier, and Rome talks about it.
+/* =====================================================================
+   AGEING — every ninth day the years take their cut. Under thirty a body
+   still firms up; after that it slides, and the slide is slower for a
+   house that keeps its baths hot, its lagoon full and its wardrobe stocked.
+   Nothing drops below 1, and an IMPOSSIBLE body never ages at all.
+   ===================================================================== */
+function upkeepScore(){
+  let u = 0;
+  u += clamp((G.hygiene===undefined?70:G.hygiene),0,100)*0.45;     // 0..45
+  if(G.hasPool) u += 22;                                            // a heated lagoon is the best of it
+  if(G.hasWardrobe) u += 8;
+  if(G.hasVilla) u += 6;
+  u += clamp((G.coin||0)/900, 0, 12);                               // money buys oil, physicians and time
+  if(hasTrait('healer')) u += 7;
+  if(hasFlaw('sickly')) u -= 12;
+  return clamp(Math.round(u),0,100);
+}
+function ageOneBody(body, age, male, up){
+  if(!body) return null;
+  const parts=(male?BODY_PARTS_M:BODY_PARTS).map(P=>P.id).concat(male?['secret']:[]);
+  const imp = parts.every(id=>(body[id]||0)>=IMPOSSIBLE_V);
+  if(imp) return null;                                              // the impossible does not age. Obviously.
+  // Under 30 a body is still coming in; after that it drifts down. One tick is
+  // nine days, so ~4 ticks a year: an upkept forty-five-year-old should lose
+  // about a point a decade, a neglected one two or three.
+  const prime = age<30;
+  const decade = Math.max(0,(age-30))/10;
+  const kept   = 1 - up/150;                                        // upkeep 85 → 0.43 · upkeep 5 → 0.97
+  const rate   = prime? 0.020 : (0.018 + decade*0.020) * kept;
+  const dir    = prime? 1 : -1;
+  const moved=[];
+  for(const id of parts){
+    if(body[id]===undefined) continue;
+    if(body[id]>=IMPOSSIBLE_V) continue;                            // an impossible PART is fixed too
+    if(id==='secret') continue;                                     // that one is not the years' business
+    // the waist is the first thing the years take, and the last thing they give back
+    const w = (id==='waist')? 1.5 : (id==='face'||id==='hairq')? 1.1 : 0.9;
+    if(Math.random() < rate*w){
+      const nv = clamp(body[id]+dir, 1, 10);
+      if(nv!==body[id]){ body[id]=nv; moved.push([id,dir]); }
+    }
+  }
+  return moved.length? moved : null;
+}
+function ageBodies(){
+  if(!G || !G.body) return;
+  const up=upkeepScore(), age=G.age||19;
+  const mine=ageOneBody(G.body, age, !G.isFemale, up);
+  if(mine){ syncPlayerLooks();
+    const gain=mine.filter(m=>m[1]>0).length, loss=mine.length-gain;
+    if(loss>gain) G.lastRaid='⏳ The years take a little: '+mine.filter(m=>m[1]<0).map(m=>partName(m[0],!G.isFemale)).join(', ')
+      +'. '+(up>=60?'The baths are holding most of it back.':'Hot baths, a lagoon and a full purse would slow this.');
+    else if(gain) G.lastRaid='💪 You are still filling out — '+mine.filter(m=>m[1]>0).map(m=>partName(m[0],!G.isFemale)).join(', ')+' improved.';
+  }
+  if(G.wife && G.wife.body){
+    const wAge = (G.wife.age===undefined? (G.wife.age = Math.max(16, age - ri(-3,5))) : G.wife.age);
+    const theirs=ageOneBody(G.wife.body, wAge, !!G.wife.male, up);
+    if(theirs){
+      const ps=(G.wife.male?BODY_PARTS_M:BODY_PARTS);
+      G.wife.looks=clamp(Math.round(ps.reduce((a,P)=>a+(G.wife.body[P.id]===undefined?5:G.wife.body[P.id]),0)/ps.length),1,10);
+    }
+  }
+  if(G.wife && G.wife.age!==undefined && G.day%36===0) G.wife.age++;
+}
+function partName(id,male){
+  const P=(id==='secret')?SECRET_PART:(male?BODY_PARTS_M:BODY_PARTS).find(p=>p.id===id);
+  return P? P.name.toLowerCase() : id;
+}
+function spouseTierBonus(){
+  const w=G&&G.wife; if(!w) return {mult:1, name:'—', fert:0, pop:0, col:'#8a8a7a'};
+  const bodyAvg2 = BODY_PARTS.reduce((a,P)=>a+((w.body&&w.body[P.id])===undefined?5:w.body[P.id]),0)/BODY_PARTS.length;
+  const st=lookStage(Math.max(bodyAvg2, w.looks===undefined?5:w.looks));
+  const T={
+    'NO LOOKS':      {mult:0.80, fert:-0.04, pop:0, col:'#8a8a7a'},
+    'GOOD LOOKS':    {mult:0.92, fert:-0.01, pop:0, col:'#c8b070'},
+    'CURVY':         {mult:1.00, fert:0.02,  pop:0, col:'#e8a04a'},
+    'GOOD LOOKING':  {mult:1.15, fert:0.05,  pop:1, col:'#e8688a'},
+    'ABSOLUTE FIRE': {mult:1.32, fert:0.09,  pop:2, col:'#e0407a'},
+    'SPICY (MAX)':   {mult:1.50, fert:0.13,  pop:3, col:'#a83ad0'},
+    '⛧ IMPOSSIBLE':  {mult:1.85, fert:0.20,  pop:5, col:'#ff7ae0'},
+  }[st.name] || {mult:1, fert:0, pop:0, col:'#e8a04a'};
+  return Object.assign({name:st.name}, T);
+}
 function finishBed(){
   const mode=BC.mode, w=G.wife, len=BC.len||'quick';
-  const emoF= len==='night'?9 : len==='long'?6 : 4;                 // fun-mode emotional gain
-  const phys= len==='night'?12 : len==='long'?7 : 4;                // physical gain, always
+  const TB=spouseTierBonus();                                       // the tier on the wall, cashed in
+  const emoF= Math.round((len==='night'?9 : len==='long'?6 : 4) * TB.mult);   // fun-mode emotional gain
+  const phys= Math.round((len==='night'?12 : len==='long'?7 : 4) * TB.mult);  // physical gain, always
   if(len==='vigil'){
     // THE VIGIL OF VENUS — perfection, rewarded
     advanceDay(6);                                                  // TWO months pass; nobody regrets a single day
@@ -5644,7 +5797,9 @@ function finishBed(){
   G.wifePhys=clamp((G.wifePhys===undefined?45:G.wifePhys)+phys,0,100);
   if(mode==='fun'){
     G.wifeRel=clamp(G.wifeRel+emoF+(G.wifeRel<40?3:0),0,100);
+    if(TB.pop){ G.pop=clamp(G.pop+TB.pop,0,100); G.approval=clamp(G.approval+Math.ceil(TB.pop/2),0,100); }
     BC=null; state='menu'; saveQuiet(); openVilla();
+    if(TB.pop) setTimeout(()=>toast('◈ '+TB.name+' — Rome hears about a match like yours. (+'+TB.pop+' pop)',3000),900);
     toast(ADULT
       ? (len==='night'? '🌌 Dawn finds you both wrecked and grinning. The slaves pretend not to notice the walk. (+'+emoF+' ♥, +'+phys+' 🔥)'
         : len==='long'? '🌙 The lamps burned all the way down. '+(G.isFemale?'He':'She')+' hums at breakfast for days. (+'+emoF+' ♥, +'+phys+' 🔥)'
@@ -5653,7 +5808,8 @@ function finishBed(){
     return;
   }
   const base= len==='night'?0.55 : len==='long'?0.42 : 0.32;        // the gods favour the thorough
-  const chance=base + (G.honor/400) + (w&&w.build!=='slender'&&w.build!=='slight'?0.06:0) + (G.wifeRel/500) + (hasTrait('fertile')?0.22:0) - (hasFlaw('barren')?0.28:0) - (hasFlaw('sickly')?0.10:0);
+  const chance=base + (G.honor/400) + (w&&w.build!=='slender'&&w.build!=='slight'?0.06:0) + (G.wifeRel/500) + (hasTrait('fertile')?0.22:0) - (hasFlaw('barren')?0.28:0) - (hasFlaw('sickly')?0.10:0)
+    + TB.fert;                                                      // and the tier of the match itself
   const hit=Math.random()<chance;
   if(hit && !G.pregnant) G.pregnant={due:G.day+27};
   G.wifeRel=clamp(G.wifeRel+(len==='night'?4:len==='long'?3:2),0,100);
@@ -6990,8 +7146,11 @@ function drawBridePortrait(cnv,b,bare){
   const thigh = Math.round(3 + legV*0.26);                       // firm full thigh
   const waistW = clamp(Math.round(9 - waiV*0.62),3,9);           // HIGH waist score = TINY waist
   const bustTop=-47, bustBot=bustTop+bd, hipTop=-32, hipBot=-23;
-  // THREE OR UNDER IS FLAT — and a flat figure is drawn flat, front and back
+  // THE LADDER IS DRAWN, NOT ASSUMED. Under 3 is FLAT (nothing there at all);
+  // 3-4 is RAISED — a slight swell, NOT a canyon; 5 and up earns the full
+  // treatment. The old art jumped straight from flat to deep cleavage.
   const HASB = busV>=3, HASR = booV>=3;
+  const MODB = busV>=3 && busV<=4, MODR = booV>=3 && booV<=4;
   const warrior=b.rank==='warrior';
   const noble=b.rank==='noble'||warrior;   // both wear an elevated gown (warrior's is martial in colour)
   // ================= BACK ARM (her left, hanging behind) =================
@@ -7033,6 +7192,11 @@ function drawBridePortrait(cnv,b,bare){
   if(!HASR){
     P(bx0,hipTop+1,bw2,8,dress); P(bx0,hipTop+1,1,8,dSh);
     P(bx0+1,hipTop+8,bw2-1,1,shade(dress,-30));                                // the single line where cloth meets thigh
+  } else if(MODR){
+    // RAISED behind — one soft curve and a hint of a seam. Not two cheeks.
+    P(bx0,hipTop+1,bw2,8,dress); P(bx0,hipTop+1,1,7,dHi);
+    P(cleftX,hipTop+2,1,5,shade(dress,-30));                                   // a hint, not a cleft
+    P(bx0+1,hipTop+8,bw2-1,1,shade(dress,-40));
   } else {
   // THE CLEFT — dark line straight down the MIDDLE, splitting two perky cheeks
   P(cleftX,hipTop,1,9,shade(dress,-54));
@@ -7070,6 +7234,16 @@ function drawBridePortrait(cnv,b,bare){
     P(-4,bustTop,11,bd,dress); P(-4,bustTop,11,1,dHi);                        // one unbroken panel of cloth
     P(-4,bustBot,11,1,dSh);                                                   // where the cloth simply ends
     if(noble){ P(-4,bustTop-2,1,bd+2,gold); P(6,bustTop-2,1,bd+2,gold); }     // the trim still runs, on nothing
+  } else if(MODB){
+    // RAISED — a modest swell under the cloth. A shallow shadow between, and
+    // that is all: no plunging V, no parted cups, nothing to spill.
+    P(-4,-52,10,3,skin); P(-4,-52,10,1,sHi);
+    P(-4,bustTop-1,11,2,skin); P(-4,bustTop-1,11,1,sGlow);
+    P(-4,bustTop,11,bd,dress); P(-4,bustTop,11,1,dHi);
+    P(-3,bustTop+1,4,2,shade(dress,12)); P(4,bustTop+1,4,2,shade(dress,12));  // two soft rises
+    P(1,bustTop+1,1,2,shade(dress,-22));                                       // the faintest line between them
+    P(-4,bustBot,5,1,dSh); P(2,bustBot,5,1,dSh);                               // shallow under-curves
+    if(noble){ P(-4,bustTop-2,1,bd+2,gold); P(6,bustTop-2,1,bd+2,gold); }
   } else if(noble){
     // plunging silk: bare shoulders + a deep exposed décolletage between the cups
     P(-4,-52,10,3,skin); P(-4,-52,10,1,sHi);                                  // collar/upper chest
@@ -7335,6 +7509,7 @@ $('btn-create-go').onclick=()=>{
 function enterMap(){
   if(checkOldAgeDeath()) return;                 // the years may have come due
   stopBodyMapAnim(); ensurePlayerBody();
+  if(maybeCoup()) return;                        // the guard has stopped doing arithmetic
   if(maybeCallout()) return;                     // somebody in the street has something to say about you
   // those born to rank must first secure a dynastic marriage
   if(marriageRequired()){ openMarry(true); return; }
@@ -8445,6 +8620,118 @@ function openProvinces(){
 }
 
 /* =====================================================================
+   THE NIGHT THEY COME FOR THE PURPLE — when RISK TO THE PURPLE runs hot
+   enough, the Praetorians stop doing arithmetic and start moving. This is
+   the century that auctioned the empire off the rampart; the guard is the
+   only vote that has ever really counted.
+   ===================================================================== */
+function coupDue(){
+  if(!G || G.retired) return false;
+  const kin = G.socialClass==='imperial' || G.royal || G.emperor;
+  if(!kin) return false;
+  if((G.day||0) - (G.lastCoupDay===undefined?-99:G.lastCoupDay) < 12) return false;
+  const risk=purpleRisk();
+  if(risk < 62) return false;
+  return Math.random() < (risk-58)/150;
+}
+function maybeCoup(){ if(!coupDue()) return false; openCoup(); return true; }
+function openCoup(){
+  G.lastCoupDay=G.day;
+  if(!G.court) G.court=makeCourt();
+  const ct=G.court, pf=ct.prefect, risk=purpleRisk(), loy=loyaltyScore();
+  const sibs=(G.family&&G.family.siblings)||[];
+  const prince=sibs.find(x=>x.male&&x.prince);
+  const claimant = prince? prince.name : pick(ELITE_MEN).replace(/^(Senator|Legate|Publican|Magnate|Governor|Duumvir|Eques|Praetor) /,'');
+  // the numbers that decide it
+  const guard = pf.loyal, mine = loyaltyScore(), coinPower=clamp((G.coin||0)/220,0,60);
+  state='menu'; show('scr-villa'); $('statbar').classList.remove('hide');
+  const b=$('villa-body'); b.innerHTML='';
+  const head=document.createElement('div'); head.className='shopcard'; head.style.borderColor='var(--blood)';
+  head.innerHTML=`<div><b style="color:var(--blood)">🗡 THE GUARD IS AT THE DOOR</b></div>
+    <div class="small muted">It is the fourth hour of the night. The palace is too quiet, and then it is not quiet at all —
+      boots on marble, moving with the confidence of men who have done this before.
+      <b>${pf.name}</b> is in the colonnade with the standards, and they are not lowered.
+      They are calling for <b style="color:#e0705b">${claimant}</b>.</div>
+    <div class="small" style="margin-top:4px">⚠ risk <b style="color:#e0705b">${risk}</b>
+      · 🗡 the Prefect's loyalty <b style="color:${guard>=60?'#7ad48a':'#e0705b'}">${guard}</b>
+      · 🩸 your own loyalty <b style="color:${mine>=55?'#7ad48a':'#e0705b'}">${mine}</b>
+      · 🪙 ${fmt(G.coin||0)}d in the strongbox</div>`;
+  b.appendChild(head);
+  const row=document.createElement('div'); row.className='col gap6';
+  const opt=(lab,desc,dis,col,fn)=>{
+    const d=document.createElement('div'); d.className='shopcard'; if(col) d.style.borderColor=col;
+    d.innerHTML=`<div class="small muted">${desc}</div>`;
+    const bt=document.createElement('button'); bt.className='btn sm'; bt.textContent=lab; bt.disabled=!!dis;
+    if(col){ bt.style.borderColor=col; bt.style.color=col; }
+    bt.onclick=fn; d.insertBefore(bt,d.firstChild); row.appendChild(d);
+  };
+  const survive=(txt,extra)=>{ G.lastCoupDay=G.day;
+    if(extra) extra();
+    refreshStatbar(); saveQuiet(); toast(txt,6200); enterMap(); };
+  const fall=(txt)=>{
+    G.emperor=false; G.royal=false;
+    G.approval=clamp(G.approval-30,0,100); G.pop=clamp(G.pop-16,0,100);
+    G.regalia=(G.regalia||[]).filter(r=>r==='ring');           // they leave you the signet. Just the signet.
+    G.titles={}; G.soldiers=Math.round((G.soldiers||0)*0.15);
+    if(G.court&&G.court.prefect) G.court.prefect.loyal=ri(10,35);
+    refreshStatbar(); saveQuiet(); toast(txt,7200); enterMap();
+  };
+  // 1 ── BUY THEM. It is what actually worked, most of the time.
+  const donative = Math.max(600, Math.round(3200 + (100-guard)*90));
+  opt('🪙 PAY THE DONATIVE ('+fmt(donative)+'d)',
+    'Every emperor who kept the purple paid the guard for it, on the night and every year after. It is not a bribe; it is the salary of the throne. '
+    +(G.coin>=donative? 'You can cover it.' : 'You cannot cover it — the strongbox is short.'),
+    G.coin<donative, '#e8c34a', ()=>{
+      G.coin-=donative;
+      const odds = clamp(0.52 + guard*0.004 + mine*0.003, 0.25, 0.96);
+      if(Math.random()<odds){ pf.loyal=clamp(pf.loyal+26,0,100);
+        survive('🪙 The chest is opened in the colonnade and counted out in front of them. The standards come down. '
+          +pf.name+' salutes as though nothing happened, and by morning nothing did. (−'+fmt(donative)+'d, +26 Prefect loyalty)',
+          ()=>{ G.approval=clamp(G.approval+4,0,100); }); }
+      else fall('🪙 They take the money. They count it. And then '+pf.name+' says, almost kindly, that it is not enough — '
+        +'and that '+claimant+' has already promised more. THE PURPLE IS TAKEN.');
+    });
+  // 2 ── STAND ON YOUR OWN PEOPLE
+  opt('🩸 CALL OUT YOUR OWN',
+    'Your clients, your veterans, your household. If your house is genuinely loyal this ends in the courtyard; if it is not, it ends in your bedroom. '
+    +'Loyalty '+mine+' — '+(mine>=62?'they will come.' : mine>=45?'some of them will come.' : 'most of them will find something else to do tonight.'),
+    false, '#c89af0', ()=>{
+      const odds = clamp(mine*0.011 + (G.soldiers||0)/9000 + ((G.regalia||[]).length)*0.03, 0.08, 0.93);
+      if(Math.random()<odds){
+        G.renown=(G.renown||0)+120; G.honor=clamp(G.honor+6,0,100); pf.loyal=clamp(pf.loyal+12,0,100);
+        survive('🩸 They come. Not soldiers — YOUR people, in the dark, in whatever they were sleeping in, and there are more of them than there are guardsmen. '
+          +pf.name+' looks at the arithmetic and lowers the standards himself. Rome will tell this story for a generation. (+120 renown, +6 honor)');
+      } else fall('🩸 You call, and the courtyard stays empty. A house is only as loyal as it has been paid for, and yours had not been. THE PURPLE IS TAKEN.');
+    });
+  // 3 ── FACE THEM ALONE. Ridiculous, magnificent, occasionally successful.
+  opt('👑 WALK OUT AND FACE THEM',
+    'No guard, no money, no argument — just you, in the purple, in the doorway. It has worked. It has also very obviously not worked. '
+    +'Your standing and your bearing are all that count here.',
+    false, '#e8c34a', ()=>{
+      const bp=beautyPower();
+      const odds = clamp(0.14 + toleranceScore()*0.005 + bp.opinion*0.010 + (G.honor-50)*0.004 + ((G.regalia||[]).length)*0.05, 0.05, 0.88);
+      if(Math.random()<odds){
+        G.pop=clamp(G.pop+12,0,100); G.approval=clamp(G.approval+10,0,100); G.renown=(G.renown||0)+180;
+        pf.loyal=clamp(pf.loyal+20,0,100);
+        survive('👑 You open the door yourself and stand in it, and say nothing at all. Whatever they had rehearsed does not survive contact with '
+          +'the sight of you. Somebody at the back grounds his spear, and then they all do. (+12 pop, +10 approval, +180 renown)');
+      } else fall('👑 You walk out into the colonnade, and they are not moved, and it is very quick. THE PURPLE IS TAKEN.');
+    });
+  // 4 ── GIVE IT UP ON YOUR OWN TERMS
+  opt('📜 ABDICATE BEFORE THEY TAKE IT',
+    'Hand it over yourself and keep your name, your house, your estates and your head. Diocletian managed it and grew cabbages. Nobody else did.',
+    false, null, ()=>{
+      G.emperor=false; G.royal=false;
+      G.approval=clamp(G.approval-8,0,100); G.honor=clamp(G.honor+4,0,100);
+      G.coin+=Math.round(2000+(G.renown||0));
+      G.regalia=(G.regalia||[]).filter(r=>r==='ring'||r==='sceptre');
+      survive('📜 You send the diadem out to them on a cushion before they can come in for it. '
+        +claimant+' wears it by dawn; you keep the estates, the name and — remarkably — the head. (+honor, +coin, the purple is gone)');
+    });
+  b.appendChild(row);
+}
+
+/* =====================================================================
    CALL-OUTS — Rome says what it thinks of you, out loud, in the street.
    Four ways to answer, and the best one has to be earned in loyalty.
    ===================================================================== */
@@ -8919,7 +9206,9 @@ function buildMarriageCard(b){
         drawBridePortrait(cv,w); portImg.src=cv.toDataURL(); delete w._expr; }
       toast(ADULT? ('😍 '+(w.male?'His face lights like a festival lamp.':'Her eyes go wide and soft at once — loving, excited, and NOT patient.'))
                  : ('😊 '+(w.male?'He smiles and takes your hand.':'She smiles and takes your hand.')),1500);
-      setTimeout(()=>{ if(G.married) startBedScene(mode,bedLen,bedPlace); },1000);
+      // only if you are STILL standing in the villa a second later — this used to
+      // fire after you had already walked off to the body map and switch screens
+      setTimeout(()=>{ if(G.married && state==='villa') startBedScene(mode,bedLen,bedPlace); },1000);
     };
     // talk (4 questions) · bedchamber for an heir · bedchamber for love
     const btns=document.createElement('div'); btns.className='row gap6'; btns.style.marginTop='4px';
@@ -9419,6 +9708,10 @@ function advanceDay(n){
     // wounds knit with time
     if(G.injury){ G.injury.daysLeft-= (hasTrait('healer')?2:1); if(G.injury.daysLeft<=0){ const nm=G.injury.name; addScar(nm); toast('🩹 Your '+nm+' has healed — it leaves a scar. (+1 honor)',2400); G.injury=null; refreshStatbar(); } }
     G.fatigue=clamp((G.fatigue||0)-6,0,100);       // the ache fades with the days, but slowly
+    // ---- THE YEARS TELL. A body is not a fixed number: past thirty it slides,
+    //      and only an upkept house holds it. Baths, the lagoon and the
+    //      wardrobe are the difference between ageing well and ageing.
+    if(G.day%9===0) ageBodies();
     // ---- THE PROVINCES PAY (or bleed) EVERY SINGLE DAY ----
     { const pt=provDailyTick();
       if(pt.coin) G.coin=Math.max(0,G.coin+pt.coin);
@@ -10766,6 +11059,7 @@ window.__SS = {
   setBodyMapWalk:(v)=>{ bodyMapWalk=v; }, get bodyMapSubject(){return bodyMapSubject;},
   ARCHETYPES, ARCH_ORDER, BODY_PARTS, BODY_PARTS_M, IMPOSSIBLE_V,
   IMPOSSIBLE_CHANCE, SECRET_SELLERS, drawShadowPlayTest:drawShadowPlay, drawWifeFig, drawDomusPlayer,
+  openCoup, coupDue, purpleRisk, makeCourt, ageBodies, ageOneBody, upkeepScore, spouseTierBonus, finishBed,
   isTouchOn, setTouchPref, syncTouchPads, get touchPref(){return touchPref;},
 };
 })();

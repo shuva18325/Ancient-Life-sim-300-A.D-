@@ -114,6 +114,15 @@ publicly, leaving it off keeps the game safe for a general audience.
   yourself, which works far better than it should if you are good-looking enough.
 - **Looks are politics** — for a prince, a princess or an Augusta, a fine face is worth **public
   opinion**, **political tolerance** and **gifts that arrive unasked**.
+- **The tier pays for itself** — a *SPICY* or *⛧ IMPOSSIBLE* match doesn't just look different, it
+  burns hotter (up to ×1.85 on ♥ and 🔥), conceives easier, and Rome talks about it (+pop).
+- **The years tell** — every body drifts. Under thirty the scores climb; after thirty they slide,
+  and the slide is slower for a house that keeps its baths hot, its lagoon full and coin in the
+  box. The waist goes first. An ⛧ IMPOSSIBLE body never ages at all.
+- **The night they come for the purple** — when RISK TO THE PURPLE runs hot the Praetorians stop
+  doing arithmetic and start moving. Pay the donative, call out your own people, walk out and face
+  them in the doorway, or abdicate and keep your head. This is the century that auctioned the
+  empire off the rampart; the guard is the only vote that ever really counted.
 - **Call-outs** — Rome says what it thinks of you, out loud, in the street. Satisfy the crowd,
   stoke your spouse's jealousy, balance it out — or, if your house is loyal enough, say nothing
   at all while your own people close on the man who spoke.
