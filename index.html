@@ -1016,13 +1016,21 @@ function lookStage(v){ let s=LOOK_STAGES[0]; for(const st of LOOK_STAGES) if(v>=
    IMPOSSIBLE one bends the lamplight itself.
    ===================================================================== */
 const SHADOW_STAGES={
-  'NO LOOKS':      {curve:0.70, waist:0.86, glow:0.50, heartMul:1.9,  aura:0.00, emb:0, col:'#8a8a7a', note:'flat, plain and entirely herself'},
-  'GOOD LOOKS':    {curve:0.86, waist:0.94, glow:0.75, heartMul:1.35, aura:0.00, emb:0, col:'#c8b070', note:'a pleasant shape on the wall'},
-  'CURVY':         {curve:1.00, waist:1.00, glow:0.95, heartMul:1.00, aura:0.10, emb:0, col:'#e8a04a', note:'the lamp has something to work with'},
-  'GOOD LOOKING':  {curve:1.13, waist:1.06, glow:1.18, heartMul:0.78, aura:0.19, emb:1, col:'#e8688a', note:'the shadow alone would start an argument'},
-  'ABSOLUTE FIRE': {curve:1.26, waist:1.13, glow:1.45, heartMul:0.58, aura:0.29, emb:2, col:'#e0407a', note:'the wall is barely containing this'},
-  'SPICY (MAX)':   {curve:1.38, waist:1.20, glow:1.75, heartMul:0.44, aura:0.40, emb:3, col:'#a83ad0', note:'sculptors will copy this silhouette for centuries'},
-  '⛧ IMPOSSIBLE':  {curve:1.62, waist:1.34, glow:2.10, heartMul:0.30, aura:0.58, emb:4, col:'#ff7ae0', note:'NOT PHYSICALLY POSSIBLE — the lamplight gives up'},
+  'NO LOOKS':      {curve:0.70, waist:0.86, glow:0.50, heartMul:1.9,  aura:0.00, emb:0, col:'#8a8a7a', plate:'dull',    wall:1,
+                    note:'flat, plain and entirely herself'},
+  'GOOD LOOKS':    {curve:0.86, waist:0.94, glow:0.75, heartMul:1.35, aura:0.00, emb:0, col:'#c8b070', plate:'bronze',  wall:1,
+                    note:'a pleasant shape on the wall'},
+  'CURVY':         {curve:1.00, waist:1.00, glow:0.95, heartMul:1.00, aura:0.10, emb:0, col:'#e8a04a', plate:'amber',   wall:1,
+                    note:'the lamp has something to work with'},
+  'GOOD LOOKING':  {curve:1.13, waist:1.06, glow:1.18, heartMul:0.78, aura:0.19, emb:1, col:'#e8688a', plate:'rose',    wall:1,
+                    note:'the shadow alone would start an argument'},
+  // ---- from here the wall stops being able to hold it ----
+  'ABSOLUTE FIRE': {curve:1.26, waist:1.13, glow:1.45, heartMul:0.58, aura:0.29, emb:2, col:'#e0407a', plate:'flame',   wall:0.35,
+                    note:'THE WALL IS GONE — this one burns straight through it'},
+  'SPICY (MAX)':   {curve:1.38, waist:1.20, glow:1.75, heartMul:0.44, aura:0.40, emb:3, col:'#a83ad0', plate:'beam',    wall:0,
+                    note:'NO WALL LEFT. Sculptors will copy this silhouette for centuries'},
+  '⛧ IMPOSSIBLE':  {curve:1.62, waist:1.34, glow:2.10, heartMul:0.30, aura:0.58, emb:4, col:'#ff7ae0', plate:'ripple',  wall:0,
+                    note:'NOT PHYSICALLY POSSIBLE — no wall, no rule, no words'},
 };
 function shadowStage(avg){
   const st=lookStage(avg);
@@ -1403,6 +1411,23 @@ function makeCourt(){
     figures:[...COURT_FIGURES].sort(()=>Math.random()-0.5).slice(0,3)
       .map(f=>({role:f[0], note:f[1], icon:f[2], op:ri(18,92)})) };
 }
+/* ---- COURT FAVOUR IS A CURRENCY. Each figure at your court holds exactly one
+   lever, and cultivating them costs coin, patience and a little dignity. ---- */
+const COURT_LEVERS={
+  '🗝':{name:'DOORS',    what:'fewer petitions ever reach your desk — he turns them away at the threshold'},
+  '📜':{name:'THE LAW',  what:'+political tolerance — the edicts come out reading exactly as you meant them'},
+  '🌿':{name:'THE YEARS',what:'slows ageing — oils, regimen and a physician who has actually read Galen'},
+  '🕯':{name:'WARNING',  what:'−risk to the purple — she hears the plot forming and tells you first'},
+  '🌾':{name:'BREAD',    what:'−unrest in every province you hold — a fed city forgives a great deal'},
+  '🏛':{name:'RENOWN',   what:'+renown every day — the Augusta’s circle writes about you, favourably'},
+  '🐎':{name:'HORSE',    what:'+loyalty — four thousand cavalry who know your name'},
+};
+function courtBonus(icon){
+  const ct=G&&G.court; if(!ct||!ct.figures) return 0;
+  const f=ct.figures.find(x=>x.icon===icon);
+  return f? f.op : 0;
+}
+function courtCultivateCost(f){ return Math.round(160 + f.op*9); }
 // how likely the purple is taken off you — by the guard, by the Senate, by a brother
 function purpleRisk(){
   if(!G) return 0;
@@ -1412,7 +1437,8 @@ function purpleRisk(){
   let r = 58 - pf*0.42 - loyaltyScore()*0.22 - (toleranceScore()-50)*0.20
         + provUnrestAvg()*0.22 + complaintPressure()*1.6
         + (rivalPrince? (100-rivalPrince.opinion)*0.14 : 0)
-        - ((G.regalia||[]).length)*2.2 - (G.soldiers||0)/900;
+        - ((G.regalia||[]).length)*2.2 - (G.soldiers||0)/900
+        - courtBonus('🕯')*0.14;                           // the Vestal hears it coming, and tells you
   if(G.isFemale) r += 8;                                   // a woman on the throne is challenged more, and was
   return clamp(Math.round(r),0,100);
 }
@@ -1482,7 +1508,8 @@ const BEAUTY_GIFTS=[
 function toleranceScore(){
   const bp=beautyPower();
   let t = 50 + bp.tolerance + (G.approval-50)*0.35 + (G.renown||0)/25 + (G.honor-50)*0.2
-        + (G.leniency||0)*0.12 - (G.infamy||0)*0.25 - provUnrestAvg()*0.4;
+        + (G.leniency||0)*0.12 - (G.infamy||0)*0.25 - provUnrestAvg()*0.4
+        + courtBonus('📜')*0.12;                         // the Master of Letters, earning his keep
   if(G.isFemale && bp.rank>=2) t -= 14;              // she is held to a harder standard, and always was
   if(G.emperor) t += 10;
   if((G.regalia||[]).length) t += (G.regalia||[]).length*2;
@@ -1491,7 +1518,8 @@ function toleranceScore(){
 function loyaltyScore(){
   let l = 20 + (G.favor||0)*1.6 + (G.renown||0)/18 + (G.legionRep||0)*0.5
         + (G.soldiers||0)/150 + (G.approval-50)*0.25 + (G.patrons||[]).length*4
-        + ((G.regalia||[]).length)*3 + (G.emperor?12:0);
+        + ((G.regalia||[]).length)*3 + (G.emperor?12:0)
+        + courtBonus('🐎')*0.10;                          // the Master of the Horse
   if(G.married) l += 4;
   return clamp(Math.round(l),0,100);
 }
@@ -1536,7 +1564,8 @@ function provDailyTick(){
     const P=provOf(id);
     coin += provIncome(id) - provUpkeep(id);
     // unrest drifts with your policy
-    let d = (P.tax-2)*0.9 - P.garrison*0.10 - P.grain*0.22 - (lenient-50)*0.012 - (toleranceScore()-50)*0.02;
+    let d = (P.tax-2)*0.9 - P.garrison*0.10 - P.grain*0.22 - (lenient-50)*0.012 - (toleranceScore()-50)*0.02
+          - courtBonus('🌾')*0.010;                      // the Prefect of the Grain
     if(P.govLoyal<40) d += 0.7;
     P.unrest = clamp(P.unrest + d + rnd(-0.5,0.5), 0, 100);
     P.govLoyal = clamp(P.govLoyal + (P.unrest>60?-0.4:0.15) + rnd(-0.3,0.3), 0, 100);
@@ -1607,7 +1636,10 @@ function calloutDue(){
   if(!G || G.retired) return false;
   if((G.day||0) - (G.lastCalloutDay===undefined?-99:G.lastCalloutDay) < 4) return false;
   const bp=beautyPower();
-  const chance = 0.10 + Math.max(0,(bp.beauty-5))*0.055 + bp.rank*0.03;
+  // YOUR OWN STAGE drives how often Rome shouts about you — a CURVY citizen is
+  // remarked on now and then; ⛧ IMPOSSIBLE cannot cross a street in peace.
+  const si=stageIndex(selfStage().name);                 // 0 NO LOOKS … 6 IMPOSSIBLE
+  const chance = 0.06 + si*0.045 + Math.max(0,(bp.beauty-5))*0.030 + bp.rank*0.03;
   return Math.random() < chance;
 }
 
@@ -2282,6 +2314,14 @@ function openBodyMap(w,back){
   $('bodymap-verdict').innerHTML=`<b style="color:${lk>=11?'#ff7ae0':st.col}">${lk>=11?'⛧ IMPOSSIBLE':st.name}</b> <span class="muted">— ${st.blurb}</span>
     <div class="small" style="margin-top:3px">${bodyTierLine(w)}</div>
     <div class="small muted" style="margin-top:2px;font-style:italic">${bodyBlurb(w)}</div>
+    ${w.self? (()=>{ const ss=selfStage(), si=stageIndex(ss.name), SH=SHADOW_STAGES[ss.name]||{};
+        return `<div class="small" style="margin-top:4px;padding:3px;border:1px solid ${ss.col};border-radius:3px">
+          <b style="color:${ss.col}">◈ YOUR STAGE — ${ss.name} ◈</b>
+          <span class="muted">${SH.note||ss.blurb}</span>
+          <div class="small muted" style="margin-top:2px">This is the rung the shadow-play plays, and it drives the rest:
+            <b style="color:${ss.col}">call-outs ${['rare','uncommon','regular','frequent','constant','relentless','you cannot cross a street'][si]}</b>
+            · <b style="color:${ss.col}">gifts ${si<=1?'never come':si<=2?'trickle in':si<=4?'arrive often':'never stop'}</b>
+            ${G.married? '· <b style="color:'+ss.col+'">bedchamber ×'+(spouseTierBonus().mult)+' from your spouse\'s rung</b>':''}</div></div>`; })() : ''}
     ${bp? `<div class="small" style="margin-top:3px;color:#e8c34a">⚖ ${bp.title} — ${bp.opinion>=0?'+':''}${bp.opinion} public opinion · ${bp.tolerance>=0?'+':''}${bp.tolerance} political tolerance${bp.gifts?' · gifts arrive unasked':''}</div>`:''}
     ${(()=>{ // THE YEARS: what age is doing to this body, and how hard the house is fighting it
       const age = w.self? (G.age||19) : (w.age===undefined? (G.age||19) : w.age);
@@ -5705,6 +5745,7 @@ function upkeepScore(){
   u += clamp((G.coin||0)/900, 0, 12);                               // money buys oil, physicians and time
   if(hasTrait('healer')) u += 7;
   if(hasFlaw('sickly')) u -= 12;
+  u += courtBonus('🌿')*0.12;                             // the Court Physician
   return clamp(Math.round(u),0,100);
 }
 function ageOneBody(body, age, male, up){
@@ -5758,10 +5799,29 @@ function partName(id,male){
   const P=(id==='secret')?SECRET_PART:(male?BODY_PARTS_M:BODY_PARTS).find(p=>p.id===id);
   return P? P.name.toLowerCase() : id;
 }
+// the score the ladder is read from, for EITHER sex. A husband is measured on
+// HIS parts — chest, shoulders, midriff — and the other ledger counts too.
+function figureScore(w){ return spouseFigureScore(w); }
+// YOUR OWN rung on the very same ladder, read the very same way
+function selfStage(){ return lookStage(figureScore(selfSubject())); }
+function stageIndex(name){ return Math.max(0, LOOK_STAGES.findIndex(s=>s.name===name)); }
+function spouseFigureScore(w){
+  if(!w) return 5;
+  const male=!!w.male, ps= male? BODY_PARTS_M : BODY_PARTS, b=w.body||{};
+  let avg = ps.reduce((a,P)=>a+(b[P.id]===undefined?5:b[P.id]),0)/ps.length;
+  avg = Math.max(avg, w.looks===undefined? avg : w.looks);
+  if(male){
+    // HIS LENGTH IS PART OF THE RECKONING — a quarter of it, and it is the
+    // quarter the ledger exists for. Applied AFTER the looks floor, or a high
+    // looks score would simply swallow it.
+    const len = b.secret===undefined?5:b.secret;
+    avg = avg*0.74 + len*0.26;
+  }
+  return avg;
+}
 function spouseTierBonus(){
   const w=G&&G.wife; if(!w) return {mult:1, name:'—', fert:0, pop:0, col:'#8a8a7a'};
-  const bodyAvg2 = BODY_PARTS.reduce((a,P)=>a+((w.body&&w.body[P.id])===undefined?5:w.body[P.id]),0)/BODY_PARTS.length;
-  const st=lookStage(Math.max(bodyAvg2, w.looks===undefined?5:w.looks));
+  const st=lookStage(spouseFigureScore(w));
   const T={
     'NO LOOKS':      {mult:0.80, fert:-0.04, pop:0, col:'#8a8a7a'},
     'GOOD LOOKS':    {mult:0.92, fert:-0.01, pop:0, col:'#c8b070'},
@@ -6064,26 +6124,49 @@ function drawShadowPlay(s,T){
   // CURVY, GOOD LOOKING, ABSOLUTE FIRE, SPICY (MAX) and ⛧ IMPOSSIBLE each
   // throw a visibly different shadow rather than one generic maxed one.
   const _fAvg = BODY_PARTS.reduce((a,P)=>a+(_fem[P.id]===undefined?5:_fem[P.id]),0)/BODY_PARTS.length;
-  const STG = shadowStage(_fAvg);
+  // THE PLATE RATES THE PERSON YOU MARRIED — a husband on his own parts and his
+  // own length, a wife on hers. The woman's CURVE still follows her own scores.
+  const STG  = shadowStage(spouseFigureScore(G&&G.wife));
+  const FSTG = shadowStage(_fAvg);
   const M_CHEST=gvM('bust'), M_SHLD=gvM('booty'), M_WAIST=gvM('waist');
   const M_LEN=_man.secret===undefined?5:_man.secret;
   // ---- her measurements, in shadow-pixels ----
   const HAS_BUST = F_BUST>=3, HAS_REAR = F_REAR>=3;     // below a 3 there is simply nothing to draw
-  const CV=STG.curve;                                              // the stage multiplier on top of the parts
+  const CV=FSTG.curve;                                             // HER stage multiplies HER curve
   const bustRX = (2.2 + F_BUST*0.42)*CV, bustRY = (2.0 + F_BUST*0.36)*CV;   // 2.6 flat → 6.8 huge → beyond
   const bustPt = F_BUST>=5? (0.9 + F_BUST*0.10)*CV : 0;            // the point only reads on a full bust
   const rearR  = (2.4 + F_REAR*0.50)*CV;                           // 2.9 flat → 7.9 colossal
   const hipOut = (6.5 + F_REAR*0.48)*CV;                           // how far the hips swing wide
-  const waistIn= (5.6 + (10-F_WAIST)*0.52)/STG.waist;              // a TINY waist really pinches in
+  const waistIn= (5.6 + (10-F_WAIST)*0.52)/FSTG.waist;             // a TINY waist really pinches in
   // ---- his ----
   const chestRX= 8.0 + M_CHEST*0.42, chestRY = 4.4 + M_CHEST*0.30;
   const shldOut= 8.4 + M_SHLD*0.48;
   const gutOut = 6.4 + (10-M_WAIST)*0.34;                          // a soft midriff pushes the trunk out
   // ---- the stage backdrop, styled per location ----
-  if(style==='wall'){
-    ctx.globalAlpha=.13; px(gx-12,gy-12,gw+24,gh+24,'#ffcf7a');
-    ctx.globalAlpha=.30; px(gx,gy,gw,gh,'#ffd99a'); ctx.globalAlpha=1;
-    px(gx,gy,gw,2,'rgba(120,70,20,.5)'); px(gx,gy+gh-2,gw,2,'rgba(120,70,20,.5)');
+  // WALL STRENGTH IS A TIER PROPERTY. At ABSOLUTE FIRE it is burning through;
+  // at SPICY and ⛧ IMPOSSIBLE there is no wall left at all — the figures stand
+  // in open heat instead of being projected onto anything.
+  const WALLA = STG.wall===undefined? 1 : STG.wall;
+  if(WALLA<=0.02){
+    // NO WALL: an open field of the tier's own light, edge-lit and burning
+    const og=ctx.createRadialGradient(cx0,gy+gh*0.5,8,cx0,gy+gh*0.5,gw*0.62);
+    og.addColorStop(0, STG.col); og.addColorStop(0.45,'rgba(60,10,50,.55)'); og.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.globalAlpha=0.40+0.14*Math.sin(T*0.05); ctx.fillStyle=og; ctx.fillRect(gx-16,gy-14,gw+32,gh+28); ctx.globalAlpha=1;
+    // the cinders of whatever used to be here
+    for(let i=0;i<26;i++){ const rx=gx+((i*71+((T*1.4)|0))%gw), ry=gy+gh-((i*37+((T*1.1)|0))%(gh+10));
+      ctx.globalAlpha=0.16+0.20*Math.abs(Math.sin(T*0.04+i)); px(rx,ry,1,2,STG.col); }
+    ctx.globalAlpha=1;
+  } else if(style==='wall'){
+    ctx.globalAlpha=.13*WALLA; px(gx-12,gy-12,gw+24,gh+24,'#ffcf7a');
+    ctx.globalAlpha=.30*WALLA; px(gx,gy,gw,gh,'#ffd99a'); ctx.globalAlpha=1;
+    ctx.globalAlpha=WALLA; px(gx,gy,gw,2,'rgba(120,70,20,.5)'); px(gx,gy+gh-2,gw,2,'rgba(120,70,20,.5)'); ctx.globalAlpha=1;
+    if(WALLA<0.99){                                        // burning through: holes eaten in the plaster
+      for(let i=0;i<20;i++){ const hx=gx+16+((i*83+((T*0.5)|0))%(gw-32)), hy=gy+12+((i*47)%(gh-24));
+        const rr=3+Math.abs(Math.sin(T*0.03+i))*7;
+        ctx.globalAlpha=0.30; ctx.fillStyle=STG.col;
+        ctx.beginPath(); ctx.ellipse(hx,hy,rr,rr*0.7,0,0,7); ctx.fill(); }
+      ctx.globalAlpha=1;
+    }
   } else if(style==='water'){
     ctx.globalAlpha=.22; px(gx-8,gy-8,gw+16,gh+16,'#1a3a52'); ctx.globalAlpha=1;
     ctx.globalAlpha=.34; px(gx,gy,gw,gh,'#22506e'); ctx.globalAlpha=1;
@@ -6324,15 +6407,82 @@ function drawShadowPlay(s,T){
     ctx.globalAlpha=.10; px(gx,gy+gh-16,gw,16,'#0a1826'); ctx.globalAlpha=1; }                    // the surface below
   else if(style==='marble'){ if((T|0)%80<40){ ctx.globalAlpha=.06; px(gx+3,gy+2,gw,gh,'#12100a'); ctx.globalAlpha=1; }  // the echo pulses
     if((T|0)%50<2) s.hearts.push({x:gx+rnd(10,gw-10),y:gy+gh-6,vy:0.3,life:60,c:'#bfe0ea'}); }    // condensation drips
-  // ---- THE NAMEPLATE: which of the seven stages is on the wall tonight ----
-  { const plateW=Math.max(96, STG.name.length*7+34), plx=cx0-plateW/2, ply=gy+gh+5;
-    ctx.globalAlpha=.72; px(plx,ply,plateW,15,'#150c18'); ctx.globalAlpha=1;
+  // ---- THE NAMEPLATE: every stage gets its OWN plate and its own title effect ----
+  drawStagePlate(STG, cx0, gy+gh+5, T);
+}
+/* Seven plates, seven treatments. The tier should be readable from across the
+   room without reading a single word of it. */
+function drawStagePlate(STG,cx0,ply,T){
+  const plateW=Math.max(104, STG.name.length*7+40), plx=cx0-plateW/2, K=STG.plate||'amber';
+  const glow=(a,col,inset)=>{ ctx.globalAlpha=a; px(plx-(inset||0),ply-(inset||0),plateW+(inset||0)*2,15+(inset||0)*2,col); ctx.globalAlpha=1; };
+  let titleCol=STG.col, pulse=1;
+  if(K==='dull'){
+    // NO LOOKS — a chipped grey slab nobody polished
+    glow(.66,'#14120f');
+    ctx.strokeStyle='#6a6a5e'; ctx.lineWidth=1; ctx.strokeRect(plx+.5,ply+.5,plateW-1,14);
+    for(let i=0;i<4;i++) px(plx+7+i*((plateW-14)/4), ply+13, 3,1,'#3a3a33');   // chips along the bottom edge
+    titleCol='#9a9a8a';
+  } else if(K==='bronze'){
+    // GOOD LOOKS — plain bronze, honestly made
+    glow(.70,'#1a1510');
+    ctx.strokeStyle='#8a6f35'; ctx.lineWidth=1; ctx.strokeRect(plx+.5,ply+.5,plateW-1,14);
+    px(plx+2,ply+2,plateW-4,1,'#c8a24a'); px(plx+2,ply+12,plateW-4,1,'#5a4018');
+  } else if(K==='amber'){
+    // CURVY — warm amber, breathing gently
+    pulse=0.86+0.14*Math.sin(T*0.06);
+    glow(.70,'#1d140c');
     ctx.strokeStyle=STG.col; ctx.lineWidth=1; ctx.strokeRect(plx+.5,ply+.5,plateW-1,14);
-    const pulse = STG.aura>=0.4? (0.72+0.28*Math.sin(T*0.11)) : 1;
-    ctx.globalAlpha=pulse;
-    pixelText('◈ '+STG.name+' ◈', cx0, ply+4, STG.col, 1);
+    ctx.globalAlpha=0.30*pulse; px(plx+1,ply+1,plateW-2,3,STG.col); ctx.globalAlpha=1;
+  } else if(K==='rose'){
+    // GOOD LOOKING — rose frame with a spark at each corner
+    pulse=0.88+0.12*Math.sin(T*0.09);
+    glow(.72,'#1e1018');
+    ctx.strokeStyle=STG.col; ctx.lineWidth=1; ctx.strokeRect(plx+.5,ply+.5,plateW-1,14);
+    [[plx,ply],[plx+plateW-2,ply],[plx,ply+13],[plx+plateW-2,ply+13]].forEach((c2,i)=>{
+      ctx.globalAlpha=0.40+0.55*Math.abs(Math.sin(T*0.10+i*1.6)); px(c2[0],c2[1],2,2,'#ffd0e0'); });
     ctx.globalAlpha=1;
-    pixelText(STG.note, cx0, ply+19, 'rgba(226,210,232,.62)', 1); }
+  } else if(K==='flame'){
+    // ABSOLUTE FIRE — the plate is on fire; flames lick up off the top edge
+    pulse=0.80+0.20*Math.sin(T*0.16);
+    glow(.30,STG.col,3); glow(.74,'#22090f');
+    ctx.strokeStyle=STG.col; ctx.lineWidth=1.4; ctx.strokeRect(plx+.5,ply+.5,plateW-1,14);
+    for(let i=0;i<12;i++){ const fx=plx+5+i*((plateW-10)/12);
+      const h=3+Math.abs(Math.sin(T*0.19+i*0.9))*7;
+      ctx.globalAlpha=0.55; px(fx,ply-h,2,h,'#e0704a');
+      ctx.globalAlpha=0.75; px(fx,ply-h*0.5,2,h*0.5,'#ffc24a'); }
+    ctx.globalAlpha=1;
+  } else if(K==='beam'){
+    // SPICY (MAX) — beams radiating out, and a shine sweeping across the title
+    pulse=0.82+0.18*Math.sin(T*0.13);
+    glow(.34,STG.col,4); glow(.76,'#180a20');
+    ctx.strokeStyle=STG.col; ctx.lineWidth=1.4; ctx.strokeRect(plx+.5,ply+.5,plateW-1,14);
+    ctx.save(); ctx.strokeStyle=STG.col; ctx.lineWidth=1;
+    for(let i=0;i<10;i++){ const a=(i/10)*6.283+T*0.012;
+      ctx.globalAlpha=0.10+0.10*Math.sin(T*0.08+i);
+      ctx.beginPath(); ctx.moveTo(cx0+Math.cos(a)*(plateW*0.5+3), ply+7+Math.sin(a)*11);
+      ctx.lineTo(cx0+Math.cos(a)*(plateW*0.5+16), ply+7+Math.sin(a)*22); ctx.stroke(); }
+    ctx.restore(); ctx.globalAlpha=1;
+    const sw=((T*1.6)%(plateW+40))-20;                                    // the shine sweep
+    ctx.globalAlpha=0.30; px(plx+sw,ply+1,7,13,'#ffffff'); ctx.globalAlpha=1;
+  } else {
+    // ⛧ IMPOSSIBLE — the plate ripples, motes orbit it, and the title ghosts itself
+    pulse=0.74+0.26*Math.sin(T*0.11);
+    glow(.40,STG.col,6); glow(.78,'#1d0a1e');
+    ctx.strokeStyle=STG.col; ctx.lineWidth=1.6;
+    for(let r2=0;r2<3;r2++){ ctx.globalAlpha=0.30-r2*0.08;
+      const o=r2*3+Math.sin(T*0.07+r2)*2;
+      ctx.strokeRect(plx+.5-o,ply+.5-o,plateW-1+o*2,14+o*2); }
+    ctx.globalAlpha=1;
+    for(let i=0;i<9;i++){ const a=(i/9)*6.283 + T*0.030;
+      const mx=cx0+Math.cos(a)*(plateW*0.52+8), my=ply+7+Math.sin(a)*15;
+      ctx.globalAlpha=0.35+0.45*Math.abs(Math.sin(T*0.09+i)); px(mx,my,2,2,STG.col); }
+    ctx.globalAlpha=1;
+    pixelText('◈ '+STG.name+' ◈', cx0+1, ply+5, 'rgba(255,122,224,.35)', 1);   // the ghost, offset
+  }
+  ctx.globalAlpha=pulse;
+  pixelText('◈ '+STG.name+' ◈', cx0, ply+4, titleCol, 1);
+  ctx.globalAlpha=1;
+  pixelText(STG.note, cx0, ply+19, 'rgba(226,210,232,.62)', 1);
 }
 // the wife's people dress the theatre frame
 function drawTheaterEthnic(eth,gx,gy,gw,gh,T){
@@ -8372,10 +8522,55 @@ function openTree(){
       if(!G.isFemale && sb.male) flag = sb.prince
         ? '<div class="small" style="color:'+KINCOL+'">👑 YOUR BROTHER IS THE HEIR, not you. Rome has killed for less.</div>'
         : '<div class="small muted">A brother, and therefore a rival, however fond you are of him.</div>';
-      kinCard({ person:sb, name:sb.name, glyph:sb.male?'♂':'♀', fem:!sb.male, rank:PRANK,
+      const card=kinCard({ person:sb, name:sb.name, glyph:sb.male?'♂':'♀', fem:!sb.male, rank:PRANK,
         crown:KIN && (sb.prince || !sb.male), beard:sb.male&&PRANK==='imperial',
         nameCol:KIN?KINCOL:'var(--gold)', borderCol:(KIN&&(sb.prince||sb.wed))?KINCOL:null,
         sub:'— '+sb.role, opinion:sb.opinion, extra:flag });
+      // ---- SIBLING POLITICS: a brother with a claim is a problem to be MANAGED ----
+      const acts=document.createElement('div'); acts.className='row gap6'; acts.style.flexWrap='wrap'; acts.style.marginTop='4px';
+      const act=(lab,title,dis,col,fn)=>{ const x=document.createElement('button'); x.className='btn sm'; x.textContent=lab;
+        x.title=title||''; x.disabled=!!dis; if(col){ x.style.borderColor=col; x.style.color=col; } x.onclick=fn; acts.appendChild(x); };
+      const gift=Math.round(220 + (100-sb.opinion)*11);
+      act('🎁 SEND A GIFT ('+gift+'d)','Silver, a horse, a word to the right people. Blood is thicker than water, but not thicker than money.',
+        G.coin<gift || sb.opinion>=100, null, ()=>{ if(G.coin<gift) return; G.coin-=gift;
+          sb.opinion=clamp(sb.opinion+ri(9,18),0,100); refreshStatbar(); saveQuiet();
+          toast('🎁 '+sb.name+' writes back warmly, and means about half of it. (opinion '+sb.opinion+')',3200); openTree(); });
+      if(!sb.male && !sb.wed){
+        act('💍 MARRY HER OFF','Trade her marriage for an alliance. It is what she was raised for, and she knows it — which is not the same as forgiving you.',
+          false, '#e8c34a', ()=>{
+            sb.wed=true; sb.role='married off to seal an alliance';
+            sb.opinion=clamp(sb.opinion-ri(6,16),0,100);
+            G.favor=(G.favor||0)+3; G.approval=clamp(G.approval+5,0,100); G.coin+=ri(700,2200);
+            refreshStatbar(); saveQuiet();
+            toast('💍 '+sb.name+' is married east before the month is out. A treaty, a dowry returned, and one fewer card in your hand. (+3 favour, +5 approval)',4600);
+            openTree(); });
+      }
+      if(sb.male){
+        act('🏛 GIVE HIM A COMMAND','Buy his goodwill with real power. He will like you a great deal more, and be a great deal more dangerous.',
+          false, null, ()=>{
+            sb.opinion=clamp(sb.opinion+ri(14,24),0,100);
+            sb.role = sb.prince? sb.role : 'commanding a legion in your name';
+            G.soldiers=(G.soldiers||0)+700; G.approval=clamp(G.approval-2,0,100);
+            refreshStatbar(); saveQuiet();
+            toast('🏛 '+sb.name+' takes the command gladly. He is grateful — and he now has soldiers. (opinion '+sb.opinion+')',4200); openTree(); });
+        if(sb.prince){
+          const loy=loyaltyScore();
+          act('🗡 HAVE HIM REMOVED', loy>=58
+              ? 'Quietly, at a dinner, by people who owe you everything. It ends the rival claim. It does not end the talk.'
+              : 'Loyalty '+loy+' of 58. The people you would have to ask would talk about it before they did it.',
+            loy<58, 'var(--blood)', ()=>{
+              const caught=Math.random() < clamp(0.42 - loyaltyScore()*0.004, 0.06, 0.5);
+              sb.prince=false; sb.role='died suddenly, at dinner, at a regrettably convenient moment';
+              sb.opinion=0;
+              if(caught){ G.honor=clamp(G.honor-18,0,100); G.approval=clamp(G.approval-14,0,100); G.infamy=(G.infamy||0)+20;
+                if(G.court&&G.court.prefect) G.court.prefect.loyal=clamp(G.court.prefect.loyal-18,0,100);
+                toast('🗡 It is done — and everybody knows exactly who did it. Rome is not shocked, but it is watching. (−18 honor, −14 approval, the Prefect is uneasy)',6200); }
+              else { G.honor=clamp(G.honor-6,0,100);
+                toast('🗡 It is done, and the physicians call it a fever. The claim dies with him and nobody says otherwise out loud. (−6 honor)',5600); }
+              refreshStatbar(); saveQuiet(); openTree(); });
+        }
+      }
+      if(card) card.querySelector('div:last-child').appendChild(acts);
     });
   }
   // ---- THE COURT: who actually decides whether a purple-born prince keeps breathing ----
@@ -8395,9 +8590,40 @@ function openTree(){
         : ct.prefect.loyal>72 ? '<div class="small" style="color:#7ad48a">✓ He would put the guard between you and the Senate tonight.</div>'
         : '<div class="small muted">Loyal enough today. Today is not the problem.</div>' });
     ct.figures.forEach(f=>{
+      const LV=COURT_LEVERS[f.icon]||{name:'FAVOUR',what:'goodwill, and the uses of it'};
+      const cost=courtCultivateCost(f);
       const card=document.createElement('div'); card.className='shopcard';
-      card.innerHTML=`<div class="small"><b style="color:${KINCOL}">${f.icon} ${f.role}</b> &nbsp; ${opBar(f.op)}</div>
-        <div class="small muted" style="font-style:italic">${f.note}</div>`;
+      card.innerHTML=`<div class="small"><b style="color:${KINCOL}">${f.icon} ${f.role}</b> &nbsp; ${opBar(f.op)}
+          <span class="pill" style="border-color:${KINCOL};color:${KINCOL};font-size:9px">${LV.name}</span></div>
+        <div class="small muted" style="font-style:italic">${f.note}</div>
+        <div class="small" style="color:#cfa">⚙ ${LV.what}</div>`;
+      const row2=document.createElement('div'); row2.className='row gap6';
+      const cb=document.createElement('button'); cb.className='btn sm'; cb.style.borderColor=KINCOL; cb.style.color=KINCOL;
+      cb.textContent='🎁 CULTIVATE ('+cost+'d)'; cb.disabled = G.coin<cost || f.op>=100;
+      cb.title = f.op>=100? 'They could not be fonder of you if you paid them. Which you did.'
+        : 'Gifts, dinners, a word in the right ear. Favour at court is bought exactly the way you think it is.';
+      cb.onclick=()=>{ if(G.coin<cost) return; G.coin-=cost;
+        f.op=clamp(f.op+ri(7,15),0,100); refreshStatbar(); saveQuiet();
+        toast('🎁 '+f.role+' is warmer toward you. ('+LV.name+' now '+f.op+')',3000); openTree(); };
+      row2.appendChild(cb);
+      const lean=document.createElement('button'); lean.className='btn sm';
+      lean.textContent='🤝 LEAN ON THEM'; lean.disabled = f.op<55;
+      lean.title = f.op<55? 'They do not owe you enough yet. Cultivate first.'
+        : 'Spend the favour instead of banking it — one large service, and they will be cooler afterwards.';
+      lean.onclick=()=>{
+        const spent=ri(14,24); f.op=clamp(f.op-spent,0,100);
+        if(f.icon==='🗝'){ G.complaints=[]; toast('🗝 Every petition on the desk quietly disappears. Nobody can say where they went.',3600); }
+        else if(f.icon==='📜'){ G.leniency=clamp((G.leniency||50)+14,0,100); toast('📜 An edict goes out under your name that makes you look wise and merciful. (+14 leniency)',3600); }
+        else if(f.icon==='🌿'){ G.injury=null; G.hygiene=100; G.fatigue=0; toast('🌿 A month of regimen. Wounds closed, aches gone, and you look five years younger. ',3600); }
+        else if(f.icon==='🕯'){ G.lastCoupDay=G.day; if(ct.prefect) ct.prefect.loyal=clamp(ct.prefect.loyal+16,0,100);
+          toast('🕯 She names three men to you, quietly, in order of danger. The guard is bought back before it moves. (+16 Prefect loyalty)',4200); }
+        else if(f.icon==='🌾'){ heldProvinces().forEach(id=>{ provOf(id).unrest=clamp(provOf(id).unrest-22,0,100); });
+          toast('🌾 A free grain distribution in every province you hold. Every city forgives you at once. (−22 unrest everywhere)',4200); }
+        else if(f.icon==='🏛'){ G.renown=(G.renown||0)+140; toast('🏛 The Augusta’s circle makes you the subject of the season. (+140 renown)',3600); }
+        else { G.soldiers=(G.soldiers||0)+900; syncArmy&&syncArmy(); toast('🐎 Nine hundred cavalry are transferred to your command, on paper, by morning.',3600); }
+        refreshStatbar(); saveQuiet(); openTree(); };
+      row2.appendChild(lean);
+      card.appendChild(row2);
       b.appendChild(card);
     });
     // the reading that matters
@@ -9715,9 +9941,11 @@ function advanceDay(n){
     // ---- THE PROVINCES PAY (or bleed) EVERY SINGLE DAY ----
     { const pt=provDailyTick();
       if(pt.coin) G.coin=Math.max(0,G.coin+pt.coin);
-      pt.events.forEach(id=>{ if(pendingComplaints().length<6) pendingComplaints().push(rollComplaint()); });
+      const doorKeep = 1 - courtBonus('🗝')/190;       // the Chamberlain turns them away at the threshold
+      pt.events.forEach(id=>{ if(pendingComplaints().length<6 && Math.random()<doorKeep) pendingComplaints().push(rollComplaint()); });
       // a petition finds you even where you have no province, if you are anybody at all
-      if(beautyPower().rank>=1 && Math.random()<0.05 && pendingComplaints().length<6) pendingComplaints().push(rollComplaint());
+      if(beautyPower().rank>=1 && Math.random()<0.05*doorKeep && pendingComplaints().length<6) pendingComplaints().push(rollComplaint());
+      if(courtBonus('🏛')) G.renown=(G.renown||0)+courtBonus('🏛')/50;   // the Augusta's circle, writing
       if(pt.coin<0) G.lastRaid='🏛 The provinces cost you '+fmt(-pt.coin)+'d today — garrisons and grain do not pay for themselves.';
     }
     // ---- LOOKS ARE POLITICS: opinion drifts toward what your face is worth ----
@@ -9726,8 +9954,9 @@ function advanceDay(n){
       else if(bo<0 && G.approval > 50+bo) G.approval=clamp(G.approval-1,0,100); }
     // ---- and gifts arrive unasked for the well-favoured ----
     { const bp=beautyPower();
-      if(bp.gifts>0 && (G.day-(G.lastGiftDay===undefined?-99:G.lastGiftDay))>=6 && Math.random()<0.10+bp.gifts*0.012){
-        const gf=pick(BEAUTY_GIFTS); const val=Math.round(gf[2]*(0.6+bp.mult*0.5));
+      const si2=stageIndex(selfStage().name);
+      if(bp.gifts>0 && (G.day-(G.lastGiftDay===undefined?-99:G.lastGiftDay))>=6 && Math.random()<0.06+si2*0.022+bp.gifts*0.012){
+        const gf=pick(BEAUTY_GIFTS); const val=Math.round(gf[2]*(0.6+bp.mult*0.5)*(1+si2*0.12));
         G.coin+=val; G.giftsTaken=(G.giftsTaken||0)+1; G.lastGiftDay=G.day;
         G.approval=clamp(G.approval+1,0,100);
         if(G.married) G.jealousy=clamp((G.jealousy||0)+3,0,100);
@@ -11060,6 +11289,7 @@ window.__SS = {
   ARCHETYPES, ARCH_ORDER, BODY_PARTS, BODY_PARTS_M, IMPOSSIBLE_V,
   IMPOSSIBLE_CHANCE, SECRET_SELLERS, drawShadowPlayTest:drawShadowPlay, drawWifeFig, drawDomusPlayer,
   openCoup, coupDue, purpleRisk, makeCourt, ageBodies, ageOneBody, upkeepScore, spouseTierBonus, finishBed,
+  figureScore, selfStage, stageIndex, courtBonus, courtCultivateCost, COURT_LEVERS, SHADOW_STAGES, shadowStage,
   isTouchOn, setTouchPref, syncTouchPads, get touchPref(){return touchPref;},
 };
 })();

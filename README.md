@@ -96,9 +96,21 @@ publicly, leaving it off keeps the game safe for a general audience.
   (no invented cleavage, no invented behind), a maxed one is unmistakable, and the shadow-play
   is measured rather than assumed.
 - **Seven staged shadows** — the shadow-play reads the same ladder the body map does, and each
-  tier throws its own shadow with its own light, heat and nameplate: **NO LOOKS → GOOD LOOKS →
-  CURVY → GOOD LOOKING → ABSOLUTE FIRE → SPICY (MAX) → ⛧ IMPOSSIBLE**, the last of which bends
-  the lamplight into a halo the wall should not be able to cast.
+  tier throws its own shadow with its own light, heat and **its own nameplate treatment**:
+  **NO LOOKS** (a chipped grey slab) → **GOOD LOOKS** (plain bronze) → **CURVY** (breathing amber)
+  → **GOOD LOOKING** (rose, sparks at the corners) → **ABSOLUTE FIRE** (the plate is on fire and
+  the wall is burning through) → **SPICY (MAX)** (**no wall left at all**, radiating beams, a
+  shine sweeping the title) → **⛧ IMPOSSIBLE** (a rippling plate, orbiting motes and a ghosted
+  title). A husband is rated on **his own parts and his own length**, not hers.
+- **Your own rung** — the mirror names your stage on the same ladder, and it drives how often
+  Rome shouts about you and how often unasked gifts turn up.
+- **Sibling politics** — send a gift, marry a sister off for an alliance, give a brother a command
+  (grateful, and now armed), or have a rival prince quietly removed — which works, and which
+  people sometimes find out about.
+- **Court favour is a currency** — each figure at your court holds one lever: **DOORS** (petitions
+  never reach you), **THE LAW** (+tolerance), **THE YEARS** (slower ageing), **WARNING** (−risk to
+  the purple), **BREAD** (−unrest everywhere), **RENOWN**, **HORSE** (+loyalty). Cultivate them
+  with coin, or spend the favour all at once and have them cooler afterwards.
 - **The other ledger has a different seller for every class** — a poor man buys it from a stranger
   in a cloak because his dealings must stay hidden; everyone above him already has someone
   discreet in their own circle for it (a neighbour, a senator's wife, your own advocate, a lady of
