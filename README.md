@@ -75,6 +75,27 @@ publicly, leaving it off keeps the game safe for a general audience.
   **intrigue** against rival elites, and — at the summit — become **Emperor** and rule.
 - **Succession** — when your gladiator's day is done, **play on as your son or daughter**,
   inheriting the family's standing.
+- **Choose your sex, and roll for your blood** — pick ♂ or ♀ at the enrolment table (the champion
+  cards are drawn for both), then **roll your own body and traits** as many times as you like.
+  Only the **Emperor's Kin** can roll the ⛧ IMPOSSIBLE.
+- **The house you were born into** — a father, a mother and siblings with real occupations and
+  real opinions of you. A **prince** sees whether his sister has been married off yet; a
+  **daughter of the purple** sees whether her brother is the heir — and whether *she* could
+  take the throne instead (rare, but it happened: Irene of Athens signed herself *Basileus*).
+- **Provincial management** — every title is a job. Set the **tax rate**, pay for a **garrison**
+  and a **grain dole**, replace a governor who is stealing from you, hold **games** to buy back a
+  province's temper, and answer the **petitions and complaints** that come up from the provinces:
+  hear them out, refuse them, buy them off, make an example — or go and stand in front of them
+  yourself, which works far better than it should if you are good-looking enough.
+- **Looks are politics** — for a prince, a princess or an Augusta, a fine face is worth **public
+  opinion**, **political tolerance** and **gifts that arrive unasked**.
+- **Call-outs** — Rome says what it thinks of you, out loud, in the street. Satisfy the crowd,
+  stoke your spouse's jealousy, balance it out — or, if your house is loyal enough, say nothing
+  at all while your own people close on the man who spoke.
+- **The body map, animated** — front, side, back and a walking figure for both sexes, with a
+  **PUBLIC EYES** mode that counts where every eye in the colonnade actually went, and a
+  **SPOUSE'S EYES** mode that shows only what the person you married looks at, ranked. Marriage
+  doesn't close the chart — it adds a column: you can read it on **yourself and on your spouse**.
 - **Honor & shady play** — fight fair to build public reputation, or *hire a champion*,
   *ambush* a foe, or *rig* a bout — each trades honour for an edge.
 - All art is **drawn live on canvas** — no image assets ship with the game.
