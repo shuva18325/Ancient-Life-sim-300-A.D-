@@ -95,6 +95,10 @@ publicly, leaving it off keeps the game safe for a general audience.
   are drawn from the *actual* rolled scores of you and your spouse. A flat figure reads flat
   (no invented cleavage, no invented behind), a maxed one is unmistakable, and the shadow-play
   is measured rather than assumed.
+- **Seven staged shadows** — the shadow-play reads the same ladder the body map does, and each
+  tier throws its own shadow with its own light, heat and nameplate: **NO LOOKS → GOOD LOOKS →
+  CURVY → GOOD LOOKING → ABSOLUTE FIRE → SPICY (MAX) → ⛧ IMPOSSIBLE**, the last of which bends
+  the lamplight into a halo the wall should not be able to cast.
 - **The other ledger has a different seller for every class** — a poor man buys it from a stranger
   in a cloak because his dealings must stay hidden; everyone above him already has someone
   discreet in their own circle for it (a neighbour, a senator's wife, your own advocate, a lady of
