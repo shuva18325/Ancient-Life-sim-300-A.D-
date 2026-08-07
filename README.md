@@ -109,11 +109,18 @@ publicly, leaving it off keeps the game safe for a general audience.
   they will call it aspirin"*), wormwood, betony, opium poppy, mandrake root, and **Theriac of
   Galen** — sixty-four ingredients, compounded for the Emperor himself. They close wounds, lift
   fatigue and hold the years back.
-- **A night for love alone is not a night without consequence** — the fun-mode bedchamber now
-  carries a real risk of a child you did not plan for. **Rue** (60d, rough on her) leaves ~26%,
-  **pennyroyal** ~13%, and **silphium of Cyrene** — the contraceptive Rome harvested to
-  extinction — ~2%, for 950d. Nothing on the shelf and a poor house runs ~43%; a rich one can at
-  least send for a physician. The villa states the odds before you commit.
+  **Rue** for the eyes (Pliny says engravers ate it daily), **pennyroyal** for the chest and the
+  gut, and **silphium of Cyrene** — the panacea Rome stamped on its coinage and then harvested to
+  extinction. Every herb has a drawn icon and its own sound at the pestle.
+- **Illness in the house** — five period ailments (marsh fever, a griping flux, a winter cough,
+  streaming eyes, a wound gone bad) land on you, your spouse or a named child. The right plant
+  clears it in an evening; the wrong one does nothing; left alone it runs its course and
+  occasionally takes something with it.
+- **Childbirth is preparation, not luck** — a retained midwife, the right two plants, a clean
+  house and coin in the box take the risk from **14.5% → 0.6%** in five clear steps. The herbs
+  are actually spent at the delivery.
+- **The children live in the villa** — up to four of them underfoot in the halls, drawn at their
+  real age (infant in arms → child → half-grown), wandering, pausing and turning on their own.
 - **The husband is built from his own scores too** — his silhouette is a taper: a chiselled man
   is a V, a soft one widens toward the hem, and a great chest moves when he walks. Both spouses
   and you now **walk, run and turn** in the villa halls.
