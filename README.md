@@ -82,7 +82,19 @@ publicly, leaving it off keeps the game safe for a general audience.
   everyone else combined.
 - **The wardrobe of rank** — an elite house or the imperial line starts with a **crown and an
   expensive robe already on them**, no purchase required (toggle it on or off from the villa).
-  Everyone else sees exactly what it would take to earn one.
+  It is painted onto **every portrait of you and your house**. Everyone else sees exactly what it
+  would take to earn one.
+- **A family portrait gallery** — every name in your house gets a drawn face: parents, siblings,
+  spouse, children and you. Rank is written on it (a patrician circlet, the imperial diadem, an
+  Emperor's laurel), and the dead are painted with *D · M* the way every Roman tomb was.
+- **The imperial court** — for those born to the purple: the **Praetorian Prefect** who really
+  decides whether you keep breathing, three court figures with their own opinions of you, and a
+  live **RISK TO THE PURPLE** reading fed by unrest, unanswered petitions and a brother with a
+  better claim.
+- **Every body is its own body** — the villa walk, the bride portraits and every intimate scene
+  are drawn from the *actual* rolled scores of you and your spouse. A flat figure reads flat
+  (no invented cleavage, no invented behind), a maxed one is unmistakable, and the shadow-play
+  is measured rather than assumed.
 - **The other ledger has a different seller for every class** — a poor man buys it from a stranger
   in a cloak because his dealings must stay hidden; everyone above him already has someone
   discreet in their own circle for it (a neighbour, a senator's wife, your own advocate, a lady of
