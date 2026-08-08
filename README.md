@@ -104,6 +104,19 @@ publicly, leaving it off keeps the game safe for a general audience.
   title). A husband is rated on **his own parts and his own length**, not hers.
 - **Your own rung** — the mirror names your stage on the same ladder, and it drives how often
   Rome shouts about you and how often unasked gifts turn up.
+- **The Titles of Rome** — 22 honours from **AVGVSTVS** down to **TIRO**, each with a drawn
+  emblem (the laurel, the fasces, the aquila, the curule chair, the scales, and the *rudis* —
+  the wooden sword that bought a gladiator's freedom), ranked best to worst, with the real
+  history behind each one. You wear **1 to 4 at once** (office, the Senate and the purple each
+  open a slot), and they print under your name.
+  **Women take the masculine form where history did**: Irene of Athens ruled and signed herself
+  *Basileus*, not Basilissa, so **AVGVSTVS**, **CONSVL**, **LEGATVS LEGIONIS** and the rest are
+  hers in the man's form and marked *♂ IN THE MASCULINE*. Where Rome insisted on a feminine
+  title she gets that instead — **CLARISSIMA FEMINA** was a real legal rank — and
+  **MATER CASTRORVM**, voted to Faustina and Julia Domna, was only ever hers.
+- **Born to something** — a patrician starts as **PATRICIVS**, the imperial line as
+  **NOBILISSIMVS CAESAR**, and everyone else as **TIRO** (which is quietly replaced the moment
+  you earn better).
 - **The Herbarius** — a real Roman apothecary, ten plants a physician of 200 A.D. actually
   carried, each with its own drawn icon: garlic & honey, willow bark (*"seventeen centuries later
   they will call it aspirin"*), wormwood, betony, opium poppy, mandrake root, and **Theriac of

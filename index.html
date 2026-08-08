@@ -282,6 +282,7 @@
       <button class="btn" id="btn-mirror">🗺 BODY MAP</button>
       <button class="btn" id="btn-provinces">🏛 PROVINCES</button>
       <button class="btn" id="btn-herbs">🌿 HERBARIUS</button>
+      <button class="btn" id="btn-titles">⚜ TITLES</button>
       <button class="btn" id="btn-trophies">🏆 TROPHIES</button>
       <button class="btn" id="btn-regalia">⚜ REGALIA</button>
       <button class="btn" id="btn-circus">🏇 CIRCUS</button>
@@ -394,6 +395,16 @@
       <h2 style="color:var(--gold)">🌳 THE HOUSE — BLOOD &amp; GENERATIONS</h2>
       <div id="tree-body" class="col gap"></div>
       <div class="row" style="justify-content:flex-end;"><button class="btn gold" id="btn-tree-back">◀ BACK</button></div>
+    </div>
+  </div>
+
+  <!-- ===== THE TITLES OF ROME ===== -->
+  <div id="scr-titles" class="screen center">
+    <div class="panel pad col gap scrollbox" style="width:min(96%,780px);max-height:95%;">
+      <h2 style="color:var(--gold)">⚜ THE TITLES OF ROME</h2>
+      <div id="title-head" class="small muted"></div>
+      <div id="title-body" class="col gap"></div>
+      <div class="row" style="justify-content:flex-end;"><button class="btn gold" id="btn-titles-back">◀ BACK</button></div>
     </div>
   </div>
 
@@ -1660,7 +1671,9 @@ function calloutDue(){
   // YOUR OWN STAGE drives how often Rome shouts about you — a CURVY citizen is
   // remarked on now and then; ⛧ IMPOSSIBLE cannot cross a street in peace.
   const si=stageIndex(selfStage().name);                 // 0 NO LOOKS … 6 IMPOSSIBLE
-  const chance = 0.06 + si*0.045 + Math.max(0,(bp.beauty-5))*0.030 + bp.rank*0.03;
+  // CAPPED. Uncapped this reached ~60% per trip to the map for a high-stage
+  // noble, which stopped being flavour and started hijacking navigation.
+  const chance = clamp(0.05 + si*0.035 + Math.max(0,(bp.beauty-5))*0.022 + bp.rank*0.02, 0.03, 0.30);
   return Math.random() < chance;
 }
 
@@ -1790,6 +1803,10 @@ function inheritDNA(){
     if(Math.random() < (both?0.85:0.42)) flaws.push(f); }
   return {looks:mix(mine.looks,wl), smarts:mix(mine.smarts,ws), traits, flaws};
 }
+// are you yourself of the imperial house? Then its daughters and sons are kin.
+function bornToThePurple(){
+  return !!(G && (G.socialClass==='imperial' || G.emperor || (G.family && G.family.kin)));
+}
 function makeBride(eth, noble, quality){
   const D=BRIDE[eth]||BRIDE.roman;
   // QUALITY 0-10 drives looks, wits and traits. Nobles skew higher; paid matches are guaranteed high.
@@ -1808,7 +1825,10 @@ function makeBride(eth, noble, quality){
   const dressP = eth==='celt'?'#6b7a4a' : eth==='germanic'?'#9a7a52' : eth==='greek'?'#d8d0ba' : eth==='numidian'?'#b08a4a' : '#cbb489';
   // ---- her house's standing: common → rich → elite → the Emperor's own daughter ----
   let tier='common';
-  if(quality>=10 && Math.random()<0.22) tier='imperial';
+  // ---- YOU CANNOT MARRY THE IMPERIAL HOUSE IF YOU *ARE* THE IMPERIAL HOUSE ----
+  // The Emperor's daughter is your sister. Rome had views about this — and so,
+  // eventually, did everyone else. Born to the purple, you marry OUT.
+  if(quality>=10 && Math.random()<0.22 && !bornToThePurple()) tier='imperial';
   else if(quality>=8) tier= Math.random()<0.45?'elite':'rich';
   else if(quality>=6) tier= Math.random()<0.5?'rich':'common';
   const body=bodyRoll; body.secret=clamp(Math.round(quality + rnd(-3,3)),1,10);
@@ -1879,6 +1899,14 @@ function heatColor(v){
   const c=k=>Math.round(a[k]+(b[k]-a[k])*frac);
   return `rgb(${c(0)},${c(1)},${c(2)})`;
 }
+// ---- PER-OPEN CACHE ------------------------------------------------------
+// Anything that must not change between animation frames is computed once and
+// held here. The secret graph's quote used to call pick() inside the draw, so
+// it rerolled sixty times a second and read as a glitch; the gradients and the
+// gaze table were being rebuilt every frame too, which is what made it lag.
+let bmCache={};
+function bmResetCache(){ bmCache={}; }
+function bmOnce(key, fn){ if(bmCache[key]===undefined) bmCache[key]=fn(); return bmCache[key]; }
 function drawBodyMap(cnv,w,view,tms){
   view=view||'front';
   const c=cnv.getContext('2d'); c.imageSmoothingEnabled=true;
@@ -1886,7 +1914,8 @@ function drawBodyMap(cnv,w,view,tms){
   const GUT=150;                                   // the label gutter down the right — NOTHING is drawn into it
   const FW=W2-GUT;                                 // width the figure gets to itself
   const FOOT=34;                                   // strip along the bottom kept for the scale
-  const g=c.createLinearGradient(0,0,0,H2); g.addColorStop(0,'#2a1e36'); g.addColorStop(.6,'#1a1024'); g.addColorStop(1,'#100813');
+  const g=bmOnce('bg',()=>{ const gg0=c.createLinearGradient(0,0,0,H2);
+    gg0.addColorStop(0,'#2a1e36'); gg0.addColorStop(.6,'#1a1024'); gg0.addColorStop(1,'#100813'); return gg0; });
   c.fillStyle=g; c.fillRect(0,0,W2,H2);
   const b=w.body||{}, gv=id=>b[id]===undefined?5:b[id];
   const male=!!(w&&w.male);
@@ -1905,9 +1934,10 @@ function drawBodyMap(cnv,w,view,tms){
   for(let gy2=0;gy2<H2-FOOT;gy2+=16){ c.beginPath(); c.moveTo(0,gy2); c.lineTo(FW,gy2); c.stroke(); }
   // a soft aura behind the figure, brighter the finer they are
   { const _ps=partsFor(w); const avg=_ps.reduce((a,P)=>a+gv(P.id),0)/_ps.length;
-    const gg=c.createRadialGradient(FW*0.5,(H2-FOOT)*0.52,4,FW*0.5,(H2-FOOT)*0.52,118);
-    gg.addColorStop(0, heatColor(avg).replace('rgb','rgba').replace(')',',0.20)'));
-    gg.addColorStop(1,'rgba(0,0,0,0)'); c.fillStyle=gg; c.fillRect(0,0,FW,H2-FOOT); }
+    const gg=bmOnce('aura',()=>{ const r0=c.createRadialGradient(FW*0.5,(H2-FOOT)*0.52,4,FW*0.5,(H2-FOOT)*0.52,118);
+      r0.addColorStop(0, heatColor(avg).replace('rgb','rgba').replace(')',',0.20)'));
+      r0.addColorStop(1,'rgba(0,0,0,0)'); return r0; });
+    c.fillStyle=gg; c.fillRect(0,0,FW,H2-FOOT); }
   const bu=gv('bust'), wa=gv('waist'), be=gv('booty'), lg=gv('legs'), fa=gv('face'), ha=gv('hairq');
   const imp = (male?BODY_PARTS_M:BODY_PARTS).some(P=>gv(P.id)>=IMPOSSIBLE_V);
   // ---- the figure's own coordinate frame ----
@@ -2029,10 +2059,10 @@ function drawBodyMap(cnv,w,view,tms){
     c.fillText(SB.label+' — '+(secretSub==='behind'?'as it stands':(aro?'roused':'at rest'))
       +', measured '+(impS?'beyond the rule':val+' of 10'), cx, top+18);
     c.fillStyle='rgba(230,210,240,.6)'; c.font='italic 9px Georgia,serif';
-    { const ph2 = impS? 'No rule in Rome is long enough.'
+    { const ph2 = bmOnce('quote:'+secretSub+':'+val, ()=> impS? 'No rule in Rome is long enough.'
         : secretSub==='girth'? 'The ledger notes this one second, and underlines it.'
         : secretSub==='behind'? 'The wives compare this over wine and never write it down.'
-        : (partPhrase('secret',val,true) || 'Exactly what the ledger calls average — and the ledger does not flatter.');
+        : (partPhrase('secret',val,true) || 'Exactly what the ledger calls average — and the ledger does not flatter.'));
       const maxw=(FW-24)/K, words=('“'+ph2+'”').split(' '); let line='', yy=top+32;
       words.forEach(wd=>{ const t=line?line+' '+wd:wd;
         if(c.measureText(t).width>maxw && line){ c.fillText(line,cx,yy); yy+=11; line=wd; } else line=t; });
@@ -2224,7 +2254,7 @@ function drawEyeGlyph(c,x,y,r,col,lit){
 function drawGazeOverlay(c,w,mode,W2,H2,GUT,F){
   const {male,toScreenX,toScreenY}=F;
   const viewer = (mode==='spouse') ? (w.self ? (G&&G.wife) : selfSubject()) : null;
-  const rank = gazeWeights(w, mode, viewer);
+  const rank = bmOnce('gaze:'+mode, ()=>gazeWeights(w, mode, viewer));
   const top = rank[0];
   const FW=W2-GUT;
   // anchors on the figure, in figure space
@@ -2308,11 +2338,13 @@ let bodyMapView='front', secretAroused=false, secretSub='profile', bodyMapWalk=t
 function stopBodyMapAnim(){ if(bodyMapRAF){ cancelAnimationFrame(bodyMapRAF); bodyMapRAF=0; } }
 function startBodyMapAnim(){
   stopBodyMapAnim();
+  let lastDraw=0;
   const step=(now)=>{
     if(state!=='bodymap' || !bodyMapSubject){ bodyMapRAF=0; return; }
-    bodyMapT=now;
-    drawBodyMap($('bodymap-cv'), bodyMapSubject, bodyMapView, bodyMapT);
     bodyMapRAF=requestAnimationFrame(step);
+    if(now-lastDraw < 33) return;            // 30fps is plenty for a walk cycle and half the work
+    lastDraw=now; bodyMapT=now;
+    drawBodyMap($('bodymap-cv'), bodyMapSubject, bodyMapView, bodyMapT);
   };
   bodyMapRAF=requestAnimationFrame(step);
 }
@@ -2405,6 +2437,7 @@ function openBodyMap(w,back){
   if(G && G.married && G.wife) views.push(['spouse','⚭ SPOUSE’S EYES']);
   if(!views.some(v=>v[0]===bodyMapView)) bodyMapView='front';
   const redraw=()=>drawBodyMap($('bodymap-cv'), w, bodyMapView, bodyMapT);
+  bmResetCache();                              // a fresh subject/view gets a fresh set of fixed values
   const viewBtns={};
   const styleViews=()=>{ for(const id in viewBtns) viewBtns[id].className='btn sm'+(bodyMapView===id?' gold':''); };
   // the second row: sub-views and toggles. Nothing here ever resizes the row above.
@@ -2417,14 +2450,14 @@ function openBodyMap(w,back){
         sb.title = id==='profile'? 'The measure everyone means when they say the measure.'
                  : id==='girth'  ? 'Taken across, not along. The ledger records both.'
                  : 'The seat, charted the same way the ledger charts everybody else’s. It is only fair.';
-        sb.onclick=()=>{ if(secretSub===id) return; secretSub=id; buildSub(); redraw(); try{sfx('ui');}catch(e){} };
+        sb.onclick=()=>{ if(secretSub===id) return; secretSub=id; bmResetCache(); buildSub(); redraw(); try{sfx('ui');}catch(e){} };
         sv.appendChild(sb);
       });
       const tg=document.createElement('button'); tg.className='btn sm'+(secretAroused?' gold':'');
       tg.style.minWidth='112px';                       // label swaps; the button must NOT resize
       tg.textContent = secretAroused? '🔥 AROUSED' : '💤 AT REST';
       tg.title='The extended reading. The ledger records both states — most of them do.';
-      tg.onclick=()=>{ secretAroused=!secretAroused; buildSub(); redraw(); try{sfx('ui');}catch(e){} };
+      tg.onclick=()=>{ secretAroused=!secretAroused; bmResetCache(); buildSub(); redraw(); try{sfx('ui');}catch(e){} };
       sv.appendChild(tg);
     }
     const wk=document.createElement('button'); wk.className='btn sm'+(bodyMapWalk?' gold':'');
@@ -2443,7 +2476,7 @@ function openBodyMap(w,back){
     if(id==='eyes') bt.title='One walk down a public colonnade, and an honest count of where every eye went.';
     if(id==='spouse') bt.title='The same walk — but only what the person you married actually looks at, ranked.';
     // a light switch: restyle, rebuild ONLY the toggle row, redraw. No full rebuild.
-    bt.onclick=()=>{ if(bodyMapView===id) return; bodyMapView=id; styleViews(); buildSub(); redraw(); try{sfx('ui');}catch(e){} };
+    bt.onclick=()=>{ if(bodyMapView===id) return; bodyMapView=id; bmResetCache(); styleViews(); buildSub(); redraw(); try{sfx('ui');}catch(e){} };
     viewBtns[id]=bt; vr.appendChild(bt);
   });
   styleViews(); buildSub();
@@ -2633,6 +2666,7 @@ function freshCareer(name,origin,arch,social){
     crownWorn:false,                               // THE WARDROBE OF RANK — pre-set free on elite houses and the purple
     court:null, lastCoupDay:-99,                   // the Praetorian Prefect and the palace, for those born to the purple
     herbs:{}, herbLore:0, ill:null, midwife:false,  // the shelf · what you have learned · who is sick · the woman you retain for the birth
+    titlesWorn:[],                                 // which honours you actually introduce yourself with
   };
 }
 /* =====================================================================
@@ -2707,7 +2741,7 @@ function elevateWife(rank){
   refreshStatbar(); saveQuiet(); openVilla();
 }
 // fill in any fields missing from older saves
-function migrate(g){ const d={honor:50,food:4,mount:0,slaves:0,hasVilla:false,boat:false,favor:0,soldiers:0,hidden:[],plotTier:0,emperor:false,approval:50,legions:0,rivals:0,retired:false,detachments:[],day:0,titles:{},clears:{},socialClass:'gladiator',army:{},armyGear:0,armyTrain:0,hasOrganizer:false,generals:[],wife:null,married:false,marryPrompted:false,children:[],pregnant:null,lastLoveDay:-9,injury:null,lastDebateDay:-9,office:0,path:null,parthia:50,parthiaPact:false,wifeRel:50,lastTalkDay:-9,isFemale:false,lineage:[],hygiene:70,wifePhys:45,hasPool:false,hasWardrobe:false,legacy:null,lastFeastDay:-9,loveDay:-1,loveQuick:0,loveLong:0,loveNight:0,loveVigil:0,venusUntil:-1,lastWashDay:-9,lastPoolDay:-9,lastWardrobeDay:-9,lastKidsDay:-9,lastBathDay:-9,pila:0,bow:null,bowsOwned:[],nemesis:null,rivalsList:[],trophies:[],nemesisCount:0,pendingDeath:false,ageBase:0,wonProvinceByFight:false,familyMan:false,infamy:0,gladiatrixStage:0,pardoned:false,lastNoteDay:-9,lastNoteReply:'',regalia:[],marryRolls:0,hasBodyMap:false,hasSecretMap:false,jealousy:0,lastJealousDay:-9,traits:[],flaws:[],looks:5,smarts:5,advocate:false,tutorialDone:false,patrons:[],rivalAdv:null,landmarks:[],faction:null,oratory:1,casesWon:0,casesLost:0,renown:0,senate:false,royal:false,lastCaseDay:-9,skills:{footwork:0,guard:0,blade:0,wind:0,throwing:0},scars:[],fatigue:0,lastTrainDay:-9,tribune:false,rank:0,campaigns:0,legionRep:0,lastCampaignDay:-9,units:{legionary:0,auxilia:0,cavalry:0,archers:0,engineers:0},supply:0,sieges:0,body:null,family:null,provinces:{},complaints:[],leniency:50,lastCalloutDay:-9,lastGiftDay:-9,giftsTaken:0,calloutWins:0,crownWorn:false,court:null,lastCoupDay:-99,herbs:{},herbLore:0,ill:null,midwife:false}; for(const k in d){ if(g[k]===undefined) g[k]=d[k]; } if(!g.current) g.current='Italia'; if(g.age===undefined) g.age=19+Math.floor(((g.day||0)-(g.ageBase||0))/36);
+function migrate(g){ const d={honor:50,food:4,mount:0,slaves:0,hasVilla:false,boat:false,favor:0,soldiers:0,hidden:[],plotTier:0,emperor:false,approval:50,legions:0,rivals:0,retired:false,detachments:[],day:0,titles:{},clears:{},socialClass:'gladiator',army:{},armyGear:0,armyTrain:0,hasOrganizer:false,generals:[],wife:null,married:false,marryPrompted:false,children:[],pregnant:null,lastLoveDay:-9,injury:null,lastDebateDay:-9,office:0,path:null,parthia:50,parthiaPact:false,wifeRel:50,lastTalkDay:-9,isFemale:false,lineage:[],hygiene:70,wifePhys:45,hasPool:false,hasWardrobe:false,legacy:null,lastFeastDay:-9,loveDay:-1,loveQuick:0,loveLong:0,loveNight:0,loveVigil:0,venusUntil:-1,lastWashDay:-9,lastPoolDay:-9,lastWardrobeDay:-9,lastKidsDay:-9,lastBathDay:-9,pila:0,bow:null,bowsOwned:[],nemesis:null,rivalsList:[],trophies:[],nemesisCount:0,pendingDeath:false,ageBase:0,wonProvinceByFight:false,familyMan:false,infamy:0,gladiatrixStage:0,pardoned:false,lastNoteDay:-9,lastNoteReply:'',regalia:[],marryRolls:0,hasBodyMap:false,hasSecretMap:false,jealousy:0,lastJealousDay:-9,traits:[],flaws:[],looks:5,smarts:5,advocate:false,tutorialDone:false,patrons:[],rivalAdv:null,landmarks:[],faction:null,oratory:1,casesWon:0,casesLost:0,renown:0,senate:false,royal:false,lastCaseDay:-9,skills:{footwork:0,guard:0,blade:0,wind:0,throwing:0},scars:[],fatigue:0,lastTrainDay:-9,tribune:false,rank:0,campaigns:0,legionRep:0,lastCampaignDay:-9,units:{legionary:0,auxilia:0,cavalry:0,archers:0,engineers:0},supply:0,sieges:0,body:null,family:null,provinces:{},complaints:[],leniency:50,lastCalloutDay:-9,lastGiftDay:-9,giftsTaken:0,calloutWins:0,crownWorn:false,court:null,lastCoupDay:-99,herbs:{},herbLore:0,ill:null,midwife:false,titlesWorn:[]}; for(const k in d){ if(g[k]===undefined) g[k]=d[k]; } if(!g.current) g.current='Italia'; if(g.age===undefined) g.age=19+Math.floor(((g.day||0)-(g.ageBase||0))/36);
   // older saves predate the roll and the family — give them both, matched to who they already are
   if(!g.body){ const male=!g.isFemale, q=clamp(g.looks===undefined?5:g.looks,1,10);
     g.body=rollPlayerBody(male,q,false);
@@ -2715,6 +2749,7 @@ function migrate(g){ const d={honor:50,food:4,mount:0,slaves:0,hasVilla:false,bo
   if(!g.family) g.family=makeFamily(g.socialClass||'gladiator', !!g.isFemale);
   if(!g.provinces) g.provinces={};
   if(!g.complaints) g.complaints=[];
+  if(!g.titlesWorn) g.titlesWorn=[];
   return g; }
 function saveGame(){ try{ localStorage.setItem(slotKey(saveSlot), JSON.stringify(G)); toast('Saved to slot '+saveSlot+'.'); }catch(e){ toast('⚠ Could not save — browser storage is blocked or full.',3200); } }
 function hasSave(n){ try{ return !!localStorage.getItem(slotKey(n||saveSlot)); }catch(e){ return false; } }
@@ -2770,7 +2805,10 @@ function unlock(id){ if(ACH.has(id)) return; const a=ACHIEVEMENTS.find(x=>x.id==
    ===================================================================== */
 function refreshStatbar(){
   if(!G) return;
-  $('s-name').textContent=G.name;
+  // your name carries the titles you chose to wear, the way a Roman's did
+  { const tl=titleLine();
+    $('s-name').textContent = tl? (G.name+' — '+tl) : G.name;
+    $('s-name').title = tl? 'Titles worn: '+tl : 'No titles worn.'; }
   $('s-glory').textContent=G.glory;
   $('s-pop').textContent=G.pop;
   $('s-coin').textContent=G.coin;
@@ -5819,6 +5857,274 @@ function drawShadowFigure(fx,fy,ph,beckon,open){
 // The shadow-play names a tier; the tier now has to pay for itself. A SPICY
 // or IMPOSSIBLE match burns hotter, breeds easier, and Rome talks about it.
 /* =====================================================================
+   THE TITLES OF ROME — every honour the game can give you, in one
+   registry, ranked from the summit down to the sand.
+
+   ON WOMEN AND MASCULINE TITLES: this is not a liberty. Irene of Athens
+   ruled and signed herself BASILEUS — emperor, the masculine — not
+   Basilissa. Julia Domna was voted MATER CASTRORUM ET SENATUS ET PATRIAE
+   and ran an empire from behind a curtain. Ulpia Severina issued coin in
+   her own name. Where a woman historically took the man's title, she
+   takes it here. Where Rome insisted on a feminine form, she gets that.
+   ===================================================================== */
+const TITLES=[
+  // ---- rank 10: the summit ----
+  {id:'augustus',  rank:10, cat:'imperial', name:'AVGVSTVS',   fem:'AVGVSTA', femTakesMale:true,
+   en:'Emperor of the Romans', em:'laurel',
+   note:'The purple itself. Irene of Athens held it and signed herself BASILEUS — the masculine — because the office had no other word.',
+   has:()=>!!G.emperor},
+  {id:'patriae',   rank:9,  cat:'imperial', name:'PATER PATRIAE', fem:'MATER PATRIAE',
+   en:'Father / Mother of the Fatherland', em:'oak',
+   note:'Voted by the Senate, never claimed. Julia Domna was voted MATER SENATUS ET PATRIAE and used every word of it.',
+   has:()=>!!G.emperor && (G.approval||0)>=75},
+  {id:'pontifex',  rank:9,  cat:'imperial', name:'PONTIFEX MAXIMVS', fem:'VESTALIS MAXIMA',
+   en:'Chief Priest / Chief Vestal', em:'flame',
+   note:'The head of the state religion. Rome kept this one gendered — the woman’s equivalent ran the Vestals and outranked most senators.',
+   has:()=>!!G.emperor || (G.royal && (G.renown||0)>=200)},
+  {id:'caesar',    rank:8,  cat:'imperial', name:'NOBILISSIMVS CAESAR', fem:'NOBILISSIMA', femTakesMale:true,
+   en:'Heir to the purple', em:'diadem',
+   note:'The named successor. A princess of the house who outranked her brothers took the masculine form and dared anyone to comment.',
+   has:()=>G.socialClass==='imperial' || G.royal},
+  {id:'castrorum', rank:8,  cat:'imperial', name:'MATER CASTRORVM', fem:'MATER CASTRORVM', femOnly:true,
+   en:'Mother of the Camp', em:'vexillum',
+   note:'A real title, voted to Faustina and to Julia Domna: the legions’ own mother. There was never a masculine version — it did not need one.',
+   has:()=>!!G.isFemale && ((G.legionRep||0)>=120 || (G.soldiers||0)>=6000)},
+  // ---- rank 7-6: the state ----
+  {id:'consul',    rank:7,  cat:'civic', name:'CONSVL',       fem:'CONSVL', femTakesMale:true,
+   en:'Consul of Rome', em:'fasces',
+   note:'The highest office of the Republic and still the year’s name. No woman ever held it. Yours would be the first, and the Forum will say so.',
+   has:()=>(G.office||0)>=4},
+  {id:'magmil',    rank:7,  cat:'legion', name:'MAGISTER MILITVM', fem:'MAGISTER MILITVM', femTakesMale:true,
+   en:'Master of the Soldiers', em:'eagle',
+   note:'Supreme command of the field armies. The title is an office, not a man, and the army obeyed whoever held it.',
+   has:()=>(G.legionRep||0)>=220},
+  {id:'proconsul', rank:6,  cat:'province', name:'PROCONSVL',  fem:'PROCONSVL', femTakesMale:true,
+   en:'Governor of a great province', em:'chair',
+   note:'A year of near-absolute power over a province, its courts and its legions.',
+   has:()=>Object.keys(G.titles||{}).length>=3},
+  {id:'praetor',   rank:6,  cat:'civic', name:'PRAETOR',      fem:'PRAETRIX',
+   en:'Praetor — the courts are yours', em:'scales',
+   note:'Rome’s judge. Every prosecution in the city passes across this desk.',
+   has:()=>(G.office||0)>=3 || (G.advocate && (G.renown||0)>=140)},
+  {id:'legatus',   rank:6,  cat:'legion', name:'LEGATVS LEGIONIS', fem:'LEGATVS LEGIONIS', femTakesMale:true,
+   en:'Commander of a legion', em:'eagle',
+   note:'Five thousand men and their eagle answer to you by name.',
+   has:()=>(G.legionRep||0)>=140},
+  // ---- rank 5-4: rank and standing ----
+  {id:'senator',   rank:5,  cat:'civic', name:'SENATOR',      fem:'CLARISSIMA FEMINA',
+   en:'Of the Senate / Most Distinguished Lady', em:'scroll',
+   note:'CLARISSIMA FEMINA was the real rank of a senator’s women — a legal status, not a courtesy, and it was written on their tombs.',
+   has:()=>!!G.senate},
+  {id:'aedile',    rank:5,  cat:'civic', name:'AEDILIS',      fem:'AEDILIS', femTakesMale:true,
+   en:'Aedile — you stage the games', em:'chair',
+   note:'You pay for the games and the city remembers you for it. The fastest way to be loved and the fastest way to go broke.',
+   has:()=>(G.office||0)>=2},
+  {id:'patricius', rank:5,  cat:'civic', name:'PATRICIVS',   fem:'PATRICIA',
+   en:'Of the old blood', em:'scroll',
+   note:'Hereditary, unbuyable and older than the Republic. The Senate could vote you anything except this.',
+   has:()=>G.socialClass==='elite' || G.socialClass==='imperial' || !!G.royal},
+  {id:'advocatus', rank:4,  cat:'civic', name:'ADVOCATVS',    fem:'ADVOCATA',
+   en:'Advocate of the Basilica', em:'scroll',
+   note:'You argue for a living, and Rome is a city that decides everything by argument.',
+   has:()=>!!G.advocate},
+  {id:'tribunus',  rank:4,  cat:'legion', name:'TRIBVNVS MILITVM', fem:'TRIBVNVS MILITVM', femTakesMale:true,
+   en:'Tribune of the soldiers', em:'vexillum',
+   note:'A commission with the eagles. Where most senatorial careers actually begin.',
+   has:()=>!!G.tribune},
+  {id:'dominus',   rank:4,  cat:'province', name:'DOMINVS',   fem:'DOMINA',
+   en:'Master / Mistress of an estate', em:'chair',
+   note:'A villa, its farm and everyone on it. Not glamorous. Extremely useful.',
+   has:()=>!!G.hasVilla},
+  // ---- rank 3-1: the sand ----
+  {id:'rudiarius', rank:3,  cat:'arena', name:'RVDIARIVS',    fem:'RVDIARIA',
+   en:'Freed by the wooden sword', em:'rudis',
+   note:'The RUDIS — a wooden sword handed to a gladiator who has won their freedom. The single most wanted object in the empire.',
+   has:()=>(G.wins||0)>=25 || !!G.pardoned},
+  {id:'primuspalus',rank:3, cat:'arena', name:'PRIMVS PALVS', fem:'PRIMA PALVS',
+   en:'First Sword of the school', em:'gladius',
+   note:'The ludus ranked its fighters by the post they trained at. The first post was the best man in the house.',
+   has:()=>(G.wins||0)>=15},
+  {id:'gladiatrix',rank:3,  cat:'arena', name:'GLADIATRIX',   fem:'GLADIATRIX', femOnly:true,
+   en:'A woman on the sand', em:'gladius',
+   note:'They existed — the Halicarnassus relief shows two of them, named, fighting to a draw. Septimius Severus banned them in 200 A.D., which tells you how common they had become.',
+   has:()=>!!G.isFemale && (G.wins||0)>=3},
+  {id:'veteranus', rank:2,  cat:'arena', name:'VETERANVS',    fem:'VETERANA',
+   en:'A veteran of the sand', em:'gladius',
+   note:'You have survived enough of them to be worth betting on.',
+   has:()=>(G.wins||0)>=6},
+  {id:'civis',     rank:2,  cat:'civic', name:'CIVIS ROMANVS', fem:'CIVIS ROMANA',
+   en:'Citizen of Rome', em:'scroll',
+   note:'“Civis Romanus sum.” Four words that stopped a flogging anywhere in the world.',
+   has:()=>G.socialClass!=='gladiator' || (G.honor||0)>=70},
+  {id:'tiro',      rank:1,  cat:'arena', name:'TIRO',         fem:'TIRO', femTakesMale:true,
+   en:'Untried — a rookie', em:'rudis',
+   note:'Everyone starts here. Most stay.',
+   has:()=>true},
+];
+const TITLE_BY_ID=Object.fromEntries(TITLES.map(t=>[t.id,t]));
+// what a title is CALLED for you — and whether you are taking the man's form
+function titleName(t){
+  if(!G || !G.isFemale) return t.name;
+  if(t.femOnly) return t.fem;
+  if(t.femTakesMale) return t.name;                  // she takes the masculine, as they did
+  return t.fem || t.name;
+}
+function titleIsMasculineOnHer(t){ return !!(G && G.isFemale && t.femTakesMale && !t.femOnly); }
+// every title you currently qualify for, best first
+function earnedTitles(){
+  if(!G) return [];
+  return TITLES.filter(t=>{ try{ return (!t.femOnly || G.isFemale) && t.has(); }catch(e){ return false; } })
+               .sort((a,b)=>b.rank-a.rank);
+}
+// HOW MANY YOU MAY WEAR AT ONCE. Rome stacked titles on inscriptions, but a
+// man introduced himself with the ones that counted.
+function titleSlots(){
+  if(!G) return 1;
+  let n=1;
+  if((G.office||0)>=2 || (G.legionRep||0)>=75 || (G.renown||0)>=100) n++;
+  if(G.senate || G.royal) n++;
+  if(G.emperor) n++;
+  return Math.min(4,n);
+}
+function equippedTitles(){
+  if(!G) return [];
+  if(!G.titlesWorn) G.titlesWorn=[];
+  const earned=earnedTitles().map(t=>t.id);
+  G.titlesWorn=G.titlesWorn.filter(id=>earned.includes(id)).slice(0,titleSlots());
+  return G.titlesWorn.map(id=>TITLE_BY_ID[id]).filter(Boolean);
+}
+// the line that goes under your name
+function titleLine(){
+  const eq=equippedTitles();
+  if(!eq.length) return '';
+  return eq.map(t=>titleName(t)).join(' · ');
+}
+// a new career is not nameless if it was born to something
+function grantStartingTitles(){
+  if(!G) return;
+  if(!G.titlesWorn) G.titlesWorn=[];
+  // nobody who has earned better should still be introducing themselves as TIRO
+  if(G.titlesWorn.length===1 && G.titlesWorn[0]==='tiro'){
+    const better=earnedTitles().filter(t=>t.id!=='tiro');
+    if(better.length) G.titlesWorn=[better[0].id];
+  }
+  if(G.titlesWorn.length) return;
+  const earned=earnedTitles();
+  const want = G.socialClass==='imperial'? ['caesar','castrorum','patricius','civis']
+             : G.socialClass==='elite'?    ['patricius','civis']
+             : ['tiro'];
+  want.forEach(id=>{ if(earned.some(t=>t.id===id) && G.titlesWorn.length<titleSlots()) G.titlesWorn.push(id); });
+  if(!G.titlesWorn.length && earned.length) G.titlesWorn.push(earned[0].id);
+}
+/* ---- an emblem for every title, drawn ---- */
+function drawTitleEmblem(cnv,t,worn){
+  const c=cnv.getContext('2d'); c.imageSmoothingEnabled=false;
+  const W=cnv.width,H=cnv.height;
+  const hot = t.rank>=8? ['#3d1b44','#150a1a'] : t.rank>=6? ['#3a2a12','#160f08'] : t.rank>=4? ['#22301e','#0d1410'] : ['#2a1d12','#120c08'];
+  const g=c.createLinearGradient(0,0,0,H); g.addColorStop(0,hot[0]); g.addColorStop(1,hot[1]);
+  c.fillStyle=g; c.fillRect(0,0,W,H);
+  c.fillStyle='rgba(255,255,255,.04)'; for(let i=0;i<H;i+=4) c.fillRect(0,i,W,1);
+  c.save(); c.translate(W/2,H/2+2); const s=Math.min(W,H)/30; c.scale(s,s);
+  const P=(x,y,w,h,col)=>{c.fillStyle=col;c.fillRect(Math.round(x),Math.round(y),Math.round(w),Math.round(h));};
+  const GOLD='#e8c34a', GOLD2='#fff0b0', GOLDS='#8a6f22', SIL='#c2cad4', SILH='#eef4fa', WOOD='#9a6a3a', WOODH='#bb8a52';
+  const E=t.em;
+  if(E==='laurel'){                                  // the emperor's wreath
+    for(let i=0;i<9;i++){ const a=-2.5+i*0.62, rx=Math.cos(a)*11, ry=Math.sin(a)*8;
+      P(rx-1,ry-1,3,2,'#4f8a3a'); P(rx-1,ry-1,2,1,'#79c05a'); }
+    for(let i=0;i<9;i++){ const a=0.64+i*0.62, rx=Math.cos(a)*11, ry=Math.sin(a)*8;
+      P(rx-1,ry-1,3,2,'#4f8a3a'); P(rx-1,ry-1,2,1,'#79c05a'); }
+    P(-2,-12,5,3,GOLD); P(-2,-12,5,1,GOLD2);
+  } else if(E==='diadem'){                           // the heir's band
+    P(-11,-2,22,4,GOLD); P(-11,-2,22,1,GOLD2); P(-11,2,22,1,GOLDS);
+    for(let i=0;i<5;i++){ const x=-10+i*4.6, h=(i===2)?6:4; P(x,-2-h,3,h,GOLD); P(x,-2-h,3,1,GOLD2); }
+    P(-2,-11,4,4,'#e0405a'); P(-2,-11,2,2,'#ffd0d8');
+  } else if(E==='oak'){                              // corona civica — the oak crown
+    for(let i=0;i<11;i++){ const a=-2.8+i*0.51, rx=Math.cos(a)*11, ry=Math.sin(a)*9;
+      P(rx-2,ry-2,4,4,'#5a7a2a'); P(rx-2,ry-2,3,2,'#86ac4a'); P(rx-1,ry+1,2,1,'#3e5a1a'); }
+  } else if(E==='flame'){                            // the sacred fire
+    P(-7,7,15,3,'#8a6a3a'); P(-7,7,15,1,'#b08a52');
+    for(let i=0;i<3;i++){ const h=8+i*3, w=7-i*2;
+      P(-w/2,7-h,w,h,i===0?'#c04a1a':i===1?'#e0862a':'#ffd06a'); }
+    P(-1,-9,3,4,'#fff0b0');
+  } else if(E==='fasces'){                           // the consul's rods and axe
+    for(let i=0;i<5;i++) P(-5+i*2.2,-11,2,20,WOOD);
+    for(let i=0;i<5;i++) P(-5+i*2.2,-11,1,20,WOODH);
+    for(let k=0;k<4;k++) P(-6,-8+k*5,13,2,'#5a3a22');
+    P(4,-13,3,9,SIL); P(4,-13,1,9,SILH); P(6,-13,4,4,SIL);
+  } else if(E==='eagle'){                            // the legionary aquila
+    P(-1,-4,3,16,WOOD); P(-1,-4,1,16,WOODH);
+    P(-5,-9,11,4,GOLD); P(-5,-9,11,1,GOLD2);
+    P(-9,-8,5,3,GOLD); P(6,-8,5,3,GOLD);             // outstretched wings
+    P(-10,-6,4,2,GOLDS); P(7,-6,4,2,GOLDS);
+    P(-2,-13,4,4,GOLD); P(-2,-13,4,1,GOLD2); P(1,-12,2,1,'#241408');
+    P(-6,10,13,3,'#5a3a22');
+  } else if(E==='vexillum'){                         // the cavalry standard
+    P(-1,-12,2,22,WOOD); P(-1,-12,1,22,WOODH);
+    P(1,-12,11,10,'#8a1a2a'); P(1,-12,11,1,'#c03a4a');
+    P(1,-2,11,2,GOLD);
+    for(let i=0;i<3;i++) P(3+i*3,-9,2,5,GOLD);
+    P(-3,-15,7,3,GOLD); P(-3,-15,7,1,GOLD2);
+  } else if(E==='chair'){                            // the sella curulis
+    P(-9,-1,19,3,'#e0d0a8'); P(-9,-1,19,1,'#fff4d0');
+    P(-8,2,3,9,'#c8b489'); P(6,2,3,9,'#c8b489');
+    P(-8,2,14,2,'#a89468');
+    for(let i=0;i<3;i++){ P(-7+i*5,4,2,7,'#b8a478'); }
+    P(-6,-6,13,5,'#8a2f5a'); P(-6,-6,13,1,'#b8497a');   // the purple cushion
+  } else if(E==='scales'){                           // the praetor's balance
+    P(-1,-12,2,18,GOLD); P(-11,-11,23,2,GOLD); P(-11,-11,23,1,GOLD2);
+    P(-11,-9,2,5,GOLDS); P(10,-9,2,5,GOLDS);
+    P(-14,-4,8,3,SIL); P(-14,-4,8,1,SILH);
+    P(7,-3,8,3,SIL); P(7,-3,8,1,SILH);
+    P(-5,6,11,3,'#5a4028');
+  } else if(E==='scroll'){                           // a sealed roll
+    P(-11,-5,22,10,'#e8dcc2'); P(-11,-5,22,2,'#fff6e0'); P(-11,3,22,2,'#c8b898');
+    for(let i=0;i<4;i++) P(-8,-2+i*2,14,1,'#a89878');
+    P(-13,-6,3,12,'#8a6a3a'); P(10,-6,3,12,'#8a6a3a');
+    P(-13,-6,1,12,'#b08a52'); P(10,-6,1,12,'#b08a52');
+    P(-3,2,6,5,'#c03a4a'); P(-3,2,6,1,'#e05a6a');       // the wax seal
+  } else if(E==='rudis'){                             // THE WOODEN SWORD — freedom
+    P(-2,-13,5,19,WOOD); P(-2,-13,2,19,WOODH); P(1,-13,1,19,'#6a4426');
+    P(-6,6,13,3,WOOD); P(-6,6,13,1,WOODH);             // the crossguard
+    P(-2,9,5,5,'#7a5230'); P(-2,9,2,5,'#9a7248');      // the grip
+    P(-2,-15,5,3,'#c8a24a');                           // a gilt tip, because it is a trophy
+  } else {                                            // gladius — the working blade
+    P(-2,-14,5,20,SIL); P(-2,-14,2,20,SILH); P(1,-14,1,20,'#8a929c');
+    P(-2,-16,5,3,SILH);
+    P(-7,6,15,3,'#5a3a22'); P(-7,6,15,1,'#7a5232');
+    P(-2,9,5,6,'#3a2618'); P(-2,9,2,6,'#5a4028');
+    P(-3,15,7,2,GOLD);
+  }
+  // ---- THE MARK THAT MAKES IT ITS OWN. Several honours share an emblem
+  //      family (two of them are eagles, three are curule chairs); each still
+  //      has to be its own picture, so each carries its own device. ----
+  const M=t.id;
+  if(M==='magmil'){ for(let i=0;i<7;i++){ const a=-2.6+i*0.72;                    // a wreath around the eagle
+      P(Math.cos(a)*14-1,Math.sin(a)*11-1,3,2,'#4f8a3a'); } }
+  else if(M==='legatus'){ P(-13,9,27,2,'#8a1a2a'); P(-13,9,27,1,'#c03a4a'); }     // the legion's own colour bar
+  else if(M==='proconsul'){ P(-12,-13,25,3,'#6a2a9a'); P(-12,-13,25,1,'#9a4ad0'); } // the purple border of imperium
+  else if(M==='aedile'){ for(let i=0;i<3;i++) P(-9+i*8,-13,5,3,'#e0862a'); }      // the games he pays for
+  else if(M==='dominus'){ P(9,-13,4,7,GOLD); P(9,-13,2,7,GOLD2); P(11,-8,3,2,GOLD); } // the key of the house
+  else if(M==='primuspalus'){ P(-12,-10,3,11,GOLD); }                             // the FIRST post: a single bar
+  else if(M==='gladiatrix'){ P(10,-12,3,13,'#7a4e26'); P(11,-12,1,13,'#a87038');   // her braid, outside the helm
+      P(10,1,3,2,GOLD); }
+  else if(M==='veteranus'){ for(let i=0;i<4;i++) P(-13,-8+i*4,3,2,SIL); }         // one notch per campaign
+  else if(M==='senator'){ P(-13,-9,4,19,'#8a1a2a'); P(-13,-9,2,19,'#c03a4a'); }   // the latus clavus, the broad stripe
+  else if(M==='patricius'){ for(let i=0;i<3;i++){ P(-13+i*11,-13,4,3,GOLD); P(-13+i*11,-13,4,1,GOLD2); } } // ancestral masks
+  else if(M==='advocatus'){ P(11,-11,2,14,'#c8b489'); P(11,-11,2,2,'#5a4028'); }  // a stylus
+  else if(M==='civis'){ P(-6,9,13,3,'#4a7ac0'); P(-6,9,13,1,'#7aa8e0'); }          // the citizen's own blue
+  else if(M==='rudiarius'){ for(let i=0;i<5;i++){ const a=-2.4+i*0.6;              // laurel round the wooden sword
+      P(Math.cos(a)*12-1,Math.sin(a)*11-1,3,2,'#4f8a3a'); } }
+  else if(M==='tiro'){ P(-13,10,27,2,'#5a4a36'); }                                // a plain rope, and nothing else
+  else if(M==='castrorum'){ P(-12,-13,5,5,'#ff8ad0'); P(-12,-13,5,1,'#ffc0e8');   // hers alone, in her own colour
+      P(7,-13,5,5,'#ff8ad0'); P(7,-13,5,1,'#ffc0e8'); }
+  else if(M==='tribunus'){ P(-12,9,25,2,GOLDS); }
+  else if(M==='praetor'){ P(-13,-13,4,4,'#8a1a2a'); P(9,-13,4,4,'#8a1a2a'); }      // the lictors that walk before him
+  c.restore();
+  if(worn){ c.strokeStyle=GOLD; c.lineWidth=2; c.strokeRect(1,1,W-2,H-2);
+    c.fillStyle=GOLD; c.font='bold 8px Georgia,serif'; c.textAlign='right'; c.fillText('WORN',W-3,H-3); c.textAlign='left'; }
+}
+
+/* =====================================================================
    THE HERBARIUS — a real Roman apothecary. Every plant here is one a
    physician of 200 A.D. actually stocked, and used for what it is used
    for here. Some of it heals. Some of it is what a careful house takes
@@ -7932,6 +8238,7 @@ $('btn-create-go').onclick=()=>{
   // ---- THE WARDROBE OF RANK: an elite house or the imperial line needs no
   //      purchase and no ceremony — the crown and the robe are already yours ----
   if(sel.social==='elite' || sel.social==='imperial') G.crownWorn=true;
+  grantStartingTitles();            // nobody born to rank introduces themselves as nobody
   // ---- EMPEROR'S KIN: you begin holding the whole empire, and the arena is closed ----
   if(sel.social==='imperial'){
     REGIONS.forEach(r=>{ G.titles[r.id]=REGION_TITLES[r.id]||('Dominus '+r.id); G.cleared[r.id]=true; });
@@ -7956,7 +8263,7 @@ $('btn-create-go').onclick=()=>{
 // ---- map ----
 function enterMap(){
   if(checkOldAgeDeath()) return;                 // the years may have come due
-  stopBodyMapAnim(); ensurePlayerBody();
+  stopBodyMapAnim(); ensurePlayerBody(); grantStartingTitles();
   if(maybeCoup()) return;                        // the guard has stopped doing arithmetic
   if(maybeCallout()) return;                     // somebody in the street has something to say about you
   // those born to rank must first secure a dynastic marriage
@@ -9083,6 +9390,59 @@ function openTree(){
       + '</div>' });
   });
 }
+function openTitles(){
+  state='titles'; show('scr-titles'); $('statbar').classList.remove('hide'); refreshStatbar();
+  grantStartingTitles();
+  const earned=earnedTitles(), worn=equippedTitles(), slots=titleSlots();
+  $('title-head').innerHTML =
+    `<div>Rome stacked every honour a man held onto his tombstone, but he introduced himself with the ones that counted.
+      You may wear <b style="color:var(--gold)">${slots}</b> at once${slots<4?' — more slots open with office, the Senate and the purple':''}.</div>
+     <div class="small" style="margin-top:3px">Wearing: ${worn.length? worn.map(t=>`<b style="color:var(--gold)">${titleName(t)}</b>`).join(' · ') : '<span class="muted">nothing</span>'}
+       <span class="muted">(${worn.length}/${slots})</span></div>
+     ${G.isFemale? `<div class="small" style="margin-top:3px;color:#ff8ad0">♀ Titles marked <b>♂ IN THE MASCULINE</b> are ones a woman historically took in the man’s form — Irene of Athens signed herself BASILEUS, not Basilissa.</div>`:''}`;
+  const b=$('title-body'); b.innerHTML='';
+  const CAT={imperial:'👑 THE PURPLE', civic:'🏛 THE STATE', legion:'🦅 THE LEGIONS', province:'🌍 THE PROVINCES', arena:'⚔ THE SAND'};
+  const catOrder=['imperial','civic','legion','province','arena'];
+  const H=(t,col)=>{ const d=document.createElement('div'); d.className='small'; d.style.color=col||'var(--gold)'; d.style.marginTop='6px'; d.innerHTML=t; b.appendChild(d); };
+  // BEST TO WORST, exactly as asked
+  H('⚜ ALL TITLES — BEST TO WORST');
+  TITLES.slice().sort((a,b2)=> b2.rank-a.rank || catOrder.indexOf(a.cat)-catOrder.indexOf(b2.cat)).forEach(t=>{
+    if(t.femOnly && !G.isFemale) return;
+    let held=false; try{ held=t.has(); }catch(e){ held=false; }
+    const isWorn=(G.titlesWorn||[]).includes(t.id);
+    const card=document.createElement('div'); card.className='shopcard mediacard';
+    card.style.display='flex'; card.style.flexDirection='row'; card.style.gap='9px'; card.style.alignItems='flex-start';
+    card.style.borderColor = isWorn? '#e8c34a' : held? '#5a6a4a' : '#332a1e';
+    if(!held) card.style.opacity='0.55';
+    const cv=document.createElement('canvas'); cv.width=58; cv.height=58;
+    cv.style.cssText='position:static;width:56px;height:56px;image-rendering:pixelated;flex:0 0 auto;border-radius:3px;border:2px solid '
+      +(isWorn?'#e8c34a':'#4a3a26')+';';
+    drawTitleEmblem(cv,t,isWorn);
+    card.appendChild(cv);
+    const info=document.createElement('div'); info.style.cssText='flex:1;min-width:0;text-align:left;';
+    const masc=titleIsMasculineOnHer(t);
+    info.innerHTML=`<div><b style="color:${held?'var(--gold)':'#8a7a5c'}">${titleName(t)}</b>
+        <span class="pill" style="border-color:#8a6f35;color:#c8b070;font-size:9px">rank ${t.rank}</span>
+        <span class="small muted">${CAT[t.cat]}</span>
+        ${masc? '<span class="pill" style="border-color:#ff8ad0;color:#ff8ad0;font-size:9px">♂ IN THE MASCULINE</span>':''}
+        ${t.femOnly? '<span class="pill" style="border-color:#ff8ad0;color:#ff8ad0;font-size:9px">♀ HERS ALONE</span>':''}</div>
+      <div class="small" style="color:#cfa">${t.en}</div>
+      <div class="small muted" style="font-style:italic">${t.note}</div>
+      ${held? '' : '<div class="small" style="color:#8a7a5c">— not yours yet</div>'}`;
+    const row=document.createElement('div'); row.className='row gap6'; row.style.marginTop='3px';
+    const bt=document.createElement('button'); bt.className='btn sm'+(isWorn?' gold':'');
+    bt.textContent = isWorn? '✓ WORN — REMOVE' : 'WEAR IT';
+    bt.disabled = !held || (!isWorn && (G.titlesWorn||[]).length>=slots);
+    bt.title = !held? 'Earn it first.' : (!isWorn && (G.titlesWorn||[]).length>=slots)? 'All '+slots+' slots are full — take one off first.' : '';
+    bt.onclick=()=>{ if(!G.titlesWorn) G.titlesWorn=[];
+      if(isWorn) G.titlesWorn=G.titlesWorn.filter(x=>x!==t.id);
+      else if(G.titlesWorn.length<slots) G.titlesWorn.push(t.id);
+      try{sfx('promote');}catch(e){}
+      refreshStatbar(); saveQuiet(); openTitles(); };
+    row.appendChild(bt);
+    info.appendChild(row); card.appendChild(info); b.appendChild(card);
+  });
+}
 let herbBack='map';
 function openHerbs(back){
   herbBack=back||'map';
@@ -10157,7 +10517,7 @@ function openMarry(forced){
       openMarry(marryForced); return;
     }
     toast('💜 THE PURPLE CONSENTS. '+(G.isFemale?'They dare not refuse a woman of your standing — and they know exactly what that means.':'The imperial house opens its doors to you.'),5200);
-    marryList=rollBrides(10).map(w=>{ w.tier='imperial'; w.quality=10; w.looks=10;
+    marryList=rollBrides(10).map(w=>{ w.tier= bornToThePurple()? 'elite' : 'imperial'; w.quality=10; w.looks=10;
       w.body={}; BODY_PARTS.forEach(P=>w.body[P.id]=ri(9,10)); w.build='statuesque';
       if(w.male) w.body.secret=5;                        // the purple is magnificent in every respect but one
       w.smarts=Math.max(w.smarts,9); w.jewel=true; w.rank='noble';
@@ -10222,6 +10582,8 @@ $('btn-bodymap-back').onclick=()=>{
 $('btn-mirror').onclick=()=>openMirror();
 $('btn-provinces').onclick=()=>openProvinces();
 $('btn-herbs').onclick=()=>openHerbs('map');
+$('btn-titles').onclick=()=>openTitles();
+$('btn-titles-back').onclick=()=>enterMap();
 $('btn-herb-back').onclick=()=>{ if(herbBack==='villa') openVilla(); else enterMap(); };
 $('btn-prov-back').onclick=()=>enterMap();
 $('btn-forum').onclick=()=>openForum();
@@ -11757,6 +12119,8 @@ window.__SS = {
   figureScore, selfStage, stageIndex, courtBonus, courtCultivateCost, COURT_LEVERS, SHADOW_STAGES, shadowStage,
   drawHusbandFigTest:drawHusbandFig, openHerbs, HERBS, HERB_BY_ID, drawHerbIcon, herbCount, herbAdd, herbUse,
   ILLNESSES, rollIllness, curesIll, birthRisk, birthPrepLine, illnessBite, get DM(){return DM;},
+  TITLES, TITLE_BY_ID, titleName, titleSlots, earnedTitles, equippedTitles, titleLine, grantStartingTitles,
+  drawTitleEmblem, openTitles, titleIsMasculineOnHer, bornToThePurple,
   isTouchOn, setTouchPref, syncTouchPads, get touchPref(){return touchPref;},
 };
 })();
