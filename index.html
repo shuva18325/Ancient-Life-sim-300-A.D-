@@ -704,8 +704,16 @@ const REGIONS = [
   {id:'Babylonia',            x:83, y:65, tier:4, city:'Ctesiphon',     prov:'Parthian frontier'},
   {id:'Persis',               x:93, y:73, tier:4, city:'Istakhr',       prov:'Parthian heartland'},
   {id:'Sogdiana',             x:97, y:44, tier:4, city:'Maracanda',     prov:'far east'},
+  // THE GEPIDS — a Gothic-speaking people on the Carpathian rim. Strictly they
+  // step into the record a few decades after 200 A.D.; they are here as the
+  // frontier federation Rome is already paying not to cross the Danube.
+  {id:'Gepidia',              x:50, y:22, tier:3, city:'the Carpathian gate', prov:'Gepid federation'},
 ];
 const REGION_BY_ID = Object.fromEntries(REGIONS.map(r=>[r.id,r]));
+// which regions Rome actually governed in 200 A.D. — the East beyond the
+// Euphrates belongs to the Arsacids, and the Carpathian rim to the Gepids
+const NON_ROMAN=['Babylonia','Persis','Sogdiana','Germania Magna','Gepidia'];
+function ROMAN_REGIONS(){ return REGIONS.filter(r=>!NON_ROMAN.includes(r.id)); }
 // grand titles you can claim once you dominate a province
 // grand governor titles — office + victory epithet, as the triumphators bore
 const REGION_TITLES={
@@ -715,7 +723,8 @@ const REGION_TITLES={
   'Achaea':'Archon Achaeae, ACHAICUS','Creta':'Praetor Cretae, CRETICUS','Asia Minor':'Satrapes Asiae, ASIATICUS',
   'Bosporan Kingdom':'Rex Bospori, TAURICUS','Cyprus':'Dominus Cypri, CYPRIUS','Aegyptus':'Praefectus Aegypti, AEGYPTIACUS',
   'Syria Palaestina':'Dominus Palaestinae, SYRIACUS','Arabia Petraea':'Dux Arabiae, ARABICUS','Mesopotamia':'Dux Mesopotamiae, PARTHICUS',
-  'Babylonia':'Satrap of Babylonia, VICTOR ORIENTIS','Persis':'Great King of Persis, KING OF KINGS','Sogdiana':'Lord of the Silk Road, ULTIMUS ORIENTIS'};
+  'Babylonia':'Satrap of Babylonia, VICTOR ORIENTIS','Persis':'Great King of Persis, KING OF KINGS','Sogdiana':'Lord of the Silk Road, ULTIMUS ORIENTIS',
+  'Gepidia':'Foederatus Gepidarum, GEPIDICUS'};
 
 // Gladiator classes (real types). Each grants a starting loadout + trait.
 const CLASSES = {
@@ -1470,7 +1479,8 @@ function purpleRisk(){
         + provUnrestAvg()*0.22 + complaintPressure()*1.6
         + (rivalPrince? (100-rivalPrince.opinion)*0.14 : 0)
         - ((G.regalia||[]).length)*2.2 - (G.soldiers||0)/900
-        - courtBonus('🕯')*0.14;                           // the Vestal hears it coming, and tells you
+        - courtBonus('🕯')*0.14                            // the Vestal hears it coming, and tells you
+        + (titleBoons().risk||0);
   if(G.isFemale) r += 8;                                   // a woman on the throne is challenged more, and was
   return clamp(Math.round(r),0,100);
 }
@@ -1518,7 +1528,7 @@ function beautyPower(){
   const mult=[0.35,0.7,1.0,1.5,2.0][rank];
   return {
     beauty:b, rank, mult,
-    opinion:   Math.round((b-5)*2.2*mult),
+    opinion:   Math.round((b-5)*2.2*mult) + (titleBoons().opinion||0),
     tolerance: Math.round((b-5)*2.6*mult),
     gifts:     Math.max(0, Math.round((b-5)*mult*1.6)),
     title: b>=10.5?'BEYOND BEAUTY' : b>=9?'THE FACE OF ROME' : b>=7.5?'CELEBRATED'
@@ -1541,7 +1551,8 @@ function toleranceScore(){
   const bp=beautyPower();
   let t = 50 + bp.tolerance + (G.approval-50)*0.35 + (G.renown||0)/25 + (G.honor-50)*0.2
         + (G.leniency||0)*0.12 - (G.infamy||0)*0.25 - provUnrestAvg()*0.4
-        + courtBonus('📜')*0.12;                         // the Master of Letters, earning his keep
+        + courtBonus('📜')*0.12                          // the Master of Letters, earning his keep
+        + (titleBoons().tolerance||0);                   // and the honours you actually wear
   if(G.isFemale && bp.rank>=2) t -= 14;              // she is held to a harder standard, and always was
   if(G.emperor) t += 10;
   if((G.regalia||[]).length) t += (G.regalia||[]).length*2;
@@ -1551,7 +1562,8 @@ function loyaltyScore(){
   let l = 20 + (G.favor||0)*1.6 + (G.renown||0)/18 + (G.legionRep||0)*0.5
         + (G.soldiers||0)/150 + (G.approval-50)*0.25 + (G.patrons||[]).length*4
         + ((G.regalia||[]).length)*3 + (G.emperor?12:0)
-        + courtBonus('🐎')*0.10;                          // the Master of the Horse
+        + courtBonus('🐎')*0.10                           // the Master of the Horse
+        + (titleBoons().loyalty||0);
   if(G.married) l += 4;
   return clamp(Math.round(l),0,100);
 }
@@ -1585,9 +1597,12 @@ function provIncome(id){
   const base = wealth*(P.tax*0.55);
   const drag = 1 - clamp(P.unrest,0,100)/140;
   const skim = P.govLoyal<40? 0.55 : P.govLoyal<65? 0.82 : 1;
-  return Math.max(0, Math.round(base*drag*skim));
+  return Math.max(0, Math.round(base*drag*skim*(1+(titleBoons().income||0))));
 }
-function provUpkeep(id){ const P=provOf(id); return Math.round(P.garrison*0.6 + P.grain*1.2); }
+function provUpkeep(id){ const P=provOf(id);
+  const base=P.garrison*0.6 + P.grain*1.2 + 2;
+  return Math.round(base * (1 + overExtension()*0.10));    // every province past capacity costs everyone more
+}
 function provDailyTick(){
   const ids=heldProvinces(); if(!ids.length) return {coin:0,events:[]};
   let coin=0; const events=[];
@@ -1597,7 +1612,8 @@ function provDailyTick(){
     coin += provIncome(id) - provUpkeep(id);
     // unrest drifts with your policy
     let d = (P.tax-2)*0.9 - P.garrison*0.10 - P.grain*0.22 - (lenient-50)*0.012 - (toleranceScore()-50)*0.02
-          - courtBonus('🌾')*0.010;                      // the Prefect of the Grain
+          - courtBonus('🌾')*0.010                       // the Prefect of the Grain
+          + (titleBoons().unrest||0)*0.02;              // PATER PATRIAE quiets a whole empire
     if(P.govLoyal<40) d += 0.7;
     P.unrest = clamp(P.unrest + d + rnd(-0.5,0.5), 0, 100);
     P.govLoyal = clamp(P.govLoyal + (P.unrest>60?-0.4:0.15) + rnd(-0.3,0.3), 0, 100);
@@ -2539,7 +2555,7 @@ const LEGACY_INFO={
   'Cyprus':{w:3,s:true},'Gallia':{w:3,s:true},'Hispania Baetica':{w:3,s:true,note:'silver mines and good wine'},
   'Insulae Baleares & Sicilia':{w:3,s:true},'Persis':{w:3,s:false,note:'the rich Persian heartland — but far, and no friend of Rome'},
   'Dalmatia':{w:2,s:true},'Illyricum':{w:2,s:true},'Creta':{w:2,s:true},
-  'Bosporan Kingdom':{w:2,s:false},'Arabia Petraea':{w:2,s:false},'Mesopotamia':{w:2,s:false},'Babylonia':{w:2,s:false},'Sogdiana':{w:2,s:false},
+  'Bosporan Kingdom':{w:2,s:false},'Arabia Petraea':{w:2,s:false},'Mesopotamia':{w:2,s:false},'Babylonia':{w:2,s:false},'Sogdiana':{w:2,s:false},'Gepidia':{w:1,s:false},
   'Britannia':{w:1,s:false,note:'cold, wet, and very far from anyone who matters — the babes would grow up in fog'},
   'Germania Magna':{w:1,s:false,note:'a forest full of men who want us dead; no place for a cradle'},
 };
@@ -2667,6 +2683,8 @@ function freshCareer(name,origin,arch,social){
     court:null, lastCoupDay:-99,                   // the Praetorian Prefect and the palace, for those born to the purple
     herbs:{}, herbLore:0, ill:null, midwife:false,  // the shelf · what you have learned · who is sick · the woman you retain for the birth
     titlesWorn:[],                                 // which honours you actually introduce yourself with
+    warExhaust:0, lastExhaustWhy:'', titleRites:[],// how spent the army is · why · which honours have been ceremonially conferred
+    tombs:[], inheritedFrom:null,                  // the stones of those who came before
   };
 }
 /* =====================================================================
@@ -2741,7 +2759,7 @@ function elevateWife(rank){
   refreshStatbar(); saveQuiet(); openVilla();
 }
 // fill in any fields missing from older saves
-function migrate(g){ const d={honor:50,food:4,mount:0,slaves:0,hasVilla:false,boat:false,favor:0,soldiers:0,hidden:[],plotTier:0,emperor:false,approval:50,legions:0,rivals:0,retired:false,detachments:[],day:0,titles:{},clears:{},socialClass:'gladiator',army:{},armyGear:0,armyTrain:0,hasOrganizer:false,generals:[],wife:null,married:false,marryPrompted:false,children:[],pregnant:null,lastLoveDay:-9,injury:null,lastDebateDay:-9,office:0,path:null,parthia:50,parthiaPact:false,wifeRel:50,lastTalkDay:-9,isFemale:false,lineage:[],hygiene:70,wifePhys:45,hasPool:false,hasWardrobe:false,legacy:null,lastFeastDay:-9,loveDay:-1,loveQuick:0,loveLong:0,loveNight:0,loveVigil:0,venusUntil:-1,lastWashDay:-9,lastPoolDay:-9,lastWardrobeDay:-9,lastKidsDay:-9,lastBathDay:-9,pila:0,bow:null,bowsOwned:[],nemesis:null,rivalsList:[],trophies:[],nemesisCount:0,pendingDeath:false,ageBase:0,wonProvinceByFight:false,familyMan:false,infamy:0,gladiatrixStage:0,pardoned:false,lastNoteDay:-9,lastNoteReply:'',regalia:[],marryRolls:0,hasBodyMap:false,hasSecretMap:false,jealousy:0,lastJealousDay:-9,traits:[],flaws:[],looks:5,smarts:5,advocate:false,tutorialDone:false,patrons:[],rivalAdv:null,landmarks:[],faction:null,oratory:1,casesWon:0,casesLost:0,renown:0,senate:false,royal:false,lastCaseDay:-9,skills:{footwork:0,guard:0,blade:0,wind:0,throwing:0},scars:[],fatigue:0,lastTrainDay:-9,tribune:false,rank:0,campaigns:0,legionRep:0,lastCampaignDay:-9,units:{legionary:0,auxilia:0,cavalry:0,archers:0,engineers:0},supply:0,sieges:0,body:null,family:null,provinces:{},complaints:[],leniency:50,lastCalloutDay:-9,lastGiftDay:-9,giftsTaken:0,calloutWins:0,crownWorn:false,court:null,lastCoupDay:-99,herbs:{},herbLore:0,ill:null,midwife:false,titlesWorn:[]}; for(const k in d){ if(g[k]===undefined) g[k]=d[k]; } if(!g.current) g.current='Italia'; if(g.age===undefined) g.age=19+Math.floor(((g.day||0)-(g.ageBase||0))/36);
+function migrate(g){ const d={honor:50,food:4,mount:0,slaves:0,hasVilla:false,boat:false,favor:0,soldiers:0,hidden:[],plotTier:0,emperor:false,approval:50,legions:0,rivals:0,retired:false,detachments:[],day:0,titles:{},clears:{},socialClass:'gladiator',army:{},armyGear:0,armyTrain:0,hasOrganizer:false,generals:[],wife:null,married:false,marryPrompted:false,children:[],pregnant:null,lastLoveDay:-9,injury:null,lastDebateDay:-9,office:0,path:null,parthia:50,parthiaPact:false,wifeRel:50,lastTalkDay:-9,isFemale:false,lineage:[],hygiene:70,wifePhys:45,hasPool:false,hasWardrobe:false,legacy:null,lastFeastDay:-9,loveDay:-1,loveQuick:0,loveLong:0,loveNight:0,loveVigil:0,venusUntil:-1,lastWashDay:-9,lastPoolDay:-9,lastWardrobeDay:-9,lastKidsDay:-9,lastBathDay:-9,pila:0,bow:null,bowsOwned:[],nemesis:null,rivalsList:[],trophies:[],nemesisCount:0,pendingDeath:false,ageBase:0,wonProvinceByFight:false,familyMan:false,infamy:0,gladiatrixStage:0,pardoned:false,lastNoteDay:-9,lastNoteReply:'',regalia:[],marryRolls:0,hasBodyMap:false,hasSecretMap:false,jealousy:0,lastJealousDay:-9,traits:[],flaws:[],looks:5,smarts:5,advocate:false,tutorialDone:false,patrons:[],rivalAdv:null,landmarks:[],faction:null,oratory:1,casesWon:0,casesLost:0,renown:0,senate:false,royal:false,lastCaseDay:-9,skills:{footwork:0,guard:0,blade:0,wind:0,throwing:0},scars:[],fatigue:0,lastTrainDay:-9,tribune:false,rank:0,campaigns:0,legionRep:0,lastCampaignDay:-9,units:{legionary:0,auxilia:0,cavalry:0,archers:0,engineers:0},supply:0,sieges:0,body:null,family:null,provinces:{},complaints:[],leniency:50,lastCalloutDay:-9,lastGiftDay:-9,giftsTaken:0,calloutWins:0,crownWorn:false,court:null,lastCoupDay:-99,herbs:{},herbLore:0,ill:null,midwife:false,titlesWorn:[],warExhaust:0,lastExhaustWhy:'',titleRites:[],tombs:[],inheritedFrom:null}; for(const k in d){ if(g[k]===undefined) g[k]=d[k]; } if(!g.current) g.current='Italia'; if(g.age===undefined) g.age=19+Math.floor(((g.day||0)-(g.ageBase||0))/36);
   // older saves predate the roll and the family — give them both, matched to who they already are
   if(!g.body){ const male=!g.isFemale, q=clamp(g.looks===undefined?5:g.looks,1,10);
     g.body=rollPlayerBody(male,q,false);
@@ -5433,7 +5451,7 @@ function openCheats(){
   btn(r,'+10 Levels',()=>{ for(let i=0;i<10;i++){ G.level++; G.hpBonus++; if(G.level%2===0)G.dmgBonus++; } });
   // ---- provinces ----
   r=card('🗺 GOVERN THE PROVINCES','— take the titles without the wars');
-  btn(r,'👑 GOVERN ALL 21 REGIONS',()=>{ REGIONS.forEach(rg=>{ G.titles[rg.id]=REGION_TITLES[rg.id]||('Dominus '+rg.id); G.cleared[rg.id]=true; G.clears[rg.id]=99; });
+  btn(r,'👑 GOVERN EVERY REGION (incl. Parthia)',()=>{ REGIONS.forEach(rg=>{ G.titles[rg.id]=REGION_TITLES[rg.id]||('Dominus '+rg.id); G.cleared[rg.id]=true; G.clears[rg.id]=99; });
     G.wonProvinceByFight=true; toast('🗺 Every province in the empire flies your colours.',3000); });
   btn(r,'GOVERN THIS REGION',()=>{ const rg=REGION_BY_ID[G.current]; if(rg){ G.titles[rg.id]=REGION_TITLES[rg.id]||('Dominus '+rg.id); G.cleared[rg.id]=true; G.clears[rg.id]=99; G.wonProvinceByFight=true; } });
   btn(r,'UNLOCK ALL REGIONS',()=>{ REGIONS.forEach(rg=>{ G.cleared[rg.id]=true; }); G.pop=100; });
@@ -5857,6 +5875,91 @@ function drawShadowFigure(fx,fy,ph,beckon,open){
 // The shadow-play names a tier; the tier now has to pay for itself. A SPICY
 // or IMPOSSIBLE match burns hotter, breeds easier, and Rome talks about it.
 /* =====================================================================
+   EXHAUSTION AND OVER-EXTENSION — the thing that actually broke Rome.
+   Every province is a garrison, a road and a grain convoy. Take too many,
+   or take the wrong ones, and the army stops being an army and becomes a
+   very long queue of tired men. The CORE provinces (Italia, Aegyptus, Asia
+   Minor, Syria, Africa) are the ones the empire is actually made of —
+   attacking one is a civil war, and the legions feel it.
+   ===================================================================== */
+const CORE_PROVINCES=['Italia','Aegyptus','Asia Minor','Syria Palaestina','Africa Proconsularis','Gallia'];
+function isCore(id){ return CORE_PROVINCES.includes(id); }
+// how far a province is from Rome, in rough marching weight
+function provReach(id){
+  const R=REGION_BY_ID[id]; if(!R) return 2;
+  return (R.tier||2) + (R.sea?1:0) + (NON_ROMAN.includes(id)?2:0);
+}
+// the empire's carrying capacity: what it can hold before it starts to sag
+function supplyCapacity(){
+  if(!G) return 6;
+  let cap = 5;
+  cap += Math.floor((G.soldiers||0)/1500);            // men to garrison it with
+  cap += Math.floor((G.legionRep||0)/60);             // and officers who know how
+  cap += (G.hasOrganizer?2:0);
+  cap += Math.floor(courtBonus('🌾')/34);             // the grain prefect keeps the roads fed
+  cap += (G.emperor?2:0);
+  cap += (titleBoons().capacity||0);                  // MAGISTER MILITVM alone is worth three provinces
+  return cap;
+}
+// what you are actually carrying
+function supplyLoad(){
+  if(!G) return 0;
+  return heldProvinces().reduce((a,id)=>a+provReach(id),0);
+}
+function overExtension(){
+  const load=supplyLoad(), cap=supplyCapacity();
+  return Math.max(0, load-cap);
+}
+// 0..100 — how spent the army is. Campaigns, sieges and overreach all add.
+function exhaustion(){
+  if(!G) return 0;
+  return clamp(Math.round(G.warExhaust||0),0,100);
+}
+function addExhaustion(n,why){
+  if(!G) return;
+  G.warExhaust = clamp((G.warExhaust||0) + n, 0, 100);
+  if(why) G.lastExhaustWhy=why;
+}
+function exhaustState(){
+  const e=exhaustion(), ov=overExtension();
+  const name = e>=80? 'MUTINOUS' : e>=60? 'SPENT' : e>=38? 'WORN' : e>=18? 'MARCHED HARD' : 'FRESH';
+  const col  = e>=80? '#e0705b' : e>=60? '#e0865b' : e>=38? '#e8c34a' : e>=18? '#c8d48a' : '#7ad48a';
+  return { e, ov, name, col,
+    // what it costs you
+    fightMul: 1 - e*0.0035,                       // up to −35% army strength
+    upkeepMul: 1 + ov*0.10,                       // every province past capacity costs more
+    unrestAdd: ov*0.28,                           // and the provinces feel it
+    desertRisk: clamp((e-45)/260 + ov*0.006, 0, 0.22),
+    note: e>=80? 'They are one bad order from going home without you.'
+        : e>=60? 'Spent. Every march costs double and the sick lists are long.'
+        : e>=38? 'Worn through — they will fight, but not well and not for long.'
+        : e>=18? 'Marched hard, and holding.'
+        : 'Rested, fed, and looking for someone to fight.' };
+}
+// TAKING A CORE PROVINCE IS A CIVIL WAR. It costs far more than a frontier one.
+function conquestCost(id){
+  const core=isCore(id), reach=provReach(id);
+  return { exhaust: core? 22+reach*3 : 7+reach*2,
+           honor: core? -8 : 0,
+           approval: core? -10 : 0,
+           unrest: core? 26 : 10,
+           core };
+}
+function applyConquestStrain(id, how){
+  const c=conquestCost(id);
+  addExhaustion(c.exhaust, (how||'taking')+' '+id);
+  if(c.honor) G.honor=clamp(G.honor+c.honor,0,100);
+  if(c.approval) G.approval=clamp(G.approval+c.approval,0,100);
+  const P=provOf(id); P.unrest=clamp(P.unrest+c.unrest,0,100);
+  if(c.core){
+    // the rest of the empire notices when you turn on its own heart
+    heldProvinces().forEach(pid=>{ if(pid!==id) provOf(pid).unrest=clamp(provOf(pid).unrest+6,0,100); });
+    G.infamy=(G.infamy||0)+10;
+  }
+  return c;
+}
+
+/* =====================================================================
    THE TITLES OF ROME — every honour the game can give you, in one
    registry, ranked from the summit down to the sand.
 
@@ -5870,94 +5973,94 @@ function drawShadowFigure(fx,fy,ph,beckon,open){
 const TITLES=[
   // ---- rank 10: the summit ----
   {id:'augustus',  rank:10, cat:'imperial', name:'AVGVSTVS',   fem:'AVGVSTA', femTakesMale:true,
-   en:'Emperor of the Romans', em:'laurel',
+   en:'Emperor of the Romans', em:'laurel', boon:{tolerance:18, opinion:10, capacity:2},
    note:'The purple itself. Irene of Athens held it and signed herself BASILEUS — the masculine — because the office had no other word.',
    has:()=>!!G.emperor},
   {id:'patriae',   rank:9,  cat:'imperial', name:'PATER PATRIAE', fem:'MATER PATRIAE',
-   en:'Father / Mother of the Fatherland', em:'oak',
+   en:'Father / Mother of the Fatherland', em:'oak', boon:{unrest:-10, opinion:8, loyalty:6},
    note:'Voted by the Senate, never claimed. Julia Domna was voted MATER SENATUS ET PATRIAE and used every word of it.',
    has:()=>!!G.emperor && (G.approval||0)>=75},
   {id:'pontifex',  rank:9,  cat:'imperial', name:'PONTIFEX MAXIMVS', fem:'VESTALIS MAXIMA',
-   en:'Chief Priest / Chief Vestal', em:'flame',
+   en:'Chief Priest / Chief Vestal', em:'flame', boon:{tolerance:12, risk:-10, birth:-0.02},
    note:'The head of the state religion. Rome kept this one gendered — the woman’s equivalent ran the Vestals and outranked most senators.',
    has:()=>!!G.emperor || (G.royal && (G.renown||0)>=200)},
   {id:'caesar',    rank:8,  cat:'imperial', name:'NOBILISSIMVS CAESAR', fem:'NOBILISSIMA', femTakesMale:true,
-   en:'Heir to the purple', em:'diadem',
+   en:'Heir to the purple', em:'diadem', boon:{risk:-8, opinion:5, gift:1},
    note:'The named successor. A princess of the house who outranked her brothers took the masculine form and dared anyone to comment.',
    has:()=>G.socialClass==='imperial' || G.royal},
   {id:'castrorum', rank:8,  cat:'imperial', name:'MATER CASTRORVM', fem:'MATER CASTRORVM', femOnly:true,
-   en:'Mother of the Camp', em:'vexillum',
+   en:'Mother of the Camp', em:'vexillum', boon:{loyalty:14, exhaust:-0.5, capacity:1},
    note:'A real title, voted to Faustina and to Julia Domna: the legions’ own mother. There was never a masculine version — it did not need one.',
    has:()=>!!G.isFemale && ((G.legionRep||0)>=120 || (G.soldiers||0)>=6000)},
   // ---- rank 7-6: the state ----
   {id:'consul',    rank:7,  cat:'civic', name:'CONSVL',       fem:'CONSVL', femTakesMale:true,
-   en:'Consul of Rome', em:'fasces',
+   en:'Consul of Rome', em:'fasces', boon:{tolerance:10, income:0.12},
    note:'The highest office of the Republic and still the year’s name. No woman ever held it. Yours would be the first, and the Forum will say so.',
    has:()=>(G.office||0)>=4},
   {id:'magmil',    rank:7,  cat:'legion', name:'MAGISTER MILITVM', fem:'MAGISTER MILITVM', femTakesMale:true,
-   en:'Master of the Soldiers', em:'eagle',
+   en:'Master of the Soldiers', em:'eagle', boon:{capacity:3, exhaust:-0.6, loyalty:8},
    note:'Supreme command of the field armies. The title is an office, not a man, and the army obeyed whoever held it.',
    has:()=>(G.legionRep||0)>=220},
   {id:'proconsul', rank:6,  cat:'province', name:'PROCONSVL',  fem:'PROCONSVL', femTakesMale:true,
-   en:'Governor of a great province', em:'chair',
+   en:'Governor of a great province', em:'chair', boon:{income:0.18, unrest:-6},
    note:'A year of near-absolute power over a province, its courts and its legions.',
    has:()=>Object.keys(G.titles||{}).length>=3},
   {id:'praetor',   rank:6,  cat:'civic', name:'PRAETOR',      fem:'PRAETRIX',
-   en:'Praetor — the courts are yours', em:'scales',
+   en:'Praetor — the courts are yours', em:'scales', boon:{tolerance:8, petitions:0.30},
    note:'Rome’s judge. Every prosecution in the city passes across this desk.',
    has:()=>(G.office||0)>=3 || (G.advocate && (G.renown||0)>=140)},
   {id:'legatus',   rank:6,  cat:'legion', name:'LEGATVS LEGIONIS', fem:'LEGATVS LEGIONIS', femTakesMale:true,
-   en:'Commander of a legion', em:'eagle',
+   en:'Commander of a legion', em:'eagle', boon:{capacity:2, loyalty:6},
    note:'Five thousand men and their eagle answer to you by name.',
    has:()=>(G.legionRep||0)>=140},
   // ---- rank 5-4: rank and standing ----
   {id:'senator',   rank:5,  cat:'civic', name:'SENATOR',      fem:'CLARISSIMA FEMINA',
-   en:'Of the Senate / Most Distinguished Lady', em:'scroll',
+   en:'Of the Senate / Most Distinguished Lady', em:'scroll', boon:{tolerance:7, opinion:4},
    note:'CLARISSIMA FEMINA was the real rank of a senator’s women — a legal status, not a courtesy, and it was written on their tombs.',
    has:()=>!!G.senate},
   {id:'aedile',    rank:5,  cat:'civic', name:'AEDILIS',      fem:'AEDILIS', femTakesMale:true,
-   en:'Aedile — you stage the games', em:'chair',
+   en:'Aedile — you stage the games', em:'chair', boon:{opinion:9, unrest:-5},
    note:'You pay for the games and the city remembers you for it. The fastest way to be loved and the fastest way to go broke.',
    has:()=>(G.office||0)>=2},
   {id:'patricius', rank:5,  cat:'civic', name:'PATRICIVS',   fem:'PATRICIA',
-   en:'Of the old blood', em:'scroll',
+   en:'Of the old blood', em:'scroll', boon:{tolerance:6, gift:1},
    note:'Hereditary, unbuyable and older than the Republic. The Senate could vote you anything except this.',
    has:()=>G.socialClass==='elite' || G.socialClass==='imperial' || !!G.royal},
   {id:'advocatus', rank:4,  cat:'civic', name:'ADVOCATVS',    fem:'ADVOCATA',
-   en:'Advocate of the Basilica', em:'scroll',
+   en:'Advocate of the Basilica', em:'scroll', boon:{petitions:0.20, tolerance:4},
    note:'You argue for a living, and Rome is a city that decides everything by argument.',
    has:()=>!!G.advocate},
   {id:'tribunus',  rank:4,  cat:'legion', name:'TRIBVNVS MILITVM', fem:'TRIBVNVS MILITVM', femTakesMale:true,
-   en:'Tribune of the soldiers', em:'vexillum',
+   en:'Tribune of the soldiers', em:'vexillum', boon:{capacity:1, exhaust:-0.3},
    note:'A commission with the eagles. Where most senatorial careers actually begin.',
    has:()=>!!G.tribune},
   {id:'dominus',   rank:4,  cat:'province', name:'DOMINVS',   fem:'DOMINA',
-   en:'Master / Mistress of an estate', em:'chair',
+   en:'Master / Mistress of an estate', em:'chair', boon:{income:0.10, birth:-0.01},
    note:'A villa, its farm and everyone on it. Not glamorous. Extremely useful.',
    has:()=>!!G.hasVilla},
   // ---- rank 3-1: the sand ----
   {id:'rudiarius', rank:3,  cat:'arena', name:'RVDIARIVS',    fem:'RVDIARIA',
-   en:'Freed by the wooden sword', em:'rudis',
+   en:'Freed by the wooden sword', em:'rudis', boon:{opinion:6, refuseBout:true},
    note:'The RUDIS — a wooden sword handed to a gladiator who has won their freedom. The single most wanted object in the empire.',
    has:()=>(G.wins||0)>=25 || !!G.pardoned},
   {id:'primuspalus',rank:3, cat:'arena', name:'PRIMVS PALVS', fem:'PRIMA PALVS',
-   en:'First Sword of the school', em:'gladius',
+   en:'First Sword of the school', em:'gladius', boon:{opinion:4, purse:0.15},
    note:'The ludus ranked its fighters by the post they trained at. The first post was the best man in the house.',
    has:()=>(G.wins||0)>=15},
   {id:'gladiatrix',rank:3,  cat:'arena', name:'GLADIATRIX',   fem:'GLADIATRIX', femOnly:true,
-   en:'A woman on the sand', em:'gladius',
+   en:'A woman on the sand', em:'gladius', boon:{opinion:8, tolerance:-4, purse:0.20},
    note:'They existed — the Halicarnassus relief shows two of them, named, fighting to a draw. Septimius Severus banned them in 200 A.D., which tells you how common they had become.',
    has:()=>!!G.isFemale && (G.wins||0)>=3},
   {id:'veteranus', rank:2,  cat:'arena', name:'VETERANVS',    fem:'VETERANA',
-   en:'A veteran of the sand', em:'gladius',
+   en:'A veteran of the sand', em:'gladius', boon:{purse:0.10, exhaust:-0.2},
    note:'You have survived enough of them to be worth betting on.',
    has:()=>(G.wins||0)>=6},
   {id:'civis',     rank:2,  cat:'civic', name:'CIVIS ROMANVS', fem:'CIVIS ROMANA',
-   en:'Citizen of Rome', em:'scroll',
+   en:'Citizen of Rome', em:'scroll', boon:{tolerance:3},
    note:'“Civis Romanus sum.” Four words that stopped a flogging anywhere in the world.',
    has:()=>G.socialClass!=='gladiator' || (G.honor||0)>=70},
   {id:'tiro',      rank:1,  cat:'arena', name:'TIRO',         fem:'TIRO', femTakesMale:true,
-   en:'Untried — a rookie', em:'rudis',
+   en:'Untried — a rookie', em:'rudis', boon:{},
    note:'Everyone starts here. Most stay.',
    has:()=>true},
 ];
@@ -5993,6 +6096,33 @@ function equippedTitles(){
   G.titlesWorn=G.titlesWorn.filter(id=>earned.includes(id)).slice(0,titleSlots());
   return G.titlesWorn.map(id=>TITLE_BY_ID[id]).filter(Boolean);
 }
+/* ---- WHAT THE TITLES ARE ACTUALLY WORTH. Only the ones you WEAR pay out;
+   a title in the cupboard is a line on a tomb, not a lever. ---- */
+const BOON_LABEL={
+  tolerance:'political tolerance', opinion:'public opinion', loyalty:'loyalty',
+  capacity:'provinces you can carry', exhaust:'daily army recovery', income:'provincial income',
+  unrest:'unrest everywhere', risk:'risk to the purple', petitions:'petitions turned away',
+  gift:'gifts arriving', birth:'risk at the birth', purse:'arena purse',
+  refuseBout:'you may refuse a bout without disgrace',
+};
+function titleBoons(){
+  const out={};
+  equippedTitles().forEach(t=>{ const b=t.boon||{};
+    for(const k in b){ if(k==='refuseBout'){ out.refuseBout=true; continue; } out[k]=(out[k]||0)+b[k]; } });
+  return out;
+}
+function boonLine(t){
+  const b=t.boon||{}; const bits=[];
+  for(const k in b){
+    if(k==='refuseBout'){ bits.push('<span style="color:#7ad48a">you may refuse a bout without disgrace</span>'); continue; }
+    const v=b[k];
+    const pct=(k==='income'||k==='petitions'||k==='purse');
+    const good=(k==='unrest'||k==='risk'||k==='birth')? v<0 : v>0;
+    const shown= k==='birth'? (v*100).toFixed(0)+'%' : pct? (v>0?'+':'')+Math.round(v*100)+'%' : (v>0?'+':'')+v;
+    bits.push(`<span style="color:${good?'#7ad48a':'#e0705b'}">${shown} ${BOON_LABEL[k]||k}</span>`);
+  }
+  return bits.length? bits.join(' · ') : '<span class="muted">honour alone — no material benefit</span>';
+}
 // the line that goes under your name
 function titleLine(){
   const eq=equippedTitles();
@@ -6016,6 +6146,120 @@ function grantStartingTitles(){
   want.forEach(id=>{ if(earned.some(t=>t.id===id) && G.titlesWorn.length<titleSlots()) G.titlesWorn.push(id); });
   if(!G.titlesWorn.length && earned.length) G.titlesWorn.push(earned[0].id);
 }
+/* =====================================================================
+   THE CONFERRING — a rank-8 honour is not a silent unlock. The Senate
+   votes it, the legions acclaim it, or the mob simply decides. Each of the
+   great titles gets its moment, once, the first time you qualify.
+   ===================================================================== */
+const TITLE_RITES={
+  augustus:{ by:'THE PRAETORIAN GUARD AND THE SENATE', sound:'win',
+    scene:'They bring the purple to you on a spear-shaft, because there was no cushion to hand and nobody wanted to wait. '
+      +'The Senate ratifies it the following morning, unanimously, as the Senate always does once the matter is settled.' },
+  patriae:{ by:'THE SENATE, BY ACCLAMATION', sound:'cheer',
+    scene:'It cannot be asked for. It is voted, and only when the House has decided it means it — '
+      +'and when the vote comes it comes standing, and it goes on a good deal longer than the business required.' },
+  pontifex:{ by:'THE COLLEGE OF PONTIFFS', sound:'scroll',
+    scene:'The fire in the Temple of Vesta has not gone out since the kings. Tonight it is your responsibility, '
+      +'and every augur in the city stands in the smoke to watch you accept it.' },
+  caesar:{ by:'THE IMPERIAL HOUSE', sound:'promote',
+    scene:'The diadem is placed, the acclamation is read out, and every person in the room begins quietly recalculating '
+      +'their own position relative to yours.' },
+  castrorum:{ by:'THE LEGIONS, IN THE FIELD', sound:'horn',
+    scene:'The camp comes out to the rampart in the cold and shouts one word until the officers give up trying to stop them. '
+      +'Faustina was given this. So was Julia Domna. Neither of them ever gave it back.' },
+  consul:{ by:'THE COMITIA CENTURIATA', sound:'promote',
+    scene:'The lictors form up, the fasces go before you, and the year itself will be named after you in every document '
+      +'filed from Britannia to the Euphrates.' },
+  magmil:{ by:'THE FIELD ARMIES', sound:'horn',
+    scene:'Every eagle in the west is now yours to move. The men who carry them are told at dawn and take it calmly, '
+      +'which is the most alarming part.' },
+};
+function titleRiteDue(){
+  if(!G) return null;
+  if(!G.titleRites) G.titleRites=[];
+  const e=earnedTitles().filter(t=>t.rank>=7 && TITLE_RITES[t.id] && !G.titleRites.includes(t.id));
+  return e.length? e[0] : null;
+}
+function maybeTitleRite(){ const t=titleRiteDue(); if(!t) return false; openTitleRite(t); return true; }
+function openTitleRite(t){
+  if(!G.titleRites) G.titleRites=[];
+  G.titleRites.push(t.id);
+  const R=TITLE_RITES[t.id];
+  try{ sfx(R.sound); }catch(e){}
+  state='menu'; show('scr-villa'); $('statbar').classList.remove('hide');
+  const b=$('villa-body'); b.innerHTML='';
+  const card=document.createElement('div'); card.className='shopcard'; card.style.borderColor='#e8c34a';
+  const cv=document.createElement('canvas'); cv.width=96; cv.height=96;
+  cv.style.cssText='position:static;width:94px;height:94px;image-rendering:pixelated;display:block;margin:0 auto 6px;'
+    +'border:3px solid #e8c34a;border-radius:4px;';
+  drawTitleEmblem(cv,t,true);
+  card.appendChild(cv);
+  const txt=document.createElement('div');
+  const masc=titleIsMasculineOnHer(t);
+  txt.innerHTML=`<div style="text-align:center"><b style="color:var(--gold);font-size:15px;letter-spacing:2px">${titleName(t)}</b>
+      <div class="small" style="color:#cfa">${t.en}</div>
+      <div class="small muted">conferred by ${R.by}</div>
+      ${masc? '<div class="small" style="color:#ff8ad0">♂ IN THE MASCULINE — as Irene of Athens took it, and signed it</div>':''}</div>
+    <div class="small muted" style="margin-top:6px;font-style:italic">${R.scene}</div>
+    <div class="small" style="margin-top:5px">⚜ What it is worth: ${boonLine(t)}</div>`;
+  card.appendChild(txt);
+  b.appendChild(card);
+  const row=document.createElement('div'); row.className='row gap6'; row.style.marginTop='4px';
+  const wear=document.createElement('button'); wear.className='btn gold';
+  const slots=titleSlots(), full=(G.titlesWorn||[]).length>=slots;
+  wear.textContent = full? '⚜ WEAR IT (replace your lowest)' : '⚜ WEAR IT';
+  wear.onclick=()=>{
+    if(!G.titlesWorn) G.titlesWorn=[];
+    if(G.titlesWorn.length>=slots){                       // drop the least of what you are wearing
+      let worst=null, wr=99;
+      G.titlesWorn.forEach(id=>{ const tt=TITLE_BY_ID[id]; if(tt && tt.rank<wr){ wr=tt.rank; worst=id; } });
+      if(worst) G.titlesWorn=G.titlesWorn.filter(x=>x!==worst);
+    }
+    G.titlesWorn.push(t.id);
+    try{sfx('promote');}catch(e){}
+    refreshStatbar(); saveQuiet();
+    toast('⚜ '+titleName(t)+' — it goes under your name from today.',4200);
+    enterMap();
+  };
+  const later=document.createElement('button'); later.className='btn sm'; later.textContent='ACCEPT, BUT WEAR IT LATER';
+  later.onclick=()=>{ saveQuiet(); enterMap(); };
+  row.appendChild(wear); row.appendChild(later);
+  b.appendChild(row);
+}
+
+/* =====================================================================
+   THE INSCRIPTION — what goes on the stone. A Roman's tomb listed every
+   office he ever held, in order, and his heir inherited a share of the
+   standing that came with them. This is that.
+   ===================================================================== */
+function fullTitulature(){
+  // every honour ever EARNED, best first — not merely the ones worn
+  return earnedTitles();
+}
+function inscriptionHTML(name, opts){
+  opts=opts||{};
+  const list=(opts.titles||fullTitulature().map(t=>titleName(t)));
+  const yrs=opts.age!==undefined? opts.age : (G.age||19);
+  return `<div style="text-align:center;font-family:Georgia,serif;background:#d8cfb4;color:#3a2e1c;
+      border:3px solid #8a7a56;border-radius:3px;padding:9px 7px;letter-spacing:1px;line-height:1.5">
+    <div style="font-size:12px;letter-spacing:4px">D&nbsp;·&nbsp;M</div>
+    <div style="font-size:13px;font-weight:bold;letter-spacing:2px;margin:3px 0">${(name||G.name).toUpperCase()}</div>
+    <div style="font-size:9px">${list.length? list.join('<br>') : 'NVLLIS HONORIBVS'}</div>
+    <div style="font-size:9px;margin-top:4px">VIXIT ANNIS ${yrs}</div>
+    ${opts.extra? `<div style="font-size:9px;margin-top:3px;font-style:italic">${opts.extra}</div>`:''}
+    <div style="font-size:8px;margin-top:4px;opacity:.7">STTL — sit tibi terra levis</div></div>`;
+}
+// what an heir inherits from the stone: a share of the standing those titles bought
+function inheritTitulature(){
+  const earned=fullTitulature();
+  const top=earned.slice(0,3);
+  return { names:top.map(t=>titleName(t)),
+    // the higher the house climbed, the more the next one starts with
+    renown: Math.round(top.reduce((a,t)=>a+t.rank,0)*9),
+    honor:  Math.round(top.reduce((a,t)=>a+t.rank,0)*0.8),
+    tolerance: top.length? top[0].rank : 0 };
+}
+
 /* ---- an emblem for every title, drawn ---- */
 function drawTitleEmblem(cnv,t,worn){
   const c=cnv.getContext('2d'); c.imageSmoothingEnabled=false;
@@ -6214,6 +6458,7 @@ function birthRisk(){
   r -= clamp((G.coin||0)/20000,0,1)*0.020;
   if(hasTrait('healer')) r -= 0.022;
   if(hasFlaw('sickly')) r += 0.045;
+  r += (titleBoons().birth||0);
   if((G.age||19) > 38) r += 0.030;
   return clamp(r, 0.006, 0.24);
 }
@@ -8241,7 +8486,10 @@ $('btn-create-go').onclick=()=>{
   grantStartingTitles();            // nobody born to rank introduces themselves as nobody
   // ---- EMPEROR'S KIN: you begin holding the whole empire, and the arena is closed ----
   if(sel.social==='imperial'){
-    REGIONS.forEach(r=>{ G.titles[r.id]=REGION_TITLES[r.id]||('Dominus '+r.id); G.cleared[r.id]=true; });
+    // Rome's own provinces only. Ctesiphon and Persis were PARTHIAN — Trajan
+    // took Ctesiphon for about a year and it was given straight back. No prince
+    // is born holding the Great King's capital, and Sogdiana was never even close.
+    ROMAN_REGIONS().forEach(r=>{ G.titles[r.id]=REGION_TITLES[r.id]||('Dominus '+r.id); G.cleared[r.id]=true; });
     G.regalia=['ring','sceptre']; G.approval=70; G.favor=25; G.soldiers=6000; G.pop=60; G.glory=200;
     G.retired=false;
     if(G.isFemale) G.advocate=true;                       // a princess's power is argued, not fought
@@ -8264,6 +8512,7 @@ $('btn-create-go').onclick=()=>{
 function enterMap(){
   if(checkOldAgeDeath()) return;                 // the years may have come due
   stopBodyMapAnim(); ensurePlayerBody(); grantStartingTitles();
+  if(maybeTitleRite()) return;                   // Rome has voted you something, and wants to say so
   if(maybeCoup()) return;                        // the guard has stopped doing arithmetic
   if(maybeCallout()) return;                     // somebody in the street has something to say about you
   // those born to rank must first secure a dynastic marriage
@@ -8433,7 +8682,14 @@ function claimProvince(reg){
   G.wonProvinceByFight=true;                       // governed by PURE fighting — the Warrior-Queen path opens
   G.pop=clamp(G.pop+6,0,100); G.honor=clamp(G.honor+3,0,100);
   bumpStat('provinces'); unlock('governor');
-  toast('You are proclaimed '+G.titles[reg.id]+' — '+reg.id+' now flies your colours!',2600);
+  // ---- AND THE ARMY PAYS FOR IT ----
+  const c=applyConquestStrain(reg.id,'taking'), st=exhaustState();
+  let extra='';
+  if(c.core) extra=' ⚠ '+reg.id.toUpperCase()+' IS A CORE PROVINCE — this was a civil war, not a conquest. '
+    +'Rome noticed (−'+(-c.approval)+' approval, −'+(-c.honor)+' honor), every other province you hold is uneasy, and the legions are '+st.name+'.';
+  else if(st.e>=38) extra=' The legions are '+st.name+' — '+st.note;
+  if(overExtension()>0) extra+=' 📐 OVER-EXTENDED by '+overExtension()+': upkeep is up and the provinces are restless.';
+  toast('You are proclaimed '+G.titles[reg.id]+' — '+reg.id+' now flies your colours!'+extra, extra?7000:2600);
   saveQuiet();
 }
 function govBlock(reg){
@@ -8735,13 +8991,26 @@ function succession(ch, path){
     if(fem) offerDaughterPath(ch); else offerSonPath(ch); return;
   }
   const prestige=legacyScore();                       // the legacy house's standing passes down
+  // ---- THE STONE. Everything the dead held is cut into it, and the heir
+  //      inherits a share of what those honours actually bought. ----
+  const inh=inheritTitulature();
+  const epitaph={ name:G.name, titles:fullTitulature().map(t=>titleName(t)), age:(G.age||19),
+                  day:G.day, emperor:!!G.emperor };
+  G.tombs=(G.tombs||[]).concat([epitaph]);
   G.lineage=G.lineage||[];
   G.lineage.push({name:G.name, glory:G.glory, wins:G.wins, losses:G.losses, day:G.day, emperor:!!G.emperor,
-    looks:G.looks, smarts:G.smarts, traits:(G.traits||[]).slice(), flaws:(G.flaws||[]).slice()});
+    looks:G.looks, smarts:G.smarts, traits:(G.traits||[]).slice(), flaws:(G.flaws||[]).slice(),
+    titles:epitaph.titles.slice()});
   // the appointed son gives up his command to take the family name
   G.generals=(G.generals||[]).filter(g=>!(g.son && g.name===ch.name));
   G.children=G.children.filter(c=>c!==ch);
   G.name=heir; G.isFemale=fem;
+  // the heir starts with a share of the house's standing, and a clean set of honours
+  G.titlesWorn=[]; G.titleRites=[];
+  G.inheritedFrom=epitaph;
+  G.renown=(G.renown||0)+inh.renown;
+  G.honor=clamp((G.honor||50)+inh.honor,0,100);
+  G.warExhaust=0;
   G.glory=Math.floor(G.glory*0.25) + Math.round(prestige*0.4); G.pop=clamp(20+Math.round(prestige*0.08),0,100);
   G.coin+=Math.round(prestige*2);
   G.level=Math.max(1,Math.round(G.level/3)); G.xp=0;
@@ -8822,8 +9091,11 @@ function armyPowerDetail(){
   UNIT_TYPES.forEach(U=>{ const n=unitCount(U.id); atk+=n*U.atk; def+=n*U.def; siege+=n*U.siege; });
   const gear=1+(G.armyGear||0)*0.12, drill=1+(G.armyTrain||0)*0.10;
   const supplyMul = supplyState().mul;
-  return {atk:Math.round(atk*gear*drill*supplyMul), def:Math.round(def*gear*drill*supplyMul),
-          siege:Math.round(siege*gear*supplyMul), size:armySize()};
+  // TIRED MEN FIGHT WORSE. Up to a third comes straight off the top.
+  const ex=exhaustState(), exMul=ex.fightMul;
+  return {atk:Math.round(atk*gear*drill*supplyMul*exMul), def:Math.round(def*gear*drill*supplyMul*exMul),
+          siege:Math.round(siege*gear*supplyMul*exMul), size:armySize(),
+          exhaust:ex.e, exhaustName:ex.name, exhaustCol:ex.col, over:ex.ov};
 }
 // SUPPLY — an army eats. Starve it and everything degrades.
 function supplyState(){
@@ -8962,6 +9234,7 @@ function runCampaign(cp){
   advanceDay(2); checkMilRank(); refreshStatbar(); saveQuiet(); openLegion();
 }
 function runSiege(F,odds){
+  addExhaustion(9,'the siege of '+(F&&F.name||'a fortress'));
   const P=armyPowerDetail();
   const won=Math.random()<odds;
   // a siege eats stores and men whatever happens
@@ -9339,7 +9612,15 @@ function openTree(){
   if(lin.length){
     H('⏳ THOSE WHO CAME BEFORE — '+lin.length+' generation'+(lin.length===1?'':'s'));
     lin.forEach((a,i)=>add(personRow(a.name, '— generation '+(i+1)+(a.emperor?' · wore the purple':''), a.looks, a.smarts, a.traits, a.flaws,
-      `${a.wins||0} wins · ${a.losses||0} losses · ${fmt(a.glory||0)} glory`)));
+      `${a.wins||0} wins · ${a.losses||0} losses · ${fmt(a.glory||0)} glory`
+      + ((a.titles&&a.titles.length)? '<br>🪦 '+a.titles.slice(0,4).join(' · ') : ''))));
+    // and the stone of the one you directly succeeded
+    if(G.inheritedFrom){ const sc=document.createElement('div'); sc.className='shopcard';
+      sc.innerHTML='<div class="small muted">🪦 The stone you were raised beside:</div>';
+      const st=document.createElement('div'); st.style.marginTop='4px';
+      st.innerHTML=inscriptionHTML(G.inheritedFrom.name,{titles:G.inheritedFrom.titles, age:G.inheritedFrom.age,
+        extra:G.inheritedFrom.emperor? 'DIVVS — he wore the purple' : ''});
+      sc.appendChild(st); b.appendChild(sc); }
   } else H('⏳ You are the FIRST of your house. What follows begins with you.');
   // you
   H('👤 THE HEAD OF THE HOUSE');
@@ -9401,6 +9682,31 @@ function openTitles(){
        <span class="muted">(${worn.length}/${slots})</span></div>
      ${G.isFemale? `<div class="small" style="margin-top:3px;color:#ff8ad0">♀ Titles marked <b>♂ IN THE MASCULINE</b> are ones a woman historically took in the man’s form — Irene of Athens signed herself BASILEUS, not Basilissa.</div>`:''}`;
   const b=$('title-body'); b.innerHTML='';
+  // ---- WHAT YOU ARE CURRENTLY DRAWING FROM THEM ----
+  { const bo=titleBoons(), keys=Object.keys(bo);
+    const sc=document.createElement('div'); sc.className='shopcard'; sc.style.borderColor='#e8c34a';
+    sc.innerHTML=`<div><b style="color:var(--gold)">⚜ WHAT YOU ARE DRAWING FROM THEM</b></div>`
+      + (keys.length? `<div class="small">${keys.map(k=>{
+            if(k==='refuseBout') return '<span style="color:#7ad48a">you may refuse a bout without disgrace</span>';
+            const v=bo[k], pct=(k==='income'||k==='petitions'||k==='purse');
+            const good=(k==='unrest'||k==='risk'||k==='birth')? v<0 : v>0;
+            const shown= k==='birth'? (v*100).toFixed(0)+'%' : pct? (v>0?'+':'')+Math.round(v*100)+'%' : (v>0?'+':'')+v;
+            return `<span style="color:${good?'#7ad48a':'#e0705b'}">${shown} ${BOON_LABEL[k]||k}</span>`; }).join(' · ')}</div>`
+          : '<div class="small muted">Nothing — you are wearing nothing that pays.</div>');
+    b.appendChild(sc); }
+  // ---- THE INSCRIPTION: what the stone will say ----
+  { const sc=document.createElement('div'); sc.className='shopcard';
+    sc.innerHTML=`<div><b style="color:var(--gold)">🪦 THE INSCRIPTION</b>
+        <span class="small muted">— every honour you have ever earned goes on the stone, not just the ones you wear.
+        Your heir inherits a share of what they bought.</span></div>`;
+    const st=document.createElement('div'); st.style.marginTop='4px';
+    st.innerHTML=inscriptionHTML(G.name); sc.appendChild(st);
+    const inh=inheritTitulature();
+    const nx=document.createElement('div'); nx.className='small muted'; nx.style.marginTop='4px';
+    nx.innerHTML=`⚱ Your heir would begin with <b style="color:#7ad48a">+${inh.renown} renown</b>,
+      <b style="color:#7ad48a">+${inh.honor} honor</b> and <b style="color:#7ad48a">+${inh.tolerance} tolerance</b>
+      from these${inh.names.length? ' — carried down as “'+inh.names.join(', ')+'”' : ''}.`;
+    sc.appendChild(nx); b.appendChild(sc); }
   const CAT={imperial:'👑 THE PURPLE', civic:'🏛 THE STATE', legion:'🦅 THE LEGIONS', province:'🌍 THE PROVINCES', arena:'⚔ THE SAND'};
   const catOrder=['imperial','civic','legion','province','arena'];
   const H=(t,col)=>{ const d=document.createElement('div'); d.className='small'; d.style.color=col||'var(--gold)'; d.style.marginTop='6px'; d.innerHTML=t; b.appendChild(d); };
@@ -9427,6 +9733,7 @@ function openTitles(){
         ${masc? '<span class="pill" style="border-color:#ff8ad0;color:#ff8ad0;font-size:9px">♂ IN THE MASCULINE</span>':''}
         ${t.femOnly? '<span class="pill" style="border-color:#ff8ad0;color:#ff8ad0;font-size:9px">♀ HERS ALONE</span>':''}</div>
       <div class="small" style="color:#cfa">${t.en}</div>
+      <div class="small">⚜ ${boonLine(t)}</div>
       <div class="small muted" style="font-style:italic">${t.note}</div>
       ${held? '' : '<div class="small" style="color:#8a7a5c">— not yours yet</div>'}`;
     const row=document.createElement('div'); row.className='row gap6'; row.style.marginTop='3px';
@@ -9546,7 +9853,17 @@ function openProvinces(){
        <div class="small" style="margin-top:3px">😠 unrest ${bar(provUnrestAvg(),'#e0705b')} <b>${Math.round(provUnrestAvg())}</b>
         &nbsp; ⚖ political tolerance ${bar(tol,'#e8c34a')} <b>${tol}</b>
         &nbsp; 🩸 loyalty ${bar(loy,'#c89af0')} <b>${loy}</b></div>
-       <div class="small muted" style="margin-top:2px">⚜ ${bp.title} — your face is worth ${bp.tolerance>=0?'+':''}${bp.tolerance} tolerance and ${bp.opinion>=0?'+':''}${bp.opinion} public opinion at your rank.</div>`
+       <div class="small muted" style="margin-top:2px">⚜ ${bp.title} — your face is worth ${bp.tolerance>=0?'+':''}${bp.tolerance} tolerance and ${bp.opinion>=0?'+':''}${bp.opinion} public opinion at your rank.</div>
+       ${(()=>{ const ex=exhaustState(), load=supplyLoad(), cap=supplyCapacity();
+         return `<div class="small" style="margin-top:4px;padding:3px;border:1px solid ${ex.col};border-radius:3px">
+           <b style="color:${ex.col}">🥾 THE LEGIONS ARE ${ex.name}</b> ${bar(ex.e,ex.col)} <b>${ex.e}</b>
+           <span class="muted">— ${ex.note}</span>
+           <div class="small muted" style="margin-top:2px">📐 carrying <b>${load}</b> of a capacity of <b>${cap}</b>
+             ${ex.ov>0? `— <span style="color:#e0705b">OVER-EXTENDED by ${ex.ov}</span>: upkeep ×${ex.upkeepMul.toFixed(2)}, unrest climbing everywhere, and men slipping away.`
+                      : '— within your reach. Men, officers and grain all keep up.'}
+             ${ex.fightMul<0.98? ` Army strength is at <b>${Math.round(ex.fightMul*100)}%</b>.`:''}
+             ${G.lastExhaustWhy? ` <i>Last hard march: ${G.lastExhaustWhy}.</i>`:''}</div>
+           <div class="small muted">Capacity rises with soldiers, legion reputation, an organiser, the Prefect of the Grain and the purple.</div></div>`; })()}`
     : `<div class="small muted">You govern nothing yet. Clear a province in the arena, win one by war, or be born to it.</div>`;
   const b=$('prov-body'); b.innerHTML='';
   const H=(t,col)=>{ const d=document.createElement('div'); d.className='small'; d.style.color=col||'var(--gold)'; d.style.marginTop='6px'; d.innerHTML=t; b.appendChild(d); };
@@ -10758,10 +11075,23 @@ function advanceDay(n){
     //      and only an upkept house holds it. Baths, the lagoon and the
     //      wardrobe are the difference between ageing well and ageing.
     if(G.day%9===0) ageBodies();
+    // ---- THE ARMY RECOVERS, SLOWLY, AND ONLY IF IT IS NOT OVERSTRETCHED ----
+    { const ov=overExtension();
+      const heal = 0.9 - ov*0.16 + (G.hasVilla?0.15:0) + (courtBonus('🌾')/220) - (titleBoons().exhaust||0);
+      G.warExhaust = clamp((G.warExhaust||0) - heal, 0, 100);
+      const ex=exhaustState();
+      // over-extension pushes unrest everywhere and can cost you men outright
+      if(ov>0 && G.day%3===0) heldProvinces().forEach(id=>{ provOf(id).unrest=clamp(provOf(id).unrest+ex.unrestAdd*0.4,0,100); });
+      if(ex.desertRisk>0 && Math.random()<ex.desertRisk*0.25 && (G.soldiers||0)>200){
+        const lost=Math.round((G.soldiers||0)*rnd(0.03,0.09)); G.soldiers-=lost; if(typeof syncArmy==='function') syncArmy();
+        G.lastRaid='🥾 DESERTION — '+fmt(lost)+' men slip away in the night. '+ex.note
+          +(ov>0? ' You are holding '+ov+' more province'+(ov===1?'':'s')+' than you can feed.' : '');
+      }
+    }
     // ---- THE PROVINCES PAY (or bleed) EVERY SINGLE DAY ----
     { const pt=provDailyTick();
       if(pt.coin) G.coin=Math.max(0,G.coin+pt.coin);
-      const doorKeep = 1 - courtBonus('🗝')/190;       // the Chamberlain turns them away at the threshold
+      const doorKeep = clamp(1 - courtBonus('🗝')/190 - (titleBoons().petitions||0), 0.05, 1);   // the Chamberlain, and the praetor's own authority
       pt.events.forEach(id=>{ if(pendingComplaints().length<6 && Math.random()<doorKeep) pendingComplaints().push(rollComplaint()); });
       // a petition finds you even where you have no province, if you are anybody at all
       if(beautyPower().rank>=1 && Math.random()<0.05*doorKeep && pendingComplaints().length<6) pendingComplaints().push(rollComplaint());
@@ -11339,6 +11669,53 @@ $('btn-quit').onclick=()=>{ show('scr-title'); $('statbar').classList.add('hide'
 const mapcv=$('mapcv'), mctx=mapcv.getContext('2d');
 // --- true equirectangular projection: real longitude/latitude → canvas px ---
 const MAP_PROJ={lonW:-11, lonE:56, latN:60, latS:19};
+/* =====================================================================
+   PROVINCE TERRITORIES — every playable region as an actual shape on the
+   map, so holding one paints the whole province in your colour instead of
+   just tinting a floating label. Rings are [lon,lat] and are deliberately
+   simplified: recognisable at 480px wide, not survey-accurate.
+
+   `realm` decides the base colour when it is nobody's: 'rome' is imperial
+   salmon, 'parth' is Parthian steel, 'barb' is barbaricum cream.
+   ===================================================================== */
+const PROV_SHAPES={
+  'Britannia':{realm:'rome',ring:[[-5.3,50.1],[-3.0,50.3],[-0.3,50.8],[1.4,51.4],[1.7,52.8],[0.6,53.0],[-1.4,54.5],[-2.2,55.4],[-3.2,55.0],[-3.1,54.0],[-4.6,53.4],[-4.4,52.5],[-5.2,52.4],[-4.6,51.6]]},
+  'Gallia':{realm:'rome',ring:[[-1.6,43.4],[-1.2,45.0],[-1.1,46.3],[-2.3,47.2],[-4.6,48.4],[-2.0,48.7],[-1.0,49.4],[1.6,51.0],[3.2,51.3],[4.4,50.3],[6.2,49.5],[7.8,49.0],[8.2,47.6],[7.0,46.3],[6.9,45.0],[7.5,44.2],[6.0,43.5],[4.8,43.3],[3.2,42.9],[1.6,42.6],[0.7,42.8],[-1.4,43.3]]},
+  'Germania Magna':{realm:'barb',ring:[[7.6,49],[8.6,50.4],[8,53.4],[9,55.2],[13.4,54.6],[17,54],[19,52],[18.6,49.6],[16.4,48.6],[13.2,48.4],[10.4,48],[8.2,47.8]]},
+  'Hispania Baetica':{realm:'rome',ring:[[-8.9,37.0],[-6.9,36.9],[-5.4,36.0],[-2.2,36.7],[-0.6,38.2],[0.2,39.9],[0.9,41.0],[3.2,41.9],[3.0,42.5],[0.7,42.8],[-1.6,43.3],[-4.6,43.6],[-8.8,43.4],[-9.2,41.9],[-8.8,39.4],[-9.1,38.4]]},
+  'Italia':{realm:'rome',ring:[[7.8,44.6],[9.9,44.5],[12.3,45.4],[13.7,45.8],[13.6,44.1],[16.0,41.9],[18.5,40.1],[17.2,40.2],[16.1,38.9],[15.6,38.0],[16.0,39.9],[14.2,40.9],[12.0,41.4],[11.0,42.4],[9.9,44.0]]},
+  'Insulae Baleares & Sicilia':{realm:'rome',parts:[
+      [[1.2,38.6],[3.2,39.2],[4.4,39.9],[3.4,40.1],[1.3,39.1]],
+      [[12.4,37.8],[15.1,38.3],[15.6,38],[15.2,36.7],[12.5,37.6]],
+      [[8.2,41.4],[9.6,41.2],[9.7,39],[8.4,38.9]]]},
+  'Africa Proconsularis':{realm:'rome',ring:[[3,36.6],[6.5,37],[9,37.3],[10.3,36.9],[11.2,35.2],[10.5,33.8],[9.5,31.4],[7.4,31.6],[4,32.6],[0.4,33.4],[-2,34.3],[-5.4,35.6],[-3,35.9]]},
+  'Dalmatia':{realm:'rome',ring:[[13.7,45.7],[16.4,45.6],[19,44.6],[19.4,42.6],[18,42.7],[16.4,43.5],[14.4,44.8]]},
+  'Illyricum':{realm:'rome',ring:[[13.9,46.6],[16.4,46.8],[19.6,46.4],[22.4,45],[22.8,43.6],[19.4,42.6],[19,44.6],[16.4,45.6],[13.7,45.7]]},
+  'Achaea':{realm:'rome',ring:[[19.3,40.4],[21.4,41.2],[23.3,41.4],[24.2,40.3],[23.3,40.6],[22.9,39.2],[23.8,38],[23,37.4],[22,36.4],[21.4,37.6],[20.9,38.9]]},
+  'Creta':{realm:'rome',ring:[[23.6,35.2],[26,35.3],[26.3,35],[24.8,34.8],[23.5,35]]},
+  'Asia Minor':{realm:'rome',ring:[[26.3,40.4],[29.0,41.0],[31.5,41.4],[34.5,42.0],[36.5,41.1],[38.2,40.5],[40.5,40.2],[41.0,38.8],[40.0,37.6],[38.2,36.9],[36.2,36.3],[34.0,36.3],[31.5,36.4],[29.0,36.5],[27.5,37.2],[26.8,38.4],[26.4,39.6]]},
+  'Bosporan Kingdom':{realm:'rome',ring:[[33.4,44.4],[36.6,45.4],[38.4,45.4],[38.2,44.2],[36.4,43.4],[34,43.4]]},
+  'Cyprus':{realm:'rome',ring:[[32.3,35.1],[34.6,35.7],[34.6,34.9],[32.9,34.6]]},
+  'Aegyptus':{realm:'rome',ring:[[25.6,31.5],[29.2,31.4],[31.6,31.6],[32.6,31.2],[32.2,30.2],[31.6,28.6],[32.4,26.4],[33.2,24.4],[33.0,22.4],[31.4,22.0],[30.2,23.6],[29.6,26.2],[29.8,28.4],[29.2,29.6],[27.0,30.2],[25.4,30.6]]},
+  'Syria Palaestina':{realm:'rome',ring:[[34.2,31.2],[35.6,32.9],[36.2,36.2],[38,36.6],[40,37.2],[41.4,35.6],[39.6,33.4],[38,31.4],[35.6,30]]},
+  'Arabia Petraea':{realm:'rome',ring:[[34,29],[35.6,30],[38,31.4],[39.6,33.4],[42,31.4],[41,28],[38,25],[36,24],[34.6,27.4]]},
+  'Mesopotamia':{realm:'rome',ring:[[40,37.2],[42.6,37.6],[45,36.6],[45.4,34.4],[43,33.2],[41.4,35.6]]},
+  // ---- the East, which is NOT Rome's, whatever a prince may believe ----
+  'Babylonia':{realm:'parth',ring:[[43,33.2],[45.4,34.4],[47.6,33.6],[49,31],[48.4,29.4],[46.2,29.6],[43.6,31]]},
+  'Persis':{realm:'parth',ring:[[48.4,29.4],[52,29.4],[55.6,28],[56,25.4],[53,26.4],[49.6,27.2],[48.2,28]]},
+  'Sogdiana':{realm:'parth',ring:[[52,38],[56,38.6],[56,34],[53.2,34.6],[51.6,36]]},
+  // ---- and the Gepids, on the Carpathian rim ----
+  'Gepidia':{realm:'barb',ring:[[20.4,47.4],[22.6,48.6],[25.6,48.4],[27.2,47.2],[26.4,45.6],[24.0,45.3],[21.4,45.9],[20.0,46.4]]},
+};
+// the internal seams between neighbouring provinces, drawn as short dotted lines
+const PROV_SEAMS=[
+  [[-1.5,43.4],[0.7,42.7]], [[7.6,44.2],[8.2,47.6]], [[7.6,49],[8.2,47.8]],
+  [[13.7,45.7],[13.9,46.6]], [[19.4,42.6],[19,44.6]], [[19.6,46.4],[20.2,45.4]],
+  [[22.8,43.6],[23.3,41.4]], [[24.2,40.3],[26.2,40.5]], [[26.2,40.5],[27,38]],
+  [[34.2,31.2],[35.6,30]], [[38,36.6],[40,37.2]], [[40,37.2],[41.4,35.6]],
+  [[41.4,35.6],[43,33.2]], [[45.4,34.4],[47.6,33.6]], [[48.4,29.4],[48.2,28]],
+  [[9.5,31.4],[10.5,33.8]], [[24.7,27],[24.7,31.4]], [[33.4,44.4],[34,43.4]],
+];
 function lonlat(lon,lat){ const {lonW,lonE,latN,latS}=MAP_PROJ;
   return [ (lon-lonW)/(lonE-lonW)*480, (latN-lat)/(latN-latS)*216 ]; }
 function drawMapLegend(){
@@ -11538,6 +11915,56 @@ function drawMapCanvas(){
     mctx.fillStyle='rgba(58,42,24,.85)'; mctx.font=(cap?'bold ':'')+'5px Georgia,serif'; mctx.textAlign='left';
     mctx.fillText(nm,p[0]+3,p[1]+2); }
   mctx.textAlign='center';
+
+  // =====================================================================
+  // PROVINCE TERRITORIES — the whole province takes your colour, not the
+  // label. Yours is imperial gold; cleared but ungoverned is a warm tint;
+  // Rome's own is salmon; Parthia's is steel; barbaricum stays cream.
+  // =====================================================================
+  { const MINE='#e0b23a', MINE2='#f0cf6a', CLEARED='#efbb9a';
+    // CLIP TO THE LAND. Province rings are simplified, so without this they
+    // bleed into the Mediterranean; clipped, a rough ring still stops at the coast.
+    mctx.save();
+    mctx.beginPath();
+    [EUR,AFR,EAS,BRIT].forEach(pp=>{ const p0=Q(pp[0][0],pp[0][1]); mctx.moveTo(p0[0],p0[1]);
+      for(let k=1;k<pp.length;k++){ const q=Q(pp[k][0],pp[k][1]); mctx.lineTo(q[0],q[1]); } mctx.closePath(); });
+    // the islands are their own land and must be clippable too
+    [[[1.2,38.6],[4.6,40.1],[3.2,39.9],[1.1,39.2]],
+     [[12.3,37.6],[15.7,38.4],[15.3,36.6],[12.4,37.5]],
+     [[8.1,41.5],[9.8,41.3],[9.8,38.8],[8.3,38.8]],
+     [[23.4,35.4],[26.4,35.5],[26.4,34.7],[23.4,34.8]],
+     [[32.2,35.2],[34.7,35.8],[34.7,34.5],[32.7,34.5]]].forEach(pp=>{
+      const p0=Q(pp[0][0],pp[0][1]); mctx.moveTo(p0[0],p0[1]);
+      for(let k=1;k<pp.length;k++){ const q=Q(pp[k][0],pp[k][1]); mctx.lineTo(q[0],q[1]); } mctx.closePath(); });
+    mctx.clip();
+    const held=(G&&G.titles)||{}, cleared=(G&&G.cleared)||{};
+    const rings=(sh)=> sh.parts? sh.parts : [sh.ring];
+    for(const id in PROV_SHAPES){
+      const sh=PROV_SHAPES[id], owned=!!held[id], done=!owned && !!cleared[id];
+      const base = sh.realm==='parth'? PARTH : sh.realm==='barb'? LAND : EMP;
+      const col  = owned? MINE : done? CLEARED : base;
+      rings(sh).forEach(rg=>{
+        fill(rg,col);
+        if(owned){                                    // a held province is hatched in gold, so it reads at a glance
+          mctx.save(); poly(rg); mctx.clip();
+          mctx.strokeStyle='rgba(255,244,190,.55)'; mctx.lineWidth=0.8;
+          for(let d=-40;d<120;d+=4){ mctx.beginPath(); mctx.moveTo(d*4,0); mctx.lineTo(d*4-220,216); mctx.stroke(); }
+          mctx.restore();
+          poly(rg); mctx.strokeStyle='#8a5a12'; mctx.lineWidth=1.1; mctx.stroke();
+        }
+      });
+    }
+    // ---- the dotted seams BETWEEN provinces inside the empire ----
+    mctx.save(); mctx.setLineDash([2,2.2]); mctx.lineWidth=0.7; mctx.strokeStyle='rgba(120,70,40,.62)';
+    PROV_SEAMS.forEach(sm=>{ const a=Q(sm[0][0],sm[0][1]), b2=Q(sm[1][0],sm[1][1]);
+      mctx.beginPath(); mctx.moveTo(a[0],a[1]); mctx.lineTo(b2[0],b2[1]); mctx.stroke(); });
+    // and a dotted outline around every province, so the grid of them is visible
+    mctx.strokeStyle='rgba(120,70,40,.34)'; mctx.setLineDash([1.6,2]);
+    for(const id in PROV_SHAPES){ const sh=PROV_SHAPES[id];
+      (sh.parts||[sh.ring]).forEach(rg=>{ poly(rg); mctx.stroke(); }); }
+    mctx.restore();          // end seam dashes
+    mctx.restore();          // end land clip
+  }
 
   // ===== small province names (dark red italics, like the printed plate) =====
   const PROV=[['Lusitania',-7.6,39.2],['Tarraconensis',-3.6,41.6],['Aquitania',0.3,44.4],['Lugdunensis',2.7,47.7],
@@ -12120,6 +12547,9 @@ window.__SS = {
   drawHusbandFigTest:drawHusbandFig, openHerbs, HERBS, HERB_BY_ID, drawHerbIcon, herbCount, herbAdd, herbUse,
   ILLNESSES, rollIllness, curesIll, birthRisk, birthPrepLine, illnessBite, get DM(){return DM;},
   TITLES, TITLE_BY_ID, titleName, titleSlots, earnedTitles, equippedTitles, titleLine, grantStartingTitles,
+  titleBoons, boonLine, TITLE_RITES, titleRiteDue, openTitleRite, fullTitulature, inscriptionHTML, inheritTitulature,
+  exhaustion, exhaustState, overExtension, supplyCapacity, supplyLoad, addExhaustion, applyConquestStrain,
+  conquestCost, isCore, CORE_PROVINCES, PROV_SHAPES, ROMAN_REGIONS, NON_ROMAN, drawMapCanvas,
   drawTitleEmblem, openTitles, titleIsMasculineOnHer, bornToThePurple,
   isTouchOn, setTouchPref, syncTouchPads, get touchPref(){return touchPref;},
 };

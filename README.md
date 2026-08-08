@@ -117,6 +117,23 @@ publicly, leaving it off keeps the game safe for a general audience.
 - **Born to something** — a patrician starts as **PATRICIVS**, the imperial line as
   **NOBILISSIMVS CAESAR**, and everyone else as **TIRO** (which is quietly replaced the moment
   you earn better).
+- **Titles pay** — every worn honour carries a real effect: *AVGVSTVS* +18 tolerance,
+  *MAGISTER MILITVM* +3 to the provinces you can carry, *PATER PATRIAE* quiets unrest across the
+  whole empire, *RVDIARIVS* lets you refuse a bout without disgrace.
+- **The conferring** — a rank-7 honour is not a silent unlock. The Guard brings the purple on a
+  spear-shaft; the Senate votes *Pater Patriae* standing; the legions shout one word at the
+  rampart until the officers give up stopping them.
+- **The inscription** — every honour you ever earned is cut into your stone (*D · M … VIXIT
+  ANNIS …  STTL*), and your heir inherits a share of what those honours bought in renown, honour
+  and tolerance.
+- **A political map, painted** — hold a province and **the whole territory takes your colour**,
+  gold-hatched, not just the label. Dotted seams mark the internal borders, Parthia is steel,
+  barbaricum cream, and the **Gepids** hold the Carpathian rim.
+- **Exhaustion and over-extension** — every province is a garrison, a road and a grain convoy.
+  Take more than you can carry and upkeep climbs, unrest spreads and men desert in the night.
+  Taking a **core** province (Italia, Aegyptus, Asia Minor, Syria, Africa, Gallia) is a civil
+  war, not a conquest: triple the exhaustion, −honour, −approval, and every other province you
+  hold turns uneasy.
 - **The Herbarius** — a real Roman apothecary, ten plants a physician of 200 A.D. actually
   carried, each with its own drawn icon: garlic & honey, willow bark (*"seventeen centuries later
   they will call it aspirin"*), wormwood, betony, opium poppy, mandrake root, and **Theriac of
