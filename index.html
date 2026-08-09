@@ -5764,12 +5764,16 @@ function openPortrait(){
   const bond=G.wifeRel|0, spouseMale=!!(G.wife&&G.wife.male);
   if(G.wife && !spouseMale){ const wc=document.createElement('canvas'); wc.width=wc.height=148; drawBridePortrait(wc,G.wife,true);
     c.drawImage(wc, 186,106, 148*0.78,148*0.78); }                                                       // the domina
-  else if(G.isFemale){ // the head of the house is herself the domina — paint HER at the center
-    const me={build:'curvy',skin:G.skin||'#e6bd94',hair:'#3a2618',dress:G.tunic||'#8a2f5a',neckline:'fine',jewel:true,rank:'noble',eth:'roman',adj:'Roman',name:G.name};
+  else if(G.isFemale){ // the head of the house is herself the domina — paint HER at the center, on HER OWN scores
+    const me={build:'curvy',skin:G.skin||'#e6bd94',hair:'#3a2618',dress:G.tunic||'#7a2d9a',neckline:'fine',
+      jewel:!!G.crownWorn||true, rank:'noble', eth:'roman', adj:'Roman', name:G.name, body:G.body};
     const wc=document.createElement('canvas'); wc.width=wc.height=148; drawBridePortrait(wc,me,true);
     c.drawImage(wc, 186,106, 148*0.78,148*0.78); }
-  if(spouseMale){ c.save(); c.translate(324,224); c.scale(1.95,1.95); drawHusbandFig(c,0,0,bond,G.wife.skin,G.wife.dress); c.restore(); } // her lord at her side
-  else if(!G.isFemale){ c.save(); c.translate(324,224); c.scale(1.95,1.95); drawHusbandFig(c,0,0,bond); c.restore(); }                    // the master — her equal in height
+  // her lord at her side — drawn on HIS measurements, face tier and all
+  if(spouseMale){ c.save(); c.translate(324,224); c.scale(1.95,1.95);
+    drawHusbandFig(c,0,0,bond,G.wife.skin,G.wife.dress,G.wife,0,'idle'); c.restore(); }
+  else if(!G.isFemale){ c.save(); c.translate(324,224); c.scale(1.95,1.95);
+    drawHusbandFig(c,0,0,bond,null,null,{body:G.body,skin:G.skin,dress:G.tunic,hair:'#3a2618'},0,'idle'); c.restore(); }
   const kids=G.children.slice(0,6);
   kids.forEach((k,i)=>{ c.save(); c.translate(168-i*34,222); c.scale(1.45,1.45); drawKidFig(c,0,0,k.sex,G.day-k.born); c.restore(); });
   if(bond>=90){ c.fillStyle='#e26a8a'; c.font='14px monospace'; c.fillText('♥', 272, 96); }            // devoted
@@ -8270,7 +8274,7 @@ function drawBridePortrait(cnv,b,bare){
   // 3-4 is RAISED — a slight swell, NOT a canyon; 5 and up earns the full
   // treatment. The old art jumped straight from flat to deep cleavage.
   const HASB = busV>=3, HASR = booV>=3;
-  const MODB = busV>=3 && busV<=4, MODR = booV>=3 && booV<=4;
+  const MODB = busV>=3 && busV<=4;
   const warrior=b.rank==='warrior';
   const noble=b.rank==='noble'||warrior;   // both wear an elevated gown (warrior's is martial in colour)
   // ================= BACK ARM (her left, hanging behind) =================
@@ -8301,43 +8305,64 @@ function drawBridePortrait(cnv,b,bare){
     P(-7,-2,thigh+1,2,'#6a4828'); P(0,-2,thigh+2,2,'#8a5c34');                 // sandals
     P(1,-6,thigh,1,'#8a5c34'); P(-6,-6,thigh-1,1,'#6a4828');                   // ankle laces
   }
-  // ================= HIPS & REAR — two round cheeks split by a CENTRE cleft =================
+  // ============ HIPS & REAR — FIVE DRAWN TIERS, NOT ONE SHAPE SCALED ============
+  // FLAT · RAISED · ELEVATED · FAT · COLOSSAL. Each is its own silhouette in
+  // the painted plate, exactly as it is on the body map and the villa sprite.
   P(-6,hipTop,hips-2,hipBot-hipTop,dress);
-  const bx0=-8-rear, bw2=rear+3, cleftX=bx0+((bw2/2)|0);                       // rear mass + its midline
-  P(bx0+1,hipTop,bw2-2,1,dress);                                               // rounded crown
-  P(bx0,hipTop+1,bw2,8,dress);                                                 // lifted, tight rear mass
-  P(bx0-1,hipTop+2,1,6,dress); P(bx0+1,hipTop+9,bw2-2,1,dress);                // outer bulge + rounded base
-  // A FLAT BEHIND IS FLAT: nothing to split, so no cleft and no twin cheeks —
-  // just the fall of the cloth, which is all there would honestly be to see.
-  if(!HASR){
-    P(bx0,hipTop+1,bw2,8,dress); P(bx0,hipTop+1,1,8,dSh);
-    P(bx0+1,hipTop+8,bw2-1,1,shade(dress,-30));                                // the single line where cloth meets thigh
-  } else if(MODR){
-    // RAISED behind — one soft curve and a hint of a seam. Not two cheeks.
-    P(bx0,hipTop+1,bw2,8,dress); P(bx0,hipTop+1,1,7,dHi);
-    P(cleftX,hipTop+2,1,5,shade(dress,-30));                                   // a hint, not a cleft
-    P(bx0+1,hipTop+8,bw2-1,1,shade(dress,-40));
+  const bT = booV>=9?4 : booV>=7?3 : booV>=5?2 : booV>=3?1 : 0;
+  const bw2 = [3, rear+2, rear+4, rear+6, rear+8][bT];                          // how far it projects
+  const bh2 = [7, 8, 9, 11, 13][bT];                                            // and how deep it hangs
+  const bx0 = -6-bw2;
+  const cleftX = bx0+((bw2/2)|0);
+  if(bT===0){
+    // FLAT — the cloth simply falls from the girdle to the thigh. Nothing to see.
+    P(bx0+2,hipTop+1,bw2,bh2,dress); P(bx0+2,hipTop+1,1,bh2,dSh);
+    P(bx0+3,hipTop+bh2,bw2-1,1,shade(dress,-30));
+  } else if(bT===1){
+    // RAISED — a single shallow swell with a hint of a seam. Not two cheeks.
+    P(bx0+1,hipTop+1,bw2,bh2,dress); P(bx0+1,hipTop+1,1,bh2-1,dHi);
+    P(bx0+1,hipTop,bw2-1,1,dress);
+    P(cleftX,hipTop+2,1,bh2-4,shade(dress,-28));
+    P(bx0+2,hipTop+bh2,bw2-2,1,shade(dress,-40));
+  } else if(bT===2){
+    // ELEVATED — round, high and clearly two of them, sitting up on a shelf
+    P(bx0+1,hipTop,bw2-1,1,dress);
+    P(bx0,hipTop+1,bw2,bh2,dress);
+    P(bx0-1,hipTop+2,1,bh2-4,dress);
+    P(cleftX,hipTop+1,1,bh2-1,shade(dress,-48));                                // the cleft
+    P(bx0,hipTop+1,1,bh2-3,dHi);                                                // outer rim light
+    P(cleftX+1,hipTop+2,1,bh2-5,shade(dress,14));
+    P(bx0+1,hipTop+bh2,bw2-2,1,shade(dress,-46));                               // the shelf under it
+  } else if(bT===3){
+    // FAT — heavy and round, spilling past the girdle, with a real underfold
+    P(bx0+1,hipTop-1,bw2-1,2,dress);                                            // it rises ABOVE the girdle line
+    P(bx0,hipTop+1,bw2,bh2,dress);
+    P(bx0-2,hipTop+2,2,bh2-3,dress); P(bx0-2,hipTop+3,1,bh2-5,dHi);             // and swings wider
+    P(cleftX,hipTop,1,bh2+1,shade(dress,-54));
+    P(cleftX-1,hipTop,1,2,shade(dress,-22)); P(cleftX+1,hipTop,1,2,shade(dress,-22));
+    P(bx0,hipTop+2,1,bh2-4,dHi); P(cleftX+1,hipTop+2,2,bh2-6,shade(dress,16));
+    P(bx0+1,hipTop+bh2,((bw2/2)|0),2,shade(dress,-50));                         // separate folds under EACH
+    P(cleftX+1,hipTop+bh2,bw2-((bw2/2)|0)-1,2,shade(dress,-50));
+    P(bx0+2,hipTop+bh2+2,bw2-3,1,shade(dress,-58));
   } else {
-  // THE CLEFT — dark line straight down the MIDDLE, splitting two perky cheeks
-  P(cleftX,hipTop,1,9,shade(dress,-54));
-  P(cleftX,hipTop+7,1,3,shade(dress,-44));                                     // flares as it meets the folds
-  P(cleftX-1,hipTop,1,2,shade(dress,-22)); P(cleftX+1,hipTop,1,2,shade(dress,-22)); // soft press at the crown
-  // OUTER cheek: bright rim light rolling round its curve
-  P(bx0,hipTop+1,1,6,dHi); P(bx0-1,hipTop+3,1,3,dHi); P(bx0+1,hipTop+1,2,2,shade(dress,16));
-  P(bx0+1,hipTop+7,2,1,shade(dress,-20));                                      // under-curve turn
-  // INNER cheek: its own highlight + shadow toward the hip
-  P(cleftX+1,hipTop+1,1,4,shade(dress,14)); P(cleftX+2,hipTop+2,2,2,dHi);
-  P(cleftX+1,hipTop+7,2,1,shade(dress,-20));
-  P(bx0+bw2-1,hipTop+1,1,7,shade(dress,-16));
-  // high, separate gluteal fold under EACH cheek (a lifted shelf, not a sag)
-  P(bx0,hipTop+9,((bw2/2)|0),1,shade(dress,-48));
-  P(cleftX+1,hipTop+9,bw2-((bw2/2)|0)-1,1,shade(dress,-48));
-  P(bx0+1,hipTop+10,bw2-2,1,shade(dress,-54));                                 // deep shadow beneath both
+    // COLOSSAL — it enters the room first. Overhangs the thigh entirely.
+    P(bx0+1,hipTop-2,bw2-1,3,dress);
+    P(bx0,hipTop+1,bw2,bh2,dress);
+    P(bx0-3,hipTop+2,3,bh2-2,dress); P(bx0-3,hipTop+3,1,bh2-5,dHi);
+    P(bx0-4,hipTop+4,1,bh2-7,dress);                                            // wider again
+    P(cleftX,hipTop-1,1,bh2+3,shade(dress,-58));                                // a cleft from crown to fold
+    P(cleftX-1,hipTop-1,1,3,shade(dress,-24)); P(cleftX+1,hipTop-1,1,3,shade(dress,-24));
+    P(bx0,hipTop+2,1,bh2-3,dHi); P(bx0+1,hipTop+2,2,3,shade(dress,26));
+    P(cleftX+1,hipTop+2,2,bh2-5,shade(dress,16)); P(cleftX+2,hipTop+3,2,2,dHi);
+    P(bx0+1,hipTop+bh2,((bw2/2)|0),3,shade(dress,-52));                         // deep double underfold
+    P(cleftX+1,hipTop+bh2,bw2-((bw2/2)|0)-1,3,shade(dress,-52));
+    P(bx0+2,hipTop+bh2+3,bw2-3,1,shade(dress,-60));
+    c.fillStyle='rgba(255,255,255,.10)'; c.fillRect(bx0,hipTop+1,2,bh2);        // light rolls right round it
   }
   P(-5,hipTop+1,2,2,dHi);                                                      // hip sheen
   P(hips-8,hipTop,2,hipBot-hipTop,dSh);                                        // front hip shadow
   // girdle low on the hips
-  P(-6-rear+1,hipTop,hips+rear-2,2,noble?gold:shade(dress,-52)); if(noble)P(0,hipTop,2,2,goldHi);
+  P(bx0+1,hipTop,hips+bw2-2,2,noble?gold:shade(dress,-52)); if(noble)P(0,hipTop,2,2,goldHi);
   // ================= WAIST =================
   const wx=-(waistW/2)|0;
   P(wx,bustBot+1,waistW,hipTop-bustBot-1,dress);
@@ -10347,12 +10372,50 @@ function offerDaughterPath(ch){
      +'<b style="color:#e8a0d0">This is how Julia Domna did it — and she ran an empire.</b>','⚭ TAKE THE MARRIAGE ROAD','marriage','#e8a0d0');
 }
 
+/* =====================================================================
+   THE GROOM'S PLATE — the same painted alcove her portrait gets, and HIS
+   OWN body drawn into it. This used to hand drawHusbandFig nothing but a
+   skin tone, so every suitor was rendered with YOUR measurements and a
+   default face; now his own face tier, chest, shoulders, midriff and
+   length all show, which is the entire point of looking at him.
+   ===================================================================== */
+function drawGroomPortrait(cnv,b){
+  const c=cnv.getContext('2d'); c.imageSmoothingEnabled=false;
+  const W=cnv.width,H=cnv.height;
+  const noble=(b.rank==='noble'||b.rank==='warrior');
+  const bg=c.createLinearGradient(0,0,0,H);
+  if(b.rank==='warrior'){ bg.addColorStop(0,'#3a1620'); bg.addColorStop(.6,'#2a1016'); bg.addColorStop(1,'#14080a'); }
+  else if(noble){ bg.addColorStop(0,'#33203e'); bg.addColorStop(.6,'#221430'); bg.addColorStop(1,'#120a18'); }
+  else { bg.addColorStop(0,'#3a2c1c'); bg.addColorStop(.6,'#2a1e12'); bg.addColorStop(1,'#160f08'); }
+  c.fillStyle=bg; c.fillRect(0,0,W,H);
+  c.save(); c.translate(W/2,H-3); const s=Math.min(W,H)/74; c.scale(s,s);
+  const P=(x,y,w,hh,col)=>{c.fillStyle=col;c.fillRect(Math.round(x),Math.round(y),Math.round(w),Math.round(hh));};
+  // the same alcove she stands in — a column, a drape and a floor
+  if(noble){
+    P(-32,-70,8,70,'#cfc0a2'); P(-31,-70,2,70,'#e8dcc2'); P(-27,-70,2,70,'#a8997c'); P(-34,-72,12,3,'#e0d4b8');
+    for(let i=0;i<8;i++){ P(16+i*2,-70+i,3,68-i,shade('#5a2d6a',i*6)); }
+    P(14,-72,22,4,'#3c1d48'); P(15,-69,2,2,'#e8c34a');
+    for(let fx=-34;fx<36;fx+=10){ P(fx,-2,9,2,'#b8a888'); P(fx,-2,9,1,'#d8ccb0'); }
+  } else {
+    for(let i=0;i<6;i++) P(-32,-64+i*11,64,1,'#4a3822');
+    P(20,-52,11,15,'#6a5030'); P(21,-50,9,4,'#8a6a40'); P(21,-44,9,4,'#8a6a40');
+    P(-34,-2,70,3,'#5a4428'); for(let i=0;i<9;i++)P(-32+i*8,-1,3,1,'#3e2e18');
+  }
+  // his kit, by rank — a warrior stands with his spear planted
+  if(b.rank==='warrior'){ P(-24,-66,1,64,'#6a4a2c'); P(-24,-66,1,1,'#8a6a44');
+    P(-25,-70,3,5,'#c8c0b0'); P(-24,-73,1,4,'#e8e0d0'); }
+  c.restore();
+  // THE MAN HIMSELF, on his own measurements
+  c.save(); c.translate(W/2, H-8); c.scale(1.62,1.62);
+  drawHusbandFig(c,0,0,0,b.skin,b.dress,b,0,'idle');
+  c.restore();
+  // a gold ring for a noble match, as her plate gets a jewel
+  if(b.jewel){ c.fillStyle='#e8c34a'; c.fillRect(W-14,H-16,5,5); c.fillStyle='#fff0b0'; c.fillRect(W-13,H-15,2,2); }
+  c.strokeStyle=b.jewel?'#8a6f35':'#4a3a26'; c.lineWidth=2; c.strokeRect(1,1,W-2,H-2);
+}
 // ---- MARRIAGE ----
 function briadeImg(b,size){ const cv=document.createElement('canvas'); cv.width=cv.height=148;
-  if(b.male){ const c=cv.getContext('2d'); c.imageSmoothingEnabled=false;
-    const g2=c.createLinearGradient(0,0,0,148); g2.addColorStop(0,'#33203e'); g2.addColorStop(1,'#150c18');
-    c.fillStyle=g2; c.fillRect(0,0,148,148);
-    c.save(); c.translate(74,142); c.scale(1.85,1.85); drawHusbandFig(c,0,0,0,b.skin,b.dress); c.restore(); }
+  if(b.male) drawGroomPortrait(cv,b);
   else drawBridePortrait(cv,b);
   const im=document.createElement('img'); im.src=cv.toDataURL(); im.width=im.height=size||148; im.style.cssText='image-rendering:pixelated;border:1px solid #000;border-radius:4px;flex:0 0 auto'; return im; }
 function marriageEffectsText(b){
@@ -12665,7 +12728,8 @@ window.__SS = {
   IMPOSSIBLE_CHANCE, SECRET_SELLERS, drawShadowPlayTest:drawShadowPlay, drawWifeFig, drawDomusPlayer,
   openCoup, coupDue, purpleRisk, makeCourt, ageBodies, ageOneBody, upkeepScore, spouseTierBonus, finishBed,
   figureScore, selfStage, stageIndex, courtBonus, courtCultivateCost, COURT_LEVERS, SHADOW_STAGES, shadowStage,
-  drawHusbandFigTest:drawHusbandFig, openHerbs, HERBS, HERB_BY_ID, drawHerbIcon, herbCount, herbAdd, herbUse,
+  drawHusbandFigTest:drawHusbandFig, drawGroomPortrait, briadeImg, openPortrait,
+  openHerbs, HERBS, HERB_BY_ID, drawHerbIcon, herbCount, herbAdd, herbUse,
   ILLNESSES, rollIllness, curesIll, birthRisk, birthPrepLine, illnessBite, get DM(){return DM;},
   TITLES, TITLE_BY_ID, titleName, titleSlots, earnedTitles, equippedTitles, titleLine, grantStartingTitles,
   titleBoons, boonLine, TITLE_RITES, titleRiteDue, openTitleRite, fullTitulature, inscriptionHTML, inheritTitulature,

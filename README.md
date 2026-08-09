@@ -91,13 +91,22 @@ publicly, leaving it off keeps the game safe for a general audience.
   decides whether you keep breathing, three court figures with their own opinions of you, and a
   live **RISK TO THE PURPLE** reading fed by unrest, unanswered petitions and a brother with a
   better claim.
-- **Five drawn booty tiers** — FLAT, RAISED, ELEVATED, FAT and COLOSSAL are five genuinely
-  different silhouettes in the villa sprite *and* on the body map, not one shape scaled up. The
-  readout puts the tier first, the way a person would say it: **FAT Booty**, **TINY Waist**.
-- **Five drawn male faces** — Plain (round, soft, heavy-nosed) → Rough (a broken nose and a
-  crooked mouth) → Handsome → Striking (a straight nose and a jaw that juts) → Godlike (deep-set
-  eyes, hollows under the cheekbones, a chin with a corner on it). The head shape changes too, so
-  it reads at sprite size.
+- **Five drawn booty tiers, in the portrait too** — FLAT, RAISED, ELEVATED, FAT and COLOSSAL are
+  five genuinely different silhouettes on the body map, in the villa sprite **and in the painted
+  marriage portrait you actually look at**, not one shape scaled up. FLAT lets the cloth fall
+  straight from girdle to thigh; RAISED is one shallow swell; ELEVATED sits round and high on a
+  shelf; FAT rises above the girdle with a real underfold; COLOSSAL overhangs the thigh with a
+  double fold and light rolls around the hip. The girdle line bends to follow whichever it is.
+  The readout puts the tier first, the way a person would say it: **FAT Booty**, **TINY Waist**.
+- **Five drawn male faces, in the portrait too** — Plain (round, soft, heavy-nosed) → Rough (a
+  broken nose and a crooked mouth) → Handsome → Striking (a straight nose and a jaw that juts) →
+  Godlike (deep-set eyes, hollows under the cheekbones, a chin with a corner on it). The head
+  shape changes too, so it reads at sprite size.
+- **Suitors are drawn as themselves** — the husband's marriage portrait used to render *your*
+  body with a default face on every candidate. He now gets his own painted alcove — a marble
+  column and hung curtain for a noble, a plastered wall and a shuttered window for a peasant, a
+  planted spear if he is a warrior — and his own face tier, build, length, skin, tunic and rank
+  clavus. Ten suitors are ten different men.
 - **White wool and Tyrian purple** — the brown is gone. Roman tunics were undyed white with a
   **purple clavus**, and its width was the rank: broad for a senator, narrow for everyone else.
   Noblewomen wear real purple, which cost more than its weight in silver and was the whole point.
