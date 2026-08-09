@@ -103,13 +103,23 @@ publicly, leaving it off keeps the game safe for a general audience.
   drawn there for the rest of your life: on the body map, in the villa, on your
   portrait and in the bath, where there is nothing to hide it. A light wound is one
   stroke, a serious one two, a grave one a ruin. The chart lists them by name.
+- **The bedchamber is a theatre** — the shadow-play used to run at two-thirds size
+  against its own flat backdrop. It now gets what made the pool work: the room dims to
+  nothing, a **wall of lamplit warmth** appears behind the pair so the silhouettes are
+  shadows *on* something, two lamps carry the light with a real flicker, the **camera
+  comes in**, and a vignette holds the eye. All seven positions — the embrace, the
+  kiss, from behind, the ride, the lift, the sundial, the tangle — read as clean black
+  figures against warm light, and each is **named on the plate** as it settles.
 - **The max face is three faces** — a man of twenty-four, forty and sixty-five are not
   handsome in the same way. The top tier now draws a **young**, a **middle-aged** and
   an **old** cut of the same head: the same bones, but the brow thickens and goes
   unruly, the eye-lines deepen, the jaw corner grows heavy, and the years arrive on
-  top. The jaw itself is drawn as a jaw — the cheek narrowing into a corner, the
-  corner turning, the chin squared and lit — instead of a stripe of shadow. And the
-  scar that used to be painted on **every man in the game whether he had earned one or
+  top. It is also **drawn simple on purpose**: the previous version stacked thirty-odd
+  marks on a thirteen-pixel head — brow rows, lash lines, sockets, hollows, four rows
+  of mouth — and all that detail turned to mud at sprite size. It is a dozen marks
+  now: clean skin, two bright eyes with a glint apiece, one light arched brow, the
+  smallest nose that reads, and a **cheeky lopsided grin with a dimple**. And the scar
+  that used to be painted on **every man in the game whether he had earned one or
   not** is gone; you get scars by being cut.
 - **The matchmaker matches on age** — pay her and she does what you are paying her
   for. An ordinary viewing is off by sixteen years on average; **SEND FOR FINER
