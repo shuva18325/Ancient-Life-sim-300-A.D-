@@ -91,6 +91,25 @@ publicly, leaving it off keeps the game safe for a general audience.
   decides whether you keep breathing, three court figures with their own opinions of you, and a
   live **RISK TO THE PURPLE** reading fed by unrest, unanswered petitions and a brother with a
   better claim.
+- **Eight haircuts and five beards for men** — the game used to draw every man
+  alive with the same head of hair. Now there is **the Roman crop** (combed forward,
+  cut straight across the brow), **swept back** (tight sides, height at the front),
+  **tousled**, **tight curls** (the Hadrianic fashion), **Germanic long**, the real
+  **Suebian knot** tied above one ear, the **steppe queue** (shaved sides, one long
+  tail), and **cropped to the scalp** — plus clean-shaven, stubble, a full beard, a
+  forked beard and a drooping Celtic moustache, and a hair palette that runs from
+  blue-black through chestnut and auburn to Germanic blond.
+- **Seven outfits** — a white wool tunic, a soldier's **muscled cuirass** with
+  pteruges and a general's cloak, the **toga** with its purple border sweeping hip to
+  shoulder, an **embroidered eastern robe** over trousers, a **fur-trimmed Germanic
+  cloak** with a great round brooch and cross-gartered legs, a **rider's kaftan**
+  crossed over a fitted belt, and a **Greek himation** worn off one bare shoulder.
+  Each people wears its own, and the marriage card tells you which.
+- **The villa is the portrait** — this was the bug: the painted plate gave a woman a
+  krobylos knot, an Egyptian wig or a Celtic braid, and the villa gave *everyone* the
+  same generic cap of hair. Both now call **one hair routine**, so the woman walking
+  your halls has the arrangement, the gown, the gold and the diadem she was painted
+  with — and the same is true of your husband's cut, beard and clothes, and of you.
 - **The years, written on every face** — one age drives grey at the temples, crow's
   feet, a furrowed brow, a jaw that softens and then goes, clouded eyes past seventy,
   a receding hairline on a man and a covered head on a matron — and youth gets its own
