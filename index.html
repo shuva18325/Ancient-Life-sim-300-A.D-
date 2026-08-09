@@ -1306,9 +1306,9 @@ function makeFamily(social, isFemale){
   const highborn = (cls==='imperial'||cls==='elite');
   const F={
     father:{name: fa[2] || (pick(NAMES_M)+' '+G_GENS()), what:fa[0], note:fa[1],
-      alive: Math.random()< (cls==='imperial'?0.7:0.55), opinion: ri(highborn?35:45, 85)},
+      alive: Math.random()< (cls==='imperial'?0.7:0.55), opinion: ri(highborn?35:45, 85), _ageOff: ri(24,37)},
     mother:{name: mo[2] || pick(NAMES_F), what:mo[0], note:mo[1],
-      alive: Math.random()<0.72, opinion: ri(55,95)},
+      alive: Math.random()<0.72, opinion: ri(55,95), _ageOff: ri(19,32)},
     siblings:[],
     kin: cls==='imperial',
   };
@@ -1330,20 +1330,31 @@ function makeFamily(social, isFemale){
       opinion: ri(20,90),
       wed: !male && /married|betrothed/.test(role),
       prince: male && /PRINCE/.test(role),
+      _ageOff: ri(-9,9),
     });
   }
   // THE IMPERIAL HOUSE always has the two questions that matter answered
   if(cls==='imperial'){
     if(isFemale && !F.siblings.some(x=>x.male)){
       F.siblings.push({name:freshName(true), male:true, role: Math.random()<0.6?'heir presumptive — THE PRINCE':freshRole(true),
-        opinion:ri(15,70), wed:false, prince:Math.random()<0.6});
+        opinion:ri(15,70), wed:false, prince:Math.random()<0.6, _ageOff:ri(-9,9)});
     }
     if(!isFemale && !F.siblings.some(x=>!x.male)){
       F.siblings.push({name:freshName(false), male:false, role:freshRole(false), opinion:ri(30,90),
-        wed:Math.random()<0.5, prince:false});
+        wed:Math.random()<0.5, prince:false, _ageOff:ri(-9,9)});
     }
   }
+  // BLOOD SHOWS. Roll the parents' faces first, then draw every child out of
+  // the pair — a house of plain people does not produce five stunning children.
+  kinLook(F.father); kinLook(F.mother);
+  F.siblings.forEach(sb=>kinInherit(sb, F.father, F.mother));
   return F;
+}
+// everyone in the house ages exactly as fast as you do — the offset is fixed for life
+function kinAge(p, fallbackOff){
+  if(!p) return 30;
+  if(p._ageOff===undefined) p._ageOff = (fallbackOff===undefined)? ((kinHash(p.name+'·age')%19)-9) : fallbackOff;
+  return clamp(((G&&G.age)||19) + p._ageOff, 1, 96);
 }
 function G_GENS(){ return pick(['Aemilianus','Severus','Verus','Rufus','Priscus','Longinus','Crispus','Maximus','Cato','Galba']); }
 /* =====================================================================
@@ -1357,11 +1368,33 @@ function kinHash(str){ let h=2166136261; const n=String(str||'x');
   for(let i=0;i<n.length;i++){ h^=n.charCodeAt(i); h=Math.imul(h,16777619); } return h>>>0; }
 // a face is fixed for life — derived from the name, so it never changes between visits
 function kinLook(p){
-  if(!p) return {_skin:KIN_SKINS[1],_hair:KIN_HAIRS[1]};
+  if(!p) return {_skin:KIN_SKINS[1],_hair:KIN_HAIRS[1],_face:5,_hairq:5,_build:5};
   if(!p._skin){ const h=kinHash(p.name);
     p._skin=KIN_SKINS[h%KIN_SKINS.length];
     p._hair=KIN_HAIRS[(h>>>5)%KIN_HAIRS.length]; }
+  // ---- and a FACE, a HEAD OF HAIR and a BUILD, on the same 1-10 ladder the
+  //      body map uses, so a brother can be plain and a sister stunning and
+  //      the gallery shows it. Fixed for life: the name is the seed. ----
+  if(p._face===undefined){ const h=kinHash(p.name+'·look');
+    p._face  = 1 + (h % 10);
+    p._hairq = 1 + ((h>>>7)  % 10);
+    p._build = 1 + ((h>>>13) % 10);
+  }
   return p;
+}
+// blood shows: a child's face is rolled from the parents, not from nothing
+function kinInherit(child, father, mother){
+  if(!child || child._face!==undefined) return child;
+  kinLook(father); kinLook(mother);
+  const h=kinHash(child.name+'·blood');
+  const mixOne=(a,b,bit)=>{ const base=(a+b)/2, jitter=((h>>>bit)%5)-2;   // -2..+2 of their own
+    return clamp(Math.round(base+jitter),1,10); };
+  child._face  = mixOne((father&&father._face)||5,  (mother&&mother._face)||5,  0);
+  child._hairq = mixOne((father&&father._hairq)||5, (mother&&mother._hairq)||5, 6);
+  child._build = mixOne((father&&father._build)||5, (mother&&mother._build)||5, 12);
+  if(!child._skin){ child._skin = ((h>>>18)&1)? ((father&&father._skin)||KIN_SKINS[2]) : ((mother&&mother._skin)||KIN_SKINS[2]);
+    child._hair = ((h>>>19)&1)? ((father&&father._hair)||KIN_HAIRS[1]) : ((mother&&mother._hair)||KIN_HAIRS[1]); }
+  return child;
 }
 function drawKinPortrait(cnv,p,o){
   o=o||{}; kinLook(p);
@@ -1371,59 +1404,228 @@ function drawKinPortrait(cnv,p,o){
   const g=c.createLinearGradient(0,0,0,H); g.addColorStop(0,bg[0]); g.addColorStop(1,bg[1]);
   c.fillStyle=g; c.fillRect(0,0,W,H);
   c.fillStyle='rgba(255,255,255,.045)'; for(let i=0;i<H;i+=4) c.fillRect(0,i,W,1);
+  // a painted niche behind the highborn, plaster behind everyone else
+  if(rank!=='plain'){ c.fillStyle='rgba(232,195,74,.10)';
+    c.beginPath(); c.arc(W/2,H*0.46,W*0.40,Math.PI,0); c.fill(); }
   c.save(); c.translate(W/2,H-2); const s=Math.min(W/40,H/46); c.scale(s,s);
   const P=(x,y,w,hh,col)=>{c.fillStyle=col;c.fillRect(Math.round(x),Math.round(y),Math.round(w),Math.round(hh));};
-  const skin=p._skin, sSh=shade(skin,-34), sHi=shade(skin,24);
-  const hair=p._hair, hSh=shade(hair,-28), hHi=shade(hair,32);
-  const cloth = o.cloth || (rank==='imperial'? '#6a2a9a' : rank==='elite'? '#8a2f3a' : '#8a7a5a');
+  /* ---- THE YEARS. One age in; grey, lines and a softening jaw out. ---- */
+  const age = (o.age!==undefined? o.age : (p&&p._age!==undefined? p._age : 34));
+  const A=ageMarks(age);
+  const skin=agedSkin(p._skin,age), sSh=shade(skin,-34), sHi=shade(skin,24), sDeep=shade(skin,-52);
+  const hair=greyHair(p._hair,age), hSh=shade(hair,-28), hHi=shade(hair,32);
+  /* ---- HER FACE / HIS FACE, ON THE SAME 1-10 LADDER AS EVERYTHING ELSE ---- */
+  const fv=(p._face===undefined?5:p._face), hq=(p._hairq===undefined?5:p._hairq), bv=(p._build===undefined?5:p._build);
+  const fT = fv>=9?4 : fv>=7?3 : fv>=5?2 : fv>=3?1 : 0;
+  const cloth = o.cloth || (rank==='imperial'? '#6a2a9a' : rank==='elite'? '#8a2f3a' : '#e6e0d0');
   const cHi=shade(cloth,26), cSh=shade(cloth,-38);
   const GOLD='#e8c34a', GOLD2='#fff0b0', GOLDS='#8a6f22';
-  // ---- shoulders: a woman's stola pinned at the shoulder, a man's toga folds ----
-  const shW = fem? 11 : 13;
+  const PURPLE = rank==='imperial'? '#6a2a9a' : '#8a2f5a';
+  // ---- head geometry IS the face tier: a plain head is wide and round, a
+  //      striking one long and narrow; a man's grows heavier up the ladder ----
+  const hw   = fem? (6.4 - fT*0.30) : (5.7 + fT*0.32);
+  const hgt  = fem? Math.round(14 + fT*0.7) : Math.round(14 + fT);
+  const hy0  = -18-hgt;                            // top of the skull; the jaw sits at -18
+  const eyeY = hy0 + Math.round(hgt*0.44);         // eye line, scaled to the skull
+  const noseY= eyeY+3, mouthY= -18-Math.round(hgt*0.16);
+  // ---- SHOULDERS: build, and for a woman the bust reads right here on the card ----
+  const shW = fem? (9.4 + bv*0.30) : (11.2 + bv*0.42);
   P(-shW,-14,shW*2,14,cloth); P(-shW,-14,shW*2,2,cHi);
   P(-shW,-14,2,14,cSh); P(shW-2,-14,2,14,cSh);
-  if(fem){ P(-shW+2,-13,3,13,cHi); P(shW-5,-13,2,13,cSh); P(-shW+3,-14,2,2,GOLD); }
-  else { for(let i=0;i<4;i++) P(-shW+4+i*3,-13,1,13,cSh); P(-shW+1,-12,shW,2,cHi); }
-  if(rank==='imperial'){ P(-shW,-6,shW*2,2,GOLD); P(-shW,-5,shW*2,1,GOLDS); }   // the purple carries a gold band
-  // ---- neck + head ----
-  P(-3,-19,6,6,skin); P(-3,-19,6,1,sSh);
-  P(-6,-33,12,15,skin); P(-6,-33,12,2,sHi); P(4,-31,2,13,sSh);
-  P(-4,-27,3,2,'#100c08'); P(1,-27,3,2,'#100c08');
-  P(-4,-27,1,1,'#cfe'); P(1,-27,1,1,'#cfe');
-  P(-5,-29,3,1,sSh); P(2,-29,3,1,sSh);                                   // brow
-  P(-1,-22,3,1,'#a8545a');                                               // mouth
-  // ---- hair ----
   if(fem){
-    P(-7,-36,14,6,hair); P(-7,-36,14,2,hHi);
-    P(-8,-32,2,11,hair); P(6,-32,2,11,hair);
-    P(6,-25,3,11,hair); P(7,-25,1,11,hHi); P(6,-15,3,2,hSh);             // the braid over her shoulder
-    if(rank!=='plain'){ P(-5,-37,3,2,GOLD); P(2,-37,3,2,GOLD); }         // pearls set in the hair
+    P(-shW+2,-13,3,13,cHi); P(shW-5,-13,2,13,cSh);
+    P(-shW+3,-14,2,2,GOLD);                                            // the shoulder brooch
+    // FIVE BUST TIERS, the same ladder the body map reads
+    const busT = bv>=9?4 : bv>=7?3 : bv>=5?2 : bv>=3?1 : 0;
+    if(busT===0){ P(-5,-10,10,1,cSh); }                                // FLAT — one plain fall of cloth
+    else if(busT===1){ P(-5,-11,4,2,cHi); P(1,-11,4,2,cHi); P(0,-11,1,2,cSh); }
+    else if(busT===2){ P(-6,-12,5,4,cHi); P(1,-12,5,4,cHi); P(0,-12,1,4,cSh); P(-6,-8,5,1,cSh); P(1,-8,5,1,cSh); }
+    else if(busT===3){ P(-7,-13,6,5,cHi); P(1,-13,6,5,cHi); P(0,-13,1,5,cSh); P(-7,-8,6,1,cSh); P(1,-8,6,1,cSh);
+      P(-1,-13,3,1,skin); }                                            // the neckline parts
+    else { P(-8,-13,7,6,cHi); P(1,-13,7,6,cHi); P(0,-14,1,7,cSh); P(-8,-7,7,1,cSh); P(1,-7,7,1,cSh);
+      P(-2,-14,5,2,skin); P(-1,-13,3,2,skin); P(0,-13,1,3,sSh); }      // and plunges
   } else {
-    P(-7,-35,14,5,hair); P(-7,-35,14,2,hHi);
-    P(-8,-32,2,8,hair); P(6,-32,2,8,hair);
-    if(o.beard){ P(-5,-23,10,4,hair); P(-5,-23,10,1,hSh); }
+    for(let i=0;i<4;i++) P(-shW+4+i*3,-13,1,13,cSh); P(-shW+1,-12,shW,2,cHi);
+    if(bv>=7){ P(-5,-11,10,3,cHi); P(-1,-11,2,3,cSh); }                // a chest that fills the toga
+    if(rank==='plain'){ P(-2,-14,2,14,PURPLE); P(-2,-14,1,14,shade(PURPLE,24)); }   // the clavus
   }
-  // ---- THE CROWN: this is what the wardrobe of rank actually buys you ----
+  if(rank==='imperial'){ P(-shW,-6,shW*2,2,GOLD); P(-shW,-5,shW*2,1,GOLDS); }
+  // ---- neck: a strong face sits on a strong neck; the years thin it ----
+  { const nw = Math.round((fem?4:5) + fT*0.4 - A.sag*1.2);
+    P(-nw/2,hy0+hgt-1,nw,7,skin); P(-nw/2,hy0+hgt-1,1,7,sHi); P(nw/2-1,hy0+hgt-1,1,7,sSh);
+    if(A.sag>0.35){ P(-nw/2,hy0+hgt+2,nw,1,sSh); P(-nw/2+1,hy0+hgt+4,nw-2,1,sSh); }   // the cords show
+  }
+  // ---- the skull ----
+  P(-hw,hy0,hw*2,hgt,skin); P(-hw,hy0,hw*2,2,sHi); P(hw-2,hy0+2,2,hgt-2,sSh);
+  if(fT<=0 && !fem) { P(-hw-1,eyeY-1,1,6,skin); P(hw,eyeY-1,1,6,skin); }   // PLAIN: wide and round
+  if(fT>=3){ P(-hw+1,-20,hw*2-2,2,skin); P(-hw+1,-20,hw*2-2,1,sHi); }      // STRIKING+: the jaw juts
+  if(A.sag>0.3){ P(-hw,-19,hw*2,2,mixHex(skin,'#9a8a76',0.35)); }          // and later it softens again
+  /* ================= THE FACE, BY TIER ================= */
+  if(fem){
+    if(fT<=0){
+      // PLAIN — small close-set eyes, a heavy flat nose, a thin mouth
+      P(-3,eyeY,2,2,'#efe6d6'); P(1,eyeY,2,2,'#efe6d6');
+      P(-3,eyeY,1,2,'#2a1a0e'); P(1,eyeY,1,2,'#2a1a0e');
+      P(-4,eyeY-2,3,1,hSh); P(1,eyeY-2,3,1,hSh);
+      P(-2,noseY,3,2,sSh);
+      P(-2,mouthY,4,1,'#94555c');
+    } else if(fT===1){
+      // FAIR — even, unremarkable, but nothing wrong with it
+      P(-4,eyeY,3,2,'#f2e8da'); P(1,eyeY,3,2,'#f2e8da');
+      P(-3,eyeY,2,2,'#33200f'); P(2,eyeY,2,2,'#33200f');
+      P(-4,eyeY-2,3,1,hSh); P(1,eyeY-2,3,1,hSh);
+      P(-1,noseY,2,2,sSh);
+      P(-2,mouthY,5,1,'#a8545a'); P(-1,mouthY,3,1,'#bb6470');
+    } else if(fT===2){
+      // PRETTY — bigger eyes, a defined mouth, a little colour high on the cheek
+      P(-4,eyeY-1,1,1,'#1c1109'); P(3,eyeY-1,1,1,'#1c1109');
+      P(-4,eyeY,4,2,'#f6efe0'); P(1,eyeY,4,2,'#f6efe0');
+      P(-3,eyeY,2,2,'#3a2410'); P(2,eyeY,2,2,'#3a2410');
+      P(-4,eyeY-1,4,1,'#241608'); P(1,eyeY-1,4,1,'#241608');
+      P(-4,eyeY-3,3,1,hSh); P(2,eyeY-3,3,1,hSh);
+      P(-1,noseY,2,2,sSh);
+      P(-2,mouthY,5,1,'#b04a58'); P(-2,mouthY+1,5,1,'#c8606e');
+      c.fillStyle='rgba(214,92,92,.26)'; c.fillRect(-5,eyeY+2,3,2); c.fillRect(3,eyeY+2,3,2);
+    } else if(fT===3){
+      // LOVELY — long almond eyes under lashes, full lips, a lit cheekbone
+      P(-5,eyeY-1,5,1,'#181008'); P(1,eyeY-1,5,1,'#181008');            // heavy lash line
+      P(-5,eyeY,4,2,'#f8f2e4'); P(2,eyeY,4,2,'#f8f2e4');
+      P(-4,eyeY,2,2,'#3f2712'); P(2,eyeY,2,2,'#3f2712');
+      P(-3,eyeY+1,1,1,'#fff8ec'); P(3,eyeY+1,1,1,'#fff8ec');            // the glint
+      P(-5,eyeY-3,4,1,hSh); P(2,eyeY-3,4,1,hSh);
+      P(0,noseY-1,2,3,sSh); P(0,noseY-1,1,2,sHi);
+      P(-2,mouthY,6,1,'#b8404f'); P(-2,mouthY+1,6,1,'#d2647a'); P(-1,mouthY,3,1,'#e2809a');
+      P(-hw+1,eyeY+2,2,1,sHi); P(hw-3,eyeY+2,2,1,sHi);                  // cheekbones catch the light
+      c.fillStyle='rgba(214,92,92,.26)'; c.fillRect(-hw+1,eyeY+3,3,2); c.fillRect(hw-4,eyeY+3,3,2);
+    } else {
+      // STUNNING — the face that is a political asset, and knows it
+      P(-6,eyeY-2,6,1,'#120a04'); P(1,eyeY-2,6,1,'#120a04');
+      P(-6,eyeY-1,1,1,'#120a04'); P(6,eyeY-1,1,1,'#120a04');            // kohl, winged at the corners
+      P(-5,eyeY,5,2,'#fcf7ec'); P(1,eyeY,5,2,'#fcf7ec');
+      P(-4,eyeY,2,2,'#4a2c14'); P(2,eyeY,2,2,'#4a2c14');
+      P(-4,eyeY,2,1,'#2a180a'); P(2,eyeY,2,1,'#2a180a');
+      P(-3,eyeY+1,1,1,'#fffbf0'); P(3,eyeY+1,1,1,'#fffbf0');
+      P(-5,eyeY-4,4,1,hSh); P(2,eyeY-4,4,1,hSh);                        // thin arched brows
+      P(0,noseY-2,2,4,sSh); P(0,noseY-2,1,3,sHi);                       // a straight fine nose
+      P(-3,mouthY,7,1,'#b03448'); P(-3,mouthY+1,7,1,'#d45c78'); P(-1,mouthY,4,1,'#ec8ca6');
+      P(-hw,eyeY+2,2,2,sHi); P(hw-2,eyeY+2,2,2,sHi);
+      P(-hw+1,eyeY+4,2,1,shade(skin,-18)); P(hw-3,eyeY+4,2,1,shade(skin,-18));  // hollows beneath
+      c.fillStyle='rgba(220,96,110,.30)'; c.fillRect(-hw+1,eyeY+3,3,2); c.fillRect(hw-4,eyeY+3,3,2);
+      P(-hw-1,eyeY+1,1,2,GOLD); P(hw,eyeY+1,1,2,GOLD);                  // pearl drops at the ear
+    }
+  } else {
+    if(fT<=0){
+      // PLAIN — small eyes, a heavy nose, a jaw that simply stops
+      P(-3,eyeY,2,2,'#e8dccc'); P(1,eyeY,2,2,'#e8dccc');
+      P(-3,eyeY,1,2,'#241408'); P(1,eyeY,1,2,'#241408');
+      P(-4,eyeY-2,3,1,hSh); P(1,eyeY-2,3,1,hSh);
+      P(-2,noseY,4,2,sSh); P(-1,noseY+1,2,1,sDeep);
+      P(-2,mouthY,5,1,'#7a4038');
+      P(-hw,-20,hw*2,1,shade(skin,-12));
+    } else if(fT===1){
+      // ROUGH — a nose broken and reset badly, a crooked mouth, an old dent
+      P(-4,eyeY,3,2,'#f2ead8'); P(1,eyeY,3,2,'#f2ead8');
+      P(-3,eyeY,2,2,'#241408'); P(2,eyeY,2,2,'#241408');
+      P(-4,eyeY-2,4,1,hSh); P(1,eyeY-2,4,1,hSh);
+      P(-1,noseY,3,3,sSh); P(0,noseY+1,1,1,sDeep);
+      P(-2,mouthY,4,1,'#8a4038'); P(2,mouthY-1,2,1,'#8a4038');
+      P(-hw+1,eyeY+2,1,3,sSh); P(hw-2,eyeY+3,1,2,sSh);
+      P(-2,eyeY-4,3,1,sSh);
+    } else if(fT===2){
+      // HANDSOME — even features and a clear jaw. Nothing to remark on but nothing wrong.
+      P(-4,eyeY,3,2,'#f2ead8'); P(1,eyeY,3,2,'#f2ead8');
+      P(-3,eyeY,2,2,'#241408'); P(2,eyeY,2,2,'#241408');
+      P(-4,eyeY-2,4,1,hSh); P(1,eyeY-2,4,1,hSh);
+      P(-1,noseY,2,2,sSh); P(-1,noseY+1,1,1,sHi);
+      P(-2,mouthY,5,1,'#8a4038');
+      P(-hw+1,eyeY+1,1,4,sHi); P(hw-2,eyeY+1,1,4,sHi);
+    } else if(fT===3){
+      // STRIKING — a straight brow, a straight nose, a jaw squared off
+      P(-5,eyeY-2,4,1,'#241408'); P(1,eyeY-2,4,1,'#241408');
+      P(-4,eyeY,3,2,'#f6f0e2'); P(1,eyeY,3,2,'#f6f0e2');
+      P(-3,eyeY,2,2,'#1a1008'); P(2,eyeY,2,2,'#1a1008');
+      P(0,noseY-2,2,4,sHi); P(0,noseY+1,2,1,sSh);
+      P(-4,eyeY+2,2,1,shade(skin,-22)); P(2,eyeY+2,2,1,shade(skin,-22));
+      P(-2,mouthY,6,1,'#a04a40');
+      P(-hw+1,eyeY+1,1,5,sHi); P(hw-2,eyeY+1,1,5,sHi);
+      P(-hw+1,-20,hw*2-2,1,shade(skin,-30));
+    } else {
+      // GODLIKE — the head they put on the coinage
+      P(-5,eyeY-3,4,2,'#1a1008'); P(1,eyeY-3,4,2,'#1a1008');
+      P(-4,eyeY,3,3,'#fbf6ea'); P(1,eyeY,3,3,'#fbf6ea');
+      P(-3,eyeY,2,3,'#140c06'); P(2,eyeY,2,3,'#140c06');
+      P(-3,eyeY-1,2,1,sSh); P(1,eyeY-1,2,1,sSh);                        // deep-set
+      P(0,noseY-3,2,5,sHi); P(0,noseY+1,3,1,sSh);
+      P(-5,eyeY+2,3,2,shade(skin,-26)); P(2,eyeY+2,3,2,shade(skin,-26));
+      P(-5,eyeY+1,2,1,sHi); P(3,eyeY+1,2,1,sHi);
+      P(-2,mouthY,7,1,'#a8524a'); P(-2,mouthY+1,7,1,shade(skin,-18));
+      P(-hw,eyeY+2,1,6,sHi); P(hw-1,eyeY+2,1,6,sHi);
+      P(-hw,-20,hw*2,2,shade(skin,-34));
+      P(-2,-19,5,2,skin); P(-2,-19,5,1,sHi);                            // a chin with a corner on it
+    }
+    if(o.beard){ const bc=greyHair(p._hair,age+6);
+      P(-hw+1,mouthY,hw*2-2,4,bc); P(-hw+1,mouthY,hw*2-2,1,shade(bc,-24));
+      P(-2,mouthY,5,1,'#5a2e26'); }                                     // the mouth still shows through
+  }
+  /* ---- HAIR: thin at a low score, magnificent at a high one, grey with age ---- */
+  const hairH = Math.max(3, Math.round((fem?4:3) + hq*0.42 - (A.old?1:0)));
+  if(fem){
+    P(-hw-1,hy0-hairH+1,hw*2+2,hairH+2,hair); P(-hw-1,hy0-hairH+1,hw*2+2,2,hHi);
+    P(-hw-2,hy0+1,2,Math.round(7+hq*0.7),hair); P(hw,hy0+1,2,Math.round(7+hq*0.7),hair);
+    if(hq>=5){ P(hw,eyeY+2,3,Math.round(8+hq*0.5),hair); P(hw+1,eyeY+2,1,Math.round(8+hq*0.5),hHi);
+      P(hw,-16,3,2,hSh); }                                              // the braid over her shoulder
+    if(hq>=8){ P(-hw-2,hy0-hairH,hw*2+4,2,hair); P(-hw-2,hy0-hairH,hw*2+4,1,hHi); }   // piled high, Flavian
+    if(rank!=='plain'){ P(-4,hy0-hairH,3,2,GOLD); P(2,hy0-hairH,3,2,GOLD); }
+    if(A.old){ P(-hw-2,hy0-hairH,hw*2+4,3,'#cfc6b6'); P(-hw-2,hy0-hairH,hw*2+4,1,'#e6dfd2'); }  // a matron veils it
+  } else {
+    const recede = A.old? 2 : (A.grey>0.4? 1 : 0);                      // the hairline goes back
+    P(-hw+recede,hy0-hairH+1,hw*2-recede*2,hairH+1,hair);
+    P(-hw+recede,hy0-hairH+1,hw*2-recede*2,1,hHi);
+    if(hq<=2){ P(-hw+1,hy0,hw*2-2,1,skin); }                            // thinning on top
+    P(-hw-1,hy0+1,2,Math.round(4+hq*0.4),hair); P(hw-1,hy0+1,2,Math.round(4+hq*0.4),hair);
+    if(hq>=9){ P(-hw-2,hy0+2,2,7,hair); P(hw,hy0+2,2,7,hair); }         // leonine
+  }
+  /* ---- the years, drawn last so they sit on top of the face ---- */
+  if(A.young){ c.fillStyle='rgba(255,236,224,.16)'; c.fillRect(-hw,eyeY-2,hw*2,6);   // the bloom of being young
+               P(-hw+1,eyeY+2,2,1,sHi); P(hw-3,eyeY+2,2,1,sHi); }
+  if(A.lines>0.18){ P(-hw+1,eyeY+1,1,1,sSh); P(hw-2,eyeY+1,1,1,sSh); }              // crow's feet
+  if(A.lines>0.45){ P(-2,mouthY-2,1,2,sSh); P(2,mouthY-2,1,2,sSh);                    // lines beside the mouth
+                   P(-3,eyeY-3,7,1,mixHex(skin,'#8a7a66',0.30)); }                   // a line across the brow
+  if(A.lines>0.72){ P(-3,eyeY-5,7,1,mixHex(skin,'#8a7a66',0.26));
+                    P(-hw+1,eyeY+3,2,1,sSh); P(hw-3,eyeY+3,2,1,sSh); }
+  if(A.sag>0.5){ P(-hw+1,eyeY+4,2,2,mixHex(skin,'#9a8a76',0.28)); P(hw-3,eyeY+4,2,2,mixHex(skin,'#9a8a76',0.28)); }
+  if(A.aged){                                                                       // and the very old look it
+    P(-hw+1,eyeY-6,hw*2-2,1,mixHex(skin,'#8a7a66',0.34));                           // a third line on the brow
+    P(-hw,eyeY+5,hw*2,1,mixHex(skin,'#9a8a76',0.34));                               // the cheek has fallen
+    P(-2,mouthY+1,5,1,mixHex(skin,'#8a7a66',0.40));                                 // the mouth has thinned
+    P(-hw,-19,hw*2,3,mixHex(skin,'#9a8a76',0.40));                                  // and the jaw is gone
+    P(-1,eyeY,1,1,mixHex('#e8e2d6','#cfc6b6',0.5)); P(3,eyeY,1,1,mixHex('#e8e2d6','#cfc6b6',0.5)); }  // clouded eyes
+  /* ---- THE CROWN: this is what the wardrobe of rank actually buys you ---- */
+  const crownY = hy0-hairH-1;
   if(o.crown){
-    const y0 = fem? -38 : -37;
-    P(-8,y0,16,3,GOLD); P(-8,y0,16,1,GOLD2); P(-8,y0+3,16,1,GOLDS);
-    for(let i=0;i<5;i++){ const x=-7+i*3.3, hgt=(i===2)?5:3;
-      P(x,y0-hgt,2,hgt,GOLD); P(x,y0-hgt,2,1,GOLD2); }
-    P(-1,y0-6,3,3, rank==='imperial'? '#e0405a' : '#4a7ac0');            // ruby for the purple, sapphire for a patrician
+    const y0=crownY;
+    P(-hw-2,y0,hw*2+4,3,GOLD); P(-hw-2,y0,hw*2+4,1,GOLD2); P(-hw-2,y0+3,hw*2+4,1,GOLDS);
+    for(let i=0;i<5;i++){ const x=-hw-1+i*((hw*2+2)/5), hgt2=(i===2)?5:3;
+      P(x,y0-hgt2,2,hgt2,GOLD); P(x,y0-hgt2,2,1,GOLD2); }
+    P(-1,y0-6,3,3, rank==='imperial'? '#e0405a' : '#4a7ac0');
     P(-1,y0-6,1,1,'#ffd0d8');
   }
-  if(o.laurel){                                                          // an EMPEROR wears the laurel over it all
-    const y0 = (o.crown? (fem?-44:-43) : (fem?-38:-37));
-    for(let i=0;i<7;i++){ const a=-2.2+i*0.63, rx=Math.cos(a)*10, ry=Math.sin(a)*5;
+  if(o.laurel){
+    const y0 = (o.crown? crownY-6 : crownY);
+    for(let i=0;i<7;i++){ const a=-2.2+i*0.63, rx=Math.cos(a)*(hw+4), ry=Math.sin(a)*5;
       P(rx-1,y0+ry-1,3,2,'#4f8a3a'); P(rx-1,y0+ry-1,2,1,'#79c05a'); }
     P(-1,y0-6,3,2,GOLD);
   }
   c.restore();
-  if(o.dead){                                                            // the dead are painted, not present
+  if(o.dead){
     c.fillStyle='rgba(26,18,34,.52)'; c.fillRect(0,0,W,H);
     c.fillStyle='rgba(220,210,230,.5)'; c.fillRect(0,H-7,W,1);
     c.font='bold 7px Georgia,serif'; c.fillStyle='rgba(226,214,238,.75)'; c.textAlign='center';
-    c.fillText('D · M', W/2, H-1.5); c.textAlign='left';                 // Dis Manibus, as on every Roman tomb
+    c.fillText('D · M', W/2, H-1.5); c.textAlign='left';
+  } else if(o.showAge && age){
+    c.fillStyle='rgba(0,0,0,.5)'; c.fillRect(0,H-10,W,10);
+    c.font='bold 7px Georgia,serif'; c.fillStyle='rgba(232,214,180,.85)'; c.textAlign='center';
+    c.fillText(age+' yrs', W/2, H-2.5); c.textAlign='left';
   }
 }
 /* =====================================================================
@@ -1439,19 +1641,22 @@ const PRAETORIAN_PREFECTS=[
   ['Marcus Oclatinius Adventus','Old, half-blind, and has buried every man who underestimated him.'],
 ];
 const COURT_FIGURES=[
-  ['The Chamberlain','a freedman who controls every door in the palace, including yours','🗝'],
-  ['The Master of Letters','he drafts what the Emperor is later understood to have said','📜'],
-  ['The Court Physician','a pupil of Galen; he has outlived three of his patients','🌿'],
-  ['The Vestal Maxima','she cannot be touched, and she hears everything worth hearing','🕯'],
-  ['The Prefect of the Grain','he feeds the city, and the city knows whose bread it eats','🌾'],
-  ['The Empress’s Circle','philosophers, poets and one man nobody can name','🏛'],
-  ['The Master of the Horse','he can put four thousand cavalry outside your door by morning','🐎'],
+  ['The Chamberlain','a freedman who controls every door in the palace, including yours','🗝',false,40],
+  ['The Master of Letters','he drafts what the Emperor is later understood to have said','📜',false,34],
+  ['The Court Physician','a pupil of Galen; he has outlived three of his patients','🌿',false,56],
+  ['The Vestal Maxima','she cannot be touched, and she hears everything worth hearing','🕯',true,44],
+  ['The Prefect of the Grain','he feeds the city, and the city knows whose bread it eats','🌾',false,48],
+  ['The Empress’s Circle','philosophers, poets and one man nobody can name','🏛',true,31],
+  ['The Master of the Horse','he can put four thousand cavalry outside your door by morning','🐎',false,38],
 ];
 function makeCourt(){
   const pf=pick(PRAETORIAN_PREFECTS);
-  return { prefect:{name:pf[0], note:pf[1], loyal:ri(28,86)},
+  return { prefect:{name:pf[0], note:pf[1], loyal:ri(28,86), _ageOff:ri(16,30)},
     figures:[...COURT_FIGURES].sort(()=>Math.random()-0.5).slice(0,3)
-      .map(f=>({role:f[0], note:f[1], icon:f[2], op:ri(18,92)})) };
+      // a court figure is a PERSON — a name, a sex, an age and a face of their own
+      .map(f=>({role:f[0], note:f[1], icon:f[2], op:ri(18,92), fem:!!f[3],
+                name: f[3]? pick(NAMES_F) : (pick(NAMES_M)+' '+G_GENS()),
+                age: f[4]+ri(-6,9) })) };
 }
 /* ---- COURT FAVOUR IS A CURRENCY. Each figure at your court holds exactly one
    lever, and cultivating them costs coin, patience and a little dignity. ---- */
@@ -1818,8 +2023,25 @@ function inheritDNA(){
   const fpool=[...new Set([...(G.flaws||[]), ...(w.flaws||[])])], flaws=[];
   for(const f of fpool){ const both=(G.flaws||[]).includes(f) && (w.flaws||[]).includes(f);
     if(Math.random() < (both?0.85:0.42)) flaws.push(f); }
-  return {looks:mix(mine.looks,wl), smarts:mix(mine.smarts,ws), traits, flaws};
+  /* ---- AND A BODY, ROLLED FROM BOTH PARENTS. A house of plain people does
+     not produce five stunning children, and the gallery should show that. ---- */
+  const mb=(G&&G.body)||{}, fb=(w&&w.body)||{};
+  const body={};
+  ['face','hairq','bust','waist','booty','legs'].forEach(id=>{
+    const a=(mb[id]===undefined?5:Math.min(mb[id],10)), b2=(fb[id]===undefined?5:Math.min(fb[id],10));
+    body[id]=clamp(Math.round((a+b2)/2 + rnd(-1.6,1.8)),1,10);
+  });
+  return {looks:mix(mine.looks,wl), smarts:mix(mine.smarts,ws), traits, flaws, body,
+    _face:body.face, _hairq:body.hairq, _build:body.bust,
+    skin:(Math.random()<0.5? (G&&G.skin) : (w&&w.skin)) || (G&&G.skin) || '#caa06a',
+    hair:(Math.random()<0.5? '#3a2618' : (w&&w.hair)) || '#3a2618' };
 }
+// a child's age in YEARS — the calendar runs at 36 days to the year, but a
+// child is marriageable at 40 days, so childhood is drawn on its own clock
+function childYears(days){ return clamp(Math.round((days||0)/2.4), 0, 60); }
+// grown enough to be painted standing among the adults
+function kGrownDraw(k,days){ return days>=40 && k && k.body; }
+function kidGrown(c){ return c && (G.day-(c.born||0))>=40; }
 // are you yourself of the imperial house? Then its daughters and sons are kin.
 function bornToThePurple(){
   return !!(G && (G.socialClass==='imperial' || G.emperor || (G.family && G.family.kin)));
@@ -1858,6 +2080,9 @@ function makeBride(eth, noble, quality){
     name: pick(D.names)+' '+pick(D.surn),
     skin: D.skin, hair: pick(D.hair),
     dress: noble?dressN:dressP,
+    // AN AGE, because the years get drawn on the face. A great match is young;
+    // a poor one is often a widow with two children and no illusions left.
+    age: clamp(Math.round(17 + (10-quality)*0.95 + rnd(-2,4)), 15, 44),
     jewel: noble,                              // gold necklace / earrings / diadem
     // cleavage/neckline richness: nobles wear a fine low stola; peasants a clinging homespun
     neckline: noble?'fine':'plain',
@@ -1897,7 +2122,8 @@ function makeBride(eth, noble, quality){
   else if(b.tier==='elite'){ b.approval=(b.approval||0)+8; b.perk='Of a great senatorial house — '+b.perk; }
   b.dowryCoin=b.dowryCoin||0; b.dowryFood=b.dowryFood||0; b.dowrySoldiers=b.dowrySoldiers||0;
   b.approval=b.approval||0; b.favor=b.favor||0; b.honor=b.honor||0; b.pop=b.pop||0; b.tradeCoin=b.tradeCoin||0; b.tradeFood=b.tradeFood||0;
-  if(G && G.isFemale){ b.male=true; b.name=pick(GROOM_NAMES[eth]||GROOM_NAMES.roman)+' '+pick(D.surn); }
+  if(G && G.isFemale){ b.male=true; b.name=pick(GROOM_NAMES[eth]||GROOM_NAMES.roman)+' '+pick(D.surn);
+    b.age = clamp(b.age + ri(5,13), 18, 58); }   // Roman husbands ran a decade ahead of their wives
   return b;
 }
 // suitors present themselves — ANYONE may wed, but noble alliances have a price.
@@ -1948,10 +2174,18 @@ function drawBodyMap(cnv,w,view,tms){
   const sway = Math.sin(ph)*anim;
   const jig  = (!male)? Math.sin(ph*2+0.9)*anim : 0;    // WOMEN ONLY on the map
   const jig2 = (!male)? Math.sin(ph*2+0.15)*anim : 0;
-  // survey grid, so it reads as a chart rather than a drawing
-  c.strokeStyle='rgba(200,150,220,.07)'; c.lineWidth=1;
-  for(let gx2=0;gx2<FW;gx2+=16){ c.beginPath(); c.moveTo(gx2,0); c.lineTo(gx2,H2-FOOT); c.stroke(); }
-  for(let gy2=0;gy2<H2-FOOT;gy2+=16){ c.beginPath(); c.moveTo(0,gy2); c.lineTo(FW,gy2); c.stroke(); }
+  /* ---- A SURVEYOR'S CHART, not a lattice. Minor lines every 16, a major line
+     every 64 with a numeral against it, and a vignette to hold the eye in. ---- */
+  c.lineWidth=1;
+  for(let gx2=0;gx2<FW;gx2+=16){ c.strokeStyle= (gx2%64===0)?'rgba(206,158,226,.15)':'rgba(200,150,220,.06)';
+    c.beginPath(); c.moveTo(gx2+0.5,0); c.lineTo(gx2+0.5,H2-FOOT); c.stroke(); }
+  for(let gy2=0;gy2<H2-FOOT;gy2+=16){ c.strokeStyle= (gy2%64===0)?'rgba(206,158,226,.15)':'rgba(200,150,220,.06)';
+    c.beginPath(); c.moveTo(0,gy2+0.5); c.lineTo(FW,gy2+0.5); c.stroke(); }
+  c.font='7px Georgia,serif'; c.fillStyle='rgba(206,170,226,.30)'; c.textAlign='left';
+  for(let gy2=64;gy2<H2-FOOT;gy2+=64) c.fillText(String(gy2/16), 2, gy2-2);
+  { const vg=bmOnce('vig',()=>{ const r0=c.createRadialGradient(FW*0.5,(H2-FOOT)*0.5,FW*0.30,FW*0.5,(H2-FOOT)*0.5,FW*0.92);
+      r0.addColorStop(0,'rgba(0,0,0,0)'); r0.addColorStop(1,'rgba(0,0,0,.40)'); return r0; });
+    c.fillStyle=vg; c.fillRect(0,0,FW,H2-FOOT); }
   // a soft aura behind the figure, brighter the finer they are
   { const _ps=partsFor(w); const avg=_ps.reduce((a,P)=>a+gv(P.id),0)/_ps.length;
     const gg=bmOnce('aura',()=>{ const r0=c.createRadialGradient(FW*0.5,(H2-FOOT)*0.52,4,FW*0.5,(H2-FOOT)*0.52,118);
@@ -1965,11 +2199,34 @@ function drawBodyMap(cnv,w,view,tms){
   const CX=FW*0.5;
   const toScreenX=fx=>CX+fx*SC, toScreenY=fy=>TOP+fy*SC;
   c.save(); c.translate(CX,TOP); c.scale(SC,SC); c.translate(sway*0.7, -bob*0.9);
-  const ell=(x,y,rx,ry,col,rot)=>{ c.fillStyle=col; c.beginPath(); c.ellipse(x,y,Math.max(0.4,rx),Math.max(0.4,ry),rot||0,0,7); c.fill();
-    c.strokeStyle='rgba(0,0,0,.42)'; c.lineWidth=0.5; c.stroke(); };
-  const cap=(x1,y1,x2,y2,r1,r2,col)=>{ c.fillStyle=col; const a2=Math.atan2(y2-y1,x2-x1);
-    c.beginPath(); c.arc(x1,y1,Math.max(0.4,r1),a2+1.5708,a2-1.5708); c.arc(x2,y2,Math.max(0.4,r2),a2-1.5708,a2+1.5708); c.closePath(); c.fill();
-    c.strokeStyle='rgba(0,0,0,.42)'; c.lineWidth=0.5; c.stroke(); };
+  /* ---- EVERY MASS IS MODELLED. A flat fill with an outline reads as a sticker;
+     a fill with a light from the upper left and a shadow opposite reads as a
+     body. Both primitives do it, so all four views gain it at once. ---- */
+  const ell=(x,y,rx,ry,col,rot)=>{ const RX=Math.max(0.4,rx), RY=Math.max(0.4,ry);
+    c.fillStyle=col; c.beginPath(); c.ellipse(x,y,RX,RY,rot||0,0,7); c.fill();
+    c.save(); c.beginPath(); c.ellipse(x,y,RX,RY,rot||0,0,7); c.clip();
+    c.fillStyle=rgbA(shade2(col),0.55);                                       // the shadowed side
+    c.beginPath(); c.ellipse(x+RX*0.34,y+RY*0.32,RX,RY,rot||0,0,7); c.fill();
+    c.fillStyle=rgbA(lit2(col),0.42);                                         // and the lit crown
+    c.beginPath(); c.ellipse(x-RX*0.30,y-RY*0.34,RX*0.62,RY*0.54,rot||0,0,7); c.fill();
+    c.restore();
+    c.strokeStyle='rgba(0,0,0,.42)'; c.lineWidth=0.5;
+    c.beginPath(); c.ellipse(x,y,RX,RY,rot||0,0,7); c.stroke(); };
+  const cap=(x1,y1,x2,y2,r1,r2,col)=>{ const R1=Math.max(0.4,r1), R2=Math.max(0.4,r2);
+    const a2=Math.atan2(y2-y1,x2-x1);
+    const path=()=>{ c.beginPath(); c.arc(x1,y1,R1,a2+1.5708,a2-1.5708); c.arc(x2,y2,R2,a2-1.5708,a2+1.5708); c.closePath(); };
+    c.fillStyle=col; path(); c.fill();
+    c.save(); path(); c.clip();
+    // the same capsule, shifted away from the light, clipped back to itself:
+    // what shows is a crescent of shadow down the far edge. And the reverse for the light.
+    const off=(dx,dy,r)=>{ c.beginPath();
+      c.arc(x1+dx,y1+dy,R1*r,a2+1.5708,a2-1.5708); c.arc(x2+dx,y2+dy,R2*r,a2-1.5708,a2+1.5708);
+      c.closePath(); c.fill(); };
+    const nx=Math.cos(a2+1.5708), ny=Math.sin(a2+1.5708);                     // across the limb, not along it
+    c.fillStyle=rgbA(shade2(col),0.52); off(nx*R1*0.62, ny*R1*0.62, 1);
+    c.fillStyle=rgbA(lit2(col),0.34);   off(-nx*R1*0.44,-ny*R1*0.44, 0.56);
+    c.restore();
+    c.strokeStyle='rgba(0,0,0,.42)'; c.lineWidth=0.5; path(); c.stroke(); };
   // every score physically shapes the figure — a FLAT 1 really is flat, an IMPOSSIBLE 11 is absurd
   const bustR = (1.1 + bu*0.86) * (1 + jig*0.035);
   const hipR  = (2.4 + be*0.86) * (1 + jig2*0.028);
@@ -1998,79 +2255,143 @@ function drawBodyMap(cnv,w,view,tms){
     const val=SB.val, impS=val>=IMPOSSIBLE_V;
     const tier= impS? 'IMPOSSIBLE' : SB.tiers[clamp(Math.floor((val-1)/2),0,SB.tiers.length-1)];
     const col = impS? '#ff7ae0' : heatColor(val);
-    // ---- the rule the measure is taken against, identical in all three views ----
-    c.fillStyle='rgba(255,255,255,.06)'; c.fillRect(cx-66,top-14,132,176);
+    /* ---- THE RULE. A surveyor's rule with numerals, a coloured run up to the
+       measure, and ROME'S AVERAGE pinned on it — a number with nothing to read
+       it against is not a measurement, it is a boast. ---- */
+    { const pl=bmOnce('plate',()=>{ const gg=c.createLinearGradient(0,top-14,0,top+176);
+        gg.addColorStop(0,'rgba(255,255,255,.10)'); gg.addColorStop(1,'rgba(255,255,255,.03)'); return gg; });
+      c.fillStyle=pl; c.fillRect(cx-66,top-14,132,190);
+      c.strokeStyle='rgba(220,180,240,.16)'; c.lineWidth=1; c.strokeRect(cx-66.5,top-13.5,132,190); }
     c.strokeStyle='rgba(220,180,240,.35)'; c.lineWidth=1;
     c.beginPath(); c.moveTo(cx-52,top+128); c.lineTo(cx+52,top+128); c.stroke();
+    c.fillStyle=rgbA(col,0.30); c.fillRect(cx-52, top+125, (clamp(val,0,10)/10)*104, 3);   // the run made good
     for(let i2=0;i2<=10;i2++){
       const gx2=cx-52+(i2/10)*104, big=(i2%2===0);
       c.strokeStyle= i2<=val? heatColor(i2||1) : 'rgba(255,255,255,.18)';
       c.lineWidth= big?2:1; c.beginPath(); c.moveTo(gx2,top+128); c.lineTo(gx2,top+128-(big?9:5)); c.stroke();
+      if(big && i2){ c.font='6px Georgia,serif'; c.fillStyle= i2<=val?'rgba(240,220,250,.55)':'rgba(230,210,240,.26)';
+        c.textAlign='center'; c.fillText(String(i2), gx2, top+136); }
     }
+    { const ax2=cx-52+(5/10)*104;                                       // where everyone else stands
+      c.strokeStyle='rgba(255,255,255,.36)'; c.setLineDash([2,2]); c.lineWidth=1;
+      c.beginPath(); c.moveTo(ax2,top+117); c.lineTo(ax2,top+128); c.stroke(); c.setLineDash([]);
+      c.font='6px Georgia,serif'; c.fillStyle='rgba(230,214,244,.50)'; c.textAlign='center';
+      c.fillText('ROME', ax2, top+114); }
     c.font='bold 8px Georgia,serif'; c.fillStyle='rgba(230,210,240,.5)';
-    c.textAlign='left';  c.fillText(SB.ends[0], cx-52, top+142);
-    c.textAlign='right'; c.fillText(SB.ends[1], cx+52, top+142);
+    c.textAlign='left';  c.fillText(SB.ends[0], cx-52, top+147);
+    c.textAlign='right'; c.fillText(SB.ends[1], cx+52, top+147);
     { const mx=clamp(cx-52+(val/10)*104, cx-40, cx+40);
-      c.textAlign='center'; c.fillStyle=col; c.fillText('▲ '+tier.toUpperCase(), mx, top+156); }
+      c.textAlign='center'; c.fillStyle=col; c.fillText('▲ '+tier.toUpperCase(), mx, top+158);
+      if(val>5){ c.fillStyle='rgba(230,214,244,.40)'; c.font='italic 7px Georgia,serif';
+        c.fillText('+'+(val-5)+' over Rome’s common run', cx, top+168); }
+      else if(val<5){ c.fillStyle='rgba(230,214,244,.34)'; c.font='italic 7px Georgia,serif';
+        c.fillText((5-val)+' under Rome’s common run', cx, top+168); } }
     // ---- THE STUDY ITSELF. A man's physics live here and nowhere else. ----
     const phys = anim * (aro? 2.2 : 5.0) * Math.sin(ph*2);
     if(secretSub==='profile'){
       const eff = aro? Math.min(IMPOSSIBLE_V, val+2.2) : val;
       const len = (aro?18:11) + (eff/10)*(aro?96:80);
       const th  = (aro?11:8.5) + (eff/10)*(aro?8:6);
-      const baseX=cx-52, baseY=top+96;
+      const baseX=cx-52, baseY=top+87;
       const rise = (aro? -14 - eff*0.9 : 6 + eff*0.35) + phys;
       const tipX = baseX+len + anim*Math.cos(ph*2)*(aro?1.2:2.6), tipY = baseY+rise;
       const midX = baseX+len*0.55, midY = baseY+rise*0.42 + (aro? -3 : 4) + phys*0.35;
-      const capseg=(x1,y1,x2,y2,r1,r2)=>{ const a2=Math.atan2(y2-y1,x2-x1); c.fillStyle=col;
-        c.beginPath(); c.arc(x1,y1,r1,a2+1.5708,a2-1.5708); c.arc(x2,y2,r2,a2-1.5708,a2+1.5708); c.closePath(); c.fill(); };
+      // a cast shadow on the plate, so the study sits ON something
+      c.fillStyle='rgba(0,0,0,.22)';
+      c.beginPath(); c.ellipse((baseX+tipX)/2, baseY+th*0.95, len*0.48, th*0.24, 0,0,7); c.fill();
+      // the study, modelled: lit along the top, shadowed underneath
+      const grad=c.createLinearGradient(0,baseY-th*0.6,0,baseY+th*0.7);
+      grad.addColorStop(0, lit2(col,1.30)); grad.addColorStop(0.42, col); grad.addColorStop(1, shade2(col));
+      const capseg=(x1,y1,x2,y2,r1,r2)=>{ const a2=Math.atan2(y2-y1,x2-x1); c.fillStyle=grad;
+        c.beginPath(); c.arc(x1,y1,r1,a2+1.5708,a2-1.5708); c.arc(x2,y2,r2,a2-1.5708,a2+1.5708); c.closePath(); c.fill();
+        c.strokeStyle='rgba(0,0,0,.30)'; c.lineWidth=0.8; c.stroke(); };
       capseg(baseX,baseY, midX,midY, th*0.54, th*0.50);
       capseg(midX,midY, tipX,tipY, th*0.50, th*0.46);
-      c.fillStyle=col; c.beginPath(); c.arc(tipX,tipY,th*0.56,0,7); c.fill();
+      c.fillStyle=grad; c.beginPath(); c.arc(tipX,tipY,th*0.56,0,7); c.fill();
+      c.strokeStyle='rgba(0,0,0,.30)'; c.lineWidth=0.8; c.beginPath(); c.arc(tipX,tipY,th*0.56,0,7); c.stroke();
       c.fillStyle='rgba(0,0,0,.20)'; c.beginPath(); c.ellipse(tipX-th*0.16,tipY,th*0.16,th*0.5,0,0,7); c.fill();
-      c.fillStyle=col;
+      c.fillStyle=grad;
       c.beginPath(); c.arc(baseX+2, baseY+th*0.52+anim*Math.sin(ph*2+0.6)*1.1, th*0.44,0,7); c.fill();
       c.beginPath(); c.arc(baseX+11, baseY+th*0.56+anim*Math.sin(ph*2+1.2)*1.1, th*0.42,0,7); c.fill();
-      c.strokeStyle='rgba(255,255,255,.20)'; c.lineWidth=1;
+      c.strokeStyle='rgba(255,255,255,.26)'; c.lineWidth=1.1;                 // the lit ridge along the top
       c.beginPath(); c.moveTo(baseX+4,baseY-th*0.34); c.quadraticCurveTo(midX,midY-th*0.42,tipX-th*0.3,tipY-th*0.34); c.stroke();
+      if(val>=8){ c.strokeStyle='rgba(255,255,255,.13)'; c.lineWidth=0.8;      // and the definition a high score earns
+        c.beginPath(); c.moveTo(baseX+8,baseY+th*0.10); c.quadraticCurveTo(midX,midY+th*0.06,tipX-th*0.6,tipY+th*0.04); c.stroke(); }
+      // GHOST OF AT REST, drawn OVER the study — when roused, the difference is
+      // the entire point of the view, so it must be the thing you can see.
+      if(aro){ const rlen=11+(val/10)*80, rth=8.5+(val/10)*6, rrise=6+val*0.35;
+        c.strokeStyle='rgba(255,255,255,.42)'; c.setLineDash([3,3]); c.lineWidth=1.1;
+        c.beginPath(); c.moveTo(baseX,baseY-rth*0.5); c.lineTo(baseX+rlen,baseY+rrise-rth*0.45);
+        c.arc(baseX+rlen,baseY+rrise,rth*0.5,-1.5708,1.5708);
+        c.lineTo(baseX,baseY+rth*0.5); c.closePath(); c.stroke(); c.setLineDash([]);
+        c.font='italic 6px Georgia,serif'; c.fillStyle='rgba(255,255,255,.55)'; c.textAlign='left';
+        c.fillText('at rest', baseX+rlen+4, baseY+rrise+9); }
+      // a calliper span across the whole length, because this IS a measurement
+      c.strokeStyle='rgba(230,210,240,.34)'; c.lineWidth=1;
+      const cy2=baseY+th*1.5;
+      c.beginPath(); c.moveTo(baseX,cy2-4); c.lineTo(baseX,cy2+4);
+      c.moveTo(tipX+th*0.56,cy2-4); c.lineTo(tipX+th*0.56,cy2+4);
+      c.moveTo(baseX,cy2); c.lineTo(tipX+th*0.56,cy2); c.stroke();
       c.fillStyle='rgba(230,210,240,.55)'; c.font='bold 8px Georgia,serif'; c.textAlign='left';
-      c.fillText('◐ PROFILE · '+(aro?'AROUSED':'AT REST')+(anim?' · IN MOTION':''), baseX, baseY-th-9);
+      c.fillText('◐ '+(aro?'AROUSED':'AT REST')+(anim?' · IN MOTION':''), baseX, baseY-th-14);
     } else if(secretSub==='girth'){
       // HEAD-ON — the ring gauge. Foreshortened to nothing but its section.
       const eff = aro? Math.min(IMPOSSIBLE_V, val+1.6) : val;
       const R = 6 + (eff/10)*17;
-      const ccx=cx, ccy=top+88 + phys*0.4;
+      const ccx=cx, ccy=top+82 + phys*0.4;
       for(let r2=3;r2>=1;r2--){ c.strokeStyle='rgba(220,180,240,'+(0.10*r2)+')'; c.lineWidth=1;
         c.beginPath(); c.arc(ccx,ccy,R+r2*4,0,7); c.stroke(); }
-      c.fillStyle=col; c.beginPath(); c.arc(ccx,ccy,R,0,7); c.fill();
-      c.fillStyle='rgba(255,255,255,.16)'; c.beginPath(); c.arc(ccx-R*0.3,ccy-R*0.3,R*0.42,0,7); c.fill();
-      c.strokeStyle='rgba(0,0,0,.35)'; c.lineWidth=1.2; c.beginPath(); c.arc(ccx,ccy,R,0,7); c.stroke();
-      c.fillStyle=col;                                        // the pair, tucked behind
+      c.fillStyle='rgba(0,0,0,.24)'; c.beginPath(); c.ellipse(ccx,ccy+R*1.30,R*0.92,R*0.20,0,0,7); c.fill();
+      c.fillStyle=col;                                        // the pair, tucked behind and in shadow
       c.beginPath(); c.arc(ccx-R*0.72,ccy+R*0.9,R*0.42,0,7); c.fill();
       c.beginPath(); c.arc(ccx+R*0.72,ccy+R*0.9,R*0.40,0,7); c.fill();
-      // the calliper marks across the section
-      c.strokeStyle='rgba(255,255,255,.4)'; c.lineWidth=1;
-      c.beginPath(); c.moveTo(ccx-R-6,ccy); c.lineTo(ccx+R+6,ccy); c.stroke();
-      c.fillStyle='rgba(230,210,240,.55)'; c.font='bold 8px Georgia,serif'; c.textAlign='center';
-      c.fillText('◧ HEAD-ON · MEASURED ACROSS', cx, top+52);
+      c.fillStyle='rgba(0,0,0,.22)';
+      c.beginPath(); c.arc(ccx-R*0.72,ccy+R*0.9,R*0.42,0,7); c.fill();
+      c.beginPath(); c.arc(ccx+R*0.72,ccy+R*0.9,R*0.40,0,7); c.fill();
+      { const rg=c.createRadialGradient(ccx-R*0.34,ccy-R*0.38,R*0.10, ccx,ccy,R*1.06);   // a sphere, not a disc
+        rg.addColorStop(0, lit2(col,1.42)); rg.addColorStop(0.52, col); rg.addColorStop(1, shade2(col));
+        c.fillStyle=rg; c.beginPath(); c.arc(ccx,ccy,R,0,7); c.fill(); }
+      c.fillStyle='rgba(255,255,255,.22)'; c.beginPath(); c.arc(ccx-R*0.32,ccy-R*0.34,R*0.30,0,7); c.fill();
+      c.strokeStyle='rgba(0,0,0,.35)'; c.lineWidth=1.2; c.beginPath(); c.arc(ccx,ccy,R,0,7); c.stroke();
+      // CALLIPER JAWS actually closing on it, with the span written between them
+      c.strokeStyle='rgba(240,220,250,.55)'; c.lineWidth=1.4;
+      c.beginPath(); c.moveTo(ccx-R-9,ccy-9); c.lineTo(ccx-R-2,ccy-2); c.lineTo(ccx-R-2,ccy+2); c.lineTo(ccx-R-9,ccy+9); c.stroke();
+      c.beginPath(); c.moveTo(ccx+R+9,ccy-9); c.lineTo(ccx+R+2,ccy-2); c.lineTo(ccx+R+2,ccy+2); c.lineTo(ccx+R+9,ccy+9); c.stroke();
+      c.strokeStyle='rgba(240,220,250,.30)'; c.lineWidth=1; c.setLineDash([2,2]);
+      c.beginPath(); c.moveTo(ccx-R-2,ccy); c.lineTo(ccx+R+2,ccy); c.stroke(); c.setLineDash([]);
+      c.fillStyle='rgba(240,220,250,.70)'; c.font='bold 7px Georgia,serif'; c.textAlign='left';
+      c.fillText('◄ '+val+'/10', ccx+R+13, ccy+3);
+      c.fillStyle='rgba(230,210,240,.55)'; c.font='bold 8px Georgia,serif';
+      c.fillText('◧ HEAD-ON · ACROSS', cx, top+56);
     } else {
       // BEHIND — the seat, as the chart measures every other rear on it
       const eff=val, W3=11+(eff/10)*18, H3=7+(eff/10)*10;
-      const bx=cx, by=top+88;
+      const bx=cx, by=top+82;
       const roll=anim*Math.sin(ph*2)*H3*0.10;
-      c.fillStyle=col;
-      c.beginPath(); c.ellipse(bx-W3*0.5,by+roll,W3*0.56,H3,0.10,0,7); c.fill();
-      c.beginPath(); c.ellipse(bx+W3*0.5,by-roll,W3*0.56,H3,-0.10,0,7); c.fill();
-      c.strokeStyle='rgba(0,0,0,.42)'; c.lineWidth=1;
-      c.beginPath(); c.ellipse(bx-W3*0.5,by+roll,W3*0.56,H3,0.10,0,7); c.stroke();
-      c.beginPath(); c.ellipse(bx+W3*0.5,by-roll,W3*0.56,H3,-0.10,0,7); c.stroke();
+      c.fillStyle='rgba(0,0,0,.24)';                                          // it stands on something
+      c.beginPath(); c.ellipse(bx,by+H3*1.85,W3*1.05,H3*0.22,0,0,7); c.fill();
+      const half=(sx,sy,rot)=>{ const rg=c.createRadialGradient(bx+sx-W3*0.20,by+sy-H3*0.34,H3*0.12, bx+sx,by+sy,W3*0.62);
+        rg.addColorStop(0, lit2(col,1.34)); rg.addColorStop(0.55, col); rg.addColorStop(1, shade2(col));
+        c.fillStyle=rg; c.beginPath(); c.ellipse(bx+sx,by+sy,W3*0.56,H3,rot,0,7); c.fill();
+        c.strokeStyle='rgba(0,0,0,.42)'; c.lineWidth=1; c.stroke(); };
+      half(-W3*0.5, roll, 0.10); half(W3*0.5, -roll, -0.10);
       c.strokeStyle='rgba(0,0,0,.45)'; c.lineWidth=1.4;
       c.beginPath(); c.moveTo(bx,by-H3*0.85); c.lineTo(bx,by+H3*0.85); c.stroke();
-      c.fillStyle=shade2(col);                                  // the backs of the thighs
+      c.fillStyle=shade2(col);                                                // the backs of the thighs
       c.beginPath(); c.ellipse(bx-W3*0.52,by+H3*1.15,W3*0.40,H3*0.45,0,0,7); c.fill();
       c.beginPath(); c.ellipse(bx+W3*0.52,by+H3*1.15,W3*0.40,H3*0.45,0,0,7); c.fill();
+      c.strokeStyle='rgba(0,0,0,.30)'; c.lineWidth=0.8;
+      c.beginPath(); c.ellipse(bx-W3*0.52,by+H3*1.15,W3*0.40,H3*0.45,0,0,7); c.stroke();
+      c.beginPath(); c.ellipse(bx+W3*0.52,by+H3*1.15,W3*0.40,H3*0.45,0,0,7); c.stroke();
+      if(eff>=8){ c.strokeStyle='rgba(255,255,255,.20)'; c.lineWidth=0.9;      // light rolls round a high score
+        c.beginPath(); c.arc(bx-W3*0.5,by,W3*0.44,3.5,5.5); c.stroke();
+        c.beginPath(); c.arc(bx+W3*0.5,by,W3*0.44,3.9,5.9); c.stroke(); }
+      c.strokeStyle='rgba(240,220,250,.34)'; c.lineWidth=1;                    // measured across, as ever
+      c.beginPath(); c.moveTo(bx-W3*1.06,by+H3*1.55); c.lineTo(bx+W3*1.06,by+H3*1.55);
+      c.moveTo(bx-W3*1.06,by+H3*1.55-3); c.lineTo(bx-W3*1.06,by+H3*1.55+3);
+      c.moveTo(bx+W3*1.06,by+H3*1.55-3); c.lineTo(bx+W3*1.06,by+H3*1.55+3); c.stroke();
       c.fillStyle='rgba(230,210,240,.55)'; c.font='bold 8px Georgia,serif'; c.textAlign='center';
-      c.fillText('◨ FROM BEHIND · THE SEAT', cx, top+52);
+      c.fillText('◨ FROM BEHIND', cx, top+56);
     }
     // the reading, stacked with real clearance
     c.textAlign='center'; c.fillStyle=col; c.font='bold 19px Georgia,serif';
@@ -2145,8 +2466,37 @@ function drawBodyMap(cnv,w,view,tms){
     ell(0,5,headR*0.86,headR, heatColor(fa));                              // face
     cap(0,10.5,0,13.5,1.8,2.2, heatColor((fa+bu)/2));                      // neck
     cap(-6.6,16,6.6,16,3.0,3.0, heatColor((bu+wa)/2));                     // shoulders
-    ell(-bustR*0.58,18.6+bustDY,bustR,bustR*0.84, heatColor(bu));          // bust, both sides — and it MOVES
-    ell( bustR*0.58,18.6+bustDY,bustR,bustR*0.84, heatColor(bu));
+    // ---- THE BUST, BY TIER: FLAT · RAISED · GOOD · BIG · HUGE. The same five
+    //      rungs the rear is drawn on, and the same rule — nothing invented. ----
+    { const uT = bu>=9?4 : bu>=7?3 : bu>=5?2 : bu>=3?1 : 0, uc=heatColor(bu);
+      if(uT===0){                                                          // FLAT — a plain chest plate, no swell
+        cap(-4.6,18.4,4.6,18.4,2.1,2.1,uc);
+      } else if(uT===1){                                                   // RAISED — one shallow rise, barely parted
+        ell(-bustR*0.44,18.8+bustDY,bustR*0.80,bustR*0.60,uc);
+        ell( bustR*0.44,18.8+bustDY,bustR*0.80,bustR*0.60,uc);
+      } else if(uT===2){                                                   // GOOD — round, clearly two, sitting high
+        ell(-bustR*0.54,18.6+bustDY,bustR*0.94,bustR*0.80,uc);
+        ell( bustR*0.54,18.6+bustDY,bustR*0.94,bustR*0.80,uc);
+        c.strokeStyle='rgba(0,0,0,.28)'; c.lineWidth=0.6;
+        c.beginPath(); c.moveTo(0,17.6); c.lineTo(0,21.4); c.stroke();
+      } else if(uT===3){                                                   // BIG — heavy, wide-set, a real cleft
+        ell(-bustR*0.58,18.6+bustDY,bustR,bustR*0.86,uc);
+        ell( bustR*0.58,18.6+bustDY,bustR,bustR*0.86,uc);
+        ell(-bustR*0.60,20.4+bustDY,bustR*0.86,bustR*0.44,shade2(uc));     // the weight hangs
+        ell( bustR*0.60,20.4+bustDY,bustR*0.86,bustR*0.44,shade2(uc));
+        c.strokeStyle='rgba(0,0,0,.40)'; c.lineWidth=0.8;
+        c.beginPath(); c.moveTo(0,16.8); c.lineTo(0,22.4); c.stroke();
+      } else {                                                             // HUGE — past the ribs on both sides
+        ell(-bustR*0.66,18.4+bustDY,bustR*1.16,bustR*0.96,uc);
+        ell( bustR*0.66,18.4+bustDY,bustR*1.16,bustR*0.96,uc);
+        ell(-bustR*0.70,20.8+bustDY,bustR*0.98,bustR*0.52,shade2(uc));
+        ell( bustR*0.70,20.8+bustDY,bustR*0.98,bustR*0.52,shade2(uc));
+        c.strokeStyle='rgba(0,0,0,.48)'; c.lineWidth=1.0;
+        c.beginPath(); c.moveTo(0,15.8); c.lineTo(0,23.2); c.stroke();
+        c.fillStyle='rgba(255,255,255,.10)';                               // and catches light right across
+        c.beginPath(); c.ellipse(-bustR*0.66,17.4+bustDY,bustR*0.62,bustR*0.26,0,0,7); c.fill();
+        c.beginPath(); c.ellipse( bustR*0.66,17.4+bustDY,bustR*0.62,bustR*0.26,0,0,7); c.fill();
+      } }
     cap(0,21,0,29,7.6,waistR, heatColor(wa));                              // torso → waist
     ell(0,34+hipDY,hipR,hipR*0.72, heatColor(be));                         // hips
     cap(-hipR*0.42,38,-hipR*0.38+fx,54,legR,legR*0.72, heatColor(lg));     // legs
@@ -2163,7 +2513,17 @@ function drawBodyMap(cnv,w,view,tms){
     ell(headR*0.62,5.4,1.5,1.2, heatColor(fa));                            // nose
     cap(0,10.5,0,13.5,1.9,2.2, heatColor((fa+bu)/2));                      // neck
     cap(0,16,0,29,3.4,waistR*0.52, heatColor(wa));                         // the trunk seen edge-on
-    ell(bustR*0.72,18.8+bustDY*1.5,bustR*0.94,bustR*0.74, heatColor(bu), -0.25+jig*0.05);   // BUST thrust forward
+    // ---- IN PROFILE the same five rungs read as how far it carries forward ----
+    { const uT = bu>=9?4 : bu>=7?3 : bu>=5?2 : bu>=3?1 : 0, uc=heatColor(bu);
+      if(uT===0){ cap(1.2,16.6,1.2,21.0,1.9,1.9,uc); }                     // FLAT — the chest wall, and nothing more
+      else if(uT===1){ ell(bustR*0.48,19.0+bustDY*1.5,bustR*0.66,bustR*0.56,uc,-0.16+jig*0.04); }
+      else if(uT===2){ ell(bustR*0.62,18.9+bustDY*1.5,bustR*0.82,bustR*0.68,uc,-0.22+jig*0.05); }
+      else if(uT===3){ ell(bustR*0.74,18.8+bustDY*1.5,bustR*0.98,bustR*0.78,uc,-0.26+jig*0.05);
+        ell(bustR*0.62,21.2+bustDY*1.5,bustR*0.74,bustR*0.36,shade2(uc),-0.10); }   // the underside carries
+      else { ell(bustR*0.92,18.4+bustDY*1.7,bustR*1.22,bustR*0.88,uc,-0.30+jig*0.06);
+        ell(bustR*0.78,21.6+bustDY*1.7,bustR*0.92,bustR*0.44,shade2(uc),-0.12);
+        c.fillStyle='rgba(255,255,255,.12)';
+        c.beginPath(); c.ellipse(bustR*1.02,17.4+bustDY*1.7,bustR*0.52,bustR*0.24,-0.30,0,7); c.fill(); } }
     ell(-hipR*0.80,33.5+hipDY*1.4,hipR*0.96,hipR*0.76, heatColor(be), 0.22+jig2*0.04);      // BOOTY thrust back
     ell(0,34,hipR*0.60,hipR*0.66, heatColor(be));                          // hip mass
     cap(0,38,0.4+fx*1.5,54,legR*1.05,legR*0.74, heatColor(lg));            // near leg (profile)
@@ -2224,10 +2584,27 @@ function drawBodyMap(cnv,w,view,tms){
   drawMapReadout(c,w,W2,H2,GUT,gv,male);
   drawMapScale(c,W2,H2,imp);
 }
-function shade2(rgb){ // a darker twin of a heat colour, for limbs on the far side
-  const m=/rgb\((\d+),(\d+),(\d+)\)/.exec(rgb); if(!m) return rgb;
-  return `rgb(${Math.round(m[1]*0.62)},${Math.round(m[2]*0.62)},${Math.round(m[3]*0.62)})`;
+// any colour the chart uses — rgb() from heatColor, or the flat hex the
+// IMPOSSIBLE tier is painted in — broken back into three numbers
+function rgbTriple(col){
+  const m=/rgb\((\d+),\s*(\d+),\s*(\d+)\)/.exec(col);
+  if(m) return [+m[1],+m[2],+m[3]];
+  if(typeof col==='string' && col[0]==='#' && col.length>=7){ const n=parseInt(col.slice(1,7),16);
+    return [(n>>16)&255,(n>>8)&255,n&255]; }
+  return null;
 }
+function shade2(rgb){ // a darker twin of a heat colour, for limbs on the far side
+  const t=rgbTriple(rgb); if(!t) return rgb;
+  return `rgb(${Math.round(t[0]*0.62)},${Math.round(t[1]*0.62)},${Math.round(t[2]*0.62)})`;
+}
+// and a lit twin, so a mass can carry a rim light as well as a shadow. Between
+// the two, every shape on the chart reads as round instead of as a flat sticker.
+function lit2(rgb,k){ k=k===undefined?1.34:k;
+  const t=rgbTriple(rgb); if(!t) return rgb;
+  return `rgb(${Math.min(255,Math.round(t[0]*k))},${Math.min(255,Math.round(t[1]*k))},${Math.min(255,Math.round(t[2]*k))})`;
+}
+function rgbA(rgb,a){ const t=rgbTriple(rgb); if(!t) return rgb;
+  return `rgba(${t[0]},${t[1]},${t[2]},${a})`; }
 // the readout down the right gutter, with each part's NAMED tier
 function drawMapReadout(c,w,W2,H2,GUT,gv,male){
   c.textAlign='left';
@@ -2883,6 +3260,32 @@ function toast(msg,ms=1400){ const t=$('hud-toast'); t.textContent=msg; t.style.
    ===================================================================== */
 const SKIN=['#caa06a','#b07a4a','#8a5a36','#e0b888'];
 function shade(hex,amt){ const n=parseInt(hex.slice(1),16); const r=clamp(((n>>16)&255)+amt,0,255),g=clamp(((n>>8)&255)+amt,0,255),b=clamp((n&255)+amt,0,255); return '#'+(0x1000000+(r<<16)+(g<<8)+b).toString(16).slice(1); }
+// blend two hex colours — needed because ageing is a mix toward grey, not a shade
+function mixHex(a,b,t){ t=clamp(t,0,1);
+  const x=parseInt(a.slice(1),16), y=parseInt(b.slice(1),16);
+  const r=Math.round(((x>>16)&255)*(1-t)+((y>>16)&255)*t);
+  const g=Math.round(((x>>8)&255)*(1-t)+((y>>8)&255)*t);
+  const b2=Math.round((x&255)*(1-t)+(y&255)*t);
+  return '#'+(0x1000000+(r<<16)+(g<<8)+b2).toString(16).slice(1); }
+/* =====================================================================
+   THE YEARS, WRITTEN ON THE FACE. One number in, four things out — and every
+   portrait in the game reads from this so a man of sixty looks sixty in the
+   gallery, in the marriage plate, in the villa and on his own body map.
+   ===================================================================== */
+function ageMarks(age){
+  age = (age===undefined||age===null)? 30 : age;
+  return {
+    age,
+    grey:  clamp((age-38)/36, 0, 1),        // temples first, then the whole head, white by ~74
+    lines: clamp((age-27)/34, 0, 1),        // crow's feet, brow, the line by the mouth
+    young: age<=23,                          // and before all that, the bloom that only youth has
+    sag:   clamp((age-44)/35, 0, 1),        // the jaw goes soft and the cheek drops
+    old:   age>=58,                          // past which a Roman was simply old
+    aged:  age>=70,                          // and past which very few of them got at all
+  };
+}
+function greyHair(hair, age){ const A=ageMarks(age); return mixHex(hair, '#c8c2b6', A.grey*0.88); }
+function agedSkin(skin, age){ const A=ageMarks(age); return mixHex(skin, '#b6a894', A.sag*0.30); }
 function paletteFor(f){
   const skin=f.skin||SKIN[0], cloth=f.tunic||'#9a3b2a';
   return {
@@ -5597,13 +6000,16 @@ function drawHusbandFig(c,x,y,bond,skinOv,tunOv,w,ph,mode){
     c.save(); c.translate(x,y); c.scale(sx,1); c.translate(-x,-y); }
   const yy=bob;
   const P=(a,b2,ww,h,col)=>{c.fillStyle=col;c.fillRect(Math.round(x+a+lean*0.4),Math.round(y+yy+b2),Math.round(ww),Math.round(h));};
-  const skin=skinOv||(w&&w.skin)||G.skin||'#caa06a', sSh=shade(skin,-30), sHi=shade(skin,22);
+  const skin0=skinOv||(w&&w.skin)||G.skin||'#caa06a';
+  const skin=skin0, sSh=shade(skin,-30), sHi=shade(skin,22);
   const tun=tunOv||(w&&w.dress)||G.tunic||'#eae4d6', tSh=shade(tun,-24), tHi=shade(tun,18), tMid=shade(tun,-11);
   // THE CLAVUS — the purple stripe down a Roman tunic, and its WIDTH was the
   // rank: a senator wore the broad one (latus clavus), an eques the narrow.
   const clavW = (G.emperor||G.royal||G.socialClass==='imperial')? 3 : (G.senate||G.socialClass==='elite')? 2 : 1;
   const CLAV = (G.emperor||G.socialClass==='imperial')? '#6a2a9a' : '#8a2f5a';
-  const hairC=(w&&w.hair)||'#3a2618', hairHi=shade(hairC,22);
+  const HAGE = (w&&w.age!==undefined)? w.age : ((!w && G)? (G.age||30) : 30);
+  const AM = ageMarks(HAGE);
+  const hairC=greyHair((w&&w.hair)||'#3a2618', HAGE), hairHi=shade(hairC,22);
   const top=-22-legLen;                                              // where the tunic's hem sits
   // ---- legs: a real walk cycle, longer or shorter by his score ----
   const lF=stride, lB=-stride;
@@ -5662,9 +6068,11 @@ function drawHusbandFig(c,x,y,bond,skinOv,tunOv,w,ph,mode){
   }
   P(-5,-57,10,1,sSh);
   // hair: thin at a low score, leonine at a high one
-  const hH=Math.round(2+ha*0.30);
-  P(-headW/2,-70-hH+2,headW,hH+2,hairC); P(-headW/2,-70-hH+2,headW,1,hairHi);
+  const rec = AM.old? 2 : (AM.grey>0.45? 1 : 0);                     // the hairline goes back with the years
+  const hH=Math.max(1, Math.round(2+ha*0.30) - (AM.old?1:0));
+  P(-headW/2+rec,-70-hH+2,headW-rec*2,hH+2,hairC); P(-headW/2+rec,-70-hH+2,headW-rec*2,1,hairHi);
   P(-headW/2-1,-69,2,Math.round(4+ha*0.5),hairC); P(headW/2-1,-69,2,Math.round(4+ha*0.5),hairC);
+  if(rec){ P(-headW/2+1,-70,2,2,skin); P(headW/2-3,-70,2,2,skin); }  // and takes the temples first
   if(running&&ha>=7){ P(headW/2,-69,3,6,hairC); }                    // it streams when he runs
   /* ---- HIS FACE, BY TIER. Plain → Rough → Handsome → Striking → Godlike, and
      each one is a different face, not the same face in a different colour. ---- */
@@ -5714,6 +6122,23 @@ function drawHusbandFig(c,x,y,bond,skinOv,tunOv,w,ph,mode){
     P(-2,-56,5,2,skin); P(-2,-56,5,1,sHi);                           // the chin, squared and lit
   }
   if(fTier>=3) P(3,-67,1,5,'#8a5a4a'); else P(3,-67,1,4,'#8a5a4a');  // the old scar
+  /* ---- AND THE YEARS ON TOP OF IT ALL: crow's feet, a furrowed brow, a
+     line beside the mouth, and a jaw that finally gives up its corner. ---- */
+  if(AM.young){ c.fillStyle='rgba(255,238,228,.13)'; c.fillRect(-headW/2,-66,headW,7);
+                P(-headW/2+1,-62,2,1,sHi); P(headW/2-3,-62,2,1,sHi); }
+  if(AM.lines>0.18){ P(-headW/2+1,-63,1,1,sSh); P(headW/2-2,-63,1,1,sSh); }
+  if(AM.lines>0.45){ P(-4,-69,9,1,mixHex(skin,'#8a7a66',0.32));
+                    P(-3,-59,1,2,sSh); P(3,-59,1,2,sSh); }
+  if(AM.lines>0.72){ P(-4,-71,9,1,mixHex(skin,'#8a7a66',0.26));
+                     P(-headW/2+1,-61,2,1,sSh); P(headW/2-3,-61,2,1,sSh); }
+  if(AM.sag>0.3){ P(-headW/2,-58,headW,2,mixHex(skin,'#9a8a76',0.34));           // the jaw softens
+                  P(-3,-56,7,1,mixHex(skin,'#9a8a76',0.26)); }
+  if(AM.sag>0.55){ P(-3,-55,7,2,mixHex(skin,'#9a8a76',0.30)); }                  // and goes altogether
+  if(AM.old){ P(-headW/2,-56,headW,1,shade(skin,-14)); }
+  if(AM.aged){ P(-4,-73,9,1,mixHex(skin,'#8a7a66',0.30));                        // a third furrow
+               P(-headW/2,-57,headW,3,mixHex(skin,'#9a8a76',0.42));              // the jaw has gone entirely
+               P(-3,-64,1,1,'#ded6c8'); P(2,-64,1,1,'#ded6c8');                  // eyes gone milky
+               P(-shW-1,-49,2,4,shade(tun,-14)); P(shW-1,-49,2,4,shade(tun,-14)); }  // and the shoulders drop
   if((G.emperor||(w&&w.crown)) && !skinOv){ P(-7,-73-hH+2,14,2,'#e8c34a'); P(-1,-75-hH+2,2,2,'#fff0b0'); }
   if(G.crownWorn && w){ P(-7,-73-hH+2,14,2,'#e8c34a'); P(-1,-75-hH+2,3,3,'#e0405a'); }
   if(bond>=90){ P(-shW-3,-40,3,3,skin); }                            // his hand reaches toward her
@@ -5722,11 +6147,13 @@ function drawHusbandFig(c,x,y,bond,skinOv,tunOv,w,ph,mode){
 function drawKidFig(c,x,y,sex,age){
   const P=(a,b2,w,h,col)=>{c.fillStyle=col;c.fillRect(Math.round(x+a),Math.round(y+b2),Math.round(w),Math.round(h));};
   const h=Math.min(40, 22+Math.round(age/4));                        // they grow
-  const skin=G.skin||'#caa06a', sSh=shade(skin,-28), sHi=shade(skin,20);
+  const K=arguments[5]||{}, KB=K.body||{};                            // the child's OWN inherited scores
+  const kfa=KB.face===undefined?5:KB.face, kha=KB.hairq===undefined?5:KB.hairq;
+  const skin=K.skin||G.skin||'#caa06a', sSh=shade(skin,-28), sHi=shade(skin,20);
   const boy = sex==='m';
   const cloth= boy ? shade(G.tunic||'#7a2f22',12) : shade((G.wife&&G.wife.dress)||'#8a2f5a',16);
   const clSh=shade(cloth,-22), clHi=shade(cloth,24);
-  const hairC = boy ? '#3a2618' : ((G.wife&&G.wife.hair)||'#5a3a1e'), hairHi=shade(hairC,22);
+  const hairC = K.hair || (boy ? '#3a2618' : ((G.wife&&G.wife.hair)||'#5a3a1e')), hairHi=shade(hairC,22);
   // legs + little sandals
   P(-2,-9,2,7,skin); P(1,-9,2,7,skin); P(-2,-9,1,7,sHi); P(2,-9,1,7,sSh);
   P(-3,-2,3,2,'#6a4426'); P(1,-2,3,2,'#6a4426');
@@ -5750,6 +6177,12 @@ function drawKidFig(c,x,y,sex,age){
   // face — whites + pupils, tiny nose, grin
   P(-2,-h+3,2,2,'#f2ead8'); P(1,-h+3,2,2,'#f2ead8'); P(-2,-h+3,1,2,'#241408'); P(1,-h+3,1,2,'#241408');
   P(0,-h+5,1,1,sSh); P(-1,-h+6,3,1,'#8a4038');                      // nose + grin
+  // even at this size the inherited face reads: a fine-featured child is drawn finer
+  if(kfa>=8){ P(-3,-h+2,2,1,shade(hairC,-10)); P(2,-h+2,2,1,shade(hairC,-10));   // clear brows
+              P(-1,-h+6,3,1,'#a8524a'); }
+  else if(kfa<=3){ P(-1,-h+5,3,2,sSh); P(-2,-h+7,5,1,shade(skin,-16)); }         // heavier features
+  if(kha>=8 && !boy){ P(-6,-h+1,2,10,hairC); P(5,-h+1,2,10,hairC); }             // her mother's hair
+  if(kha<=2 && boy){ P(-3,-h-1,7,1,skin); }                                       // a thin crop
 }
 function openPortrait(){
   state='menu'; show('scr-portrait');
@@ -5766,7 +6199,7 @@ function openPortrait(){
     c.drawImage(wc, 186,106, 148*0.78,148*0.78); }                                                       // the domina
   else if(G.isFemale){ // the head of the house is herself the domina — paint HER at the center, on HER OWN scores
     const me={build:'curvy',skin:G.skin||'#e6bd94',hair:'#3a2618',dress:G.tunic||'#7a2d9a',neckline:'fine',
-      jewel:!!G.crownWorn||true, rank:'noble', eth:'roman', adj:'Roman', name:G.name, body:G.body};
+      jewel:!!G.crownWorn||true, rank:'noble', eth:'roman', adj:'Roman', name:G.name, body:G.body, age:G.age};
     const wc=document.createElement('canvas'); wc.width=wc.height=148; drawBridePortrait(wc,me,true);
     c.drawImage(wc, 186,106, 148*0.78,148*0.78); }
   // her lord at her side — drawn on HIS measurements, face tier and all
@@ -5775,7 +6208,17 @@ function openPortrait(){
   else if(!G.isFemale){ c.save(); c.translate(324,224); c.scale(1.95,1.95);
     drawHusbandFig(c,0,0,bond,null,null,{body:G.body,skin:G.skin,dress:G.tunic,hair:'#3a2618'},0,'idle'); c.restore(); }
   const kids=G.children.slice(0,6);
-  kids.forEach((k,i)=>{ c.save(); c.translate(168-i*34,222); c.scale(1.45,1.45); drawKidFig(c,0,0,k.sex,G.day-k.born); c.restore(); });
+  // A CHILD WHO HAS GROWN UP IS DRAWN AS AN ADULT — with the face they inherited,
+  // not the same round-cheeked sprite they were painted as at three years old.
+  kids.forEach((k,i)=>{ const days=G.day-k.born; c.save(); c.translate(168-i*34,222);
+    if(kGrownDraw(k,days)){
+      const subj={body:k.body, skin:k.skin||G.skin, dress:(k.sex==='m'? (G.tunic||'#eae4d6') : ((G.wife&&G.wife.dress)||'#8a2f5a')),
+                  hair:k.hair||'#3a2618', male:k.sex==='m'};
+      c.scale(1.05,1.05);
+      if(k.sex==='m') drawHusbandFig(c,0,0,0,subj.skin,subj.dress,subj,0,'idle');
+      else drawWifeFig(c,0,0,subj,0,'idle');
+    } else { c.scale(1.45,1.45); drawKidFig(c,0,0,k.sex,days,k); }
+    c.restore(); });
   if(bond>=90){ c.fillStyle='#e26a8a'; c.font='14px monospace'; c.fillText('♥', 272, 96); }            // devoted
   if(G.familyMan){ c.fillStyle='#e8c34a'; c.font='bold 10px Georgia,serif'; c.textAlign='center';
     c.fillText('· FAMILY MAN OF THE HOUSE ·', 240, 20); }                                                // the earned title, in gold
@@ -7643,14 +8086,43 @@ function drawWifeFig(c,x,y,w,ph,mode){
   P(-waistW/2, top-13, waistW, 8, shade(dress,-8));
   // ================= BODICE + BUST =================
   P(-6+lean*0.4, top-24, 12, 12, dress); P(-6+lean*0.4, top-24, 12, 2, dHi);
-  // the bust itself — width, depth and bounce all from her score.
-  // Nothing at all to bounce below a 3: a flat chest just sits there.
-  if(bu>=3){
+  /* ---- THE BUST, ON THE SAME FIVE RUNGS AS THE REAR: FLAT · RAISED · GOOD ·
+     BIG · HUGE. Width, depth, spill and bounce all come off her score, and a
+     flat chest is drawn flat — there is nothing there to bounce. ---- */
+  { const uT = bu>=9?4 : bu>=7?3 : bu>=5?2 : bu>=3?1 : 0;
     const bH2=Math.max(1,bustH+Math.round(bSquash));           // squashes on the fall, stretches on the rise
-    P(-bustW-1+lean*0.4, top-23+bJig, bustW, bH2, shade(dress,14));
-    P( 1+lean*0.4,       top-23+bJig, bustW, bH2, shade(dress,14));
-    P(-1+lean*0.4,       top-23+bJig, 2, bH2-1, shade(dress,-26));      // the line between
-    if(bu>=8){ P(-bustW-1+lean*0.4, top-24+bJig, bustW*2+2, 1, shade(dress,34)); }  // a fine bust catches the light
+    const LX=lean*0.4;
+    if(uT===0){
+      P(-5+LX, top-22, 11, 1, shade(dress,-18));                             // one plain fall of cloth
+    } else if(uT===1){
+      P(-bustW+LX, top-22+bJig, bustW-1, Math.max(1,bH2-1), shade(dress,10));  // a shallow swell either side
+      P( 1+LX,     top-22+bJig, bustW-1, Math.max(1,bH2-1), shade(dress,10));
+      P( 0+LX,     top-22+bJig, 1, Math.max(1,bH2-1), shade(dress,-20));
+    } else if(uT===2){
+      P(-bustW-1+LX, top-23+bJig, bustW, bH2, shade(dress,14));
+      P( 1+LX,       top-23+bJig, bustW, bH2, shade(dress,14));
+      P(-1+LX,       top-23+bJig, 2, bH2-1, shade(dress,-26));               // the line between
+      P(-bustW-1+LX, top-23+bH2+bJig, bustW, 1, shade(dress,-30));           // under-curves
+      P( 1+LX,       top-23+bH2+bJig, bustW, 1, shade(dress,-30));
+    } else if(uT===3){
+      P(-bustW-2+LX, top-24+bJig, bustW+1, bH2+1, shade(dress,14));
+      P( 1+LX,       top-24+bJig, bustW+1, bH2+1, shade(dress,14));
+      P(-1+LX,       top-24+bJig, 2, bH2, shade(dress,-32));
+      P(-bustW-2+LX, top-25+bJig, bustW*2+4, 1, shade(dress,34));            // catches the light right across
+      P(-bustW-2+LX, top-23+bH2+bJig, bustW+1, 2, shade(dress,-38));         // and the weight under it
+      P( 1+LX,       top-23+bH2+bJig, bustW+1, 2, shade(dress,-38));
+    } else {
+      P(-bustW-3+LX, top-25+bJig, bustW+2, bH2+2, shade(dress,14));          // it clears the bodice
+      P( 1+LX,       top-25+bJig, bustW+2, bH2+2, shade(dress,14));
+      P(-bustW-2+LX, top-26+bJig, bustW,   1, shade(dress,26));               // rounded at the crown
+      P( 2+LX,       top-26+bJig, bustW,   1, shade(dress,26));
+      P(-1+LX,       top-25+bJig, 2, bH2+1, shade(dress,-42));
+      P(-bustW-4+LX, top-24+bJig, 1, bH2, shade(dress,4));                   // spilling past the ribs
+      P( bustW+3+LX, top-24+bJig, 1, bH2, shade(dress,-14));
+      P(-bustW-3+LX, top-23+bH2+bJig, bustW+2, 3, shade(dress,-46));         // heavy double underfold
+      P( 1+LX,       top-23+bH2+bJig, bustW+2, 3, shade(dress,-46));
+      P(-2+LX, top-27+bJig, 5, 2, skin);                                      // and skin above the neckline
+    }
   }
   // ================= NECK / ARMS =================
   P(-2+lean*0.5, top-28, 5, 5, skin);
@@ -7874,7 +8346,7 @@ function drawDomus(){
       if(k.turn>0){ const sx=Math.max(0.12, Math.abs(Math.cos((1-(k.turn/12))*Math.PI))); ctx.scale(sx,1); }
       const sc2 = 0.62 + Math.min(0.55, age/90);                   // infant → child → half-grown
       ctx.scale(sc2,sc2);
-      drawKidFig(ctx,0,0,k.ref.sex,age);
+      drawKidFig(ctx,0,0,k.ref.sex,age,k.ref);
       ctx.restore();
       if(age<9){ pixelText('👶',k.x,FY-30,'#f0c8d4',1); }          // still in arms
     }
@@ -8251,9 +8723,12 @@ function drawBridePortrait(cnv,b,bare){
     P(20,-52,11,15,'#6a5030'); P(21,-50,9,4,'#8a6a40'); P(21,-44,9,4,'#8a6a40');                                // window
     P(-34,-2,70,3,'#5a4428'); for(let i=0;i<9;i++)P(-32+i*8,-1,3,1,'#3e2e18');                                  // dirt floor
   }
-  const skin=b.skin, sSh=shade(skin,-36), sHi=shade(skin,28), sGlow=shade(skin,12);
+  /* ---- THE YEARS. A woman of forty is not drawn as a woman of eighteen: the
+     hair greys, the jaw softens, and the lines come in around the eyes. ---- */
+  const BAGE = (b.age===undefined? 22 : b.age), BM = ageMarks(BAGE);
+  const skin=agedSkin(b.skin,BAGE), sSh=shade(skin,-36), sHi=shade(skin,28), sGlow=shade(skin,12);
   const dress=b.dress, dSh=shade(dress,-38), dHi=shade(dress,30), dMid=shade(dress,-16);
-  const hair=b.hair, hSh=shade(hair,-30), hHi=shade(hair,32), gold='#e8c34a', goldHi='#fff0b0';
+  const hair=greyHair(b.hair,BAGE), hSh=shade(hair,-30), hHi=shade(hair,32), gold='#e8c34a', goldHi='#fff0b0';
   // ---- figure metrics: bust depth & protrusion, hips & rear, waist pinch ----
   // ---- THE FIGURE IS HER SCORES. A FLAT 1 draws flat; an IMPOSSIBLE 11 draws absurd. ----
   const bIdx = Math.max(0, BUILDS.indexOf(b.build||'curvy'));    // 0..5 fallback for old saves
@@ -8273,8 +8748,6 @@ function drawBridePortrait(cnv,b,bare){
   // THE LADDER IS DRAWN, NOT ASSUMED. Under 3 is FLAT (nothing there at all);
   // 3-4 is RAISED — a slight swell, NOT a canyon; 5 and up earns the full
   // treatment. The old art jumped straight from flat to deep cleavage.
-  const HASB = busV>=3, HASR = booV>=3;
-  const MODB = busV>=3 && busV<=4;
   const warrior=b.rank==='warrior';
   const noble=b.rank==='noble'||warrior;   // both wear an elevated gown (warrior's is martial in colour)
   // ================= BACK ARM (her left, hanging behind) =================
@@ -8370,61 +8843,95 @@ function drawBridePortrait(cnv,b,bare){
   P(wx+2,bustBot+1,1,hipTop-bustBot-1,dHi);
   // cinched sash under the bust
   P(wx-1,bustBot,waistW+2,2,noble?gold:shade(dress,-52)); if(noble)P(0,bustBot,2,2,goldHi);
-  // ================= BUST — drawn to her score. THREE OR UNDER IS FLAT, and
-  //      a flat chest gets a plain bodice: no cups to part, no V to plunge,
-  //      no under-curve to shade. Pretending otherwise just looked like a lie.
-  if(!HASB){
-    P(-4,-52,10,3,skin); P(-4,-52,10,1,sHi);                                  // collar/upper chest
-    P(-4,bustTop-1,11,2,skin);                                                // a plain flat upper chest
-    P(-4,bustTop,11,bd,dress); P(-4,bustTop,11,1,dHi);                        // one unbroken panel of cloth
-    P(-4,bustBot,11,1,dSh);                                                   // where the cloth simply ends
-    if(noble){ P(-4,bustTop-2,1,bd+2,gold); P(6,bustTop-2,1,bd+2,gold); }     // the trim still runs, on nothing
-  } else if(MODB){
+  /* ============ BUST — FIVE DRAWN TIERS, exactly as the rear has ============
+     FLAT · RAISED · GOOD · BIG · HUGE. Each is its own piece of art, not one
+     shape scaled: a flat chest gets a plain bodice with no cups to part and no
+     V to plunge, and a huge one overflows the neckline and strains the cloth. */
+  const busT = busV>=9?4 : busV>=7?3 : busV>=5?2 : busV>=3?1 : 0;
+  P(-4,-52,10,3,skin); P(-4,-52,10,1,sHi);                                     // collar & upper chest, always
+  if(busT===0){
+    // FLAT — one unbroken panel of cloth. There is nothing under it to draw.
+    P(-4,bustTop-1,11,2,skin);
+    P(-4,bustTop,11,bd,dress); P(-4,bustTop,11,1,dHi);
+    P(-4,bustBot,11,1,dSh);                                                    // where the cloth simply ends
+    if(noble){ P(-4,bustTop-2,1,bd+2,gold); P(6,bustTop-2,1,bd+2,gold); }      // the trim still runs, on nothing
+    else { P(1,bustTop+2,1,bd-3,shade(dress,-30)); }                           // a slack lace, hanging loose
+  } else if(busT===1){
     // RAISED — a modest swell under the cloth. A shallow shadow between, and
     // that is all: no plunging V, no parted cups, nothing to spill.
-    P(-4,-52,10,3,skin); P(-4,-52,10,1,sHi);
     P(-4,bustTop-1,11,2,skin); P(-4,bustTop-1,11,1,sGlow);
     P(-4,bustTop,11,bd,dress); P(-4,bustTop,11,1,dHi);
-    P(-3,bustTop+1,4,2,shade(dress,12)); P(4,bustTop+1,4,2,shade(dress,12));  // two soft rises
-    P(1,bustTop+1,1,2,shade(dress,-22));                                       // the faintest line between them
-    P(-4,bustBot,5,1,dSh); P(2,bustBot,5,1,dSh);                               // shallow under-curves
+    P(-3,bustTop+1,4,2,shade(dress,12)); P(4,bustTop+1,4,2,shade(dress,12));   // two soft rises
+    P(1,bustTop+1,1,2,shade(dress,-22));                                        // the faintest line between them
+    P(-4,bustBot,5,1,dSh); P(2,bustBot,5,1,dSh);                                // shallow under-curves
     if(noble){ P(-4,bustTop-2,1,bd+2,gold); P(6,bustTop-2,1,bd+2,gold); }
-  } else if(noble){
-    // plunging silk: bare shoulders + a deep exposed décolletage between the cups
-    P(-4,-52,10,3,skin); P(-4,-52,10,1,sHi);                                  // collar/upper chest
-    P(-4,bustTop-2,11,3,skin); P(-4,bustTop-2,11,1,sGlow);                    // wide exposed upper curve
-    P(-4,bustTop,4,bd,dress);  P(3,bustTop,3+bp,bd,dress);                    // two cups, parted
-    P(6,bustTop+1,bp+1,bd-2,dress);                                            // forward thrust
-    // the exposed skin V of the cleavage — deep, with graded shading
-    P(-1,bustTop-1,5,1,sGlow);                                                 // sunlit brim of the V
+  } else if(busT===2){
+    // GOOD — two clear cups with a short V between them. Present, unmistakable,
+    // and still comfortably inside the cloth.
+    P(-4,bustTop-2,11,3,skin); P(-4,bustTop-2,11,1,sGlow);
+    P(-4,bustTop,5,bd,dress); P(2,bustTop,5+Math.round(bp*0.5),bd,dress);       // the two cups
+    P(0,bustTop,2,2,skin); P(1,bustTop+1,1,1,skin);                             // a short skin V
+    P(1,bustTop,1,2,shade(skin,-18));
+    P(0,bustTop,1,1,sGlow); P(2,bustTop,1,1,sGlow);
+    P(1,bustTop+2,1,bd-3,dSh);                                                  // and cloth beneath it
+    P(-3,bustTop+1,3,2,dHi); P(3,bustTop+1,3,2,dHi);                            // sheen on each swell
+    P(-4,bustBot,5,1,dSh); P(2,bustBot,5,1,dSh);
+    P(-3,bustBot+1,2,1,shade(dress,-24)); P(3,bustBot+1,2,1,shade(dress,-24));   // rounded under-curves
+    c.fillStyle='rgba(220,110,110,.14)'; c.fillRect(-1,bustTop,1,2); c.fillRect(3,bustTop,1,2);
+    if(noble){ P(-4,bustTop-2,1,bd+2,gold); P(7,bustTop,1,bd,gold);
+      c.fillStyle='rgba(255,255,255,.28)'; c.fillRect(-3,bustTop+1,2,1); c.fillRect(4,bustTop+1,2,1); }
+    else { for(let ly=bustTop+3;ly<bustBot;ly+=3) P(1,ly,1,1,shade(dress,-42)); }  // laced, and holding
+  } else if(busT===3){
+    // BIG — parted cups, a real V with depth, and a forward thrust the
+    // silhouette cannot hide.
+    P(-4,bustTop-2,11,3,skin); P(-4,bustTop-2,11,1,sGlow);                      // wide exposed upper curve
+    P(-4,bustTop,4,bd,dress);  P(3,bustTop,3+bp,bd,dress);                      // two cups, parted
+    P(6,bustTop+1,bp+1,bd-2,dress);                                              // forward thrust
+    P(-1,bustTop-1,5,1,sGlow);                                                   // sunlit brim of the V
     P(0,bustTop,3,1,skin); P(0,bustTop+1,3,1,skin); P(1,bustTop+2,2,1,skin); P(1,bustTop+3,1,1,skin);
-    if(bd>=9) P(1,bustTop+4,1,1,shade(skin,-28));                              // the V plunges deeper on full figures
-    P(1,bustTop,1,2,shade(skin,-16)); P(1,bustTop+2,1,2,sSh); P(1,bustTop+3,1,1,shade(skin,-46)); // centre darkens with depth
-    P(0,bustTop,1,2,sGlow); P(2,bustTop,1,2,sGlow);                            // lit inner swells
-    P(0,bustTop+2,1,1,shade(skin,-8)); P(2,bustTop+2,1,1,shade(skin,-8));      // curves rolling inward
-    c.fillStyle='rgba(220,110,110,.20)'; c.fillRect(-1,bustTop,1,3); c.fillRect(3,bustTop,1,3); // soft blush at the curves
-    P(-1,bustTop,1,2,shade(dress,-26)); P(3,bustTop,1,2,shade(dress,-26));     // cups press in against the V
-    P(1,bustBot-2,1,1,shade(skin,-20));                                        // sternum crease below
-    P(1,bustTop+4,1,bd-5,dSh);                                                 // fabric cleavage continues
-    P(-3,bustTop,3,2,dHi); P(3,bustTop+1,3,2,dHi); P(6,bustTop+2,2,1,dHi);    // sheen on the swell
-    c.fillStyle='rgba(255,255,255,.35)'; c.fillRect(-3,bustTop+1,2,1); c.fillRect(4,bustTop+2,2,1); // silk shine
-    c.fillStyle='rgba(255,255,255,.18)'; c.fillRect(-2,bustTop+3,1,1); c.fillRect(5,bustTop+4,1,1);
-    P(-4,bustBot,5,1,dSh); P(2,bustBot,5+bp,1,dSh);                            // twin under-bust shadows
-    P(-3,bustBot+1,2,1,dSh); P(3,bustBot+1,3,1,dSh);                           // rounded under-curves
-    P(-2,bustBot-1,1,1,shade(dress,-26)); P(4,bustBot-1,2,1,shade(dress,-26)); // weight shading low on the cups
-    P(-4,bustTop-3,1,bd+3,gold); P(6+bp,bustTop,1,bd,gold);                    // gilt neckline trim
+    P(1,bustTop,1,2,shade(skin,-16)); P(1,bustTop+2,1,2,sSh); P(1,bustTop+3,1,1,shade(skin,-46));
+    P(0,bustTop,1,2,sGlow); P(2,bustTop,1,2,sGlow);                              // lit inner swells
+    P(0,bustTop+2,1,1,shade(skin,-8)); P(2,bustTop+2,1,1,shade(skin,-8));
+    c.fillStyle='rgba(220,110,110,.20)'; c.fillRect(-1,bustTop,1,3); c.fillRect(3,bustTop,1,3);
+    P(-1,bustTop,1,2,shade(dress,-26)); P(3,bustTop,1,2,shade(dress,-26));       // cups press in against the V
+    P(1,bustBot-2,1,1,shade(skin,-20));                                          // sternum crease below
+    P(1,bustTop+4,1,bd-5,dSh);
+    P(-3,bustTop,3,2,dHi); P(3,bustTop+1,3,2,dHi); P(6,bustTop+2,2,1,dHi);
+    P(-4,bustBot,5,1,dSh); P(2,bustBot,5+bp,1,dSh);                              // twin under-bust shadows
+    P(-3,bustBot+1,2,1,dSh); P(3,bustBot+1,3,1,dSh);
+    P(-2,bustBot-1,1,1,shade(dress,-26)); P(4,bustBot-1,2,1,shade(dress,-26));
+    if(noble){ P(-4,bustTop-3,1,bd+3,gold); P(6+bp,bustTop,1,bd,gold);           // gilt neckline trim
+      c.fillStyle='rgba(255,255,255,.35)'; c.fillRect(-3,bustTop+1,2,1); c.fillRect(4,bustTop+2,2,1);
+      c.fillStyle='rgba(255,255,255,.18)'; c.fillRect(-2,bustTop+3,1,1); c.fillRect(5,bustTop+4,1,1); }
+    else { for(let ly=bustTop+2;ly<bustBot;ly+=2) P(1,ly,2,1,shade(dress,-46)); } // straining laces
   } else {
-    // strained homespun — deep unlaced scoop, the figure fills the cloth
-    P(-4,-52,10,3,skin); P(-4,-50,10,2,sGlow);                                 // open scoop
-    P(-4,bustTop-1,11,2,skin);                                                 // exposed upper curve
-    P(-4,bustTop,10+bp,bd,dress);
-    P(6,bustTop+1,bp,bd-2,dress);                                              // forward thrust
-    P(0,bustTop,3,1,skin); P(1,bustTop+1,2,1,skin);                            // skin V where the lacing gapes
-    P(1,bustTop,1,3,sSh);                                                      // cleavage shadow
-    P(-3,bustTop,3,2,dHi); P(3,bustTop,3,2,dHi);
-    P(1,bustTop+3,1,bd-4,dSh);
-    P(-4,bustBot,5,1,dSh); P(2,bustBot,5+bp,1,dSh);                            // twin under-shadows
-    for(let ly=bustTop+2;ly<bustBot;ly+=2) P(0,ly,2,1,shade(dress,-46));       // straining laces
+    // HUGE — it does not fit the cloth. The swell rises clear of the neckline,
+    // spills past the ribs on both sides, and the seam is visibly losing.
+    // TWO CROWNS, each rounded — not one flat shelf of skin across the chest
+    P(-5,bustTop-3,5,4,skin);   P(3,bustTop-3,5+bp,4,skin);                      // it crests ABOVE the bodice
+    P(-4,bustTop-4,3,1,skin);   P(4,bustTop-4,3+bp,1,skin);                      // and rounds off at the top
+    P(-4,bustTop-4,3,1,sGlow);  P(4,bustTop-4,3+bp,1,sGlow);
+    P(-5,bustTop-3,2,1,sGlow);  P(3,bustTop-3,2,1,sGlow);                        // lit on the inner slope
+    P(-5,bustTop-1,1,2,shade(skin,-16)); P(7+bp,bustTop-1,1,2,shade(skin,-22));  // and spilling past the ribs
+    P(-6,bustTop,5,bd,dress); P(3,bustTop,4+bp,bd,dress);                        // the cups, both overfull
+    P(7,bustTop+1,bp+2,bd-2,dress); P(-6,bustTop+2,1,bd-4,dress);                // thrust forward and out
+    P(0,bustTop-3,3,1,sGlow);
+    P(0,bustTop-2,3,1,skin); P(0,bustTop-1,3,1,skin); P(0,bustTop,3,1,skin);     // a V that runs the whole bodice
+    P(1,bustTop+1,2,1,skin); P(1,bustTop+2,2,1,skin); P(1,bustTop+3,1,1,skin);
+    P(1,bustTop+4,1,Math.max(1,bd-6),shade(skin,-40));                            // and darkens to nothing
+    P(1,bustTop-2,1,3,shade(skin,-18)); P(1,bustTop+1,1,3,sSh);
+    P(0,bustTop-2,1,3,sGlow); P(2,bustTop-2,1,3,sGlow);
+    c.fillStyle='rgba(220,110,110,.24)'; c.fillRect(-2,bustTop-2,2,4); c.fillRect(3,bustTop-2,2,4);
+    P(-1,bustTop-1,1,3,shade(dress,-30)); P(3,bustTop-1,1,3,shade(dress,-30));    // cloth cutting in
+    P(-4,bustTop+1,3,2,dHi); P(4,bustTop+2,3,2,dHi); P(7,bustTop+3,2,1,dHi);
+    P(-6,bustBot,6,2,dSh); P(2,bustBot,6+bp,2,dSh);                               // heavy twin under-shadows
+    P(-5,bustBot+2,4,1,shade(dress,-52)); P(3,bustBot+2,5,1,shade(dress,-52));    // and the weight beneath them
+    P(-4,bustBot-1,2,1,shade(dress,-30)); P(5,bustBot-1,3,1,shade(dress,-30));
+    if(noble){ P(-6,bustTop-1,1,bd+1,gold); P(8+bp,bustTop-1,1,bd+1,gold);
+      c.fillStyle='rgba(255,255,255,.38)'; c.fillRect(-4,bustTop,3,1); c.fillRect(5,bustTop+2,3,1);
+      c.fillStyle='rgba(255,255,255,.20)'; c.fillRect(-3,bustTop+3,2,1); c.fillRect(6,bustTop+5,2,1); }
+    else { for(let ly=bustTop+1;ly<bustBot;ly+=2){ P(0,ly,3,1,shade(dress,-50)); }  // the lacing, losing
+      P(-1,bustTop+2,1,1,skin); P(3,bustTop+5,1,1,skin); }                          // and gaping between
   }
   // ================= FRONT ARM (akimbo — hand on hip) =================
   P(4,-51,4,3,skin); P(4,-51,4,1,sHi);                                        // shoulder
@@ -8452,6 +8959,23 @@ function drawBridePortrait(cnv,b,bare){
   P(3,-59,2,1,sSh);                                                            // nose
   P(1,-58,4,1,'#a83246'); P(1,-57,4,1,'#c44a60'); P(2,-57,2,1,'#e2708a');      // full bitten lips
   P(2,-56,2,1,shade(skin,-16));                                                 // lip shadow
+  /* ---- and the years, painted over the face rather than hidden behind it ---- */
+  if(BM.young){ c.fillStyle='rgba(255,238,228,.15)'; c.fillRect(-4,-64,10,7);
+                P(-4,-60,2,1,sHi); P(5,-60,1,1,sHi); }                          // young, and it shows
+  if(BM.lines>0.18){ P(-5,-62,1,1,sSh); P(6,-62,1,1,sSh); }                     // the first crow's feet
+  if(BM.lines>0.45){ P(-3,-68,9,1,mixHex(skin,'#8a7a66',0.30));                  // a line across the brow
+                    P(-1,-58,1,2,sSh); P(4,-58,1,2,sSh); }                       // and beside the mouth
+  if(BM.lines>0.72){ P(-3,-70,9,1,mixHex(skin,'#8a7a66',0.24));
+                     P(-5,-60,2,1,sSh); P(5,-60,2,1,sSh); }
+  if(BM.sag>0.3){ P(-4,-55,10,2,mixHex(skin,'#9a8a76',0.30));                    // the jaw goes soft
+                  P(-2,-53,6,1,mixHex(skin,'#9a8a76',0.22)); }
+  if(BM.sag>0.6){ P(-2,-52,6,2,mixHex(skin,'#9a8a76',0.26)); }
+  if(BM.aged){ P(-3,-72,9,1,mixHex(skin,'#8a7a66',0.32));
+               P(-4,-54,10,3,mixHex(skin,'#9a8a76',0.40));                        // the jaw and throat together
+               P(-2,-62,1,1,'#ded6c8'); P(3,-62,1,1,'#ded6c8');
+               P(1,-57,4,1,mixHex('#a83246','#8a6a66',0.55)); }                   // the colour has left her mouth
+  if(BM.old && !bare){ P(-6,-72,13,3,'#d2cabc'); P(-6,-72,13,1,'#e8e2d6');       // a matron covers her head
+                       P(-7,-70,2,9,'#d2cabc'); P(6,-70,2,9,'#d2cabc'); }
   if(b._expr==='love'){
     // the word lands — her whole face changes: wide bright eyes, hearts in them
     // ---- her eyes literally become bright pink HEARTS ----
@@ -9577,7 +10101,9 @@ function openTree(){
     d.textContent='Your blood is the state. Every face below is a claim, a threat, or both.'; b.appendChild(d); }
   [['father','♂',F.father,false],['mother','♀',F.mother,true]].forEach(([role,sg,pp,fem])=>{
     if(!pp) return;
-    kinCard({ person:pp, name:pp.name, glyph:sg, fem, rank:PRANK, dead:!pp.alive, beard:!fem&&PRANK!=='plain',
+    kinCard({ person:pp, name:pp.name, glyph:sg, fem, rank:PRANK, dead:!pp.alive,
+      beard:!fem && (PRANK!=='plain' || kinAge(pp, fem?26:30)>=44),
+      age:kinAge(pp, fem?26:30), showAge:pp.alive,
       crown:KIN, laurel:KIN && /EMPEROR HIMSELF|Augustus/.test(pp.what||''),
       nameCol:KIN?KINCOL:'var(--gold)', borderCol:KIN?KINCOL:null,
       sub:`— your ${role}, ${pp.what}${pp.alive?'':' <span style="color:#e0705b">· dead</span>'}`,
@@ -9602,8 +10128,11 @@ function openTree(){
       if(!G.isFemale && sb.male) flag = sb.prince
         ? '<div class="small" style="color:'+KINCOL+'">👑 YOUR BROTHER IS THE HEIR, not you. Rome has killed for less.</div>'
         : '<div class="small muted">A brother, and therefore a rival, however fond you are of him.</div>';
+      kinInherit(sb, F.father, F.mother);
+      const sbAge=kinAge(sb,0);
       const card=kinCard({ person:sb, name:sb.name, glyph:sb.male?'♂':'♀', fem:!sb.male, rank:PRANK,
-        crown:KIN && (sb.prince || !sb.male), beard:sb.male&&PRANK==='imperial',
+        age:sbAge, showAge:true,
+        crown:KIN && (sb.prince || !sb.male), beard:sb.male&&(PRANK==='imperial'||sbAge>=40),
         nameCol:KIN?KINCOL:'var(--gold)', borderCol:(KIN&&(sb.prince||sb.wed))?KINCOL:null,
         sub:'— '+sb.role, opinion:sb.opinion, extra:flag });
       // ---- SIBLING POLITICS: a brother with a claim is a problem to be MANAGED ----
@@ -9662,7 +10191,8 @@ function openTree(){
       d.innerHTML='The Senate votes. The <b>Praetorian Guard</b> decides. In this century they sold the empire at auction once already — '
         +'keep the Prefect fed, flattered and paid, or the purple is a shroud.'; b.appendChild(d); }
     kinCard({ person:ct.prefect, name:ct.prefect.name, glyph:'🗡', fem:false, rank:'imperial', beard:true,
-      nameCol:'#e0705b', borderCol:ct.prefect.loyal<45?'#e0705b':'#e8c34a',
+      age:kinAge(ct.prefect,22), showAge:true,
+      nameCol:'#e0705b', borderCol:ct.prefect.loyal<45?'#e8c34a':'#e8c34a',
       sub:'— PRAETORIAN PREFECT, commander of the guard at your door',
       note:ct.prefect.note, opinion:ct.prefect.loyal,
       extra: ct.prefect.loyal<40
@@ -9673,10 +10203,25 @@ function openTree(){
       const LV=COURT_LEVERS[f.icon]||{name:'FAVOUR',what:'goodwill, and the uses of it'};
       const cost=courtCultivateCost(f);
       const card=document.createElement('div'); card.className='shopcard';
-      card.innerHTML=`<div class="small"><b style="color:${KINCOL}">${f.icon} ${f.role}</b> &nbsp; ${opBar(f.op)}
+      // ---- a face at court, drawn on the same ladder as the family gallery ----
+      if(!f.name){ f.fem = !!(COURT_FIGURES.find(x=>x[2]===f.icon)||[])[3];
+        f.name = f.fem? pick(NAMES_F) : (pick(NAMES_M)+' '+G_GENS());
+        f.age  = ((COURT_FIGURES.find(x=>x[2]===f.icon)||[0,0,0,0,42])[4]) + ri(-6,9); }
+      const head=document.createElement('div');
+      head.style.cssText='display:flex;flex-direction:row;gap:9px;align-items:flex-start;text-align:left;';
+      const fcv=document.createElement('canvas'); fcv.width=52; fcv.height=62;
+      fcv.style.cssText='position:static;width:50px;height:60px;image-rendering:pixelated;flex:0 0 auto;'
+        +'border-radius:3px;border:2px solid '+(f.op>=70?'#e8c34a':KINCOL)+';';
+      drawKinPortrait(fcv, f, {fem:f.fem, rank:'elite', age:f.age, showAge:true,
+        beard:!f.fem && f.age>=42, cloth:f.fem?'#5a3a6a':'#e6e0d0'});
+      head.appendChild(fcv);
+      const txt=document.createElement('div'); txt.style.cssText='flex:1;min-width:0;';
+      txt.innerHTML=`<div class="small"><b style="color:${KINCOL}">${f.icon} ${f.role}</b> &nbsp; ${opBar(f.op)}
           <span class="pill" style="border-color:${KINCOL};color:${KINCOL};font-size:9px">${LV.name}</span></div>
+        <div class="small" style="color:#e8c34a">${f.name}<span class="muted">, ${f.age}</span></div>
         <div class="small muted" style="font-style:italic">${f.note}</div>
         <div class="small" style="color:#cfa">⚙ ${LV.what}</div>`;
+      head.appendChild(txt); card.appendChild(head);
       const row2=document.createElement('div'); row2.className='row gap6';
       const cb=document.createElement('button'); cb.className='btn sm'; cb.style.borderColor=KINCOL; cb.style.color=KINCOL;
       cb.textContent='🎁 CULTIVATE ('+cost+'d)'; cb.disabled = G.coin<cost || f.op>=100;
@@ -10673,7 +11218,7 @@ function buildMarriageCard(b){
     const eC= v.e>=75?'#e26a8a': v.e>=45?'#e8c34a':'#8a6a4a';
     const pC= v.p>=75?'#e0533a': v.p>=45?'#d88a3a':'#8a6a4a';
     const info=document.createElement('div'); info.innerHTML=
-      `<div><b style="color:var(--gold)">⚭ ${w.name}</b> ${tierBadge(w.tier)} <span class="small muted">— your ${w.adj} ${w.rank} ${w.male?'husband':'wife'}</span></div>
+      `<div><b style="color:var(--gold)">⚭ ${w.name}</b> ${tierBadge(w.tier)} <span class="small muted">— your ${w.adj} ${w.rank} ${w.male?'husband':'wife'}${w.age!==undefined?', '+w.age:''}</span></div>
        ${(()=>{const st=lookStage(w.looks===undefined?5:w.looks); return `<div class="small"><b style="color:${st.col}">${st.name}</b> <span class="muted">— ${st.blurb}</span></div>`;})()}
        <div class="small">♥ Emotional: ${mkbar(v.e,eC)} <b style="color:${eC}">${v.e}</b>/100 <span class="muted">${v.ew}</span></div>
        <div class="small">${ADULT?'🔥 Physical':'🔥 Devotion'}: ${mkbar(v.p,pC)} <b style="color:${pC}">${v.p}</b>/100 <span class="muted">${v.pw}</span></div>
@@ -10909,7 +11454,9 @@ function buildMarriageCard(b){
       kids.innerHTML='<b style="color:var(--gold)">YOUR HOUSE:</b> '+G.children.map(c=>{
         const age=G.day-c.born, kr=(c.rel===undefined?55:c.rel)|0;
         const krC= kr>=75?'#e26a8a': kr>=45?'#e8c34a':'#8a6a4a';
-        return (c.sex==='m'?'👦 ':'👧 ')+c.name+' <span style="color:'+krC+'">♥'+kr+'</span> <span class="muted">('+age+'d'
+        const yrs=childYears(age), grown=age>=40;
+        return (grown?(c.sex==='m'?'🧔 ':'👩 '):(c.sex==='m'?'👦 ':'👧 '))+c.name
+          +' <span style="color:'+krC+'">♥'+kr+'</span> <span class="muted">('+yrs+' yrs'
           +(c.sex==='m'&&age>=40&&!c.wedTo?(c.appointed?' · serves as your general':' · OF AGE — appoint him in INTRIGUE'):'')
           +(c.wedTo?' · wed to '+c.wedTo: c.wed?' · wed to a foreign court':'')
           +(c.kids?' · '+c.kids+'👶':'')+')</span>';
@@ -10960,7 +11507,7 @@ function openMarry(forced){
     const st=lookStage(w.looks===undefined?5:w.looks);
     const info=document.createElement('div'); info.style.flex='1'; info.innerHTML=
       `<div><b style="color:var(--gold)">${w.name}</b> ${tierBadge(w.tier)}</div>
-       <div class="small">${w.adj} ${w.rank} · <span class="muted">${w.male? 'a lord of his people'+(w.jewel?', gold-ringed':'') : w.build+' of figure'+(w.jewel?', richly adorned':'')}</span></div>
+       <div class="small">${w.adj} ${w.rank}${w.age!==undefined?', <b>'+w.age+'</b>':''} · <span class="muted">${w.male? 'a lord of his people'+(w.jewel?', gold-ringed':'') : w.build+' of figure'+(w.jewel?', richly adorned':'')}${w.age>=34?(w.male?' · greying at the temples':' · a widow, and no longer young'):''}</span></div>
        <div class="small" style="margin:2px 0"><b style="color:${st.col}">${st.name}</b> <span class="muted">— ${st.blurb}</span></div>
        ${G.hasBodyMap? `<div class="small muted" style="font-style:italic">${bodyBlurb(w)}</div>` : '<div class="small muted" style="font-style:italic">buy the BODY MAP to see exactly what you are getting</div>'}
        ${statPips(w)}
@@ -12729,6 +13276,10 @@ window.__SS = {
   openCoup, coupDue, purpleRisk, makeCourt, ageBodies, ageOneBody, upkeepScore, spouseTierBonus, finishBed,
   figureScore, selfStage, stageIndex, courtBonus, courtCultivateCost, COURT_LEVERS, SHADOW_STAGES, shadowStage,
   drawHusbandFigTest:drawHusbandFig, drawGroomPortrait, briadeImg, openPortrait,
+  drawKinPortrait, kinLook, kinInherit, kinAge, ageMarks, greyHair, agedSkin, mixHex,
+  drawWifeFigTest:drawWifeFig, drawKidFig, inheritDNA, childYears, makeBride,
+  drawBridePortrait, setSecretSub:(v)=>{ secretSub=v; }, setSecretAroused:(v)=>{ secretAroused=!!v; },
+  lit2, rgbA, rgbTriple,
   openHerbs, HERBS, HERB_BY_ID, drawHerbIcon, herbCount, herbAdd, herbUse,
   ILLNESSES, rollIllness, curesIll, birthRisk, birthPrepLine, illnessBite, get DM(){return DM;},
   TITLES, TITLE_BY_ID, titleName, titleSlots, earnedTitles, equippedTitles, titleLine, grantStartingTitles,

@@ -91,6 +91,36 @@ publicly, leaving it off keeps the game safe for a general audience.
   decides whether you keep breathing, three court figures with their own opinions of you, and a
   live **RISK TO THE PURPLE** reading fed by unrest, unanswered petitions and a brother with a
   better claim.
+- **The years, written on every face** — one age drives grey at the temples, crow's
+  feet, a furrowed brow, a jaw that softens and then goes, clouded eyes past seventy,
+  a receding hairline on a man and a covered head on a matron — and youth gets its own
+  bloom, so twenty does not look like thirty-five. It runs in the family gallery, the
+  court, the marriage portraits, the husband sprite and the villa alike. Your house
+  ages exactly as fast as you do, because everyone's age is an offset from yours.
+- **Five drawn bust tiers to match the rear** — FLAT (one unbroken panel, nothing to
+  part), RAISED (a modest swell), GOOD (two clear cups and a short V), BIG (parted
+  cups with real depth and a forward thrust), HUGE (it crests above the neckline,
+  spills past the ribs and the lacing is visibly losing). Drawn in the marriage
+  portrait, the villa sprite and the body map's front and side views — noble silk and
+  peasant homespun each get their own treatment at every rung.
+- **The whole house has real faces** — every parent, sibling, Praetorian Prefect and
+  court figure is drawn on the same 1-10 ladder as your spouse: five male face tiers,
+  five female, a build that shows in the shoulders and the bodice, and hair from thin
+  to piled-high Flavian. Fixed for life, seeded from the name.
+- **Blood shows** — a child's face, hair and build are rolled from *both* parents
+  rather than from nothing, so a house of plain people does not produce five stunning
+  children. Grown children stand in the family portrait as adults, drawn on the face
+  they inherited, instead of staying round-cheeked toddlers forever.
+- **The court are people now** — each of the three court figures has a name, an age,
+  a sex and a drawn face beside their lever, not just an emoji.
+- **The body map is modelled** — every mass on the chart now carries a light from the
+  upper left and a shadow opposite, so a figure reads as a body rather than as a set
+  of flat stickers. Plus a surveyor's grid with major lines and numerals, and a vignette.
+- **The other ledger, rebuilt** — the studies are drawn with real gradients and a cast
+  shadow; the rule has numerals and a **ROME · AVERAGE** pin so the number means
+  something ("+3 over Rome's common run"); the girth view has calliper jaws that
+  actually close on the section; and when roused, the **at-rest state is ghosted over
+  the top** so the difference is the thing you can see.
 - **Five drawn booty tiers, in the portrait too** — FLAT, RAISED, ELEVATED, FAT and COLOSSAL are
   five genuinely different silhouettes on the body map, in the villa sprite **and in the painted
   marriage portrait you actually look at**, not one shape scaled up. FLAT lets the cloth fall
