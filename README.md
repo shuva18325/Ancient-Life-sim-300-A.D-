@@ -103,6 +103,20 @@ publicly, leaving it off keeps the game safe for a general audience.
   drawn there for the rest of your life: on the body map, in the villa, on your
   portrait and in the bath, where there is nothing to hide it. A light wound is one
   stroke, a serious one two, a grave one a ruin. The chart lists them by name.
+- **Three pool bugs, fixed** — pressing SPACE or W near the pool used to be able to
+  glitch: both keys were checked unconditionally in the same tick, so a fast
+  double-press (or a touch player's thumb clipping two adjacent pads) could start
+  the solo bath and have it silently replaced by the invite scene, or vice versa,
+  before either ever drew a frame. Only one action starts per tick now. Separately,
+  the **W/INVITE touch button was hidden outright in the villa** — the on-screen
+  prompt said "W: INVITE" but touch players had no control that sent it; it now
+  shows in the villa too, relabelled 💞 so it isn't confused with the race's WHIP
+  button. And the five pool positions were assigning roles to **"the player" and
+  "the spouse"** rather than to whichever figure is actually male — so a woman
+  playing opposite a male spouse was drawn behind him doing the pressing in
+  "against the marble lip," and lifting him in "lifted." Roles now follow **which
+  figure is actually male**, so the pairing plays the same way regardless of which
+  side of it is you.
 - **The bedchamber is a theatre** — the shadow-play used to run at two-thirds size
   against its own flat backdrop. It now gets what made the pool work: the room dims to
   nothing, a **wall of lamplit warmth** appears behind the pair so the silhouettes are
