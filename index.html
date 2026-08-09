@@ -8377,33 +8377,113 @@ function drawPoolPlace(s,T,dx,dw,kind){
   if(bath && T>500 && (T|0)%200<1.5) s.hearts.push({x:px0+80,y:wy-46,vy:0.5,life:56,c:'#ffd0da'});
 }
 // two silhouettes waist-deep: the drift, the dolphin roll, the merge
-function drawWaterCouple(cx0,wy,T,s){
-  const S='#17100a', S2='#1c130c';
+/* =====================================================================
+   THE SHALLOWS. Two silhouettes at the waterline — and they were the same two
+   rectangles for everybody, drawn on nobody's measurements, which then simply
+   merged into one lump that sat there tilting a pixel and a half. Both figures
+   are now built from their OWN scores, the roles follow who is actually who,
+   and once they close there is a rhythm to the thing instead of a hug.
+   A and B are the two people: A waits in the water, B came in after.
+   ===================================================================== */
+function waterMetrics(p){
+  const b=(p&&p.body)||{}, g=(id,d)=>b[id]===undefined?d:b[id], male=!!(p&&p.male);
+  return { male,
+    shW: male? Math.round(8 + g('booty',6)*0.72) : Math.round(6 + g('bust',6)*0.20 + g('booty',6)*0.10),
+    bust: g('bust',6), booty:g('booty',6), waist:g('waist',6),
+    hdW: Math.round(8 + g('face',6)*0.16),
+    hair: Math.round(2 + g('hairq',6)*0.34),
+    tone: male? '#1c130c' : '#17100a',
+  };
+}
+function drawWaterCouple(cx0,wy,T,s,A,B,o){
+  A=A||{male:!(G&&G.isFemale), body:(G&&G.body)}; B=B||(G&&G.wife)||{male:true};
+  o=o||{};
+  // hearts and splash live in the UNTRANSFORMED layer, so when the camera comes
+  // in they need to be told where the pair actually landed on screen
+  const SX=(o.sx===undefined? cx0 : o.sx), SY=(o.sy===undefined? wy : o.sy);
+  const MA=waterMetrics(A), MB=waterMetrics(B);
   const close=clamp((T-540)/260,0,1);                                            // they drift together
-  const b1=Math.sin(T*0.09)*1.5, b2=Math.sin(T*0.09+1.4)*1.5;
-  const hx=cx0-20+close*11, wx2=cx0+20-close*11;
+  const bA=Math.sin(T*0.09)*1.5, bB=Math.sin(T*0.09+1.4)*1.5;
+  const ax=cx0-20+close*11, bx=cx0+20-close*11;
+  // ---- ONE PERSON AT THE WATERLINE, shaped by what they actually are ----
+  const person=(X,Y,M,bob,lean)=>{
+    const S=M.tone, hd=M.hdW, sh=M.shW, HY=Y-30+bob, hw2=(hd/2)|0;
+    // a rim of lamplight down the lit side, so a black shape still has an edge
+    ctx.globalAlpha=0.40;
+    px(X+((sh/2)|0),HY+12,1,17,'#ffdca0'); px(X+hw2,HY+1,1,7,'#ffdca0');
+    ctx.globalAlpha=1;
+    // THE SKULL — rounded off at the crown and the jaw, not a square
+    px(X-hw2+1,HY,hd-2,1,S); px(X-hw2,HY+1,hd,6,S); px(X-hw2+1,HY+7,hd-2,1,S);
+    if(M.male){
+      px(X-hw2,HY-Math.max(1,M.hair-2),hd,Math.max(1,M.hair-1),S);            // a cropped head, or a long one
+      if(M.hair>=6){ px(X-hw2-1,HY+2,2,M.hair+1,S); px(X+hw2-1,HY+2,2,M.hair+1,S); }
+    } else {
+      px(X-hw2-1,HY-3,hd+2,4,S); px(X-hw2-2,HY-1,2,3,S); px(X+hw2,HY-1,2,3,S);  // piled wet hair
+      px(X+hw2-1,HY+6,3,M.hair+5,S);                                            // and a wet fall of it
+    }
+    px(X-1+lean,HY+8,3,3,S);                                                    // neck
+    // SHOULDERS, sloped rather than a plank
+    px(X-((sh/2)|0)+2,HY+10,sh-4,1,S); px(X-((sh/2)|0),HY+11,sh,3,S);
+    // THE TRUNK, tapering to the waterline
+    for(let r=0;r<16;r++){ const t=r/15, hw3=Math.max(2,Math.round((sh/2)*(1-0.26*t)));
+      px(X-hw3,HY+14+r,hw3*2,1,S); }
+    if(M.male){
+      if(M.bust>=7){ px(X-((sh/2)|0)+1,HY+14,sh-2,4,shade(S,9)); }              // a great chest breaks the surface
+      px(X-((sh/2)|0)-3,HY+12,3,12,S); px(X+((sh/2)|0),HY+12,3,12,S);           // arms
+    } else {
+      // HER BUST AT THE WATERLINE, on the same five rungs as everywhere else
+      const uT = M.bust>=9?4 : M.bust>=7?3 : M.bust>=5?2 : M.bust>=3?1 : 0;
+      if(uT>0){ const w2=2+uT, h2=3+uT, buoy=Math.max(0,Math.sin(T*0.18))*1.4;
+        px(X-w2-1,HY+15-buoy,w2,h2,S); px(X+1,HY+15-buoy,w2,h2,S);
+        px(X,HY+15-buoy,1,h2-1,shade(S,8));
+        if(uT>=3) px(X-w2-2,HY+16-buoy,1,h2-2,S); }
+      px(X-((sh/2)|0)-3,HY+12,3,11,S); px(X+((sh/2)|0),HY+12,3,11,S);
+    }
+  };
   if(close<1){
-    // HIM: head + broad shoulders riding the waterline
-    px(hx-4,wy-28+b1,9,10,S2); px(hx-2,wy-30+b1,7,3,S2);
-    px(hx-9,wy-18+b1,19,6,S2); px(hx-6,wy-12+b1,13,14,S2);
-    // HER: piled wet hair, shoulders — and the profile that started three wars
-    px(wx2-4,wy-25+b2,9,9,S); px(wx2-5,wy-29+b2,11,4,S); px(wx2+3,wy-20+b2,3,8,S);
-    px(wx2-6,wy-16+b2,13,5,S); px(wx2-5,wy-11+b2,11,13,S);
-    px(wx2-9,wy-9+b2+Math.max(0,Math.sin(T*0.18))*1.4,5,7,S);                    // the bust profile, buoyant
+    person(ax,wy,MA,bA,0);
+    person(bx,wy,MB,bB,0);
+    // a wake between them as they close
+    ctx.globalAlpha=0.35; px(ax+6,wy+3,Math.max(1,(bx-ax)-12),1,'#5a9ec4'); ctx.globalAlpha=1;
   } else {
-    // ONE silhouette now — two heads tilting into a kiss above a single shape
-    const kiss=Math.sin(T*0.06)*1.2;
-    px(cx0-11,wy-28+kiss,9,10,S2); px(cx0-9,wy-30+kiss,7,3,S2);
-    px(cx0+2,wy-26-kiss,9,9,S); px(cx0+1,wy-30-kiss,11,4,S);
-    px(cx0-13,wy-18,26,8,S); px(cx0-10,wy-10,20,12,S);
-    if((T|0)%22<2) s.hearts.push({x:cx0,y:wy-36,vy:0.6,life:50,c:'#e26a8a'});
+    /* ---- TOGETHER, AND MOVING. A beat, and everything answers to it: they
+       rise and settle on it, the near one leans in and away, the arms shift,
+       the water heaves, rings pulse out of them and the surface breaks. ---- */
+    const heat = clamp(((MA.bust+MA.booty+MB.bust+MB.booty)/4 - 3)/7, 0.25, 1);
+    const beat = T*(0.13+heat*0.06);
+    const surge= Math.sin(beat), surge2=Math.sin(beat-0.7);
+    const amp  = 2.2 + heat*2.6;
+    const lift = -Math.max(0,surge)*amp;                                          // one rises on the beat
+    const roll = surge2*1.6;
+    const AX=cx0-6+roll*0.6, BX=cx0+6-roll*0.6;
+    person(AX,wy+lift*0.35,MA,Math.sin(T*0.09)*0.8, roll*0.5);
+    person(BX,wy+lift,      MB,Math.sin(T*0.09+1.4)*0.8, -roll*0.5);
+    // the heads tip together at the top of each beat
+    if(surge>0.55){ px(cx0-2,wy-32+lift*0.7,5,3,'#17100a'); }
+    // arms round the other — they move rather than clamp
+    ctx.globalAlpha=0.9;
+    px(AX+4,wy-14+lift*0.5+surge*1.6,7,3,'#1c130c');
+    px(BX-10,wy-11+lift*0.8-surge*1.4,7,3,'#17100a');
+    ctx.globalAlpha=1;
+    // THE WATER ANSWERS: the surface heaves, and breaks on the peak
+    const heave=Math.abs(surge)*amp*0.7;
+    px(cx0-30,wy+2-heave*0.5,60,3,'rgba(90,158,196,.40)');
+    for(let i=0;i<3;i++){ const rr=8+((T*1.6+i*17)%40);
+      ctx.globalAlpha=clamp(1-rr/40,0,1)*0.55;
+      ctx.strokeStyle='#5a9ec4'; ctx.lineWidth=1;
+      ctx.beginPath(); ctx.ellipse(cx0,wy+5,rr,rr*0.26,0,0,7); ctx.stroke(); ctx.globalAlpha=1; }
+    if(surge>0.92 && (T|0)%6<2){
+      for(let i=0;i<5;i++) s.splash.push({x:SX+rnd(-16,16),y:SY-4,vx:rnd(-1.6,1.6),vy:rnd(-2.6,-1.0),life:22});
+    }
+    if((T|0)%22<2) s.hearts.push({x:SX+rnd(-10,10),y:SY-46,vy:0.6,life:50,c:'#e26a8a'});
   }
-  // every so often the famous 🍑 breaches like a dolphin — Rome would weep
-  const roll=(T-500)%240;
-  if(close>=0.4 && roll>190 && roll<230){
-    const rp=(roll-190)/40, arc=Math.sin(rp*Math.PI)*11;
-    px(cx0+34,wy+4-arc,9,7,S); px(cx0+42,wy+6-arc,8,8,S); px(cx0+49,wy+7-arc,3,5,S);   // back → the two rounds → gone
-    if(rp>0.4&&rp<0.6) for(let i=0;i<4;i++) px(cx0+36+i*5,wy-arc,2,2,'#8ac4e0');
+  // every so often the famous 🍑 breaches like a dolphin — and only if there is one
+  const roll2=(T-500)%240;
+  if(close>=0.4 && roll2>190 && roll2<230 && Math.max(MA.booty,MB.booty)>=5){
+    const M=(MA.booty>=MB.booty?MA:MB), rp=(roll2-190)/40, arc=Math.sin(rp*Math.PI)*11;
+    const w2=Math.round(5+M.booty*0.5), S=M.tone;
+    px(cx0+30,wy+4-arc,w2,7,S); px(cx0+30+w2,wy+6-arc,w2-1,8,S); px(cx0+30+w2*2-1,wy+7-arc,3,5,S);
+    if(rp>0.4&&rp<0.6) for(let i=0;i<4;i++) px(cx0+32+i*5,wy-arc,2,2,'#8ac4e0');
   }
   // the water takes them from the waist down
   px(cx0-44,wy+2,88,14,'rgba(26,66,92,.78)'); px(cx0-44,wy+2,88,1,'rgba(90,158,196,.55)');
@@ -8584,25 +8664,67 @@ function drawWifeFig(c,x,y,w,ph,mode){
   if(turning) c.restore();
 }
 // the same lady, robe left on the rim — the steam does the censoring
+/* ---- UNDRESSED, AND ON THEIR OWN MEASUREMENTS. This used to be two fixed
+   sets of rectangles, so a flat spouse and a maxed one were drawn identically
+   in the pool. Every dimension now comes off the same scores the body map
+   reads, and the hair is the arrangement they were painted with. ---- */
 function drawUndressedFig(c,x,y,w){
   const P=(a,b2,ww,h,col)=>{c.fillStyle=col;c.fillRect(Math.round(x+a),Math.round(y+b2),Math.round(ww),Math.round(h));};
-  const skin=w.skin||'#e6bd94', hair=w.hair||'#5a3a1e', sh=shade(skin,-24);
-  if(w.male){                                                     // a lord of the house, robe on the rim
-    P(-4,-32,4,16,skin); P(1,-32,4,16,skin); P(-5,-2,6,2,'#8a5c34'); P(1,-2,6,2,'#8a5c34');
-    P(-6,-42,12,11,skin); P(-6,-42,12,1,shade(skin,20));           // hips/thighs
-    P(-7,-56,14,15,skin); P(-7,-56,14,2,shade(skin,22)); P(5,-54,2,12,sh);   // broad chest + shading
-    P(-2,-60,5,5,skin);                                            // neck
-    P(-10,-55,3,13,skin); P(7,-55,3,13,skin);                      // arms
-    P(-5,-70,10,10,skin); P(-5,-72,11,4,hair);                     // head + cropped hair
+  const skin=w.skin||'#e6bd94', hair=w.hair||'#5a3a1e', sh=shade(skin,-24), hi=shade(skin,20);
+  const hHi=shade(hair,26), hSh=shade(hair,-24);
+  const B=w.body||{}, gv=(id,d)=>B[id]===undefined?d:B[id];
+  const bu=gv('bust',6), be=gv('booty',6), wa=gv('waist',6), lg=gv('legs',6), fa=gv('face',6), hq=gv('hairq',6);
+  const cut=w.hairStyle||hairStyleFallback(w);
+  if(w.male){
+    const shW  = Math.round(6 + be*0.52);                     // shoulder half-width
+    const chW  = Math.round(5 + bu*0.42);                     // the chest slab
+    const gut  = Math.round((10-wa)*0.34);                    // a soft middle pushes out
+    const legL = Math.round(12 + lg*0.52);
+    const legW = Math.round(3 + lg*0.12);
+    const hdW  = Math.round(9 + fa*0.24), hdH = 9 + (fa>=9?2:fa>=7?1:0);
+    const top  = -18-legL;                                    // where the hips sit
+    P(-legW-1,-legL-2,legW,legL,skin); P(1,-legL-2,legW,legL,sh);          // legs
+    P(-legW-2,-2,legW+2,2,'#8a5c34'); P(1,-2,legW+2,2,'#8a5c34');
+    P(-shW+1,top-9,shW*2-2+gut,11,skin); P(-shW+1,top-9,shW*2-2,1,hi);     // hips
+    for(let ry=0;ry<15;ry++){ const t=ry/14;                               // the trunk, tapered row by row
+      const hw=Math.round(shW + ((shW*0.62+gut)-shW)*t);
+      P(-hw,top-24+ry,hw*2,1,skin); P(-hw,top-24+ry,1,1,hi); P(hw-1,top-24+ry,1,1,sh); }
+    P(-chW,top-23,chW*2,6,shade(skin,6)); P(-1,top-23,2,6,sh);             // the pectorals
+    if(bu>=8) P(-chW,top-24,chW*2,1,hi);
+    if(wa>=8){ P(-3,top-14,7,1,sh); P(-3,top-11,7,1,sh); }                 // and a cut midriff
+    P(-2,top-28,5,5,skin);                                                  // neck
+    P(-shW-3,top-24,3,14,skin); P(shW,top-24,3,14,skin);                    // arms
+    P(-hdW/2,top-28-hdH,hdW,hdH,skin); P(-hdW/2,top-28-hdH,hdW,1,hi);       // head
+    drawHairM(P,{hair,hHi,hSh},cut,-hdW/2,top-28-hdH,hdW,{fall:0.5});
     return;
   }
-  P(-3,-32,7,15,skin); P(-4,-17,4,15,skin); P(1,-17,4,15,skin); P(-4,-2,5,2,'#8a5c34'); P(0,-2,5,2,'#8a5c34'); // legs
-  P(-6,-40,12,10,skin); P(-6,-40,12,1,shade(skin,20)); P(4,-38,2,8,sh);                            // hips
-  P(-3,-44,7,5,skin);                                                                              // waist
-  P(-5,-53,10,9,skin); P(-7,-51,3,6,skin);                                                         // torso + bust hint
-  P(-2,-57,5,4,skin);                                                                              // neck
-  P(-8,-52,3,11,skin); P(5,-52,3,11,skin);                                                         // arms
-  P(-4,-66,9,9,skin); P(-5,-69,11,5,hair); P(5,-65,2,10,hair);                                     // head + hair down
+  const bustW = Math.round(1 + bu*0.62), bustH = Math.round(2 + bu*0.40);
+  const hipW  = Math.round(4 + be*0.56);
+  const waistW= Math.round(6 - wa*0.30);
+  const legL  = Math.round(11 + lg*0.52);
+  const hdW   = Math.round(8 - (fa>=9?1:0)), hdH = 8 + (fa>=7?1:0);
+  const top   = -16-legL;
+  P(-3,top-2,7,13,skin);                                                    // seat
+  P(-waistW/2-2,-legL-2,legL>0?4:0,legL,skin); P(1,-legL-2,4,legL,sh);      // legs
+  P(-5,-2,5,2,'#8a5c34'); P(0,-2,5,2,'#8a5c34');
+  P(-hipW,top-9,hipW*2,11,skin); P(-hipW,top-9,hipW*2,1,hi);                // hips, to her score
+  P(hipW-2,top-7,2,8,sh);
+  P(-waistW/2,top-14,waistW,6,skin);                                        // and the waist she has
+  P(-5,-0-legL-11,10,9,skin);
+  P(-5,top-24,10,11,skin); P(-5,top-24,10,1,hi);                            // ribcage
+  if(bu>=3){                                                                // THE BUST, on the same five rungs
+    const uT = bu>=9?4 : bu>=7?3 : bu>=5?2 : 1;
+    P(-bustW-2,top-24,bustW,bustH+uT,skin); P(2,top-24,bustW,bustH+uT,skin);
+    P(-bustW-2,top-24,bustW,1,hi);          P(2,top-24,bustW,1,hi);
+    P(0,top-24,1,bustH+uT-1,sh);                                            // the line between
+    P(-bustW-2,top-24+bustH+uT,bustW,1,sh); P(2,top-24+bustH+uT,bustW,1,sh);
+    if(uT>=3){ P(-bustW-3,top-23,1,bustH+uT-2,skin); P(2+bustW,top-23,1,bustH+uT-2,skin); }
+  } else { P(-5,top-19,10,1,sh); }                                          // flat is drawn flat
+  P(-2,top-28,5,5,skin);                                                    // neck
+  P(-7,top-24,3,12,skin); P(4,top-24,3,12,skin);                            // arms
+  P(-hdW/2,top-28-hdH,hdW,hdH,skin); P(-hdW/2,top-28-hdH,hdW,1,hi);         // head
+  drawHairF(P,{hair,hHi,hSh,gold:'#e8c34a',goldHi:'#fff0b0',dress:w.dress||'#7a2d9a'},
+            cut,-hdW/2,top-28-hdH,hdW,{fall:0.34});
 }
 /* ---- ONE DESCRIPTION OF YOU, used by the villa, the portrait and the plates,
    so the person walking your halls is the person in your family portrait. ---- */
@@ -8701,7 +8823,11 @@ function updateDomusScene(dt){
     if(T>216&&T<218) D.props.push({kind:'breastband',x:128,y:182,vx:2.0,vy:-2.6,r:0,vr:-0.1});
     if(T>238&&T<240){ D.props.push({kind:'girdle',x:128,y:186,vx:1.4,vy:-2.2,r:0,vr:0.14}); sfx('giggle'); }
     if(T>262&&T<264){ sfx('thud'); for(let i=0;i<12;i++) D.splash.push({x:98+rnd(-12,12),y:200,vx:rnd(-1.6,1.6),vy:rnd(-2.8,-1),life:30}); }
-    if(T>290 && (T|0)%4<1) D.steam.push({x:36+Math.random()*100,y:202,vy:0.3+Math.random()*0.3,life:76});
+    // steam used to spawn straight on top of the pair at four-frame intervals,
+    // which put a dozen half-opaque clouds over the only thing worth looking at.
+    // It now rises at the two ENDS of the pool and leaves the middle clear.
+    if(T>290 && (T|0)%9<1) D.steam.push({x:(Math.random()<0.5? 26+Math.random()*26 : 110+Math.random()*24),
+                                         y:202, vy:0.3+Math.random()*0.3, life:70, soft:1});
     if(T>310){
       if(!sc.nGig||T>=sc.nGig){ sfx('giggle'); sc.nGig=T+70+Math.random()*60; }
       if(!sc.nKiss||T>=sc.nKiss){ sfx('kiss'); sc.nKiss=T+90+Math.random()*70; }
@@ -8815,12 +8941,22 @@ function drawDomus(){
     px(118,190,16,6,G.tunic||'#7a2f22'); px(118,190,16,2,shade(G.tunic||'#7a2f22',22)); // tunic folded on the rim
     if(T2<316){ ctx.textAlign='center'; pixelText('~ the water takes the week away ~',W/2,H-6,'#c8b060',1); }
   } else if(sc.kind==='poolwife'){
-    const T2=sc.t;
-    // the player waits in the water from the start
-    px(60,192,9,9,G.skin||'#caa06a'); px(60,190,9,3,'#3a2618'); px(55,200,19,3,shade(G.skin||'#caa06a',-12));
+    const T2=sc.t, ME=playerLook();
+    // THE PLAYER WAITS IN THE WATER — but only until the pair take over. This
+    // block used to draw every frame, so a spare head sat beside the couple
+    // for the whole of the scene.
+    if(T2<292){
+      const mHair=greyHair(G.hairCol||'#3a2618',G.age);
+      px(60,192,9,9,G.skin||'#caa06a'); px(60,190,9,3,mHair);
+      if(G.isFemale) px(68,192,3,9,mHair);                                            // her wet hair down her neck
+      px(55,200,19,3,shade(G.skin||'#caa06a',-12));
+    }
     if(T2<160){ const wx2=330-(T2/160)*(330-124);                                     // the walk over
-      if(w.male){ ctx.save(); ctx.translate(wx2,FY); drawHusbandFig(ctx,0,0,G.wifeRel|0,w.skin,w.dress); ctx.restore(); }
-      else drawWifeFig(ctx,wx2,FY,w,T2*0.25); }
+      // ...on THEIR measurements. This passed no subject at all, so your spouse
+      // walked to the pool wearing your body.
+      if(w.male){ ctx.save(); ctx.translate(wx2,FY);
+        drawHusbandFig(ctx,0,0,G.wifeRel|0,w.skin,w.dress,w,T2*0.22,'walk'); ctx.restore(); }
+      else drawWifeFig(ctx,wx2,FY,w,T2*0.25,'walk'); }
     else if(T2<262){                                                                   // the robe drops — steam is a gentleman
       drawUndressedFig(ctx,124,FY,w);                                                  // works for either spouse now
       ctx.globalAlpha=.85; px(115,FY-52,19,11,'#efeae2'); px(114,FY-38,21,13,'#efeae2'); ctx.globalAlpha=1;  // two stubborn clouds
@@ -8841,27 +8977,66 @@ function drawDomus(){
       ctx.globalAlpha=.8; px(96,FY-40,20,10,'#efeae2'); ctx.globalAlpha=1;
       ctx.textAlign='center'; pixelText('~ a clean dive ~',W/2,H-6,'#c8b060',1);
     }
-    else {                                                                             // full silhouettes in the shallows
-      drawWaterCouple(80,202,T2+210,D);
+    else {
+      /* ---- THE CAMERA COMES IN. This whole scene used to play out in a sixty
+         pixel wide corner of a four-hundred-and-eighty pixel hall, which is
+         why you could not see the silhouettes doing anything: they were four
+         pixels tall. The hall dims and the shallows fill the frame. ---- */
+      const Z=2.6, CX=W/2, CY=164;
+      ctx.fillStyle='rgba(9,6,11,.86)'; ctx.fillRect(0,14,W,H-30);                     // the hall goes out
+      /* A WALL OF LAMPLIT STEAM BEHIND THEM. They are shadows, and a shadow
+         needs something bright to be a shadow ON — drawn dark-on-dark, all you
+         could make out was that two blurs had merged. */
+      { const flick=0.90+Math.sin(T2*0.11)*0.06+Math.sin(T2*0.29)*0.03;
+        const g4=ctx.createRadialGradient(CX,CY-16,8,CX,CY-16,164);
+        g4.addColorStop(0,   'rgba(250,238,216,'+(0.95*flick)+')');
+        g4.addColorStop(0.38,'rgba(234,204,158,'+(0.66*flick)+')');
+        g4.addColorStop(0.72,'rgba(176,124,74,'+(0.26*flick)+')');
+        g4.addColorStop(1,   'rgba(90,56,32,0)');
+        ctx.fillStyle=g4; ctx.fillRect(0,14,W,H-30); }
+      // two lamps carrying the light, one either side
+      for(const lx of [CX-150, CX+150]){
+        px(lx-3,150,7,4,'#6a5230'); px(lx-2,142,5,8,'#8a6a3a');
+        const fl=3+Math.sin(T2*0.31+lx)*1.2;
+        px(lx-1,138-fl,3,fl+4,'#ffd88a'); px(lx,136-fl,1,fl+3,'#fff4d0');
+        ctx.globalAlpha=0.20; px(lx-9,132-fl,19,18,'#ffcf80'); ctx.globalAlpha=1;
+      }
+      ctx.save();
+      ctx.translate(CX,CY); ctx.scale(Z,Z); ctx.translate(-80,-198);
+      px(22,200,116,18,'rgba(30,84,116,.86)'); px(22,200,116,2,'rgba(150,214,238,.85)'); // the water, enlarged with them
+      for(let i=0;i<5;i++) px(26+((T2*0.6+i*19)%104),203+i*3,8,1,'rgba(120,186,214,.6)');
+      drawWaterCouple(80,202,T2+210,D,ME,w,{sx:CX, sy:CY+(202-198)*Z});
+      ctx.restore();
+      // the faintest vignette — enough to hold the eye, not enough to hide them
+      { const g3=ctx.createRadialGradient(CX,CY-8,90,CX,CY-8,220);
+        g3.addColorStop(0,'rgba(0,0,0,0)'); g3.addColorStop(1,'rgba(6,4,8,.55)');
+        ctx.fillStyle=g3; ctx.fillRect(0,14,W,H-30); }
       ctx.textAlign='center'; pixelText('~ the steam keeps its secrets ~',W/2,H-6,'#c8b060',1);
     }
   } else if(sc.kind==='wardrobe'){
     const T2=sc.t;
     if(T2<140){ const wx2=(sc.fromX||330)+(280-(sc.fromX||330))*(T2/140);
-      if(w.male){ ctx.save(); ctx.translate(wx2,FY); drawHusbandFig(ctx,0,0,G.wifeRel|0,w.skin,w.dress); ctx.restore(); }
-      else drawWifeFig(ctx,wx2,FY,w,T2*0.25);
+      if(w.male){ ctx.save(); ctx.translate(wx2,FY);
+        drawHusbandFig(ctx,0,0,G.wifeRel|0,w.skin,w.dress,w,T2*0.22,'walk'); ctx.restore(); }
+      else drawWifeFig(ctx,wx2,FY,w,T2*0.25,'walk');
       drawDomusPlayer(D.x,FY,0); }
     else if(T2<180){ ctx.globalAlpha=1-(T2-140)/40;                                    // they slip inside
       drawDomusPlayer(300,FY,0);
-      if(w.male){ ctx.save(); ctx.translate(284,FY); drawHusbandFig(ctx,0,0,G.wifeRel|0,w.skin,w.dress); ctx.restore(); }
+      if(w.male){ ctx.save(); ctx.translate(284,FY);
+        drawHusbandFig(ctx,0,0,G.wifeRel|0,w.skin,w.dress,w,0,'idle'); ctx.restore(); }
       else drawWifeFig(ctx,284,FY,w,0);
       ctx.globalAlpha=1; }
     else if(T2<900){
       // two silhouettes pressed against the cedar doors, and the whole thing working
       const k=(T2-180)/720, rock=Math.sin(T2*0.9);
-      ctx.globalAlpha=0.30+0.10*Math.sin(T2*0.5);
-      px(296+rock*1.4,150,12,44,'#1c130c'); px(310+rock*1.4,146,12,48,'#1c130c');       // the pair, shadowed on the doors
-      ctx.globalAlpha=1;
+      // the pair shadowed on the cedar — on THEIR builds, and moving with it
+      { const MA=waterMetrics(playerLook()), MB=waterMetrics(w);
+        const beat=T2*0.34, sg=Math.sin(beat), lift=-Math.max(0,sg)*3.2;
+        ctx.globalAlpha=0.30+0.10*Math.sin(T2*0.5);
+        px(298+rock*1.4-MA.shW*0.30, 150+lift*0.4, Math.round(MA.shW*0.9), 44, '#1c130c');
+        px(310+rock*1.4-MB.shW*0.24, 146+lift,     Math.round(MB.shW*0.9), 48, '#17100a');
+        px(298+rock*1.4-2,146+lift*0.4,7,7,'#1c130c'); px(312+rock*1.4,142+lift,7,7,'#17100a');   // their heads
+        ctx.globalAlpha=1; }
       px(292+rock*1.6,132,34,3,'#8a6640');                                              // the cornice knocking loose
       if((T2|0)%9<1) D.props.push({kind:'sandal',x:300,y:206,vx:rnd(-1.4,-0.4),vy:rnd(-1.6,-0.6),r:0,vr:0.2});
       const line = k<0.3? '~ sturdy craftsmanship ~' : k<0.6? '~ the cedar is being TESTED ~'
@@ -8870,7 +9045,8 @@ function drawDomus(){
     }
   }
   // steam veils all — drawn last on purpose
-  for(const st of D.steam){ ctx.globalAlpha=clamp(st.life/50,0,1)*0.55; px(st.x-4,st.y-8,9,7,'#e8e2da'); px(st.x-2,st.y-13,6,5,'#f2eee8'); ctx.globalAlpha=1; }
+  for(const st of D.steam){ ctx.globalAlpha=clamp(st.life/50,0,1)*(st.soft?0.34:0.55);
+    px(st.x-4,st.y-8,9,7,'#e8e2da'); px(st.x-2,st.y-13,6,5,'#f2eee8'); ctx.globalAlpha=1; }
   ctx.textAlign='center';
   for(const h of D.hearts) pixelText('♥',h.x,h.y,'#e26a8a',1);
 }

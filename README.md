@@ -91,6 +91,18 @@ publicly, leaving it off keeps the game safe for a general audience.
   decides whether you keep breathing, three court figures with their own opinions of you, and a
   live **RISK TO THE PURPLE** reading fed by unrest, unanswered petitions and a brother with a
   better claim.
+- **The pool, rebuilt** — the bathing scene was four bugs stacked on each other: the
+  player's head-in-the-water was drawn every frame, so a spare head sat beside the
+  couple for the whole scene; the spouse walked over with **no subject passed**, so
+  they arrived wearing *your* body; the undressed figure on the rim was two fixed sets
+  of rectangles, identical for a flat spouse and a maxed one; and the two silhouettes
+  in the shallows merged into one lump that tilted a pixel and a half and did nothing
+  else. Both figures are now built from **their own scores**, the roles follow who is
+  actually who, and once they close there is a **beat** — they rise and settle on it,
+  arms shift, the surface heaves and breaks, and rings pulse out in time. The camera
+  also **comes in**: this played out at sixty pixels wide in the corner of a
+  four-hundred-and-eighty-pixel hall, lit from behind by a wall of lamplit steam so
+  the shadows are shadows *on* something.
 - **Eight haircuts and five beards for men** — the game used to draw every man
   alive with the same head of hair. Now there is **the Roman crop** (combed forward,
   cut straight across the brow), **swept back** (tight sides, height at the front),
