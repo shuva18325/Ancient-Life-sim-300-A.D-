@@ -91,6 +91,18 @@ publicly, leaving it off keeps the game safe for a general audience.
   decides whether you keep breathing, three court figures with their own opinions of you, and a
   live **RISK TO THE PURPLE** reading fed by unrest, unanswered petitions and a brother with a
   better claim.
+- **Five drawn booty tiers** — FLAT, RAISED, ELEVATED, FAT and COLOSSAL are five genuinely
+  different silhouettes in the villa sprite *and* on the body map, not one shape scaled up. The
+  readout puts the tier first, the way a person would say it: **FAT Booty**, **TINY Waist**.
+- **Five drawn male faces** — Plain (round, soft, heavy-nosed) → Rough (a broken nose and a
+  crooked mouth) → Handsome → Striking (a straight nose and a jaw that juts) → Godlike (deep-set
+  eyes, hollows under the cheekbones, a chin with a corner on it). The head shape changes too, so
+  it reads at sprite size.
+- **White wool and Tyrian purple** — the brown is gone. Roman tunics were undyed white with a
+  **purple clavus**, and its width was the rank: broad for a senator, narrow for everyone else.
+  Noblewomen wear real purple, which cost more than its weight in silver and was the whole point.
+- **The villa sprites are the portraits** — your spouse in the halls now carries the same gown
+  colour, hair, gold hem, diadem, necklace and earrings as the painted plate she came from.
 - **Every body is its own body** — the villa walk, the bride portraits and every intimate scene
   are drawn from the *actual* rolled scores of you and your spouse. A flat figure reads flat
   (no invented cleavage, no invented behind), a maxed one is unmistakable, and the shadow-play
