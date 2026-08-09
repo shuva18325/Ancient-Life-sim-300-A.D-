@@ -2438,7 +2438,8 @@ function kidGrown(c){ return c && (G.day-(c.born||0))>=40; }
 function bornToThePurple(){
   return !!(G && (G.socialClass==='imperial' || G.emperor || (G.family && G.family.kin)));
 }
-function makeBride(eth, noble, quality){
+function makeBride(eth, noble, quality, opts){
+  opts=opts||{};
   const D=BRIDE[eth]||BRIDE.roman;
   // QUALITY 0-10 drives looks, wits and traits. Nobles skew higher; paid matches are guaranteed high.
   if(quality===undefined) quality = clamp(Math.round((noble? rnd(3,8) : rnd(1,6)) + (G&&G.marryRolls? Math.min(2.5,G.marryRolls*0.18):0)), 0, 10);
@@ -2474,7 +2475,11 @@ function makeBride(eth, noble, quality){
     dress: noble?dressN:dressP,
     // AN AGE, because the years get drawn on the face. A great match is young;
     // a poor one is often a widow with two children and no illusions left.
-    age: clamp(Math.round(17 + (10-quality)*0.95 + rnd(-2,4)), 15, 44),
+    // WHEN YOU PAY THE MATCHMAKER she matches you on age as well as on looks —
+    // that is most of what you are paying her for.
+    age: (opts.ageNear!==undefined)
+      ? clamp(Math.round(opts.ageNear + rnd(-(opts.spread||5), (opts.spread||5))), 16, 62)
+      : clamp(Math.round(17 + (10-quality)*0.95 + rnd(-2,4)), 15, 44),
     jewel: noble,                              // gold necklace / earrings / diadem
     // cleavage/neckline richness: nobles wear a fine low stola; peasants a clinging homespun
     neckline: noble?'fine':'plain',
@@ -2516,7 +2521,9 @@ function makeBride(eth, noble, quality){
   b.approval=b.approval||0; b.favor=b.favor||0; b.honor=b.honor||0; b.pop=b.pop||0; b.tradeCoin=b.tradeCoin||0; b.tradeFood=b.tradeFood||0;
   b.hairStyle = pick(HAIR_F_BY_ETH[eth]||HAIR_F_BY_ETH.roman);
   if(G && G.isFemale){ b.male=true; b.name=pick(GROOM_NAMES[eth]||GROOM_NAMES.roman)+' '+pick(D.surn);
-    b.age = clamp(b.age + ri(5,13), 18, 58);     // Roman husbands ran a decade ahead of their wives
+    b.age = (opts.ageNear!==undefined)
+      ? clamp(b.age + ri(0,4), 18, 64)             // a matched pair stays a matched pair
+      : clamp(b.age + ri(5,13), 18, 58);           // otherwise Roman husbands ran a decade ahead
     // A MAN IS NOT ONE SHAPE IN ONE BROWN. His people's cut, his people's
     // beard, his people's hair colour and his people's clothes.
     b.hairStyle = pick(HAIR_M_BY_ETH[eth]||HAIR_M_BY_ETH.roman);
@@ -2979,6 +2986,13 @@ function drawBodyMap(cnv,w,view,tms){
     cap(-8.4,17,-9.8+ax,31,2.0,1.6, heatColor((bu+wa)/2));
     cap( 8.4,17, 9.8-ax,31,2.0,1.6, heatColor((bu+wa)/2));
   }
+  if(w&&w.self && view!=='eyes' && view!=='spouse'){
+    // the marks themselves, on the figure, in the chart's own frame
+    const marks=scarList(G);
+    if(marks.length){ const PP=(x2,y2,w2,h2,col)=>{ c.fillStyle=col; c.fillRect(x2,y2,w2,h2); };
+      drawScarsOn(PP,marks,{ face:[-3,2,6,7], torso:[-5,18,10,14], arm:[-9,18,2,12], leg:[-4,40,3,20] },
+        'rgba(232,150,128,.92)'); }
+  }
   if(!male){
     const fx=swing*STR;
     c.fillStyle='rgba(0,0,0,.30)'; c.beginPath(); c.ellipse(0,69,hipR*0.95,2.4,0,0,7); c.fill();   // she stands on something
@@ -3023,6 +3037,23 @@ function drawMapReadout(c,w,W2,H2,GUT,gv,male){
     c.fillStyle=isImp?'#ff7ae0':heatColor(v); c.font='bold 9px Georgia,serif'; c.textAlign='right';
     c.fillText(partTier(P.id,v,male).toUpperCase(),W2-8,y); c.textAlign='left';
   });
+  /* ---- AND WHAT THE ARENA TOOK. Only your own chart carries these: a
+     matchmaker does not sell you a list of another man's scars. ---- */
+  if(w&&w.self){
+    const marks=scarList(G); const y0=24+partsFor(w).length*21+8;
+    c.fillStyle='#b8705e'; c.fillRect(W2-GUT,y0-9,11,11);
+    c.strokeStyle='rgba(0,0,0,.6)'; c.lineWidth=1; c.strokeRect(W2-GUT,y0-9,11,11);
+    c.fillStyle='#efe3c2'; c.font='bold 9px Georgia,serif'; c.fillText('Scars',W2-GUT+15,y0);
+    c.textAlign='right'; c.fillStyle=marks.length?'#d8907c':'#6a5a4a';
+    c.fillText(marks.length? String(marks.length).toUpperCase() : 'NONE', W2-8, y0); c.textAlign='left';
+    c.font='8px Georgia,serif'; c.fillStyle='rgba(216,144,124,.72)';
+    let yy=y0+11;
+    for(const m of marks.slice(0,6)){
+      if(yy>H2-46) break;
+      c.fillText('· '+m.name+(m.sev>=3?' (grave)':m.sev>=2?' (serious)':''), W2-GUT+2, yy); yy+=10;
+    }
+    if(marks.length>6){ c.fillStyle='rgba(216,144,124,.5)'; c.fillText('· and '+(marks.length-6)+' more', W2-GUT+2, yy); }
+  }
 }
 // the bottom scale — it owns the last 34px and nothing else is drawn there
 function drawMapScale(c,W2,H2,imp){
@@ -3343,9 +3374,11 @@ function rollBrides(minQ){
     // a poor man weds a poor man's daughter; grand houses open only to the great
     let noble = tier>=price || (tier>=price*0.6 && Math.random()<0.2);
     if(minQ>=6) noble=true;                                     // paid matches are always of good family
+    // PAID MATCHES ARE MATCHED ON AGE TOO — the finer the fee, the closer the match
+    const near = minQ>=6? {ageNear:(G&&G.age)||22, spread: minQ>=9? 3 : 6} : undefined;
     if(minQ){ const q=clamp(Math.round(rnd(minQ, Math.min(10,minQ+1.5))),1,10);
-      return makeBride(e, noble, q); }
-    return makeBride(e, noble);
+      return makeBride(e, noble, q, near); }
+    return makeBride(e, noble, undefined, near);
   });
 }
 function marriageUnlocked(){ return !!G && !G.married; }   // even the poorest tiro may take a wife
@@ -6529,33 +6562,62 @@ function drawHusbandFig(c,x,y,bond,skinOv,tunOv,w,ph,mode){
     P(-headW/2+1,-61,1,5,sHi); P(headW/2-2,-61,1,5,sHi);
     P(-headW/2+1,-58,headW-2,1,shade(skin,-30));                     // the jaw, squared off
   } else {
-    /* GODLIKE — the face on the reference. What makes it is NOT more shadow:
-       it is one heavy straight brow-line sitting clear above the eye, a narrow
-       straight nose, cheekbones lit rather than hollowed, a wide square jaw
-       with a lit edge, and stubble. The previous attempt stacked four dark rows
-       on top of each other and turned both eyes into one black blob. */
-    P(-5,-67,4,1,'#140c06'); P(1,-67,4,1,'#140c06');                 // ONE heavy straight brow apiece
-    P(-5,-68,4,1,'#241408'); P(1,-68,4,1,'#241408');                 // with a soft upper edge
-    P(-5,-66,1,1,shade(skin,-34)); P(4,-66,1,1,shade(skin,-34));     // and a shadow at the outer corner
-    P(-4,-65,4,1,'#2a1a10'); P(1,-65,4,1,'#2a1a10');                 // the lash line, one row, clear of the brow
-    P(-4,-64,4,2,'#f4eee0'); P(1,-64,4,2,'#f4eee0');                 // clean whites
-    P(-3,-64,2,2,'#2a1a10'); P(2,-64,2,2,'#2a1a10');                 // dark irises
-    P(-3,-63,1,1,'#fffaf0'); P(2,-63,1,1,'#fffaf0');                 // one glint apiece
-    P(-4,-62,4,1,shade(skin,-14)); P(1,-62,4,1,shade(skin,-14));     // a soft line beneath
-    P(0,-63,2,4,sHi); P(0,-63,1,4,skin);                             // a narrow straight nose, lit down the ridge
-    P(-1,-59,4,1,shade(skin,-32)); P(0,-59,2,1,skin);                // and its base
-    P(-5,-63,2,2,sHi); P(3,-63,2,2,sHi);                             // cheekbones, LIT
-    P(-5,-61,2,1,shade(skin,-18)); P(3,-61,2,1,shade(skin,-18));     // the hollow beneath, only a hint
-    P(-2,-57,5,1,'#8a453f'); P(-2,-56,5,1,'#a85850');                // a full mouth, and not a wide one
-    P(-1,-56,3,1,'#bc6860'); P(-2,-55,5,1,shade(skin,-24));          // lit, with a shadow under it
-    P(-headW/2,-62,1,7,sHi); P(headW/2-1,-62,1,7,sHi);               // the jaw, LIT down each edge
-    P(-headW/2+1,-55,headW-2,1,shade(skin,-26));                     // one clean line beneath it
-    P(-2,-54,5,2,skin); P(-2,-54,5,1,sHi);                           // and a squared, lit chin
+    /* GODLIKE — and it is THREE faces, not one. A man of twenty-four, a man of
+       forty and a man of sixty-five are not handsome in the same way, so the
+       top tier now has a young, a middle-aged and an old cut of the same head:
+       the bones are the same, what sits on them is not. */
+    const GA = AM.age>=54? 2 : AM.age>=34? 1 : 0;
+    // ---- THE BROW: heavy, straight, and LOW. It gets heavier with the years.
+    P(-5,-67,4,1,'#140c06'); P(1,-67,4,1,'#140c06');
+    P(-5,-68,4,1,'#241408'); P(1,-68,4,1,'#241408');
+    if(GA>=1){ P(-5,-69,3,1,'#2a1a0c'); P(2,-69,3,1,'#2a1a0c'); }     // and thickens
+    if(GA>=2){ P(-6,-69,2,1,'#3a2a18'); P(5,-69,2,1,'#3a2a18');       // and finally goes unruly
+               P(-5,-70,1,1,'#3a2a18'); P(5,-70,1,1,'#3a2a18'); }
+    P(-5,-66,1,1,shade(skin,-34)); P(4,-66,1,1,shade(skin,-34));
+    // ---- THE EYES
+    P(-4,-65,4,1,'#2a1a10'); P(1,-65,4,1,'#2a1a10');                  // lash line, one row, clear of the brow
+    P(-4,-64,4,2,'#f4eee0'); P(1,-64,4,2,'#f4eee0');
+    P(-3,-64,2,2,'#2a1a10'); P(2,-64,2,2,'#2a1a10');
+    P(-3,-63,1,1,'#fffaf0'); P(2,-63,1,1,'#fffaf0');
+    if(GA===0){ P(-4,-62,4,1,shade(skin,-12)); P(1,-62,4,1,shade(skin,-12)); }        // young: a clean line beneath
+    else { P(-4,-62,4,1,shade(skin,-22)); P(1,-62,4,1,shade(skin,-22));               // older: it deepens
+           P(-4,-61,4,1,shade(skin,-10)); P(1,-61,4,1,shade(skin,-10)); }
+    // ---- THE NOSE: narrow and straight, and it broadens a little with age
+    P(0,-63,2,4,sHi); P(0,-63,1,4,skin);
+    P(-1,-59,4,1,shade(skin,-32)); P(0,-59,2,1,skin);
+    if(GA>=2){ P(-1,-60,4,1,shade(skin,-18)); }
+    // ---- THE CHEEKBONES: lit at any age; the hollow under them deepens
+    P(-5,-63,2,2,sHi); P(3,-63,2,2,sHi);
+    P(-5,-61,2,1,shade(skin,-18+GA*-6)); P(3,-61,2,1,shade(skin,-18+GA*-6));
+    if(GA>=1){ P(-5,-60,2,1,shade(skin,-14)); P(3,-60,2,1,shade(skin,-14)); }
+    // ---- THE MOUTH
+    P(-2,-57,5,1,'#8a453f'); P(-2,-56,5,1,'#a85850');
+    P(-1,-56,3,1,'#bc6860'); P(-2,-55,5,1,shade(skin,-24));
+    if(GA>=1){ P(-3,-57,1,2,shade(skin,-26)); P(3,-57,1,2,shade(skin,-26)); }         // lines beside it
+    /* ---- THE JAWLINE. This is what the tier is FOR, so it is drawn as a jaw
+       and not as a stripe: the cheek narrows into a corner, the corner turns,
+       and the chin is squared off and lit. It widens with the years. ---- */
+    { const jw = (headW/2)|0;
+      // Everything here stays INSIDE the silhouette — pushing the corner out past
+      // the skull gave him a pair of flaps where his ears should be.
+      P(-jw,-63,1,7,sHi); P(jw-1,-63,1,7,sHi);                          // carried wide and high, lit both edges
+      P(-jw+1,-59,1,4,shade(skin,-16)); P(jw-2,-59,1,4,shade(skin,-16)); // the plane turning under the cheek
+      P(-jw,-57,2,2,skin); P(jw-2,-57,2,2,skin);                         // THE CORNER, where the jaw turns
+      P(-jw,-57,1,2,sHi);  P(jw-1,-57,1,2,shade(skin,-14));
+      P(-jw+1,-55,jw*2-2,2,skin);                                        // and runs in to the chin
+      P(-jw+1,-55,jw*2-2,1,shade(skin,-10));
+      P(-jw+2,-53,jw*2-4,1,shade(skin,-32));                             // one clean line beneath it
+      P(-2,-54,5,2,skin); P(-2,-54,5,1,sHi);                             // a squared, lit chin
+      P(-1,-53,3,1,shade(skin,-20));
+      if(GA>=1){ P(-jw,-56,2,2,skin); P(jw-2,-56,2,2,skin); }            // heavier at the corners with the years
+    }
+    if(GA===0){ c.fillStyle='rgba(255,240,226,.14)'; c.fillRect(-5,-66,11,7); }        // the bloom of being young
+    if(GA>=2){ P(-4,-71,9,1,mixHex(skin,'#8a7a66',0.34));                              // and the years, on top
+               P(-headW/2+1,-58,headW-2,1,mixHex(skin,'#9a8a76',0.26)); }
   }
   { const bd2 = (w&&w.beard) || (!w&&G.beardStyle) || beardFallback(w||{name:(G&&G.name)||'x',eth:'roman'});
     drawBeardM(P,{hair:hairC,beardCol:greyHair(hairC,HAGE+5)}, bd2, -headW/2, MOUTHY, headW,
                {fall:0.9, mouth: fTier>=3?'#a04a40':'#7a4038'}); }
-  if(fTier>=3) P(3,-67,1,5,'#8a5a4a'); else P(3,-67,1,4,'#8a5a4a');  // the old scar
   /* ---- AND THE YEARS ON TOP OF IT ALL: crow's feet, a furrowed brow, a
      line beside the mouth, and a jaw that finally gives up its corner. ---- */
   if(AM.young){ c.fillStyle='rgba(255,238,228,.13)'; c.fillRect(-headW/2,-66,headW,7);
@@ -6565,16 +6627,28 @@ function drawHusbandFig(c,x,y,bond,skinOv,tunOv,w,ph,mode){
                     P(-3,-59,1,2,sSh); P(3,-59,1,2,sSh); }
   if(AM.lines>0.72){ P(-4,-71,9,1,mixHex(skin,'#8a7a66',0.26));
                      P(-headW/2+1,-61,2,1,sSh); P(headW/2-3,-61,2,1,sSh); }
-  if(AM.sag>0.3){ P(-headW/2,-58,headW,2,mixHex(skin,'#9a8a76',0.34));           // the jaw softens
-                  P(-3,-56,7,1,mixHex(skin,'#9a8a76',0.26)); }
-  if(AM.sag>0.55){ P(-3,-55,7,2,mixHex(skin,'#9a8a76',0.30)); }                  // and goes altogether
-  if(AM.old){ P(-headW/2,-56,headW,1,shade(skin,-14)); }
+  // The top tier paints its OWN jaw, three ways by age — these generic bands
+  // were laid straight over it and washed the whole lower face into a slab.
+  if(fTier<4){
+    if(AM.sag>0.3){ P(-headW/2,-58,headW,2,mixHex(skin,'#9a8a76',0.34));         // the jaw softens
+                    P(-3,-56,7,1,mixHex(skin,'#9a8a76',0.26)); }
+    if(AM.sag>0.55){ P(-3,-55,7,2,mixHex(skin,'#9a8a76',0.30)); }                // and goes altogether
+  } else if(AM.sag>0.45){
+    P(-headW/2+1,-59,2,2,mixHex(skin,'#9a8a76',0.30));                            // even here it slackens
+    P(headW/2-3,-59,2,2,mixHex(skin,'#9a8a76',0.30));
+  }
+  if(AM.old && fTier<4){ P(-headW/2,-56,headW,1,shade(skin,-14)); }
   if(AM.aged){ P(-4,-73,9,1,mixHex(skin,'#8a7a66',0.30));                        // a third furrow
-               P(-headW/2,-57,headW,3,mixHex(skin,'#9a8a76',0.42));              // the jaw has gone entirely
+               if(fTier<4) P(-headW/2,-57,headW,3,mixHex(skin,'#9a8a76',0.42));  // the jaw has gone entirely
                P(-3,-64,1,1,'#ded6c8'); P(2,-64,1,1,'#ded6c8');                  // eyes gone milky
                P(-shW-1,-49,2,4,shade(tun,-14)); P(shW-1,-49,2,4,shade(tun,-14)); }  // and the shoulders drop
   if((G.emperor||(w&&w.crown)) && !skinOv){ P(-7,-73-hH+2,14,2,'#e8c34a'); P(-1,-75-hH+2,2,2,'#fff0b0'); }
   if(G.crownWorn && w){ P(-7,-73-hH+2,14,2,'#e8c34a'); P(-1,-75-hH+2,3,3,'#e0405a'); }
+  /* ---- SCARS. A man who has been in the arena eleven times looks like it. ---- */
+  { const marks=(w&&w.scars)||(!w&&G? scarList(G):null);
+    if(marks&&marks.length) drawScarsOn(P,marks,{
+      face:[-headW/2+1,-66,headW-2,10], torso:[-shW+2,-50,shW*2-4,24],
+      arm:[-shW-2,-50,3,14], leg:[-6,-20,legW,16] }, mixHex(skin,'#7a4038',0.55), skin); }
   if(bond>=90){ P(-shW-3,-40,3,3,skin); }                            // his hand reaches toward her
   if(turning) c.restore();
 }
@@ -8004,6 +8078,9 @@ function drawShadowPlay(s,T){
   }
   const total= s.len==='quick'?6:8;
   const vi=(((T-520)/160)|0)%total, vt=(T-520)%160;
+  // SAY WHAT IS PLAYING. Seven positions have been in here for a while and
+  // nothing on the plate ever told you which one you were looking at.
+  const POSE_NAMES=['the embrace','the kiss','from behind','the ride','the lift','the sundial','the tangle'];
   const celt=(G.wife&&G.wife.eth==='celt'), egy=(G.wife&&G.wife.eth==='egyptian');
   // ---- CURVE PRIMITIVES: silhouettes are one flat colour, so draw real curves ----
   const ball=(x,y,r)=>{ ctx.fillStyle=S; ctx.beginPath(); ctx.arc(x,y,Math.max(0.5,r),0,7); ctx.fill(); };
@@ -8067,6 +8144,11 @@ function drawShadowPlay(s,T){
     cap(x-2,base-41,x-6,base-24,5.4,4.2); cap(x-6,base-24,x-4,base-13,4.2,3.4); ell(x-6,base-11,5.4,3);   // near kneeling leg
     cap(x+6,base-40,x+8,base-22,5.2,4); ell(x+8,base-13,5.6,3); };         // far leg
   const rock=Math.sin(T*0.34), rk2=Math.sin(T*0.34-0.55);
+  { // the nameplate for the position itself, fading in as each one settles
+    const nm=POSE_NAMES[vi]||'', a2=clamp((vt-18)/26,0,1)*clamp((150-vt)/24,0,1);
+    if(nm && a2>0.02){ ctx.globalAlpha=a2*0.92; ctx.textAlign='center';
+      pixelText('· '+nm.toUpperCase()+' ·', cx0, gy+gh+11, STG.col||'#e8c34a', 1);
+      ctx.globalAlpha=1; ctx.textAlign='left'; } }
 
   if(vi===0){ // THE EMBRACE — he grinds against her in a real, hungry rhythm; the tease reads in the gap
     const beat=Math.max(0,Math.sin(T*0.30)), sw=beat*3;                 // fast, insistent — not a tap
@@ -8446,25 +8528,73 @@ function drawWaterCouple(cx0,wy,T,s,A,B,o){
     // a wake between them as they close
     ctx.globalAlpha=0.35; px(ax+6,wy+3,Math.max(1,(bx-ax)-12),1,'#5a9ec4'); ctx.globalAlpha=1;
   } else {
-    /* ---- TOGETHER, AND MOVING. A beat, and everything answers to it: they
-       rise and settle on it, the near one leans in and away, the arms shift,
-       the water heaves, rings pulse out of them and the surface breaks. ---- */
+    /* ---- TOGETHER, AND MOVING, AND NOT ALWAYS THE SAME WAY. Five positions,
+       each with its own placement and its own motion, cycling through the
+       scene — and each one named on the plate so you can tell what you are
+       looking at, which was the other half of the complaint. ---- */
     const heat = clamp(((MA.bust+MA.booty+MB.bust+MB.booty)/4 - 3)/7, 0.25, 1);
     const beat = T*(0.13+heat*0.06);
     const surge= Math.sin(beat), surge2=Math.sin(beat-0.7);
     const amp  = 2.2 + heat*2.6;
-    const lift = -Math.max(0,surge)*amp;                                          // one rises on the beat
+    const lift = -Math.max(0,surge)*amp;
     const roll = surge2*1.6;
-    const AX=cx0-6+roll*0.6, BX=cx0+6-roll*0.6;
-    person(AX,wy+lift*0.35,MA,Math.sin(T*0.09)*0.8, roll*0.5);
-    person(BX,wy+lift,      MB,Math.sin(T*0.09+1.4)*0.8, -roll*0.5);
-    // the heads tip together at the top of each beat
-    if(surge>0.55){ px(cx0-2,wy-32+lift*0.7,5,3,'#17100a'); }
-    // arms round the other — they move rather than clamp
-    ctx.globalAlpha=0.9;
-    px(AX+4,wy-14+lift*0.5+surge*1.6,7,3,'#1c130c');
-    px(BX-10,wy-11+lift*0.8-surge*1.4,7,3,'#17100a');
-    ctx.globalAlpha=1;
+    // a figure placed, tilted and scaled — px() draws through the transform
+    const posed=(X,Y,M,bob,lean,rot,sc)=>{
+      if(!rot && !sc){ person(X,Y,M,bob,lean); return; }
+      ctx.save(); ctx.translate(X,Y-14);
+      if(rot) ctx.rotate(rot); if(sc) ctx.scale(sc,sc);
+      ctx.translate(-X,-(Y-14)); person(X,Y,M,bob,lean); ctx.restore(); };
+    // five turns, paced to fit the time the scene actually runs for
+    const POS = Math.floor(Math.max(0,(T-800))/180) % 5;
+    const b0=Math.sin(T*0.09)*0.8, b1=Math.sin(T*0.09+1.4)*0.8;
+    let label='';
+    if(POS===0){
+      // FACE TO FACE — upright, chest to chest, rocking on the beat
+      label='face to face';
+      posed(cx0-8+roll*0.5, wy+lift*0.25, MA, b0,  roll*0.5);
+      posed(cx0+8-roll*0.5, wy+lift*0.60, MB, b1, -roll*0.5);
+      if(surge>0.55) px(cx0-2,wy-32+lift*0.7,5,3,'#17100a');                    // the heads tip together
+      ctx.globalAlpha=0.92;
+      px(cx0-2,wy-15+lift*0.5+surge*1.4,10,3,MA.tone);                          // his arm round her
+      px(cx0-8,wy-11+lift*0.8-surge*1.2,10,3,MB.tone);                          // and hers round him
+      ctx.globalAlpha=1;
+    } else if(POS===1){
+      // LIFTED — one carried clear of the water, rising on every beat
+      label='lifted clean out of the water';
+      const hi=-9-Math.max(0,surge)*(amp*1.3);
+      posed(cx0-7, wy+2, MA, b0*0.4, roll*0.3);
+      posed(cx0+5, wy+hi, MB, b1*0.3, -roll*0.6, roll*0.04);
+      ctx.globalAlpha=0.94;
+      px(cx0-8,wy-16,14,4,MA.tone); px(cx0-11,wy-13,4,7,MA.tone);               // his arms under her
+      px(cx0-2,wy+hi-14,9,3,MB.tone);                                            // hers round his neck
+      ctx.globalAlpha=1;
+    } else if(POS===2){
+      // AGAINST THE EDGE — she is folded over the marble lip, he is behind her
+      label='against the marble lip';
+      px(cx0-6,wy-9,42,4,'rgba(206,192,162,.9)'); px(cx0-6,wy-9,42,1,'rgba(236,224,196,.95)');
+      posed(cx0+11, wy-2+lift*0.3, MB, b1*0.5, 2.2, 0.50, 0.98);                 // leant right forward onto it
+      posed(cx0-8+roll*0.5, wy+lift*0.7, MA, b0*0.6, 1.4);                       // and him behind
+      ctx.globalAlpha=0.92;
+      px(cx0-4,wy-17+lift*0.5,12,3,MA.tone);                                     // his hands on her hips
+      ctx.globalAlpha=1;
+      if(surge>0.88 && (T|0)%5<2) for(let i=0;i<3;i++) s.splash.push({x:SX+rnd(-18,18),y:SY-6,vx:rnd(-1.8,1.8),vy:rnd(-2.6,-1.1),life:20});
+    } else if(POS===3){
+      // ASTRIDE — one seated on the submerged step, the other over them
+      label='astride, on the step';
+      px(cx0+12,wy-5,30,9,'rgba(206,192,162,.78)'); px(cx0+12,wy-5,30,1,'rgba(236,224,196,.8)');
+      posed(cx0+4, wy+5, MA, b0*0.3, -0.5);                                      // he is sitting on it
+      posed(cx0+2, wy-8+lift*1.5, MB, b1*0.2, roll*0.4);                         // she is over him
+      ctx.globalAlpha=0.92;
+      px(cx0-6,wy-11+lift*1.0,9,3,MA.tone); px(cx0+7,wy-11+lift*1.0,9,3,MA.tone);  // his hands
+      ctx.globalAlpha=1;
+    } else {
+      // ADRIFT — both sunk to the shoulders, tipped together, in no hurry at all
+      label='adrift, and in no hurry';
+      const drift=Math.sin(T*0.05)*4;
+      posed(cx0-11+drift, wy+11, MA, b0*0.3, 0.8,  0.46);
+      posed(cx0+11+drift, wy+11, MB, b1*0.3, -0.8, -0.46);
+      ctx.globalAlpha=0.85; px(cx0-6+drift,wy-6,14,3,MB.tone); ctx.globalAlpha=1;
+    }
     // THE WATER ANSWERS: the surface heaves, and breaks on the peak
     const heave=Math.abs(surge)*amp*0.7;
     px(cx0-30,wy+2-heave*0.5,60,3,'rgba(90,158,196,.40)');
@@ -8476,6 +8606,7 @@ function drawWaterCouple(cx0,wy,T,s,A,B,o){
       for(let i=0;i<5;i++) s.splash.push({x:SX+rnd(-16,16),y:SY-4,vx:rnd(-1.6,1.6),vy:rnd(-2.6,-1.0),life:22});
     }
     if((T|0)%22<2) s.hearts.push({x:SX+rnd(-10,10),y:SY-46,vy:0.6,life:50,c:'#e26a8a'});
+    if(o.label) o.label(label);
   }
   // every so often the famous 🍑 breaches like a dolphin — and only if there is one
   const roll2=(T-500)%240;
@@ -8658,6 +8789,10 @@ function drawWifeFig(c,x,y,w,ph,mode){
   if(noble){ P(-5+lean*0.6, top-42, 11, 2, '#e8c34a'); P(-5+lean*0.6, top-42, 11, 1, '#fff0b0'); }  // her diadem
   P(-2+lean*0.6, top-34, 2, 2, '#241408'); P(1+lean*0.6, top-34, 2, 2, '#241408');
   P(-1+lean*0.6, top-31, 3, 1, '#a84a52');
+  { const marks=w.scars||null;
+    if(marks&&marks.length) drawScarsOn((a,b2,ww,h,col)=>P(a+lean*0.6,b2,ww,h,col),marks,{
+      face:[-3,top-36,7,7], torso:[-5,top-22,10,12], arm:[-8,top-22,3,10], leg:[-3,top-6,6,8] },
+      mixHex(skin,'#7a4038',0.55), skin); }
   if(w.jewel){ P(-3+lean*0.6, top-29, 7, 1, '#e8c34a');                                 // her necklace
                P(-1+lean*0.6, top-28, 2, 2, '#e8c34a');
                P(-5+lean*0.6, top-35, 1, 2, '#e8c34a'); P(5+lean*0.6, top-35, 1, 2, '#e8c34a'); }   // earrings
@@ -8696,6 +8831,10 @@ function drawUndressedFig(c,x,y,w){
     P(-shW-3,top-24,3,14,skin); P(shW,top-24,3,14,skin);                    // arms
     P(-hdW/2,top-28-hdH,hdW,hdH,skin); P(-hdW/2,top-28-hdH,hdW,1,hi);       // head
     drawHairM(P,{hair,hHi,hSh},cut,-hdW/2,top-28-hdH,hdW,{fall:0.5});
+    if(w.scars&&w.scars.length) drawScarsOn(P,w.scars,{                     // nothing to hide them here
+      face:[-hdW/2+1,top-26-hdH,hdW-2,7], torso:[-shW+2,top-23,shW*2-4,20],
+      arm:[-shW-3,top-23,3,12], leg:[-legW-1,-legL-2,legW,legL-2] },
+      mixHex(skin,'#7a4038',0.6), skin);
     return;
   }
   const bustW = Math.round(1 + bu*0.62), bustH = Math.round(2 + bu*0.40);
@@ -8725,6 +8864,10 @@ function drawUndressedFig(c,x,y,w){
   P(-hdW/2,top-28-hdH,hdW,hdH,skin); P(-hdW/2,top-28-hdH,hdW,1,hi);         // head
   drawHairF(P,{hair,hHi,hSh,gold:'#e8c34a',goldHi:'#fff0b0',dress:w.dress||'#7a2d9a'},
             cut,-hdW/2,top-28-hdH,hdW,{fall:0.34});
+  if(w.scars&&w.scars.length) drawScarsOn(P,w.scars,{
+    face:[-hdW/2+1,top-26-hdH,hdW-2,7], torso:[-5,top-23,10,20],
+    arm:[-7,top-23,3,11], leg:[-4,-legL-2,4,legL-2] },
+    mixHex(skin,'#7a4038',0.6), skin);
 }
 /* ---- ONE DESCRIPTION OF YOU, used by the villa, the portrait and the plates,
    so the person walking your halls is the person in your family portrait. ---- */
@@ -8735,7 +8878,7 @@ function playerLook(){
     hairStyle:G.hairStyle||(G.isFemale?'crown':'caesar'),
     beard:G.beardStyle||(G.isFemale?'none':'stubble'),
     outfit:G.outfit||'tunic',
-    jewel:!!G.crownWorn, crown:!!G.crownWorn,
+    jewel:!!G.crownWorn, crown:!!G.crownWorn, scars:scarList(G),
     rank: (kin||elite)?'noble':'peasant', tier: kin?'imperial': elite?'elite':'common',
     body:G.body||{bust:6,booty:6,waist:6,legs:6,face:6,hairq:6} };
 }
@@ -8834,7 +8977,7 @@ function updateDomusScene(dt){
       if(!sc.nMoan||T>=sc.nMoan){ sfx('moan'); sc.nMoan=T+130+Math.random()*80; }
       if((T|0)%38<1) D.hearts.push({x:86+rnd(-24,24),y:190,vy:0.5,life:60});
     }
-    if(T>=1500){ D.scene=null; G.hygiene=100; G.wifePhys=clamp((G.wifePhys===undefined?45:G.wifePhys)+8,0,100); G.wifeRel=clamp(G.wifeRel+4,0,100);
+    if(T>=1760){ D.scene=null; G.hygiene=100; G.wifePhys=clamp((G.wifePhys===undefined?45:G.wifePhys)+8,0,100); G.wifeRel=clamp(G.wifeRel+4,0,100);
       refreshStatbar(); saveQuiet();
       toast('🏝 The steam keeps its secrets. You are both extremely clean and extremely pleased. (+4 ♥, +8 🔥, 🧼 100)',3600); }
   } else if(sc.kind==='wardrobe'){
@@ -9005,13 +9148,16 @@ function drawDomus(){
       ctx.translate(CX,CY); ctx.scale(Z,Z); ctx.translate(-80,-198);
       px(22,200,116,18,'rgba(30,84,116,.86)'); px(22,200,116,2,'rgba(150,214,238,.85)'); // the water, enlarged with them
       for(let i=0;i<5;i++) px(26+((T2*0.6+i*19)%104),203+i*3,8,1,'rgba(120,186,214,.6)');
-      drawWaterCouple(80,202,T2+210,D,ME,w,{sx:CX, sy:CY+(202-198)*Z});
+      let posLabel='';
+      drawWaterCouple(80,202,T2+210,D,ME,w,{sx:CX, sy:CY+(202-198)*Z, label:(t)=>{posLabel=t;}});
       ctx.restore();
+      sc.posLabel=posLabel;
       // the faintest vignette — enough to hold the eye, not enough to hide them
       { const g3=ctx.createRadialGradient(CX,CY-8,90,CX,CY-8,220);
         g3.addColorStop(0,'rgba(0,0,0,0)'); g3.addColorStop(1,'rgba(6,4,8,.55)');
         ctx.fillStyle=g3; ctx.fillRect(0,14,W,H-30); }
-      ctx.textAlign='center'; pixelText('~ the steam keeps its secrets ~',W/2,H-6,'#c8b060',1);
+      ctx.textAlign='center';
+      pixelText(sc.posLabel? ('~ '+sc.posLabel+' ~') : '~ the steam keeps its secrets ~',W/2,H-6,'#c8b060',1);
     }
   } else if(sc.kind==='wardrobe'){
     const T2=sc.t;
@@ -9621,6 +9767,10 @@ function drawBridePortrait(cnv,b,bare){
      woman walking through your halls is the woman in this plate ================= */
   drawHairF(P,{hair,hHi,hSh,gold,goldHi,dress,dHi,dSh}, (b.hairStyle||hairStyleFallback(b)),
             -4,-66,10, {noble, fall:1});
+  /* ---- AND THE SCARS, if this is a woman who has fought for a living ---- */
+  if(b.scars&&b.scars.length) drawScarsOn(P,b.scars,{
+    face:[-3,-64,8,8], torso:[-4,-50,10,16], arm:[4,-50,4,14], leg:[3,-22,4,14] },
+    mixHex(skin,'#7a4038',0.55), skin);
   // ================= JEWELLERY =================
   if(b.jewel){
     P(-2,-53,7,1,gold); P(-1,-52,5,1,goldHi);                                   // choker
@@ -10145,6 +10295,7 @@ function openVilla(){
     hb2.onclick=()=>openHerbs('villa'); row2.appendChild(hb2);
     sc.appendChild(row2);
     b.appendChild(sc); }
+  buildBarberCard(b);
   // ---- THE WARDROBE OF RANK — pre-set free on elite houses and the purple ----
   { const eligible = (G.socialClass==='elite' || G.socialClass==='imperial' || G.emperor || G.royal);
     const wh=document.createElement('div'); wh.className='small'; wh.style.color='var(--gold)'; wh.style.marginTop='6px';
@@ -10170,6 +10321,90 @@ function openVilla(){
 }
 $('btn-villa-back').onclick=()=>enterMap();
 
+/* =====================================================================
+   THE BARBER AND THE CLOTHIER — you had eight cuts, five beards, seven
+   outfits and a palette, and no way on earth to choose any of them. Now the
+   villa keeps a tonsor and a wardrobe, and Rome keeps its rules about who is
+   allowed to wear what.
+   ===================================================================== */
+function outfitAllowed(id){
+  if(id==='toga')     return !!(G.senate||G.socialClass==='elite'||G.socialClass==='imperial'||G.emperor||G.royal||G.office>=1);
+  if(id==='military') return !!(G.tribune||G.legions>0||G.soldiers>0||G.campaigns>0||G.socialClass==='gladiator');
+  return true;                                        // the rest anyone may wear
+}
+function outfitLockNote(id){
+  if(id==='toga')     return 'The toga is the dress of a citizen with an office. Win an election, take a seat, or be born to the purple.';
+  if(id==='military') return 'You have never commanded anything. Take a commission or raise a man-at-arms first.';
+  return '';
+}
+function barberCost(){ return 40 + Math.round((G.renown||0)/40); }
+function clothierCost(id){ return id==='toga'? 420 : id==='military'? 380 : id==='eastern'? 300 : id==='steppe'? 260 : id==='germanic'? 200 : id==='himation'? 180 : 90; }
+function buildBarberCard(b){
+  if(!G.hasVilla) return;
+  const male=!G.isFemale;
+  const head=document.createElement('div'); head.className='small'; head.style.color='var(--gold)'; head.style.marginTop='6px';
+  head.textContent='💇 THE TONSOR AND THE CLOTHIER — your own hair, beard and cloth:'; b.appendChild(head);
+  const card=document.createElement('div'); card.className='shopcard';
+  const prev=document.createElement('canvas'); prev.width=76; prev.height=104;
+  prev.style.cssText='position:static;width:76px;height:104px;image-rendering:pixelated;border:2px solid #4a3a26;border-radius:3px;flex:0 0 auto;';
+  const paint=()=>{ const c=prev.getContext('2d'); c.imageSmoothingEnabled=false;
+    c.fillStyle='#241a12'; c.fillRect(0,0,76,104);
+    c.fillStyle='rgba(232,195,74,.10)'; c.beginPath(); c.arc(38,54,30,Math.PI,0); c.fill();
+    const me=playerLook();
+    c.save(); c.translate(38,100); c.scale(1.12,1.12);
+    if(male) drawHusbandFig(c,0,0,0,me.skin,me.dress,me,0,'idle');
+    else drawWifeFig(c,0,0,me,0,'idle');
+    c.restore(); };
+  const row=document.createElement('div');
+  row.style.cssText='display:flex;flex-direction:row;gap:9px;align-items:flex-start;text-align:left;';
+  row.appendChild(prev);
+  const col=document.createElement('div'); col.style.cssText='flex:1;min-width:0;';
+  row.appendChild(col); card.appendChild(row);
+  const pickRow=(label,note,items,cur,onPick,costOf,lockOf)=>{
+    const h=document.createElement('div'); h.className='small'; h.style.cssText='color:#c8a86a;margin-top:4px';
+    h.innerHTML='<b>'+label+'</b> <span class="muted">'+(note||'')+'</span>'; col.appendChild(h);
+    const r=document.createElement('div'); r.className='row gap6'; r.style.flexWrap='wrap'; r.style.marginTop='2px';
+    items.forEach(it=>{
+      const on=(it.id===cur), lock=lockOf?lockOf(it.id):'', cost=costOf?costOf(it.id):barberCost();
+      const bt=document.createElement('button'); bt.className='btn sm'+(on?' gold':'');
+      bt.textContent=(on?'✓ ':'')+it.name+(on?'':' ('+cost+'d)');
+      bt.disabled = on || !!lock || G.coin<cost;
+      bt.title = lock || (it.note? it.note+' — ':'')+(on?'You wear this now.':cost+' denarii.');
+      if(lock){ bt.style.opacity='.55'; }
+      bt.onclick=()=>{ if(G.coin<cost) return; G.coin-=cost; onPick(it.id);
+        refreshStatbar(); saveQuiet(); openVilla(); };
+      r.appendChild(bt);
+    });
+    col.appendChild(r);
+  };
+  pickRow('✂ THE CUT', male?'— the tonsor keeps a bronze mirror and no opinions':'— she has done every head in the district',
+    (male?HAIR_M:HAIR_F), G.hairStyle, id=>{ G.hairStyle=id;
+      toast('💇 The tonsor works in silence and hands you the mirror. — '+hairStyleName(id,male),3000); });
+  if(male) pickRow('🪒 THE BEARD','— Hadrian made them fashionable and nobody has dared stop', BEARD_M, G.beardStyle,
+    id=>{ G.beardStyle=id; toast('🪒 '+beardName(id)+'. The razor is Spanish steel and it shows.',3000); });
+  { const cols = male? HAIR_COL_M.roman.concat(['#a8481e','#e6c860','#8a6a3a'])
+                     : ['#3a2618','#5a3a1e','#241408','#6e4423','#a8481e','#8a6a3a'];
+    const h=document.createElement('div'); h.className='small'; h.style.cssText='color:#c8a86a;margin-top:4px';
+    h.innerHTML='<b>🎨 THE COLOUR</b> <span class="muted">— henna, walnut hulls and Germanic soap-lye. Rome dyed its hair constantly.</span>';
+    col.appendChild(h);
+    const r=document.createElement('div'); r.className='row gap6'; r.style.flexWrap='wrap'; r.style.marginTop='2px';
+    cols.forEach(cc=>{ const on=(G.hairCol||'').toLowerCase()===cc.toLowerCase(), cost=barberCost()*2;
+      const bt=document.createElement('button'); bt.className='btn sm'; bt.textContent=on?'✓':'　';
+      bt.style.cssText='background:'+cc+';min-width:26px;border-color:'+(on?'#e8c34a':'#4a3a26')+';color:#fff';
+      bt.disabled=on||G.coin<cost; bt.title=on?'This is your colour.':'Dyed for '+cost+' denarii.';
+      bt.onclick=()=>{ if(G.coin<cost) return; G.coin-=cost; G.hairCol=cc;
+        toast('🎨 It takes an afternoon and smells appalling, but it holds.',2800); refreshStatbar(); saveQuiet(); openVilla(); };
+      r.appendChild(bt); });
+    col.appendChild(r); }
+  pickRow('👘 THE CLOTH','— and Rome had views on who was allowed to wear what', OUTFITS_M, G.outfit,
+    id=>{ G.outfit=id; toast('👘 '+outfitName(id)+'. The clothier steps back and is visibly pleased with himself.',3200); },
+    clothierCost, id=>outfitAllowed(id)?'':outfitLockNote(id));
+  const foot=document.createElement('div'); foot.className='small muted'; foot.style.marginTop='4px';
+  foot.textContent='Whatever you choose here is what you wear in these halls, in your family portrait and on every plate you appear on.';
+  col.appendChild(foot);
+  b.appendChild(card);
+  paint();
+}
 // ---- THE LEGACY HOUSE ----
 function buildLegacyCard(b){
   if(!G.hasVilla) return;   // a man builds his farm first, his dynasty second
@@ -11103,7 +11338,8 @@ function openHerbs(back){
           msg+='the dose is wrong. You lose a day and a half to a sleep nobody could wake you from.';
         } else {
           if(h.heal && G.injury){ G.injury.daysLeft-=h.heal*3;
-            if(G.injury.daysLeft<=0){ const nm=G.injury.name; addScar(nm); G.injury=null; msg+='the '+nm+' closes and scars over. '; }
+            if(G.injury.daysLeft<=0){ const nm=G.injury.name, sv=G.injury.sev||1; addScar(nm,sv); G.injury=null;
+              msg+='the '+nm+' closes and scars over. '; }
             else msg+='the wound eases — '+Math.max(0,G.injury.daysLeft)+' days left. '; }
           else if(h.heal) msg+='nothing to mend, but you feel better for it. ';
           if(h.fatigue){ G.fatigue=clamp((G.fatigue||0)-h.fatigue,0,100); msg+='The ache lifts. '; }
@@ -12146,8 +12382,8 @@ function openMarry(forced){
     rrow.appendChild(bt);
   };
   mkRoll('↻ Other suitors (20d)',20,0,'Ordinary matches — but each viewing nudges your luck upward.');
-  mkRoll('💰 SEND FOR FINER FAMILIES (300d)',300,6,'Guaranteed good matches: handsome, clever, and gifted.');
-  mkRoll('👑 THE MATCHMAKER’S FINEST (1000d)',1000,9,'The greatest match in the empire — near-perfect looks and wits, three gifts of blood.');
+  mkRoll('💰 SEND FOR FINER FAMILIES (300d)',300,6,'Guaranteed good matches: handsome, clever, gifted — and matched to within a few years of your own age.');
+  mkRoll('👑 THE MATCHMAKER’S FINEST (1000d)',1000,9,'The greatest match in the empire — near-perfect looks and wits, three gifts of blood, and matched to within three years of your own age.');
   // the rarest match of all — bought outright rather than waited for
   const impBt=document.createElement('button'); impBt.className='btn sm gold'; impBt.style.borderColor='#ff8ad0';
   const _pw=powerScore(), _needP = G.isFemale? 70 : 45;     // the Emperor fears a strong woman far more
@@ -13723,8 +13959,51 @@ function makeWound(sev){
   return {name:pick(W.pool), sev:W.sev, sevName:W.name, daysLeft:ri(W.days[0],W.days[1]), hp:W.hp, dmg:W.dmg};
 }
 function woundMul(){ const w=G.injury; return w? {hp:(w.hp||0.85), dmg:(w.dmg||0.85)} : {hp:1,dmg:1}; }
-function addScar(name){ G.scars=G.scars||[]; if(G.scars.length<12) G.scars.push(name);
+/* =====================================================================
+   SCARS — THE ARENA'S PRICE, AND IT IS PAID ON THE SKIN. A wound that closes
+   leaves a mark that is placed once and then drawn for the rest of your life:
+   on the body map, in the villa, on your own portrait and in the bath.
+   ===================================================================== */
+function scarZoneOf(name){
+  const n=String(name||'').toLowerCase();
+  if(/brow|skull|jaw|eye|cheek|lip|nose|ear/.test(n)) return 'face';
+  if(/arm|shoulder|hand|forearm|wrist/.test(n))       return 'arm';
+  if(/thigh|leg|ankle|knee|shin|calf|foot/.test(n))   return 'leg';
+  return 'torso';
+}
+function addScar(name,sev){ G.scars=G.scars||[];
+  if(G.scars.length<12) G.scars.push({name, zone:scarZoneOf(name), sev:clamp(sev||1,1,3), day:G.day});
   G.honor=clamp(G.honor+1,0,100); }                 // Rome respects a scarred man
+function scarName(s){ return (typeof s==='string')? s : (s&&s.name)||'scar'; }
+// every mark gets a fixed place on the body, derived from its name — so the
+// same scar is in the same place in the villa, the plate and the chart
+function scarList(g){
+  const src=((g||G||{}).scars)||[];
+  return src.map((sc,i)=>{
+    const nm=scarName(sc), h=kinHash(nm+'#'+i);
+    return { name:nm,
+      zone:(typeof sc==='object'&&sc.zone)||scarZoneOf(nm),
+      sev :(typeof sc==='object'&&sc.sev )||1,
+      u:((h>>>3)%100)/100, v:((h>>>11)%100)/100,
+      len:2+((h>>>17)%3), side:((h>>>23)&1)?1:-1 };
+  });
+}
+function scarCount(){ return ((G&&G.scars)||[]).length; }
+// zones is {face:[x,y,w,h], torso:[…], arm:[…], leg:[…]} in whatever frame the caller draws in
+function drawScarsOn(P,marks,zones,col,skin){
+  if(!marks||!marks.length) return;
+  const C=col||'#a8705e';
+  for(const m of marks){
+    const z=zones[m.zone]; if(!z) continue;
+    const L=Math.max(1,Math.min(m.len, z[3]-1));
+    const x=z[0]+Math.round(m.u*Math.max(0,z[2]-1));
+    const y=z[1]+Math.round(m.v*Math.max(0,z[3]-L));
+    P(x,y,1,L,C);
+    if(m.sev>=2) P(x+m.side,y+1,1,Math.max(1,L-1),C);                 // a serious one is two strokes
+    if(m.sev>=3){ P(x-m.side,y,1,Math.max(1,L-1),C);                  // a grave one is a ruin
+                  if(skin) P(x,y-1,2,1,mixHex(C,skin,0.45)); }
+  }
+}
 function trainScreen(){
   state='ludus'; show('scr-ludus'); $('statbar').classList.remove('hide'); refreshStatbar();
   const fat=Math.round(G.fatigue||0);
@@ -13734,7 +14013,7 @@ function trainScreen(){
        <span class="muted">— drill while exhausted and you will hurt yourself. Rest a day to shed it.</span></div>
      <div style="height:8px;background:#2a1f16;border-radius:4px;margin-top:4px;overflow:hidden"><div style="height:100%;width:${fat}%;background:${fat>70?'#e05b5b':fat>40?'#e8c34a':'#8ad48a'}"></div></div>
      ${wnd? `<div class="small" style="color:var(--blood);margin-top:5px">🩹 <b>${wnd.name}</b> (${wnd.sevName||'wound'}) — ${wnd.daysLeft} days to knit · you fight at ${Math.round((wnd.hp||0.85)*100)}% health, ${Math.round((wnd.dmg||0.85)*100)}% force</div>`:''}
-     ${(G.scars||[]).length? `<div class="small muted" style="margin-top:4px">⚔ Scars: ${G.scars.join(' · ')}</div>`:''}`;
+     ${(G.scars||[]).length? `<div class="small muted" style="margin-top:4px">⚔ Scars: ${(G.scars||[]).map(scarName).join(' · ')}</div>`:''}`;
   const b=$('ludus-body'); b.innerHTML='';
   // ---- the drills ----
   SKILLS.forEach(S2=>{
@@ -13889,6 +14168,8 @@ window.__SS = {
   HAIR_M, HAIR_F, BEARD_M, OUTFITS_M, HAIR_COL_M, HAIR_M_BY_ETH, HAIR_F_BY_ETH, BEARD_BY_ETH, OUTFIT_BY_ETH,
   drawHairM, drawHairF, drawBeardM, drawOutfitM, hairStyleName, beardName, outfitName,
   hairStyleFallback, beardFallback, outfitFallback, ensureLook, playerLook, TUNIC_COL_M,
+  addScar, scarList, scarName, scarZoneOf, drawScarsOn, outfitAllowed, clothierCost, barberCost,
+  rollBrides, drawUndressedFig, drawWaterCouple, waterMetrics,
   lit2, rgbA, rgbTriple,
   openHerbs, HERBS, HERB_BY_ID, drawHerbIcon, herbCount, herbAdd, herbUse,
   ILLNESSES, rollIllness, curesIll, birthRisk, birthPrepLine, illnessBite, get DM(){return DM;},

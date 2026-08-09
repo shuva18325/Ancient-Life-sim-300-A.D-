@@ -91,6 +91,34 @@ publicly, leaving it off keeps the game safe for a general audience.
   decides whether you keep breathing, three court figures with their own opinions of you, and a
   live **RISK TO THE PURPLE** reading fed by unrest, unanswered petitions and a brother with a
   better claim.
+- **The tonsor and the clothier** — you had eight cuts, five beards, seven outfits and
+  a hair palette, and no way on earth to choose any of them. The villa now keeps a
+  barber and a wardrobe: pick your cut, your beard, your colour (henna, walnut hulls,
+  Germanic soap-lye — Rome dyed its hair constantly) and your cloth, with a live
+  preview of yourself, and **Rome's rules about who may wear what**: the toga needs an
+  office or a seat, the cuirass needs a command. What you choose is what you wear in
+  the halls, in the family portrait and on every plate you appear on.
+- **Scars, and the arena's price** — a wound that closes is placed **once** on the
+  body — face, arm, torso or leg, chosen from what the wound actually was — and then
+  drawn there for the rest of your life: on the body map, in the villa, on your
+  portrait and in the bath, where there is nothing to hide it. A light wound is one
+  stroke, a serious one two, a grave one a ruin. The chart lists them by name.
+- **The max face is three faces** — a man of twenty-four, forty and sixty-five are not
+  handsome in the same way. The top tier now draws a **young**, a **middle-aged** and
+  an **old** cut of the same head: the same bones, but the brow thickens and goes
+  unruly, the eye-lines deepen, the jaw corner grows heavy, and the years arrive on
+  top. The jaw itself is drawn as a jaw — the cheek narrowing into a corner, the
+  corner turning, the chin squared and lit — instead of a stripe of shadow. And the
+  scar that used to be painted on **every man in the game whether he had earned one or
+  not** is gone; you get scars by being cut.
+- **The matchmaker matches on age** — pay her and she does what you are paying her
+  for. An ordinary viewing is off by sixteen years on average; **SEND FOR FINER
+  FAMILIES** lands within six, and **THE MATCHMAKER'S FINEST** within three.
+- **Five positions in the pool** — face to face, lifted clean out of the water,
+  against the marble lip, astride on the step, and adrift in no hurry at all. Each has
+  its own placement and its own motion, they cycle through the scene, and **each one
+  is named on the plate** so you can tell what you are looking at. The bedchamber's
+  seven positions are named now too.
 - **The pool, rebuilt** — the bathing scene was four bugs stacked on each other: the
   player's head-in-the-water was drawn every frame, so a spare head sat beside the
   couple for the whole scene; the spouse walked over with **no subject passed**, so
