@@ -142,6 +142,17 @@ publicly, leaving it off keeps the game safe for a general audience.
   drawn there for the rest of your life: on the body map, in the villa, on your
   portrait and in the bath, where there is nothing to hide it. A light wound is one
   stroke, a serious one two, a grave one a ruin. The chart lists them by name.
+- **500 denarii buys you a hearing** — station opens the matchmaker's door by
+  default, but so does money, because it always did. A gladiator with **500d in hand**
+  gets the same shortlists as anyone; below that the locked card tells you exactly how
+  much you are short. Courting stays available at every station either way — it is a
+  second road, not a punishment.
+- **The wardrobe scene was running blind** — twelve seconds of two dark-brown
+  silhouettes drawn at 0.3 alpha onto dark-brown cedar, which is to say twelve seconds
+  of nothing. The same failure the pool had. **The lamp is inside now**: the panels
+  glow, light bleeds through the seam and spills on the floor, and the pair read as
+  near-black shadows against it — which is the entire point of putting them behind a
+  door.
 - **The steam got out of the way** — the pool's censoring was two near-opaque slabs at
   0.85 alpha covering the figure from shoulders to thigh, which read as a white bar
   rather than as steam. It is now a pair of **narrow bands that drift, breathe and

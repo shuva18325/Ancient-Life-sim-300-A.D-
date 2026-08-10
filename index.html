@@ -3941,8 +3941,15 @@ function renderCourt(){
     body.appendChild(bt);
   });
 }
-// below the citizen line there is no matchmaker — only conversation
-function courtOnly(){ return SOCIAL_ORDER.indexOf(G.socialClass||'gladiator') < 1; }
+/* ---- WHO THE MATCHMAKER WILL WORK FOR. Station opens the door by default —
+   but so does money, because it always did. A gladiator with a real purse is a
+   man with something to trade, and Rome was never too proud to take it. Put
+   500 denarii on the table and the shortlists open the same as anyone's. ---- */
+const MATCHMAKER_FEE=500;
+function courtOnly(){
+  if(SOCIAL_ORDER.indexOf(G.socialClass||'gladiator') >= 1) return false;   // citizen or better
+  return (G.coin||0) < MATCHMAKER_FEE;                                       // …or rich enough to be heard
+}
 /* ---- THE COURTING BOARD. Four doors, and it shows you the shut ones on
    purpose: a locked button that tells you exactly what it would take is worth
    more than a button that is simply not there. ---- */
@@ -9847,13 +9854,34 @@ function drawDomus(){
     else if(T2<900){
       // two silhouettes pressed against the cedar doors, and the whole thing working
       const k=(T2-180)/720, rock=Math.sin(T2*0.9);
-      // the pair shadowed on the cedar — on THEIR builds, and moving with it
-      { const MA=waterMetrics(playerLook()), MB=waterMetrics(w);
-        const beat=T2*0.34, sg=Math.sin(beat), lift=-Math.max(0,sg)*3.2;
-        ctx.globalAlpha=0.30+0.10*Math.sin(T2*0.5);
-        px(298+rock*1.4-MA.shW*0.30, 150+lift*0.4, Math.round(MA.shW*0.9), 44, '#1c130c');
-        px(310+rock*1.4-MB.shW*0.24, 146+lift,     Math.round(MB.shW*0.9), 48, '#17100a');
-        px(298+rock*1.4-2,146+lift*0.4,7,7,'#1c130c'); px(312+rock*1.4,142+lift,7,7,'#17100a');   // their heads
+      /* ---- THE LAMP IS INSIDE. This ran for twelve seconds showing nothing at
+         all: two dark-brown silhouettes at 0.3 alpha drawn onto dark-brown
+         cedar. Same failure the pool had. The doors are now LIT from within —
+         a lamp behind them, light bleeding through the seam and the panel
+         edges — so the pair read as shadows ON something, which is the whole
+         idea of putting them behind a door in the first place. ---- */
+      { const wx2=292+rock;
+        const flick=0.86+Math.sin(T2*0.27)*0.10+Math.sin(T2*0.62)*0.04;
+        // the panels glow, brightest at the middle seam
+        { const g=ctx.createLinearGradient(wx2,0,wx2+34,0);
+          g.addColorStop(0,'rgba(255,190,110,'+(0.16*flick)+')');
+          g.addColorStop(0.5,'rgba(255,216,150,'+(0.46*flick)+')');
+          g.addColorStop(1,'rgba(255,190,110,'+(0.16*flick)+')');
+          ctx.fillStyle=g; ctx.fillRect(wx2+2,140,30,70); }
+        ctx.globalAlpha=0.75*flick; px(wx2+16,138,2,74,'#ffdca0'); ctx.globalAlpha=1;   // the seam itself
+        ctx.globalAlpha=0.30*flick; px(wx2+2,138,30,2,'#ffcf80'); px(wx2+2,208,30,2,'#ffcf80'); ctx.globalAlpha=1;
+        // a spill of light on the floor in front of it
+        ctx.globalAlpha=0.22*flick; px(wx2-4,212,42,4,'#ffcf80'); ctx.globalAlpha=1;
+        // ---- and NOW the two of them, near-black against it ----
+        const MA=waterMetrics(playerLook()), MB=waterMetrics(w);
+        const beat=T2*0.34, sg=Math.sin(beat), lift=-Math.max(0,sg)*3.4;
+        const aw=Math.max(7,Math.round(MA.shW*0.72)), bw=Math.max(7,Math.round(MB.shW*0.66));
+        ctx.globalAlpha=0.90;
+        px(wx2+7+rock*1.2-aw/2,  152+lift*0.4, aw, 44, '#140d08');                       // him
+        px(wx2+24+rock*1.2-bw/2, 148+lift,     bw, 48, '#100a06');                       // her
+        px(wx2+7+rock*1.2-4,  144+lift*0.4, 8, 9, '#140d08');                            // their heads
+        px(wx2+24+rock*1.2-4, 139+lift,     8, 9, '#100a06');
+        px(wx2+11+rock*1.2, 160+lift*0.5+sg*2, 12, 3, '#140d08');                        // an arm across her
         ctx.globalAlpha=1; }
       px(292+rock*1.6,132,34,3,'#8a6640');                                              // the cornice knocking loose
       if((T2|0)%9<1) D.props.push({kind:'sandal',x:300,y:206,vx:rnd(-1.4,-0.4),vy:rnd(-1.6,-0.6),r:0,vr:0.2});
@@ -13085,10 +13113,14 @@ function openMarry(forced){
   const rr=document.createElement('div'); rr.className='shopcard';
   if(courtOnly()){
     rr.style.borderColor='#4a3a26';
-    rr.innerHTML=`<div><b style="color:#8a7a5a">🔎 THE MATCHMAKER — 🔒 NOT FOR YOU</b></div>
+    const short=MATCHMAKER_FEE-(G.coin||0);
+    rr.innerHTML=`<div><b style="color:#8a7a5a">🔎 THE MATCHMAKER — 🔒 NOT FOR YOU YET</b></div>
       <div class="small muted">A matchmaker is a service bought by families with something to trade: land, a name, a seat.
-      She takes one look at your station and is already talking to somebody else. <b>Become a free citizen or better</b>
-      and the shortlists open up — until then, the only way to a wife is the one above: go and talk to somebody.</div>`;
+      She takes one look at your station and is already talking to somebody else.</div>
+      <div class="small" style="color:#e8c34a;margin-top:3px">💰 <b>${short}d short.</b>
+      Come back with <b>${MATCHMAKER_FEE} denarii</b> in hand — or rise to <b>free citizen</b> — and the shortlists open
+      the same as anyone's. Rome was never too proud to take a fighter's money.</div>
+      <div class="small muted" style="margin-top:2px">Until then the only road to a wife is the one above: go and talk to somebody.</div>`;
     body.appendChild(rr);
     const backOnly=document.createElement('div'); backOnly.className='small muted';
     body.appendChild(backOnly);
@@ -14899,7 +14931,8 @@ window.__SS = {
   rollBrides, drawUndressedFig, drawWaterCouple, waterMetrics, drawSteamVeil,
   COURT_RANKS, COURT_PROMPTS, COURT_BOASTS, courtAccess, courtOnly, startCourtship,
   courtChoose, courtShow, courtBackDown, courtFinish, renderCourt, get CT(){return CT;},
-  buildCourtBoard, rollHiddenPotential, drawCourtScene, openCreate,
+  buildCourtBoard, rollHiddenPotential, drawCourtScene, openCreate, MATCHMAKER_FEE,
+  set marryList(v){ marryList=v; }, get marryList(){ return marryList; },
   lit2, rgbA, rgbTriple,
   openHerbs, HERBS, HERB_BY_ID, drawHerbIcon, herbCount, herbAdd, herbUse,
   ILLNESSES, rollIllness, curesIll, birthRisk, birthPrepLine, illnessBite, get DM(){return DM;},
