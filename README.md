@@ -108,6 +108,21 @@ publicly, leaving it off keeps the game safe for a general audience.
   been flattered by professionals and wants to know what you actually ARE.** Every
   answer gets a real reply, colour-coded, and a reaction — flattered, amused,
   unmoved, put off, offended.
+- **🂠 HIDDEN POTENTIAL — the gutter roll** — a roll offered at the enrolment table
+  to the **bottom of the ladder and nobody else**. Every visible part of you comes back
+  resolutely ordinary (average 4.8, never above 6 — you will not turn a head in the
+  street), except the one thing nobody can see, which comes back **immense, every
+  time**. A patrician has no use for it; he can buy a match on his name. A gladiator
+  cannot buy anything and has to talk — and this is the hand that makes the secret
+  boast **true**, where an ordinary poor roll backs it only about 13% of the time.
+- **The courtship has a scene** — it was a wall of text with a stamp-sized portrait.
+  It now draws **the two of you where you actually are**: a torchlit street fountain,
+  a colonnaded garden with the wine out, a marble hall, or the palace with the guards'
+  spears at the edge. Their posture answers to how it is going — half turned away
+  while they are unconvinced, square on once you have them — you **close the distance**
+  as the bar fills, hearts rise between you past two-thirds, and a mood glyph sits over
+  their head. Plus a proper inset progress bar with quarter-marks, mistake pips that
+  look like pips, and every answer colour-coded down its edge by type.
 - **A boast is a claim, and a claim can be false** — once the conversation is going
   well enough, lines unlock that name a thing about your body and put a number behind
   it. Say it when it's **true** and it lands harder than any sweet line. Say it when
@@ -127,6 +142,11 @@ publicly, leaving it off keeps the game safe for a general audience.
   drawn there for the rest of your life: on the body map, in the villa, on your
   portrait and in the bath, where there is nothing to hide it. A light wound is one
   stroke, a serious one two, a grave one a ruin. The chart lists them by name.
+- **The steam got out of the way** — the pool's censoring was two near-opaque slabs at
+  0.85 alpha covering the figure from shoulders to thigh, which read as a white bar
+  rather than as steam. It is now a pair of **narrow bands that drift, breathe and
+  taper off at both ends**, with loose curls rising off the water — shoulders, arms,
+  waist and legs all read through it, and it still covers what it has to.
 - **Three pool bugs, fixed** — pressing SPACE or W near the pool used to be able to
   glitch: both keys were checked unconditionally in the same tick, so a fast
   double-press (or a touch player's thumb clipping two adjacent pads) could start
