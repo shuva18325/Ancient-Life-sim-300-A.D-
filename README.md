@@ -91,6 +91,30 @@ publicly, leaving it off keeps the game safe for a general audience.
   decides whether you keep breathing, three court figures with their own opinions of you, and a
   live **RISK TO THE PURPLE** reading fed by unrest, unanswered petitions and a brother with a
   better claim.
+- **The poor do not buy a marriage — they have to talk** — a matchmaker is a service
+  bought by families with something to trade. Below the citizen line there is no
+  shortlist and no roll buttons at all: the matchmaker card is **locked, and says
+  why**. What you get instead is **a conversation**. Four doors — someone of your own
+  station, a rich merchant's child, a patrician's child, one of the imperial house —
+  and the shut ones stay **visible and locked with the exact requirement on them**
+  (a slave cannot contract a legal marriage into the senatorial class no matter how
+  much coin he is sitting on, which is real Roman law, not a balance decision).
+- **Courtship is a talking game** — a progress bar to 100, a hard mistake limit (four
+  at your own station, three for the rich, two for a patrician, **one** for the
+  purple), and a fresh exchange every turn with four ways to answer. Every line is
+  tagged — 💗 sweet · 🫱 honest · 🎭 wit · 💪 body · 🔥 bold — and the card tells you
+  how *this particular person* takes that sort of thing, because taste inverts by
+  station: **a woman of your own class warms to sweetness and honesty; a rich one has
+  been flattered by professionals and wants to know what you actually ARE.** Every
+  answer gets a real reply, colour-coded, and a reaction — flattered, amused,
+  unmoved, put off, offended.
+- **A boast is a claim, and a claim can be false** — once the conversation is going
+  well enough, lines unlock that name a thing about your body and put a number behind
+  it. Say it when it's **true** and it lands harder than any sweet line. Say it when
+  it isn't and they simply **do not believe you** — and then you decide: let it go and
+  eat the mistake, or **SHOW THEM**. If the claim was true, that settles it completely.
+  If it wasn't, it is a disaster you do not recover from. And in front of a patrician
+  or the imperial house, offering at all ends the evening on the spot.
 - **The tonsor and the clothier** — you had eight cuts, five beards, seven outfits and
   a hair palette, and no way on earth to choose any of them. The villa now keeps a
   barber and a wardrobe: pick your cut, your beard, your colour (henna, walnut hulls,

@@ -339,6 +339,16 @@
     </div>
   </div>
 
+  <!-- ===== COURTSHIP: the poor do not buy a match, they have to earn one ===== -->
+  <div id="scr-court" class="screen center">
+    <div class="panel pad col gap scrollbox" style="width:min(97%,900px);max-height:95%;">
+      <h2 style="color:var(--gold)" id="court-title">🌹 COURTSHIP</h2>
+      <div id="court-head" class="col gap"></div>
+      <div id="court-body" class="col gap"></div>
+      <div class="row" style="justify-content:flex-end;"><button class="btn gold" id="btn-court-back">◀ WALK AWAY</button></div>
+    </div>
+  </div>
+
   <!-- ===== THE TABULA (a wax-tablet note to your spouse, ancient texting) ===== -->
   <div id="scr-note" class="screen center">
     <div class="panel pad col gap scrollbox" style="width:min(94%,620px);max-height:95%;">
@@ -3379,6 +3389,472 @@ function rollBrides(minQ){
     if(minQ){ const q=clamp(Math.round(rnd(minQ, Math.min(10,minQ+1.5))),1,10);
       return makeBride(e, noble, q, near); }
     return makeBride(e, noble, undefined, near);
+  });
+}
+/* =====================================================================
+   COURTSHIP — YOU HAVE TO TALK.
+   A matchmaker is a service for people with money. Below the citizen line
+   nobody is presenting you with a shortlist of noble daughters: you meet
+   somebody, and you either hold their interest or you do not. So the poor get
+   no roll buttons at all. They get a conversation, four mistakes, and a bar.
+   Rank decides who will even speak to you, how many mistakes you are allowed,
+   and — crucially — what they want to HEAR. A woman of your own station warms
+   to sweetness and honesty. A rich one has been flattered by better liars than
+   you and wants to know what you actually ARE.
+   ===================================================================== */
+const COURT_RANKS={
+  poor:{ id:'poor', label:'someone of your own station', icon:'🌾',
+    blurb:'A freedwoman at the fountain, a smith’s daughter, a soldier off duty. No dowry, no politics — just whether they like you.',
+    mistakes:4, quality:[2,5], noble:false, patience:'They have all evening, and nothing to lose by hearing you out.',
+    taste:{sweet:1.35, honest:1.25, wit:1.05, body:0.75, bold:0.90} },
+  rich:{ id:'rich', label:'a rich merchant’s child', icon:'💰',
+    blurb:'Grain money, three ships and a father who counts. They have been flattered by professionals — sweet words bounce off. Show them what you ARE.',
+    mistakes:3, quality:[5,8], noble:true, patience:'They are bored, and boredom is not patience.',
+    taste:{sweet:0.80, honest:0.90, wit:1.20, body:1.30, bold:1.05} },
+  elite:{ id:'elite', label:'a patrician’s child', icon:'🏛',
+    blurb:'An old name, a seat in the Senate behind them, and absolutely no reason to be standing here talking to you.',
+    mistakes:2, quality:[7,9], noble:true, patience:'You have perhaps a dozen sentences before they remember somewhere else to be.',
+    taste:{sweet:0.65, honest:0.85, wit:1.35, body:1.15, bold:1.00} },
+  imperial:{ id:'imperial', label:'one of the imperial house', icon:'👑',
+    blurb:'Born of the purple. Every word you say will be repeated to somebody who writes things down.',
+    mistakes:1, quality:[9,10], noble:true, patience:'One wrong sentence is a story that outlives you.',
+    taste:{sweet:0.55, honest:0.80, wit:1.25, body:1.20, bold:1.15} },
+};
+// WHO WILL EVEN STAND THERE. Rank is a door, and most of them are shut.
+function courtAccess(id){
+  const cls=G.socialClass||'gladiator', rank=SOCIAL_ORDER.indexOf(cls);
+  const off=(G.office||0), pw=(typeof powerScore==='function'? powerScore():0);
+  if(id==='poor') return {ok:true};
+  if(id==='rich'){
+    // a rich house will hear out anyone who is somebody in the city — a famous
+    // gladiator absolutely counts, which is the whole appeal of the arena
+    const fame=(G.glory||0)+(G.renown||0)*2;
+    if(rank>=1 || fame>=400 || off>=1) return {ok:true};
+    return {ok:false, why:'A merchant house will not open the door to a nobody. Win some fame in the arena (glory + renown ≥ 400), or become a citizen.'};
+  }
+  if(id==='elite'){
+    if(rank<1) return {ok:false, why:'You are not a free citizen. Roman law did not merely frown on this match — it did not recognise it. No amount of coin buys around your station; rise to CITIZEN first.'};
+    if(rank>=2 || off>=2 || G.senate) return {ok:true};
+    return {ok:false, why:'A patrician does not converse with the unranked. Hold a real office (aedile or above), rise to the equestrian class, or take a Senate seat.'};
+  }
+  // the purple
+  if(rank<1) return {ok:false, why:'You are not a free citizen. The imperial house does not receive suitors off the street, and it certainly does not receive them off the sand.'};
+  const need = G.isFemale? 70 : 45;
+  if((rank>=4) || pw>=need) return {ok:true};
+  return {ok:false, why:'The imperial house does not receive suitors off the street. Build POWER — coin, provinces, offices, regalia — to '+need+'. You are at '+pw+'.'};
+}
+/* ---- WHAT YOU CAN SAY. Each option carries a TYPE (which decides how well it
+   lands on this particular person) and a raw value. A boast additionally names
+   a STAT and a threshold: say it when it is true and it lands hard; say it when
+   it is not and they simply do not believe you, and then you have a problem. ---- */
+const COURT_PROMPTS=[
+ {q:'“I have not seen you here before.”', opts:[
+   {t:'sweet', v:8,  say:'“You would have remembered.”',
+    r:'They laugh before they can stop themselves. “That is unbearable. Say another one.”'},
+   {t:'honest',v:7,  say:'“I do not usually come to places like this.”',
+    r:'“No,” they say, looking at your hands. “You do not.” It is not unkind.'},
+   {t:'wit',   v:9,  say:'“I have been here the whole time. You were busy being looked at.”',
+    r:'A single raised eyebrow, and their whole posture changes.'},
+   {t:'bold',  v:-6, say:'“You have now. Do not waste it.”',
+    r:'“…Right.” They take a small, deliberate step back.'} ]},
+
+ {q:'“And what is it you do?”', opts:[
+   {t:'honest',v:9,  say:'“I fight. It is the only thing I have ever been good at.”',
+    r:'“At least you did not dress it up.” They are still standing there, which is the point.'},
+   {t:'body',  v:8,  say:'“I fight. Men my size do not get many other offers.”',
+    r:'Their eyes go, briefly and unsubtly, across your shoulders.'},
+   {t:'wit',   v:7,  say:'“I am employed by Rome to be stabbed at, publicly.”',
+    r:'“Gods. And they PAY you?” — “Barely.” They laugh properly at that.'},
+   {t:'sweet', v:-5, say:'“Nothing that matters, now.”',
+    r:'“That is a line.” The warmth drops out of their voice by about half.'} ]},
+
+ {q:'“You are very sure of yourself.”', opts:[
+   {t:'wit',   v:9,  say:'“I am very sure of YOU. There is a difference.”',
+    r:'“…That is better than it had any right to be.”'},
+   {t:'honest',v:8,  say:'“Not really. I am just louder about the doubt.”',
+    r:'Something in their face softens that had been braced against you.'},
+   {t:'bold',  v:5,  say:'“Should I be less?”',
+    r:'“No,” they say, after a pause that lasts a fraction too long. “No, do not do that.”'},
+   {t:'sweet', v:-6, say:'“Only when I am looking at you.”',
+    r:'“Mm.” They look over your shoulder to see who else is here.'} ]},
+
+ {q:'They say nothing at all, and wait to see what you do with the silence.', opts:[
+   {t:'honest',v:10, say:'You wait it out with them.',
+    r:'They break first, and smile at having broken first. “Well done.”'},
+   {t:'wit',   v:6,  say:'“Is this a test?”',
+    r:'“Everything is a test.” But they are amused.'},
+   {t:'sweet', v:3,  say:'“You are lovely when you are deciding about someone.”',
+    r:'A small, unwilling smile. It is not nothing.'},
+   {t:'bold',  v:-8, say:'You fill the silence with talk about yourself.',
+    r:'They let you run out of air, then say: “Are you finished?”'} ]},
+
+ {q:'“My father would want to know what you are worth.”', opts:[
+   {t:'honest',v:9,  say:'“Very little. I would not lie to you about it.”',
+    r:'“Good.” They say it fast, like it mattered. “The last one lied.”'},
+   {t:'wit',   v:8,  say:'“Tell him I am an appreciating asset.”',
+    r:'“He would actually like that. Do NOT say it to him.”'},
+   {t:'body',  v:6,  say:'“Tell him what I am worth is standing in front of you.”',
+    r:'They look, and take their time about it, and do not answer straight away.'},
+   {t:'sweet', v:-7, say:'“Your father does not have to know anything.”',
+    r:'Their expression closes like a door. “He is my FATHER.”'} ]},
+
+ {q:'“Everyone here wants something from me.”', opts:[
+   {t:'honest',v:11, say:'“I want something from you. I am just not pretending otherwise.”',
+    r:'That lands. They actually turn to face you properly for the first time.'},
+   {t:'sweet', v:7,  say:'“I want you to have one evening where that is not true.”',
+    r:'They go quiet, and the quiet is a good one.'},
+   {t:'wit',   v:5,  say:'“I want the seat. You were on it.”',
+    r:'“You are ridiculous.” They do not move off the seat.'},
+   {t:'bold',  v:-7, say:'“And what do you want?”',
+    r:'“Not this.” Flat. You have been weighed and found generic.'} ]},
+
+ {q:'“Say something true. Anything.”', opts:[
+   {t:'honest',v:12, say:'“I am frightened almost all of the time. I have simply stopped letting it show.”',
+    r:'They do not say anything for a moment. Then: “…Thank you.”'},
+   {t:'sweet', v:6,  say:'“I have not thought about tomorrow once since you started talking.”',
+    r:'“That IS true, isn’t it,” they say, half to themselves.'},
+   {t:'wit',   v:4,  say:'“This wine is appalling.”',
+    r:'“It is, isn’t it. My father imports it.” A very dry look.'},
+   {t:'bold',  v:-9, say:'“You will be mine before the month is out.”',
+    r:'“Extraordinary,” they say. “Not a question. Just a decision you made alone.”'} ]},
+
+ {q:'They ask, quite directly, why they should choose you over a richer man.', opts:[
+   {t:'body',  v:10, say:'“Because a rich man has never had to be strong.”',
+    r:'“…Go on then.” They are listening now, properly.'},
+   {t:'honest',v:9,  say:'“You should not, on the arithmetic. I am asking you not to do the arithmetic.”',
+    r:'“That is a terrible argument.” Pause. “Keep going.”'},
+   {t:'wit',   v:7,  say:'“Because he will bore you, and I will at minimum be a scandal.”',
+    r:'They laugh out loud, and several people turn round.'},
+   {t:'sweet', v:-4, say:'“Because I would love you more.”',
+    r:'“Everyone says that.” They have heard it, clearly, a great many times.'} ]},
+
+ {q:'“Do you even know how to talk to someone like me?”', opts:[
+   {t:'wit',   v:10, say:'“No. I am improvising, and it is going better than expected.”',
+    r:'“It really is,” they admit, and seem annoyed about admitting it.'},
+   {t:'honest',v:8,  say:'“No. I thought I would try anyway.”',
+    r:'“Most people do not try.” They say it like it counts for something.'},
+   {t:'bold',  v:6,  say:'“I am not talking to someone like you. I am talking to you.”',
+    r:'That one goes in. They blink, and recover a half-second late.'},
+   {t:'sweet', v:-5, say:'“I would learn, for you.”',
+    r:'“Learn first,” they say. “Then come back.”'} ]},
+
+ {q:'“Show me you are not like the others.”', opts:[
+   {t:'honest',v:10, say:'“I probably am. But I will not lie to you, which narrows the field.”',
+    r:'A short, surprised laugh. “That is bleak. And fair.”'},
+   {t:'wit',   v:8,  say:'“I cannot. The others all said that too.”',
+    r:'“…Damn.” They are grinning.'},
+   {t:'sweet', v:5,  say:'“I will not ask you for anything tonight.”',
+    r:'They watch you to see whether that was true. So far it is.'},
+   {t:'bold',  v:-7, say:'You reach for their hand.',
+    r:'They withdraw it without hurry and without apology.'} ]},
+
+ {q:'“What would you do if I said no?”', opts:[
+   {t:'honest',v:11, say:'“Go home. Be poor company for a week. Not blame you.”',
+    r:'“Gods, you mean it.” Something shifts behind their eyes.'},
+   {t:'wit',   v:7,  say:'“Ask a second time, worse.”',
+    r:'“The SECOND one is worse?” — “Considerably.”'},
+   {t:'sweet', v:6,  say:'“Remember the evening kindly anyway.”',
+    r:'“That is annoyingly decent of you.”'},
+   {t:'bold',  v:-8, say:'“You will not.”',
+    r:'“I might,” they say, very evenly, “just to see your face.”'} ]},
+
+ {q:'They mention, lightly, that a soldier asked for them last month.', opts:[
+   {t:'wit',   v:9,  say:'“And how is he? Still standing?”',
+    r:'“He is a QUARTERMASTER,” they say. “He counts blankets.” You have won something here.'},
+   {t:'body',  v:8,  say:'“Did he look like he could carry you out of a burning house?”',
+    r:'They look at your arms and decline to answer, which is an answer.'},
+   {t:'honest',v:6,  say:'“Then he has better judgement than most.”',
+    r:'“Careful,” they say. “That was almost gracious.”'},
+   {t:'bold',  v:-6, say:'“Forget him.”',
+    r:'“I HAD forgotten him,” they say pointedly. “Until you made him interesting.”'} ]},
+];
+/* ---- THE BOASTS. These are the ones with teeth: naming a thing about your
+   body and putting a number behind it. Land it and it lands harder than any
+   sweet line. Miss it and they do not merely dislike you — they do not BELIEVE
+   you, and then you have to decide how far you are willing to go about it. ---- */
+const COURT_BOASTS=[
+ {stat:'bust',  need:7, t:'body', v:13, minProg:30,
+  say:'“Feel the arm before you decide anything.”',
+  good:'They do. Their eyebrows go up and stay up. “…Oh.”',
+  bad:'They squeeze once, politely, and say nothing at all. It is worse than laughing.'},
+ {stat:'booty', need:7, t:'body', v:12, minProg:30,
+  say:'“I fill a doorway. Ask anyone who has had to get past me.”',
+  good:'They step back to look properly, and do not pretend they were not looking.',
+  bad:'“Mm,” they say, to the doorway, which you do not fill.'},
+ {stat:'waist', need:8, t:'body', v:12, minProg:35,
+  say:'“There is not a soft inch on me. There has not been for years.”',
+  good:'“Prove it,” they say — and you already have, standing there.',
+  bad:'Their eyes drop to your middle for exactly one second too long.'},
+ {stat:'face',  need:8, t:'body', v:11, minProg:25,
+  say:'“You have been looking at my face since I sat down.”',
+  good:'“I have,” they say, entirely unembarrassed. “Keep it where I can see it.”',
+  bad:'“I was looking PAST you. There is a man behind you I owe money to.”'},
+ {stat:'legs',  need:8, t:'body', v:10, minProg:25,
+  say:'“I have run down men on horseback. On foot.”',
+  good:'“That is a lie.” It is not, and they can see it is not.',
+  bad:'“On foot,” they repeat, flatly, and look at your legs.'},
+ {stat:'secret',need:8, t:'bold', v:16, minProg:60, adultOnly:true,
+  say:'“There is one more thing, and the baths already know about it.”',
+  good:'They go very still. “…The BATHS know?” — “The baths gossip.”',
+  bad:'“The baths,” they say, “know nothing of the sort. I would have heard.”'},
+];
+const COURT_RESULT={
+  glow:  {c:'#7ad48a', w:['flattered','warmed','delighted','pleased','disarmed']},
+  ok:    {c:'#e8c34a', w:['interested','amused','curious','listening']},
+  cool:  {c:'#c8a86a', w:['unmoved','patient','waiting']},
+  bad:   {c:'#e0705b', w:['unimpressed','cooler','bored','put off']},
+  awful: {c:'#e05b5b', w:['offended','insulted','angry','done with you']},
+};
+/* ---- THE ENGINE ---------------------------------------------------------- */
+let CT=null;   // the live courtship
+function courtBodyVal(stat){
+  const b=(G&&G.body)||{}; return b[stat]===undefined? 5 : b[stat];
+}
+function startCourtship(rankId){
+  const R=COURT_RANKS[rankId]; if(!R) return;
+  const acc=courtAccess(rankId);
+  if(!acc.ok){ toast('🔒 '+acc.why, 5200); return; }
+  // the person is rolled UP FRONT, with a face and a name — you are courting
+  // somebody specific, not an abstraction you win at the end
+  const eth=pick(BRIDE_ETHS);
+  const q=clamp(Math.round(rnd(R.quality[0],R.quality[1])),1,10);
+  const who=makeBride(eth, R.noble, q, {ageNear:(G.age||22), spread: rankId==='poor'?7:5});
+  who.tier = rankId==='poor'?'common' : rankId==='rich'?'rich' : rankId==='elite'?'elite':'imperial';
+  CT={ rank:R, rankId, who, prog:0, mistakes:0, max:R.mistakes,
+       beat:null, used:[], doubt:null, over:false, won:false, turns:0, lastMsg:null };
+  courtNextBeat();
+  state='court'; show('scr-court'); $('statbar').classList.remove('hide'); refreshStatbar();
+  renderCourt();
+}
+// pick the next thing they say — a boast opportunity sometimes, otherwise a prompt
+function courtNextBeat(){
+  if(!CT) return;
+  const fresh=COURT_PROMPTS.filter((p,i)=>!CT.used.includes(i));
+  const pool = fresh.length? fresh : COURT_PROMPTS;
+  const idx = COURT_PROMPTS.indexOf(pick(pool));
+  CT.used.push(idx); if(CT.used.length>COURT_PROMPTS.length-2) CT.used=[idx];
+  const P=COURT_PROMPTS[idx];
+  // options are the prompt's four, PLUS any boast the conversation has earned
+  const opts=P.opts.slice();
+  const boasts=COURT_BOASTS.filter(b=>
+     CT.prog>=b.minProg && (!b.adultOnly || (ADULT && !G.isFemale)) );
+  if(boasts.length && Math.random()<0.55){
+    const B=pick(boasts);
+    opts.push({t:B.t, v:B.v, say:B.say, boast:B});
+  }
+  CT.beat={ q:P.q, opts };
+}
+function courtWeight(t){ const w=CT.rank.taste[t]; return w===undefined?1:w; }
+function courtBand(score){
+  return score>=9? 'glow' : score>=4? 'ok' : score>=0? 'cool' : score>=-5? 'bad' : 'awful';
+}
+function courtChoose(i){
+  if(!CT||CT.over) return;
+  const O=CT.beat.opts[i]; if(!O) return;
+  CT.turns++;
+  // A BOAST IS A CLAIM, AND A CLAIM CAN BE FALSE
+  if(O.boast){
+    const B=O.boast, have=courtBodyVal(B.stat), true_=have>=B.need;
+    if(true_){
+      const gain=Math.round(B.v*courtWeight(O.t));
+      CT.prog=clamp(CT.prog+gain,0,100);
+      CT.lastMsg={say:O.say, r:B.good, band:'glow', delta:gain, note:'They believe you, because it is true.'};
+    } else {
+      // THEY DO NOT BELIEVE YOU. Now you have a decision to make.
+      CT.doubt={boast:B, stat:B.stat, need:B.need};
+      CT.lastMsg={say:O.say, r:B.bad, band:'bad', delta:0,
+        note:'They do not believe a word of it. You can let it go — or prove it.'};
+    }
+    if(!CT.doubt) courtAdvance();
+    renderCourt(); return;
+  }
+  const raw=O.v, score=Math.round(raw*courtWeight(O.t));
+  CT.prog=clamp(CT.prog+Math.max(score,0),0,100);
+  if(score<0){ CT.mistakes++; CT.prog=clamp(CT.prog+Math.round(score*0.6),0,100); }
+  CT.lastMsg={say:O.say, r:O.r, band:courtBand(score), delta:score,
+    note: score<0? 'A mistake. '+(CT.max-CT.mistakes)+' left.' : null};
+  courtAdvance();
+  renderCourt();
+}
+// SHOW THEM — the last resort. Honest if you have it, catastrophic if you do not,
+// and simply not done at all in front of the kind of people who write things down.
+function courtShow(){
+  if(!CT||!CT.doubt) return;
+  const D=CT.doubt, have=courtBodyVal(D.stat), true_=have>=D.need;
+  const stiff=(CT.rankId==='elite'||CT.rankId==='imperial');
+  CT.doubt=null;
+  if(stiff){
+    CT.lastMsg={say:'You offer to prove it, here, in front of everyone.',
+      r:'They stand up. “I am going to pretend that did not happen, and you are going to leave.”',
+      band:'awful', delta:-99, note:'That is not done. Not with this one.'};
+    CT.mistakes=CT.max+1; courtAdvance(); renderCourt(); return;
+  }
+  if(true_){
+    const gain=Math.round(D.boast.v*1.5*courtWeight('bold'));
+    CT.prog=clamp(CT.prog+gain,0,100);
+    CT.lastMsg={say:'You show them. Quietly, and only them.',
+      r:'A long silence. Then, in a completely different voice: “…You were not exaggerating.”',
+      band:'glow', delta:gain, note:'It was true, and now it is settled.'};
+  } else {
+    CT.mistakes+=2; CT.prog=clamp(CT.prog-22,0,100);
+    CT.lastMsg={say:'You show them.',
+      r:'They look. They look back up at your face. “Why,” they ask, “would you DO that?”',
+      band:'awful', delta:-22, note:'It was not true, and now everyone is certain.'};
+  }
+  courtAdvance(); renderCourt();
+}
+function courtBackDown(){
+  if(!CT||!CT.doubt) return;
+  CT.doubt=null; CT.mistakes++;
+  CT.prog=clamp(CT.prog-6,0,100);
+  CT.lastMsg={say:'“…Forget I said it.”',
+    r:'“Already have,” they say, and mean about half of it.',
+    band:'bad', delta:-6, note:'A mistake, but a survivable one. '+(CT.max-CT.mistakes)+' left.'};
+  courtAdvance(); renderCourt();
+}
+function courtAdvance(){
+  if(CT.mistakes>CT.max){ CT.over=true; CT.won=false; return; }
+  if(CT.prog>=100){ CT.over=true; CT.won=true; return; }
+  courtNextBeat();
+}
+function courtFinish(){
+  if(!CT) return;
+  if(CT.won){
+    const who=CT.who;
+    marryList=[who];                       // the person you actually talked to
+    CT=null; state='marry';
+    toast('🌹 They say yes — and they say it to YOU, not to your purse.',4200);
+    openMarry(false); return;
+  }
+  CT=null; state='marry'; openMarry(false);
+}
+/* ---- THE SCREEN ---------------------------------------------------------- */
+function renderCourt(){
+  if(!CT) return;
+  const who=CT.who, R=CT.rank;
+  $('court-title').innerHTML='🌹 COURTING <span style="color:#e2a0b8">'+who.name+'</span>';
+  const head=$('court-head'); head.innerHTML='';
+  const card=document.createElement('div'); card.className='shopcard';
+  const row=document.createElement('div'); row.className='row gap'; row.style.alignItems='flex-start';
+  row.appendChild(briadeImg(who,104));
+  const info=document.createElement('div'); info.style.flex='1';
+  const st=lookStage(who.looks===undefined?5:who.looks);
+  const pc = CT.prog>=75?'#7ad48a' : CT.prog>=40?'#e8c34a' : '#c8a86a';
+  const lives=CT.max-CT.mistakes;
+  info.innerHTML=
+    `<div><b style="color:var(--gold)">${who.name}</b> ${tierBadge(who.tier)}
+       <span class="small muted">— ${who.adj} ${who.rank}${who.age!==undefined?', '+who.age:''}</span></div>
+     <div class="small"><b style="color:${st.col}">${st.name}</b></div>
+     <div class="small muted" style="font-style:italic;margin:2px 0">${R.icon} ${R.blurb}</div>
+     <div class="small" style="margin-top:4px">💗 <b>HOW IT IS GOING</b>
+       <span style="display:inline-block;width:190px;height:9px;background:#241812;border:1px solid #000;vertical-align:middle">
+         <span style="display:block;width:${CT.prog}%;height:100%;background:${pc}"></span></span>
+       <b style="color:${pc}">${CT.prog}</b>/100</div>
+     <div class="small" style="margin-top:2px">🩹 <b>MISTAKES</b> —
+       <span style="color:${lives<=1?'#e05b5b':lives<=2?'#e8c34a':'#7ad48a'}">${
+         '✗'.repeat(Math.min(CT.mistakes,CT.max))+'○'.repeat(Math.max(0,lives))}</span>
+       <span class="muted">${lives>0? lives+' left of '+CT.max : 'none left — the next one ends it'}</span></div>
+     <div class="small muted" style="margin-top:2px">${R.patience}</div>`;
+  row.appendChild(info); card.appendChild(row); head.appendChild(card);
+
+  // what just happened, in colour
+  if(CT.lastMsg){
+    const M=CT.lastMsg, RES=COURT_RESULT[M.band]||COURT_RESULT.ok;
+    const fb=document.createElement('div'); fb.className='shopcard';
+    fb.style.borderColor=RES.c;
+    fb.innerHTML=`<div class="small" style="color:#cfc0a2">You: <i>${M.say}</i></div>
+      <div class="small" style="color:${RES.c};margin-top:3px">${M.r}</div>
+      <div class="small" style="margin-top:3px"><b style="color:${RES.c}">
+        ${M.delta>0? '▲ +'+M.delta : M.delta<0? '▼ '+M.delta : '— nothing'}</b>
+        <span class="muted">— ${pick(RES.w)}</span>${M.note? ' <span style="color:#e8c34a">'+M.note+'</span>':''}</div>`;
+    head.appendChild(fb);
+  }
+
+  const body=$('court-body'); body.innerHTML='';
+  // ---- IT IS OVER ----
+  if(CT.over){
+    const end=document.createElement('div'); end.className='shopcard';
+    end.style.borderColor=CT.won?'#7ad48a':'#e05b5b';
+    end.innerHTML= CT.won
+      ? `<div><b style="color:#7ad48a">🌹 THEY SAY YES.</b></div>
+         <div class="small">You talked your way to this. No matchmaker, no dowry negotiated over your head —
+         ${who.name.split(' ')[0]} chose you because of what you said standing in front of them.</div>`
+      : `<div><b style="color:#e05b5b">🚪 THEY ARE DONE.</b></div>
+         <div class="small">“I think we are finished here.” ${who.name.split(' ')[0]} goes back to their evening,
+         and you go back to yours. Nothing is lost but the hour — you may try again, with someone else.</div>`;
+    body.appendChild(end);
+    const b2=document.createElement('button'); b2.className='btn gold';
+    b2.textContent= CT.won? '⚭ GO AND MAKE IT FORMAL' : '◀ BACK';
+    b2.onclick=()=>courtFinish(); body.appendChild(b2);
+    return;
+  }
+  // ---- THEY DOUBT YOU: show, or let it go ----
+  if(CT.doubt){
+    const d=document.createElement('div'); d.className='shopcard'; d.style.borderColor='#e8c34a';
+    d.innerHTML=`<div><b style="color:#e8c34a">⚠ THEY DO NOT BELIEVE YOU.</b></div>
+      <div class="small muted">You made a claim about yourself that is not true, and they heard it as one.
+      You can drop it and take the mistake — or prove it, which is not a thing a careful person does.</div>`;
+    body.appendChild(d);
+    const r2=document.createElement('div'); r2.className='row gap6';
+    const b3=document.createElement('button'); b3.className='btn sm'; b3.textContent='😐 LET IT GO';
+    b3.title='Take the mistake. Survivable.'; b3.onclick=()=>courtBackDown(); r2.appendChild(b3);
+    const b4=document.createElement('button'); b4.className='btn sm'; b4.style.borderColor='#e05b5b'; b4.style.color='#e05b5b';
+    b4.textContent='🔥 SHOW THEM';
+    b4.title=(CT.rankId==='elite'||CT.rankId==='imperial')
+      ? 'In front of THIS one? Absolutely not. It will end the evening and possibly your name.'
+      : 'The last resort. If the claim was true it settles the matter completely. If it was not, it is a disaster you do not recover from.';
+    b4.onclick=()=>courtShow(); r2.appendChild(b4);
+    body.appendChild(r2);
+    return;
+  }
+  // ---- THEIR LINE, AND YOUR FOUR ANSWERS ----
+  const q=document.createElement('div'); q.className='shopcard'; q.style.borderColor='#8a6f35';
+  q.innerHTML=`<div class="small" style="color:#e2a0b8;font-size:13px"><b>${who.name.split(' ')[0]}:</b> ${CT.beat.q}</div>`;
+  body.appendChild(q);
+  const TYPE_LABEL={sweet:'💗 sweet', honest:'🫱 honest', wit:'🎭 wit', body:'💪 body', bold:'🔥 bold'};
+  CT.beat.opts.forEach((O,i)=>{
+    const bt=document.createElement('button'); bt.className='btn';
+    bt.style.textAlign='left'; bt.style.textTransform='none'; bt.style.whiteSpace='normal';
+    const w=courtWeight(O.t);
+    // the TYPE is shown, and how well this person takes that type — that is the
+    // read. It never tells you the answer, only what they are inclined to hear.
+    const lean = w>=1.25? '<span style="color:#7ad48a">▲ they like this sort of thing</span>'
+               : w>=1.05? '<span style="color:#c8dda0">▲ works on them</span>'
+               : w>=0.95? '<span class="muted">— neutral ground</span>'
+               : w>=0.8 ? '<span style="color:#e8c34a">▼ not really their taste</span>'
+               :          '<span style="color:#e0705b">▼ falls flat on this one</span>';
+    bt.innerHTML=`<div style="font-size:12px">${O.say}</div>
+      <div class="small" style="margin-top:2px">${TYPE_LABEL[O.t]||O.t} · ${lean}${
+        O.boast? ' · <span style="color:#ff8ad0">a CLAIM about yourself — only say it if it is true</span>':''}</div>`;
+    bt.onclick=()=>courtChoose(i);
+    body.appendChild(bt);
+  });
+}
+// below the citizen line there is no matchmaker — only conversation
+function courtOnly(){ return SOCIAL_ORDER.indexOf(G.socialClass||'gladiator') < 1; }
+/* ---- THE COURTING BOARD. Four doors, and it shows you the shut ones on
+   purpose: a locked button that tells you exactly what it would take is worth
+   more than a button that is simply not there. ---- */
+function buildCourtBoard(body){
+  const head=document.createElement('div'); head.className='small';
+  head.style.cssText='color:var(--gold);margin-top:4px';
+  head.innerHTML='🌹 <b>GO AND TALK TO SOMEBODY</b> <span class="muted">— no dowry, no fathers, no arrangement. '
+    +'You get a conversation and a limited number of mistakes. Who will stand there at all depends on who you are.</span>';
+  body.appendChild(head);
+  ['poor','rich','elite','imperial'].forEach(id=>{
+    const R=COURT_RANKS[id], acc=courtAccess(id);
+    const c=document.createElement('div'); c.className='shopcard';
+    c.style.borderColor = acc.ok? (id==='poor'?'#7a9a5a': id==='rich'?'#c8a03a': id==='elite'?'#8a2f5a':'#6a2a9a') : '#3a3028';
+    c.innerHTML=`<div><b style="color:${acc.ok?'var(--gold)':'#8a7a5a'}">${R.icon} ${acc.ok?'':'🔒 '}${R.label.toUpperCase()}</b>
+        <span class="small muted"> — ${R.mistakes} mistake${R.mistakes>1?'s':''} allowed</span></div>
+      <div class="small muted" style="font-style:italic">${R.blurb}</div>
+      ${acc.ok? '' : '<div class="small" style="color:#e0705b;margin-top:2px">🔒 '+acc.why+'</div>'}`;
+    const bt=document.createElement('button'); bt.className='btn sm'+(acc.ok?' gold':'');
+    bt.textContent = acc.ok? ('💬 FLIRT — '+R.label) : '🔒 THEY WILL NOT SPEAK TO YOU';
+    bt.disabled=!acc.ok;
+    bt.title = acc.ok? R.patience : acc.why;
+    bt.onclick=()=>startCourtship(id);
+    c.appendChild(bt); body.appendChild(c);
   });
 }
 function marriageUnlocked(){ return !!G && !G.married; }   // even the poorest tiro may take a wife
@@ -12380,9 +12856,16 @@ let marryForced=false, marryList=null;
 function openMarry(forced){
   state='marry'; show('scr-marry'); $('statbar').classList.remove('hide'); refreshStatbar();
   marryForced=!!forced; G.marryPrompted=true;
-  if(!marryList) marryList=rollBrides();
+  // BELOW THE CITIZEN LINE THERE IS NO SHORTLIST. Nobody is presenting noble
+  // daughters to a gladiator; you meet people and you talk to them. The roll
+  // only happens for those who can actually command a matchmaker.
+  if(!marryList) marryList = courtOnly()? [] : rollBrides();
+  else if(!marryList.length && !courtOnly()) marryList = rollBrides();
   { const t=$('marry-title'); if(t) t.textContent = G.isFemale? '⚭ TAKE A HUSBAND' : '⚭ TAKE A WIFE'; }
-  $('marry-intro').innerHTML = forced
+  $('marry-intro').innerHTML = courtOnly()
+    ? 'No matchmaker works for free, and none of them work for <b>you</b>. Nobody is going to present you with a shortlist of noble daughters — '
+      +'below the citizen line a marriage is not arranged, it is <b>earned in conversation</b>. Find somebody, talk to them, and do not waste their evening.'
+    : forced
     ? 'As one born to rank, custom <b>demands</b> you wed. Choose the alliance that will define your house — a Roman patrician for politics, a foreign noble for armies or grain, or a love-match for honour.'
     : (G.isFemale?'Suitors and their fathers present themselves — lords, soldiers and merchant princes. Each match brings a different dowry and advantage. Choose well — you may wed but once.'
        :'Suitors and their fathers present themselves. Each match brings a different dowry and advantage. Choose well — you may wed but once.');
@@ -12417,8 +12900,21 @@ function openMarry(forced){
     brow.appendChild(mp); card.appendChild(brow);
     body.appendChild(card);
   });
+  // ---- THE COURTING BOARD: who will stand there and talk to you ----
+  buildCourtBoard(body);
   // ---- KEEP LOOKING: every set of suitors seen makes the next a little finer ----
   const rr=document.createElement('div'); rr.className='shopcard';
+  if(courtOnly()){
+    rr.style.borderColor='#4a3a26';
+    rr.innerHTML=`<div><b style="color:#8a7a5a">🔎 THE MATCHMAKER — 🔒 NOT FOR YOU</b></div>
+      <div class="small muted">A matchmaker is a service bought by families with something to trade: land, a name, a seat.
+      She takes one look at your station and is already talking to somebody else. <b>Become a free citizen or better</b>
+      and the shortlists open up — until then, the only way to a wife is the one above: go and talk to somebody.</div>`;
+    body.appendChild(rr);
+    const backOnly=document.createElement('div'); backOnly.className='small muted';
+    body.appendChild(backOnly);
+    return;
+  }
   rr.innerHTML=`<div><b style="color:var(--gold)">🔎 THE MATCHMAKER</b> <span class="small muted">— suitors seen: <b>${G.marryRolls||0}</b>. Word spreads; the longer you look, the finer the families that present themselves.</span></div>`;
   const rrow=document.createElement('div'); rrow.className='row gap6'; rrow.style.flexWrap='wrap';
   const mkRoll=(label,cost,minQ,title)=>{
@@ -12498,6 +12994,10 @@ function marry(w){
   enterMap();
 }
 $('btn-marry-back').onclick=()=>enterMap();
+// walking away mid-conversation costs you nothing but the evening
+$('btn-court-back').onclick=()=>{ if(CT && !CT.over){
+    toast('🚪 You make your excuses and go. No harm done — they will not remember by Saturnalia.',3200); }
+  CT=null; state='marry'; openMarry(marryForced); };
 $('btn-note-send').onclick=()=>sendNote();
 $('btn-note-back').onclick=()=>{ if(noteReturn==='villa') openVilla(); else enterMap(); };
 $('btn-circus-back').onclick=()=>enterMap();
@@ -14218,6 +14718,9 @@ window.__SS = {
   addScar, scarList, scarName, scarZoneOf, drawScarsOn, outfitAllowed, clothierCost, barberCost,
   startBedScene, drawShadowTheatre, get BC(){return BC;}, setBCT:(t)=>{ if(BC) BC.t=t; }, get state(){return state;},
   rollBrides, drawUndressedFig, drawWaterCouple, waterMetrics,
+  COURT_RANKS, COURT_PROMPTS, COURT_BOASTS, courtAccess, courtOnly, startCourtship,
+  courtChoose, courtShow, courtBackDown, courtFinish, renderCourt, get CT(){return CT;},
+  buildCourtBoard,
   lit2, rgbA, rgbTriple,
   openHerbs, HERBS, HERB_BY_ID, drawHerbIcon, herbCount, herbAdd, herbUse,
   ILLNESSES, rollIllness, curesIll, birthRisk, birthPrepLine, illnessBite, get DM(){return DM;},
