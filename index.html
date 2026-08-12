@@ -2813,6 +2813,40 @@ function heatColor(v){
 let bmCache={};
 function bmResetCache(){ bmCache={}; }
 function bmOnce(key, fn){ if(bmCache[key]===undefined) bmCache[key]=fn(); return bmCache[key]; }
+/* =====================================================================
+   SLAP PHYSICS — one damped spring, shared by every figure that can take one
+   ---------------------------------------------------------------------
+   A slap that only plays a flash is a decal. What sells it is that the
+   thing keeps MOVING afterwards and takes a moment to settle, so the
+   impact drives a real spring: a kick to the velocity, a restoring force
+   pulling it back toward rest, and damping so it rings down instead of
+   oscillating forever. ONE spring, read by the villa sprite and by the
+   body-map chart alike, so a slap in either place wobbles the same way.
+   ===================================================================== */
+let SLAPJ={x:0, v:0};
+/* The kick is in DISPLACEMENT PIXELS, not arbitrary units. At 8.5 the spring
+   peaked at 28, which the villa sprite multiplies by ~1.7 — a forty-seven pixel
+   lurch on a figure forty pixels tall. A unit kick peaks near 3.3, which is a
+   wobble you can see and not a dislocation. */
+function slapKick(power){ SLAPJ.v += (power===undefined?1:power)*1.0; }
+function slapJigTick(dt){
+  if(!SLAPJ.x && !SLAPJ.v) return;
+  /* CLAMP THE STEP. The body-map loop derives dt from wall time and its
+     lastDraw starts at zero, so the very first tick handed this a dt in the
+     tens of thousands — the integrator ran away to x = -86 and drove the
+     chart's ellipse radii NEGATIVE, which the canvas refuses outright. No
+     frame is worth more than four ticks of spring, however long it really was. */
+  dt=Math.max(0,Math.min(4,dt||0)); if(!dt) return;
+  const steps=Math.max(1,Math.min(6,Math.ceil(dt))), h=dt/steps;   // and sub-stepped on top of that
+  for(let i=0;i<steps;i++){
+    SLAPJ.v += (-0.115*SLAPJ.x)*h;                                   // the restoring force
+    SLAPJ.v *= Math.pow(0.885, h);                                   // and the damping that rings it down
+    SLAPJ.x += SLAPJ.v*h;
+  }
+  if(Math.abs(SLAPJ.x)<0.03 && Math.abs(SLAPJ.v)<0.03){ SLAPJ.x=0; SLAPJ.v=0; }
+}
+function slapJig(){ return SLAPJ.x; }
+function slapLive(){ return !!(SLAPJ.x||SLAPJ.v); }
 function drawBodyMap(cnv,w,view,tms){
   view=view||'front';
   const c=cnv.getContext('2d'); c.imageSmoothingEnabled=true;
@@ -2888,12 +2922,15 @@ function drawBodyMap(cnv,w,view,tms){
     c.restore();
     c.strokeStyle='rgba(0,0,0,.42)'; c.lineWidth=0.5; path(); c.stroke(); };
   // every score physically shapes the figure — a FLAT 1 really is flat, an IMPOSSIBLE 11 is absurd
-  const bustR = (1.1 + bu*0.86) * (1 + jig*0.035);
-  const hipR  = (2.4 + be*0.86) * (1 + jig2*0.028);
+  // the slap rings through the chart too, and the bigger the tier the more of it
+  const SJ = (!male)? slapJig() : 0;
+  const sjH = SJ*(0.6+be*0.075), sjB = SJ*(0.34+bu*0.045);
+  const bustR = Math.max(0.6, (1.1 + bu*0.86) * (1 + jig*0.035 + sjB*0.030));
+  const hipR  = Math.max(0.8, (2.4 + be*0.86) * (1 + jig2*0.028 + sjH*0.034));
   const waistR= 9.4 - wa*0.72;
   const legR  = 1.3 + lg*0.26;
   const headR = 4.2 + fa*0.16;
-  const bustDY = jig*bustR*0.075, hipDY = jig2*hipR*0.055;
+  const bustDY = jig*bustR*0.075 + sjB*0.30, hipDY = jig2*hipR*0.055 + sjH*0.42;
   const STR = 3.2;                                        // how far the feet travel
   if(view==='secret' && male && secretAllowed(w)){
     // ---- THE OTHER LEDGER, and it gets the same three views the rest of the
@@ -3449,8 +3486,11 @@ function startBodyMapAnim(){
   let lastDraw=0;
   const step=(now)=>{
     if(state!=='bodymap' || !bodyMapSubject){ bodyMapRAF=0; return; }
+    if(!bodyMapWalk && !slapLive()){ bodyMapRAF=0;          // idle chart: stop, but never mid-wobble
+      drawBodyMap($('bodymap-cv'), bodyMapSubject, bodyMapView, bodyMapT); return; }
     bodyMapRAF=requestAnimationFrame(step);
     if(now-lastDraw < 33) return;            // 30fps is plenty for a walk cycle and half the work
+    slapJigTick((now-lastDraw)/16.7);        // the spring runs on wall time, not on the walk cycle
     lastDraw=now; bodyMapT=now;
     drawBodyMap($('bodymap-cv'), bodyMapSubject, bodyMapView, bodyMapT);
   };
@@ -3555,6 +3595,8 @@ function openBodyMap(w,back){
           + 'and what comes back is entirely hers: <b>'+((G.slapsAll||0))+'</b> so far, '
           + '<b>'+(3-(G.slapDay===G.day?(G.slapCount||0):0))+'</b> left today.';
       bt.onclick=()=>{ const v=doSlap('chart'); if(!v) return;
+        { const be=((w.body&&w.body.booty)||5); slapKick(0.85+be*0.075); }
+        startBodyMapAnim();                                 // so the ring-down actually animates
         const col = v.k==='love'?'#ffb0d0' : v.k==='return'?'#ffd07a'
                   : (v.k==='bad'||v.k==='cold'||v.k==='enough')?'#ff8a8a':'#ffd0da';
         toast((v.k==='love'?'👋💞 ':v.k==='bad'||v.k==='cold'?'👋💢 ':'👋 ')+v.t
@@ -4558,7 +4600,7 @@ function elevateWife(rank){
   refreshStatbar(); saveQuiet(); openVilla();
 }
 // fill in any fields missing from older saves
-function migrate(g){ const d={honor:50,food:4,mount:0,slaves:0,hasVilla:false,boat:false,favor:0,soldiers:0,hidden:[],plotTier:0,emperor:false,approval:50,legions:0,rivals:0,retired:false,detachments:[],day:0,titles:{},clears:{},socialClass:'gladiator',army:{},armyGear:0,armyTrain:0,hasOrganizer:false,generals:[],wife:null,married:false,marryPrompted:false,children:[],pregnant:null,lastLoveDay:-9,injury:null,lastDebateDay:-9,office:0,path:null,parthia:50,parthiaPact:false,wifeRel:50,lastTalkDay:-9,isFemale:false,lineage:[],hygiene:70,wifePhys:45,hasPool:false,hasWardrobe:false,legacy:null,lastFeastDay:-9,loveDay:-1,loveQuick:0,loveLong:0,loveNight:0,loveVigil:0,venusUntil:-1,lastWashDay:-9,lastPoolDay:-9,lastWardrobeDay:-9,lastKidsDay:-9,lastBathDay:-9,pila:0,bow:null,bowsOwned:[],nemesis:null,rivalsList:[],trophies:[],nemesisCount:0,pendingDeath:false,ageBase:0,wonProvinceByFight:false,familyMan:false,infamy:0,gladiatrixStage:0,pardoned:false,lastNoteDay:-9,lastNoteReply:'',regalia:[],marryRolls:0,hasBodyMap:false,hasSecretMap:false,jealousy:0,lastJealousDay:-9,traits:[],flaws:[],looks:5,smarts:5,advocate:false,tutorialDone:false,patrons:[],rivalAdv:null,landmarks:[],faction:null,oratory:1,casesWon:0,casesLost:0,renown:0,senate:false,royal:false,lastCaseDay:-9,skills:{footwork:0,guard:0,blade:0,wind:0,throwing:0},scars:[],fatigue:0,lastTrainDay:-9,tribune:false,rank:0,campaigns:0,legionRep:0,lastCampaignDay:-9,units:{legionary:0,auxilia:0,cavalry:0,archers:0,engineers:0},supply:0,sieges:0,body:null,family:null,provinces:{},complaints:[],leniency:50,lastCalloutDay:-9,lastGiftDay:-9,giftsTaken:0,calloutWins:0,crownWorn:false,court:null,lastCoupDay:-99,herbs:{},herbLore:0,ill:null,midwife:false,titlesWorn:[],warExhaust:0,lastExhaustWhy:'',titleRites:[],tombs:[],inheritedFrom:null,hairStyle:null,hairCol:null,beardStyle:null,outfit:null,courtLog:{},lastAskDay:-9,retirePromise:null,askLog:{},temptHeld:0,temptTook:0,slapDay:-9,slapCount:0,slapsAll:0}; for(const k in d){ if(g[k]===undefined) g[k]=d[k]; }
+function migrate(g){ const d={honor:50,food:4,mount:0,slaves:0,hasVilla:false,boat:false,favor:0,soldiers:0,hidden:[],plotTier:0,emperor:false,approval:50,legions:0,rivals:0,retired:false,detachments:[],day:0,titles:{},clears:{},socialClass:'gladiator',army:{},armyGear:0,armyTrain:0,hasOrganizer:false,generals:[],wife:null,married:false,marryPrompted:false,children:[],pregnant:null,lastLoveDay:-9,injury:null,lastDebateDay:-9,office:0,path:null,parthia:50,parthiaPact:false,wifeRel:50,lastTalkDay:-9,isFemale:false,lineage:[],hygiene:70,wifePhys:45,hasPool:false,hasWardrobe:false,legacy:null,lastFeastDay:-9,loveDay:-1,loveQuick:0,loveLong:0,loveNight:0,loveVigil:0,venusUntil:-1,lastWashDay:-9,lastPoolDay:-9,lastWardrobeDay:-9,lastKidsDay:-9,lastBathDay:-9,pila:0,bow:null,bowsOwned:[],nemesis:null,rivalsList:[],trophies:[],nemesisCount:0,pendingDeath:false,ageBase:0,wonProvinceByFight:false,familyMan:false,infamy:0,gladiatrixStage:0,pardoned:false,lastNoteDay:-9,lastNoteReply:'',regalia:[],marryRolls:0,hasBodyMap:false,hasSecretMap:false,jealousy:0,lastJealousDay:-9,traits:[],flaws:[],looks:5,smarts:5,advocate:false,tutorialDone:false,patrons:[],rivalAdv:null,landmarks:[],faction:null,oratory:1,casesWon:0,casesLost:0,renown:0,senate:false,royal:false,lastCaseDay:-9,skills:{footwork:0,guard:0,blade:0,wind:0,throwing:0},scars:[],fatigue:0,lastTrainDay:-9,tribune:false,rank:0,campaigns:0,legionRep:0,lastCampaignDay:-9,units:{legionary:0,auxilia:0,cavalry:0,archers:0,engineers:0},supply:0,sieges:0,body:null,family:null,provinces:{},complaints:[],leniency:50,lastCalloutDay:-9,lastGiftDay:-9,giftsTaken:0,calloutWins:0,crownWorn:false,court:null,lastCoupDay:-99,herbs:{},herbLore:0,ill:null,midwife:false,titlesWorn:[],warExhaust:0,lastExhaustWhy:'',titleRites:[],tombs:[],inheritedFrom:null,hairStyle:null,hairCol:null,beardStyle:null,outfit:null,courtLog:{},lastAskDay:-9,retirePromise:null,promiseBreaks:0,promiseFights:0,tutor:false,freedmen:0,askLog:{},temptHeld:0,temptTook:0,slapDay:-9,slapCount:0,slapsAll:0}; for(const k in d){ if(g[k]===undefined) g[k]=d[k]; }
   if(g.wife) ensureQuirks(g.wife);          // a spouse saved before the five bands existed
   if(!g.hairStyle){ const male=!g.isFemale, eth='roman';
     g.hairStyle = (male? HAIR_M_BY_ETH : HAIR_F_BY_ETH)[eth][kinHash((g.name||'x')+'·cut') % (male?HAIR_M_BY_ETH:HAIR_F_BY_ETH)[eth].length];
@@ -5257,6 +5299,7 @@ function nemesisBriefBlock(){
   </div>`;
 }
 function startFight(region, briefData){
+  checkPromise();                     // she said one more year, and she is counting
   const tier=region.tier;
   // player fighter from career loadout
   const cls=CLASSES[G.cls];
@@ -7297,7 +7340,7 @@ function openCheats(){
   btn(r,'+50,000 SOLDIERS',()=>{ addTroops('roman',50000); });
   btn(r,'BECOME EMPEROR',()=>{ G.emperor=true; G.approval=100; G.imperialDone=true; G.legions=20; toast('👑 You wear the purple.',2600); });
   btn(r,'+100 FAVOR',()=>G.favor+=100);
-  btn(r,'RETIRE TO THE SENATE',()=>{ G.retired=true; G.socialClass='elite'; });
+  btn(r,'RETIRE TO THE SENATE',()=>{ G.retired=true; checkPromiseKept(); G.socialClass='elite'; });
   // ---- the house ----
   r=card('🏡 THE HOUSE','— family, blood and the bedchamber');
   btn(r,'PERFECT SPOUSE (all 10s)',()=>{ if(!G.wife){ toast('Wed someone first.',1800); return; }
@@ -8648,6 +8691,50 @@ function spouseTierBonus(){
 /* THE ODDS OF AN HEIR, in one place. This calculation lived inline inside
    finishBed, so the villa could not ask the same question without copying it —
    and a copy drifts. Both callers read it from here now. */
+/* =====================================================================
+   THE PROMISE YOU MADE
+   ---------------------------------------------------------------------
+   "One more year. Then I stop." was stored on G.retirePromise and then
+   never looked at again, so the most loaded thing you can say to a spouse
+   in this game cost you nothing. A year is 360 days. Fight past it and
+   she notices, every time, and it gets worse the longer you leave it.
+   Reach the end of the year without going back on it and she says so.
+   ===================================================================== */
+function promiseDaysLeft(){
+  if(!G || G.retirePromise===null || G.retirePromise===undefined) return null;
+  return 360 - ((G.day||0) - G.retirePromise);
+}
+function promiseBroken(){ const d=promiseDaysLeft(); return d!==null && d<=0; }
+// called whenever you step onto the sand with a promise outstanding
+function checkPromise(){
+  if(!G || !G.married || !G.wife) return;
+  const left=promiseDaysLeft(); if(left===null) return;
+  if(left>0){                                        // still inside the year: she counts, and says so
+    G.promiseFights=(G.promiseFights||0)+1;
+    if(G.promiseFights===1) toast('🤝 “One more year,” you said. She is counting the bouts. ('+left+' days)',4200);
+    return;
+  }
+  // past it. Every bout now costs, and the cost grows.
+  G.promiseBreaks=(G.promiseBreaks||0)+1;
+  const hit=Math.min(14, 4+G.promiseBreaks);
+  G.wifeRel=clamp(G.wifeRel-hit,0,bondCeiling());
+  G.jealousy=clamp((G.jealousy||0)+3,0,100);
+  toast('💔 The year is up and you are still on the sand. −'+hit+' 💞 '
+        +(G.promiseBreaks>=4?'— she has stopped asking when you will stop.':'— she said nothing, which is worse.'),4600);
+  saveQuiet();
+}
+// and the day it comes good, she is the one who brings it up
+function checkPromiseKept(){
+  if(!G || G.retirePromise===null || G.retirePromise===undefined) return;
+  if(!G.retired) return;
+  const left=promiseDaysLeft();
+  if(left!==null && left>0 && !(G.promiseBreaks||0)){
+    G.wifeRel=clamp(G.wifeRel+22,0,bondCeiling());
+    G.honor=clamp((G.honor||50)+6,0,100);
+    toast('🤝 You said one more year and you meant it. She has not forgotten that. +22 💞, +6 honor.',6000);
+  }
+  G.retirePromise=null; saveQuiet();
+}
 function conceiveChance(base, w, tierFert){
   return base + (G.honor/400)
     + (w && w.build!=='slender' && w.build!=='slight'? 0.06 : 0)
@@ -10693,10 +10780,11 @@ function drawWifeFig(c,x,y,w,ph,mode){
     const hipW2=Math.max(4,Math.round(hipW*0.60*(1-lean*0.10)));
     // ---- the seat, lifted and pushed back, drawn on HER tier ----
     { const bands=[[0.35,0.74],[0.78,1.0],[1.0,1.0],[0.60,0.84]];
-      let yAt=seatTop;
+      const SJ2=slapJig()*(0.5+bT*0.32);            // a slap rings through the bend as well
+      let yAt=seatTop+Math.round(SJ2*0.5);
       bands.forEach(([hf,wf],bi)=>{
         const bh=Math.max(1,Math.round(deep*hf*0.42*(1+lean*0.42)));
-        const bw=Math.round((hipW2+flare)*wf*(1+lean*0.26));
+        const bw=Math.round((hipW2+flare)*wf*(1+lean*0.26)+SJ2*0.30);
         P(-bw-back, yAt, bw*2, bh, dress);
         if(bi===0) P(-bw-back, yAt, bw*2, 1, dHi);
         if(bi>=1 && bT>=2){ P(-bw-back, yAt, 1, bh, dHi); P(bw-1-back, yAt, 1, bh, dSh); }
@@ -10815,9 +10903,10 @@ function drawWifeFig(c,x,y,w,ph,mode){
   const jig    = walking? Math.sin(ph*2)* (running?1.0:0.72) : Math.sin(ph*0.9)*0.16;
   const bAmt   = clamp((bu-2)/8,0,1);               // a 2 barely moves; a 10 really goes
   const hAmt   = clamp((be-2)/8,0,1);
-  const bJig   = jig * bAmt * (running?7.5:5.2);    // bust bounce
-  const hJig   = jig * hAmt * (running?5.0:3.4);    // hips
-  const bSquash= jig * bAmt * (running?1.5:1.0);    // and it compresses on the downbeat
+  const SJ     = slapJig();                          // and whatever the last slap is still doing
+  const bJig   = jig * bAmt * (running?7.5:5.2) + SJ*bAmt*0.55;          // bust bounce
+  const hJig   = jig * hAmt * (running?5.0:3.4) + SJ*(0.55+hAmt*1.35);   // hips — the tier decides how much
+  const bSquash= jig * bAmt * (running?1.5:1.0) + SJ*bAmt*0.18;          // and it compresses on the downbeat
   const yy=bob;
   const top = yy-26-legLen;                         // where the gown's hem sits above the feet
   // ================= LEGS (a real walk cycle, visible under the hem) =================
@@ -11093,7 +11182,7 @@ function tryWardrobe(){
   G.lastWardrobeDay=G.day; DM.scene={kind:'wardrobe',t:0, fromX:DM.wifeX}; saveQuiet();
 }
 function updateDomus(dt){
-  const D=DM; D.t+=dt;
+  const D=DM; D.t+=dt; slapJigTick(dt);
   for(const st of D.steam){ st.y-=st.vy*dt; st.x+=Math.sin(st.y*0.08)*0.25*dt; st.life-=dt; }
   D.steam=D.steam.filter(s2=>s2.life>0);
   for(const h of D.hearts){ h.y-=h.vy*dt; h.life-=dt; } D.hearts=D.hearts.filter(h=>h.life>0);
@@ -11222,13 +11311,34 @@ function temptDue(){
   if((D.t||0) - (D.lastTemptT===undefined? -9999 : D.lastTemptT) < 900) return false;
   return Math.random() < 0.010;            // ~ once every few laps of the atrium
 }
+/* WHAT SHE IS ACTUALLY REACHING FOR. One crate, forever, meant the same
+   event five times over. Each of these draws differently and gets its own line,
+   so the trait stops being one animation on a timer. */
+const TEMPT_PROPS=[
+  {id:'crate', line:'“It is in the bottom crate. Of course it is.”',
+   draw:(x,FY)=>{ px(x-4,FY-7,9,7,'#7a5c34'); px(x-4,FY-8,9,2,'#a8813f'); px(x-2,FY-5,5,1,'#5a4024'); }},
+  {id:'scroll', line:'“Half the shelf came down. Do NOT help.”',
+   draw:(x,FY)=>{ for(let i=0;i<3;i++){ px(x-6+i*5,FY-3-((i*2)%3),9,3,'#e6dcc2');
+     px(x-6+i*5,FY-3-((i*2)%3),9,1,'#f6efdc'); px(x-6+i*5,FY-3-((i*2)%3),1,3,'#b8a882'); } }},
+  {id:'basin', line:'“I have knocked the basin over. Obviously.”',
+   draw:(x,FY,T)=>{ px(x-7,FY-5,15,5,'#8a9aa8'); px(x-7,FY-6,15,2,'#b8c8d4');
+     ctx.globalAlpha=0.45; px(x-14,FY-1,30,2,'#5a9ec4');
+     px(x-16-Math.sin(T*0.05)*3,FY-1,6,1,'#7fd0ec'); ctx.globalAlpha=1; }},
+  {id:'coin', line:'“Your denarii are all over my floor.”',
+   draw:(x,FY,T)=>{ for(let i=0;i<7;i++){ const cx2=x-11+((i*7)%22), sp=(i%3);
+     px(cx2,FY-2-sp,3,3,'#e8c34a'); px(cx2,FY-2-sp,3,1,'#fff0b0'); } }},
+  {id:'sandal', line:'“Under the couch. Where you left it.”',
+   draw:(x,FY)=>{ px(x-8,FY-4,11,4,'#8a5c34'); px(x-8,FY-5,11,1,'#a87446');
+     px(x-6,FY-7,2,3,'#6a4426'); px(x+4,FY-3,7,3,'#7a4e2c'); }},
+];
 function startTempt(){
   const D=DM;
   D.lastTemptT=D.t;
   // rarely she is not being incidental about it at all
   const invited = Math.random() < 0.18;
+  const prop = pick(TEMPT_PROPS);
   D.tempt={ ph:'bend', t:0, k:0, x:D.wifeX, hits:0, hold:100, locks:false,
-            invited, shelf: D.wifeX + (D.wifeDir>0? 14 : -14) };
+            invited, prop, shelf: D.wifeX + (D.wifeDir>0? 14 : -14) };
   D.wifePause=99999;                        // she is busy
 }
 function updateTempt(dt){
@@ -11290,7 +11400,7 @@ function startVillaLove(atX, invited){
   if(!spouseWilling()){ openTemptAftermath(); return; }   // she decides whether this happens at all
   spendLove('quick');
   D.tempt=null; D.wifePause=99999;
-  D.scene={kind:'villalove', t:0, x:clamp(atX,150,400), invited:!!invited,
+  D.scene={kind:'villalove', t:0, x:clamp(atX,150,400), invited:!!invited, prop:(D.tempt&&D.tempt.prop)||TEMPT_PROPS[0],
            fromTook:!invited,                    // explicit: only a FAILED hold owes her an explanation
            choice:null, burst:[], asked:false};
   sfx('kiss');
@@ -11411,7 +11521,11 @@ function startSlapAnim(atX){
 }
 function updateSlap(dt){
   const D=DM, S=D.slap; if(!S) return;
-  S.t+=dt;
+  const was=S.t; S.t+=dt;
+  if(was<16 && S.t>=16){                                   // the hand lands: kick the spring
+    const be=((G.wife&&G.wife.body&&G.wife.body.booty)||5);
+    slapKick(0.85 + be*0.075);                             // and a bigger tier carries more of it
+  }
   if(S.t>132){ toast((S.v.k==='love'?'👋💞 ':S.v.k==='bad'||S.v.k==='cold'?'👋💢 ':'👋 ')
       + S.v.t + '  ('+(S.v.bond>=0?'+':'')+S.v.bond+' 💞'
       + (S.v.phys? ', '+(S.v.phys>0?'+':'')+S.v.phys+' 🔥':'')+')', 4600);
@@ -11558,7 +11672,7 @@ function drawVillaLove(){
     g.addColorStop(0,'rgba(255,206,150,'+(0.26+heat*0.14)+')');
     g.addColorStop(1,'rgba(0,0,0,0)'); ctx.fillStyle=g; ctx.fillRect(0,60,W,H-60); }
   // the crate she was reaching for, still there, being knocked about
-  px(X+(D.face>0?16:-24)+Math.sin(T*0.4)*dr, FY-7, 9,7,'#7a5c34');
+  (sc.prop||TEMPT_PROPS[0]).draw(X+(D.face>0?16:-24)+Math.sin(T*0.4)*dr, FY, T);
   // HER, still bent over it, riding the beat — and coming back up at the end
   drawWifeFig(ctx, X+dr*2.4, FY, w, 1-cool*0.78, 'bend');
   // HIM, behind her, and he is the one driving — his own four stages
@@ -11615,7 +11729,9 @@ function drawVillaLove(){
 function drawTempt(){
   const D=DM, X=D.tempt; if(!X) return; const FY=214, w=G.wife;
   // whatever it was she wanted, on the floor where she is reaching
-  px(X.shelf-4, FY-7, 9, 7, '#7a5c34'); px(X.shelf-4, FY-8, 9, 2, '#a8813f');
+  (X.prop||TEMPT_PROPS[0]).draw(X.shelf, FY, D.t);
+  if(X.ph==='bend' && X.t>40 && X.t<150){ ctx.textAlign='center';
+    pixelText((X.prop||TEMPT_PROPS[0]).line, W/2, 30, 'rgba(255,222,200,.85)', 1.02); ctx.textAlign='left'; }
   if(X.ph==='bend'||X.ph==='approach'||X.ph==='resist'||X.ph==='invited'){
     drawWifeFig(ctx, X.x, FY, w, X.ph==='bend'? X.k : 1, 'bend');
   } else drawWifeFig(ctx, X.x, FY, w, 1, 'bend');
@@ -14480,6 +14596,37 @@ const SPOUSE_ASKS=[
     no: {lab:'🚫 “NOT THIS MONTH.”', desc:'The couches stay stacked. So does her ambition.', bond:-6},
     explain:true },
 
+  { id:'school', icon:'📜', w:()=>((G.children||[]).length? 2.0:0) + (hasTrait('literate')?1.6:0) + (hasTrait('smart')?1.2:0),
+    ok:()=>G.married && G.wife && (G.children||[]).length>0,
+    title:'SHE WANTS A GREEK FOR THE CHILDREN',
+    line:()=>pick(['“A tutor. A real one. Not the freedman who counts on his fingers.”',
+                   '“Your son can hold a sword and cannot hold a sentence.”',
+                   '“Every house that matters has one. Ours has a man who counts jars.”']),
+    cost:()=>420,
+    yes:{lab:'📜 HIRE THE GREEK', desc:'Expensive, and it is the kind of expense that shows up two generations later.'},
+    no: {lab:'⚔ “THEY LEARN THE SWORD.”', desc:'It worked for you. She has views about how well it worked for you.', bond:-7},
+    explain:true },
+
+  { id:'rival', icon:'🗡', w:()=>((G.rivalsList||[]).length||G.nemesis? 2.2:0) + (hasQuirk('possessive')?1.4:0),
+    ok:()=>G.married && G.wife && !!(G.nemesis || (G.rivalsList||[]).length),
+    title:'SHE HAS HEARD THE NAME AGAIN',
+    line:()=>pick(['“He was in the Forum saying what he will do to you. Loudly.”',
+                   '“I would like to know whether I am burying you this month.”',
+                   '“Everyone in that colonnade knew his name before I did.”']),
+    yes:{lab:'🛡 “HE IS NOTHING. I SWEAR IT.”', desc:'You put it to bed, out loud, and mean it. Costs pride and buys quiet.', bond:12},
+    no: {lab:'🗡 “LET HIM COME.”', desc:'Exactly what she was afraid you would say.', bond:-9},
+    explain:true },
+
+  { id:'manumit', icon:'⛓', w:()=>((G.slaves||0)>=2? 1.8:0) + (hasTrait('pious')?1.8:0) + (hasQuirk('generous')?2.2:0),
+    ok:()=>G.married && G.wife && (G.slaves||0)>=2,
+    title:'SHE WANTS ONE OF THEM FREED',
+    line:()=>pick(['“She has run this house for nine years. Nine.”',
+                   '“He carried your shield off the sand. You know which one I mean.”',
+                   '“The rod, then. Do it properly, in front of everyone.”']),
+    yes:{lab:'⛓ THE ROD, AND THE RECORD', desc:'One fewer pair of hands on the estate, and a household that saw you do it.'},
+    no: {lab:'🚫 “THEY ARE PROPERTY.”', desc:'A legally correct sentence, said in a room that heard it.', bond:-10},
+    explain:true },
+
   { id:'jealous', icon:'💢', w:()=>((G.jealousy||0)>=45? 2.4:0) + (hasQuirk('possessive')?2.6:0) + (hasFlaw('jealous')?2.2:0),
     ok:()=>G.married && G.wife && (G.jealousy||0)>=35,
     title:'SHE HEARD ABOUT THE COLONNADE',
@@ -14489,6 +14636,44 @@ const SPOUSE_ASKS=[
     no: {lab:'😤 “I DO NOT ANSWER TO YOU.”', desc:'A true thing said in the worst possible way.', bond:-14, jealousy:12},
     explain:true },
 ];
+/* A QUIRK SHOULD SAY SOMETHING. Listing "Reader of Omens" under her name told
+   you what she IS; it never had her behave like it. So when she opens her mouth
+   the quirk gets a second line of its own — and the two that trade in
+   information hand you something REAL: the omen names the actual day you are
+   having, and the gossip tells you a true thing about your own house that you
+   would otherwise have had to go and look up. */
+function quirkAside(A){
+  const w=G.wife||{}, out=[];
+  const say=(col,icon,txt)=>out.push(`<div class="small" style="margin-top:3px;padding:2px 5px;
+    border-left:3px solid ${col};background:${col}12;color:${col}">${icon} ${txt}</div>`);
+  if(hasQuirk('omens')){
+    const f=festivalToday(), risk=purpleRisk(), unrest=provUnrestAvg();
+    const bad = G.injury? 'the birds went left over the training yard, and you are already carrying a wound'
+              : risk>=58? 'the smoke off the hearth lay flat this morning. “Do not sleep near the Guard tonight.”'
+              : unrest>=55? 'a crow on the north wall, three times. She has been right about the provinces before.'
+              : f? 'it is '+f+'. “Nothing begins today. Nothing.”'
+              : null;
+    say('#a8e0c0','🐦', bad || 'the liver was clean. “Today is a good day to ask me for things.”');
+  }
+  if(hasQuirk('gossip')){
+    const bits=[];
+    if((G.jealousy||0)>=40) bits.push('half the district is already talking about you and it is not about the arena');
+    if((G.complaints||[]).length) bits.push('there are '+(G.complaints||[]).length+' complaints against your house nobody has shown you');
+    if(purpleRisk()>=55) bits.push('the Prefect has been seen at dinners he has no business at');
+    if((G.coin||0)<200) bits.push('the fishmonger has stopped extending you credit, and he told everyone why');
+    if(!bits.length) bits.push('nothing at all, which she finds suspicious in itself');
+    say('#e0a0d8','🍇','“Before you answer — ”  '+pick(bits)+'.');
+  }
+  if(hasQuirk('tempest') && A && A.id==='jealous')
+    say('#ffb45b','⚡','She is not asking calmly and both of you know how this usually goes.');
+  if(hasQuirk('devout') && festivalToday())
+    say('#cfc4e2','🕯','It is '+festivalToday()+'. Whatever you say next, say it carefully.');
+  if(hasQuirk('ambitious') && (G.rank||0)<1 && !G.emperor)
+    say('#9ad4ff','🪜','“And while we are talking — when does any of this actually go anywhere?”');
+  if(hasQuirk('highmaint') && (G.coin||0)<400)
+    say('#e8c34a','💎','She has already looked at the strongbox today. She knows what is in it.');
+  return out.join('');
+}
 function spouseAskDue(){
   if(!G || G.retired || !G.married || !G.wife) return false;
   if((G.day||0) - (G.lastAskDay===undefined?-99:G.lastAskDay) < 3) return false;
@@ -14521,6 +14706,7 @@ function openSpouseAsk(which){
     <div style="margin-top:4px;font-size:13px;color:#ffd8e6">${A.line()}</div>
     <div class="small muted" style="margin-top:3px">— ${w.name.split(' ')[0]}${
       (w.quirks||[]).length? ', who is '+(w.quirks||[]).map(q=>(quirkById(q)||{}).name||q).join(' and ').toLowerCase() : ''}</div>
+    ${quirkAside(A)}
     <div style="margin-top:5px">${traitsHtml(w)}</div>
     <div class="small" style="margin-top:4px">💞 bond <b style="color:${(G.wifeRel|0)>=60?'#7ad48a':'#e0705b'}">${G.wifeRel|0}</b>
       ${cost?`· 🪙 asked: <b style="color:${(G.coin||0)>=cost?'#e8c34a':'#e0705b'}">${cost}d</b> (you have ${fmt(G.coin||0)}d)`:''}
@@ -14548,13 +14734,22 @@ function openSpouseAsk(which){
     if(A.id==='gift'){ G.wifeRel=clamp(G.wifeRel+12,0,bondCeiling()); G.wifePhys=clamp((G.wifePhys||45)+6,0,100);
       G.pop=clamp((G.pop||0)+2,0,100);
       return finish(`💎 She has it on before you reach the door. +12 💞 bond, +2 popularity, −${cost}d.`); }
-    if(A.id==='retire'){ G.retirePromise=(G.day||0);
-      return finish('🤝 You say it out loud, in your own house. +14 💞 bond — and she will hold you to it.'); }
+    if(A.id==='retire'){ G.retirePromise=(G.day||0); G.promiseBreaks=0; G.promiseFights=0;
+      return finish('🤝 You say it out loud, in your own house. +14 💞 — and she starts counting from today.'); }
     if(A.id==='family'){ advanceDay(2); G.wifeRel=clamp(G.wifeRel+2,0,bondCeiling());
       return finish('🐎 Two days on the road, and she comes back somebody easier to live with. +16 💞 bond.'); }
     if(A.id==='feast'){ G.pop=clamp((G.pop||0)+6,0,100); G.approval=clamp((G.approval||50)+4,0,100);
       G.wifeRel=clamp(G.wifeRel+10,0,bondCeiling());
       return finish(`🍇 Forty couches and the good wine. +6 popularity, +4 approval, +10 💞 bond, −${cost}d.`); }
+    if(A.id==='school'){ G.tutor=true; G.wifeRel=clamp(G.wifeRel+11,0,bondCeiling());
+      for(const c of (G.children||[])) c.smarts=clamp((c.smarts===undefined?5:c.smarts)+1,1,10);
+      return finish(`📜 A Greek from Antioch, and every child in this house is one point sharper. +11 💞, −${cost}d.`); }
+    if(A.id==='rival'){ G.jealousy=clamp((G.jealousy||0)-10,0,100);
+      return finish('🛡 You say it out loud and she lets go of it. +12 💞, −10 💢.'); }
+    if(A.id==='manumit'){ G.slaves=Math.max(0,(G.slaves||0)-1);
+      G.honor=clamp((G.honor||50)+4,0,100); G.pop=clamp((G.pop||0)+3,0,100);
+      G.wifeRel=clamp(G.wifeRel+13,0,bondCeiling()); G.freedmen=(G.freedmen||0)+1;
+      return finish('⛓ The rod, the record, and a free Roman standing in your atrium. +13 💞, +4 honor, +3 pop, −1 slave.'); }
     return finish('💞 She takes the answer she came for.');
   });
   // ---- NO ----
@@ -15048,6 +15243,12 @@ function buildMarriageCard(b){
        <div style="margin-top:4px">${traitsDetailHtml(w)}</div>
        ${(()=>{ const j=Math.round(G.jealousy||0), lv=jealousyLevel(); const jc=['#8a8a6a','#e8c34a','#e08a3a','#e05b5b'][lv];
           return `<div class="small">💢 Jealousy: ${mkbar(j,jc)} <b style="color:${jc}">${j}</b>/100 <span class="muted">— ${w.male?'he is':'she is'} ${jealousyLabel()}${lv>=3?'; the bedchamber door may well be barred':lv>=2?'; make time for '+(w.male?'him':'her'):''}</span></div>`; })()}
+       ${(()=>{ const left=promiseDaysLeft(); if(left===null) return '';
+          return left>0
+            ? `<div class="small" style="color:#e8c34a">🤝 “One more year, then I stop.” — <b>${left}</b> days left,
+                 <b>${G.promiseFights||0}</b> bouts fought since.</div>`
+            : `<div class="small" style="color:#e0705b">💔 The year you promised is <b>${-left}</b> days gone.
+                 Broken <b>${G.promiseBreaks||0}</b> times, and it costs more each time.</div>`; })()}
        <div class="small" style="color:var(--gold)">${marriageEffectsText(w)}</div>`+
       (preg? `<div class="small" style="color:#e2a0b8">🤰 ${G.isFemale?'You are':'She is'} with child — month <b>${Math.max(1,month)}</b> of 9.</div>`:'');
     row.appendChild(info); card.appendChild(row);
@@ -15832,7 +16033,7 @@ function checkOldAgeDeath(){
   G.pendingDeath=false;
   const kids=(G.children||[]).slice().sort((a,b)=>a.born-b.born);
   if(kids.length){ toast('🕯 Age claims '+G.name+' at '+(G.age||60)+'. The house gathers — and the sword passes on.',4600); succession(kids[0]); return true; }
-  G.retired=true; saveQuiet();
+  G.retired=true; checkPromiseKept(); saveQuiet();
   toast('🕯 '+G.name+' dies of old age at '+(G.age||60)+', with no heir to lift the sword. The legend is complete — you may begin a new career from the title screen.',6500);
   return true;
 }
@@ -16222,7 +16423,7 @@ function startRival(){
   toast('A rival senator draws steel to seize your throne…',2000);
 }
 function retire(){
-  G.retired=true; saveQuiet();
+  G.retired=true; checkPromiseKept(); saveQuiet();
   state='menu'; show('scr-result');
   $('res-head').textContent='RETIRED INTO GLORY'; $('res-head').style.color='var(--gold)';
   const era = G.emperor? 'You step back from the daily blade to rule Rome as a statesman-Caesar — proof that a man of the sand is no soft creature, but iron who has earned the purple.'
@@ -17187,8 +17388,10 @@ window.__SS = {
   WIFE_BOONS, WIFE_BANES, rollBoons, rollBanes, hasBoon, hasBane, boonById, baneById, CHIP_TIERS, bondCeiling,
   SPOUSE_ASKS, spouseAskDue, openSpouseAsk, maybeSpouseAsk, spouseExcuse, festivalToday, FESTIVALS,
   temptDue, startTempt, updateTempt, drawTempt, openTemptAftermath, TEMPT_NEED, updateDomusScene,
+  TEMPT_PROPS, quirkAside, promiseDaysLeft, promiseBroken, checkPromise, checkPromiseKept,
   startVillaLove, updateVillaLove, drawVillaLove, villaLoveFinish, VILLALOVE_LEN, drawVillaMale,
   doSlap, slapVerdict, startSlapAnim, updateSlap, drawSlap,
+  slapKick, slapJigTick, slapJig, slapLive,
   conceiveChance, villaConceive,
   figureScore, selfStage, stageIndex, courtBonus, courtCultivateCost, COURT_LEVERS, SHADOW_STAGES, shadowStage,
   drawHusbandFigTest:drawHusbandFig, drawGroomPortrait, briadeImg, openPortrait,
