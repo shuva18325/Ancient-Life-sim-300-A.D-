@@ -2686,10 +2686,30 @@ const TIERS={
   rich:    {name:'RICH',              icon:'💰', col:'#e8c34a', mult:2.2, desc:'a wealthy merchant house'},
   elite:   {name:'ELITE',             icon:'🏛', col:'#c89af0', mult:4,   desc:'a great senatorial family'},
   imperial:{name:'EMPEROR’S DAUGHTER',icon:'👑', col:'#ff8ad0', mult:9,   desc:'the imperial house itself'},
+  // ^ the label above is the default; spouseTierName() flips it for a husband
   impossible:{name:'IMPOSSIBLE',    icon:'⛧', col:'#ff7ae0', mult:20,  desc:'a being that should not exist (cheats only)'},
 };
-function tierBadge(t){ const T=TIERS[t]||TIERS.common;
-  return `<span class="pill" style="border-color:${T.col};color:${T.col};font-size:10px">${T.icon} ${T.name}</span>`; }
+/* EMPEROR'S SON. Every one of these reads the same for either spouse except the
+   imperial one, which was hardcoded to DAUGHTER — so a woman who married into
+   the purple was told she had wed the Emperor's daughter. Anything that draws
+   the badge passes the spouse it is drawing it for. */
+function spouseTierName(t, male){
+  const T=TIERS[t]||TIERS.common;
+  if(t==='imperial' && male) return 'EMPEROR’S SON';
+  return T.name;
+}
+/* WHAT THE BUTTON SAYS. "A ROMAN GREETING" is his joke, and it was the only
+   label either spouse ever got. A woman with a husband gets her own wording for
+   both kinds, and the romantic one is called what it actually is. */
+function slapLabel(kind){
+  const male=!!(G&&G.wife&&G.wife.male);
+  if(kind==='spent') return male? '👋 HE HAS HAD ENOUGH TODAY' : '👋 SHE HAS HAD ENOUGH TODAY';
+  if(kind==='spentShort') return male? 'HE HAS HAD ENOUGH' : 'SHE HAS HAD ENOUGH';
+  if(kind==='romantic') return male? '💞 LET HIM HIT IT' : '💞 THE ROMANTIC SLAP';
+  return male? '👋 LET HIM HAVE IT' : '👋 A ROMAN GREETING';
+}
+function tierBadge(t, male){ const T=TIERS[t]||TIERS.common;
+  return `<span class="pill" style="border-color:${T.col};color:${T.col};font-size:10px">${T.icon} ${spouseTierName(t,male)}</span>`; }
 function traitById(id){ return WIFE_TRAITS.find(t=>t.id===id); }
 function traitLabel(id){ const t=traitById(id); return t? t.icon+' '+t.name : id; }
 // quality 0..10 → how many traits, how good the body/mind
@@ -2819,7 +2839,7 @@ function makeBride(eth, noble, quality, opts){
   b.dowryCoin=Math.round((b.dowryCoin||0)*TM.mult); b.dowrySoldiers=Math.round((b.dowrySoldiers||0)*TM.mult);
   b.tradeCoin=Math.round((b.tradeCoin||0)*TM.mult);
   if(b.tier==='imperial'){ b.approval=(b.approval||0)+20; b.honor=(b.honor||0)+10; b.favor=(b.favor||0)+6;
-    b.perk='THE EMPEROR’S OWN DAUGHTER — the purple itself marries into your house. Nothing in Rome opens more doors.'; }
+    b.perk='THE EMPEROR’S OWN '+(b.male?'SON':'DAUGHTER')+' — the purple itself marries into your house. Nothing in Rome opens more doors.'; }
   else if(b.tier==='elite'){ b.approval=(b.approval||0)+8; b.perk='Of a great senatorial house — '+b.perk; }
   b.dowryCoin=b.dowryCoin||0; b.dowryFood=b.dowryFood||0; b.dowrySoldiers=b.dowrySoldiers||0;
   b.approval=b.approval||0; b.favor=b.favor||0; b.honor=b.honor||0; b.pop=b.pop||0; b.tradeCoin=b.tradeCoin||0; b.tradeFood=b.tradeFood||0;
@@ -3639,11 +3659,11 @@ function openBodyMap(w,back){
      map is where you are already looking at the part in question, and it means
      the button is reachable without walking anywhere. */
   { const sr2=$('bodymap-secret');
-    if(!w.self && G.married && G.wife && ADULT && !w.male){
+    if(!w.self && G.married && G.wife && ADULT){
       const cd=(G.slapDay===G.day && (G.slapCount||0)>=3);
       const d=document.createElement('div'); d.className='shopcard'; d.style.borderColor=cd?'#6a5a4a':'#e0a0b8';
       const bt=document.createElement('button'); bt.className='btn sm'; bt.disabled=cd;
-      bt.textContent = cd? '👋 SHE HAS HAD ENOUGH TODAY' : '👋 A ROMAN GREETING';
+      bt.textContent = slapLabel(cd?'spent':'hand');
       bt.style.borderColor=cd?'#6a5a4a':'#e0a0b8'; bt.style.color=cd?'#8a7a6a':'#e0a0b8';
       const note=document.createElement('div'); note.className='small muted';
       note.innerHTML = cd
@@ -4273,7 +4293,7 @@ function renderCourt(){
   const pc = CT.prog>=75?'#7ad48a' : CT.prog>=40?'#e8c34a' : '#c8a86a';
   const lives=CT.max-CT.mistakes;
   info.innerHTML=
-    `<div><b style="color:var(--gold)">${who.name}</b> ${tierBadge(who.tier)}
+    `<div><b style="color:var(--gold)">${who.name}</b> ${tierBadge(who.tier, who.male)}
        <span class="small muted">— ${who.adj} ${who.rank}${who.age!==undefined?', '+who.age:''}</span></div>
      <div class="small"><b style="color:${st.col}">${st.name}</b></div>
      <div class="small muted" style="font-style:italic;margin:2px 0">${R.icon} ${R.blurb}</div>
@@ -11687,6 +11707,10 @@ function romanticVerdict(){
 function startRomantic(atX){
   const D=DM; if(!D || !G.married || !G.wife) return;
   if(!ADULT) return;
+  /* NO ART FOR IT YET. drawRomanticFem is a woman braced on a wall and
+     drawVillaMale is YOU; with a husband the scene would paint a wife as him
+     and hand you his body. Say so plainly rather than draw the wrong people. */
+  if(G.wife.male){ toast('💞 He is willing. The scene is not drawn yet — a husband’s version is still on the bench.',3600); return; }
   if(privacyNeeded('romantic')){ toast(privacyRefusal('romantic'),3200); return; }
   if(!spouseWilling()){ toast('“Not like that. Not tonight.” — win the heart first.',2600); return; }
   if(loveLeft('quick')<=0){ toast('“AGAIN?!” — nothing left in you today.',2400); return; }
@@ -11947,8 +11971,10 @@ function drawSlap(){
   const swing=clamp(T/16,0,1);                       // the hand comes across
   const hit=T>=16, since=T-16;
   const shk = hit? Math.max(0,1-since/22)*Math.sin(since*1.2)*2.6 : 0;
-  // she takes it, and the whole figure answers
-  drawWifeFig(ctx, S.x+shk, FY, w, 0, 'idle');
+  // the spouse takes it, and the whole figure answers. This drew drawWifeFig
+  // unconditionally, so a woman's husband was painted with the wife routine.
+  if(w.male) drawHusbandFig(ctx, S.x+shk, FY, G.wifeRel|0, w.skin, w.dress, w, 0, 'idle');
+  else drawWifeFig(ctx, S.x+shk, FY, w, 0, 'idle');
   // his hand, arriving
   { const skin=G.skin||'#caa06a';
     const hx=S.x-24+swing*16, hy=FY-30-Math.sin(swing*3.14159)*7;
@@ -11977,8 +12003,13 @@ function drawVillaMale(x, y, T, beat, cool, swing){
   const tun=G.tunic||'#7a2f22', tHi=shade(tun,22), tSh=shade(tun,-24);
   const hair=G.hairCol||'#3a2618';
   const ch=gv('bust',6), shd=gv('booty',6), mid=gv('waist',6), lg=gv('legs',6), len=gv('secret',5);
-  const shW=Math.round(7+shd*0.52), gut=Math.round(1+(10-mid)*0.34);
-  const legLen=Math.round(13+lg*0.52), legW=Math.round(4+lg*0.12);
+  const fa=gv('face',6), ha=gv('hairq',6);
+  /* THE SAME MAN. These were his own slightly smaller formulas, so the husband
+     who walks the halls and the one in this scene were built to two different
+     scales — narrower shoulders, shorter legs, a nine-pixel head with a dot for
+     an eye and no beard at all. Every one of them is drawHusbandFig's now. */
+  const shW=Math.round(8+shd*0.62), gut=Math.round(1+(10-mid)*0.42);
+  const legLen=Math.round(15+lg*0.62), legW=Math.round(4+lg*0.14);
   const P=(a,b,w2,h,c2)=>{ctx.fillStyle=c2;ctx.fillRect(Math.round(x+a),Math.round(y+b),Math.round(w2),Math.round(h));};
   // FOUR STAGES: 0 hands to the belt · 1 the belt goes · 2 the tunic comes off · 3 and he is working
   cool=cool||0;
@@ -12002,7 +12033,7 @@ function drawVillaMale(x, y, T, beat, cool, swing){
     const hw=Math.round(shW + ((shW*0.62+gut)-shW)*t2);
     P(-hw+dx, top-24+ry, hw*2, 1, skin);
     P(-hw+dx, top-24+ry, 1, 1, sHi); P(hw-1+dx, top-24+ry, 1, 1, sSh); }
-  { const chW=Math.round(6+ch*0.40);
+  { const chW=Math.round(7+ch*0.44);
     P(-chW+dx, top-23, chW*2, 6, shade(skin,6)); P(-1+dx, top-23, 2, 6, sSh);
     if(mid>=7){ P(-3+dx, top-14, 7, 1, sSh); P(-3+dx, top-11, 7, 1, sSh); } }
   P(-2+dx, top-28, 5, 5, skin);
@@ -12069,13 +12100,27 @@ function drawVillaMale(x, y, T, beat, cool, swing){
       P(shW+2+dx, ey+6, 5, 3, skin); P(shW+2+dx, ey+6, 5, 1, sHi); }  // and the hand at the end of it
   }
   if(st!==2){
-    const hdW=9, hdH=9;
-    P(-hdW/2+dx, top-28-hdH, hdW, hdH, skin); P(-hdW/2+dx, top-28-hdH, hdW, 1, sHi);
-    P(hdW/2-3+dx, top-25-hdH, 1, 1, '#2a1a10');
-    // HIS actual cut, not a block — the same routine the theatre and the bend use
-    { const L=playerLook(), cut=L.hairStyle||hairStyleFallback({male:true});
-      const HP=(a,b2,ww,h,c2)=>P(dx+a, top-28+b2, ww, h, c2);
-      drawHairSmall(HP, cut, true, hair, hdW, hdH, skin); }
+    /* HIS HEAD, built the way drawHusbandFig builds it — the same width off the
+       face tier, the same height, the same portrait hair routine, and the beard
+       that was simply missing here. A bearded man walked into the room and a
+       clean-shaven one bent his wife over the couch. */
+    const L2=playerLook();
+    const headW=Math.round(10+fa*0.30);
+    const HEADH=13+(fa>=9?4 : fa>=7?3 : fa>=5?2 : fa>=3?1 : 0);
+    const HBOT=top-26, HEADTOP=HBOT-HEADH, MOUTHY=HBOT-(fa>=9?1:2);
+    const HP=(a,b2,ww,h,c2)=>P(a+dx, b2, ww, h, c2);
+    { const neckW=4+Math.round(fa*0.22);
+      HP(-neckW/2, HBOT, neckW, 5, skin); HP(-neckW/2, HBOT, 1, 5, sHi); }
+    HP(-headW/2, HEADTOP, headW, HEADH, skin); HP(-headW/2, HEADTOP, headW, 2, sHi);
+    HP(headW/2-2, HEADTOP+2, 2, HEADH-2, sSh);
+    HP(-headW/2+2, HBOT-6, 2, 2, '#f4ece0'); HP(-headW/2+2, HBOT-6, 1, 1, '#2a1a10');
+    HP(headW/2-4,  HBOT-6, 2, 2, '#f4ece0'); HP(headW/2-4,  HBOT-6, 1, 1, '#2a1a10');
+    HP(-headW/2+1, HBOT-8, headW-2, 1, shade(hair,-20));                  // the brow
+    { const cut=L2.hairStyle||hairStyleFallback({name:(G&&G.name)||'x',male:true,eth:'roman'});
+      drawHairM(HP,{hair:hair, hHi:shade(hair,26), hSh:shade(hair,-28)}, cut,
+                -headW/2, HEADTOP, headW, {fall:0.70+ha*0.05}); }
+    { const bd=L2.beard||beardFallback({name:(G&&G.name)||'x',eth:'roman'});
+      drawBeardM(HP,{hair:hair, beardCol:hair}, bd, -headW/2, MOUTHY, headW, {fall:0.9}); }
   }
   return {st, top};
 }
@@ -12383,8 +12428,8 @@ function drawDomus(){
     else if(G.hasWardrobe&&Math.abs(D.x-309)<20) prompt=G.married?'SPACE: …THE WARDROBE 😏':'SPACE: WARDROBE';
     else if(Math.abs(D.x-414)<16) prompt='SPACE: THE BEDCHAMBER ('+bedLen.toUpperCase()+')';
     else if(G.married&&G.wife&&ADULT&&Math.abs(D.x-D.wifeX)<26)
-      prompt='SPACE: 👋 '+((G.slapCount||0)>=3&&G.slapDay===G.day? 'SHE HAS HAD ENOUGH':'A ROMAN GREETING')
-             +'  ·  W: 💞 THE OTHER KIND'+(loveLeft('quick')<=0?' (spent)':'');
+      prompt='SPACE: '+((G.slapCount||0)>=3&&G.slapDay===G.day? '👋 '+slapLabel('spentShort') : slapLabel('hand'))
+             +'  ·  W: '+slapLabel('romantic')+(loveLeft('quick')<=0?' (spent)':'');
     if(kidsPresent() && !villaClear())
       prompt = 'E: 🚸 CLEAR THE HALL ('+kidsPresent()+' watching)'+(prompt?'   ·   '+prompt:'');
     else if(kidsPresent() && villaClear())
@@ -15924,7 +15969,7 @@ function buildMarriageCard(b){
     const eC= v.e>=75?'#e26a8a': v.e>=45?'#e8c34a':'#8a6a4a';
     const pC= v.p>=75?'#e0533a': v.p>=45?'#d88a3a':'#8a6a4a';
     const info=document.createElement('div'); info.innerHTML=
-      `<div><b style="color:var(--gold)">⚭ ${w.name}</b> ${tierBadge(w.tier)} <span class="small muted">— your ${w.adj} ${w.rank} ${w.male?'husband':'wife'}${w.age!==undefined?', '+w.age:''}</span></div>
+      `<div><b style="color:var(--gold)">⚭ ${w.name}</b> ${tierBadge(w.tier, w.male)} <span class="small muted">— your ${w.adj} ${w.rank} ${w.male?'husband':'wife'}${w.age!==undefined?', '+w.age:''}</span></div>
        ${(()=>{const st=lookStage(w.looks===undefined?5:w.looks); return `<div class="small"><b style="color:${st.col}">${st.name}</b> <span class="muted">— ${st.blurb}</span></div>`;})()}
        <div class="small">♥ Emotional: ${mkbar(v.e,eC)} <b style="color:${eC}">${v.e}</b>/100 <span class="muted">${v.ew}</span></div>
        <div class="small">${ADULT?'🔥 Physical':'🔥 Devotion'}: ${mkbar(v.p,pC)} <b style="color:${pC}">${v.p}</b>/100 <span class="muted">${v.pw}</span></div>
@@ -16225,7 +16270,7 @@ function openMarry(forced){
     row.appendChild(briadeImg(w,132));
     const st=lookStage(w.looks===undefined?5:w.looks);
     const info=document.createElement('div'); info.style.flex='1'; info.innerHTML=
-      `<div><b style="color:var(--gold)">${w.name}</b> ${tierBadge(w.tier)}</div>
+      `<div><b style="color:var(--gold)">${w.name}</b> ${tierBadge(w.tier, w.male)}</div>
        <div class="small">${w.adj} ${w.rank}${w.age!==undefined?', <b>'+w.age+'</b>':''} · <span class="muted">${w.male? 'a lord of his people'+(w.jewel?', gold-ringed':'') : w.build+' of figure'+(w.jewel?', richly adorned':'')}${w.age>=34?(w.male?' · greying at the temples':' · a widow, and no longer young'):''}</span></div>
        <div class="small" style="color:#c8a86a">${w.male
           ? '💇 '+hairStyleName(w.hairStyle||hairStyleFallback(w),true)+' · '+beardName(w.beard||beardFallback(w))+' · 👘 '+outfitName(w.outfit||outfitFallback(w))
@@ -16320,7 +16365,7 @@ function openMarry(forced){
       w.smarts=Math.max(w.smarts,9); w.jewel=true; w.rank='noble';
       w.traits=[...new Set([...(w.traits||[]),'noble','beauty','wealthy','smart'])].slice(0,4);
       w.approval=(w.approval||0)+20; w.honor=(w.honor||0)+10; w.dowryCoin=(w.dowryCoin||0)+4000;
-      w.perk='THE EMPEROR’S OWN DAUGHTER — the purple itself marries into your house.'; return w; });
+      w.perk='THE EMPEROR’S OWN '+(w.male?'SON':'DAUGHTER')+' — the purple itself marries into your house.'; return w; });
     refreshStatbar(); saveQuiet(); openMarry(marryForced); };
   rrow.appendChild(impBt);
   rr.appendChild(rrow); body.appendChild(rr);
@@ -18083,6 +18128,7 @@ window.__SS = {
   kidsPresent, villaClear, privacyNeeded, privacyRefusal, clearTheVilla, BABY_YEARS,
   FAMILY_EVENTS, familyDue, maybeFamily, openFamilyEvent, kidBand, kidAgeYears, heirPressure,
   SIBLING_LINES, siblingAside, drawDomus, romanticSwing, STRIKES,
+  spouseTierName, tierBadge, slapLabel, drawSlap, startSlapAnim, startRomantic, drawHusbandFig, drawVillaMale,
   livingKids, kidsOfBand,
   slapKick, slapJigTick, slapJig, slapLive,
   conceiveChance, villaConceive,
