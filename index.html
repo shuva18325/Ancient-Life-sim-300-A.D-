@@ -1398,6 +1398,50 @@ function rgbA0(hex,a){ const n=parseInt(String(hex).slice(1),16);
   return 'rgba('+((n>>16)&255)+','+((n>>8)&255)+','+(n&255)+','+a+')'; }
 // anyone from an older save still gets the arrangement their people wore,
 // chosen from their name so it never changes between one visit and the next
+/* =====================================================================
+   SMALL-SCALE HAIR — one routine, every sprite that is not a portrait
+   ---------------------------------------------------------------------
+   drawHairM/drawHairF are PORTRAIT routines, laid out for a head about
+   forty-four pixels across; on a nine-pixel one they come apart into a
+   tower of spikes. The shadow theatre grew its own miniature version and
+   kept it to itself, so the villa's bend and the villa's male both drew a
+   plain block instead — MEASURED: ten brides rolled four different cuts
+   and every single bend sprite drew the same silhouette. Same cut, same
+   code, everywhere now. P is a plotter in HEAD-LOCAL space with the head
+   box at (-hdW/2, -hdH) .. (hdW/2, 0).
+   ===================================================================== */
+function drawHairSmall(P, cut, male, hair, hdW, hdH, skinCol){
+  const hHi=shade(hair,24), hSh=shade(hair,-26);
+  const cap2=(ex)=>{ P(-hdW/2-1,-hdH-2,hdW+2,3+(ex||0),hair); P(-hdW/2-1,-hdH-2,hdW+2,1,hHi); };
+  const fall=(len)=>{ P(-hdW/2-1,-hdH+1,2,len,hair); P(hdW/2-1,-hdH+1,2,len,hSh); };
+  if(male){
+    if(cut==='shaved'){ P(-hdW/2,-hdH-1,hdW,2,mixHex(hair,skinCol||'#caa06a',0.45)); }
+    else if(cut==='caesar'){ cap2(0); P(-hdW/2-1,-hdH+1,hdW+2,1,hSh); }      // combed forward, straight brow
+    else if(cut==='swept'){ cap2(1); P(-hdW/2-2,-hdH-1,2,3,hair); }
+    else if(cut==='messy'){ cap2(1);
+      for(let i=0;i<4;i++) P(-hdW/2+i*2.2,-hdH-3-((i*3)%3),2,2,hair); }       // sticking up in tufts
+    else if(cut==='curls'){ cap2(1);
+      for(let i=0;i<4;i++) P(-hdW/2+i*2.4,-hdH-3,2,2,i%2?hHi:hair); }
+    else if(cut==='germanic'){ cap2(0); fall(7); }                            // to the shoulders
+    else if(cut==='suebian'){ cap2(0); P(hdW/2-1,-hdH-5,3,4,hair); P(hdW/2,-hdH-5,1,4,hHi); }
+    else if(cut==='steppe'){ P(-hdW/2,-hdH-2,hdW,3,hair);                     // shaved sides, one long tail
+      P(-hdW/2-2,-hdH+1,2,10,hair); P(-hdW/2-2,-hdH+1,1,10,hHi); }
+    else cap2(0);
+  } else {
+    if(cut==='loose'){ cap2(1); fall(12); P(-hdW/2-2,-hdH+2,2,10,hair); P(hdW/2,-hdH+2,2,10,hSh); }
+    else if(cut==='braid'){ cap2(0);
+      for(let i=0;i<5;i++) P(hdW/2-1,-hdH+2+i*2,2,2,i%2?hHi:hair); }          // one long braid behind
+    else if(cut==='bangs'){ cap2(0); P(-hdW/2-1,-hdH+1,hdW+2,2,hSh); fall(6); }
+    else if(cut==='knot'){ cap2(0); P(-1,-hdH-5,3,3,hair); P(-1,-hdH-5,3,1,hHi); }
+    else if(cut==='crown'){ cap2(0); P(-hdW/2-1,-hdH-3,hdW+2,2,hair); P(-hdW/2,-hdH-3,hdW,1,'#e8c34a'); }
+    else if(cut==='coils'){ cap2(0);
+      for(let i=0;i<3;i++) P(-hdW/2+1+i*2.6,-hdH-4,2,2,i%2?hHi:hair); }
+    else if(cut==='tower'){ cap2(0);                                          // the Flavian tower, but SHORT
+      P(-hdW/2+1,-hdH-4,hdW-2,2,hair); P(-hdW/2+2,-hdH-6,hdW-4,2,hHi); fall(5); }
+    else if(cut==='veil'){ cap2(0); P(-hdW/2-2,-hdH-2,hdW+4,3,'#cfc4e2'); P(-hdW/2-2,-hdH+1,2,8,'#cfc4e2'); }
+    else { cap2(0); fall(8); }
+  }
+}
 function hairStyleFallback(w){
   const eth=(w&&w.eth)||'roman', male=!!(w&&w.male);
   const pool=(male? HAIR_M_BY_ETH : HAIR_F_BY_ETH)[eth] || (male?['caesar']:['crown']);
@@ -9239,44 +9283,8 @@ function drawShadowPlay(s,T){
     blk(-hdW/2,-hdH,hdW,hdH,col);
     // the jaw and the shadow under it, so the head is not a plain tile
     px(-hdW/2+1,-1,hdW-2,1,_lo(col));
-    /* THE HAIR, AT THIS SCALE. drawHairM/drawHairF are PORTRAIT routines — they
-       are laid out for a head about 44 pixels across, and asked to work on a
-       nine-pixel one they come apart into a tower of spikes (her 'loose' came
-       out looking like a candelabra). So the theatre draws the same CUT as a
-       small mass instead: right colour, right length, right silhouette, and it
-       still tells a Suebian knot from a steppe queue from hair worn long. */
-    const cut=(L&&L.hairStyle)||hairStyleFallback({male});
-    const hHi=shade(hair,24), hSh=shade(hair,-26);
-    const cap2=(ex)=>{ px(-hdW/2-1,-hdH-2,hdW+2,3+(ex||0),hair); px(-hdW/2-1,-hdH-2,hdW+2,1,hHi); };
-    const fall=(len,back)=>{ const bx=back===undefined?1:back;              // hair down the back of the neck
-      px(-hdW/2-1+(bx>0?0:0),-hdH+1,2,len,hair); px(hdW/2-1,-hdH+1,2,len,hSh); };
-    if(male){
-      if(cut==='shaved'){ px(-hdW/2,-hdH-1,hdW,2,mixHex(hair,col,0.45)); }
-      else if(cut==='caesar'){ cap2(0); px(-hdW/2-1,-hdH+1,hdW+2,1,hSh); }   // combed forward, straight brow
-      else if(cut==='swept'){ cap2(1); px(-hdW/2-2,-hdH-1,2,3,hair); }
-      else if(cut==='messy'){ cap2(1);
-        for(let i=0;i<4;i++) px(-hdW/2+i*2.2,-hdH-3-((i*3)%3),2,2,hair); }    // sticking up in tufts
-      else if(cut==='curls'){ cap2(1);
-        for(let i=0;i<4;i++) px(-hdW/2+i*2.4,-hdH-3,2,2,i%2?hHi:hair); }
-      else if(cut==='germanic'){ cap2(0); fall(7); }                          // to the shoulders
-      else if(cut==='suebian'){ cap2(0); px(hdW/2-1,-hdH-5,3,4,hair); px(hdW/2,-hdH-5,1,4,hHi); }  // knotted above one ear
-      else if(cut==='steppe'){ px(-hdW/2,-hdH-2,hdW,3,hair);                  // shaved sides, one long tail
-        px(-hdW/2-2,-hdH+1,2,10,hair); px(-hdW/2-2,-hdH+1,1,10,hHi); }
-      else cap2(0);
-    } else {
-      if(cut==='loose'){ cap2(1); fall(12); px(-hdW/2-2,-hdH+2,2,10,hair); px(hdW/2,-hdH+2,2,10,hSh); }
-      else if(cut==='braid'){ cap2(0);
-        for(let i=0;i<5;i++) px(hdW/2-1,-hdH+2+i*2,2,2,i%2?hHi:hair); }       // one long braid behind
-      else if(cut==='bangs'){ cap2(0); px(-hdW/2-1,-hdH+1,hdW+2,2,hSh); fall(6); }
-      else if(cut==='knot'){ cap2(0); px(-1,-hdH-5,3,3,hair); px(-1,-hdH-5,3,1,hHi); }
-      else if(cut==='crown'){ cap2(0); px(-hdW/2-1,-hdH-3,hdW+2,2,hair); px(-hdW/2,-hdH-3,hdW,1,'#e8c34a'); }
-      else if(cut==='coils'){ cap2(0);
-        for(let i=0;i<3;i++) px(-hdW/2+1+i*2.6,-hdH-4,2,2,i%2?hHi:hair); }
-      else if(cut==='tower'){ cap2(0);                                        // the Flavian tower, but SHORT
-        px(-hdW/2+1,-hdH-4,hdW-2,2,hair); px(-hdW/2+2,-hdH-6,hdW-4,2,hHi); fall(5); }
-      else if(cut==='veil'){ cap2(0); px(-hdW/2-2,-hdH-2,hdW+4,3,'#cfc4e2'); px(-hdW/2-2,-hdH+1,2,8,'#cfc4e2'); }
-      else { cap2(0); fall(8); }
-    }
+    // the same cut every other sprite draws, at the same scale
+    drawHairSmall(px, (L&&L.hairStyle)||hairStyleFallback({male}), male, hair, hdW, hdH, col);
     // one eye and a mouth when we are looking at a profile — enough to aim a face
     if(side){ const d=side>0?1:-1;
       px(d*(hdW/2-3),-hdH+3,1,1,'#2a1a10');
@@ -10876,12 +10884,20 @@ function drawWifeFig(c,x,y,w,ph,mode){
     P(shX+1, shY-8, 2, 1, shade(skin,-18));                    // a brow over it
     P(shX+2, shY-4, 2, 1, mixHex(skin,'#a04a4a',0.55));        // and a mouth
     P(shX+4, shY-8, 1, 3, skin);                               // the ear
-    P(shX-5, shY-13, 10, 4, hair); P(shX-5, shY-13, 10, 1, hairHi);
-    P(shX-5, shY-13, 3, 3, hairSh);
-    { const fall=Math.round(4+lean*13);                        // and it hangs straight down, which sells it
-      P(shX-6, shY-10, 3, fall, hair); P(shX-6, shY-10, 1, fall, hairHi);
-      P(shX+3, shY-10, 3, fall*0.86, hairSh);
-      for(let i=0;i<3;i++) P(shX-5+i*3, shY-10+fall-1-((i*2)%3), 1, 2+((i*3)%3), hair); }  // loose strands at the ends
+    /* HER ACTUAL CUT. This drew one generic cap for everybody, so ten brides
+       rolling four different hairstyles all bent over with identical hair. */
+    { const cut=w.hairStyle||hairStyleFallback(w);
+      const HP=(a,b2,ww,h,c2)=>P(shX+a, shY-1+b2, ww, h, c2);   // head-local → figure-local
+      drawHairSmall(HP, cut, false, hair, 8, 9, skin); }
+    // and then gravity: whatever the cut, the length of it hangs straight DOWN
+    { const cut=w.hairStyle||hairStyleFallback(w);
+      const long = (cut==='loose'||cut==='braid'||cut==='bangs'||cut==='tower'||cut==='veil');
+      const fall=Math.round((long?5:1)+lean*(long?13:5));
+      if(fall>1){
+        P(shX-6, shY-10, 3, fall, hair); P(shX-6, shY-10, 1, fall, hairHi);
+        P(shX+3, shY-10, 3, Math.round(fall*0.86), hairSh);
+        if(cut==='braid') for(let i=0;i<4;i++) P(shX-6, shY-10+i*3, 3, 2, i%2?hairHi:hair);   // the braid keeps its bands
+        for(let i=0;i<3;i++) P(shX-5+i*3, shY-10+fall-1-((i*2)%3), 1, 2+((i*3)%3), hair); } }  // loose strands at the ends
     // ---- one arm reaching down for whatever it was ----
     { const reach=Math.round(7+lean*9);
       P(shX-1, shY+1, 3, reach, skin); P(shX-2, shY+reach, 5, 3, skin);
@@ -11354,8 +11370,13 @@ function updateTempt(dt){
     if(Math.abs(D.x-tx)<2 || X.t>150){ X.ph = X.invited? 'invited':'resist'; X.t=0; }
   } else if(X.ph==='resist'){
     X.locks=true;
-    X.hold -= 0.62*dt;                                    // it drains whatever you do
-    if(consume('space')||consume('attack')||consume('w')){ X.hits++; X.hold=Math.min(100,X.hold+4.2); }
+    /* SLOWER. At 0.62 a tick the bar was gone in under three seconds, which is
+       long enough to mash and not long enough to WATCH anything — and the whole
+       point of the beat is that you can see him losing the argument. Roughly
+       five and a half seconds from full now, and a hit is worth proportionally
+       less so the twenty still matter. */
+    X.hold -= 0.30*dt;
+    if(consume('space')||consume('attack')||consume('w')){ X.hits++; X.hold=Math.min(100,X.hold+2.6); }
     if(X.hits>=TEMPT_NEED){ X.ph='held'; X.t=0; }
     else if(X.hold<=0){ X.ph='took'; X.t=0; }
   } else if(X.ph==='invited'){
@@ -11649,7 +11670,10 @@ function drawVillaMale(x, y, T, beat, cool){
     const hdW=9, hdH=9;
     P(-hdW/2+dx, top-28-hdH, hdW, hdH, skin); P(-hdW/2+dx, top-28-hdH, hdW, 1, sHi);
     P(hdW/2-3+dx, top-25-hdH, 1, 1, '#2a1a10');
-    P(-hdW/2-1+dx, top-30-hdH, hdW+2, 4, hair); P(-hdW/2-1+dx, top-30-hdH, hdW+2, 1, shade(hair,26));
+    // HIS actual cut, not a block — the same routine the theatre and the bend use
+    { const L=playerLook(), cut=L.hairStyle||hairStyleFallback({male:true});
+      const HP=(a,b2,ww,h,c2)=>P(dx+a, top-28+b2, ww, h, c2);
+      drawHairSmall(HP, cut, true, hair, hdW, hdH, skin); }
   }
   return {st, top};
 }
@@ -11743,6 +11767,29 @@ function drawTempt(){
       ctx.globalAlpha=clamp(1-hy/40,0,1)*0.8; pixelText('♥', X.x-10+i*5, FY-52-hy, '#e26a8a', 1); }
     ctx.globalAlpha=1; ctx.textAlign='left'; }
   if(X.ph==='resist'){
+    /* WHAT YOU ARE ACTUALLY WATCHING. The bar told you he was losing; nothing
+       on him showed it. As the hold drains it rises — a bump under the tunic
+       first, then the tunic gives up on containing it — and it is HIS length
+       score that says how much there is to contain. */
+    { const lose=clamp(1-X.hold/100,0,1);
+      const B=(G.body)||{}, len=(B.secret===undefined?5:B.secret);
+      const skin=G.skin||'#caa06a', tun=G.tunic||'#7a2f22';
+      const lg=(B.legs===undefined?6:B.legs), legLen=Math.round(15+lg*0.62);
+      const hipY=FY-18-legLen, dirx=(D.face>0?1:-1);
+      const rise=lose*(2.5+len*0.62), th=Math.max(2,Math.round(1.4+len*0.16));
+      if(lose>0.10){
+        // under the cloth: the tunic tents, and the tent grows
+        const pl=Math.round(rise);
+        for(let i=0;i<pl;i++){ const t2=i/Math.max(1,pl-1);
+          px(D.x+dirx*(2+i), hipY-2-Math.round(t2*rise*0.55), 1, th, lose>0.72? skin : tun);
+          px(D.x+dirx*(2+i), hipY-2-Math.round(t2*rise*0.55), 1, 1, lose>0.72? shade(skin,20):shade(tun,20)); }
+        if(lose>0.72){ px(D.x+dirx*(2+pl), hipY-2-Math.round(rise*0.55), th, th, mixHex(skin,'#c07a68',0.34));
+          px(D.x+dirx*1, hipY+1, th+1, th+1, mixHex(skin,'#2a150a',0.16)); }
+        else if(lose>0.40) px(D.x+dirx*(2+pl), hipY-2-Math.round(rise*0.5), th, 2, shade(tun,-18));
+      }
+      if(lose>0.72 && (D.t|0)%12<6){ ctx.textAlign='center';
+        pixelText('!', D.x+dirx*10, hipY-14, '#ffd0a0', 1.1); ctx.textAlign='left'; }
+    }
     // THE HOLD — a bar that drains, and a count that has to get there first
     const bw=180, bx=W/2-bw/2, by=34;
     px(bx-2,by-2,bw+4,16,'#140c10'); px(bx,by,bw,12,'#3a1a24');
@@ -11750,10 +11797,15 @@ function drawTempt(){
     px(bx,by,Math.round(bw*f),12,col); px(bx,by,Math.round(bw*f),2,shade(col,40));
     ctx.textAlign='center';
     pixelText('HOLD YOURSELF TOGETHER — MASH  SPACE', W/2, 26, '#ffd0da', 1.05);
+    if(f<0.62) pixelText(f<0.3? '— it is getting away from you —' : '— you are losing this —',
+      W/2, by+22, 'rgba(255,190,170,.85)', 1);
     pixelText(X.hits+' / '+TEMPT_NEED, W/2, by+10, '#120c08', 1.15);
     ctx.textAlign='left';
     // he is visibly losing it
-    if(f<0.5 && (D.t|0)%6<3){ ctx.globalAlpha=0.5-f*0.5;
+    // a pulse of red as he loses the argument — 0.5-f*0.5 put HALF an opaque
+    // red sheet over the whole villa at the bottom of the bar, which drowned
+    // the very thing it was supposed to draw attention to
+    if(f<0.5 && (D.t|0)%6<3){ ctx.globalAlpha=Math.min(0.20,(0.5-f)*0.34);
       px(-4,-4,W+8,H+8,'#e0533a'); ctx.globalAlpha=1; }
   }
   if(X.ph==='held'){ ctx.textAlign='center';
@@ -17390,7 +17442,7 @@ window.__SS = {
   temptDue, startTempt, updateTempt, drawTempt, openTemptAftermath, TEMPT_NEED, updateDomusScene,
   TEMPT_PROPS, quirkAside, promiseDaysLeft, promiseBroken, checkPromise, checkPromiseKept,
   startVillaLove, updateVillaLove, drawVillaLove, villaLoveFinish, VILLALOVE_LEN, drawVillaMale,
-  doSlap, slapVerdict, startSlapAnim, updateSlap, drawSlap,
+  doSlap, slapVerdict, startSlapAnim, updateSlap, drawSlap, drawHairSmall,
   slapKick, slapJigTick, slapJig, slapLive,
   conceiveChance, villaConceive,
   figureScore, selfStage, stageIndex, courtBonus, courtCultivateCost, COURT_LEVERS, SHADOW_STAGES, shadowStage,
