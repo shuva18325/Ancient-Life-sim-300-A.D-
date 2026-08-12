@@ -10658,8 +10658,11 @@ function drawWifeFig(c,x,y,w,ph,mode){
          detail that makes it read as riding up rather than being cut short. */
       if(lean>0.30){
         const g=clamp((lean-0.30)/0.70,0,1);                                   // 0 at stage 3 → 1 at stage 5
-        const uw=Math.round((hipW2+flare)*0.86), uy=seatTop+2+hemH-1;
-        const uh=Math.max(2,Math.round((2+deep*0.30)*g));
+        /* HOW MUCH COMES OUT IS HER TIER. A flat 3 shows a sliver and a
+           colossal 9 does not fit under the hem at all — at the top two tiers
+           it clears the cloth entirely and sits proud of it. */
+        const uw=Math.round((hipW2+flare)*(0.86+bT*0.045)), uy=seatTop+2+hemH-1;
+        const uh=Math.max(2,Math.round((1.4+deep*0.62)*g));
         // the underside of the seat, in skin
         P(-uw-back+2, uy, uw*2-4, uh, skin);
         P(-uw-back+2, uy, uw*2-4, 1, shade(skin,16));                          // lit along the top of the curve
@@ -10667,6 +10670,16 @@ function drawWifeFig(c,x,y,w,ph,mode){
         if(bT>=3){ P(-1-back, uy, 2, uh, shade(skin,-34)); }                   // the line down the middle of it
         if(bT>=2){ P(-uw-back+2, uy+1, 1, uh-1, shade(skin,-20));
                    P( uw-back-3, uy+1, 1, uh-1, shade(skin,-20)); }
+        if(bT>=3){                                                             // it swings WIDER than the gown
+          const ov=Math.round(g*(1+bT));
+          P(-uw-back+1-ov, uy+1, ov+1, Math.max(1,uh-2), skin);
+          P( uw-back-2,    uy+1, ov+1, Math.max(1,uh-2), sSh);
+          P(-uw-back+1-ov, uy+1, ov+1, 1, shade(skin,14)); }
+        if(bT>=4){                                                             // and at the top it clears the hem
+          const pop=Math.round(g*3);
+          P(-uw-back+3, uy-pop, uw*2-6, pop+1, skin);
+          P(-uw-back+3, uy-pop, uw*2-6, 1, shade(skin,22));
+          P(-1-back, uy-pop, 2, pop+1, shade(skin,-30)); }
         // the hem CATCHING on the curve, lifted at the back and dropping at the front
         for(let i=0;i<5;i++){ const t2=i/4, lx=Math.round(-hipW2+t2*hipW2*2);
           const lift=Math.round(Math.sin(t2*3.14159)*g*3);
@@ -11219,14 +11232,21 @@ function villaLoveFinish(mode){
   if(mode==='love'){                                     // and you see every bit of it
     for(let i=0;i<64;i++) sc.burst.push({
       x:sc.x+rnd(-3,3), y:214-30+rnd(-3,3),
-      vx:rnd(-3.4,3.4), vy:rnd(-3.6,0.6), life:rnd(30,74), r:rnd(1,2.4)});
+      vx:rnd(-3.4,3.4), vy:rnd(-3.6,0.6), life:rnd(30,74), r:rnd(1,2.4), drip:false});
     sfx('giggle');
+  } else {                                               // held — a few only, and they run DOWN
+    for(let i=0;i<14;i++) sc.burst.push({
+      x:sc.x-14+rnd(-5,5), y:214-28+rnd(-2,2),
+      vx:rnd(-0.16,0.16), vy:rnd(0.05,0.30), life:rnd(70,140), r:rnd(1,2), drip:true});
   }
 }
 function updateVillaLove(dt){
   const D=DM, sc=D.scene, T=sc.t;
-  for(const b of sc.burst){ b.x+=b.vx*dt; b.y+=b.vy*dt; b.vy+=0.13*dt; b.life-=dt;
-    if(b.y>212){ b.y=212; b.vx*=0.55; b.vy=0; } }
+  for(const b of sc.burst){ b.x+=b.vx*dt; b.y+=b.vy*dt;
+    b.vy += (b.drip? 0.012 : 0.13)*dt;                   // a drip barely accelerates; a burst falls
+    if(b.drip) b.vy=Math.min(b.vy,0.55);
+    b.life-=dt;
+    if(b.y>212){ b.y=212; b.vx*=0.55; b.vy=0; if(b.drip) b.life=Math.min(b.life,26); } }
   sc.burst=sc.burst.filter(b=>b.life>0);
   if((T|0)%7<1) D.hearts.push({x:sc.x+rnd(-14,14), y:180, vy:0.5, life:46});
   // THE ASK — it opens near the end, and it waits for you
@@ -11236,7 +11256,7 @@ function updateVillaLove(dt){
     else if(consume('w')) villaLoveFinish('heir');
     if(T>820) villaLoveFinish('love');                   // say nothing and nature decides
   }
-  if(sc.choice && sc.t - sc.chooseT > 170){
+  if(sc.choice && sc.t - sc.chooseT > 300){          // long enough for the whole wind-down to play
     const mode=sc.choice;
     D.scene=null; D.wifePause=0;
     G.wifeRel=clamp(G.wifeRel+(mode==='love'?9:6),0,bondCeiling());
@@ -11265,7 +11285,7 @@ function updateVillaLove(dt){
    his own measure showing — because the LENGTH score is a real number in
    this game and this is the one view where it should be visible.
    ===================================================================== */
-function drawVillaMale(x, y, T, beat){
+function drawVillaMale(x, y, T, beat, cool){
   const B=(G.body)||{}, gv=(id,d)=>B[id]===undefined?d:B[id];
   const skin=G.skin||'#caa06a', sSh=shade(skin,-26), sHi=shade(skin,20);
   const tun=G.tunic||'#7a2f22', tHi=shade(tun,22), tSh=shade(tun,-24);
@@ -11275,8 +11295,9 @@ function drawVillaMale(x, y, T, beat){
   const legLen=Math.round(13+lg*0.52), legW=Math.round(4+lg*0.12);
   const P=(a,b,w2,h,c2)=>{ctx.fillStyle=c2;ctx.fillRect(Math.round(x+a),Math.round(y+b),Math.round(w2),Math.round(h));};
   // FOUR STAGES: 0 hands to the belt · 1 the belt goes · 2 the tunic comes off · 3 and he is working
-  const st = T<70? 0 : T<130? 1 : T<190? 2 : 3;
-  const drive = st>=3? beat : 0;
+  cool=cool||0;
+  const st = cool>0.55? 4 : T<70? 0 : T<130? 1 : T<190? 2 : 3;   // 4 = getting dressed again
+  const drive = st===3? beat : 0;
   const dx = drive*4.2;                                   // he moves in on the beat
   /* THE HIPS MUST SIT ON THE LEGS. Carried over from the body-map figure, this
      was -18-legLen, which put the pelvis fifteen pixels above the top of the
@@ -11300,7 +11321,7 @@ function drawVillaMale(x, y, T, beat){
     if(mid>=7){ P(-3+dx, top-14, 7, 1, sSh); P(-3+dx, top-11, 7, 1, sSh); } }
   P(-2+dx, top-28, 5, 5, skin);
   // ---- HIS OWN MEASURE, and it is his score that draws it ----
-  if(st>=3){
+  if(st===3){
     const pl=Math.round(3.4+len*0.85), pth=Math.max(2,Math.round(1.6+len*0.20));
     const rise=Math.round(2+drive*3);
     const py=top-4-rise;
@@ -11333,8 +11354,16 @@ function drawVillaMale(x, y, T, beat){
     P(-shW+dx, top-34-Math.round(up*10), shW*2, 2, tHi);
     P(-4+dx, top-30, 3, 10, skin); P(3+dx, top-30, 3, 10, skin);     // both arms up in it
   }
+  // ---- and at the end he simply puts it back on ----
+  if(st===4){
+    const back=clamp((cool-0.55)/0.45,0,1);
+    P(-shW-1, top-26, shW*2+2, Math.round(26*back), tun);
+    P(-shW-1, top-26, shW*2+2, Math.max(1,Math.round(2*back)), tHi);
+    P(-shW-3, top-24, 3, 13, skin);
+    P(shW,    top-24, 3, 13, skin);
+  }
   // ---- arms and head, once he is free of it ----
-  if(st>=3){
+  if(st===3){
     P(-shW-3+dx, top-24, 3, 13, skin); P(-shW-3+dx, top-24, 1, 13, sHi);
     // the near arm comes DOWN and forward onto her hip, and travels with him
     { const ey=top-14+Math.round(drive*2);
@@ -11354,7 +11383,15 @@ function drawVillaLove(){
   const D=DM, sc=D.scene, T=sc.t, FY=214, w=G.wife, X=sc.x;
   const heat=clamp(T/560,0,1);
   const beat=Math.max(0,Math.sin(T*(0.20+heat*0.26)));       // it builds over the fifteen seconds
-  const dr=sc.choice? Math.max(0,1-(T-sc.chooseT)/60) : beat;
+  /* HE IS STILL GETTING HIS TUNIC OFF. The beat used to drive her, the crate
+     and the band from tick zero regardless, so the whole room was already
+     going while he was stuck with it over his head. Nothing moves until he
+     is actually free of it, and then it ramps in rather than snapping on. */
+  const READY=190;
+  const ramp=clamp((T-READY)/70,0,1);
+  const after = sc.choice? (T-sc.chooseT) : -1;
+  const cool = after>=0? clamp((after-70)/150,0,1) : 0;      // the wind-down, 0 → 1
+  const dr = (after>=0? Math.max(0,1-after/60) : beat*ramp) * (1-cool);
   // the room dims to a pool of lamplight around the two of them
   ctx.globalAlpha=0.30+heat*0.26; px(-4,-4,W+8,H+8,'#160b12'); ctx.globalAlpha=1;
   { const g=ctx.createRadialGradient(X,FY-34,6,X,FY-34,86+heat*22);
@@ -11362,18 +11399,18 @@ function drawVillaLove(){
     g.addColorStop(1,'rgba(0,0,0,0)'); ctx.fillStyle=g; ctx.fillRect(0,60,W,H-60); }
   // the crate she was reaching for, still there, being knocked about
   px(X+(D.face>0?16:-24)+Math.sin(T*0.4)*dr, FY-7, 9,7,'#7a5c34');
-  // HER, still bent over it, riding the beat
-  drawWifeFig(ctx, X+dr*2.4, FY, w, 1, 'bend');
+  // HER, still bent over it, riding the beat — and coming back up at the end
+  drawWifeFig(ctx, X+dr*2.4, FY, w, 1-cool*0.78, 'bend');
   // HIM, behind her, and he is the one driving — his own four stages
-  const HE=drawVillaMale(X-20, FY, T, dr);
+  const HE=drawVillaMale(X-20-cool*16, FY, T, dr, cool);
   // the tunic he got out of, on the floor where it landed
   if(HE.st>=3){ px(X-46+Math.sin(T*0.02)*2, FY-4, 13, 4, G.tunic||'#7a2f22');
                 px(X-46+Math.sin(T*0.02)*2, FY-5, 13, 1, shade(G.tunic||'#7a2f22',22)); }
   // the join, veiled — the same warm band the theatre uses
-  { const bx=X-16+dr*4, by=FY-26, bw=24, bh=6;
-    ctx.globalAlpha=0.52; ctx.fillStyle='#efe6d6';
+  if(cool<0.86){ const bx=X-16+dr*4, by=FY-26, bw=Math.round(24*(1-cool)), bh=6;
+    ctx.globalAlpha=0.52*(1-cool); ctx.fillStyle='#efe6d6';
     ctx.fillRect(Math.round(bx),Math.round(by),bw,bh);
-    ctx.globalAlpha=0.26; ctx.fillRect(Math.round(bx-3),Math.round(by+1),bw+6,bh-2);
+    ctx.globalAlpha=0.26*(1-cool); ctx.fillRect(Math.round(bx-3),Math.round(by+1),bw+6,bh-2);
     ctx.globalAlpha=1; }
   // and the rhythm reads in the air behind him
   if(beat>0.8){ ctx.globalAlpha=0.22;
@@ -11390,11 +11427,18 @@ function drawVillaLove(){
     if(fl>0){ ctx.globalAlpha=fl*0.6; px(-4,-4,W+8,H+8,'#fff6ea'); ctx.globalAlpha=1; }
     pixelText('~ and you did not even try to be quiet about it ~', W/2, 46, '#fff0dc', 1.05);
   } else if(sc.choice==='heir'){
-    // there is deliberately NOTHING to see here. The line is the whole event.
-    const fl=clamp(1-(T-sc.chooseT)/40,0,1);
-    if(fl>0){ ctx.globalAlpha=fl*0.20; px(-4,-4,W+8,H+8,'#e0a060'); ctx.globalAlpha=1; }
+    /* Not a burst. Held means it goes nowhere fast — so the few that escape
+       just run DOWN, slowly, and the room glows warm instead of flashing. */
+    for(const b of sc.burst){ ctx.globalAlpha=clamp(b.life/50,0,1)*0.9;
+      px(b.x,b.y,1,Math.round(1+b.r),'#f2ece0'); px(b.x,b.y,1,1,'#ffffff'); }
+    ctx.globalAlpha=1;
+    const fl=clamp(1-(T-sc.chooseT)/50,0,1);
+    if(fl>0){ ctx.globalAlpha=fl*0.24; px(-4,-4,W+8,H+8,'#e0a060'); ctx.globalAlpha=1; }
     pixelText('~ contained. held. every drop of it. ~', W/2, 46, '#ffd9a0', 1.05);
     pixelText('~ Venus has been asked, and Venus decides ~', W/2, 58, 'rgba(255,208,150,.75)', 1);
+    if(after>200) pixelText(sc.choice==='love'
+      ? '~ she is laughing. the whole household heard THAT. ~'
+      : '~ she straightens up, and neither of you says anything ~', W/2, 70, 'rgba(240,216,190,.7)', 1);
   } else if(sc.asked){
     // the ask itself, and the bar that runs out if you sit on your hands
     const left=clamp(1-(T-640)/180,0,1);
