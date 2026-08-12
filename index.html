@@ -11318,6 +11318,8 @@ function updateDomus(dt){
   if(D.slap){ updateSlap(dt); return; }
   if(D.tempt){ updateTempt(dt); if(D.tempt && D.tempt.locks) return; }
   else if(temptDue()) startTempt();
+  if(D.drop){ updateDrop(dt); if(D.drop && D.drop.locks) return; }
+  else if(dropDue()) startDrop();
   const sp2=(held.s? 3.0 : 1.5)*dt;        // hold S to RUN
   const face0=D.face;
   if(held.a){ D.x-=sp2; D.face=-1; } if(held.d){ D.x+=sp2; D.face=1; }
@@ -11441,6 +11443,168 @@ function updateDomusScene(dt){
    this one; it was a second bar doing the same thing a beat later and it read
    as a chore, so it is gone and its presses were folded in here instead. */
 const TEMPT_NEED=30;
+/* =====================================================================
+   THE DROP — her side of the same room
+   ---------------------------------------------------------------------
+   Tempting is a thing that happens TO a male player: she stoops, and the
+   whole game is whether you keep your head. Played as a woman none of that
+   exists, so the villa was a hall you walked up and down.
+
+   This is the counterpart, and deliberately NOT a mirror of it. Something of
+   yours goes on the floor. Stooping for it is the most ordinary act in the
+   world, and it is also the one that brings him across the room — so the
+   game is a race you are running against your own husband, with one lever:
+
+     SPACE   reach for it. Twenty of them and it is in your hand.
+     W       a look back over your shoulder. It stops him where he stands —
+             and it costs you the reach, because you cannot do both.
+
+   Three looks in you, each weaker than the last. Spend them and you get your
+   comb; spend none and he is behind you before you have it. Both are valid
+   and the game does not think one of them is the win.
+   ===================================================================== */
+const DROP_PROPS=[
+  {id:'comb', line:'Your comb goes straight out of your hair and onto the tiles.',
+   draw:(x,FY)=>{ px(x-5,FY-3,11,3,'#d8c8a8'); px(x-5,FY-4,11,1,'#f0e4c8');
+     for(let i=0;i<5;i++) px(x-4+i*2,FY,1,2,'#c0ae8a'); }},
+  {id:'phial', line:'The scent bottle. Of course it is the scent bottle.',
+   draw:(x,FY,T)=>{ px(x-3,FY-7,6,7,'#7fb8d0'); px(x-3,FY-7,6,2,'#b8e0f0');
+     px(x-1,FY-9,2,2,'#e8c34a');
+     ctx.globalAlpha=0.40; px(x-8-Math.sin(T*0.06)*2,FY-1,16,2,'#cfe8f4'); ctx.globalAlpha=1; }},
+  {id:'pin', line:'A hairpin. Somewhere under the couch, by the sound of it.',
+   draw:(x,FY)=>{ px(x-6,FY-2,13,2,'#e8c34a'); px(x-6,FY-2,13,1,'#fff0b0');
+     px(x+5,FY-4,3,3,'#e8c34a'); px(x+5,FY-4,3,1,'#fff0b0'); }},
+  {id:'spindle', line:'The whole spindle, and the thread with it, right across the floor.',
+   draw:(x,FY,T)=>{ px(x-2,FY-9,4,9,'#8a6a3e'); px(x-2,FY-9,1,9,'#b08c56');
+     px(x-5,FY-4,10,4,'#d8b8d0'); px(x-5,FY-4,10,1,'#f0d8ea');
+     ctx.globalAlpha=0.6; for(let i=0;i<9;i++) px(x+4+i*2,FY-1-((i+((T*0.1)|0))%2),2,1,'#d8b8d0');
+     ctx.globalAlpha=1; }},
+  {id:'ring', line:'Your ring. It has gone under something, obviously.',
+   draw:(x,FY,T)=>{ const b2=((T*0.08)|0)%2;
+     px(x-2,FY-3,5,5,'#e8c34a'); px(x-1,FY-2,3,3,'#2a1c12');
+     px(x-2,FY-3,5,1,'#fff0b0'); if(!b2) px(x+3,FY-5,1,1,'#fffdf0'); }},
+];
+const DROP_NEED=20;          // reaches to get it in your hand
+const DROP_LOOKS=3;          // and the looks you have to buy yourself time with
+function dropDue(){
+  if(!G || !G.isFemale || !G.married || !G.wife || !G.wife.male || !ADULT) return false;
+  const D=DM; if(!D || D.scene || D.tempt || D.drop || D.slap || D.rslap) return false;
+  if((D.t||0) - (D.lastDropT===undefined? -9999 : D.lastDropT) < 2600) return false;
+  return Math.random() < 0.0016;                 // the same pacing the bend runs on
+}
+function startDrop(){
+  const D=DM; if(!D) return;
+  D.lastDropT=D.t;
+  const prop=pick(DROP_PROPS);
+  // it lands a little away from you, so you have to go and get it
+  const x=clamp(D.x + (Math.random()<0.5? -34 : 34), 60, 430);
+  D.drop={ ph:'fall', t:0, x, prop, reach:0, looks:DROP_LOOKS, lookT:0,
+           husbX:D.wifeX, k:0, locks:false, deliberate:false };
+  toast('💧 '+prop.line, 3000);
+}
+function updateDrop(dt){
+  const D=DM, X=D.drop; if(!X) return; X.t+=dt;
+  if(X.ph==='fall'){
+    // it is on the floor and you are free to walk. Or not — ignoring it is an answer.
+    if(X.t>1400){ D.drop=null; return; }                       // he never noticed. Fine.
+    if(Math.abs(D.x-X.x)<16 && (consume('space')||consume('attack'))){
+      X.ph='stoop'; X.t=0; X.husbX=D.wifeX; }
+  } else if(X.ph==='stoop'){
+    X.locks=true;
+    X.k=clamp(X.t/60,0,1);                                     // she goes down over a beat
+    if(X.lookT>0) X.lookT-=dt;                                 // he is frozen mid-step
+    else {
+      const closing=Math.sign(X.x-X.husbX)||1;
+      X.husbX += closing*0.62*dt;                              // and otherwise he keeps coming
+    }
+    if(consume('w')&&X.looks>0&&X.lookT<=0){
+      /* THE LOOK. It stops him — less each time, because the third one is not
+         a warning any more, it is an invitation and both of you know it. */
+      X.looks--;
+      const power=[0,42,60,84][X.looks+1] || 40;
+      X.lookT=power;
+      X.husbX -= Math.sign(X.x-X.husbX)*(6+X.looks*3);
+      X.reach=Math.max(0, X.reach-2);                          // you cannot look back AND reach
+      D.hearts.push({x:D.x,y:176,vy:0.5,life:38,c:'#9ad4ff'});
+    }
+    if(consume('space')||consume('attack')) X.reach++;
+    if(X.reach>=DROP_NEED){ X.ph='got'; X.t=0; }
+    else if(Math.abs(X.husbX-X.x)<13){
+      X.deliberate = (X.reach < DROP_NEED*0.34);               // you barely tried, and he noticed
+      X.ph='caught'; X.t=0; }
+  } else if(X.ph==='got'){
+    X.locks=true;
+    if(X.t>130){ const de=X.looks;
+      D.drop=null; D.wifePause=0;
+      G.dropsKept=(G.dropsKept||0)+1;
+      G.honor=clamp((G.honor||50)+1,0,100);
+      toast(de===DROP_LOOKS
+        ? '🪮 You have it, and he never moved. He is reading. He says he is reading.'
+        : '🪮 You have it. He is standing rather closer than he was, with nothing to say for himself.',4200);
+      saveQuiet(); }
+  } else if(X.ph==='caught'){
+    X.locks=true;
+    if(X.t>150){ const ax=X.x, del=X.deliberate; D.drop=null; D.wifePause=0;
+      G.dropsCaught=(G.dropsCaught||0)+1;
+      /* THE CHILDREN ARE STILL THE CHILDREN. Whatever this was going to be, it
+         is not going to be it with the hall full — same line every other scene
+         in this house draws. */
+      if(privacyNeeded('romantic')){ toast(privacyRefusal('romantic'),3400); saveQuiet(); return; }
+      if(loveLeft('quick')>0 && spouseWilling()) startVillaLove(ax, del);
+      else { G.wifeRel=clamp(G.wifeRel+(del?4:2),0,bondCeiling());
+        toast(del? '💞 “You were not even trying.” “No.”' : '💞 He gets there first, and picks it up for you. Slowly.',4000);
+        saveQuiet(); } }
+  }
+}
+function drawDrop(){
+  const D=DM, X=D.drop; if(!X) return; const FY=214, w=G.wife, T=D.t;
+  // ---- the thing on the floor ----
+  if(X.ph!=='got'){ try{ X.prop.draw(X.x, FY, T); }catch(e){} }
+  if(X.ph==='fall'){
+    const near=Math.abs(D.x-X.x)<16;
+    if((T|0)%26<15){ ctx.textAlign='center';
+      pixelText('▾', X.x, FY-18, near? '#e8c34a':'rgba(232,195,74,.5)', 1); ctx.textAlign='left'; }
+  }
+  // ---- HER, stooping for it ----
+  if(X.ph==='stoop'||X.ph==='got'||X.ph==='caught'){
+    const up = X.ph==='got'? clamp(1-X.t/50,0,1) : 1;
+    drawWifeFig(ctx, D.x, FY, playerLook(), X.k*up, 'bend');
+    if(X.ph==='got' && X.t<50){ ctx.textAlign='center';
+      pixelText('✓', D.x, FY-56, '#7ad48a', 1.2); ctx.textAlign='left'; }
+  }
+  // ---- HIM, crossing the room, or stopped dead by a look ----
+  if(X.ph==='stoop'||X.ph==='caught'){
+    const frozen=X.lookT>0;
+    ctx.save(); ctx.translate(X.husbX, FY);
+    if(X.x<X.husbX) ctx.scale(-1,1);
+    drawHusbandFig(ctx,0,0,G.wifeRel|0,w.skin,w.dress,w, frozen?0:T*0.22, frozen?'idle':'walk');
+    ctx.restore();
+    if(frozen && (T|0)%14<8){ ctx.textAlign='center';
+      pixelText('…', X.husbX, FY-58, '#9ad4ff', 1); ctx.textAlign='left'; }
+  }
+  // ---- the bars ----
+  if(X.ph==='stoop'){
+    const bx=W/2-70, by=H-40, bw=140, bh=9;
+    px(bx-2,by-2,bw+4,bh+4,'#120c08');
+    px(bx,by,bw,bh,'#2e2218'); px(bx,by,bw,1,'#4a3826');
+    const f=clamp(X.reach/DROP_NEED,0,1);
+    px(bx,by,bw*f,bh,'#e8c34a'); px(bx,by,bw*f,1,'#fff0b0');
+    // how close he is, running the other way along the same bar
+    const hf=clamp(1-Math.abs(X.husbX-X.x)/120,0,1);
+    px(bx,by+bh+2,bw*hf,2, hf>0.72? '#e0705b':'#a06a5b');
+    // the looks you have left
+    for(let i=0;i<DROP_LOOKS;i++)
+      px(bx+bw/2-13+i*10, by-9, 7, 3, i<X.looks? '#9ad4ff':'#4a3826');
+    ctx.textAlign='center';
+    pixelText('REACH FOR IT — SPACE      ·      W: A LOOK BACK ('+X.looks+')', W/2, 26, '#ffd0da', 1.02);
+    if(hf>0.78) pixelText('— he is right behind you —', W/2, by+22, 'rgba(255,190,170,.9)', 1);
+    else if(X.lookT>0) pixelText('— he has stopped —', W/2, by+22, 'rgba(190,214,255,.85)', 1);
+    ctx.textAlign='left';
+  }
+  if(X.ph==='caught'){ ctx.textAlign='center';
+    pixelText(X.deliberate? '“…you were not even trying.”' : '“Allow me.”',
+      W/2, 40, '#ffd0da', 1.05); ctx.textAlign='left'; }
+}
 function temptDue(){
   if(!G || !G.married || !G.wife || !ADULT) return false;
   if(!hasTrait('tempting')) return false;
@@ -12507,6 +12671,7 @@ function drawDomus(){
       if(D.rslap){ drawRomantic(); }                    // the other kind of reminder
       else if(D.slap){ drawSlap(); }                    // she is being reminded you are in the room
       else if(D.tempt){ drawTempt(); }                  // she is busy with the low shelf
+      else if(D.drop && D.drop.ph!=='fall'){ /* the drop draws him where HE is, not where he idles */ }
       else if(w.male) drawHusbandFig(ctx,D.wifeX,FY,G.wifeRel|0,w.skin,w.dress,w,wPh,wMode);
       else drawWifeFig(ctx,D.wifeX,FY,w,wPh,wMode);
     }
@@ -12532,7 +12697,8 @@ function drawDomus(){
     /* THE ROMANTIC SCENE DRAWS ITS OWN MALE. This ran unconditionally, so his
        ordinary walking sprite stayed on screen standing next to the undressed
        one the scene was drawing — two of him, every time. */
-    if(!D.rslap){ const mv=(held.a||held.d), run=mv&&held.s, turning=(D.turn||0)>0;
+    if(D.drop) drawDrop();                              // the floor, her, and him crossing to it
+    if(!D.rslap && !(D.drop && D.drop.ph!=='fall')){ const mv=(held.a||held.d), run=mv&&held.s, turning=(D.turn||0)>0;
       drawDomusPlayer(D.x,FY,
         turning? 1-(D.turn/14) : (mv? D.t*(run?0.6:0.35) : 0),
         turning? 'turn' : (run?'run':(mv?'walk':'idle'))); }
@@ -12555,7 +12721,8 @@ function drawDomus(){
       pixelText('▾', who, FY-52, col, 1);
       ctx.textAlign='left'; }
     let prompt='';
-    if(D.x>452) prompt='SPACE: LEAVE THE HALLS';
+    if(D.drop && D.drop.ph==='fall' && Math.abs(D.x-D.drop.x)<16) prompt='SPACE: 🪮 STOOP FOR IT';
+    else if(D.x>452) prompt='SPACE: LEAVE THE HALLS';
     else if(G.hasPool&&Math.abs(D.x-86)<36) prompt='SPACE: BATHE'+(G.married?'  ·  W: INVITE '+(w&&w.male?'HIM':'HER'):'');
     else if(G.hasWardrobe&&Math.abs(D.x-309)<20) prompt=G.married?'SPACE: …THE WARDROBE 😏':'SPACE: WARDROBE';
     else if(Math.abs(D.x-414)<16) prompt='SPACE: THE BEDCHAMBER ('+bedLen.toUpperCase()+')';
@@ -18295,6 +18462,7 @@ window.__SS = {
   romanticVerdict, startRomantic, updateRomantic, drawRomantic, drawRomanticFem,
   kidsPresent, villaClear, privacyNeeded, privacyRefusal, clearTheVilla, BABY_YEARS,
   privacyTier, watchersPresent, qText, drawManFace, hasMyQuirk,
+  DROP_PROPS, DROP_NEED, DROP_LOOKS, dropDue, startDrop, updateDrop, drawDrop,
   FAMILY_EVENTS, familyDue, maybeFamily, openFamilyEvent, kidBand, kidAgeYears, heirPressure,
   SIBLING_LINES, siblingAside, drawDomus, romanticSwing, STRIKES,
   spouseTierName, tierBadge, slapLabel, drawSlap, startSlapAnim, startRomantic, drawHusbandFig, drawVillaMale,
