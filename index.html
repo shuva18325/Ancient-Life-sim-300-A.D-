@@ -8615,6 +8615,26 @@ function spouseTierBonus(){
   }[st.name] || {mult:1, fert:0, pop:0, col:'#e8a04a'};
   return Object.assign({name:st.name}, T);
 }
+/* THE ODDS OF AN HEIR, in one place. This calculation lived inline inside
+   finishBed, so the villa could not ask the same question without copying it —
+   and a copy drifts. Both callers read it from here now. */
+function conceiveChance(base, w, tierFert){
+  return base + (G.honor/400)
+    + (w && w.build!=='slender' && w.build!=='slight'? 0.06 : 0)
+    + (G.wifeRel/500)
+    + (hasTrait('fertile')?0.22:0) + (hasQuirk('insatiable')?0.16:0)
+    + (hasQuirk('nightowl')?0.07:0) + (hasBoon('goldenwomb')?0.34:0)
+    - (hasFlaw('barren')?0.28:0) - (hasFlaw('sickly')?0.10:0)
+    + (tierFert||0);
+}
+// the villa's own try, on the same odds a quick session gets
+function villaConceive(){
+  if(!G.married || !G.wife || G.pregnant) return false;
+  const TB=spouseTierBonus();
+  const hit = Math.random() < conceiveChance(0.32, G.wife, TB.fert);
+  if(hit) G.pregnant={due:G.day+27};
+  return hit;
+}
 function finishBed(){
   const mode=BC.mode, w=G.wife, len=BC.len||'quick';
   const TB=spouseTierBonus();                                       // the tier on the wall, cashed in
@@ -8650,8 +8670,7 @@ function finishBed(){
     return;
   }
   const base= len==='night'?0.55 : len==='long'?0.42 : 0.32;        // the gods favour the thorough
-  const chance=base + (G.honor/400) + (w&&w.build!=='slender'&&w.build!=='slight'?0.06:0) + (G.wifeRel/500) + (hasTrait('fertile')?0.22:0) + (hasQuirk('insatiable')?0.16:0) + (hasQuirk('nightowl')?0.07:0) + (hasBoon('goldenwomb')?0.34:0) - (hasFlaw('barren')?0.28:0) - (hasFlaw('sickly')?0.10:0)
-    + TB.fert;                                                      // and the tier of the match itself
+  const chance=conceiveChance(base, w, TB.fert);
   const hit=Math.random()<chance;
   if(hit && !G.pregnant) G.pregnant={due:G.day+27};
   G.wifeRel=clamp(G.wifeRel+(len==='night'?4:len==='long'?3:2),0,bondCeiling());
@@ -9563,17 +9582,28 @@ function drawShadowPlay(s,T){
         headAng:0.16+tl*0.02+dr*0.30,                                     // and her head goes back with it
         legs:[[0.05+dr*0.10,-2],[-0.02-dr*0.06,2]],
         arms:[[-1.30-dr*0.22,10,0.95],[0.30-dr*0.30,10,0.55]]});
+      /* WHERE THE CONTACT IS. Both his hands used to climb her BACK on the press,
+         which is the only thing that moved below her shoulders — so the whole
+         pose read as a man rubbing someone's back. They are pressed front to
+         front standing up; the contact is at the HIPS. One hand stays low and
+         holds her there, the other is the only one that travels, and the join
+         itself is drawn between them instead of being left to the imagination. */
       const HIM=rfig({x:hx, y:base, male:true, headAng:-0.13-dr*0.16, face:1, crouch:dr*0.09,
         legs:[[-0.04,-2],[0.06,2]],
-        arms:[[0.12-dr*0.55,13,0.42],[0.42-dr*0.30,13,0.30]]});           // both hands travelling UP her back
+        arms:[[0.62-dr*0.14,13,0.30],[0.30-dr*0.42,13,0.34]]});           // one low and staying, one travelling
       // her hand, ARRIVING somewhere: his jaw, not the air beside it
       { const fs=_sk(false), jx=hx+5, jy=HIM.shY-7+br-lift*0.4;
         rlimb(wx-4,HER.shY-1, jx+2,jy, 2.6,2.2, fs); px(jx,jy-1,4,3,fs);
         px(jx,jy-1,4,1,_hi(fs)); }
-      // and his, at the small of her back — they climb as the press builds
-      { const ms=_sk(true), hy=HIM.hipY-2-dr*9;
-        px(wx-3,hy,5,4,ms); px(wx-3,hy,5,1,_hi(ms));
-        px(wx-4,HIM.hipY,5,4,mixHex(ms,'#2a150a',0.22)); }
+      // THE JOIN — the two of them meeting at the hip, and it moves with the beat
+      if(on){ const ms=_sk(true);
+        rphallus(hx+7, HIM.hipY+3, 1, 0.30+dr*0.55);                      // implied, and under the band
+        // his hand LOW, holding her against him — this one does not travel
+        px(wx+1,HER.hipY+2,6,5,ms); px(wx+1,HER.hipY+2,6,1,_hi(ms));
+        px(wx+1,HER.hipY+7,6,2,mixHex(ms,'#2a150a',0.26));
+        // and the other one, which is the one that moves, at the small of her back
+        px(wx-2,HIM.hipY-8-dr*7,5,4,mixHex(ms,'#2a150a',0.16)); }
+      else { const ms=_sk(true); px(wx-3,HIM.hipY-2,5,4,ms); }
       if(on){
         px(cx0-2,HIM.shY-8+br,5,2,'rgba(255,232,206,.9)');
         for(let i=0;i<4;i++){ const rr=(T*0.7+i*7)%20;
@@ -9585,7 +9615,7 @@ function drawShadowPlay(s,T){
           px(hx-15,HIM.shY+10,6,1,'rgba(255,226,190,.9)'); ctx.globalAlpha=1; }
         HB(cx0,base-94,8);
       }
-      veil(cx0+dr*1.6, HER.hipY+1, 23-gap*1.6, 6, 0);                     // hips — no band across a gap still open
+      veil((hx+wx)/2+2+dr*1.4, HER.hipY+3, 24-gap*1.6, 7, 0);             // right on the join, and it rides the beat
       veil(wx-1, HER.shY+5, 13, 4, 1.9);                                  // and her chest, slimmer than his shoulders
       woad(hx-6,base-46);
     } else {
@@ -10578,9 +10608,16 @@ function drawWifeFig(c,x,y,w,ph,mode){
     const bT = be>=9?4 : be>=7?3 : be>=5?2 : be>=3?1 : 0;
     const flare=[0,1,2,3,4][bT], deep=[6,7,8,9,10][bT];
     const back=Math.round(lean*5);                            // hips counterweight BACKWARD
-    // ---- legs, braced, slightly apart ----
-    P(-5-back, -legL2-2, 4, legL2, sSh);  P(-6-back, -2, 5, 2, '#6a4426');
-    P( 1-back, -legL2-2, 4, legL2, skin); P( 1-back, -2, 5, 2, '#8a5c34');
+    // ---- the shadow she casts, which is what puts her ON the floor ----
+    { c.globalAlpha=0.26; c.fillStyle='#120b08';
+      c.beginPath(); c.ellipse(x-back+lean*5, y-1, 13+lean*7, 3.2, 0,0,7); c.fill(); c.globalAlpha=1; }
+    // ---- legs, braced, slightly apart, with the far one held back in shade ----
+    P(-5-back, -legL2-2, 4, legL2, sSh);  P(-5-back, -legL2-2, 1, legL2, shade(skin,-40));
+    P(-6-back, -2, 5, 2, '#6a4426');      P(-6-back, -2, 5, 1, '#8a6a3a');
+    P( 1-back, -legL2-2, 4, legL2, skin); P( 1-back, -legL2-2, 1, legL2, shade(skin,18));
+    P( 4-back, -legL2-2, 1, legL2, sSh);
+    P( 1-back, -2, 5, 2, '#8a5c34');      P( 1-back, -2, 5, 1, '#a87446');
+    if(lean>0.4){ P(-1-back, -legL2+1, 2, 3, sSh); P(4-back, -legL2+2, 1, 4, sSh); }   // the backs of the knees
     // ---- THE HEM RIDES UP. This is the whole tease, and it is on a curve. ----
     const hemH=Math.round(17-lean*9);
     const seatTop=hy-1-Math.round(lean*6);                     // the seat climbs to become the top of her
@@ -10597,17 +10634,26 @@ function drawWifeFig(c,x,y,w,ph,mode){
         P(-bw-back, yAt, bw*2, bh, dress);
         if(bi===0) P(-bw-back, yAt, bw*2, 1, dHi);
         if(bi>=1 && bT>=2){ P(-bw-back, yAt, 1, bh, dHi); P(bw-1-back, yAt, 1, bh, dSh); }
+        if(bi===3) P(-bw+1-back, yAt+bh-1, bw*2-2, 1, shade(dress,-38));   // the fold underneath it
         yAt+=bh; });
+      { const bwT=Math.round((hipW2+flare)*0.74*(1+lean*0.26));            // and a crown of light on top
+        P(-bwT-back, seatTop-1, bwT*2, 1, shade(dress,34)); }
       if(bT>=4) P(-2-back, seatTop+2, 4, deep-3, shade(dress,-30));
-      // the hem, shorter at every stage, and the fold of it
+      // the hem, shorter at every stage — with a HEMLINE that is not a straight cut
       P(-hipW2-back, seatTop+2, hipW2*2, hemH, dress);
       P(-hipW2-back, seatTop+2, hipW2*2, 2, dHi);
-      P(-hipW2-1-back, seatTop+hemH-4, 2, 6, dSh);
-      P( hipW2-1-back, seatTop+hemH-4, 2, 6, dSh);
+      P(-hipW2-back, seatTop+3, 1, hemH-2, shade(dress,14));               // the lit edge of the cloth
+      P( hipW2-1-back, seatTop+3, 1, hemH-2, dSh);
+      for(let i=0;i<4;i++){ const fx=-hipW2+2+i*Math.max(2,Math.round(hipW2*0.55));
+        P(fx-back, seatTop+4, 1, hemH-3, dSh); }                           // and the folds running down it
+      { const hemY=seatTop+2+hemH;                                          // a scalloped hem, not a ruler line
+        for(let i=0;i<hipW2*2;i+=3) P(-hipW2+i-back, hemY-((i>>1)%2), 3, 1, dSh); }
       if(noble) P(-hipW2-back, seatTop+hemH+1, hipW2*2, 1, '#e8c34a');
       // and the bare thigh the hem has left behind — it grows every stage
-      if(lean>0.22){ const th=Math.round((lean-0.22)*17);
-        P(-5-back, seatTop+hemH+2, 4, th, sSh); P(1-back, seatTop+hemH+2, 4, th, skin); }
+      if(lean>0.22){ const th=Math.round((lean-0.22)*17), ty=seatTop+hemH+2;
+        P(-5-back, ty, 4, th, sSh);   P(-5-back, ty, 4, 1, shade(skin,-12));  // the cloth's shadow on the skin
+        P( 1-back, ty, 4, th, skin);  P( 1-back, ty, 4, 1, shade(skin,-12));
+        P( 1-back, ty, 1, th, shade(skin,20)); }                            // and the light down the near thigh
     }
     /* Placed directly rather than off an angle. Bending over is not a body
        rotating to horizontal — the seat becomes the HIGHEST point and the
@@ -10625,15 +10671,25 @@ function drawWifeFig(c,x,y,w,ph,mode){
         P(bx-bw, by-1, bw*2, 1, dHi); } }
     // what hangs forward once she is over
     if(bu>=3 && lean>0.25){ const bw2=bustW, bh2=bustH+Math.round(lean*4);
-      P(shX-bw2-1, shY+1, bw2, bh2, dress); P(shX-bw2-1, shY+1, bw2, 1, dHi);
-      P(shX+1,     shY+1, bw2, bh2, dress); P(shX+1,     shY+1, bw2, 1, dHi); }
+      P(shX-bw2-1, shY+1, bw2, bh2, dress);   P(shX-bw2-1, shY+1, bw2, 1, dHi);
+      P(shX-bw2-1, shY+bh2, bw2, 1, dSh);
+      P(shX+1,     shY+1, bw2, bh2, dress);   P(shX+1,     shY+1, bw2, 1, dHi);
+      P(shX+1,     shY+bh2, bw2, 1, dSh);
+      P(shX,       shY+1, 1, bh2, shade(dress,-30)); }                      // the line between them
     // ---- head: UPRIGHT, at the end of the trunk, with the hair falling down ----
-    P(shX-2, shY-3, 5, 4, skin);                               // neck
-    P(shX-4, shY-11, 8, 8, skin); P(shX-4, shY-11, 8, 1, shade(skin,20));
+    P(shX-2, shY-3, 5, 4, skin); P(shX-2, shY-3, 5, 1, shade(skin,16));   // neck
+    P(shX-4, shY-11, 8, 8, skin); P(shX-4, shY-11, 8, 1, shade(skin,22));
+    P(shX+3, shY-10, 1, 8, sSh);                               // the shaded side of the face
     P(shX+2, shY-7, 1, 1, '#2a1a10');                          // one eye, on whatever she is after
+    P(shX+1, shY-8, 2, 1, shade(skin,-18));                    // a brow over it
+    P(shX+2, shY-4, 2, 1, mixHex(skin,'#a04a4a',0.55));        // and a mouth
+    P(shX+4, shY-8, 1, 3, skin);                               // the ear
     P(shX-5, shY-13, 10, 4, hair); P(shX-5, shY-13, 10, 1, hairHi);
+    P(shX-5, shY-13, 3, 3, hairSh);
     { const fall=Math.round(4+lean*13);                        // and it hangs straight down, which sells it
-      P(shX-6, shY-10, 3, fall, hair); P(shX+3, shY-10, 3, fall, hairSh); }
+      P(shX-6, shY-10, 3, fall, hair); P(shX-6, shY-10, 1, fall, hairHi);
+      P(shX+3, shY-10, 3, fall*0.86, hairSh);
+      for(let i=0;i<3;i++) P(shX-5+i*3, shY-10+fall-1-((i*2)%3), 1, 2+((i*3)%3), hair); }  // loose strands at the ends
     // ---- one arm reaching down for whatever it was ----
     { const reach=Math.round(7+lean*9);
       P(shX-1, shY+1, 3, reach, skin); P(shX-2, shY+reach, 5, 3, skin);
@@ -10990,6 +11046,7 @@ function updateDomus(dt){
 }
 function updateDomusScene(dt){
   const D=DM, sc=D.scene; sc.t+=dt; const T=sc.t;
+  if(sc.kind==='villalove'){ updateVillaLove(dt); return; }
   if(sc.kind==='bath'){
     if(T>10 && (T|0)%6<1) D.steam.push({x:44+Math.random()*84,y:204,vy:0.35+Math.random()*0.25,life:56+Math.random()*30});
     if(T>16&&T<18){ sfx('thud'); for(let i=0;i<8;i++) D.splash.push({x:86+rnd(-8,8),y:202,vx:rnd(-1.2,1.2),vy:rnd(-2.4,-0.8),life:26}); }
@@ -11088,8 +11145,8 @@ function updateTempt(dt){
     X.locks=true;
     if(X.t>170){ D.tempt=null; D.wifePause=0;
       G.wifeRel=clamp(G.wifeRel+6,0,bondCeiling()); G.wifePhys=clamp((G.wifePhys||45)+9,0,100);
-      saveQuiet(); toast('🍑 She was looking back the whole time. +6 💞, +9 🔥 — it was never a test.',4200);
-      if(loveLeft('quick')>0 && spouseWilling()){ spendLove('quick'); DM=null; startBedScene('fun','quick'); } }
+      saveQuiet(); toast('🍑 She was looking back the whole time. It was never a test.',3600);
+      if(loveLeft('quick')>0 && spouseWilling()) startVillaLove(X.x, true); }
   } else if(X.ph==='held'){
     X.locks=true;
     if(X.t>120){ D.tempt=null; D.wifePause=0;
@@ -11098,9 +11155,134 @@ function updateTempt(dt){
       saveQuiet(); toast('🧊 You look at the frieze. You comment on the frieze. (+1 honor — she noticed that too.)',4200); }
   } else if(X.ph==='took'){
     X.locks=true;
-    if(X.t>150){ const inv=X.invited; D.tempt=null; D.wifePause=0;
-      G.temptTook=(G.temptTook||0)+1; openTemptAftermath(); }
+    if(X.t>150){ const ax=X.x; D.tempt=null; D.wifePause=0;
+      G.temptTook=(G.temptTook||0)+1;
+      // it does NOT hand off to the bedchamber. What happens here happens HERE.
+      if(loveLeft('quick')>0 && spouseWilling()) startVillaLove(ax, false);
+      else openTemptAftermath(); }
   }
+}
+/* =====================================================================
+   THE VILLA'S OWN WOOHOO — fifteen seconds, in the room you are standing in
+   ---------------------------------------------------------------------
+   Handing off to startBedScene() teleported you into the bedchamber's
+   shadow-theatre, which is a different room, a different camera and a
+   different pair of figures — so the whole build-up in the atrium threw
+   itself away at the last moment. This plays where it started: same
+   villa, same floor, same light, her still bent over the low shelf.
+
+   And it ENDS with a decision, which is the part the theatre never had.
+   Press for LOVE and you see it — a burst of it, everywhere, and the
+   estate is no closer to an heir. Press for an HEIR and you see nothing
+   at all, because there is nothing to see: the line under it just says
+   so, and Venus does the rest.
+   ===================================================================== */
+const VILLALOVE_LEN=900;                 // 900 ticks at 60fps ≈ fifteen seconds
+function startVillaLove(atX, invited){
+  const D=DM; if(!D) return;
+  if(!spouseWilling()){ openTemptAftermath(); return; }   // she decides whether this happens at all
+  spendLove('quick');
+  D.tempt=null; D.wifePause=99999;
+  D.scene={kind:'villalove', t:0, x:clamp(atX,150,400), invited:!!invited,
+           fromTook:!invited,                    // explicit: only a FAILED hold owes her an explanation
+           choice:null, burst:[], asked:false};
+  sfx('kiss');
+}
+function villaLoveFinish(mode){
+  const D=DM, sc=D.scene; if(!sc || sc.choice) return;
+  sc.choice=mode; sc.chooseT=sc.t;
+  if(mode==='love'){                                     // and you see every bit of it
+    for(let i=0;i<64;i++) sc.burst.push({
+      x:sc.x+rnd(-3,3), y:214-30+rnd(-3,3),
+      vx:rnd(-3.4,3.4), vy:rnd(-3.6,0.6), life:rnd(30,74), r:rnd(1,2.4)});
+    sfx('giggle');
+  }
+}
+function updateVillaLove(dt){
+  const D=DM, sc=D.scene, T=sc.t;
+  for(const b of sc.burst){ b.x+=b.vx*dt; b.y+=b.vy*dt; b.vy+=0.13*dt; b.life-=dt;
+    if(b.y>212){ b.y=212; b.vx*=0.55; b.vy=0; } }
+  sc.burst=sc.burst.filter(b=>b.life>0);
+  if((T|0)%7<1) D.hearts.push({x:sc.x+rnd(-14,14), y:180, vy:0.5, life:46});
+  // THE ASK — it opens near the end, and it waits for you
+  if(T>640 && !sc.choice){
+    sc.asked=true;
+    if(consume('space')||consume('attack')) villaLoveFinish('love');
+    else if(consume('w')) villaLoveFinish('heir');
+    if(T>820) villaLoveFinish('love');                   // say nothing and nature decides
+  }
+  if(sc.choice && sc.t - sc.chooseT > 170){
+    const mode=sc.choice;
+    D.scene=null; D.wifePause=0;
+    G.wifeRel=clamp(G.wifeRel+(mode==='love'?9:6),0,bondCeiling());
+    G.wifePhys=clamp((G.wifePhys||45)+(mode==='love'?12:9),0,100);
+    G.hygiene=clamp((G.hygiene|0)-6,0,100);
+    G.lastLoveDay=G.day;
+    let got=false;
+    if(mode==='heir'){ G.villaHeirTry=(G.villaHeirTry||0)+1; got=villaConceive(); }
+    refreshStatbar(); saveQuiet();
+    toast(mode==='love'
+      ? '💞 Fifteen minutes and the whole household pretending not to notice. +9 💞, +12 🔥.'
+      : (got? '🌾 Held — and it took. Weeks from now you will both be certain. +6 💞, +9 🔥.'
+             : '🌾 Held. Every drop of it. +6 💞, +9 🔥 — and Venus was not listening today.'), 5200);
+    if(sc.fromTook) openTemptAftermath();       // and she still wants to hear it
+  }
+  if(T>VILLALOVE_LEN+400){ D.scene=null; D.wifePause=0; }   // a hard floor, so it can never wedge
+}
+function drawVillaLove(){
+  const D=DM, sc=D.scene, T=sc.t, FY=214, w=G.wife, X=sc.x;
+  const heat=clamp(T/560,0,1);
+  const beat=Math.max(0,Math.sin(T*(0.20+heat*0.26)));       // it builds over the fifteen seconds
+  const dr=sc.choice? Math.max(0,1-(T-sc.chooseT)/60) : beat;
+  // the room dims to a pool of lamplight around the two of them
+  ctx.globalAlpha=0.30+heat*0.26; px(-4,-4,W+8,H+8,'#160b12'); ctx.globalAlpha=1;
+  { const g=ctx.createRadialGradient(X,FY-34,6,X,FY-34,86+heat*22);
+    g.addColorStop(0,'rgba(255,206,150,'+(0.26+heat*0.14)+')');
+    g.addColorStop(1,'rgba(0,0,0,0)'); ctx.fillStyle=g; ctx.fillRect(0,60,W,H-60); }
+  // the crate she was reaching for, still there, being knocked about
+  px(X+(D.face>0?16:-24)+Math.sin(T*0.4)*dr, FY-7, 9,7,'#7a5c34');
+  // HER, still bent over it, riding the beat
+  drawWifeFig(ctx, X+dr*2.4, FY, w, 1, 'bend');
+  // HIM, behind her, and he is the one driving
+  drawDomusPlayer(X-20+dr*4.6, FY, T*0.18, 'idle');
+  // the join, veiled — the same warm band the theatre uses
+  { const bx=X-9+dr*3, by=FY-24, bw=22, bh=6;
+    ctx.globalAlpha=0.52; ctx.fillStyle='#efe6d6';
+    ctx.fillRect(Math.round(bx),Math.round(by),bw,bh);
+    ctx.globalAlpha=0.26; ctx.fillRect(Math.round(bx-3),Math.round(by+1),bw+6,bh-2);
+    ctx.globalAlpha=1; }
+  // and the rhythm reads in the air behind him
+  if(beat>0.8){ ctx.globalAlpha=0.22;
+    px(X-34,FY-30,7,1,'rgba(255,226,190,.9)'); px(X-32,FY-22,6,1,'rgba(255,226,190,.9)');
+    ctx.globalAlpha=1; }
+  ctx.textAlign='center';
+  // ---- THE FINISH ----
+  if(sc.choice==='love'){
+    for(const b of sc.burst){ ctx.globalAlpha=clamp(b.life/40,0,1);
+      px(b.x,b.y,Math.round(b.r*1.6),Math.round(b.r*1.4),'#f6f2ea');
+      px(b.x,b.y,Math.round(b.r),1,'#ffffff'); }
+    ctx.globalAlpha=1;
+    const fl=clamp(1-(T-sc.chooseT)/26,0,1);
+    if(fl>0){ ctx.globalAlpha=fl*0.6; px(-4,-4,W+8,H+8,'#fff6ea'); ctx.globalAlpha=1; }
+    pixelText('~ and you did not even try to be quiet about it ~', W/2, 46, '#fff0dc', 1.05);
+  } else if(sc.choice==='heir'){
+    // there is deliberately NOTHING to see here. The line is the whole event.
+    const fl=clamp(1-(T-sc.chooseT)/40,0,1);
+    if(fl>0){ ctx.globalAlpha=fl*0.20; px(-4,-4,W+8,H+8,'#e0a060'); ctx.globalAlpha=1; }
+    pixelText('~ contained. held. every drop of it. ~', W/2, 46, '#ffd9a0', 1.05);
+    pixelText('~ Venus has been asked, and Venus decides ~', W/2, 58, 'rgba(255,208,150,.75)', 1);
+  } else if(sc.asked){
+    // the ask itself, and the bar that runs out if you sit on your hands
+    const left=clamp(1-(T-640)/180,0,1);
+    px(W/2-60, 30, 120, 4, '#2a1620'); px(W/2-60, 30, Math.round(120*left), 4, '#e8c34a');
+    pixelText('SPACE — FOR LOVE            W — FOR AN HEIR', W/2, 24, '#ffd0da', 1.05);
+    pixelText('love: you will see it. an heir: you will not.', W/2, 44, 'rgba(240,212,220,.8)', 1);
+  } else {
+    if(T<70)  pixelText('~ “…the door is shut. Come here.” ~', W/2, 40, 'rgba(255,214,190,.9)', 1.05);
+    else if(T>320 && T<420) pixelText('~ the household has found somewhere else to be ~', W/2, 40, 'rgba(255,214,190,.7)', 1);
+    else if(T>500) pixelText('~ ' + (heat>0.9?'nearly':'not much longer') + ' ~', W/2, 40, 'rgba(255,200,180,.7)', 1);
+  }
+  ctx.textAlign='left';
 }
 function drawTempt(){
   const D=DM, X=D.tempt; if(!X) return; const FY=214, w=G.wife;
@@ -11134,7 +11316,10 @@ function drawTempt(){
     pixelText('“…fine frieze, that.”', W/2, 40, '#9ad4ff', 1.05); ctx.textAlign='left'; }
   if(X.ph==='took'){
     ctx.textAlign='center';
-    pixelText('“— MARCUS.”'.replace('MARCUS',(G.name||'YOU').toUpperCase()), W/2, 40, '#ff8a8a', 1.1);
+    // he makes a pass — hands on her hips — and she answers it. What she is
+    // cross about is the ROOM, and the line says so before anything else does.
+    pixelText('“— '+((G.name||'YOU').toUpperCase())+'. Not HERE.”', W/2, 36, '#ff8a8a', 1.1);
+    if(X.t>60) pixelText('“…the door. Get the door.”', W/2, 50, '#ffc0b0', 1.02);
     ctx.textAlign='left';
     if((D.t|0)%5<3){ ctx.globalAlpha=0.16; px(-4,-4,W+8,H+8,'#e0533a'); ctx.globalAlpha=1; }
     for(let i=0;i<4;i++){ const hy=(X.t*0.7+i*14)%34;
@@ -11152,9 +11337,10 @@ function openTemptAftermath(){
   const card=document.createElement('div'); card.className='shopcard'; card.style.borderColor='#e0705b';
   card.innerHTML=`<div><b style="color:#e0705b">🍑 SHE STRAIGHTENED UP</b></div>
     <div style="margin-top:4px;font-size:13px;color:#ffd8e6">${pick([
-      '“I was getting the oil. The OIL.”',
-      '“Half the household is in this room.”',
-      '“You could not wait until the door was shut?”'])}</div>
+      '“I was getting the oil. The OIL. In front of the kitchen girl.”',
+      '“Half the household is in this room. HALF of it.”',
+      '“You could not have walked four steps and shut the door first?”'])}</div>
+    <div class="small muted" style="margin-top:2px;font-style:italic">Her objection is the room, and she has been clear about that.</div>
     <div class="small muted" style="margin-top:3px">— ${w.name.split(' ')[0]}, who has not moved</div>
     <div style="margin-top:5px">${traitsHtml(w)}</div>
     <div class="small" style="margin-top:4px">💞 bond <b>${G.wifeRel|0}</b> · caught <b>${G.temptTook||0}×</b> · resisted <b>${G.temptHeld||0}×</b></div>`;
@@ -11242,7 +11428,8 @@ function drawDomus(){
   px(-4,H-14,W+8,18,'#0a0705');
   // actors
   const sc=D.scene, w=G.wife;
-  if(!sc){
+  if(sc && sc.kind==='villalove'){ drawVillaLove(); }
+  else if(!sc){
     if(G.married && w){
       const turning = (D.wifeTurn||0)>0, tp = turning? 1-(D.wifeTurn/16) : 0;
       const moving = !turning && D.wifePause<=0;
@@ -16658,7 +16845,9 @@ window.__SS = {
   WIFE_QUIRKS, rollQuirks, hasQuirk, quirkById, quirkLabel, ensureQuirks, traitChip, traitsDetailHtml,
   WIFE_BOONS, WIFE_BANES, rollBoons, rollBanes, hasBoon, hasBane, boonById, baneById, CHIP_TIERS, bondCeiling,
   SPOUSE_ASKS, spouseAskDue, openSpouseAsk, maybeSpouseAsk, spouseExcuse, festivalToday, FESTIVALS,
-  temptDue, startTempt, updateTempt, drawTempt, openTemptAftermath, TEMPT_NEED,
+  temptDue, startTempt, updateTempt, drawTempt, openTemptAftermath, TEMPT_NEED, updateDomusScene,
+  startVillaLove, updateVillaLove, drawVillaLove, villaLoveFinish, VILLALOVE_LEN,
+  conceiveChance, villaConceive,
   figureScore, selfStage, stageIndex, courtBonus, courtCultivateCost, COURT_LEVERS, SHADOW_STAGES, shadowStage,
   drawHusbandFigTest:drawHusbandFig, drawGroomPortrait, briadeImg, openPortrait,
   drawKinPortrait, kinLook, kinInherit, kinAge, ageMarks, greyHair, agedSkin, mixHex,
