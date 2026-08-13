@@ -76,11 +76,19 @@
     text-shadow:1px 1px 0 #000;transform:translate(-50%,-50%);transition:transform .06s;z-index:2;
     user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent;touch-action:manipulation;}
   .region:hover{transform:translate(-50%,-50%) scale(1.18);z-index:6;filter:brightness(1.3);}
-  .region.owned{background:linear-gradient(#f3d876,#d1a52f);color:#3a2400;border-color:#fff;}
-  .region.locked{filter:grayscale(1) brightness(.55);cursor:not-allowed;}
-  .region.cur{background:var(--blood);border-color:var(--gold);box-shadow:0 0 0 2px var(--gold);}
+  /* OWNED HAS TO WIN. All five of these are (0,2,0) specificity, so the LAST
+     one written takes the background — and .cur, .done and .imperial were all
+     written after .owned. Hold the entire empire and the province you happened
+     to be standing in was still blood-red, and Italia was still purple, so the
+     map never actually went gold no matter how much of it was yours.
+     Every background that is not ownership goes first; owned goes last and
+     wins; and "you are here" becomes a RING, which sits on top of any of them. */
   .region.done{background:var(--green);}
   .region.imperial{background:#5a2d8a;border-color:var(--gold);}
+  .region.cur:not(.owned){background:var(--blood);border-color:var(--gold);}
+  .region.owned{background:linear-gradient(#f3d876,#d1a52f);color:#3a2400;border-color:#fff;}
+  .region.cur{box-shadow:0 0 0 2px var(--gold),0 0 0 4px #1a1008;}
+  .region.locked{filter:grayscale(1) brightness(.55);cursor:not-allowed;}
   .dot{width:10px;height:10px;background:var(--gold);border:2px solid #000;display:inline-block;}
   .toast{position:absolute;left:50%;top:46%;transform:translateX(-50%);z-index:30;
     padding:12px 18px;text-align:center;font-size:clamp(10px,2.4vw,20px);
@@ -1294,21 +1302,48 @@ function drawOutfitM(P,C,style,o){
   const lF=o.lF||0, lB=o.lB||0, legW=o.legW||5;
   const TOP=-52, HEM=-24;
   if(style==='military'){
-    // A MUSCLED CUIRASS, pteruges, and the general's cloak over one shoulder
-    const cw=Math.round(shW*0.92);
-    P(-cw,TOP+2,cw*2,17,'#9a7838'); P(-cw,TOP+2,cw*2,2,'#d8b45a');            // bronze plate
-    P(cw-2,TOP+3,2,16,'#6a5020');
-    P(-cw+2,TOP+5,cw-2,4,'#b8944a'); P(2,TOP+5,cw-2,4,'#b8944a');             // the pectorals, embossed
-    P(-1,TOP+5,2,10,'#7a5c26');                                                // sternum groove
-    P(-cw+2,TOP+11,cw*2-4,1,'#6a5020'); P(-cw+3,TOP+13,cw*2-6,1,'#6a5020');   // the abdominals
-    P(-cw+3,TOP+15,cw*2-6,1,'#6a5020');
-    for(let i=0;i<7;i++){ const x=-cw+1+i*((cw*2-2)/7);                        // pteruges hanging off it
-      P(x,TOP+19,3,7,'#7a5430'); P(x,TOP+19,1,7,'#a0764a'); P(x,TOP+25,3,1,'#4a3018'); }
-    P(-shW-3,TOP,4,10,'#8a2020'); P(-shW-3,TOP,4,2,'#b83434');                 // the paludamentum
-    P(-shW-3,TOP+9,5,14,'#8a2020'); P(-shW-3,TOP+9,2,14,'#a02a2a');
-    P(-shW-2,TOP-1,3,3,GOLD); P(-shW-2,TOP-1,2,1,GH);                          // pinned with a brooch
-    P(-shW-2,TOP+2,4,14,'#9a7838'); P(shW-2,TOP+2,4,14,'#9a7838');             // shoulder guards
-    P(-shW-2,TOP+2,1,14,'#d8b45a'); P(shW+1,TOP+2,1,14,'#6a5020');
+    /* A MUSCLED CUIRASS. This was a flat olive slab of ONE constant width with
+       two rectangles stuck on for pectorals, three ruled lines for abdominals,
+       and a solid brown block of pteruges under it — a sandwich board hung off
+       a man, with his arms behind it and a white hem poking out below. It now
+       follows the taper of the body inside it (rowW, the same curve the tunic
+       uses), the muscling is SHADED rather than outlined, and the straps hang
+       separately with daylight between them. */
+    const BR='#a8853e', BRH='#e2be6a', BRS='#6a5020', BRM='#8d6f33';
+    const PT='#8a5c34', PTH='#ab7549', PTS='#4a3018';
+    const CH=20;                                                    // rows of plate
+    // ---- the plate, row by row, narrowing where he narrows ----
+    for(let ry=0; ry<CH; ry++){
+      const t=ry/(CH-1), hw=Math.max(4, Math.round(rowW(t*0.62)*0.95));
+      const y2=TOP+2+ry;
+      P(-hw,y2,hw*2,1,BR);
+      P(-hw,y2,1,1,BRH); P(hw-1,y2,1,1,BRS);                        // lit edge, shadowed edge
+      if(ry===0) P(-hw,y2,hw*2,1,BRH);                              // the collar catches the light
+    }
+    // ---- the muscling, shaded into the plate instead of drawn on top ----
+    { const pw=Math.max(3,Math.round(rowW(0.10)*0.52));
+      P(-pw-1,TOP+5,pw,4,BRM); P(2,TOP+5,pw,4,BRM);                 // pectorals, soft
+      P(-pw-1,TOP+5,pw,1,BRH);  P(2,TOP+5,pw,1,BRH);
+      P(-1,TOP+4,2,9,BRS);                                          // the sternum groove
+      for(let i=0;i<3;i++){ const aw=Math.max(2,Math.round(rowW(0.34+i*0.10)*0.46));
+        P(-aw,TOP+12+i*3,aw*2,1,BRS);                               // abdominals, shrinking downward
+        P(-aw,TOP+13+i*3,aw*2,1,BRM); } }
+    // ---- pteruges: separate straps, with gaps you can see between ----
+    { const hw=Math.max(4,Math.round(rowW(0.62)*0.95)), n=6, span=hw*2, step=span/n;
+      for(let i=0;i<n;i++){
+        const x=Math.round(-hw+i*step), len=6+((i===0||i===n-1)?-1:0);
+        P(x,TOP+CH+2,Math.max(2,Math.round(step)-1),len,PT);
+        P(x,TOP+CH+2,1,len,PTH);
+        P(x,TOP+CH+1+len,Math.max(2,Math.round(step)-1),1,PTS); } }
+    // ---- shoulder guards, sitting ON the yoke rather than beside it ----
+    P(-shW-1,TOP+1,4,12,BR);  P(shW-3,TOP+1,4,12,BR);
+    P(-shW-1,TOP+1,4,1,BRH);  P(shW-3,TOP+1,4,1,BRH);
+    P(-shW-1,TOP+1,1,12,BRH); P(shW,TOP+1,1,12,BRS);
+    // ---- the paludamentum, hanging FROM the shoulder it is pinned to ----
+    P(-shW-3,TOP+2,3,9,'#8a2020');  P(-shW-3,TOP+2,1,9,'#b83434');
+    P(-shW-4,TOP+10,4,13,'#7a1c1c'); P(-shW-4,TOP+10,1,13,'#a02a2a');
+    P(-shW-4,TOP+22,4,1,'#5a1414');
+    P(-shW-2,TOP,3,3,GOLD); P(-shW-2,TOP,2,1,GH);                   // pinned with a brooch
   } else if(style==='toga'){
     // THE TOGA — six yards of wool wound round him. Read it as a broad band
     // sweeping up from the left hip across the chest to the right shoulder,
@@ -11608,6 +11643,13 @@ function drawDrop(){
 function temptDue(){
   if(!G || !G.married || !G.wife || !ADULT) return false;
   if(!hasTrait('tempting')) return false;
+  /* SHE bends. There is exactly one figure this scene knows how to draw, and
+     drawTempt paints it with drawWifeFig unconditionally — so played as a
+     woman, a husband with this trait came out as a SECOND WOMAN stooping in
+     your hall, which is confusing for reasons that go well beyond the art.
+     Played as a woman you get THE DROP instead, which is her own version of
+     the same moment and is drawn with the right two people in it. */
+  if(G.wife.male) return false;               // a husband gets THE DROP, not this
   if(kidsPresent() && !villaClear()) return false;   // she is not doing THAT with the children about
   const D=DM; if(!D || D.scene || D.tempt) return false;
   /* PACING. 0.010 a tick at sixty frames a second is a 45% chance every second
@@ -17620,7 +17662,16 @@ function drawMapCanvas(){
   // palette — printed Roman atlas
   const SEA='#a9d3e6', SEA2='#9dcadf', SEAdk='#8bbdd6';
   const LAND='#efe3c6';                     // barbaricum / Parthia (cream)
-  const EMP='#e79c86';                       // Roman Empire (salmon)
+  /* THE WHOLE MAP GOES GOLD WHEN THE WHOLE MAP IS YOURS. Province rings are
+     deliberately simplified, so they do NOT tile the empire — salmon landmass
+     shows through between them, along the frontier and inside the larger
+     provinces. Holding all seventeen still left eighteen thousand salmon
+     pixels, so the map never actually turned. The base coat is what has to
+     change: barbaricum, Parthia and the province rings all paint over it
+     afterwards exactly as they did, so only the gaps are affected. */
+  const _rom=Object.keys(PROV_SHAPES).filter(k=>(PROV_SHAPES[k].realm||'rome')==='rome');
+  const ALL_MINE = !!(G&&G.titles) && _rom.length>0 && _rom.every(id=>!!G.titles[id]);
+  const EMP = ALL_MINE? '#e0b23a' : '#e79c86';   // Roman Empire — salmon, or yours
   const CLIENT='#f2ccbc';                    // client states (pale salmon)
   const FRONT='#b0392a';                     // red imperial frontier line
   const PARTH='#8f9fd0';                      // the Parthian Empire — periwinkle steel, clearly land (not sea), clashing with Roman salmon
