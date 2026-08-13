@@ -11354,6 +11354,7 @@ function updateDomus(dt){
   if(D.slap){ updateSlap(dt); return; }
   if(D.tempt){ updateTempt(dt); if(D.tempt && D.tempt.locks) return; }
   else if(temptDue()) startTempt();
+  if(D.refuse) updateRefusal(dt);                     // a refusal plays over whatever else is happening
   if(D.husb){ updateHusbandMove(dt); return; }        // he is already crossing; nothing interrupts that
   if(D.drop){ updateDrop(dt); if(D.drop && D.drop.locks) return; }
   else if(dropDue()) startDrop();
@@ -11560,6 +11561,11 @@ function updateDrop(dt){
     if(consume('space')||consume('attack')){
       X.shakes++; X.shakeT=16;
       X.noticed += 16 + (G.body&&G.body.booty? G.body.booty*1.6 : 8);
+      /* drawWifeFig's bend ALREADY rings its own seat off slapJig — it is the
+         same spring the slap uses and it is drawn inside the figure, on the
+         figure's own tier maths. Kicking it beats painting a slab over the
+         top and guessing where the slab goes. */
+      slapKick(0.55);
       D.hearts.push({x:D.x,y:180,vy:0.55,life:44,c:'#ff9ad8'}); }
     if(X.shakeT>0) X.shakeT-=dt;
     // his own appetite decides the bar he has to clear
@@ -11751,7 +11757,10 @@ function drawHusbandMove(){
   const D=DM, H=D.husb; if(!H) return; const FY=214, w=G.wife, T=D.t;
   const j=slapJig();
   // YOU, taking it, with the spring in you
-  drawWifeFig(ctx, D.x + (H.fired? j*0.30 : 0), FY, playerLook(), 0, 'idle');
+  drawWifeFig(ctx, D.x, FY, playerLook(), H.fired? clamp(Math.abs(j)*0.05,0,0.14) : 0,
+    H.fired? 'bend' : 'idle');                    // she takes it, and the bend rings on its own
+  if(H.fired) drawSlapAfter(D.x, FY, playerLook(), H.t, H.kind,
+    !!(H.v && (H.v.bond||0)>=0));
   // HIM, arriving on his own account
   ctx.save(); ctx.translate(H.x, FY);
   if(D.x < H.x) ctx.scale(-1,1);
@@ -11770,6 +11779,107 @@ function drawHusbandMove(){
     W/2, 30, H.kind==='romantic'?'#ffd0da':'#ffd0a0', 1.05);
   ctx.textAlign='left';
 }
+/* =====================================================================
+   THE JIGGLE, AND THE ELBOW — drawn, not nudged
+   ---------------------------------------------------------------------
+   Both of these were one number added to an x coordinate: the whole figure
+   slid sideways and that was the "animation". A shake is not a body moving
+   sideways, it is a body staying put while ONE part of it does not; and a
+   shove is a shoulder and an elbow going somewhere, not a person drifting.
+   Both are painted on top of the bend now, keyed to its own colours.
+   ===================================================================== */
+function drawElbowOver(x, y, look, t){
+  /* THE ELBOW. Three beats and it is over: the shoulder drops and loads, the
+     elbow comes back hard, and she settles. */
+  const skin=look.skin||'#e6bd94', sHi=shade(skin,20), sSh=shade(skin,-26);
+  /* ANCHORED TO THE BEND, not to a pose she is not in. Built off the romantic
+     figure's numbers this drew an arm hanging in mid-air above her. In the
+     bend her shoulders are at the HEAD end — the right — and low, because she
+     is folded over; these are drawWifeFig's own. */
+  const B=look.body||{}, lg=(B.legs===undefined?6:B.legs);
+  const legLen=Math.round(9+lg*0.55);
+  const legL2=Math.max(6, legLen-2.2);
+  const shY=y-legL2-2-13;
+  x+=9;                                  // toward the shoulder, which is by her head
+  const k = t<8? t/8 : t<20? 1-(t-8)/12 : 0;                    // load, snap, settle
+  const back = t<8? -t*0.35 : t<20? (t-8)*1.25-2.8 : 0;
+  const P=(a,b2,ww,h,c2)=>{ ctx.fillStyle=c2;
+    ctx.fillRect(Math.round(x+a), Math.round(b2), Math.round(ww), Math.round(h)); };
+  if(t>26) return;
+  // the arm, cocked and then driven back
+  P(-2+back, shY+2, 4, 3, skin); P(-2+back, shY+2, 4, 1, sHi);
+  P(-6+back, shY+3, 5, 3, skin); P(-6+back, shY+3, 1, 3, sSh);
+  P(-9+back, shY+1, 4, 4, skin); P(-9+back, shY+1, 4, 1, sHi);    // the point of it
+  // the impact, on the beat it lands
+  if(t>=8 && t<15){
+    ctx.globalAlpha=clamp(1-(t-8)/7,0,1);
+    for(let i=0;i<6;i++){ const a=(i/6)*6.283, r=2+(t-8)*1.5;
+      P(-10+back+Math.cos(a)*r, shY+3+Math.sin(a)*r*0.6, 2,2,'#fff0dc'); }
+    ctx.globalAlpha=1;
+  }
+  if(k>0){ ctx.textAlign='center';
+    pixelText('💢', x-12, shY-10, 'rgba(255,180,150,'+k.toFixed(2)+')', 1.0+k*0.3);
+    ctx.textAlign='left'; }
+}
+/* THE COLOUR IT LEAVES. A slap that lands well leaves a mark and a face that
+   has an opinion about it; the other kind leaves the same mark and a different
+   opinion. Both were a white ring and nothing else. */
+function drawSlapAfter(x, y, look, t, kind, good){
+  if(t>90) return;
+  const skin=look.skin||'#e6bd94';
+  const B=look.body||{}, lg=(B.legs===undefined?6:B.legs), be=(B.booty===undefined?6:B.booty);
+  const legLen=Math.round(11+lg*0.52);
+  const seatY=y-legLen-2-6;
+  const hw=Math.max(5,Math.round(5+be*0.42));
+  const fade=clamp(1-t/90,0,1);
+  // the mark, warm and going down slowly
+  ctx.globalAlpha=fade*0.55;
+  ctx.fillStyle=mixHex(skin,'#d0574a',0.55);
+  ctx.fillRect(Math.round(x-hw*0.6), Math.round(seatY), Math.round(hw*1.2), 4);
+  ctx.globalAlpha=1;
+  // the blush, up at the face, arriving a beat later and lasting longer
+  if(t>10){
+    const bf=clamp((t-10)/16,0,1)*clamp(1-(t-10)/80,0,1);
+    ctx.globalAlpha=bf*0.7; ctx.fillStyle='#e0708a';
+    ctx.fillRect(Math.round(x-6), Math.round(y-legLen-2-34), 3, 2);
+    ctx.fillRect(Math.round(x+3), Math.round(y-legLen-2-34), 3, 2);
+    ctx.globalAlpha=1;
+  }
+  // and what it meant
+  if(t<52){ ctx.textAlign='center';
+    const a=clamp(1-t/52,0,1);
+    if(kind==='romantic') pixelText(good?'💞':'💢', x, y-legLen-2-46-t*0.22, 'rgba(255,180,205,'+a.toFixed(2)+')', 1.2);
+    else pixelText(good?'♥':'💢', x, y-legLen-2-46-t*0.22, good?'rgba(255,200,190,'+a.toFixed(2)+')':'rgba(255,150,140,'+a.toFixed(2)+')', 1.1);
+    ctx.textAlign='left'; }
+}
+/* NOT WITH THEM IN THE ROOM. This was a toast and nothing on screen at all —
+   you pressed the key and a line of text appeared somewhere else. Now she
+   actually says no, with her whole body, and you can see why. */
+function startRefusal(kind, why){
+  const D=DM; if(!D || D.refuse) return;
+  D.refuse={ t:0, kind, why, x:(G.isFemale? D.wifeX : D.x) };
+}
+function updateRefusal(dt){
+  const D=DM, R=D.refuse; if(!R) return; R.t+=dt;
+  if(R.t>150) D.refuse=null;
+}
+function drawRefusal(){
+  const D=DM, R=D.refuse; if(!R) return; const FY=214, T=R.t;
+  const who=R.x;
+  // the flat palm, out and firm, with a shake in it
+  const sh=Math.sin(T*0.42)*(T<50?2.2:0.6);
+  const skin=(G.isFemale? (G.wife&&G.wife.skin) : (G.skin))||'#caa06a';
+  px(who+10+sh, FY-42, 5, 7, skin); px(who+10+sh, FY-42, 5, 1, shade(skin,20));
+  px(who+9+sh, FY-36, 7, 2, skin);
+  ctx.globalAlpha=clamp(1-T/150,0,1);
+  ctx.textAlign='center';
+  pixelText(R.why==='tempest'? '⚡ NOT IN FRONT OF THEM'
+          : R.why==='devout' ? '🕯 NOT UNDER THIS ROOF'
+          : '🚸 NOT IN FRONT OF THE CHILDREN',
+    W/2, 34, '#ff9a8a', 1.06);
+  ctx.textAlign='left';
+  ctx.globalAlpha=1;
+}
 function drawDrop(){
   const D=DM, X=D.drop; if(!X) return; const FY=214, w=G.wife, T=D.t;
   // ---- the thing on the floor ----
@@ -11783,14 +11893,14 @@ function drawDrop(){
   const bending = ['stoop','got','caught','bait','taken','ignored','resist'].includes(X.ph);
   if(bending){
     const up = X.ph==='got'? clamp(1-X.t/50,0,1) : 1;
-    // THE SHAKE — a short lateral wobble at the hips, and nothing subtle about it
-    const sh = (X.shakeT>0)? Math.sin(X.t*1.15)*2.4*clamp(X.shakeT/16,0,1) : 0;
-    const rs = (X.ph==='resist' && X.t<18)? -Math.sin(X.t*0.5)*3 : 0;
-    drawWifeFig(ctx, D.x+sh+rs, FY, playerLook(), X.k*up, 'bend');
+    drawWifeFig(ctx, D.x, FY, playerLook(), X.k*up, 'bend');
+    // the elbow, if this is the beat where she has had enough. The shake needs
+    // nothing here — slapKick rang the spring and the bend draws its own.
+    if(X.ph==='resist') drawElbowOver(D.x, FY, playerLook(), X.t);
     if(X.ph==='got' && X.t<50){ ctx.textAlign='center';
       pixelText('✓', D.x, FY-56, '#7ad48a', 1.2); ctx.textAlign='left'; }
     if(X.shakeT>0){ ctx.textAlign='center';
-      pixelText('~', D.x+sh*2, FY-52, '#ff9ad8', 1.1); ctx.textAlign='left'; }
+      pixelText('~', D.x+Math.sin(X.t*1.15)*4, FY-52, '#ff9ad8', 1.1); ctx.textAlign='left'; }
   }
   // ---- HIM, crossing, stopped by a look, stepped back, or shoved off ----
   if(['stoop','caught','bait','taken','ignored','resist'].includes(X.ph)){
@@ -12243,7 +12353,8 @@ function startRomantic(atX){
      drawVillaMale is YOU; with a husband the scene would paint a wife as him
      and hand you his body. Say so plainly rather than draw the wrong people. */
   if(G.wife.male){ toast('💞 He is willing. The scene is not drawn yet — a husband’s version is still on the bench.',3600); return; }
-  if(privacyNeeded('romantic')){ toast(privacyRefusal('romantic'),3200); return; }
+  if(privacyNeeded('romantic')){ toast(privacyRefusal('romantic'),3200);
+    startRefusal('romantic', privacyTier()==='strict'?'devout':privacyTier()==='mid'?'tempest':'kids'); return; }
   if(!spouseWilling()){ toast('“Not like that. Not tonight.” — win the heart first.',2600); return; }
   if(loveLeft('quick')<=0){ toast('“AGAIN?!” — nothing left in you today.',2400); return; }
   spendLove('quick');
@@ -12480,7 +12591,8 @@ function romanticSwing(T){
 }
 function startSlapAnim(atX){
   const D=DM; if(!D) return;
-  if(privacyNeeded('slap')){ toast(privacyRefusal('slap'),3200); return; }
+  if(privacyNeeded('slap')){ toast(privacyRefusal('slap'),3200);
+    startRefusal('slap', privacyTier()==='strict'?'devout':privacyTier()==='mid'?'tempest':'kids'); return; }
   const v=doSlap('villa');
   if(!v) return;
   D.slap={t:0, x:(atX===undefined? D.wifeX : atX), v};
@@ -12519,6 +12631,8 @@ function drawSlap(){
     ctx.globalAlpha=1;
     px(S.x-6,FY-32,14,2,'rgba(255,240,220,.8)');
   }
+  // and what it leaves behind — the mark, the blush, and the verdict
+  if(hit) drawSlapAfter(S.x, FY, w, since, 'hand', !!(S.v && (S.v.bond||0)>=0));
   ctx.textAlign='center';
   if(hit && since>8){
     const col = S.v.k==='love'? '#ffb0d0' : S.v.k==='return'? '#ffd07a'
@@ -12597,12 +12711,30 @@ function drawVillaMale(x, y, T, beat, cool, swing){
     P(-shW+dx, top-14, shW*2, 5, mixHex(skin,'#2a150a',0.14));
     P(-2+dx, top-7, 5, 4, mixHex(skin,'#6a4430',0.42));
   }
-  // ---- what he is still wearing, if anything ----
+  /* ---- WHAT HE IS ACTUALLY WEARING, AND THEREFORE WHAT COMES OFF ----
+     This drew a plain rectangle in his tunic colour no matter what he had on.
+     So a man in a muscled cuirass, or a senator in a toga, walked into the
+     room and then peeled off a flat sheet that was not the garment anyone had
+     just been looking at. He undresses out of his REAL outfit now — the same
+     drawOutfitM the hall uses — with the hem clipped so the thing genuinely
+     rides up rather than being swapped for a different thing. */
   if(st<=1){
     const hemUp = st===1? Math.round((T-70)*0.22) : 0;
-    P(-shW-1+dx, top-26, shW*2+2, 26-hemUp, tun);
+    const OFF = top+28;                      // drawOutfitM's TOP (-52) onto this frame's shoulder
+    const wh = Math.max(3,Math.round(shW*0.72));
+    const OO = {shW, waistHalf:wh, rowW:(t)=>Math.round(shW+(wh-shW)*t), lF:0, lB:0, legW};
+    const OC = {tun, tSh, tHi, tMid:shade(tun,8), skin, sSh, sHi, clav:'#8a2f5a', accent:'#c8a03a'};
+    const fit = (playerLook().outfit)||'tunic';
+    ctx.save();
+    ctx.beginPath();                          // everything below the rising hem, and nothing above it
+    ctx.rect(Math.round(x-shW-8), Math.round(y+top-32),
+             Math.round(shW*2+16), Math.round(31-hemUp));
+    ctx.clip();
+    P(-shW-1+dx, top-26, shW*2+2, 26, tun);   // the tunic he has on under everything
     P(-shW-1+dx, top-26, shW*2+2, 2, tHi);
-    P(-shW-1+dx, top-1-hemUp, shW*2+2, 1, tSh);
+    if(fit!=='tunic') drawOutfitM((a,b2,w2,h2,c2)=>P(a+dx, b2+OFF, w2, h2, c2), OC, fit, OO);
+    ctx.restore();
+    P(-shW-1+dx, top-1-hemUp, shW*2+2, 1, tSh);                       // the hem itself, wherever it is
     if(st===0){ P(-shW-1+dx, top-9, shW*2+2, 3, '#5a3a22');          // the belt, and his hands on it
       P(-shW-1+dx, top-9, shW*2+2, 1, '#7a5634');
       P(-4+dx, top-10, 4, 5, skin); P(2+dx, top-10, 4, 5, skin); }
@@ -12958,6 +13090,7 @@ function drawDomus(){
     /* THE ROMANTIC SCENE DRAWS ITS OWN MALE. This ran unconditionally, so his
        ordinary walking sprite stayed on screen standing next to the undressed
        one the scene was drawing — two of him, every time. */
+    if(D.refuse) drawRefusal();                         // “no”, with a hand out and a reason
     if(D.husb) drawHusbandMove();                       // he crossed the room without being asked
     if(D.drop) drawDrop();                              // the floor, her, and him crossing to it
     if(!D.rslap && !D.husb && !(D.drop && D.drop.ph!=='fall')){ const mv=(held.a||held.d), run=mv&&held.s, turning=(D.turn||0)>0;
@@ -18736,6 +18869,7 @@ window.__SS = {
   privacyTier, watchersPresent, qText, drawManFace, hasMyQuirk,
   DROP_PROPS, DROP_NEED, DROP_LOOKS, dropDue, startDrop, updateDrop, drawDrop,
   openIgnoredCard, husbandMoveDue, startHusbandMove, updateHusbandMove, drawHusbandMove,
+  drawElbowOver, drawSlapAfter, startRefusal, updateRefusal, drawRefusal,
   FAMILY_EVENTS, familyDue, maybeFamily, openFamilyEvent, kidBand, kidAgeYears, heirPressure,
   SIBLING_LINES, siblingAside, drawDomus, romanticSwing, STRIKES,
   spouseTierName, tierBadge, slapLabel, drawSlap, startSlapAnim, startRomantic, drawHusbandFig, drawVillaMale,
