@@ -6655,7 +6655,8 @@ window.addEventListener('keydown',e=>{
   else if(k==='d'){ if(!held.d) setEdge('d'); held.d=true; }
   else if(k==='w'){ setEdge('w'); held.w=true; }
   else if(k==='s'){ held.s=true; }
-  else if(k==='e'){ setEdge('e'); }                 // clear the hall, in the villa
+  else if(k==='e'){ setEdge('e'); }                 // clear the hall · “move back a bit”
+  else if(k==='f'){ setEdge('f'); }                 // and bend for something that is not there
   else if(k===' '){ setEdge('space'); }
   else if(k==='arrowright'){ setEdge('elbow'); }
   else if(k==='arrowleft'){ setEdge('thrust'); }
@@ -11353,8 +11354,10 @@ function updateDomus(dt){
   if(D.slap){ updateSlap(dt); return; }
   if(D.tempt){ updateTempt(dt); if(D.tempt && D.tempt.locks) return; }
   else if(temptDue()) startTempt();
+  if(D.husb){ updateHusbandMove(dt); return; }        // he is already crossing; nothing interrupts that
   if(D.drop){ updateDrop(dt); if(D.drop && D.drop.locks) return; }
   else if(dropDue()) startDrop();
+  else if(husbandMoveDue()) startHusbandMove();
   const sp2=(held.s? 3.0 : 1.5)*dt;        // hold S to RUN
   const face0=D.face;
   if(held.a){ D.x-=sp2; D.face=-1; } if(held.d){ D.x+=sp2; D.face=1; }
@@ -11534,7 +11537,8 @@ function startDrop(){
   // it lands a little away from you, so you have to go and get it
   const x=clamp(D.x + (Math.random()<0.5? -34 : 34), 60, 430);
   D.drop={ ph:'fall', t:0, x, prop, reach:0, looks:DROP_LOOKS, lookT:0,
-           husbX:D.wifeX, k:0, locks:false, deliberate:false };
+           husbX:D.wifeX, k:0, locks:false, deliberate:false,
+           backs:2, backT:0, shakes:0, shakeT:0, noticed:0, fake:false };
   toast('💧 '+prop.line, 3000);
 }
 function updateDrop(dt){
@@ -11544,14 +11548,53 @@ function updateDrop(dt){
     if(X.t>1400){ D.drop=null; return; }                       // he never noticed. Fine.
     if(Math.abs(D.x-X.x)<16 && (consume('space')||consume('attack'))){
       X.ph='stoop'; X.t=0; X.husbX=D.wifeX; }
+    /* THE FAKE. There is nothing under you. You are not picking anything up.
+       You bend anyway, and you take your time about it, and the entire
+       question is whether he notices — which he may simply decline to do. */
+    else if(consume('f')){ X.ph='bait'; X.t=0; X.fake=true; X.husbX=D.wifeX; X.shakes=0; X.noticed=0; }
+  } else if(X.ph==='bait'){
+    X.locks=true;
+    X.k=clamp(X.t/55,0,1);
+    /* SHAKE. Each one adds to how hard this is to ignore, and how hard it is
+       to ignore is the only thing deciding whether he comes. */
+    if(consume('space')||consume('attack')){
+      X.shakes++; X.shakeT=16;
+      X.noticed += 16 + (G.body&&G.body.booty? G.body.booty*1.6 : 8);
+      D.hearts.push({x:D.x,y:180,vy:0.55,life:44,c:'#ff9ad8'}); }
+    if(X.shakeT>0) X.shakeT-=dt;
+    // his own appetite decides the bar he has to clear
+    const pull = X.noticed + (G.wifePhys||45)*0.35 + (hasQuirk('insatiable')?45:0)
+               + (hasQuirk('devout')?-30:0) + (G.wifeRel||0)*0.10;
+    if(pull>92){ X.ph='taken'; X.t=0; X.husbX=D.wifeX; }        // he is coming, and he chose to
+    else if(X.t>300){ X.ph='ignored'; X.t=0; }                  // he genuinely did not look up
+  } else if(X.ph==='taken'){
+    // he crosses on his own. You did not invite him; you baited him, which is
+    // a different thing, and he would say so.
+    X.locks=true; X.k=1;
+    const closing=Math.sign(D.x-X.husbX)||1;
+    X.husbX += closing*0.72*dt;
+    if(Math.abs(X.husbX-D.x)<13){ X.ph='caught'; X.t=0; X.deliberate=true; X.x=D.x; }
+  } else if(X.ph==='ignored'){
+    X.locks=true;
+    if(X.t>110){ D.drop=null; D.wifePause=0; openIgnoredCard(X.shakes); }
   } else if(X.ph==='stoop'){
     X.locks=true;
     X.k=clamp(X.t/60,0,1);                                     // she goes down over a beat
     if(X.lookT>0) X.lookT-=dt;                                 // he is frozen mid-step
+    else if(X.backT>0){ X.backT-=dt; }                         // he has taken his step back
     else {
       const closing=Math.sign(X.x-X.husbX)||1;
       X.husbX += closing*0.62*dt;                              // and otherwise he keeps coming
     }
+    /* “COULD YOU MOVE BACK A BIT.” Perfectly reasonable. He complies, at the
+       speed of a man who knows exactly what he is being asked and is choosing
+       to be gracious about it — and then he drifts straight back in. */
+    if(consume('e') && X.backs>0 && X.backT<=0){
+      X.backs--; X.backT=52;
+      X.husbX -= Math.sign(X.x-X.husbX)*11;
+      toast(pick(['🙄 “Could you move back a bit? I am trying to reach this.” He moves back a bit.',
+                  '🙄 “A LITTLE further.” He takes half a step and stops, on principle.',
+                  '🙄 “Thank you.” He is already drifting forward again.']),2600); }
     if(consume('w')&&X.looks>0&&X.lookT<=0){
       /* THE LOOK. It stops him — less each time, because the third one is not
          a warning any more, it is an invitation and both of you know it. */
@@ -11566,7 +11609,22 @@ function updateDrop(dt){
     if(X.reach>=DROP_NEED){ X.ph='got'; X.t=0; }
     else if(Math.abs(X.husbX-X.x)<13){
       X.deliberate = (X.reach < DROP_NEED*0.34);               // you barely tried, and he noticed
-      X.ph='caught'; X.t=0; }
+      /* AND YOU CAN STILL SAY NO. Reaching hard means you actually wanted the
+         comb, so arriving on top of you gets an elbow rather than a welcome. */
+      if(!X.deliberate && X.looks>0){ X.ph='resist'; X.t=0; }
+      else { X.ph='caught'; X.t=0; } }
+  } else if(X.ph==='resist'){
+    /* THE SHOVE. Not a refusal of him, a refusal of the TIMING, and he takes it
+       exactly as well as men take that. */
+    X.locks=true;
+    if(X.t<10) X.husbX += Math.sign(X.husbX-X.x)*1.9*dt;       // he goes back a step
+    if(X.t>140){ D.drop=null; D.wifePause=0;
+      G.dropsShoved=(G.dropsShoved||0)+1;
+      G.wifeRel=clamp(G.wifeRel-1,0,bondCeiling());
+      toast(pick(['🤨 An elbow, without looking up. He retreats to the couch with his dignity.',
+                  '🤨 “I am BUSY.” He says he can see that. He says it from further away.',
+                  '🤨 You get it in your hand and stand up into him. He apologises to the pillar.']),4200);
+      saveQuiet(); }
   } else if(X.ph==='got'){
     X.locks=true;
     if(X.t>130){ const de=X.looks;
@@ -11591,6 +11649,127 @@ function updateDrop(dt){
         saveQuiet(); } }
   }
 }
+/* =====================================================================
+   HE DID NOT LOOK UP
+   ---------------------------------------------------------------------
+   You bent, you shook, you gave him every chance, and he carried on reading.
+   That is a real outcome and you are entitled to have a view about it.
+   ===================================================================== */
+function openIgnoredCard(shakes){
+  const w=G.wife;
+  state='menu'; show('scr-villa'); $('statbar').classList.remove('hide');
+  villaHead('🙄 HE DID NOT LOOK UP',
+            'You gave him every opportunity. He had a scroll.', '#9ad4ff');
+  const b=$('villa-body'); b.innerHTML='';
+  const card=document.createElement('div'); card.className='shopcard'; card.style.borderColor='#9ad4ff';
+  card.innerHTML=`<div><b style="color:#9ad4ff">🍑 ${shakes} attempt${shakes===1?'':'s'}. Nothing.</b></div>
+    <div style="margin-top:4px;font-size:13px;color:#ffe8d0">${pick([
+      '“What are you doing?” “Picking something up.” “There is nothing there.” “I KNOW.”',
+      'He turned a page. At one point he turned it back, which was almost worse.',
+      'He asked, without looking up, whether your back was troubling you.',
+      'A slave noticed. Your husband did not. You will be thinking about that all week.'])}</div>`;
+  b.appendChild(card);
+  const wrap=document.createElement('div'); wrap.className='col gap6'; b.appendChild(wrap);
+  const fin=(msg)=>{ refreshStatbar(); saveQuiet(); toast(msg,4600); openDomus(); };
+  const mk=(lab,desc,col,run)=>{
+    const d=document.createElement('div'); d.className='shopcard'; d.style.borderColor=col;
+    d.innerHTML=`<div class="small muted">${desc}</div>`;
+    const bt=document.createElement('button'); bt.className='btn sm'; bt.textContent=lab;
+    bt.style.borderColor=col; bt.style.color=col;
+    bt.onclick=()=>fin(run());
+    d.insertBefore(bt,d.firstChild); wrap.appendChild(d);
+  };
+  mk('😤 BE FURIOUS ABOUT IT','You have earned this and you are going to spend it.','#e0705b',()=>{
+    G.wifeRel=clamp(G.wifeRel-4,0,bondCeiling());
+    G.husbandOwes=(G.husbandOwes||0)+1;              // and he will be made aware
+    return '😤 He is informed. At length. He now understands, and he will be paying for it.'; });
+  mk('😏 LET HIM NOTICE LATER','Say nothing. Bank it. He will work it out, and it will cost him more.','#e8c34a',()=>{
+    G.husbandOwes=(G.husbandOwes||0)+2;
+    return '😏 You say nothing at all. That is much worse for him and you both know it.'; });
+  mk('😂 LAUGH AT YOURSELF','It WAS quite funny. He never even looked up.','#7ad48a',()=>{
+    G.wifeRel=clamp(G.wifeRel+3,0,bondCeiling());
+    G.honor=clamp((G.honor||50)+1,0,100);
+    return '😂 You laugh. He asks what is funny. You tell him nothing, and mean it.'; });
+}
+/* =====================================================================
+   HIS OWN IDEA
+   ---------------------------------------------------------------------
+   Everything in this house so far has been something YOU start. Played as a
+   woman that made a husband into furniture that occasionally reacted. He
+   crosses the room on his own now and he picks which kind it is — a hand, or
+   the other one — and you find out when he does. What he owes you from
+   ignoring the bait makes him bolder about it, which is the joke.
+   ===================================================================== */
+function husbandMoveDue(){
+  if(!G || !G.isFemale || !G.married || !G.wife || !G.wife.male || !ADULT) return false;
+  const D=DM; if(!D || D.scene || D.drop || D.slap || D.rslap || D.tempt) return false;
+  if((D.t||0) - (D.lastHusbT===undefined? -9999 : D.lastHusbT) < 2200) return false;
+  if(!spouseWilling()) return false;
+  if(hasQuirk('devout') && festivalToday()) return false;      // not today, and asking offends
+  const eager = 0.0011 + (G.wifePhys||45)*0.000016 + (G.husbandOwes||0)*0.0006
+              + (hasQuirk('insatiable')?0.0012:0) + (hasQuirk('possessive')?0.0006:0);
+  return Math.random() < eager;
+}
+function startHusbandMove(){
+  const D=DM; if(!D) return; D.lastHusbT=D.t;
+  /* HIS PICK, not yours. The romantic one needs the room clear and something
+     left in the day; otherwise he settles for the ordinary kind. */
+  const canRomantic = !privacyNeeded('romantic') && loveLeft('quick')>0
+                    && (G.wifeRel||0)>=55 && !hasQuirk('devout');
+  const wantsRomantic = canRomantic && Math.random() < (0.30 + (G.husbandOwes||0)*0.10
+                       + (hasQuirk('insatiable')?0.20:0));
+  if(!wantsRomantic && privacyNeeded('slap')){ return; }        // tempest, kids in the hall
+  D.husb={ t:0, kind: wantsRomantic?'romantic':'hand', x:D.wifeX, locks:false, fired:false };
+  G.husbandOwes=Math.max(0,(G.husbandOwes||0)-1);
+}
+function updateHusbandMove(dt){
+  const D=DM, H=D.husb; if(!H) return; H.t+=dt;
+  H.locks=true;
+  const closing=Math.sign(D.x-H.x)||1;
+  if(!H.fired) H.x += closing*0.70*dt;
+  if(!H.fired && Math.abs(H.x-D.x)<14){
+    H.fired=true; H.t=0;
+    const be=((G.body&&G.body.booty)||5);
+    slapKick((H.kind==='romantic'? 1.35 : 1.0) + be*0.10);
+    const v = H.kind==='romantic'? romanticVerdict() : slapVerdict('villa');
+    H.v=v;
+    G.wifeRel=clamp(G.wifeRel+(v.bond||0),0,bondCeiling());
+    G.wifePhys=clamp((G.wifePhys===undefined?45:G.wifePhys)+(v.phys||0),0,100);
+    if(H.kind==='romantic'){ spendLove('quick'); G.romanticAll=(G.romanticAll||0)+1; }
+    else { G.slapsAll=(G.slapsAll||0)+1; }
+    G.husbInitiated=(G.husbInitiated||0)+1;
+    saveQuiet();
+  }
+  if(H.fired && H.t>170){
+    const v=H.v||{t:''};
+    toast((H.kind==='romantic'? '💞 ':'👋 ')+'HE decided. '+(v.t||'')
+      +'  ('+((v.bond||0)>=0?'+':'')+(v.bond||0)+' 💞)',5000);
+    D.husb=null; D.wifePause=0;
+  }
+}
+function drawHusbandMove(){
+  const D=DM, H=D.husb; if(!H) return; const FY=214, w=G.wife, T=D.t;
+  const j=slapJig();
+  // YOU, taking it, with the spring in you
+  drawWifeFig(ctx, D.x + (H.fired? j*0.30 : 0), FY, playerLook(), 0, 'idle');
+  // HIM, arriving on his own account
+  ctx.save(); ctx.translate(H.x, FY);
+  if(D.x < H.x) ctx.scale(-1,1);
+  drawHusbandFig(ctx,0,0,G.wifeRel|0,w.skin,w.dress,w, H.fired?0:T*0.22, H.fired?'idle':'walk');
+  ctx.restore();
+  if(H.fired && H.t<12){
+    ctx.globalAlpha=clamp(1-H.t/12,0,1);
+    for(let i=0;i<8;i++){ const a=(i/8)*6.283, r=3+H.t*1.8;
+      px(D.x+2+Math.cos(a)*r, FY-30+Math.sin(a)*r*0.6, 2,2,'#fff0dc'); }
+    ctx.globalAlpha=1;
+    px(D.x-6,FY-32,13,2,'rgba(255,240,220,.8)');
+  }
+  ctx.textAlign='center';
+  if(!H.fired) pixelText('~ he has put the scroll down ~', W/2, 30, 'rgba(255,214,190,.8)', 1.02);
+  else if(H.t<70) pixelText(H.kind==='romantic'? '💞 he did not ask' : '👋 he did not ask',
+    W/2, 30, H.kind==='romantic'?'#ffd0da':'#ffd0a0', 1.05);
+  ctx.textAlign='left';
+}
 function drawDrop(){
   const D=DM, X=D.drop; if(!X) return; const FY=214, w=G.wife, T=D.t;
   // ---- the thing on the floor ----
@@ -11600,22 +11779,35 @@ function drawDrop(){
     if((T|0)%26<15){ ctx.textAlign='center';
       pixelText('▾', X.x, FY-18, near? '#e8c34a':'rgba(232,195,74,.5)', 1); ctx.textAlign='left'; }
   }
-  // ---- HER, stooping for it ----
-  if(X.ph==='stoop'||X.ph==='got'||X.ph==='caught'){
+  // ---- HER, stooping for it. The fake shakes; the real one does not. ----
+  const bending = ['stoop','got','caught','bait','taken','ignored','resist'].includes(X.ph);
+  if(bending){
     const up = X.ph==='got'? clamp(1-X.t/50,0,1) : 1;
-    drawWifeFig(ctx, D.x, FY, playerLook(), X.k*up, 'bend');
+    // THE SHAKE — a short lateral wobble at the hips, and nothing subtle about it
+    const sh = (X.shakeT>0)? Math.sin(X.t*1.15)*2.4*clamp(X.shakeT/16,0,1) : 0;
+    const rs = (X.ph==='resist' && X.t<18)? -Math.sin(X.t*0.5)*3 : 0;
+    drawWifeFig(ctx, D.x+sh+rs, FY, playerLook(), X.k*up, 'bend');
     if(X.ph==='got' && X.t<50){ ctx.textAlign='center';
       pixelText('✓', D.x, FY-56, '#7ad48a', 1.2); ctx.textAlign='left'; }
+    if(X.shakeT>0){ ctx.textAlign='center';
+      pixelText('~', D.x+sh*2, FY-52, '#ff9ad8', 1.1); ctx.textAlign='left'; }
   }
-  // ---- HIM, crossing the room, or stopped dead by a look ----
-  if(X.ph==='stoop'||X.ph==='caught'){
-    const frozen=X.lookT>0;
-    ctx.save(); ctx.translate(X.husbX, FY);
-    if(X.x<X.husbX) ctx.scale(-1,1);
-    drawHusbandFig(ctx,0,0,G.wifeRel|0,w.skin,w.dress,w, frozen?0:T*0.22, frozen?'idle':'walk');
+  // ---- HIM, crossing, stopped by a look, stepped back, or shoved off ----
+  if(['stoop','caught','bait','taken','ignored','resist'].includes(X.ph)){
+    const frozen = X.lookT>0 || X.backT>0;
+    const away   = (X.ph==='bait'||X.ph==='ignored');
+    const hx = away? (X.husbX + (X.ph==='ignored'? 0 : 0)) : X.husbX;
+    ctx.save(); ctx.translate(hx, FY);
+    if(D.x<hx) ctx.scale(-1,1);
+    drawHusbandFig(ctx,0,0,G.wifeRel|0,w.skin,w.dress,w,
+      (frozen||away)?0:T*0.22, (frozen||away)?'idle':'walk');
     ctx.restore();
-    if(frozen && (T|0)%14<8){ ctx.textAlign='center';
-      pixelText('…', X.husbX, FY-58, '#9ad4ff', 1); ctx.textAlign='left'; }
+    // the scroll he is so absorbed in
+    if(away){ px(hx-4,FY-40,9,6,'#e6dcc2'); px(hx-4,FY-40,9,1,'#f6efdc'); px(hx-4,FY-40,1,6,'#b8a882'); }
+    if(X.backT>0 && (T|0)%16<9){ ctx.textAlign='center';
+      pixelText('🙄', hx, FY-58, '#9ad4ff', 1); ctx.textAlign='left'; }
+    else if(X.lookT>0 && (T|0)%14<8){ ctx.textAlign='center';
+      pixelText('…', hx, FY-58, '#9ad4ff', 1); ctx.textAlign='left'; }
   }
   // ---- the bars ----
   if(X.ph==='stoop'){
@@ -11627,18 +11819,44 @@ function drawDrop(){
     // how close he is, running the other way along the same bar
     const hf=clamp(1-Math.abs(X.husbX-X.x)/120,0,1);
     px(bx,by+bh+2,bw*hf,2, hf>0.72? '#e0705b':'#a06a5b');
-    // the looks you have left
+    // the looks you have left, and the times you can ask him to back off
     for(let i=0;i<DROP_LOOKS;i++)
       px(bx+bw/2-13+i*10, by-9, 7, 3, i<X.looks? '#9ad4ff':'#4a3826');
+    for(let i=0;i<2;i++)
+      px(bx+bw-14+i*7, by-9, 5, 3, i<X.backs? '#e8c34a':'#4a3826');
     ctx.textAlign='center';
-    pixelText('REACH FOR IT — SPACE      ·      W: A LOOK BACK ('+X.looks+')', W/2, 26, '#ffd0da', 1.02);
+    pixelText('SPACE REACH  ·  W LOOK BACK ('+X.looks+')  ·  E “MOVE BACK” ('+X.backs+')', W/2, 26, '#ffd0da', 1.02);
     if(hf>0.78) pixelText('— he is right behind you —', W/2, by+22, 'rgba(255,190,170,.9)', 1);
     else if(X.lookT>0) pixelText('— he has stopped —', W/2, by+22, 'rgba(190,214,255,.85)', 1);
     ctx.textAlign='left';
   }
   if(X.ph==='caught'){ ctx.textAlign='center';
-    pixelText(X.deliberate? '“…you were not even trying.”' : '“Allow me.”',
+    pixelText(X.fake? '“…there was nothing there, was there.”'
+            : X.deliberate? '“…you were not even trying.”' : '“Allow me.”',
       W/2, 40, '#ffd0da', 1.05); ctx.textAlign='left'; }
+  // ---- THE BAIT BAR: how hard this is becoming to ignore ----
+  if(X.ph==='bait'){
+    const bx=W/2-70, by=H-40, bw=140, bh=9;
+    px(bx-2,by-2,bw+4,bh+4,'#120c08');
+    px(bx,by,bw,bh,'#2e2218'); px(bx,by,bw,1,'#4a3826');
+    const pull = X.noticed + (G.wifePhys||45)*0.35 + (hasQuirk('insatiable')?45:0)
+               + (hasQuirk('devout')?-30:0) + (G.wifeRel||0)*0.10;
+    const f=clamp(pull/92,0,1);
+    px(bx,by,bw*f,bh,'#ff9ad8'); px(bx,by,bw*f,1,'#ffd0ea');
+    px(bx+bw-2,by-2,2,bh+4,'#e8c34a');                       // the line he has to cross
+    ctx.textAlign='center';
+    pixelText('SHAKE IT — SPACE      ·      he is still reading', W/2, 26, '#ff9ad8', 1.02);
+    pixelText(X.t>210? '— he is NOT going to look up, is he —'
+            : X.shakes? '— '+X.shakes+' and counting —' : '— there is nothing on this floor —',
+      W/2, by+22, 'rgba(255,190,214,.85)', 1);
+    ctx.textAlign='left';
+  }
+  if(X.ph==='taken'){ ctx.textAlign='center';
+    pixelText('~ he put the scroll down ~', W/2, 30, '#ffd0da', 1.05); ctx.textAlign='left'; }
+  if(X.ph==='ignored'){ ctx.textAlign='center';
+    pixelText('~ he turned a page ~', W/2, 30, '#9ad4ff', 1.05); ctx.textAlign='left'; }
+  if(X.ph==='resist'){ ctx.textAlign='center';
+    pixelText('“I am BUSY.”', W/2, 40, '#ffd0a0', 1.05); ctx.textAlign='left'; }
 }
 function temptDue(){
   if(!G || !G.married || !G.wife || !ADULT) return false;
@@ -12713,6 +12931,7 @@ function drawDomus(){
       if(D.rslap){ drawRomantic(); }                    // the other kind of reminder
       else if(D.slap){ drawSlap(); }                    // she is being reminded you are in the room
       else if(D.tempt){ drawTempt(); }                  // she is busy with the low shelf
+      else if(D.husb){ /* his own move draws both of them */ }
       else if(D.drop && D.drop.ph!=='fall'){ /* the drop draws him where HE is, not where he idles */ }
       else if(w.male) drawHusbandFig(ctx,D.wifeX,FY,G.wifeRel|0,w.skin,w.dress,w,wPh,wMode);
       else drawWifeFig(ctx,D.wifeX,FY,w,wPh,wMode);
@@ -12739,8 +12958,9 @@ function drawDomus(){
     /* THE ROMANTIC SCENE DRAWS ITS OWN MALE. This ran unconditionally, so his
        ordinary walking sprite stayed on screen standing next to the undressed
        one the scene was drawing — two of him, every time. */
+    if(D.husb) drawHusbandMove();                       // he crossed the room without being asked
     if(D.drop) drawDrop();                              // the floor, her, and him crossing to it
-    if(!D.rslap && !(D.drop && D.drop.ph!=='fall')){ const mv=(held.a||held.d), run=mv&&held.s, turning=(D.turn||0)>0;
+    if(!D.rslap && !D.husb && !(D.drop && D.drop.ph!=='fall')){ const mv=(held.a||held.d), run=mv&&held.s, turning=(D.turn||0)>0;
       drawDomusPlayer(D.x,FY,
         turning? 1-(D.turn/14) : (mv? D.t*(run?0.6:0.35) : 0),
         turning? 'turn' : (run?'run':(mv?'walk':'idle'))); }
@@ -12763,7 +12983,8 @@ function drawDomus(){
       pixelText('▾', who, FY-52, col, 1);
       ctx.textAlign='left'; }
     let prompt='';
-    if(D.drop && D.drop.ph==='fall' && Math.abs(D.x-D.drop.x)<16) prompt='SPACE: 🪮 STOOP FOR IT';
+    if(D.drop && D.drop.ph==='fall' && Math.abs(D.x-D.drop.x)<16) prompt='SPACE: 🪮 STOOP FOR IT   ·   F: 🍑 …OR FAKE IT';
+    else if(D.drop && D.drop.ph==='fall') prompt='F: 🍑 BEND FOR NOTHING AT ALL';
     else if(D.x>452) prompt='SPACE: LEAVE THE HALLS';
     else if(G.hasPool&&Math.abs(D.x-86)<36) prompt='SPACE: BATHE'+(G.married?'  ·  W: INVITE '+(w&&w.male?'HIM':'HER'):'');
     else if(G.hasWardrobe&&Math.abs(D.x-309)<20) prompt=G.married?'SPACE: …THE WARDROBE 😏':'SPACE: WARDROBE';
@@ -18514,6 +18735,7 @@ window.__SS = {
   kidsPresent, villaClear, privacyNeeded, privacyRefusal, clearTheVilla, BABY_YEARS,
   privacyTier, watchersPresent, qText, drawManFace, hasMyQuirk,
   DROP_PROPS, DROP_NEED, DROP_LOOKS, dropDue, startDrop, updateDrop, drawDrop,
+  openIgnoredCard, husbandMoveDue, startHusbandMove, updateHusbandMove, drawHusbandMove,
   FAMILY_EVENTS, familyDue, maybeFamily, openFamilyEvent, kidBand, kidAgeYears, heirPressure,
   SIBLING_LINES, siblingAside, drawDomus, romanticSwing, STRIKES,
   spouseTierName, tierBadge, slapLabel, drawSlap, startSlapAnim, startRomantic, drawHusbandFig, drawVillaMale,
