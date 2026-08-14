@@ -11408,8 +11408,14 @@ function updateDomus(dt){
       else { spendLove(bedLen); saveQuiet(); DM=null; startBedScene('fun',bedLen); return; }
     }
   }
-  if(!D.scene && !D.slap && !D.rslap && consume('w')){
+  if(!D.scene && !D.slap && !D.rslap && !D.husb && consume('w')){
     if(nearPool) tryPoolInvite();
+    /* W WAS SIMPLY DEAD FOR A WOMAN. It went to startRomantic, which declines
+       for a husband because there is no art for that scene yet — so the key
+       did nothing at all, silently. For her it CATCHES HIS EYE instead: he
+       crosses the room and picks which kind it is, which is the one thing this
+       house already does properly from his side. */
+    else if(nearWife && G.isFemale && G.wife.male) beckonHusband();
     else if(nearWife) startRomantic(D.wifeX);          // the other kind of Roman greeting
   }
   if(!D.scene && !D.slap && !D.rslap && consume('e') && privacyTier()!=='easy'
@@ -11538,8 +11544,8 @@ function startDrop(){
   // it lands a little away from you, so you have to go and get it
   const x=clamp(D.x + (Math.random()<0.5? -34 : 34), 60, 430);
   D.drop={ ph:'fall', t:0, x, prop, reach:0, looks:DROP_LOOKS, lookT:0,
-           husbX:D.wifeX, k:0, locks:false, deliberate:false,
-           backs:2, backT:0, shakes:0, shakeT:0, noticed:0, fake:false };
+           husbX:D.wifeX, k:0, locks:false, deliberate:false, landed:false,
+           backs:2, backT:0, shakes:0, shakeT:0, noticed:0, fake:false, stage:-1 };
   toast('💧 '+prop.line, 3000);
 }
 function updateDrop(dt){
@@ -11559,14 +11565,18 @@ function updateDrop(dt){
     /* SHAKE. Each one adds to how hard this is to ignore, and how hard it is
        to ignore is the only thing deciding whether he comes. */
     if(consume('space')||consume('attack')){
-      X.shakes++; X.shakeT=16;
-      X.noticed += 16 + (G.body&&G.body.booty? G.body.booty*1.6 : 8);
-      /* drawWifeFig's bend ALREADY rings its own seat off slapJig — it is the
-         same spring the slap uses and it is drawn inside the figure, on the
-         figure's own tier maths. Kicking it beats painting a slab over the
-         top and guessing where the slab goes. */
-      slapKick(0.55);
-      D.hearts.push({x:D.x,y:180,vy:0.55,life:44,c:'#ff9ad8'}); }
+      /* THREE SHAKES, and they are not the same shake three times. Each one is
+         a bigger commitment than the last — a wider swing, a harder kick into
+         the spring the bend already reads, and its own tell over the top. You
+         can see which one you are on without counting. */
+      X.shakes++; X.stage=Math.min(2,(X.stage===undefined?-1:X.stage)+1);
+      X.shakeT=[14,20,28][X.stage];
+      X.noticed += [12,20,30][X.stage] + (G.body&&G.body.booty? G.body.booty*1.6 : 8);
+      slapKick([0.42,0.72,1.15][X.stage]);
+      for(let i=0;i<1+X.stage;i++)
+        D.hearts.push({x:D.x+rnd(-5,5),y:180,vy:0.5+X.stage*0.12,life:40+X.stage*10,c:'#ff9ad8'});
+      if(X.stage>=2) X.stage=-1;                 // and it cycles back round
+    }
     if(X.shakeT>0) X.shakeT-=dt;
     // his own appetite decides the bar he has to clear
     const pull = X.noticed + (G.wifePhys||45)*0.35 + (hasQuirk('insatiable')?45:0)
@@ -11579,7 +11589,18 @@ function updateDrop(dt){
     X.locks=true; X.k=1;
     const closing=Math.sign(D.x-X.husbX)||1;
     X.husbX += closing*0.72*dt;
-    if(Math.abs(X.husbX-D.x)<13){ X.ph='caught'; X.t=0; X.deliberate=true; X.x=D.x; }
+    if(Math.abs(X.husbX-D.x)<13){ X.ph='bentslap'; X.t=0; X.x=D.x; }
+  } else if(X.ph==='bentslap'){
+    /* AND HE DOES IT WHILE YOU ARE STILL DOWN THERE. Everything before this
+       resolved the moment he arrived — he got to you and the scene cut. He
+       arrives and SLAPS, on the bend, with the same arm and the same spring
+       the rest of the house uses, and only then does it go where it goes. */
+    X.locks=true; X.k=1;
+    if(!X.landed && X.t>=16){ X.landed=true;
+      const be=((G.body&&G.body.booty)||5);
+      slapKick(1.05+be*0.10);
+      G.slapsAll=(G.slapsAll||0)+1; }
+    if(X.t>96){ X.ph='caught'; X.t=0; X.deliberate=true; }
   } else if(X.ph==='ignored'){
     X.locks=true;
     if(X.t>110){ D.drop=null; D.wifePause=0; openIgnoredCard(X.shakes); }
@@ -11706,6 +11727,52 @@ function openIgnoredCard(shakes){
    the other one — and you find out when he does. What he owes you from
    ignoring the bait makes him bolder about it, which is the joke.
    ===================================================================== */
+/* CATCHING HIS EYE. Not a command — you get his attention and he decides
+   what to do with it, exactly as he does when he crosses on his own. */
+function beckonHusband(){
+  const D=DM; if(!D || D.husb) return false;
+  if(!spouseWilling()){ toast('“Not now.” He does not even look up from it.',2600); return false; }
+  const wasT=D.lastHusbT;
+  D.lastHusbT=-99999;                       // you asked; the cooldown is not the point
+  startHusbandMove();
+  if(!D.husb){                              // the room will not allow either kind
+    D.lastHusbT=wasT;
+    toast(privacyRefusal('slap'),3200);
+    startRefusal('slap', privacyTier()==='strict'?'devout':privacyTier()==='mid'?'tempest':'kids');
+    return false; }
+  D.husb.asked=true;
+  return true;
+}
+/* =====================================================================
+   AN ACTUAL HAND
+   ---------------------------------------------------------------------
+   The slap was a ring of white pixels appearing out of nowhere with nobody
+   attached to it, which read as a stray particle rather than as a man doing
+   something. This is his arm: it comes across, it lands, it recoils. `from`
+   is which side he is on, so it swings the right way whichever end of the
+   room he walked in from.
+   ===================================================================== */
+function drawSlapArm(x, y, t, from, skin){
+  if(t>34) return 0;
+  const SK=skin||'#caa06a', HI=shade(SK,20), SH=shade(SK,-26);
+  const dir = from<0? 1 : -1;                 // he is left of her -> swings rightward
+  // three beats: cocked back, driven through, and recoiling off the contact
+  const k = t<10? (t/10) : t<16? 1 : Math.max(0, 1-(t-16)/18);
+  const swing = t<10? -(1-k)*13 : t<16? 0 : -(1-k)*7;
+  const hx = x + dir*(swing - 9);
+  /* ON the seat, not hovering over it. y-30 put the hand eight pixels clear of
+     where the bend actually puts her, so it read as a hand waving past. */
+  const hy = y - 22 - (t<10? (1-k)*8 : t<16? 0 : (1-k)*5);
+  const P=(a,b2,w2,h2,c2)=>{ ctx.fillStyle=c2;
+    ctx.fillRect(Math.round(a), Math.round(b2), Math.round(w2), Math.round(h2)); };
+  // the upper arm, back to his shoulder
+  P(hx - dir*6, hy+1, 7, 3, SK); P(hx - dir*6, hy+1, 7, 1, HI);
+  // the forearm
+  P(hx - dir*2, hy, 5, 4, SK); P(hx - dir*2, hy+3, 5, 1, SH);
+  // and the hand, flat and open
+  P(hx, hy-1, 6, 5, SK); P(hx, hy-1, 6, 1, HI); P(hx, hy+3, 6, 1, SH);
+  return t<16? 0 : 1;                         // 1 once contact has happened
+}
 function husbandMoveDue(){
   if(!G || !G.isFemale || !G.married || !G.wife || !G.wife.male || !ADULT) return false;
   const D=DM; if(!D || D.scene || D.drop || D.slap || D.rslap || D.tempt) return false;
@@ -11733,8 +11800,9 @@ function updateHusbandMove(dt){
   H.locks=true;
   const closing=Math.sign(D.x-H.x)||1;
   if(!H.fired) H.x += closing*0.70*dt;
-  if(!H.fired && Math.abs(H.x-D.x)<14){
-    H.fired=true; H.t=0;
+  if(!H.fired && Math.abs(H.x-D.x)<14){ H.fired=true; H.t=0; }
+  if(H.fired && !H.landed && H.t>=16){
+    H.landed=true;
     const be=((G.body&&G.body.booty)||5);
     slapKick((H.kind==='romantic'? 1.35 : 1.0) + be*0.10);
     const v = H.kind==='romantic'? romanticVerdict() : slapVerdict('villa');
@@ -11746,7 +11814,7 @@ function updateHusbandMove(dt){
     G.husbInitiated=(G.husbInitiated||0)+1;
     saveQuiet();
   }
-  if(H.fired && H.t>170){
+  if(H.landed && H.t>186){
     const v=H.v||{t:''};
     toast((H.kind==='romantic'? '💞 ':'👋 ')+'HE decided. '+(v.t||'')
       +'  ('+((v.bond||0)>=0?'+':'')+(v.bond||0)+' 💞)',5000);
@@ -11757,18 +11825,22 @@ function drawHusbandMove(){
   const D=DM, H=D.husb; if(!H) return; const FY=214, w=G.wife, T=D.t;
   const j=slapJig();
   // YOU, taking it, with the spring in you
-  drawWifeFig(ctx, D.x, FY, playerLook(), H.fired? clamp(Math.abs(j)*0.05,0,0.14) : 0,
-    H.fired? 'bend' : 'idle');                    // she takes it, and the bend rings on its own
-  if(H.fired) drawSlapAfter(D.x, FY, playerLook(), H.t, H.kind,
+  drawWifeFig(ctx, D.x, FY, playerLook(), H.landed? clamp(Math.abs(j)*0.05,0,0.14) : 0,
+    H.landed? 'bend' : 'idle');                   // she takes it, and the bend rings on its own
+  if(H.landed) drawSlapAfter(D.x, FY, playerLook(), H.t-16, H.kind,
     !!(H.v && (H.v.bond||0)>=0));
   // HIM, arriving on his own account
   ctx.save(); ctx.translate(H.x, FY);
   if(D.x < H.x) ctx.scale(-1,1);
   drawHusbandFig(ctx,0,0,G.wifeRel|0,w.skin,w.dress,w, H.fired?0:T*0.22, H.fired?'idle':'walk');
   ctx.restore();
-  if(H.fired && H.t<12){
-    ctx.globalAlpha=clamp(1-H.t/12,0,1);
-    for(let i=0;i<8;i++){ const a=(i/8)*6.283, r=3+H.t*1.8;
+  // HIS ARM, doing the thing. Without this the impact was a ring of pixels
+  // appearing beside her with nobody attached to it.
+  if(H.fired) drawSlapArm(D.x, FY, H.t, H.x-D.x, w.skin);
+  if(H.fired && H.t>=16 && H.t<28){
+    const q=H.t-16;
+    ctx.globalAlpha=clamp(1-q/12,0,1);
+    for(let i=0;i<8;i++){ const a=(i/8)*6.283, r=3+q*1.8;
       px(D.x+2+Math.cos(a)*r, FY-30+Math.sin(a)*r*0.6, 2,2,'#fff0dc'); }
     ctx.globalAlpha=1;
     px(D.x-6,FY-32,13,2,'rgba(255,240,220,.8)');
@@ -11890,7 +11962,7 @@ function drawDrop(){
       pixelText('▾', X.x, FY-18, near? '#e8c34a':'rgba(232,195,74,.5)', 1); ctx.textAlign='left'; }
   }
   // ---- HER, stooping for it. The fake shakes; the real one does not. ----
-  const bending = ['stoop','got','caught','bait','taken','ignored','resist'].includes(X.ph);
+  const bending = ['stoop','got','caught','bait','taken','ignored','resist','bentslap'].includes(X.ph);
   if(bending){
     const up = X.ph==='got'? clamp(1-X.t/50,0,1) : 1;
     drawWifeFig(ctx, D.x, FY, playerLook(), X.k*up, 'bend');
@@ -11899,10 +11971,39 @@ function drawDrop(){
     if(X.ph==='resist') drawElbowOver(D.x, FY, playerLook(), X.t);
     if(X.ph==='got' && X.t<50){ ctx.textAlign='center';
       pixelText('✓', D.x, FY-56, '#7ad48a', 1.2); ctx.textAlign='left'; }
-    if(X.shakeT>0){ ctx.textAlign='center';
-      pixelText('~', D.x+Math.sin(X.t*1.15)*4, FY-52, '#ff9ad8', 1.1); ctx.textAlign='left'; }
+    // the tell for whichever shake this is — one tilde, two, then a full arc
+    if(X.shakeT>0){ const st=Math.max(0,X.stage===-1?2:X.stage), sw=Math.sin(X.t*1.15);
+      ctx.textAlign='center';
+      pixelText(['~','~ ~','~ ~ ~'][st], D.x+sw*(3+st*2), FY-50-st*3,
+        'rgba(255,154,216,'+(0.55+st*0.2).toFixed(2)+')', 1.0+st*0.16);
+      ctx.textAlign='left';
+      // and motion lines off the seat, more of them the harder the swing
+      const seatY=FY-Math.round(9+((G.body&&G.body.legs)||6)*0.55)-9;
+      for(let i=0;i<=st;i++){
+        ctx.globalAlpha=clamp(X.shakeT/28,0,1)*0.5;
+        px(D.x-14-i*3+(sw>0?-2:2), seatY-i*3, 4, 1, '#ffd0ea');
+        px(D.x+11+i*3+(sw>0?-2:2), seatY-i*3, 4, 1, '#ffd0ea');
+        ctx.globalAlpha=1; }
+    }
   }
   // ---- HIM, crossing, stopped by a look, stepped back, or shoved off ----
+  if(X.ph==='bentslap'){
+    ctx.save(); ctx.translate(X.husbX, FY);
+    if(D.x<X.husbX) ctx.scale(-1,1);
+    drawHusbandFig(ctx,0,0,G.wifeRel|0,w.skin,w.dress,w,0,'idle');
+    ctx.restore();
+    drawSlapArm(D.x, FY, X.t, X.husbX-D.x, w.skin);
+    if(X.landed && X.t<28){ const q=X.t-16;
+      ctx.globalAlpha=clamp(1-q/12,0,1);
+      for(let i=0;i<8;i++){ const a=(i/8)*6.283, r=3+q*1.8;
+        px(D.x+2+Math.cos(a)*r, FY-30+Math.sin(a)*r*0.6, 2,2,'#fff0dc'); }
+      ctx.globalAlpha=1; }
+    if(X.landed) drawSlapAfter(D.x, FY, playerLook(), X.t-16, 'hand', true);
+    ctx.textAlign='center';
+    pixelText(X.t<16? '~ he does not say anything ~' : '👋 he did not ask',
+      W/2, 30, '#ffd0a0', 1.05);
+    ctx.textAlign='left';
+  }
   if(['stoop','caught','bait','taken','ignored','resist'].includes(X.ph)){
     const frozen = X.lookT>0 || X.backT>0;
     const away   = (X.ph==='bait'||X.ph==='ignored');
@@ -18870,6 +18971,7 @@ window.__SS = {
   DROP_PROPS, DROP_NEED, DROP_LOOKS, dropDue, startDrop, updateDrop, drawDrop,
   openIgnoredCard, husbandMoveDue, startHusbandMove, updateHusbandMove, drawHusbandMove,
   drawElbowOver, drawSlapAfter, startRefusal, updateRefusal, drawRefusal,
+  drawSlapArm, beckonHusband,
   FAMILY_EVENTS, familyDue, maybeFamily, openFamilyEvent, kidBand, kidAgeYears, heirPressure,
   SIBLING_LINES, siblingAside, drawDomus, romanticSwing, STRIKES,
   spouseTierName, tierBadge, slapLabel, drawSlap, startSlapAnim, startRomantic, drawHusbandFig, drawVillaMale,
