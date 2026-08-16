@@ -1671,17 +1671,29 @@ function bodyBlurb(w){
    the dowry as a number and a word, the figure in the plainest terms the
    game has, in the order that actually decides a match.
    ===================================================================== */
+/* THE TWO SEXES SHARE PART IDS AND MEAN DIFFERENT THINGS BY THEM. `booty` is
+   her seat and his SHOULDERS; `bust` is her chest and his; `waist` is her waist
+   and his midriff. Keying the words off the id alone produced "a fat shoulders"
+   on every broad-shouldered husband in the empire. Two lists, and the plural
+   parts get an article that agrees with them. */
 const BLUNT_WORDS={
-  bust:  ['flat','small','modest','decent','big','huge'],
-  booty: ['flat','small','modest','decent','fat','enormous'],
-  waist: ['thick','heavy','average','trim','tiny','absurd'],
-  legs:  ['stubby','short','average','long','very long','endless'],
-  face:  ['plain','rough','passable','pretty','beautiful','stunning'],
-  hairq: ['thin','poor','ordinary','good','fine','glorious'],
-  secret:['tiny','small','average','big','huge','absurd'],
+  f:{ bust:  ['flat','small','modest','decent','big','huge'],
+      booty: ['flat','small','modest','decent','fat','enormous'],
+      waist: ['thick','heavy','average','trim','tiny','absurd'],
+      legs:  ['stubby','short','average','long','very long','endless'],
+      face:  ['plain','rough','passable','pretty','beautiful','stunning'],
+      hairq: ['thin','poor','ordinary','good','fine','glorious'] },
+  m:{ bust:  ['sunken','narrow','solid','broad','huge','enormous'],
+      booty: ['narrow','slight','square','wide','huge','colossal'],
+      waist: ['soft','heavy','plain','firm','hard','carved'],
+      legs:  ['stubby','short','average','long','very long','endless'],
+      face:  ['plain','rough','passable','handsome','striking','magnificent'],
+      hairq: ['balding','thin','ordinary','full','thick','leonine'],
+      secret:['tiny','small','average','big','huge','absurd'] },
 };
-function bluntWord(id, v){
-  const t=BLUNT_WORDS[id]; if(!t) return null;
+const BLUNT_PLURAL={legs:1, booty:0, hairq:1};  // "long legs" and "thin hair", but "a wide back"
+function bluntWord(id, v, male){
+  const t=(BLUNT_WORDS[male?'m':'f']||{})[id]; if(!t) return null;
   if(v>=IMPOSSIBLE_V) return 'impossible';
   return t[clamp(Math.floor((v-1)/1.8),0,t.length-1)];
 }
@@ -1702,12 +1714,15 @@ function bluntBrief(w){
     .filter(o=>o.v<=3 || o.v>=7)
     .sort((a,b2)=>Math.abs(b2.v-5.5)-Math.abs(a.v-5.5));
   for(const o of rank.slice(0,3)){
-    const wd=bluntWord(o.P.id, o.v); if(!wd) continue;
-    bits.push('a '+wd+' '+o.P.name.toLowerCase());
+    const wd=bluntWord(o.P.id, o.v, male); if(!wd) continue;
+    const nm=o.P.name.toLowerCase();
+    const plural = BLUNT_PLURAL[o.P.id]===1 || /s$/.test(nm);
+    bits.push((plural? '' : /^[aeiou]/.test(wd)? 'an ' : 'a ') + wd + ' ' + nm);
   }
   if(bits.length===1) bits.push('and nothing else worth writing down');
   const looks=(w.looks===undefined?5:w.looks), sm=(w.smarts===undefined?5:w.smarts);
-  let tail=' — '+(looks>=9?'a great beauty':looks>=7?'good-looking':looks<=3?'plain':'ordinary-looking');
+  let tail=' — '+(looks>=9?(male?'a very handsome man':'a great beauty')
+                 :looks>=7?'good-looking':looks<=3?'plain':'ordinary-looking');
   tail += (sm>=9?' and very sharp':sm>=7?' and clever':sm<=3?' and slow':'');
   tail += '.';
   return bits.join(', ')+tail;
@@ -3111,10 +3126,12 @@ function drawBodyMap(cnv,w,view,tms){
      =================================================================== */
   if(SETTINGS.bluntBody && view!=='secret'){
     c.save();
-    c.translate(0, 69);                       // the sprite stands on y=0; the chart floor is 69
+    // the walk: the frame already carries sway and bob, but the LEGS have to be
+    // told to move or the toggle does nothing you can see
+    c.translate(0, 69 - bob*0.8);             // the sprite stands on y=0; the chart floor is 69
     if(view==='back') c.scale(-1,1);          // the far side of the same figure
     c.imageSmoothingEnabled=false;
-    try{ drawUndressedFig(c, 0, 0, w); }catch(e){}
+    try{ drawUndressedFig(c, 0, 0, w, bodyMapWalk? ph : undefined); }catch(e){}
     c.restore();
     // the slap still rings through it, and she still stands on something
     c.fillStyle='rgba(0,0,0,.30)';
@@ -3167,6 +3184,20 @@ function drawBodyMap(cnv,w,view,tms){
     // ---- THE OTHER LEDGER, and it gets the same three views the rest of the
     //      chart gets, because anything less would not be fair. ----
     c.restore();                                     // this view draws in screen space, not figure space
+    /* THE LEDGER BELONGS TO A BODY. In real-figure mode every other view shows
+       the actual sprite and this one silently went back to the diagram, so the
+       secret graph read as a chart about nobody. The real man stands beside his
+       own measurements now, at the same walk phase as the rest of the chart. */
+    if(SETTINGS.bluntBody){
+      c.save();
+      c.translate(26, H2-FOOT-8 - bob*1.2);
+      c.scale(1.5,1.5);
+      c.imageSmoothingEnabled=false;
+      try{ drawUndressedFig(c, 0, 0, w, bodyMapWalk? ph : undefined); }catch(e){}
+      c.restore();
+      c.globalAlpha=0.30; c.fillStyle='#000';
+      c.beginPath(); c.ellipse(26, H2-FOOT-8, 15, 3, 0,0,7); c.fill(); c.globalAlpha=1;
+    }
     const cx=FW/2, top=44, K=1.30;
     c.save(); c.translate(cx,top); c.scale(K,K); c.translate(-cx,-top);   // fill the taller chart
     const aro = secretAroused;
@@ -11302,7 +11333,11 @@ function drawSteamVeil(c, x, FY, T, w){
       clamp(1-ry/42,0,1)*0.13);
   }
 }
-function drawUndressedFig(c,x,y,w){
+/* `ph` is a walk phase in radians, and it is OPTIONAL — every existing caller
+   passes nothing and gets the standing figure it always got. The body chart
+   passes one, because a chart with a WALK toggle on it that does not move the
+   legs is just a chart with a broken toggle. */
+function drawUndressedFig(c,x,y,w,ph){
   const P=(a,b2,ww,h,col)=>{c.fillStyle=col;c.fillRect(Math.round(x+a),Math.round(y+b2),Math.round(ww),Math.round(h));};
   const skin=w.skin||'#e6bd94', hair=w.hair||'#5a3a1e', sh=shade(skin,-24), hi=shade(skin,20);
   const hHi=shade(hair,26), hSh=shade(hair,-24);
@@ -11317,8 +11352,14 @@ function drawUndressedFig(c,x,y,w){
     const legW = Math.round(3 + lg*0.12);
     const hdW  = Math.round(9 + fa*0.24), hdH = 9 + (fa>=9?2:fa>=7?1:0);
     const top  = -18-legL;                                    // where the hips sit
-    P(-legW-1,-legL-2,legW,legL,skin); P(1,-legL-2,legW,legL,sh);          // legs
-    P(-legW-2,-2,legW+2,2,'#8a5c34'); P(1,-2,legW+2,2,'#8a5c34');
+    /* SEEN HEAD-ON a stride is a scissor, not a slide: the legs part and close,
+       and the trailing one comes off the floor. Two and a half pixels of travel
+       was true and invisible; this is four, and the lift is what sells it. */
+    const _sw = ph===undefined? 0 : Math.sin(ph);
+    const STRm = _sw*(2.6+lg*0.20);
+    const lfL = Math.max(0,-_sw)*2.2, lfR = Math.max(0,_sw)*2.2;
+    P(-legW-1-STRm,-legL-2,legW,legL-lfL,skin); P(1+STRm,-legL-2,legW,legL-lfR,sh);
+    P(-legW-2-STRm,-2-lfL,legW+2,2,'#8a5c34'); P(1+STRm,-2-lfR,legW+2,2,'#8a5c34');
     /* HIS PELVIS. Both sexes were drawing the identical plain block here, which
        is simply wrong: a man's hips are NARROWER than his shoulders and run
        square, and the abdomen tapers into them in a V. Hers flare wider than
@@ -11353,8 +11394,11 @@ function drawUndressedFig(c,x,y,w){
   const hdW   = Math.round(8 - (fa>=9?1:0)), hdH = 8 + (fa>=7?1:0);
   const top   = -16-legL;
   P(-3,top-2,7,13,skin);                                                    // seat
-  P(-waistW/2-2,-legL-2,legL>0?4:0,legL,skin); P(1,-legL-2,4,legL,sh);      // legs
-  P(-5,-2,5,2,'#8a5c34'); P(0,-2,5,2,'#8a5c34');
+  const _swf = ph===undefined? 0 : Math.sin(ph);
+  const STRf = _swf*(2.4+lg*0.18);
+  const lfLf = Math.max(0,-_swf)*2.0, lfRf = Math.max(0,_swf)*2.0;
+  P(-waistW/2-2-STRf,-legL-2,legL>0?4:0,legL-lfLf,skin); P(1+STRf,-legL-2,4,legL-lfRf,sh);
+  P(-5-STRf,-2-lfLf,5,2,'#8a5c34'); P(0+STRf,-2-lfRf,5,2,'#8a5c34');
   // HER PELVIS — flaring out from a narrow waist and rounded off, not a slab
   P(-hipW+1,top-11,hipW*2-2,2,skin);                                        // the waist meeting the hip
   P(-hipW,top-9,hipW*2,9,skin); P(-hipW,top-9,hipW*2,1,hi);                 // the widest point
