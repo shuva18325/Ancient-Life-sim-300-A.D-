@@ -1662,6 +1662,56 @@ function bodyBlurb(w){
   if(!notes.length) return 'nothing remarkable either way — an ordinary figure';
   return notes.slice(0,3).join('; ');
 }
+/* =====================================================================
+   DIRECT SPOUSE DESCRIPTIONS  (Settings → Direct spouse descriptions)
+   ---------------------------------------------------------------------
+   partPhrase writes the way a Roman matchmaker wrote: flattering, oblique,
+   and never quite saying it, because saying it was the buyer's job. That is
+   the right default and it stays the default. Switched on, this says it —
+   the dowry as a number and a word, the figure in the plainest terms the
+   game has, in the order that actually decides a match.
+   ===================================================================== */
+const BLUNT_WORDS={
+  bust:  ['flat','small','modest','decent','big','huge'],
+  booty: ['flat','small','modest','decent','fat','enormous'],
+  waist: ['thick','heavy','average','trim','tiny','absurd'],
+  legs:  ['stubby','short','average','long','very long','endless'],
+  face:  ['plain','rough','passable','pretty','beautiful','stunning'],
+  hairq: ['thin','poor','ordinary','good','fine','glorious'],
+  secret:['tiny','small','average','big','huge','absurd'],
+};
+function bluntWord(id, v){
+  const t=BLUNT_WORDS[id]; if(!t) return null;
+  if(v>=IMPOSSIBLE_V) return 'impossible';
+  return t[clamp(Math.floor((v-1)/1.8),0,t.length-1)];
+}
+function bluntDowry(w){
+  const d=w.dowryCoin||0;
+  const word = d>=800?'a fat dowry' : d>=450?'a good dowry' : d>=180?'a fair dowry'
+             : d>=60?'a thin dowry' : 'almost no dowry';
+  return word+' ('+fmt(d)+'d)';
+}
+function bluntBrief(w){
+  const b=w.body||{}, male=!!(w&&w.male);
+  const bits=[bluntDowry(w)];
+  /* THE ORDER A MATCH IS ACTUALLY DECIDED IN — money, then the two or three
+     things the buyer was looking at, then the rest. Only the ones worth
+     mentioning: a middling score is not news. */
+  const rank = partsFor(w)
+    .map(P=>({P, v:(b[P.id]===undefined?5:b[P.id])}))
+    .filter(o=>o.v<=3 || o.v>=7)
+    .sort((a,b2)=>Math.abs(b2.v-5.5)-Math.abs(a.v-5.5));
+  for(const o of rank.slice(0,3)){
+    const wd=bluntWord(o.P.id, o.v); if(!wd) continue;
+    bits.push('a '+wd+' '+o.P.name.toLowerCase());
+  }
+  if(bits.length===1) bits.push('and nothing else worth writing down');
+  const looks=(w.looks===undefined?5:w.looks), sm=(w.smarts===undefined?5:w.smarts);
+  let tail=' — '+(looks>=9?'a great beauty':looks>=7?'good-looking':looks<=3?'plain':'ordinary-looking');
+  tail += (sm>=9?' and very sharp':sm>=7?' and clever':sm<=3?' and slow':'');
+  tail += '.';
+  return bits.join(', ')+tail;
+}
 // the short named readout: "BIG Bust · FAT Booty · TINY Waist"
 function bodyTierLine(w){
   const b=w.body||{}, male=!!(w&&w.male);
@@ -3047,6 +3097,33 @@ function drawBodyMap(cnv,w,view,tms){
   const CX=FW*0.5;
   const toScreenX=fx=>CX+fx*SC, toScreenY=fy=>TOP+fy*SC;
   c.save(); c.translate(CX,TOP); c.scale(SC,SC); c.translate(sway*0.7, -bob*0.9);
+  /* ===================================================================
+     THE REAL FIGURE, if you asked for it.
+     -------------------------------------------------------------------
+     The chart below this is an anatomical diagram: every mass is an
+     ellipse or a capsule, lit from the upper left. It is precise and it
+     reads well as a SURVEY, but it is not the person — the woman in the
+     villa and the woman on this chart were drawn by two different hands
+     and looked it. Switched on, the map draws drawUndressedFig: the same
+     sprite the bedchamber, the pool and the bend all use, at the same
+     proportions, blown up to fill the frame. Same gutter, same readout,
+     same scale — only the body is the real one.
+     =================================================================== */
+  if(SETTINGS.bluntBody && view!=='secret'){
+    c.save();
+    c.translate(0, 69);                       // the sprite stands on y=0; the chart floor is 69
+    if(view==='back') c.scale(-1,1);          // the far side of the same figure
+    c.imageSmoothingEnabled=false;
+    try{ drawUndressedFig(c, 0, 0, w); }catch(e){}
+    c.restore();
+    // the slap still rings through it, and she still stands on something
+    c.fillStyle='rgba(0,0,0,.30)';
+    c.beginPath(); c.ellipse(0,69,10,2.2,0,0,7); c.fill();
+    c.restore();
+    drawMapReadout(c,w,W2,H2,GUT,gv,male);
+    drawMapScale(c,W2,H2,imp);
+    return;
+  }
   /* ---- EVERY MASS IS MODELLED. A flat fill with an outline reads as a sticker;
      a fill with a light from the upper left and a shadow opposite reads as a
      body. Both primitives do it, so all four views gain it at once. ---- */
@@ -3668,7 +3745,7 @@ function openBodyMap(w,back){
   const bp = w.self? beautyPower() : null;
   $('bodymap-verdict').innerHTML=`<b style="color:${lk>=11?'#ff7ae0':st.col}">${lk>=11?'⛧ IMPOSSIBLE':st.name}</b> <span class="muted">— ${st.blurb}</span>
     <div class="small" style="margin-top:3px">${bodyTierLine(w)}</div>
-    <div class="small muted" style="margin-top:2px;font-style:italic">${bodyBlurb(w)}</div>
+    <div class="small muted" style="margin-top:2px;font-style:italic">${SETTINGS.blunt? bluntBrief(w) : bodyBlurb(w)}</div>
     ${w.self? (()=>{ const ss=selfStage(w), si=stageIndex(ss.name), SH=SHADOW_STAGES[ss.name]||{};
         return `<div class="small" style="margin-top:4px;padding:3px;border:1px solid ${ss.col};border-radius:3px">
           <b style="color:${ss.col}">◈ YOUR STAGE — ${ss.name} ◈</b>
@@ -4789,7 +4866,9 @@ function setAdult(on){ ADULT=!!on; try{ localStorage.setItem(ADULT_KEY, on?'1':'
 
 /* ---------- SETTINGS (sound · screen shake · difficulty), device-local ---------- */
 const SETTINGS_KEY='SANDSTEEL_SETTINGS';
-const SETTINGS=(function(){ const d={sound:true,shake:true,difficulty:'normal'};
+const SETTINGS=(function(){ const d={sound:true,shake:true,difficulty:'normal',
+    bluntBody:false,      // the chart draws the real game model instead of the diagram
+    blunt:false};         // and the marriage cards say what they mean
   try{ return Object.assign(d, JSON.parse(localStorage.getItem(SETTINGS_KEY)||'{}')); }catch(e){ return d; } })();
 function saveSettings(){ try{ localStorage.setItem(SETTINGS_KEY, JSON.stringify(SETTINGS)); }catch(e){} }
 const DIFF={ easy:{name:'Easy', foeHp:0.72, foeDmg:0.75}, normal:{name:'Normal', foeHp:1, foeDmg:1}, brutal:{name:'Brutal', foeHp:1.34, foeDmg:1.3} };
@@ -13450,6 +13529,18 @@ function buildSettings(){
     ()=>{ SETTINGS.sound=!SETTINGS.sound; muted=!SETTINGS.sound; saveSettings(); buildSettings(); if(SETTINGS.sound){ try{ sfx('clap'); }catch(e){} } });
   mkRow('📳 Screen shake','Camera shake on heavy hits.', SETTINGS.shake?'ON':'OFF', SETTINGS.shake,
     ()=>{ SETTINGS.shake=!SETTINGS.shake; saveSettings(); buildSettings(); });
+  mkRow('🧍 Real body chart',
+    'The body map is drawn as an anatomical diagram of shaded masses. Turn this ON and it draws the '
+    + 'ACTUAL figure the game uses everywhere else — the same sprite you see in the villa and the '
+    + 'bedchamber — blown up, with the measurements read off it.',
+    SETTINGS.bluntBody?'REAL':'CHART', SETTINGS.bluntBody,
+    ()=>{ SETTINGS.bluntBody=!SETTINGS.bluntBody; saveSettings(); buildSettings(); });
+  mkRow('💬 Direct spouse descriptions',
+    'Marriage cards are written as a Roman matchmaker would write them — flattering, oblique, and '
+    + 'never quite saying it. Turn this ON and they say it: what the dowry is, what the figure is, '
+    + 'in the plainest words available.',
+    SETTINGS.blunt?'DIRECT':'POLITE', SETTINGS.blunt,
+    ()=>{ SETTINGS.blunt=!SETTINGS.blunt; saveSettings(); buildSettings(); });
   const order=['easy','normal','brutal'];
   mkRow('⚔ Difficulty','Scales foe health &amp; damage.', DIFF[SETTINGS.difficulty].name, SETTINGS.difficulty==='brutal',
     ()=>{ const i=order.indexOf(SETTINGS.difficulty); SETTINGS.difficulty=order[(i+1)%order.length]; saveSettings(); buildSettings(); });
@@ -17108,7 +17199,7 @@ function openMarry(forced){
           ? '💇 '+hairStyleName(w.hairStyle||hairStyleFallback(w),true)+' · '+beardName(w.beard||beardFallback(w))+' · 👘 '+outfitName(w.outfit||outfitFallback(w))
           : '💇 '+hairStyleName(w.hairStyle||hairStyleFallback(w),false)}</div>
        <div class="small" style="margin:2px 0"><b style="color:${st.col}">${st.name}</b> <span class="muted">— ${st.blurb}</span></div>
-       ${G.hasBodyMap? `<div class="small muted" style="font-style:italic">${bodyBlurb(w)}</div>` : '<div class="small muted" style="font-style:italic">buy the BODY MAP to see exactly what you are getting</div>'}
+       ${G.hasBodyMap? `<div class="small muted" style="font-style:italic">${SETTINGS.blunt? bluntBrief(w) : bodyBlurb(w)}</div>` : '<div class="small muted" style="font-style:italic">buy the BODY MAP to see exactly what you are getting</div>'}
        ${statPips(w)}
        <div class="small">${traitsHtml(w)}</div>
        ${(()=>{ /* A BOON OR A BANE CHANGES THE DECISION, so it gets said out loud
@@ -18971,7 +19062,7 @@ window.__SS = {
   DROP_PROPS, DROP_NEED, DROP_LOOKS, dropDue, startDrop, updateDrop, drawDrop,
   openIgnoredCard, husbandMoveDue, startHusbandMove, updateHusbandMove, drawHusbandMove,
   drawElbowOver, drawSlapAfter, startRefusal, updateRefusal, drawRefusal,
-  drawSlapArm, beckonHusband,
+  drawSlapArm, beckonHusband, SETTINGS, saveSettings, buildSettings, bluntBrief,
   FAMILY_EVENTS, familyDue, maybeFamily, openFamilyEvent, kidBand, kidAgeYears, heirPressure,
   SIBLING_LINES, siblingAside, drawDomus, romanticSwing, STRIKES,
   spouseTierName, tierBadge, slapLabel, drawSlap, startSlapAnim, startRomantic, drawHusbandFig, drawVillaMale,
