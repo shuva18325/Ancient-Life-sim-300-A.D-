@@ -1509,13 +1509,35 @@ function beardName(id){ const B=BEARD_M.find(b=>b.id===id); return B? B.name : i
 // old saves and anyone rolled before this existed still needs a head of hair
 /* A spouse saved before quirks existed has none, and would show a blank row
    where the middle tier belongs. Roll them once, then leave them alone. */
+/* THE SEX IS SET AFTER THE ROLL. makeBride() does not take one — every caller
+   does `const w=makeBride(...); w.male=true` afterwards — so traits are rolled
+   before anyone knows whose they are. This runs from ensureLook, which every
+   path goes through, and swaps out anything that belongs to the other sex. */
+function fixTraitsForSex(w){
+  if(!w || !Array.isArray(w.traits) || w._sexFixed) return w;
+  w._sexFixed=true;
+  const male=!!w.male;
+  /* THE ROLL WAS BLIND, SO RE-ROLL IT KNOWING. Only swapping out the traits
+     that turned out to be the wrong sex gave husbands Priapic once in three
+     hundred, because it could only appear as a REPLACEMENT for the Tempting a
+     man happened to roll. Same count, same quality gate, correct pool — so his
+     own trait comes up as often for him as hers does for her. */
+  const n=w.traits.length;
+  if(!n) return w;
+  const pool=WIFE_TRAITS.filter(t=>!(t.male&&!male) && !(t.female&&male)
+    && (w.quality===undefined || w.quality>=t.min));
+  if(!pool.length) return w;
+  const sh=[...pool].sort(()=>Math.random()-0.5);
+  w.traits=sh.slice(0,Math.min(n,sh.length)).map(t=>t.id);
+  return w;
+}
 function ensureQuirks(w){ if(!w) return w;
   if(!w.quirks) w.quirks=rollQuirks();
   if(!w.boons)  w.boons =rollBoons(w.quality);
   if(!w.banes)  w.banes =rollBanes(w.quality);
   return w; }
 function ensureLook(w){
-  ensureQuirks(w);
+  ensureQuirks(w); fixTraitsForSex(w);
   if(!w) return w;
   const eth=w.eth||'roman';
   if(!w.hairStyle) w.hairStyle = pick((w.male? HAIR_M_BY_ETH : HAIR_F_BY_ETH)[eth] || (w.male?['caesar']:['crown']));
@@ -2551,7 +2573,13 @@ const WIFE_TRAITS=[
   {id:'greenhand',name:'Green-fingered',icon:'🌱',min:4,desc:'Vines, olives, grain — the land simply does better under her eye.'},
   {id:'musical',  name:'Musical',    icon:'🎼', min:5, desc:'Lyre and voice. Guests stay late and leave fond of your house.'},
   {id:'shrewd',   name:'Shrewd',     icon:'⚖', min:6, desc:'She reads a contract the way a haruspex reads a liver, and finds the rot.'},
-  {id:'tempting', name:'Tempting',   icon:'🍑', min:5, desc:'There is always something on the LOW shelf, and she never once hurries.'},
+  {id:'tempting', name:'Tempting',   icon:'🍑', min:5, female:true,
+   desc:'There is always something on the LOW shelf, and she never once hurries.'},
+  /* THE OTHER SIDE OF IT. Tempting is a thing a wife does to a room; this is a
+     thing a husband cannot help doing IN one. Priapus was a god of gardens.
+     He is not thinking about gardens. */
+  {id:'priapic',  name:'Priapic',    icon:'🏛', min:5, male:true,
+   desc:'Priapus was a god of gardens. He is not thinking about gardens.'},
 ];
 // ---- FLAWS. Every house has them. Red where the gifts are green. ----
 const WIFE_FLAWS=[
@@ -2855,9 +2883,11 @@ function tierBadge(t, male){ const T=TIERS[t]||TIERS.common;
 function traitById(id){ return WIFE_TRAITS.find(t=>t.id===id); }
 function traitLabel(id){ const t=traitById(id); return t? t.icon+' '+t.name : id; }
 // quality 0..10 → how many traits, how good the body/mind
-function rollTraits(quality){
+function rollTraits(quality, male){
   const out=[];
-  const pool=WIFE_TRAITS.filter(t=>quality>=t.min);
+  // a few of these belong to one sex — Tempting is hers, Priapic is his
+  const pool=WIFE_TRAITS.filter(t=>quality>=t.min
+    && !(t.male && !male) && !(t.female && male));
   const n = quality>=9?3 : quality>=7?2 : quality>=5?1 : (Math.random()<0.35?1:0);
   const shuffled=[...pool].sort(()=>Math.random()-0.5);
   for(let i=0;i<n && i<shuffled.length;i++) out.push(shuffled[i].id);
@@ -2933,7 +2963,10 @@ function makeBride(eth, noble, quality, opts){
   const body=bodyRoll; body.secret=clamp(Math.round(quality + rnd(-3,3)),1,10);
   const b = {
     eth, adj:D.adj, rank: noble?'noble':'peasant', build, tier, body,
-    quality, looks, smarts, traits: rollTraits(quality), flaws: rollFlaws(quality),
+    /* makeBride does not know the sex — callers set w.male afterwards — so the
+       roll is done blind and fixTraitsForSex (via ensureLook) swaps out
+       anything that turned out to belong to the other one. */
+    quality, looks, smarts, traits: rollTraits(quality, opts.male), flaws: rollFlaws(quality),
     quirks: rollQuirks(),          // and the middle tier, which quality does not buy you out of
     boons: rollBoons(quality), banes: rollBanes(quality),   // and the two rare outer bands
     name: pick(D.names)+' '+pick(D.surn),
@@ -11698,6 +11731,8 @@ function updateDomus(dt){
   if(D.tempt){ updateTempt(dt); if(D.tempt && D.tempt.locks) return; }
   else if(temptDue()) startTempt();
   if(D.refuse) updateRefusal(dt);                     // a refusal plays over whatever else is happening
+  if(D.rise){ updateRise(dt); if(D.rise && D.rise.locks) return; }
+  else if(riseDue()) startRise();
   if(D.husb){ updateHusbandMove(dt); return; }        // he is already crossing; nothing interrupts that
   if(D.drop){ updateDrop(dt); if(D.drop && D.drop.locks) return; }
   else if(dropDue()) startDrop();
@@ -12294,6 +12329,179 @@ function drawRefusal(){
     W/2, 34, '#ff9a8a', 1.06);
   ctx.textAlign='left';
   ctx.globalAlpha=1;
+}
+/* =====================================================================
+   THE RISE  —  🏛 PRIAPIC, and what a woman does about it
+   ---------------------------------------------------------------------
+   Tempting is a thing a wife DOES: she finds the low shelf and takes her
+   time over it, and the game is whether you keep your head. A husband with
+   this trait is not doing anything. That is the joke and it is also the
+   design: it arrives on its own, in five stages you can watch, and by the
+   fifth there is no pretending it is the drape of the cloth.
+
+     0  nothing. He is reading.
+     1  the cloth sits differently. It could be the cloth.
+     2  it is not the cloth.
+     3  he has stopped reading and has not turned a page in some time.
+     4  he puts the scroll down.
+
+   Then he crosses, and you play NOT NOW: three refusals, each one weaker
+   than the last, against a man who is not being unreasonable — he is just
+   very obviously not going away. Hold him off and he goes back to his
+   scroll with enormous dignity. Do not, and he does not.
+   ===================================================================== */
+const RISE_STAGES=5;
+const RISE_LINES=[
+  'He is reading.',
+  '…the cloth is sitting differently.',
+  'That is not the cloth.',
+  'He has not turned a page in some time.',
+  'He puts the scroll down.',
+];
+/* THE BUMP, in five. Drawn over whatever he is wearing, at his hip, growing
+   from a fold you could argue with into one you cannot. */
+function drawTunicBump(x, y, w, stage, T){
+  if(stage<=0) return;
+  const B=(w&&w.body)||{}, gv=(id,d)=>B[id]===undefined?d:B[id];
+  const len=gv('secret',5), lg=gv('legs',6);
+  const tun=w.dress||w.tunic||'#7a2f22';
+  const skin=w.skin||'#caa06a';
+  const legLen=Math.round(15+lg*0.62), hipY=y-18-legLen+6;
+  const k=clamp(stage/(RISE_STAGES-1),0,1);
+  const rise=(1.6+len*0.55)*k;
+  const th=Math.max(2,Math.round(1.4+len*0.14));
+  const P=(a,b2,ww,h,c2)=>{ ctx.fillStyle=c2;
+    ctx.fillRect(Math.round(x+a),Math.round(b2),Math.round(ww),Math.round(h)); };
+  // under the cloth it TENTS: the fabric lifts and takes a highlight along the ridge
+  const pl=Math.max(1,Math.round(rise));
+  for(let i=0;i<pl;i++){ const t2=i/Math.max(1,pl-1);
+    const yy=hipY-2-Math.round(t2*rise*0.42);
+    P(2+i, yy, 1, th, stage>=4? skin : tun);
+    P(2+i, yy, 1, 1, stage>=4? shade(skin,20) : shade(tun,26)); }
+  if(stage>=4){                                    // by the last one the hem has given up
+    P(2+pl, hipY-2-Math.round(rise*0.42), th, th, mixHex(skin,'#c07a68',0.34));
+    P(1, hipY+1, th+1, th+1, mixHex(skin,'#2a150a',0.16));
+  } else if(stage>=2){
+    P(2+pl, hipY-2-Math.round(rise*0.4), th, 2, shade(tun,-20));
+  }
+  // and he is aware of it: a bead of sweat from stage two, a look away from three
+  if(stage>=2 && ((T|0)%40)<20){ ctx.textAlign='center';
+    pixelText('💧', x-9, hipY-26, 'rgba(190,220,255,.75)', 0.9); ctx.textAlign='left'; }
+  if(stage>=3 && ((T|0)%30)<16){ ctx.textAlign='center';
+    pixelText('…', x+11, hipY-30, 'rgba(255,214,190,.8)', 1); ctx.textAlign='left'; }
+}
+function riseDue(){
+  if(!G || !G.isFemale || !G.married || !G.wife || !G.wife.male || !ADULT) return false;
+  if(!hasTrait('priapic')) return false;
+  const D=DM; if(!D || D.scene || D.drop || D.slap || D.rslap || D.tempt || D.husb || D.rise) return false;
+  if((D.t||0) - (D.lastRiseT===undefined? -9999 : D.lastRiseT) < 2600) return false;
+  return Math.random() < 0.0018;
+}
+function startRise(){
+  const D=DM; if(!D) return;
+  D.lastRiseT=D.t;
+  D.rise={ ph:'build', t:0, stage:0, x:D.wifeX, locks:false,
+           nos:3, noT:0, push:0, patience:0, gave:false };
+}
+const RISE_NEED=100;                                  // how much refusing it takes to send him back
+function updateRise(dt){
+  const D=DM, X=D.rise; if(!X) return; X.t+=dt;
+  if(X.ph==='build'){
+    // five stages, about a second and a half each. You can walk away during this.
+    X.stage=Math.min(RISE_STAGES-1, Math.floor(X.t/90));
+    if(X.t>90*RISE_STAGES){ X.ph='cross'; X.t=0; }
+  } else if(X.ph==='cross'){
+    X.locks=true;
+    const closing=Math.sign(D.x-X.x)||1;
+    X.x += closing*0.62*dt;
+    if(Math.abs(X.x-D.x)<16){ X.ph='notnow'; X.t=0; }
+  } else if(X.ph==='notnow'){
+    /* NOT NOW. He advances on his own patience; every refusal costs him some
+       of it and costs you one of only three, and the third is not a refusal
+       any more, it is a delay. */
+    X.locks=true;
+    if(X.noT>0){ X.noT-=dt; }
+    else { X.patience += 0.42*dt; }
+    if(consume('w')||consume('space')||consume('attack')){
+      if(X.nos>0){
+        X.nos--;
+        const power=[0,0.30,0.44,0.62][X.nos+1] || 0.30;
+        X.push += RISE_NEED*power;
+        X.noT = 34 + X.nos*10;
+        X.patience = Math.max(0, X.patience-14);
+        D.hearts.push({x:X.x,y:180,vy:0.5,life:36,c:'#9ad4ff'});
+      }
+    }
+    if(X.push>=RISE_NEED){ X.ph='held'; X.t=0; }
+    else if(X.patience>=100){ X.ph='gave'; X.t=0; X.gave=true; }
+  } else if(X.ph==='held'){
+    X.locks=true;
+    if(X.t>150){ D.rise=null; D.wifePause=0;
+      G.risesHeld=(G.risesHeld||0)+1;
+      G.honor=clamp((G.honor||50)+1,0,100);
+      G.wifeRel=clamp(G.wifeRel-1,0,bondCeiling());
+      toast(pick([
+        '🏛 “Later.” He returns to the scroll with enormous dignity and reads none of it.',
+        '🏛 “Not NOW.” He agrees that it is not now. He remains extremely close by.',
+        '🏛 He goes back to his chair. The chair is no help to him at all.']),4400);
+      saveQuiet(); }
+  } else if(X.ph==='gave'){
+    X.locks=true;
+    if(X.t>130){ const ax=D.x; D.rise=null; D.wifePause=0;
+      G.risesTook=(G.risesTook||0)+1;
+      if(privacyNeeded('romantic')){ toast(privacyRefusal('romantic'),3400);
+        startRefusal('romantic', privacyTier()==='strict'?'devout':privacyTier()==='mid'?'tempest':'kids');
+        saveQuiet(); return; }
+      if(loveLeft('quick')>0 && spouseWilling()) startVillaLove(ax, true);
+      else { G.wifeRel=clamp(G.wifeRel+3,0,bondCeiling());
+        G.wifePhys=clamp((G.wifePhys||45)+6,0,100);
+        toast('💞 You stop saying not now. He had run out of patience some minutes ago.',4000);
+        saveQuiet(); } }
+  }
+}
+function drawRise(){
+  const D=DM, X=D.rise; if(!X) return; const FY=214, w=G.wife, T=D.t;
+  // ---- HIM: reading, then not reading, then not pretending ----
+  const hx = (X.ph==='build')? X.x : X.x;
+  ctx.save(); ctx.translate(hx, FY);
+  if(D.x<hx) ctx.scale(-1,1);
+  drawHusbandFig(ctx,0,0,G.wifeRel|0,w.skin,w.dress,w,
+    X.ph==='cross'? T*0.22 : 0, X.ph==='cross'? 'walk':'idle');
+  ctx.restore();
+  if(X.ph==='build' && X.stage<4){                  // the scroll, until he puts it down
+    px(hx-4,FY-40,9,6,'#e6dcc2'); px(hx-4,FY-40,9,1,'#f6efdc'); px(hx-4,FY-40,1,6,'#b8a882'); }
+  drawTunicBump(hx, FY, w, X.ph==='build'? X.stage : RISE_STAGES-1, T);
+  // ---- YOU ----
+  drawWifeFig(ctx, D.x, FY, playerLook(), 0, 'idle');
+  ctx.textAlign='center';
+  if(X.ph==='build'){
+    pixelText(RISE_LINES[X.stage], W/2, 30,
+      X.stage>=3? '#ffd0da' : X.stage>=1? 'rgba(255,214,190,.9)' : 'rgba(255,214,190,.6)', 1.04);
+    // the five pips, so you can see how long you have
+    const bx=W/2-24;
+    for(let i=0;i<RISE_STAGES;i++)
+      px(bx+i*10, 40, 7, 3, i<=X.stage? (i>=3?'#e0705b':'#e8c34a') : '#4a3826');
+    if(X.stage>=2) pixelText('you could leave the room', W/2, H-18, 'rgba(190,214,255,.75)', 1);
+  }
+  else if(X.ph==='cross') pixelText('~ he has put the scroll down ~', W/2, 30, '#ffd0da', 1.05);
+  else if(X.ph==='notnow'){
+    const bx=W/2-70, by=H-40, bw=140, bh=9;
+    px(bx-2,by-2,bw+4,bh+4,'#120c08');
+    px(bx,by,bw,bh,'#2e2218'); px(bx,by,bw,1,'#4a3826');
+    const f=clamp(X.push/RISE_NEED,0,1);
+    px(bx,by,bw*f,bh,'#9ad4ff'); px(bx,by,bw*f,1,'#d0ecff');          // how far you have pushed him back
+    const pf=clamp(X.patience/100,0,1);
+    px(bx,by+bh+2,bw*pf,2, pf>0.7? '#e0705b':'#a06a5b');              // and how far he has come on
+    for(let i=0;i<3;i++) px(bx+bw/2-13+i*10, by-9, 7, 3, i<X.nos? '#9ad4ff':'#4a3826');
+    pixelText('“NOT NOW” — W or SPACE   ('+X.nos+' left)', W/2, 26, '#9ad4ff', 1.04);
+    pixelText(X.noT>0? '— he has stopped, briefly —'
+            : pf>0.72? '— he is not going away —'
+            : X.nos===0? '— you are out of nots —' : '— he is very close —',
+      W/2, by+22, 'rgba(200,220,255,.85)', 1);
+  }
+  else if(X.ph==='held') pixelText('“…later.”', W/2, 34, '#9ad4ff', 1.06);
+  else if(X.ph==='gave') pixelText('“…fine. FINE.”', W/2, 34, '#ffd0da', 1.06);
+  ctx.textAlign='left';
 }
 function drawDrop(){
   const D=DM, X=D.drop; if(!X) return; const FY=214, w=G.wife, T=D.t;
@@ -13352,7 +13560,10 @@ function drawTempt(){
     const f=clamp(X.hold/100,0,1), col = f>0.55?'#7ad48a' : f>0.28?'#e8c34a' : '#e0533a';
     px(bx,by,Math.round(bw*f),12,col); px(bx,by,Math.round(bw*f),2,shade(col,40));
     ctx.textAlign='center';
-    pixelText('HOLD YOURSELF TOGETHER — MASH  SPACE', W/2, 26, '#ffd0da', 1.05);
+    pixelText('DO NOT DO IT — MASH  SPACE', W/2, 26, '#ffd0da', 1.05);
+    // the same five stages her husband gets, so both sides read the same way
+    { const st5=Math.min(4,Math.floor((1-clamp(X.hold/100,0,1))*5)), bx5=W/2-24;
+      for(let i=0;i<5;i++) px(bx5+i*10, 40, 7, 3, i<=st5? (i>=3?'#e0705b':'#e8c34a') : '#4a3826'); }
     if(f<0.62) pixelText(f<0.3? '— it is getting away from you —' : '— you are losing this —',
       W/2, by+22, 'rgba(255,190,170,.85)', 1);
     pixelText(X.hits+' / '+TEMPT_NEED, W/2, by+10, '#120c08', 1.15);
@@ -13507,6 +13718,7 @@ function drawDomus(){
       if(D.rslap){ drawRomantic(); }                    // the other kind of reminder
       else if(D.slap){ drawSlap(); }                    // she is being reminded you are in the room
       else if(D.tempt){ drawTempt(); }                  // she is busy with the low shelf
+      else if(D.rise){ /* the rise draws him where HE is */ }
       else if(D.husb){ /* his own move draws both of them */ }
       else if(D.drop && D.drop.ph!=='fall'){ /* the drop draws him where HE is, not where he idles */ }
       else if(w.male) drawHusbandFig(ctx,D.wifeX,FY,G.wifeRel|0,w.skin,w.dress,w,wPh,wMode);
@@ -13534,10 +13746,12 @@ function drawDomus(){
     /* THE ROMANTIC SCENE DRAWS ITS OWN MALE. This ran unconditionally, so his
        ordinary walking sprite stayed on screen standing next to the undressed
        one the scene was drawing — two of him, every time. */
+    if(D.rise) drawRise();                              // 🏛 and he is not doing anything, he says
     if(D.refuse) drawRefusal();                         // “no”, with a hand out and a reason
     if(D.husb) drawHusbandMove();                       // he crossed the room without being asked
     if(D.drop) drawDrop();                              // the floor, her, and him crossing to it
-    if(!D.rslap && !D.husb && !(D.drop && D.drop.ph!=='fall')){ const mv=(held.a||held.d), run=mv&&held.s, turning=(D.turn||0)>0;
+    if(!D.rslap && !D.husb && !(D.rise && D.rise.ph!=='build')
+       && !(D.drop && D.drop.ph!=='fall')){ const mv=(held.a||held.d), run=mv&&held.s, turning=(D.turn||0)>0;
       drawDomusPlayer(D.x,FY,
         turning? 1-(D.turn/14) : (mv? D.t*(run?0.6:0.35) : 0),
         turning? 'turn' : (run?'run':(mv?'walk':'idle'))); }
@@ -19328,6 +19542,8 @@ window.__SS = {
   drawElbowOver, drawSlapAfter, startRefusal, updateRefusal, drawRefusal,
   drawSlapArm, beckonHusband, SETTINGS, saveSettings, buildSettings, bluntBrief,
   drawChartFig, chartLandmarks,
+  RISE_STAGES, RISE_NEED, RISE_LINES, riseDue, startRise, updateRise, drawRise, drawTunicBump,
+  fixTraitsForSex, WIFE_TRAITS, rollTraits, hasTrait,
   FAMILY_EVENTS, familyDue, maybeFamily, openFamilyEvent, kidBand, kidAgeYears, heirPressure,
   SIBLING_LINES, siblingAside, drawDomus, romanticSwing, STRIKES,
   spouseTierName, tierBadge, slapLabel, drawSlap, startSlapAnim, startRomantic, drawHusbandFig, drawVillaMale,
