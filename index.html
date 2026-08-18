@@ -4166,6 +4166,20 @@ function openBodyMap(w,back){
       if(bodyMapWalk) startBodyMapAnim(); else { stopBodyMapAnim(); redraw(); }
       try{sfx('ui');}catch(e){} };
     sv.appendChild(wk);
+    /* THE SWITCH HAS TO BE WHERE THE THING IS. It only existed on the Settings
+       screen, and Settings is reachable ONLY from the title — so once you were
+       in a career there was no way to reach it at all and the real chart could
+       not be turned off. It lives on the chart it controls now, next to the
+       other two things that change how the chart looks. */
+    const rb=document.createElement('button'); rb.className='btn sm'+(SETTINGS.bluntBody?' gold':'');
+    rb.style.minWidth='112px';
+    rb.textContent = SETTINGS.bluntBody? '🧍 REAL' : '◍ DIAGRAM';
+    rb.title = 'REAL draws the actual figure the game uses everywhere else. DIAGRAM draws '
+             + 'the anatomical chart of shaded masses, which is easier to read a measurement off. '
+             + 'Remembered on this device.';
+    rb.onclick=()=>{ SETTINGS.bluntBody=!SETTINGS.bluntBody; saveSettings();
+      bmResetCache(); buildSub(); redraw(); try{sfx('ui');}catch(e){} };
+    sv.appendChild(rb);
   };
   views.forEach(([id,label])=>{
     const bt=document.createElement('button'); bt.className='btn sm'; bt.textContent=label;
@@ -7920,6 +7934,53 @@ function openCheats(){
   btn(r,'MY LOOKS/WITS 10',()=>{ G.looks=10; G.smarts=10; });
   btn(r,'+30 RATIONS · CHARIOT',()=>{ G.food+=30; G.mount=3; G.boat=true; });
   btn(r,'ALL GEAR OWNED',()=>{ for(const cat of ['weapon','shield','helmet','armor']) GEAR[cat].forEach(g2=>{ if(!G.owned[cat].includes(g2.id)) G.owned[cat].push(g2.id); }); G.pila=15; });
+
+  /* ---- ⚭ THE SPOUSE'S TRAITS, one button each ----
+     Several traits belong to one sex — Tempting is a wife's, Priapic is a
+     husband's — so playing a man you will never roll Priapic and playing a
+     woman you will never roll Tempting, which is correct and also means there
+     was no way to LOOK at half of them. Every trait is one tap here, on
+     whoever you actually married, and it says plainly which are which. */
+  if(G.married && G.wife){
+    const w=G.wife, male=!!w.male;
+    const rr=card('⚭ '+String(w.name||'YOUR SPOUSE').split(' ')[0].toUpperCase()+'’S TRAITS',
+      '— tap to give or take away. '+(male?'He is a husband, so a husband\'s traits apply.'
+                                          :'She is a wife, so a wife\'s traits apply.'));
+    WIFE_TRAITS.forEach(T=>{
+      const has=(w.traits||[]).includes(T.id);
+      const wrongSex = (T.male&&!male) || (T.female&&male);
+      const x=document.createElement('button'); x.className='btn sm'+(has?' gold':'');
+      x.textContent=(has?'✔ ':'')+T.icon+' '+T.name+(wrongSex? ' ⚠':'');
+      x.title = T.desc + (wrongSex
+        ? '  ⚠ This one belongs to the other sex — it will never roll on this spouse, but you can force it here.'
+        : '');
+      if(wrongSex) x.style.opacity='0.72';
+      x.onclick=()=>{
+        w.traits=w.traits||[];
+        if(has) w.traits=w.traits.filter(id=>id!==T.id);
+        else w.traits.push(T.id);
+        w._sexFixed=true;                       // do not let ensureLook re-roll what you just chose
+        refreshStatbar(); saveQuiet(); openCheats();
+      };
+      rr.appendChild(x);
+    });
+    const clr=document.createElement('button'); clr.className='btn sm';
+    clr.textContent='✖ CLEAR ALL';
+    clr.onclick=()=>{ w.traits=[]; w._sexFixed=true; saveQuiet(); openCheats(); };
+    rr.appendChild(clr);
+    // and the quirks alongside them, since they drive as much of the villa
+    const qr=card('⚭ …AND THEIR QUIRKS','— the middle band: an upside and a downside each.');
+    WIFE_QUIRKS.forEach(Q=>{
+      const has=(w.quirks||[]).includes(Q.id);
+      const x=document.createElement('button'); x.className='btn sm'+(has?' gold':'');
+      x.textContent=(has?'✔ ':'')+Q.icon+' '+Q.name;
+      x.title=qText(Q,'desc',male)+'   ▲ '+qText(Q,'up',male)+'   ▼ '+qText(Q,'down',male);
+      x.onclick=()=>{ w.quirks=w.quirks||[];
+        w.quirks = has? w.quirks.filter(id=>id!==Q.id) : w.quirks.concat([Q.id]);
+        saveQuiet(); openCheats(); };
+      qr.appendChild(x);
+    });
+  }
 }
 // faction picker → the race
 function openCircus(){
@@ -13993,7 +14054,21 @@ $('btn-help-back').onclick=()=>show(prevHelp||'scr-title');
 let prevHelp=null;
 
 /* ---------- SETTINGS screen ---------- */
-function openSettings(){ show('scr-settings'); buildSettings(); }
+/* AND IT PUTS YOU BACK WHERE YOU WERE. The back button went to the title
+   unconditionally, so opening Settings from anywhere but the title threw away
+   whatever you were doing — which is most of the reason it was only ever wired
+   to the title in the first place. */
+let settingsFrom=null;
+function openSettings(from){
+  settingsFrom = from || (document.querySelector('.screen.on')||{}).id || 'scr-title';
+  if(settingsFrom==='scr-settings') settingsFrom='scr-title';
+  show('scr-settings'); buildSettings();
+}
+function closeSettings(){
+  const back=settingsFrom||'scr-title'; settingsFrom=null;
+  if(back==='scr-map' && typeof enterMap==='function'){ enterMap(); return; }
+  show(back);
+}
 function buildSettings(){
   const b=$('settings-body'); if(!b) return; b.innerHTML='';
   const mkRow=(label,desc,valText,gold,onClick)=>{
@@ -14034,7 +14109,7 @@ function buildSettings(){
 }
 function refreshSettings(){ const el=$('settings-body'); if(el && el.children.length) buildSettings(); }
 $('btn-settings').onclick=()=>openSettings();
-$('btn-settings-back').onclick=()=>show('scr-title');
+$('btn-settings-back').onclick=()=>closeSettings();
 
 /* ---------- STATS & ACHIEVEMENTS screen ---------- */
 function openStats(){ show('scr-stats'); buildStats(); }
@@ -19543,7 +19618,7 @@ window.__SS = {
   drawSlapArm, beckonHusband, SETTINGS, saveSettings, buildSettings, bluntBrief,
   drawChartFig, chartLandmarks,
   RISE_STAGES, RISE_NEED, RISE_LINES, riseDue, startRise, updateRise, drawRise, drawTunicBump,
-  fixTraitsForSex, WIFE_TRAITS, rollTraits, hasTrait,
+  fixTraitsForSex, WIFE_TRAITS, rollTraits, hasTrait, openSettings, closeSettings,
   FAMILY_EVENTS, familyDue, maybeFamily, openFamilyEvent, kidBand, kidAgeYears, heirPressure,
   SIBLING_LINES, siblingAside, drawDomus, romanticSwing, STRIKES,
   spouseTierName, tierBadge, slapLabel, drawSlap, startSlapAnim, startRomantic, drawHusbandFig, drawVillaMale,
