@@ -260,6 +260,15 @@
     </div>
   </div>
 
+  <!-- ===== THE WOOHOO GUIDE — every villa scene, what starts it, what stops it ===== -->
+  <div id="scr-woohoo" class="screen center">
+    <div class="panel pad col gap scrollbox" style="width:min(96%,720px);max-height:94%;">
+      <h2 style="color:var(--gold)">🏛 THE VILLA — HOW ANY OF THIS WORKS</h2>
+      <div id="woohoo-body" class="col gap"></div>
+      <div class="row" style="justify-content:flex-end;"><button class="btn gold" id="btn-woohoo-back">◀ BACK</button></div>
+    </div>
+  </div>
+
   <!-- ===== STATS & ACHIEVEMENTS ===== -->
   <div id="scr-stats" class="screen center">
     <div class="panel pad col gap scrollbox" style="width:min(94%,640px);max-height:92%;">
@@ -299,6 +308,7 @@
       <button class="btn" id="btn-intrigue">🗡 INTRIGUE</button>
       <button class="btn" id="btn-train">🏋 TRAIN</button>
       <button class="btn sm" id="btn-cheats" style="border-color:#c89af0;color:#c89af0">☠ CHEATS</button>
+      <button class="btn sm" id="btn-map-settings">⚙ SETTINGS</button>
       <button class="btn sm" id="btn-save">💾 SAVE</button>
       <button class="btn sm" id="btn-quit">QUIT</button>
       <span id="map-hint" class="small muted grow" style="text-align:right;">Pick a region to travel &amp; fight.</span>
@@ -641,6 +651,7 @@
       <button class="btn t2" data-k2="down" style="width:52px;height:52px">▼</button>
       <button class="btn t2" data-k2="s" style="width:56px;height:56px">RUN</button>
       <button class="btn t2 gold" data-k2="w" style="width:66px;height:66px">WHIP</button>
+      <button class="btn t2" data-k2="l" style="width:56px;height:56px">🏛</button>
       <button class="btn t2 blood" data-k2="space" style="width:56px;height:56px">ACT</button>
     </div>
   </div>
@@ -2731,6 +2742,7 @@ function quirkById(id){ return WIFE_QUIRKS.find(t=>t.id===id); }
 function quirkLabel(id){ const t=quirkById(id); return t? t.icon+' '+t.name : id; }
 function hasQuirk(id){ return !!(G && G.wife && G.wife.quirks && G.wife.quirks.includes(id)); }
 function hasMyQuirk(id){ return !!(G && G.quirks && G.quirks.includes(id)); }
+function hasMyTrait(id){ return !!(G && G.traits && G.traits.includes(id)); }
 /* A HUSBAND IS NOT A WIFE WITH THE PRONOUNS SWAPPED. Every quirk was written
    for her — "a girl whose whole job is her hair" — and a man married into the
    house got it verbatim. Each one carries an `m` variant now, and three of them
@@ -7034,6 +7046,7 @@ window.addEventListener('keydown',e=>{
   else if(k==='s'){ held.s=true; }
   else if(k==='e'){ setEdge('e'); }                 // clear the hall · “move back a bit”
   else if(k==='f'){ setEdge('f'); }                 // and bend for something that is not there
+  else if(k==='l'){ setEdge('l'); }                 // 🏛 the ardor
   else if(k===' '){ setEdge('space'); }
   else if(k==='arrowright'){ setEdge('elbow'); }
   else if(k==='arrowleft'){ setEdge('thrust'); }
@@ -7096,6 +7109,9 @@ function syncTouchPads(){
       else { b.textContent='WHIP'; b.title=''; b.style.width='66px'; b.style.height='66px'; } });
     t2.querySelectorAll('[data-k2="up"],[data-k2="down"]').forEach(b=>b.style.display=wantRace?'':'none');
     t2.querySelectorAll('[data-k2="s"]').forEach(b=>b.style.display=wantVilla?'':'none');
+    // 🏛 only appears for the half of the house it belongs to
+    t2.querySelectorAll('[data-k2="l"]').forEach(b=>b.style.display=
+      (wantVilla && typeof ardorReady==='function' && ardorReady())?'':'none');
     t2.querySelectorAll('[data-k2="space"]').forEach(b=>b.style.display=wantVilla?'':'none');
   }
 }
@@ -11794,6 +11810,7 @@ function updateDomus(dt){
   if(D.refuse) updateRefusal(dt);                     // a refusal plays over whatever else is happening
   if(D.rise){ updateRise(dt); if(D.rise && D.rise.locks) return; }
   else if(riseDue()) startRise();
+  if(D.ardor){ updateArdor(dt); if(D.ardor && D.ardor.locks) return; }
   if(D.husb){ updateHusbandMove(dt); return; }        // he is already crossing; nothing interrupts that
   if(D.drop){ updateDrop(dt); if(D.drop && D.drop.locks) return; }
   else if(dropDue()) startDrop();
@@ -11859,6 +11876,8 @@ function updateDomus(dt){
   }
   if(!D.scene && !D.slap && !D.rslap && consume('e') && privacyTier()!=='easy'
      && watchersPresent(privacyTier()==='strict') && !villaClear()) clearTheVilla();
+  // L — THE ARDOR. His half, and the only half you press yourself.
+  if(!D.scene && !D.slap && !D.rslap && !D.husb && !D.ardor && consume('l')) tryArdor();
 }
 function updateDomusScene(dt){
   const D=DM, sc=D.scene; sc.t+=dt; const T=sc.t;
@@ -12421,35 +12440,56 @@ const RISE_LINES=[
 ];
 /* THE BUMP, in five. Drawn over whatever he is wearing, at his hip, growing
    from a fold you could argue with into one you cannot. */
-function drawTunicBump(x, y, w, stage, T){
+function drawTunicBump(x, y, w, stage, T, dir){
   if(stage<=0) return;
+  dir = (dir===-1)? -1 : 1;                        // it belongs on the side he is facing
   const B=(w&&w.body)||{}, gv=(id,d)=>B[id]===undefined?d:B[id];
   const len=gv('secret',5), lg=gv('legs',6);
   const tun=w.dress||w.tunic||'#7a2f22';
   const skin=w.skin||'#caa06a';
-  const legLen=Math.round(15+lg*0.62), hipY=y-18-legLen+6;
+  // it starts in the SKIRT of the tunic, not up on the belt buckle
+  const legLen=Math.round(15+lg*0.62), hipY=y-18-legLen+11;
   const k=clamp(stage/(RISE_STAGES-1),0,1);
-  const rise=(1.6+len*0.55)*k;
-  const th=Math.max(2,Math.round(1.4+len*0.14));
+  const bare=stage>=RISE_STAGES-1;                 // by the last one the hem has given up
+  const base=bare? skin : tun;
+  const lit =mixHex(base,'#ffffff',0.34);          // a REAL highlight, on any tunic colour
+  const dark=mixHex(base,'#120a06',0.46);          // and a real shadow, so it leaves the cloth
   const P=(a,b2,ww,h,c2)=>{ ctx.fillStyle=c2;
-    ctx.fillRect(Math.round(x+a),Math.round(b2),Math.round(ww),Math.round(h)); };
-  // under the cloth it TENTS: the fabric lifts and takes a highlight along the ridge
-  const pl=Math.max(1,Math.round(rise));
-  for(let i=0;i<pl;i++){ const t2=i/Math.max(1,pl-1);
-    const yy=hipY-2-Math.round(t2*rise*0.42);
-    P(2+i, yy, 1, th, stage>=4? skin : tun);
-    P(2+i, yy, 1, 1, stage>=4? shade(skin,20) : shade(tun,26)); }
-  if(stage>=4){                                    // by the last one the hem has given up
-    P(2+pl, hipY-2-Math.round(rise*0.42), th, th, mixHex(skin,'#c07a68',0.34));
-    P(1, hipY+1, th+1, th+1, mixHex(skin,'#2a150a',0.16));
+    const ax = dir>0? (x+a) : (x-a-ww);
+    ctx.fillRect(Math.round(ax),Math.round(b2),Math.round(ww),Math.round(h)); };
+  /* THE TENT. This used to be four tunic-coloured pixels drawn ON a tunic —
+     measured at fifteen changed pixels by stage three, which is nothing at all
+     at 480x270, so the whole five-stage build was invisible. It is a wedge now:
+     a cast shadow underneath, the mass, and a lit ridge along the top, every
+     colour mixed against what he is actually wearing so it reads on any of them. */
+  const L2=Math.max(2, Math.round((2.4+len*0.92)*k));   // how far it stands out
+  const th=Math.max(2, Math.round(2.0+len*0.22));       // and how thick through
+  const climb=0.26+0.46*k;                              // low and deniable, then up
+  for(let i=0;i<L2;i++){
+    const t2=i/Math.max(1,L2-1);
+    const yy=hipY-1-Math.round(t2*L2*climb);
+    const hh=Math.max(1, Math.round(th*(1-t2*0.26)));   // tapers a little towards the end
+    P(2+i, yy+hh, 1, 2, dark);                          // it casts down onto the leg
+    P(2+i, yy, 1, hh, base);
+    P(2+i, yy, 1, 1, lit);
+  }
+  const tipY=hipY-1-Math.round(L2*climb);
+  if(bare){
+    P(2+L2, tipY-1, th, th+1, mixHex(skin,'#c07a68',0.40));
+    P(2+L2, tipY-1, th, 1,    mixHex(skin,'#ffffff',0.28));
+    P(1, hipY+1, th+2, th+2,  mixHex(skin,'#2a150a',0.18));
   } else if(stage>=2){
-    P(2+pl, hipY-2-Math.round(rise*0.4), th, 2, shade(tun,-20));
+    P(2+L2, tipY, th, 2, dark);                         // the hem, straining
+  }
+  if(!bare && stage>=2){                                // the cloth comes FROM somewhere
+    P(0, hipY+1, 2, 1, dark);
+    P(1, hipY+3, 2, 1, mixHex(base,'#120a06',0.28));
   }
   // and he is aware of it: a bead of sweat from stage two, a look away from three
   if(stage>=2 && ((T|0)%40)<20){ ctx.textAlign='center';
-    pixelText('💧', x-9, hipY-26, 'rgba(190,220,255,.75)', 0.9); ctx.textAlign='left'; }
+    pixelText('💧', x-9*dir, hipY-26, 'rgba(190,220,255,.75)', 0.9); ctx.textAlign='left'; }
   if(stage>=3 && ((T|0)%30)<16){ ctx.textAlign='center';
-    pixelText('…', x+11, hipY-30, 'rgba(255,214,190,.8)', 1); ctx.textAlign='left'; }
+    pixelText('…', x+11*dir, hipY-30, 'rgba(255,214,190,.8)', 1); ctx.textAlign='left'; }
 }
 function riseDue(){
   if(!G || !G.isFemale || !G.married || !G.wife || !G.wife.male || !ADULT) return false;
@@ -12531,7 +12571,7 @@ function drawRise(){
   ctx.restore();
   if(X.ph==='build' && X.stage<4){                  // the scroll, until he puts it down
     px(hx-4,FY-40,9,6,'#e6dcc2'); px(hx-4,FY-40,9,1,'#f6efdc'); px(hx-4,FY-40,1,6,'#b8a882'); }
-  drawTunicBump(hx, FY, w, X.ph==='build'? X.stage : RISE_STAGES-1, T);
+  drawTunicBump(hx, FY, w, X.ph==='build'? X.stage : RISE_STAGES-1, T, D.x<hx? -1 : 1);
   // ---- YOU ----
   drawWifeFig(ctx, D.x, FY, playerLook(), 0, 'idle');
   ctx.textAlign='center';
@@ -12563,6 +12603,207 @@ function drawRise(){
   else if(X.ph==='held') pixelText('“…later.”', W/2, 34, '#9ad4ff', 1.06);
   else if(X.ph==='gave') pixelText('“…fine. FINE.”', W/2, 34, '#ffd0da', 1.06);
   ctx.textAlign='left';
+}
+/* =====================================================================
+   THE ARDOR — his half of it, and the only half you drive yourself
+   ---------------------------------------------------------------------
+   Tempting is a thing she does to a room. Priapic is a thing he cannot
+   help doing in one. Neither of them is a thing YOU do, so playing a man
+   there was nothing to press at all: you stood by a door and hoped.
+
+   L starts it. SPACE is the whole game — the bar climbs on every press
+   and falls the moment you stop, and how many presses it takes is your
+   own measurement. A long one is more to bring up AND drains faster, and
+   it is worth more when it lands; Priapic halves the entire bill.
+
+   Then you walk over, and she has no excuse. What she still has is an
+   opinion about WHERE, and the opinion is her quirks talking.
+   ===================================================================== */
+const ARDOR_LINES=[
+  'Nothing is happening. Yet.',
+  'Something is thinking about happening.',
+  'The tunic has an opinion.',
+  'The tunic has stopped being subtle.',
+  'You are going to have to do something about this.',
+];
+const ARDOR_HOLD=520;                 // how long READY lasts before it gives up on you
+function ardorLen(){ const b=G&&G.body; return (b&&b.secret!==undefined)? b.secret : 5; }
+// HOW MANY PRESSES. Bigger is more work — and worth more at the end.
+function ardorNeed(){
+  let n=Math.max(4, Math.round(4 + ardorLen()*0.62));       // 3 → 6 · 6 → 8 · 10 → 10
+  if(hasMyTrait('priapic')) n=Math.max(2, Math.ceil(n/2));  // 6 → 3
+  return n;
+}
+function ardorDrain(){ return 0.30 + ardorLen()*0.030; }    // and a long one will not hold itself up
+function ardorReady(){
+  return !!(G && !G.isFemale && G.married && G.wife && !G.wife.male && ADULT);
+}
+function tryArdor(){
+  const D=DM; if(!D) return;
+  if(!ADULT){ toast('That lives behind the mature-content switch on the title screen.',2800); return; }
+  if(!G.married || !G.wife){ toast('There is nobody in this house to walk over to.',2400); return; }
+  if(G.isFemale || G.wife.male){ toast('Not your half of this one. W catches his eye instead.',2800); return; }
+  if(D.scene||D.slap||D.rslap||D.tempt||D.husb||D.drop||D.rise||D.ardor) return;
+  if(loveLeft('quick')<=0){ toast('“AGAIN?!” — there is nothing left in you today.',2400); return; }
+  if((G.hygiene|0)<25){ toast('“Bathe. Then come back and ask me that.”',2600); return; }
+  D.ardor={ ph:'wind', t:0, heat:0, got:0, need:ardorNeed(), locks:true,
+            stage:0, sel:0, spots:null, chose:null };
+  try{ sfx('ui'); }catch(e){}
+}
+/* WHERE. She has stopped arguing about whether. */
+function ardorFav(){
+  if(hasQuirk('shameless'))  return 'here';
+  if(hasQuirk('insatiable')) return 'here';
+  if(hasQuirk('devout'))     return 'bed';
+  if(hasQuirk('tempest'))    return G.hasWardrobe? 'wardrobe' : 'here';
+  if(hasQuirk('gossip'))     return G.hasWardrobe? 'wardrobe' : 'bed';
+  if(hasQuirk('highmaint'))  return 'bed';
+  if(hasQuirk('possessive')) return 'bed';
+  if(G.hasPool && (hasTrait('athletic')||hasTrait('beauty'))) return 'pool';
+  return 'bed';
+}
+function ardorSpots(){
+  const fav=ardorFav(), out=[];
+  // the atrium is the only one the household can walk in on — so it is the only
+  // one privacy can shut. A door is exactly what the other three are FOR.
+  const blocked = privacyNeeded('romantic')? privacyRefusal('romantic') : null;
+  out.push({id:'here', name:'BEND HERE',  icon:'🏛', note:'Where you are standing.',  block:blocked});
+  out.push({id:'bed',  name:'BED CHAMBER',icon:'🛏', note:'A door, and it shuts.',    block:null});
+  if(G.hasPool)     out.push({id:'pool',    name:'THE BATH',    icon:'🛁', note:'Warm, and empty at this hour.', block:null});
+  if(G.hasWardrobe) out.push({id:'wardrobe',name:'THE WARDROBE',icon:'🚪', note:'Undignified. Quick. Hers.',     block:null});
+  out.forEach(sp=>sp.fav=(sp.id===fav));
+  return out;
+}
+function updateArdor(dt){
+  const D=DM, X=D.ardor; if(!X) return; X.t+=dt;
+  if(X.ph==='wind'){
+    X.locks=true;
+    if(consume('space')||consume('attack')||consume('w')){
+      X.got++; X.heat=Math.min(112, X.heat + 100/X.need);
+      D.hearts.push({x:D.x, y:184, vy:0.5, life:28, c:'#ffb45b'});
+      try{ sfx('ui'); }catch(e){}
+    }
+    if(consume('l')){ D.ardor=null;
+      toast('You think about the estate accounts instead. It works immediately.',2800); return; }
+    X.heat -= ardorDrain()*dt;
+    if(X.heat<=0){ X.heat=0; if(X.got>0){ X.ph='fizz'; X.t=0; return; } }
+    X.stage=clamp(Math.round(X.heat/100*(RISE_STAGES-1)),0,RISE_STAGES-1);
+    if(X.heat>=100){ X.ph='ready'; X.t=0; X.stage=RISE_STAGES-1; X.locks=false;
+      try{ sfx('kiss'); }catch(e){} }
+  }
+  else if(X.ph==='fizz'){
+    X.locks=true;
+    if(X.t>110){ D.ardor=null; G.ardorsLost=(G.ardorsLost||0)+1;
+      toast(pick(['🏛 The moment passes. Somewhere a god of gardens sighs.',
+                  '🏛 You lost your train of thought and it is not coming back.',
+                  '🏛 Nothing. A wasted minute and a faintly puzzled expression.']),3200); }
+  }
+  else if(X.ph==='ready'){
+    X.locks=false;                                  // WALK. She is over there.
+    X.stage=RISE_STAGES-1;
+    if(consume('l')){ D.ardor=null;
+      toast('You decide against it, at some cost.',2600); return; }
+    if(Math.abs(D.x-D.wifeX)<26){
+      X.ph='ask'; X.t=0; X.locks=true; X.spots=ardorSpots(); X.sel=0;
+      // stand him CLEAR of her — at 18px the two sprites overlap and you cannot
+      // see which of them the menu is talking about
+      const side=(D.x<=D.wifeX)? -1 : 1;
+      D.x=clamp(D.wifeX+side*22, 24, 470);
+      D.wifePause=99999; try{ sfx('giggle'); }catch(e){} return; }
+    if(X.t>ARDOR_HOLD){ X.ph='fizz'; X.t=0; X.locks=true; }
+  }
+  else if(X.ph==='ask'){
+    X.locks=true;
+    const S=X.spots;
+    if(consume('a')){ X.sel=(X.sel+S.length-1)%S.length; try{ sfx('ui'); }catch(e){} }
+    if(consume('d')){ X.sel=(X.sel+1)%S.length;          try{ sfx('ui'); }catch(e){} }
+    if(consume('space')||consume('attack')){
+      const sp=S[X.sel];
+      if(sp.block){ toast(sp.block,3200); try{ sfx('thud'); }catch(e){} }
+      else { X.chose=sp; X.ph='go'; X.t=0; }
+    }
+    if(consume('l')){ D.ardor=null; D.wifePause=0;
+      toast('“…no? Fine.” She goes back to what she was doing, extremely aware of you.',3400); }
+  }
+  else if(X.ph==='go'){
+    X.locks=true;
+    if(X.t>90) ardorResolve(X.chose);
+  }
+}
+function ardorResolve(spot){
+  const D=DM; if(!D) return;
+  const atX=D.wifeX;
+  D.ardor=null; D.wifePause=0;
+  const power=clamp(ardorLen()/10,0,1), fav=!!(spot&&spot.fav);
+  G.ardorsRun=(G.ardorsRun||0)+1;
+  // THE BARGAIN: more presses to get here, more to show for it
+  G.wifeRel =clamp(G.wifeRel+Math.round(2+power*5)+(fav?3:0),0,bondCeiling());
+  G.wifePhys=clamp((G.wifePhys===undefined?45:G.wifePhys)+Math.round(3+power*7)+(fav?3:0),0,100);
+  const tail = fav? '  She had already decided on that one.' : '';
+  if(!spot || spot.id==='here'){
+    toast('🏛 “…here. FINE. Here.”'+tail, 3400);
+    refreshStatbar();
+    startVillaLove(atX, true, true);            // the atrium one — which IS the bend
+    return;
+  }
+  const place=spot.id;
+  toast('🏛 “Not in the atrium. '
+    + ({bed:'Come to bed.', pool:'…the bath, then.', wardrobe:'In there. NOW.'}[place]||'Come on.')
+    + '”'+tail, 3400);
+  spendLove(bedLen); saveQuiet(); DM=null;
+  startBedScene('fun', bedLen, place);
+}
+function drawArdor(){
+  const D=DM, X=D.ardor; if(!X) return; const FY=214, T=D.t, me=playerLook();
+  const dir=(D.wifeX>=D.x)? 1 : -1;                 // he is looking at her the whole time
+  const mv=(X.ph==='ready') && (held.a||held.d);
+  ctx.save(); ctx.translate(D.x,FY); if(dir<0) ctx.scale(-1,1);
+  drawHusbandFig(ctx,0,0,G.wifeRel|0,null,null,me, mv? T*0.35:0, mv?'walk':'idle');
+  ctx.restore();
+  drawTunicBump(D.x, FY, me, X.ph==='wind'? X.stage : RISE_STAGES-1, T, dir);
+  if(X.ph==='wind'){
+    const bx=W/2-70, by=H-40, bw=140, bh=10;
+    px(bx-2,by-2,bw+4,bh+4,'#120c08');
+    px(bx,by,bw,bh,'#2e2218'); px(bx,by,bw,1,'#4a3826');
+    const f=clamp(X.heat/100,0,1);
+    px(bx,by,bw*f,bh, f>0.75?'#ffce7a' : f>0.40?'#e8a25b' : '#a06a5b');
+    px(bx,by,bw*f,1,'#ffe8c0');
+    const n=X.need, pw=Math.max(3,Math.min(9,Math.floor((bw-4)/n)-1));
+    for(let i=0;i<n;i++) px(bx+2+i*(pw+1), by-8, pw, 3, i<X.got? '#ffce7a':'#4a3826');
+    pixelText('MASH SPACE — '+Math.min(X.got,X.need)+' / '+X.need, W/2, 26, '#ffce7a', 1.06);
+    pixelText(ARDOR_LINES[X.stage], W/2, 40, X.stage>=3? '#ffd0da':'rgba(255,214,190,.85)', 1.02);
+    pixelText(hasMyTrait('priapic')? '🏛 Priapic — half the work'
+                                   : '— it falls back the moment you stop —',
+      W/2, by+22, hasMyTrait('priapic')? '#ffce7a':'rgba(200,220,255,.8)', 1);
+  }
+  else if(X.ph==='fizz') pixelText('…nothing.', W/2, 34, 'rgba(210,205,215,.9)', 1.06);
+  else if(X.ph==='ready'){
+    pixelText('READY.  GO TO HER.  (A / D)', W/2, 26, '#ffce7a', 1.06);
+    const left=clamp(1-(X.t/ARDOR_HOLD),0,1);
+    px(W/2-40,36,80,3,'#4a3826'); px(W/2-40,36,80*left,3,'#ffce7a');
+    pixelText('she has no excuse — she will still have an opinion', W/2, H-18, 'rgba(255,214,190,.75)', 1);
+  }
+  else if(X.ph==='ask' || X.ph==='go'){
+    pixelText('“…fine.  But WHERE?”', W/2, 26, '#ffd0da', 1.1);
+    const S=X.spots||[], n=Math.max(1,S.length);
+    const cw=Math.min(108, Math.floor(432/n)), gap=4;
+    const tot=n*cw+(n-1)*gap, x0=W/2-tot/2, cy=H-58;
+    S.forEach((sp,i)=>{
+      const cx=x0+i*(cw+gap), on=(i===X.sel), dead=!!sp.block, taken=(X.ph==='go'&&X.chose===sp);
+      px(cx,cy,cw,40, taken? '#5a4426' : on? '#3a2c1a' : '#231a12');
+      const edge = taken? '#ffe8c0' : on? '#e8c34a' : '#4a3826';
+      px(cx,cy,cw,1,edge); px(cx,cy+39,cw,1,edge);
+      px(cx,cy,1,40,edge); px(cx+cw-1,cy,1,40,edge);
+      if(sp.fav){ px(cx+cw-9,cy+3,6,6,'#ff7ab0'); px(cx+cw-8,cy+4,4,1,'#ffd0e4'); }
+      pixelText(sp.icon+' '+sp.name, cx+cw/2, cy+11,
+        dead? 'rgba(160,150,150,.75)' : on? '#ffce7a' : 'rgba(232,227,194,.85)', 0.9);
+      pixelText(dead? 'not with them in here' : sp.note, cx+cw/2, cy+26,
+        dead? 'rgba(200,120,120,.85)' : 'rgba(200,190,170,.7)', 0.8);
+    });
+    if(X.ph==='ask')
+      pixelText('A / D choose  ·  SPACE go  ·  L think better of it', W/2, H-13,
+        'rgba(200,220,255,.8)', 0.95);
+  }
 }
 function drawDrop(){
   const D=DM, X=D.drop; if(!X) return; const FY=214, w=G.wife, T=D.t;
@@ -12810,9 +13051,11 @@ function updateTempt(dt){
    so, and Venus does the rest.
    ===================================================================== */
 const VILLALOVE_LEN=900;                 // 900 ticks at 60fps ≈ fifteen seconds
-function startVillaLove(atX, invited){
+function startVillaLove(atX, invited, force){
   const D=DM; if(!D) return;
-  if(!spouseWilling()){ openTemptAftermath(); return; }   // she decides whether this happens at all
+  /* `force` is the ardor: by the time you have mashed your way over there she
+     has already stopped arguing about whether, and is only picking where. */
+  if(!force && !spouseWilling()){ openTemptAftermath(); return; }   // she decides whether this happens at all
   spendLove('quick');
   D.tempt=null; D.wifePause=99999;
   D.scene={kind:'villalove', t:0, x:clamp(atX,150,400), invited:!!invited, prop:(D.tempt&&D.tempt.prop)||TEMPT_PROPS[0],
@@ -13762,6 +14005,7 @@ function drawDomus(){
   for(const sp of D.splash) px(sp.x,sp.y,2,2,'#8ac4e0');
   // letterbox first, so prompts print on top of it
   px(-4,-4,W+8,16,'#0a0705'); ctx.textAlign='center'; pixelText('VILLA RUSTICA — your halls · A/D walk · S run · SPACE act'
+    +((typeof ardorReady==='function' && ardorReady() && !D.ardor)? ' · L 🏛':'')
     +((DM&&DM.kids&&DM.kids.length)? '  ·  '+DM.kids.length+' underfoot':'')
     +(G.ill? '  ·  🤒 '+G.ill.who+' is ill':''),W/2,8,'#c8b060',1);
   px(-4,H-14,W+8,18,'#0a0705');
@@ -13811,7 +14055,8 @@ function drawDomus(){
     if(D.refuse) drawRefusal();                         // “no”, with a hand out and a reason
     if(D.husb) drawHusbandMove();                       // he crossed the room without being asked
     if(D.drop) drawDrop();                              // the floor, her, and him crossing to it
-    if(!D.rslap && !D.husb && !(D.rise && D.rise.ph!=='build')
+    if(D.ardor) drawArdor();                            // 🏛 and it is your own fault this time
+    if(!D.rslap && !D.husb && !D.ardor && !(D.rise && D.rise.ph!=='build')
        && !(D.drop && D.drop.ph!=='fall')){ const mv=(held.a||held.d), run=mv&&held.s, turning=(D.turn||0)>0;
       drawDomusPlayer(D.x,FY,
         turning? 1-(D.turn/14) : (mv? D.t*(run?0.6:0.35) : 0),
@@ -13835,7 +14080,11 @@ function drawDomus(){
       pixelText('▾', who, FY-52, col, 1);
       ctx.textAlign='left'; }
     let prompt='';
-    if(D.drop && D.drop.ph==='fall' && Math.abs(D.x-D.drop.x)<16) prompt='SPACE: 🪮 STOOP FOR IT   ·   F: 🍑 …OR FAKE IT';
+    /* THE ARDOR PRINTS ITS OWN. Its place menu sits along the bottom of the
+       screen, and the ordinary near-the-wife prompt was drawing straight
+       through it — two different sets of key hints in the same six pixels. */
+    if(D.ardor) prompt='';
+    else if(D.drop && D.drop.ph==='fall' && Math.abs(D.x-D.drop.x)<16) prompt='SPACE: 🪮 STOOP FOR IT   ·   F: 🍑 …OR FAKE IT';
     else if(D.drop && D.drop.ph==='fall') prompt='F: 🍑 BEND FOR NOTHING AT ALL';
     else if(D.x>452) prompt='SPACE: LEAVE THE HALLS';
     else if(G.hasPool&&Math.abs(D.x-86)<36) prompt='SPACE: BATHE'+(G.married?'  ·  W: INVITE '+(w&&w.male?'HIM':'HER'):'');
@@ -13844,7 +14093,7 @@ function drawDomus(){
     else if(G.married&&G.wife&&ADULT&&Math.abs(D.x-D.wifeX)<26)
       prompt='SPACE: '+((G.slapCount||0)>=3&&G.slapDay===G.day? '👋 '+slapLabel('spentShort') : slapLabel('hand'))
              +'  ·  W: '+slapLabel('romantic')+(loveLeft('quick')<=0?' (spent)':'');
-    const _pw=watchersPresent(privacyTier()==='strict');
+    const _pw=D.ardor? 0 : watchersPresent(privacyTier()==='strict');
     if(_pw && privacyTier()!=='easy' && !villaClear())
       prompt = 'E: '+(privacyTier()==='strict'?'🕯 CLEAR THE WHOLE VILLA':'🚸 CLEAR THE HALL')
              +' ('+_pw+' watching)'+(prompt?'   ·   '+prompt:'');
@@ -14094,6 +14343,10 @@ function buildSettings(){
     + 'in the plainest words available.',
     SETTINGS.blunt?'DIRECT':'POLITE', SETTINGS.blunt,
     ()=>{ SETTINGS.blunt=!SETTINGS.blunt; saveSettings(); buildSettings(); });
+  mkRow('🏛 Woohoo tutorial',
+    'Every scene the villa can play, what starts it, which key answers it, and who in the '
+    + 'household is allowed to be standing there while it happens. Opens a page — nothing changes.',
+    'OPEN', false, ()=>openWoohooGuide('scr-settings'));
   const order=['easy','normal','brutal'];
   mkRow('⚔ Difficulty','Scales foe health &amp; damage.', DIFF[SETTINGS.difficulty].name, SETTINGS.difficulty==='brutal',
     ()=>{ const i=order.indexOf(SETTINGS.difficulty); SETTINGS.difficulty=order[(i+1)%order.length]; saveSettings(); buildSettings(); });
@@ -14107,9 +14360,102 @@ function buildSettings(){
     tLabel, touchPref!=='off',
     ()=>{ const i=tOrder.indexOf(touchPref); setTouchPref(tOrder[(i+1)%tOrder.length]); buildSettings(); });
 }
+/* =====================================================================
+   THE WOOHOO GUIDE
+   ---------------------------------------------------------------------
+   Six systems accumulated in this villa and not one of them ever said
+   what its key was. This is the page that says it — opened on purpose,
+   from Settings, so nobody who does not want it ever sees it.
+   ===================================================================== */
+let woohooFrom=null;
+function openWoohooGuide(from){
+  woohooFrom = from || (document.querySelector('.screen.on')||{}).id || 'scr-settings';
+  if(woohooFrom==='scr-woohoo') woohooFrom='scr-settings';
+  show('scr-woohoo'); buildWoohooGuide();
+}
+function closeWoohooGuide(){
+  const back=woohooFrom||'scr-settings'; woohooFrom=null;
+  if(back==='scr-map' && typeof enterMap==='function'){ enterMap(); return; }
+  show(back);
+}
+const WOOHOO_GUIDE=[
+  {ic:'🚶', h:'THE HALL ITSELF',
+   k:['A / D walk','S run','SPACE act on whatever you are standing next to','E clear the hall'],
+   p:'Walk to the far right to leave. Everything below happens because you were standing near '
+    + 'the right thing when you pressed something.'},
+  {ic:'👋', h:'THE SLAP, AND THE OTHER KIND',
+   k:['SPACE beside your spouse — a plain one','W beside your spouse — the romantic one'],
+   p:'The plain one is a greeting and the house barely notices. The romantic one is a single '
+    + 'committed strike with the whole length of the arm behind it, and the house notices a '
+    + 'great deal. Both cost bond if the room is wrong and pay bond if it is right.'},
+  {ic:'🍑', h:'TEMPTING — hers',
+   k:['it starts itself','SPACE / W / → to look away'],
+   p:'A wife with the Tempting trait finds something on the low shelf and does not hurry. '
+    + 'You are not obliged to look. Looking is not free and not looking is not free either.'},
+  {ic:'🏛', h:'PRIAPIC — his',
+   k:['it starts itself','W or SPACE — “not now” (three of them)'],
+   p:'A husband with the Priapic trait stops turning pages. Five stages, and you can walk out '
+    + 'of the room during any of them. Stay, and you get three refusals against his patience; '
+    + 'the third one is not a refusal, it is a delay.'},
+  {ic:'🏛', h:'THE ARDOR — yours, if you are the husband',
+   k:['L to begin','SPACE, repeatedly','A / D then SPACE to pick a place','L to think better of it'],
+   p:'The only one you drive yourself. The bar climbs on every press and falls the moment you '
+    + 'stop. How many presses depends on your own measurement — a long one is more work AND '
+    + 'drains faster, and it is worth more when it lands. Priapic halves the whole bill. '
+    + 'Fill it and she has no excuse left; she will still have an opinion about where, and '
+    + 'the pink mark shows which one she already wanted.'},
+  {ic:'🪙', h:'THE DROP — yours, if you are the wife',
+   k:['SPACE reach for it','W look back at him','E “move back a bit”','F bend for nothing at all'],
+   p:'Something hits the floor. Pick it up before he crosses the room, or do not, and find out '
+    + 'what he had in mind. F is the fake: there is nothing on the floor, and the only thing '
+    + 'you are actually doing is baiting him. Shake with SPACE. If he ignores you entirely you '
+    + 'are owed something, and the game agrees.'},
+  {ic:'🚸', h:'WHO IS ALLOWED TO SEE',
+   k:['E clears the hall'],
+   p:'Four different people draw this line in four different places. SHAMELESS never needs the '
+    + 'room cleared for anything. Most people need the children out for the serious kind but '
+    + 'not for a slap. HOT-TEMPERED needs them out for both. VESTAL-STRICT needs both, and that '
+    + 'means the babies and the household slaves as well. A door — the bed chamber, the bath, '
+    + 'the wardrobe — settles all four of them at once.'},
+  {ic:'🛏', h:'THE PLACES',
+   k:['walk to the bed-chamber door and press SPACE'],
+   p:'The bed chamber always works. The bath needs a pool and the wardrobe needs a wardrobe, '
+    + 'and both are things you buy. The atrium — bending right where you stand — is the only '
+    + 'one the household can walk in on.'},
+  {ic:'❤', h:'WHAT IT COSTS',
+   k:[],
+   p:'Three quick ones a day, two long, one night. Bathe first — under 25 hygiene the answer is '
+    + 'no, in those words. Bond and heat both move; heat is how willing the next one is.'},
+];
+function buildWoohooGuide(){
+  const b=$('woohoo-body'); if(!b) return; b.innerHTML='';
+  const intro=document.createElement('div'); intro.className='small muted';
+  intro.style.lineHeight='1.6';
+  intro.innerHTML = ADULT
+    ? 'Mature content is <b style="color:var(--gold)">ON</b>. Everything below is reachable.'
+    : 'Mature content is <b style="color:var(--blood)">OFF</b>, so these scenes fade to black — '
+      + 'marriage, heirs and succession still play normally. The keys are the same either way.';
+  b.appendChild(intro);
+  WOOHOO_GUIDE.forEach(G2=>{
+    const card=document.createElement('div');
+    card.style.cssText='border:2px solid #000;border-radius:4px;padding:9px;text-align:left;'
+      + 'background:linear-gradient(#251a10,#170f08);'
+      + 'box-shadow:inset 0 0 0 1px rgba(232,195,74,.14),0 2px 6px rgba(0,0,0,.45);';
+    const keys=G2.k.map(k=>{
+      const parts=k.split(' ');
+      return '<span class="kbd">'+parts[0]+'</span> <span class="small">'
+        + parts.slice(1).join(' ')+'</span>';
+    }).join('<span class="small muted"> &nbsp;·&nbsp; </span>');
+    card.innerHTML='<b style="color:var(--gold)">'+G2.ic+' '+G2.h+'</b>'
+      + (keys? '<div style="margin:5px 0 4px">'+keys+'</div>' : '<div style="height:4px"></div>')
+      + '<div class="small muted" style="line-height:1.55">'+G2.p+'</div>';
+    b.appendChild(card);
+  });
+}
 function refreshSettings(){ const el=$('settings-body'); if(el && el.children.length) buildSettings(); }
 $('btn-settings').onclick=()=>openSettings();
 $('btn-settings-back').onclick=()=>closeSettings();
+$('btn-woohoo-back').onclick=()=>closeWoohooGuide();
 
 /* ---------- STATS & ACHIEVEMENTS screen ---------- */
 function openStats(){ show('scr-stats'); buildStats(); }
@@ -14177,7 +14523,11 @@ function rollCreation(force){
   const ps = male? BODY_PARTS_M : BODY_PARTS;
   const looks = impossible? 11 : clamp(Math.round(ps.reduce((a,P)=>a+body[P.id],0)/ps.length),1,10);
   const smarts= impossible? 10 : clamp(Math.round(q + rnd(-3,3)),1,10);
-  const traits=rollTraits(impossible?10:clamp(Math.round((looks+smarts)/2),0,10));
+  /* `male` WAS NOT PASSED. rollTraits filters the pool with it, so an undefined
+     `male` read as false: a man rolling his own character could never get
+     Priapic and could quite happily roll Tempting, which is hers. Exactly the
+     same omission as the one in makeBride. */
+  const traits=rollTraits(impossible?10:clamp(Math.round((looks+smarts)/2),0,10), male);
   const flaws =impossible? [] : rollFlaws(clamp(Math.round((looks+smarts)/2),0,10));
   sel.rolls++;
   // YOUR OWN head of hair, rolled with the rest of you and kept through the game
@@ -17888,6 +18238,10 @@ $('btn-note-send').onclick=()=>sendNote();
 $('btn-note-back').onclick=()=>{ if(noteReturn==='villa') openVilla(); else enterMap(); };
 $('btn-circus-back').onclick=()=>enterMap();
 $('btn-cheats').onclick=()=>openCheats();
+/* SETTINGS existed only on the title screen, so every switch on it — the body
+   chart among them — was unreachable the moment a career started. It comes back
+   to the map now, and openSettings already knows how to return there. */
+$('btn-map-settings').onclick=()=>openSettings('scr-map');
 $('btn-cheats-back').onclick=()=>enterMap();
 $('btn-ludus-back').onclick=()=>enterMap();
 $('btn-tree').onclick=()=>openTree();
@@ -19618,6 +19972,10 @@ window.__SS = {
   drawSlapArm, beckonHusband, SETTINGS, saveSettings, buildSettings, bluntBrief,
   drawChartFig, chartLandmarks,
   RISE_STAGES, RISE_NEED, RISE_LINES, riseDue, startRise, updateRise, drawRise, drawTunicBump,
+  updateDomus,
+  ARDOR_LINES, ARDOR_HOLD, ardorLen, ardorNeed, ardorDrain, ardorReady, tryArdor,
+  ardorFav, ardorSpots, updateArdor, drawArdor, ardorResolve, hasMyTrait,
+  openWoohooGuide, closeWoohooGuide, buildWoohooGuide, WOOHOO_GUIDE,
   fixTraitsForSex, WIFE_TRAITS, rollTraits, hasTrait, openSettings, closeSettings,
   FAMILY_EVENTS, familyDue, maybeFamily, openFamilyEvent, kidBand, kidAgeYears, heirPressure,
   SIBLING_LINES, siblingAside, drawDomus, romanticSwing, STRIKES,
