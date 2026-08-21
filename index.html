@@ -5045,7 +5045,7 @@ function freshCareer(name,origin,arch,social){
     food:4,                // travel rations
     mount:0,               // 0 on foot · 1 mule · 2 horse · 3 chariot
     slaves:0, hasVilla:false, boat:false,
-    feuds:[], grandkids:0, annivYears:0, morningAfter:null,   // the marriage ledger
+    feuds:[], grandkids:0, annivYears:0, morningAfter:null, peeked:{},   // the marriage ledger
     favor:0, soldiers:0, hidden:[], plotTier:0,   // intrigue: favors, private army, hidden elites, overthrow progress
     emperor:false, approval:50, legions:0, rivals:0, retired:false,  // rule of Rome
     detachments:[], day:0,   // marching army detachments (with travel time)
@@ -5181,7 +5181,7 @@ function elevateWife(rank){
 }
 // fill in any fields missing from older saves
 function migrate(g){ const d={honor:50,food:4,mount:0,slaves:0,hasVilla:false,boat:false,favor:0,soldiers:0,hidden:[],plotTier:0,emperor:false,approval:50,legions:0,rivals:0,retired:false,detachments:[],day:0,titles:{},clears:{},socialClass:'gladiator',army:{},armyGear:0,armyTrain:0,hasOrganizer:false,generals:[],wife:null,married:false,marryPrompted:false,children:[],pregnant:null,lastLoveDay:-9,injury:null,lastDebateDay:-9,office:0,path:null,parthia:50,parthiaPact:false,wifeRel:50,lastTalkDay:-9,isFemale:false,lineage:[],hygiene:70,wifePhys:45,hasPool:false,hasWardrobe:false,legacy:null,lastFeastDay:-9,loveDay:-1,loveQuick:0,loveLong:0,loveNight:0,loveVigil:0,venusUntil:-1,lastWashDay:-9,lastPoolDay:-9,lastWardrobeDay:-9,lastKidsDay:-9,lastBathDay:-9,pila:0,bow:null,bowsOwned:[],nemesis:null,rivalsList:[],trophies:[],nemesisCount:0,pendingDeath:false,ageBase:0,wonProvinceByFight:false,familyMan:false,infamy:0,gladiatrixStage:0,pardoned:false,lastNoteDay:-9,lastNoteReply:'',regalia:[],marryRolls:0,hasBodyMap:false,hasSecretMap:false,jealousy:0,lastJealousDay:-9,traits:[],flaws:[],looks:5,smarts:5,advocate:false,tutorialDone:false,patrons:[],rivalAdv:null,landmarks:[],faction:null,oratory:1,casesWon:0,casesLost:0,renown:0,senate:false,royal:false,lastCaseDay:-9,skills:{footwork:0,guard:0,blade:0,wind:0,throwing:0},scars:[],fatigue:0,lastTrainDay:-9,tribune:false,rank:0,campaigns:0,legionRep:0,lastCampaignDay:-9,units:{legionary:0,auxilia:0,cavalry:0,archers:0,engineers:0},supply:0,sieges:0,body:null,family:null,provinces:{},complaints:[],leniency:50,lastCalloutDay:-9,lastGiftDay:-9,giftsTaken:0,calloutWins:0,crownWorn:false,court:null,lastCoupDay:-99,herbs:{},herbLore:0,ill:null,midwife:false,titlesWorn:[],warExhaust:0,lastExhaustWhy:'',titleRites:[],tombs:[],inheritedFrom:null,hairStyle:null,hairCol:null,beardStyle:null,outfit:null,courtLog:{},lastAskDay:-9,retirePromise:null,promiseBreaks:0,promiseFights:0,tutor:false,freedmen:0,askLog:{},temptHeld:0,temptTook:0,slapDay:-9,slapCount:0,slapsAll:0,doorShut:0,caughtByHouse:0,romanticAll:0,clearedHall:0,lastFamilyDay:-9,namedHeir:null,willSplit:false,purpleWatch:0,kidHouses:[],weddings:0,woohooAll:0,marriedDay:0,
-    feuds:[],grandkids:0,annivYears:0,morningAfter:null}; for(const k in d){ if(g[k]===undefined) g[k]=d[k]; }
+    feuds:[],grandkids:0,annivYears:0,morningAfter:null,peeked:{}}; for(const k in d){ if(g[k]===undefined) g[k]=d[k]; }
   if(g.wife) ensureQuirks(g.wife);          // a spouse saved before the five bands existed
   if(g.quirks===undefined) g.quirks=rollQuirks();   // and a player from before THEY had any
   if(!g.hairStyle){ const male=!g.isFemale, eth='roman';
@@ -12133,8 +12133,11 @@ function tryPoolInvite(){
 }
 function tryWardrobe(){
   const wo=(typeof roomOccupant==='function')? roomOccupant('wardrobe') : null;
-  if(wo){ toast('🚪 Something is already going on in there. '+wo.name+' and '+wo.spouse
-    +'. Walk away.',4200); return; }
+  if(wo){
+    // the door answers you properly now — once
+    if(!peekUsed('wardrobe')){ startPeek('wardrobe', wo); return; }
+    toast('🚪 Something is already going on in there. '+wo.name+' and '+wo.spouse
+      +'. You have had your look. Walk away.',4200); return; }
   if(!G.married||!G.wife){ toast('A fine wardrobe. You hang up a tunic. Thrilling.',2200); return; }
   const wcd=G.day-(G.lastWardrobeDay===undefined?-9:G.lastWardrobeDay);
   if(wcd<1){ toast('The wardrobe still needs repairs from LAST time. (tomorrow)',2400); return; }
@@ -12157,6 +12160,8 @@ function updateDomus(dt){
   if(D.tempt){ updateTempt(dt); if(D.tempt && D.tempt.locks) return; }
   else if(temptDue()) startTempt();
   if(D.refuse) updateRefusal(dt);                     // a refusal plays over whatever else is happening
+  // the one look holds you where you stand until the door shuts again
+  if(D.peek){ updatePeek(dt); return; }
   if(D.rise){ updateRise(dt); if(D.rise && D.rise.locks) return; }
   else if(riseDue()) startRise();
   if(D.escort){ updateEscort(dt); if(D.escort && D.escort.locks) return; }
@@ -12245,15 +12250,21 @@ function updateDomus(dt){
     else if(nearWife && !nearPool && !nearWard && !nearDoor){ startSlapAnim(D.wifeX); return; }
     else if(nearPool){
       const po=roomOccupant('pool');
-      if(po) toast('🛁 The lagoon is taken — '+po.name+' and '+po.spouse
-        +' are in it, and have been for some time.',4200);
+      if(po){
+        if(!peekUsed('pool')){ startPeek('pool', po); return; }
+        toast('🛁 The lagoon is taken — '+po.name+' and '+po.spouse
+          +' are in it, and have been for some time.',4200);
+      }
       else D.scene={kind:'bath',t:0};
     }
     else if(nearWard) tryWardrobe();
     else if(nearDoor){
       const busy=houseGuestBusy();
-      if(busy) toast('🚪 The door is shut and it is not yours today — '+busy.name
-        +' and '+busy.spouse+' are in there. Nobody says anything at supper.',4200);
+      if(busy){
+        if(!peekUsed('bed')){ startPeek('bed', busy); return; }
+        toast('🚪 The door is shut and it is not yours today — '+busy.name
+          +' and '+busy.spouse+' are in there. Nobody says anything at supper.',4200);
+      }
       else if(!G.married) toast('An empty bed, neatly made. The house waits for a family.',2200);
       else if(loveLeft(bedLen)<=0) toast('“AGAIN?!” — no '+bedLen+' sessions left today.',2200);
       else if(!spouseWilling()) toast('“Not tonight.” — win the heart first.',2200);
@@ -15028,6 +15039,7 @@ function drawDomus(){
     if(D.kidWalk) drawKidWalk();                        // and so is somebody else's husband
     if(D.escort) drawEscort();                          // he is taking her somewhere
     if(D.gripe) drawRoomComplaint();                    // and somebody small has a grievance
+    if(D.peek) drawPeek();                              // your one look, and then the latch
     if(!D.rslap && !D.husb && !D.ardor && !D.escort && !(D.rise && D.rise.ph!=='build')
        && !(D.drop && D.drop.ph!=='fall')){ const mv=(held.a||held.d), run=mv&&held.s, turning=(D.turn||0)>0;
       const pfy=domusFloorY();                          // the gallery is a floor too
@@ -15071,9 +15083,23 @@ function drawDomus(){
     else if(D.drop && D.drop.ph==='fall') prompt='F: 🍑 BEND FOR NOTHING AT ALL';
     else if(nearStairs()) prompt='↑ (ARROW UP): CLIMB TO THE GALLERY';
     else if(D.x>452) prompt='SPACE: LEAVE THE HALLS';
-    else if(G.hasPool&&Math.abs(D.x-86)<36) prompt='SPACE: BATHE'+(G.married?'  ·  W: INVITE '+(w&&w.male?'HIM':'HER'):'');
-    else if(G.hasWardrobe&&Math.abs(D.x-309)<20) prompt=G.married?'SPACE: …THE WARDROBE 😏':'SPACE: WARDROBE';
-    else if(Math.abs(D.x-414)<16) prompt='SPACE: THE BEDCHAMBER ('+bedLen.toUpperCase()+')';
+    /* an occupied door offers the ONE LOOK instead of its usual business —
+       and says plainly that it is one, so spending it is a decision */
+    else if(G.hasPool&&Math.abs(D.x-86)<36)
+      prompt = roomOccupant('pool')
+        ? (peekUsed('pool')? '🔒 the lagoon is taken — you have had your look'
+                           : '👁 SPACE: ONE LOOK THROUGH THE DOOR (you get one)')
+        : 'SPACE: BATHE'+(G.married?'  ·  W: INVITE '+(w&&w.male?'HIM':'HER'):'');
+    else if(G.hasWardrobe&&Math.abs(D.x-309)<20)
+      prompt = roomOccupant('wardrobe')
+        ? (peekUsed('wardrobe')? '🔒 occupied — you have had your look'
+                               : '👁 SPACE: ONE LOOK THROUGH THE DOOR (you get one)')
+        : (G.married?'SPACE: …THE WARDROBE 😏':'SPACE: WARDROBE');
+    else if(Math.abs(D.x-414)<16)
+      prompt = houseGuestBusy()
+        ? (peekUsed('bed')? '🔒 the bedchamber is taken — you have had your look'
+                          : '👁 SPACE: ONE LOOK THROUGH THE DOOR (you get one)')
+        : 'SPACE: THE BEDCHAMBER ('+bedLen.toUpperCase()+')';
     else if(G.married&&G.wife&&ADULT&&Math.abs(D.x-D.wifeX)<26)
       prompt='SPACE: '+((G.slapCount||0)>=3&&G.slapDay===G.day? '👋 '+slapLabel('spentShort') : slapLabel('hand'))
              +'  ·  W: '+slapLabel('romantic')+(loveLeft('quick')<=0?' (spent)':'');
@@ -18943,6 +18969,256 @@ function startKidWalk(){
               looks:coupleLooks(ch), x:from, tx, startX:from,
               swatAt:maybeArmSwat(posex), swatDone:false, swat:null };
   return true;
+}
+/* =====================================================================
+   THE ONE LOOK
+   ---------------------------------------------------------------------
+   An occupied door used to answer you with a line of text and nothing
+   else. Now it opens — once. You get a single held frame of the room
+   before the latch goes across: the pair caught getting ready, in an
+   arrangement built for this and used nowhere else in the game, with
+   the furniture of whichever room it is around them.
+
+   One look per room per day, recorded on the save. After that the door
+   is simply a door and the house has made its point.
+   ===================================================================== */
+function peekKey(room){ return (G.day||0)+':'+room; }
+function peekUsed(room){ return !!((G.peeked||{})[peekKey(room)]); }
+function markPeeked(room){ G.peeked=G.peeked||{}; G.peeked[peekKey(room)]=1;
+  // keep the ledger from growing forever — yesterday's looks do not matter
+  const keep={}; for(const k in G.peeked){ if(+String(k).split(':')[0] >= (G.day||0)-2) keep[k]=1; }
+  G.peeked=keep; }
+const PEEK_ROOM={
+  bed:      { name:'THE BEDCHAMBER', warm:'#e8a84a', cool:'#3a2418',
+              cap:'They are not expecting the door.' },
+  pool:     { name:'THE BATHING LAGOON', warm:'#7ad0e0', cool:'#123640',
+              cap:'Steam, and two robes on the floor tiles.' },
+  wardrobe: { name:'THE WARDROBE', warm:'#e0a05b', cool:'#2a1c10',
+              cap:'There is not room in there for this and they knew that going in.' },
+};
+/* what the tier does to what you walk in on — the same five rungs the
+   escort walk uses, read here as "how far along they already are" */
+const PEEK_STAGE=[
+  { tier:0, lab:'STILL ENTIRELY DRESSED', note:'Both of them turn round at once. Nothing has happened yet.' },
+  { tier:1, lab:'HER HAIR IS DOWN',       note:'Pins on the table. That is as far as they had got.' },
+  { tier:2, lab:'HALFWAY OUT OF IT',      note:'One tunic is already on the floor and neither is embarrassed.' },
+  { tier:3, lab:'WELL PAST HALFWAY',      note:'You have interrupted something with momentum.' },
+  { tier:4, lab:'YOU ARE VERY LATE',      note:'They do not stop. One of them waves.' },
+];
+function startPeek(room, occ){
+  const D=DM; if(!D || D.peek) return false;
+  if(!occ || !occ.ref) return false;
+  if(peekUsed(room)){
+    toast('🔒 You have already had your look today. The latch is across and it is staying across.',3800);
+    try{ sfx('deny'); }catch(e){}
+    return false;
+  }
+  markPeeked(room);
+  const f=(typeof kidCoupleForecast==='function')? kidCoupleForecast(occ.ref) : {ard:2,kids:2};
+  const pose=escortPoseFor(f.ard, f.kids);
+  D.peek={ t:0, room, occ, ph:'open',
+           looks:coupleLooks(occ.ref),
+           stage:PEEK_STAGE[clamp(pose.tier||0,0,PEEK_STAGE.length-1)],
+           phase:pose.phase, shut:false };
+  try{ sfx('dooropen'); }catch(e){}
+  saveQuiet();
+  return true;
+}
+const PEEK_OPEN=34, PEEK_HOLD=190, PEEK_SHUT=232;
+function updatePeek(dt){
+  const D=DM, P=D.peek; if(!P) return;
+  P.t+=dt;
+  if(P.ph==='open' && P.t>=PEEK_OPEN){ P.ph='hold'; }
+  if(P.ph==='hold' && P.t>=PEEK_HOLD){
+    P.ph='shut';
+    if(!P.shut){ P.shut=true; try{ sfx('doorshut'); }catch(e){} try{ sfx('deny'); }catch(e){} }
+  }
+  if(P.t>=PEEK_SHUT){
+    const o=P.occ;
+    D.peek=null;
+    toast('🔒 The door goes shut in your face and the latch goes across. '
+      +o.name+' and '+o.spouse+' have made their position clear. '
+      +'<span class="muted">That was your one look at '+(PEEK_ROOM[P.room]||{name:'that room'}).name.toLowerCase()+' today.</span>', 5200);
+  }
+}
+/* THE COUPLE, GETTING READY. Purpose-built: this is not the walking pair
+   rotated, it is its own arrangement — she is seated and turned away, he is
+   caught mid-motion with a garment, and both heads come round toward the
+   door you just opened. */
+function drawPeekPair(cx, fy, P, T){
+  const him=P.looks.him, her=P.looks.her, tier=P.stage.tier;
+  const startle=clamp(1-(T-PEEK_OPEN)/22,0,1);        // they both flinch at the light
+  const jolt=startle*2.2*Math.sin(T*0.9);
+  // ---- HER: seated on the edge of whatever the room has, half turned ----
+  ctx.save(); ctx.translate(Math.round(cx-22+jolt*0.5), Math.round(fy));
+  /* the tier extras live INSIDE the same scale as the figure — drawn outside
+     it they sat at the unscaled coordinates and her loose hair landed above
+     her head like a hat. */
+  ctx.save(); ctx.scale(1.14,1.14);
+  try{ drawWifeFig(ctx, 0, 0, her, T*0.06, 'idle'); }catch(e){}
+  const hs=her.skin||'#e6bd94';
+  if(tier>=1){                                        // the pins are out, the hair is down
+    const hair=her.hair||'#5a3a1e';
+    px(-10,-40,5,15,hair); px(6,-40,5,13,hair);       // it falls either side of her face
+    px(-10,-40,5,2,shade(hair,26)); px(6,-40,5,2,shade(hair,26));
+  }
+  if(tier>=2){                                        // a garment already off, over her arm
+    const dr=shade(her.dress||'#a8407a',-16);
+    px(-17,-22,11,9,dr); px(-17,-22,11,2,shade(dr,26));
+  }
+  // her arm up, caught mid-unpinning
+  px(7,-38,4,10,hs); px(7,-38,1,10,shade(hs,20));
+  px(6,-42,7,4,hs);
+  ctx.restore();
+  ctx.restore();
+  // ---- HIM: standing, a tunic over his head or already in his hand ----
+  ctx.save(); ctx.translate(Math.round(cx+22-jolt*0.5), Math.round(fy));
+  ctx.save(); ctx.scale(1.14,1.14);
+  try{ drawHusbandFig(ctx, 0, 0, 70, null, null, him, T*0.06, 'idle'); }catch(e){}
+  const ms=him.skin||'#caa06a', tun=him.dress||G.tunic||'#7a2f22';
+  if(tier<=1){
+    // both hands at the belt, not yet committed to anything
+    px(-7,-28,14,3,shade(tun,-34));
+    px(-10,-29,4,6,ms); px(6,-29,4,6,ms);
+  } else if(tier<=3){
+    // the tunic is coming over his head — arms up, face inside it
+    px(-9,-56,18,13,tun); px(-9,-56,18,3,shade(tun,24));
+    px(-12,-50,4,13,ms); px(8,-50,4,13,ms);
+  } else {
+    // it is already on the floor and he is entirely unbothered about the door
+    px(-19,-4,17,5,tun); px(-19,-4,17,2,shade(tun,22));
+    px(-11,-32,4,12,ms); px(7,-32,4,12,ms);
+  }
+  ctx.restore();
+  ctx.restore();
+  // ---- and both faces come round to the door ----
+  if(startle>0.02){
+    ctx.globalAlpha=startle;
+    ctx.textAlign='center';
+    pixelText('!', cx-20, fy-64, '#ffd08a', 1.1);
+    pixelText('!', cx+20, fy-66, '#ffd08a', 1.1);
+    ctx.textAlign='left';
+    ctx.globalAlpha=1;
+  }
+}
+/* THE ROOM ITSELF. Everything here is proportional to the frame — the first
+   cut used fixed pixel sizes inside a 268-wide opening, so the bed was a
+   thumbnail in the corner and the top half of the room was dead brown. */
+function drawPeekRoom(x0, y0, w2, h2, room, T){
+  const R=PEEK_ROOM[room]||PEEK_ROOM.bed;
+  const S2=(v)=>Math.round(v*w2);                    // fractions of the opening
+  px(x0, y0, w2, h2, R.cool);
+  // ---- the wall gets a dado and a hanging, so it is a wall and not a void ----
+  const dado=y0+Math.round(h2*0.52);
+  px(x0, dado, w2, Math.round(h2*0.48), shade(R.cool, 12));
+  px(x0, dado, w2, 2, shade(R.cool, 30));
+  { const hw=S2(0.17), hx=x0+S2(0.05), hy=y0+Math.round(h2*0.11);
+    px(hx-1, hy-1, hw+2, Math.round(h2*0.30)+2, shade(R.cool,-24));      // the rod and shadow
+    px(hx, hy, hw, Math.round(h2*0.29), shade(R.warm,-66));
+    px(hx, hy, hw, 2, shade(R.warm,-44));
+    for(let i=0;i<3;i++) px(hx+3, hy+Math.round(h2*0.06)+i*Math.round(h2*0.07), hw-6, 1, shade(R.warm,-26));
+    px(hx-2, hy-2, hw+4, 2, '#6a4a2c'); }
+  // a warm lamp wash, strongest near the floor where the lamp is
+  for(let i=0;i<10;i++){
+    ctx.globalAlpha=(0.030+0.028*(i/9))+0.022*Math.sin(T*0.05+i);
+    px(x0, y0+Math.round(i*(h2/10)), w2, Math.ceil(h2/10)+1, R.warm);
+  }
+  ctx.globalAlpha=1;
+  const fy=y0+h2-Math.round(h2*0.10);
+  px(x0, fy+Math.round(h2*0.055), w2, Math.round(h2*0.06), shade(R.cool,-22));   // the floor line
+  if(room==='bed'){
+    // a proper bed, running most of the width, behind where they are standing
+    const bw=S2(0.52), bx=x0+S2(0.05), bh=Math.round(h2*0.16);
+    px(bx, fy-bh, bw, bh+Math.round(h2*0.05), '#5a3a24');
+    px(bx, fy-bh, bw, 3, '#7a5436');
+    px(bx+2, fy-bh-Math.round(h2*0.055), bw-4, Math.round(h2*0.06), '#c8b8a0');
+    px(bx+2, fy-bh-Math.round(h2*0.055), bw-4, 2, '#e6dcc8');
+    px(bx+S2(0.03), fy-bh-Math.round(h2*0.085), S2(0.10), Math.round(h2*0.045), '#e8dcc0'); // a pillow
+    px(bx-3, fy-bh-Math.round(h2*0.20), 5, Math.round(h2*0.26), '#4a3222');       // posts
+    px(bx+bw-2, fy-bh-Math.round(h2*0.20), 5, Math.round(h2*0.26), '#4a3222');
+    // the lamp that is lighting all of this
+    const lx=x0+w2-S2(0.13), ly=fy-Math.round(h2*0.30);
+    px(lx, ly, S2(0.05), Math.round(h2*0.30), '#4a3222');
+    px(lx-2, ly-Math.round(h2*0.06), S2(0.075), Math.round(h2*0.07), '#e8c34a');
+    ctx.globalAlpha=0.30+0.12*Math.sin(T*0.11);
+    px(lx-S2(0.05), ly-Math.round(h2*0.10), S2(0.17), Math.round(h2*0.16), '#ffe08a');
+    ctx.globalAlpha=1;
+  } else if(room==='pool'){
+    const wy=fy-Math.round(h2*0.02);
+    px(x0+S2(0.03), wy, w2-S2(0.06), Math.round(h2*0.14), '#2f7f9a');
+    px(x0+S2(0.03), wy, w2-S2(0.06), 3, '#5ab4cc');
+    for(let i=0;i<7;i++)
+      px(x0+S2(0.07)+i*S2(0.115), wy+4+(((T*0.1+i*3)|0)%4), S2(0.05), 1, 'rgba(210,244,255,.55)');
+    px(x0+S2(0.02), wy-Math.round(h2*0.055), w2-S2(0.04), 3, '#8a9aa4');        // the kerb
+    // two robes on the tiles, which is the whole story
+    px(x0+S2(0.07), fy-Math.round(h2*0.09), S2(0.13), Math.round(h2*0.05), '#a8407a');
+    px(x0+S2(0.72), fy-Math.round(h2*0.09), S2(0.14), Math.round(h2*0.05), '#7a2f22');
+    for(let i=0;i<6;i++){ ctx.globalAlpha=0.10+0.07*Math.sin(T*0.06+i*1.7);
+      px(x0+S2(0.10)+i*S2(0.135), wy-Math.round(h2*0.16)-((T*0.22+i*9)%Math.round(h2*0.22)),
+         S2(0.055), Math.round(h2*0.055), '#dff2f8'); }
+    ctx.globalAlpha=1;
+  } else {
+    // the wardrobe: cramped, hung, and obviously not built for two
+    px(x0+S2(0.02), y0+3, w2-S2(0.04), h2-8, shade(R.cool,14));
+    px(x0+S2(0.04), y0+Math.round(h2*0.07), w2-S2(0.08), 3, '#6a4a2c');          // the rail
+    const cols=['#6a3f66','#7a2f22','#3a5a4a','#8a6a2a','#5a3a6a','#2f4f6a'];
+    for(let i=0;i<6;i++)
+      px(x0+S2(0.07)+i*S2(0.145), y0+Math.round(h2*0.09), S2(0.075), Math.round(h2*0.34), cols[i]);
+    px(x0+S2(0.05), fy-Math.round(h2*0.07), S2(0.11), Math.round(h2*0.045), '#8a5c34'); // a kicked-off sandal
+  }
+}
+function drawPeek(){
+  const D=DM, P=D.peek; if(!P) return;
+  const T=P.t, R=PEEK_ROOM[P.room]||PEEK_ROOM.bed;
+  // how far the door has opened, and how far it has slammed back
+  let open;
+  if(P.ph==='open')      open=clamp(T/PEEK_OPEN,0,1);
+  else if(P.ph==='hold') open=1;
+  else                   open=clamp(1-(T-PEEK_HOLD)/(PEEK_SHUT-PEEK_HOLD),0,1);
+  open=open*open*(3-2*open);                                    // ease it
+  if(open<=0.01) return;
+  // the whole hall dims so the lit room is the only thing you are looking at
+  ctx.globalAlpha=0.84*open; px(0,0,W,H,'#08060c'); ctx.globalAlpha=1;
+  // the frame: a slot that widens from the middle
+  const FW=Math.round(268*open), FH=Math.round(150*open);
+  const fx=Math.round(W/2-FW/2), fy2=Math.round(H/2-FH/2)-8;
+  if(FW<8||FH<8) return;
+  // the light spilling out around it
+  ctx.globalAlpha=0.30*open;
+  px(fx-7, fy2-7, FW+14, FH+14, R.warm);
+  ctx.globalAlpha=1;
+  drawPeekRoom(fx, fy2, FW, FH, P.room, T);
+  // the pair, once the gap is wide enough for them to be in it
+  if(open>0.42){
+    ctx.save();
+    ctx.beginPath(); ctx.rect(fx,fy2,FW,FH); ctx.clip();
+    // stood on the room's floor line, a shade right of centre so the bed reads behind them
+    drawPeekPair(fx+FW*0.60, fy2+FH-Math.round(FH*0.10), P, T);
+    ctx.restore();
+  }
+  // the jamb, and the two leaves closing back over it
+  px(fx-4, fy2-4, FW+8, 4, '#3a2a18'); px(fx-4, fy2+FH, FW+8, 4, '#3a2a18');
+  px(fx-4, fy2-4, 4, FH+8, '#3a2a18'); px(fx+FW, fy2-4, 4, FH+8, '#3a2a18');
+  { const shut=1-open, lw=Math.round((FW/2)*shut);
+    if(lw>0){ px(fx, fy2, lw, FH, '#c07830'); px(fx+FW-lw, fy2, lw, FH, '#c07830');
+      px(fx, fy2, lw, 3, '#e0965a'); px(fx+FW-lw, fy2, lw, 3, '#e0965a');
+      px(fx+lw-2, fy2, 2, FH, '#7a4a1c'); px(fx+FW-lw, fy2, 2, FH, '#7a4a1c'); } }
+  // the caption, only while it is actually open
+  if(P.ph!=='open' || open>0.8){
+    ctx.textAlign='center';
+    const a=(P.ph==='shut')? clamp(open,0,1) : 1;
+    pixelText('👁 '+R.name, W/2, fy2-14, 'rgba(255,224,170,'+(0.95*a).toFixed(2)+')', 1.05);
+    pixelText(P.occ.name+' & '+P.occ.spouse, W/2, fy2+FH+14, 'rgba(255,214,190,'+(0.9*a).toFixed(2)+')', 0.86);
+    pixelText(P.stage.lab, W/2, fy2+FH+24, 'rgba(255,150,190,'+(0.9*a).toFixed(2)+')', 0.74);
+    if(P.ph==='hold'){
+      pixelText(P.stage.note, W/2, fy2+FH+34, 'rgba(220,206,190,.78)', 0.66);
+      // a shutter countdown, so the "one look" is felt rather than explained
+      const left=clamp(1-(T-PEEK_OPEN)/(PEEK_HOLD-PEEK_OPEN),0,1);
+      px(W/2-40, fy2+FH+40, 80, 2, 'rgba(255,255,255,.15)');
+      px(W/2-40, fy2+FH+40, Math.round(80*left), 2, '#ff9ad8');
+    }
+    ctx.textAlign='left';
+  }
 }
 /* WHAT THEY MEAN TO DO, before they do it. A faint pair standing where they
    are about to set off from, with the room they are headed for named — so a
@@ -22951,6 +23227,8 @@ window.__SS = {
   visitableKids, buildVisitCard, buildFeudCard,
   haggleLeverage, HAGGLE_POSTURES, openHaggle,
   rollWalkIn, fireWalkIn, drawWalkIn, CAUGHT_LINES,
+  peekKey, peekUsed, markPeeked, startPeek, updatePeek, drawPeek,
+  drawPeekPair, drawPeekRoom, PEEK_ROOM, PEEK_STAGE, PEEK_OPEN, PEEK_HOLD, PEEK_SHUT,
   DOMUS_UPPER, STAIR_X0, STAIR_X1, UPPER_DOORS, domusFloorY, nearStairs, climbStairs, upperDoorAt,
   ROOM_COMPLAINTS, maybeRoomComplaint, updateRoomComplaint, drawRoomComplaint, ROOM_DOOR_X,
   makeCheatSuitor, summonCheatSuitor,
