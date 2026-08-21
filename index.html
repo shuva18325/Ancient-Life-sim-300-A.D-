@@ -18512,21 +18512,34 @@ function kidCoupleForecast(ch){
   if(ch.forecast) return ch.forecast;
   try{ return suitorForecast(ch.spouse||{}, ch); }catch(e){ return {ard:2, kids:2}; }
 }
+/* ONCE PER COUPLE PER DAY. roomsOccupiedToday() is a stable fact about the
+   whole day, not a live simulation — so without this, the same couple could
+   be shown "arriving" at a door they are already behind over and over in a
+   single session, which reads as a clone rather than a memory. Each room
+   gets dramatized once; after that, kidWalkDue() has nothing left to offer
+   until the day turns over and occupancy is recomputed. */
+function kidWalkEligibleRooms(){
+  const D=DM; if(!D) return [];
+  if(D.kidWalkSeenDay!==G.day){ D.kidWalkSeen={}; D.kidWalkSeenDay=G.day; }
+  const rooms=roomsOccupiedToday();
+  return Object.keys(rooms).filter(r=>!D.kidWalkSeen[r]);
+}
 function kidWalkDue(){
   const D=DM; if(!D) return false;
   if(D.kidWalk || D.escort || D.scene || D.slap || D.rslap || D.tempt
      || D.husb || D.drop || D.rise || D.ardor) return false;
-  const rooms=roomsOccupiedToday();
-  if(!Object.keys(rooms).length) return false;
+  if(!kidWalkEligibleRooms().length) return false;
   if((D.t||0) - (D.lastKidWalkT===undefined? -9999 : D.lastKidWalkT) < 500) return false;
   return Math.random() < 0.006;
 }
 function startKidWalk(){
   const D=DM; if(!D) return false;
-  const rooms=roomsOccupiedToday(), keys=Object.keys(rooms);
+  const keys=kidWalkEligibleRooms();
   if(!keys.length) return false;
+  const rooms=roomsOccupiedToday();
   const room=pick(keys), occ=rooms[room], ch=occ.ref;
   if(!ch || !ch.spouse) return false;
+  D.kidWalkSeen[room]=true;
   const f=kidCoupleForecast(ch);
   const tx=(ROOM_DOOR_X[room]===undefined? 414 : ROOM_DOOR_X[room]);
   const from=(tx>240)? 40+Math.random()*60 : 400+Math.random()*50;
@@ -18661,15 +18674,22 @@ function suitorPortrait(s, size){
   c.restore();
   return cv;
 }
-/* the room they will live in, and what that costs the house */
-function weddChild(ch, s, stay){
+/* THE ROOF, AND ROME DECIDES IT, NOT YOU. Marriage here is virilocal: a
+   bride joins her husband's household. For a SON that means his wife
+   comes to yours — he stays, she moves in, and the rooms in this house
+   are ever after partly his. For a DAUGHTER it means the opposite — she
+   follows her husband out, and what she founds is a house of your blood
+   somewhere you are not, which is what the map is for. No coin flip, no
+   choice screen: which one happens is simply which child this is. */
+function weddChild(ch, s){
   ch.wed = true;
   ch.spouse = { name:s.name, male:!!s.male, house:s.house, style:s.style,
                 body:s.body, skin:s.skin, hair:s.hair, dress:s.dress,
                 traits:s.traits||[], quirks:s.quirks||[], flaws:s.flaws||[],
                 looks:s.looks, age:s.age };
   ch.wedDay = G.day;
-  ch.livesHome = !!stay;
+  const stay = ch.sex!=='f';                       // sons stay; daughters go
+  ch.livesHome = stay;
   ch.forecast = suitorForecast(s, ch);
   G.coin = (G.coin||0) + (s.dowryCoin||0);
   G.weddings = (G.weddings||0) + 1;
@@ -18983,36 +19003,41 @@ function openSuitorHall(ch, keep){
   bb.onclick=()=>{ SUITORS=null; toast('⏳ “Next year, then.” '+kidName(ch)+' says nothing at all.',3000); openVilla(); };
   back.appendChild(bb); b.appendChild(back);
 }
-/* WHERE THEY LIVE — the decision the villa and the map both have to honour */
+/* WHERE THEY LIVE — Rome decides this, not the villa screen. A bride joins
+   her husband's household: a son's wife comes here, a daughter follows her
+   husband out. There used to be a choice card for this; there is not one
+   any more, because there was never really a choice to offer. */
 function openWeddingChoice(ch, sr){
   state='menu'; show('scr-villa'); $('statbar').classList.remove('hide');
   const fem=ch.sex==='f', nm=String(sr.name||'').split(' ')[0];
   villaHead('⚭ THE MATCH IS MADE',
-    kidName(ch)+' will marry '+nm+' of the '+sr.house+'. The only question left is the roof.', '#e8c34a');
+    kidName(ch)+' will marry '+nm+' of the '+sr.house+'.', '#e8c34a');
   const b=$('villa-body'); b.innerHTML='';
-  const opt=(icon,title,desc,warn,fn)=>{
-    const c=document.createElement('div'); c.className='shopcard';
-    c.innerHTML='<div><b style="color:var(--gold)">'+icon+' '+title+'</b></div>'
-      +'<div class="small muted" style="line-height:1.5;margin-top:2px">'+desc+'</div>'
-      +(warn? '<div class="small" style="color:#e0a05b;margin-top:3px">'+warn+'</div>':'');
-    const bt=document.createElement('button'); bt.className='btn sm gold'; bt.style.marginTop='5px';
-    bt.textContent='CHOOSE THIS'; bt.onclick=fn; c.appendChild(bt); b.appendChild(c);
+  const card=document.createElement('div'); card.className='shopcard';
+  card.innerHTML = fem
+    ? '<div><b style="color:var(--gold)">🗺 SHE JOINS HIS HOUSEHOLD</b></div>'
+      +'<div class="small muted" style="line-height:1.5;margin-top:2px">Roman custom, and nobody in this '
+      +'family is the one to break it: a daughter follows her husband. '+kidName(ch)+' will take up '
+      +nm+'\'s roof, in a household of your blood a long way from this one — a name on the map you do '
+      +'not have to be standing in front of to be proud of.</div>'
+    : '<div><b style="color:var(--gold)">🏠 SHE JOINS THIS ONE</b></div>'
+      +'<div class="small muted" style="line-height:1.5;margin-top:2px">Custom again, the other half of '
+      +'it: a son brings his bride home. '+nm+' moves into a wing of the villa, and whatever grandchildren '
+      +'come of it will grow up under this roof.</div>'
+      +'<div class="small" style="color:#e0a05b;margin-top:3px">⚠ The house is not as empty as it was. '
+      +'Some nights the bedchamber will already be occupied.</div>';
+  const bt=document.createElement('button'); bt.className='btn sm gold'; bt.style.marginTop='5px';
+  bt.textContent='⚭ SO BE IT';
+  bt.onclick=()=>{
+    weddChild(ch,sr);
+    if(fem){ const where=ch.livesAt||'the provinces';
+      toast('🗺 '+kidName(ch)+' joins '+nm+'\'s household in '+where+'. +'+fmt(sr.dowryCoin||0)+'d dowry.',5200);
+    } else {
+      toast('⚭ '+kidName(ch)+' is married. '+nm+' moves in. +'+fmt(sr.dowryCoin||0)+'d dowry.',5200);
+    }
+    SUITORS=null; openVilla();
   };
-  opt('🏠','THEY STAY UNDER THIS ROOF',
-    'A wing of the villa is theirs. You keep '+(fem?'your daughter':'your son')+', you keep the grandchildren '
-    +'close, and '+kidName(ch)+' will remember that you did not simply hand '+kidHim(ch)+' over.',
-    '⚠ The house is not as empty as it was. Some nights the bedchamber will already be occupied.',
-    ()=>{ weddChild(ch,sr,true);
-      toast('⚭ '+kidName(ch)+' is married, and stays. +'+fmt(sr.dowryCoin||0)+'d dowry.',5200);
-      SUITORS=null; openVilla(); });
-  opt('🗺','THEY TAKE A HOUSE OF THEIR OWN',
-    'A household of your blood in another province — a name in a place you do not have to be. '
-    +'It will show on your map, and it will still be there when you are not.',
-    null,
-    ()=>{ weddChild(ch,sr,false);
-      const where=ch.livesAt||'the provinces';
-      toast('🗺 '+kidName(ch)+' takes a house in '+where+'. +'+fmt(sr.dowryCoin||0)+'d dowry.',5200);
-      SUITORS=null; openVilla(); });
+  card.appendChild(bt); b.appendChild(card);
   const row=document.createElement('div'); row.className='row gap6'; row.style.marginTop='4px';
   const bk=document.createElement('button'); bk.className='btn sm'; bk.textContent='◀ BACK TO THE CALLERS';
   bk.onclick=()=>openSuitorHall(ch,true); row.appendChild(bk); b.appendChild(row);
@@ -19134,10 +19159,12 @@ const FAMILY_EVENTS=[
        run:(c)=>{ const three=[makeSuitorFor(c),makeSuitorFor(c),makeSuitorFor(c)];
                   three.sort((x,y)=>(y.dowryCoin||0)-(x.dowryCoin||0));
                   const best=three[0];
-                  weddChild(c, best, Math.random()<0.5);
+                  weddChild(c, best);
                   c.resent=(c.resent||0)+3;
                   return kidName(c)+' is married to '+String(best.name||'').split(' ')[0]
-                       +' of the '+best.house+' for '+fmt(best.dowryCoin||0)+'d, having met '+kidHim(c)+' once.'; }},
+                       +' of the '+best.house+' for '+fmt(best.dowryCoin||0)+'d, having met '+kidHim(c)+' once. '
+                       +(c.sex==='f'? kidName(c)+' leaves for '+String(best.name||'').split(' ')[0]+'\'s house before the week is out.'
+                                    : String(best.name||'').split(' ')[0]+' moves in before the week is out.'); }},
     c:{lab:'🚪 “NOT YET.”', desc:'Send them all away. It costs you nothing today and something later.',
        run:(c)=>{ c.resent=(c.resent||0)+1; G.honor=clamp((G.honor||50)-1,0,100);
                   return 'The litter leaves. '+kidName(c)+' watches it go from an upstairs window.'; }} },
@@ -20066,7 +20093,9 @@ function buildMarriageCard(b){
         return (grown?(c.sex==='m'?'🧔 ':'👩 '):(c.sex==='m'?'👦 ':'👧 '))+c.name
           +' <span style="color:'+krC+'">♥'+kr+'</span> <span class="muted">('+yrs+' yrs'
           +(c.sex==='m'&&age>=40&&!c.wedTo?(c.appointed?' · serves as your general':' · OF AGE — appoint him in INTRIGUE'):'')
-          +(c.wedTo?' · wed to '+c.wedTo: c.wed?' · wed to a foreign court':'')
+          +(c.wedTo?' · wed to '+c.wedTo
+            : c.wed?(c.livesHome? ' · married, '+(c.spouse&&c.spouse.name?String(c.spouse.name).split(' ')[0]:'their spouse')+' moved in'
+                                 : ' · married, at '+(c.livesAt||'a house of their own')):'')
           +(c.kids?' · '+c.kids+'👶':'')+')</span>';
       }).join(' · ');
       card.appendChild(kids);
@@ -22013,7 +22042,7 @@ window.__SS = {
   sfx, blip, hiss, audioBus, revSend, houseIsWatching,
   ESCORT_POSES, escortPose, escortPoseFor, coupleLooks, drawEscortPair,
   startEscort, updateEscort, drawEscort, drawCarriedFem,
-  kidWalkDue, startKidWalk, updateKidWalk, drawKidWalk, kidCoupleForecast,
+  kidWalkDue, startKidWalk, updateKidWalk, drawKidWalk, kidCoupleForecast, kidWalkEligibleRooms,
   drawKidIntent, INTENT_ROOM, INTENT_LEN,
   ESCORT_WIFE_DX, maybeArmSwat, drawArmSwat,
   DOMUS_UPPER, STAIR_X0, STAIR_X1, UPPER_DOORS, domusFloorY, nearStairs, climbStairs, upperDoorAt,
