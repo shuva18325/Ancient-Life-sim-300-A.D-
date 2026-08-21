@@ -7150,6 +7150,25 @@ function sfx(kind){
       blip({f:78, to:132, d:0.55, type:'sawtooth', v:0.028, a:0.10, lp:900, lpTo:340, q:5});
       hiss({d:0.5, v:0.020, f:600, to:260, band:true, q:6, a:0.12});
       break;
+    case 'step':           // one sandal on a mosaic floor
+      hiss({d:0.030, v:0.055, f:1500, to:420, band:true, q:1.1, a:0.001, rate:R(0.9,1.1)});
+      blip({f:R(110,150), to:60, d:0.05, type:'sine', v:0.030, a:0.002});
+      break;
+    case 'stepStone':      // and on the stair, which rings a little
+      hiss({d:0.040, v:0.060, f:2100, to:600, band:true, q:1.3, a:0.001, rate:R(0.9,1.1)});
+      blip({f:R(150,200), to:80, d:0.07, type:'triangle', v:0.028, a:0.002, rev:true});
+      break;
+    case 'dooropen':       // the bar lifted, the hinges turning, the leaf swinging in
+      hiss({d:0.05, v:0.09, f:1400, to:500, band:true, q:1.4, a:0.002});          // the bar
+      blip({f:70, to:52, d:0.42, type:'sine', v:0.075, a:0.02, rev:true});        // the weight of it
+      hiss({d:0.42, v:0.032, f:700, to:280, band:true, q:5.5, a:0.10});           // hinges, complaining
+      blip({f:180, to:250, d:0.30, type:'triangle', v:0.020, a:0.09, lp:1400});
+      break;
+    case 'doorshut':       // and closing behind them
+      hiss({d:0.16, v:0.030, f:600, to:300, band:true, q:4, a:0.05});
+      blip({f:88, to:44, d:0.24, type:'sine', v:0.11, a:0.004, rev:true});
+      hiss({d:0.04, v:0.08, f:2000, to:800, band:true, q:1.2, a:0.001, at:0.16});  // the latch
+      break;
     case 'door':           // a heavy leaf swinging and latching
       blip({f:64, to:44, d:0.30, type:'sine', v:0.10, a:0.01, rev:true});
       hiss({d:0.30, v:0.030, f:520, to:200, band:true, q:4, a:0.08});
@@ -12130,6 +12149,12 @@ function updateDomus(dt){
   else if(husbandMoveDue()) startHusbandMove();
   const sp2=(held.s? 3.0 : 1.5)*dt;        // hold S to RUN
   const face0=D.face;
+  if(held.a||held.d){
+    // one footfall per stride, faster when running, and stone up on the gallery
+    const gait=held.s? 11 : 19;
+    D.stepT=(D.stepT||0)+dt;
+    if(D.stepT>=gait){ D.stepT=0; try{ sfx(D.floor? 'stepStone' : 'step'); }catch(e){} }
+  } else D.stepT=0;
   if(held.a){ D.x-=sp2; D.face=-1; } if(held.d){ D.x+=sp2; D.face=1; }
   if(D.face!==face0) D.turn=14;             // YOU turn on the spot when you reverse
   if(D.turn>0) D.turn-=dt;
@@ -12152,6 +12177,35 @@ function updateDomus(dt){
     else if(D.wifeTurn>0){ /* she is mid-turn; she does not walk through it */ }
     else { D.wifeX+=D.wifeDir*0.35*dt;
       if(D.wifeX<236||D.wifeX>376){ D.wifeDir*=-1; D.wifeTurn=16; D.wifePause=rnd(60,180); } }
+  }
+  if(D.climbT>0) D.climbT-=dt;
+  /* UPSTAIRS. The gallery is a place to walk and look at doors; the whole
+     romance apparatus lives on the ground floor, so up here SPACE talks to a
+     door and W comes back down, and nothing else fires. */
+  if(D.floor){
+    const dr=upperDoorAt(D.x);
+    /* ORDER MATTERS. This was `consume('w') || (consume('space') && nearStairs())`
+       — and && evaluates left to right, so consume('space') fired and ATE the
+       edge wherever you were standing. Two steps from the stair head, SPACE at
+       a door did nothing at all. Test the position first, consume second. */
+    if(consume('w')){ climbStairs(); return; }
+    if(nearStairs() && consume('space')){ climbStairs(); return; }
+    if(consume('space')){
+      if(dr && dr.who){
+        const rooms=roomsOccupiedToday();
+        const away=Object.keys(rooms).find(r=>rooms[r].ref===dr.who);
+        const RL={bed:'the bedchamber',pool:'the lagoon',wardrobe:'the wardrobe'};
+        try{ sfx(away? 'deny' : 'ui'); }catch(e){}
+        toast(away
+          ? '🚪 '+kidName(dr.who)+'’s room is dark — they are down in '+(RL[away]||'the house')+'.'
+          : '🚪 '+kidName(dr.who)+' and '+((dr.who.spouse&&String(dr.who.spouse.name||'').split(' ')[0])||'their spouse')
+            +' live behind this one. You knock. You think better of it.', 4200);
+      } else if(dr){
+        try{ sfx('ui'); }catch(e){}
+        toast('🚪 An empty room, shuttered. It is waiting for somebody to marry.',3200);
+      }
+    }
+    return;                                        // nothing below applies up here
   }
   const nearWife=G.married && G.wife && ADULT && Math.abs(D.x-D.wifeX)<26;
   const nearPool=G.hasPool && Math.abs(D.x-86)<36;
@@ -12199,6 +12253,9 @@ function updateDomus(dt){
      && watchersPresent(privacyTier()==='strict') && !villaClear()) clearTheVilla();
   // L — THE ARDOR. His half, and the only half you press yourself.
   if(!D.scene && !D.slap && !D.rslap && !D.husb && !D.ardor && consume('l')) tryArdor();
+  // and the stairs, which are on the far left and were decorative until now
+  if(!D.scene && !D.slap && !D.rslap && !D.husb && !D.ardor && !D.escort
+     && nearStairs() && consume('up')) climbStairs();
 }
 function updateDomusScene(dt){
   const D=DM, sc=D.scene; sc.t+=dt; const T=sc.t;
@@ -12866,9 +12923,15 @@ const RISE_LINES=[
 ];
 /* THE BUMP, in five. Drawn over whatever he is wearing, at his hip, growing
    from a fold you could argue with into one you cannot. */
-function drawTunicBump(x, y, w, stage, T, dir){
+function drawTunicBump(x, y, w, stage, T, dir, decent){
   if(stage<=0) return;
   dir = (dir===-1)? -1 : 1;                        // it belongs on the side he is facing
+  /* NOT IN FRONT OF THE HOUSEHOLD. The last stage is the one where the hem
+     gives up and there is skin — which is fine behind a door and is not fine
+     in an atrium with three children and the kitchen staff in it. `decent`
+     holds it one stage short: the tunic is doing a great deal of work, and
+     it is still a tunic. */
+  if(decent) stage=Math.min(stage, RISE_STAGES-2);
   const B=(w&&w.body)||{}, gv=(id,d)=>B[id]===undefined?d:B[id];
   const len=gv('secret',5), lg=gv('legs',6);
   const tun=w.dress||w.tunic||'#7a2f22';
@@ -12997,7 +13060,8 @@ function drawRise(){
   ctx.restore();
   if(X.ph==='build' && X.stage<4){                  // the scroll, until he puts it down
     px(hx-4,FY-40,9,6,'#e6dcc2'); px(hx-4,FY-40,9,1,'#f6efdc'); px(hx-4,FY-40,1,6,'#b8a882'); }
-  drawTunicBump(hx, FY, w, X.ph==='build'? X.stage : RISE_STAGES-1, T, D.x<hx? -1 : 1);
+  drawTunicBump(hx, FY, w, X.ph==='build'? X.stage : RISE_STAGES-1, T, D.x<hx? -1 : 1,
+    houseIsWatching());
   // ---- YOU ----
   drawWifeFig(ctx, D.x, FY, playerLook(), 0, 'idle');
   ctx.textAlign='center';
@@ -13230,7 +13294,8 @@ function drawArdor(){
   ctx.save(); ctx.translate(D.x,FY); if(dir<0) ctx.scale(-1,1);
   drawHusbandFig(ctx,0,0,G.wifeRel|0,null,null,me, mv? T*0.35:0, mv?'walk':'idle');
   ctx.restore();
-  drawTunicBump(D.x, FY, me, X.ph==='wind'? X.stage : RISE_STAGES-1, T, dir);
+  const decent=houseIsWatching();
+  drawTunicBump(D.x, FY, me, X.ph==='wind'? X.stage : RISE_STAGES-1, T, dir, decent);
   if(X.ph==='wind'){
     const bx=W/2-70, by=H-40, bw=140, bh=10;
     px(bx-2,by-2,bw+4,bh+4,'#120c08');
@@ -13249,6 +13314,8 @@ function drawArdor(){
   else if(X.ph==='fizz') pixelText('…nothing.', W/2, 34, 'rgba(210,205,215,.9)', 1.06);
   else if(X.ph==='ready'){
     pixelText('READY.  GO TO HER.  (A / D)', W/2, 26, '#ffce7a', 1.06);
+    if(decent) pixelText('— and the tunic stays ON until there is a door —',
+      W/2, H-28, 'rgba(190,214,255,.8)', 0.86);
     const left=clamp(1-(X.t/ARDOR_HOLD),0,1);
     px(W/2-40,36,80,3,'#4a3826'); px(W/2-40,36,80*left,3,'#ffce7a');
     pixelText('she has no excuse — she will still have an opinion', W/2, H-18, 'rgba(255,214,190,.75)', 1);
@@ -13764,6 +13831,13 @@ function watchersPresent(all){
   if(!G) return 0;
   const kids=(G.children||[]).filter(c=>!c.dead && (all || kidBand(c)!=='baby')).length;
   return kids + (all? (G.slaves||0) : 0);
+}
+/* is anyone in a position to be scandalised, this instant? */
+function houseIsWatching(){
+  if(!G) return false;
+  if(privacyTier()==='easy') return false;         // shameless: nobody is scandalised
+  if(villaClear()) return false;
+  return watchersPresent(privacyTier()==='strict')>0;
 }
 function privacyNeeded(kind){
   const tier=privacyTier();
@@ -14535,7 +14609,7 @@ function drawDomus(){
      with a staircase and lit doorways, which is where the grown children
      and their spouses actually live.
      ===================================================================== */
-  const UPPER=96;                                   // floor level of the gallery
+  const UPPER=DOMUS_UPPER;                          // floor level of the gallery
   // ---- the shell: three bands of wall, darkest at the top ----
   px(-4,-4,W+8,H+8,'#241a12');
   px(-4,-4,W+8,UPPER-8,'#3a2a1c');                  // upper storey wall
@@ -14814,10 +14888,11 @@ function drawDomus(){
     if(D.gripe) drawRoomComplaint();                    // and somebody small has a grievance
     if(!D.rslap && !D.husb && !D.ardor && !D.escort && !(D.rise && D.rise.ph!=='build')
        && !(D.drop && D.drop.ph!=='fall')){ const mv=(held.a||held.d), run=mv&&held.s, turning=(D.turn||0)>0;
-      drawDomusPlayer(D.x,FY,
+      const pfy=domusFloorY();                          // the gallery is a floor too
+      drawDomusPlayer(D.x,pfy,
         turning? 1-(D.turn/14) : (mv? D.t*(run?0.6:0.35) : 0),
         turning? 'turn' : (run?'run':(mv?'walk':'idle')));
-      drawArdorIcon(D.x,FY,D.t); }
+      if(!D.floor) drawArdorIcon(D.x,pfy,D.t); }
     // THE ASIDE — the big one leading the little one out, explaining nothing well
     if(D.sib){ const S2=D.sib, T3=S2.t;
       const bx=clamp(300-T3*0.55, 40, 300), sx=bx-14;
@@ -14837,12 +14912,22 @@ function drawDomus(){
       pixelText('▾', who, FY-52, col, 1);
       ctx.textAlign='left'; }
     let prompt='';
+    if(D.floor){
+      // up on the gallery: the doors, and the way back down
+      const dr=upperDoorAt(D.x);
+      prompt = nearStairs()? 'W: ⬇ BACK DOWN'
+             : dr? ('SPACE: 🚪 '+(dr.who? kidName(dr.who)+'’S DOOR' : 'AN EMPTY ROOM'))
+             : 'A/D along the gallery  ·  the stair is at the far left';
+      ctx.textAlign='center'; pixelText(prompt,W/2,H-6,'#c8b060',1); ctx.textAlign='left';
+      prompt='';                       // and nothing below may add to it
+    }
     /* THE ARDOR PRINTS ITS OWN. Its place menu sits along the bottom of the
        screen, and the ordinary near-the-wife prompt was drawing straight
        through it — two different sets of key hints in the same six pixels. */
     if(D.ardor) prompt='';
     else if(D.drop && D.drop.ph==='fall' && Math.abs(D.x-D.drop.x)<16) prompt='SPACE: 🪮 STOOP FOR IT   ·   F: 🍑 …OR FAKE IT';
     else if(D.drop && D.drop.ph==='fall') prompt='F: 🍑 BEND FOR NOTHING AT ALL';
+    else if(nearStairs()) prompt='↑ (ARROW UP): CLIMB TO THE GALLERY';
     else if(D.x>452) prompt='SPACE: LEAVE THE HALLS';
     else if(G.hasPool&&Math.abs(D.x-86)<36) prompt='SPACE: BATHE'+(G.married?'  ·  W: INVITE '+(w&&w.male?'HIM':'HER'):'');
     else if(G.hasWardrobe&&Math.abs(D.x-309)<20) prompt=G.married?'SPACE: …THE WARDROBE 😏':'SPACE: WARDROBE';
@@ -14850,7 +14935,8 @@ function drawDomus(){
     else if(G.married&&G.wife&&ADULT&&Math.abs(D.x-D.wifeX)<26)
       prompt='SPACE: '+((G.slapCount||0)>=3&&G.slapDay===G.day? '👋 '+slapLabel('spentShort') : slapLabel('hand'))
              +'  ·  W: '+slapLabel('romantic')+(loveLeft('quick')<=0?' (spent)':'');
-    const _pw=D.ardor? 0 : watchersPresent(privacyTier()==='strict');
+    // upstairs already printed its own line — the hall's prompts do not apply
+    const _pw=(D.ardor||D.floor)? 0 : watchersPresent(privacyTier()==='strict');
     if(_pw && privacyTier()!=='easy' && !villaClear())
       prompt = 'E: '+(privacyTier()==='strict'?'🕯 CLEAR THE WHOLE VILLA':'🚸 CLEAR THE HALL')
              +' ('+_pw+' watching)'+(prompt?'   ·   '+prompt:'');
@@ -18156,29 +18242,38 @@ function drawCarriedFem(cx, cy, w, T, kind, dir){
     ctx.restore(); return;
   }
 
-  /* BRIDAL — cradled across both forearms, facing up, knees bent. */
-  P(-16,-4+sway, 34, 3, sSh);                                      // the shadow of his arms
-  // --- the legs, folded up at the knee ---
-  P(10,-7+sway, 13, 9, dress); P(10,-7+sway,13,1,dHi);             // thigh
-  P(19,-16+sway, 6, 11, dress); P(19,-16+sway,6,1,dHi);            // shin, angled up
-  P(19,-19+sway, 7, 4, skin);  P(19,-19+sway,7,1,sHi);             // her ankles
-  P(18,-22+sway, 8, 4, '#8a5c34'); P(18,-22+sway,8,1,'#a87446');   // and a sandal on top
-  // --- the seat and the small of her back ---
-  const bw2=Math.round(8+be*0.46);
-  P(2,-9+sway, bw2, 11, dress); P(2,-9+sway,bw2,2,dHi); P(2,1+sway,bw2,1,dSh);
-  // --- the torso ---
-  P(-12,-10+sway, 15, 11, dress); P(-12,-10+sway,15,2,dHi); P(-12,0+sway,15,1,dSh);
-  if(bu>=4){ const q=Math.round(2+bu*0.34);                        // facing up
-    P(-6,-12-q+sway, q+4, q+2, dress); P(-6,-12-q+sway,q+4,1,dHi); }
-  // --- the head, tipped back against his chest ---
-  P(-22,-12+sway, 9, 9, skin); P(-22,-12+sway,9,1,sHi); P(-14,-11+sway,1,8,sSh);
-  P(-24,-15+sway, 12, 4, hair); P(-24,-15+sway,12,1,hHi);
-  P(-26,-12+sway, 3, 9, hair); P(-27,-4+sway, 4, 3, hair);         // hair falling away
-  P(-20,-9+sway, 2,2,'#241408'); P(-17,-9+sway, 2,2,'#241408');
-  P(-19,-6+sway, 4,1,'#b8484f');                                   // laughing
-  // --- her arm up around his neck ---
-  P(-20,-18+sway, 3, 7, skin); P(-20,-18+sway,1,7,sHi);
-  P(-19,-21+sway, 6, 3, skin); P(-19,-21+sway,6,1,sHi);
+  /* BRIDAL — cradled across both forearms.
+     The first cut had her folded into a lump: a thigh block, a shin block and
+     a sandal stacked ON TOP of the silhouette, so the reading was "man
+     carrying a chair". Laid out properly now — one long horizontal body with
+     the head clear at one end, the knees bent DOWN over his arm at the other
+     the way a carried person's legs actually hang, and her near arm up round
+     his neck so the two figures are visibly connected. */
+  // --- the legs: thigh runs level, shin hangs down over his forearm ---
+  P(6,-8+sway, 15, 9, dress); P(6,-8+sway,15,1,dHi); P(6,0+sway,15,1,dSh);   // thigh
+  P(18,-6+sway, 7, 12, dress); P(18,-6+sway,7,1,dHi);                        // knee, turning down
+  P(19,5+sway,  6, 7, skin);  P(19,5+sway,6,1,sHi); P(24,6+sway,1,6,sSh);    // her calf, hanging
+  P(18,11+sway, 8, 4, '#8a5c34'); P(18,11+sway,8,1,'#a87446');               // and the sandal, below
+  // --- the seat, resting on his forearm ---
+  const bw2=Math.round(9+be*0.44);
+  P(-2,-9+sway, bw2, 11, dress); P(-2,-9+sway,bw2,2,dHi); P(-2,1+sway,bw2,1,dSh);
+  // --- the torso, running back toward his chest ---
+  P(-15,-11+sway, 15, 12, dress); P(-15,-11+sway,15,2,dHi); P(-15,0+sway,15,1,dSh);
+  for(let f=0; f<3; f++) P(-13+f*5, -8+sway, 1, 8, dSh);                     // folds along her side
+  if(bu>=4){ const q=Math.round(2+bu*0.34);
+    P(-10,-13-q+sway, q+5, q+3, dress); P(-10,-13-q+sway,q+5,1,dHi); }
+  // --- the neck and head, tipped back against him ---
+  P(-19,-11+sway, 5, 5, skin); P(-19,-11+sway,5,1,sHi);                      // neck
+  P(-27,-15+sway, 10, 10, skin); P(-27,-15+sway,10,1,sHi); P(-18,-14+sway,1,9,sSh);
+  P(-29,-18+sway, 13, 4, hair); P(-29,-18+sway,13,1,hHi);                    // hair
+  P(-31,-15+sway, 3, 10, hair);
+  P(-33,-6+sway,  4, 4, hair); P(-34,-2+sway, 3, 3, hair);                   // and it falls away
+  P(-25,-11+sway, 2,2,'#241408'); P(-21,-11+sway, 2,2,'#241408');            // eyes
+  P(-24,-7+sway, 4,1,'#b8484f'); P(-25,-8+sway,1,1,'#b8484f');               // laughing
+  // --- her near arm, up and around his neck ---
+  P(-16,-20+sway, 3, 10, skin); P(-16,-20+sway,1,10,sHi);
+  P(-14,-23+sway, 8, 3, skin);  P(-14,-23+sway,8,1,sHi);
+  P(-7,-24+sway,  3, 4, skin);                                               // her hand, over his shoulder
   ctx.restore();
 }
 /* draw the pair, mid-walk, in one of the five holds. `dir` is +1 walking
@@ -18245,6 +18340,37 @@ function drawEscortPair(x, FY, T, pose, dir, look, wife){
    what happens when he gets there depends on whether it is free.
    --------------------------------------------------------------------- */
 const ROOM_DOOR_X={bed:414, pool:86, wardrobe:309};
+/* THE UPPER STOREY IS A PLACE YOU CAN STAND. The gallery had a staircase
+   drawn on it and no way to use it, which is worse than not drawing one.
+   96 is the gallery's floor level; the flight runs up the left wall. */
+const DOMUS_UPPER=96;
+const STAIR_X0=4, STAIR_X1=62;                     // the footprint of the flight
+const UPPER_DOORS=[62,178,300];                    // the three rooms up there
+function domusFloorY(){ return (DM && DM.floor)? DOMUS_UPPER-8 : 214; }
+function nearStairs(){ const D=DM; return !!D && D.x>=STAIR_X0-6 && D.x<=STAIR_X1+8; }
+function climbStairs(){
+  const D=DM; if(!D) return false;
+  if(!nearStairs()) return false;
+  if(D.scene||D.slap||D.rslap||D.tempt||D.husb||D.drop||D.rise||D.ardor||D.escort) return false;
+  D.floor = D.floor? 0 : 1;
+  D.climbT = 22;
+  D.x = clamp(D.x, STAIR_X0+6, STAIR_X1);
+  try{ sfx('stepStone'); }catch(e){}
+  setTimeout(()=>{ try{ sfx('stepStone'); }catch(e){} }, 130);
+  setTimeout(()=>{ try{ sfx('stepStone'); }catch(e){} }, 260);
+  toast(D.floor? '⬆ Up to the gallery. The rooms up here belong to the married ones.'
+                : '⬇ Back down to the atrium.', 2600);
+  return true;
+}
+// whose door are you standing at, up on the gallery?
+function upperDoorAt(x){
+  const home=(G.children||[]).filter(c=>!c.dead && c.wed && c.livesHome).slice(0,3);
+  for(let i=0;i<3;i++){
+    const ux=UPPER_DOORS[i];
+    if(x>=ux-8 && x<=ux+40) return { i, ux, who: home[i]||null };
+  }
+  return null;
+}
 function startEscort(room, after){
   const D=DM; if(!D) return false;
   if(!G.married || !G.wife || G.isFemale || G.wife.male) return false;
@@ -18265,6 +18391,9 @@ function updateEscort(dt){
   E.t+=dt;
   if(E.ph==='walk'){
     E.locks=true;
+    // a step every time the near foot lands, paced by the hold he is using
+    const gait=Math.max(6, Math.round(20/(E.pose.speed||1)));
+    if(Math.floor(E.t/gait) !== Math.floor((E.t-dt)/gait)) try{ sfx('step'); }catch(e){}
     const sp=1.05*(E.pose.speed||1)*dt;
     const d=E.tx-E.x;
     E.x += Math.sign(d)*Math.min(Math.abs(d), sp);
@@ -18290,10 +18419,11 @@ function updateEscort(dt){
   }
   else if(E.ph==='enter'){
     E.locks=true;
+    if(E.t<=dt) try{ sfx('dooropen'); }catch(e){}
     if(E.t>60){
       const room=E.room, after=E.after;
       D.escort=null; D.wifePause=0;
-      try{ sfx('door'); }catch(e){}
+      try{ sfx('doorshut'); }catch(e){}
       if(after){ after(room); return; }
       if(room==='here'){ startVillaLove(D.wifeX, true, true); return; }
       spendLove(bedLen); saveQuiet(); DM=null; startBedScene('fun', bedLen, room);
@@ -18355,23 +18485,57 @@ function startKidWalk(){
   const tx=(ROOM_DOOR_X[room]===undefined? 414 : ROOM_DOOR_X[room]);
   const from=(tx>240)? 40+Math.random()*60 : 400+Math.random()*50;
   D.lastKidWalkT=D.t;
-  D.kidWalk={ t:0, room, ch, occ, pose:escortPoseFor(f.ard, f.kids),
+  D.kidWalk={ t:0, ph:'intent', room, ch, occ, pose:escortPoseFor(f.ard, f.kids),
               looks:coupleLooks(ch), x:from, tx, startX:from };
   return true;
+}
+/* WHAT THEY MEAN TO DO, before they do it. A faint pair standing where they
+   are about to set off from, with the room they are headed for named — so a
+   couple crossing your hall is announced rather than simply appearing. */
+const INTENT_ROOM={bed:'the bedchamber', pool:'the lagoon', wardrobe:'the wardrobe'};
+const INTENT_LEN=110;
+function drawKidIntent(){
+  const D=DM, K=D.kidWalk; if(!K || K.ph!=='intent') return;
+  const FY=214, T=K.t;
+  const a=Math.min(1,T/16)*Math.min(1,(INTENT_LEN-T)/26);
+  const dir=(K.tx>=K.startX)? 1 : -1;
+  // the ghost of where they are standing
+  ctx.globalAlpha=0.30*a;
+  drawEscortPair(K.x, FY, T*0.4, K.pose, dir, K.looks.him, K.looks.her);
+  ctx.globalAlpha=1;
+  // a dotted line to the door they mean to reach
+  ctx.globalAlpha=0.42*a;
+  const x0=Math.min(K.x,K.tx), x1=Math.max(K.x,K.tx);
+  for(let dx=x0; dx<x1; dx+=7) px(dx, FY-6, 3, 1, '#e8c34a');
+  px(K.tx-2, FY-11, 5, 6, '#ff9ad8'); px(K.tx-2, FY-11, 5, 1, '#ffd0e4');
+  ctx.globalAlpha=1;
+  ctx.textAlign='center';
+  pixelText('⌛ '+kidName(K.ch)+' & '+K.occ.spouse, K.x, FY-98, 'rgba(232,195,74,'+(0.85*a).toFixed(2)+')', 0.74);
+  pixelText('— for '+(INTENT_ROOM[K.room]||'a room')+' —', K.x, FY-89,
+    'rgba(255,150,190,'+(0.8*a).toFixed(2)+')', 0.66);
+  ctx.textAlign='left';
 }
 function updateKidWalk(dt){
   const D=DM, K=D.kidWalk; if(!K) return;
   K.t+=dt;
+  if(K.ph==='intent'){
+    if(K.t>INTENT_LEN){ K.ph='walk'; K.t=0; try{ sfx('step'); }catch(e){} }
+    return;
+  }
+  const gait=Math.max(6, Math.round(22/(K.pose.speed||1)));
+  if(Math.floor(K.t/gait) !== Math.floor((K.t-dt)/gait)) try{ sfx('step'); }catch(e){}
   const sp=0.95*(K.pose.speed||1)*dt;
   const d=K.tx-K.x;
   K.x += Math.sign(d)*Math.min(Math.abs(d), sp);
   if(Math.abs(K.tx-K.x)<2 || K.t>1400){
     D.kidWalk=null;
-    try{ sfx('door'); }catch(e){}
+    try{ sfx('dooropen'); }catch(e){}
+    setTimeout(()=>{ try{ sfx('doorshut'); }catch(e){} }, 420);
   }
 }
 function drawKidWalk(){
   const D=DM, K=D.kidWalk; if(!K) return; const FY=214;
+  if(K.ph==='intent'){ drawKidIntent(); return; }
   const dir=(K.tx>=K.startX)? 1 : -1;
   // a shade behind the player's own business, so it never competes with it
   ctx.globalAlpha=0.90;
@@ -21786,10 +21950,12 @@ window.__SS = {
   makeSuitorFor, suitorForecast, weddChild, houseGuestBusy, suitorsAvailable,
   roomsOccupiedToday, roomOccupant, drawDoor, HOUSE_ROOMS, tryWardrobe, tryPoolInvite, openTree,
   ARD_TITLES, KID_TITLES, bedTitle, myBedTitle, pickTitle,
-  sfx, blip, hiss, audioBus, revSend,
+  sfx, blip, hiss, audioBus, revSend, houseIsWatching,
   ESCORT_POSES, escortPose, escortPoseFor, coupleLooks, drawEscortPair,
   startEscort, updateEscort, drawEscort, drawCarriedFem,
   kidWalkDue, startKidWalk, updateKidWalk, drawKidWalk, kidCoupleForecast,
+  drawKidIntent, INTENT_ROOM, INTENT_LEN,
+  DOMUS_UPPER, STAIR_X0, STAIR_X1, UPPER_DOORS, domusFloorY, nearStairs, climbStairs, upperDoorAt,
   ROOM_COMPLAINTS, maybeRoomComplaint, updateRoomComplaint, drawRoomComplaint, ROOM_DOOR_X,
   makeCheatSuitor, summonCheatSuitor,
   openSuitorHall, openWeddingChoice, buildSuitorCard, buildKidHousesCard, SUITOR_STYLE,
