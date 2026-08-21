@@ -12120,6 +12120,8 @@ function updateDomus(dt){
   if(D.rise){ updateRise(dt); if(D.rise && D.rise.locks) return; }
   else if(riseDue()) startRise();
   if(D.escort){ updateEscort(dt); if(D.escort && D.escort.locks) return; }
+  if(D.kidWalk) updateKidWalk(dt);                    // ambient — never locks you
+  else if(kidWalkDue()) startKidWalk();
   if(D.gripe) updateRoomComplaint(dt);
   if(D.ardor){ updateArdor(dt); if(D.ardor && D.ardor.locks) return; }
   if(D.husb){ updateHusbandMove(dt); return; }        // he is already crossing; nothing interrupts that
@@ -13119,11 +13121,19 @@ function ardorSpots(){
   // one privacy can shut. A door is exactly what the other three are FOR.
   const blocked = privacyNeeded('romantic')? privacyRefusal('romantic') : null;
   const occ=roomsOccupiedToday();
-  const taken=(r)=>occ[r]? ('taken — '+occ[r].name+' & '+occ[r].spouse) : null;
+  /* SHORT on the card, LONG in the toast. "taken — Livia & Marcus" is wider
+     than a 108px card at this text scale and bled straight across into the
+     next option; the card gets the child's name only and the toast still
+     names the pair. */
+  const taken=(r)=>occ[r]? ('taken — '+occ[r].name) : null;
+  const takenLong=(r)=>occ[r]? (occ[r].name+' and '+occ[r].spouse+' are in there') : null;
   out.push({id:'here', name:'BEND HERE',  icon:'🏛', note:'Where you are standing.',  block:blocked});
-  out.push({id:'bed',  name:'BED CHAMBER',icon:'🛏', note:'A door, and it shuts.',    block:taken('bed'), occ:!!occ.bed});
-  if(G.hasPool)     out.push({id:'pool',    name:'THE BATH',    icon:'🛁', note:'Warm, and empty at this hour.', block:taken('pool'), occ:!!occ.pool});
-  if(G.hasWardrobe) out.push({id:'wardrobe',name:'THE WARDROBE',icon:'🚪', note:'Undignified. Quick. Hers.',     block:taken('wardrobe'), occ:!!occ.wardrobe});
+  out.push({id:'bed',  name:'BED CHAMBER',icon:'🛏', note:'A door, and it shuts.',
+    block:taken('bed'), blockLong:takenLong('bed'), occ:!!occ.bed});
+  if(G.hasPool)     out.push({id:'pool',    name:'THE BATH',    icon:'🛁', note:'Warm, and empty at this hour.',
+    block:taken('pool'), blockLong:takenLong('pool'), occ:!!occ.pool});
+  if(G.hasWardrobe) out.push({id:'wardrobe',name:'THE WARDROBE',icon:'🚪', note:'Undignified. Quick. Hers.',
+    block:taken('wardrobe'), blockLong:takenLong('wardrobe'), occ:!!occ.wardrobe});
   out.forEach(sp=>sp.fav=(sp.id===fav));
   return out;
 }
@@ -13172,7 +13182,7 @@ function updateArdor(dt){
     if(consume('d')){ X.sel=(X.sel+1)%S.length;          try{ sfx('ui'); }catch(e){} }
     if(consume('space')||consume('attack')){
       const sp=S[X.sel];
-      if(sp.block){ toast(sp.occ? ('🚪 '+sp.block+'. Pick another door.') : sp.block, 3200);
+      if(sp.block){ toast(sp.occ? ('🚪 '+(sp.blockLong||sp.block)+'. Pick another door.') : sp.block, 3200);
         try{ sfx('deny'); }catch(e){} }
       else { X.chose=sp; X.ph='go'; X.t=0; }
     }
@@ -13257,7 +13267,13 @@ function drawArdor(){
       if(sp.fav && !dead){ px(cx+cw-9,cy+3,6,6,'#ff7ab0'); px(cx+cw-8,cy+4,4,1,'#ffd0e4'); }
       pixelText(sp.icon+' '+sp.name, cx+cw/2, cy+11,
         dead? 'rgba(190,120,116,.85)' : on? '#ffce7a' : 'rgba(232,227,194,.85)', 0.9);
-      pixelText(dead? sp.block : sp.note, cx+cw/2, cy+26,
+      /* AND IT HAS TO FIT. A blocked reason like "Not in front of the children.
+         Clear the hall first." is fifty characters in a card a fifth that wide,
+         so it ran across its neighbours. Trimmed to the card; the toast on a
+         failed pick still carries the whole sentence. */
+      const fit=(t)=>{ const max=Math.max(6, Math.floor(cw/5.4));
+        t=String(t||''); return t.length>max? t.slice(0,max-1)+'…' : t; };
+      pixelText(fit(dead? sp.block : sp.note), cx+cw/2, cy+26,
         dead? 'rgba(224,112,104,.95)' : 'rgba(200,190,170,.7)', 0.8);
       /* CROSSED OUT, IN RED. A greyed label is easy to miss at this size —
          a room you cannot have gets a line straight through it and a cross
@@ -14637,7 +14653,7 @@ function drawDomus(){
         px(60,py-9,42,9,'#2a1c10'); px(60,py-9,42,1,'#5a4028');
         ctx.textAlign='center';
         pixelText('♥ IN USE', 81, py-4, 'rgba(160,216,255,'+(0.75+0.25*Math.sin(T*0.12)).toFixed(2)+')', 0.7);
-        pixelText(po.name+' & '+po.spouse, 81, py-16, 'rgba(232,195,74,.85)', 0.68);
+        if(!placeMenuUp()) pixelText(po.name+' & '+po.spouse, 81, py-16, 'rgba(232,195,74,.85)', 0.68);
         ctx.textAlign='left';
       } }
     /* one laurel only, at the far end — the other stood exactly where the
@@ -14679,7 +14695,7 @@ function drawDomus(){
       px(wx+3,150,28,9,'#2a1c10'); px(wx+3,150,28,1,'#5a4028');
       ctx.textAlign='center';
       pixelText('♥ OCCUPIED', wx+17, 155, 'rgba(255,170,205,'+(0.75+0.25*Math.sin(T*0.12)).toFixed(2)+')', 0.68);
-      pixelText(wo.name+' & '+wo.spouse, wx+17, FY+8, 'rgba(232,195,74,.85)', 0.66);
+      if(!placeMenuUp()) pixelText(wo.name+' & '+wo.spouse, wx+17, FY+8, 'rgba(232,195,74,.85)', 0.66);
       ctx.textAlign='left';
     }
   }
@@ -14793,6 +14809,7 @@ function drawDomus(){
     if(D.husb) drawHusbandMove();                       // he crossed the room without being asked
     if(D.drop) drawDrop();                              // the floor, her, and him crossing to it
     if(D.ardor) drawArdor();                            // 🏛 and it is your own fault this time
+    if(D.kidWalk) drawKidWalk();                        // and so is somebody else's husband
     if(D.escort) drawEscort();                          // he is taking her somewhere
     if(D.gripe) drawRoomComplaint();                    // and somebody small has a grievance
     if(!D.rslap && !D.husb && !D.ardor && !D.escort && !(D.rise && D.rise.ph!=='build')
@@ -18044,25 +18061,53 @@ function myBedTitle(){
    complaining about.
    ===================================================================== */
 const ESCORT_POSES=[
-  {id:'stiff',    tier:0, lab:'…', speed:0.62,
+  {id:'stiff',    tier:0, lab:'…', speed:0.62, phase:'CEREMONIAL ONLY',
    note:'He walks a pace ahead. Neither of them says anything.'},
-  {id:'hand',     tier:1, lab:'♥', speed:0.80,
+  {id:'hand',     tier:1, lab:'♥', speed:0.80, phase:'REGULARLY',
    note:'He takes her hand at the door, the way he was taught to.'},
-  {id:'lead',     tier:2, lab:'♥', speed:1.05,
+  {id:'lead',     tier:2, lab:'♥', speed:1.05, phase:'NORMALLY',
    note:'She is walking; he is walking rather faster.'},
-  {id:'shoulder', tier:3, lab:'♥♥', speed:1.35,
+  {id:'shoulder', tier:3, lab:'♥♥', speed:1.35, phase:'MOSTLY',
    note:'He has simply picked her up. She has stopped objecting to this.'},
-  {id:'bridal',   tier:4, lab:'♥♥♥', speed:1.70,
+  {id:'bridal',   tier:4, lab:'♥♥♥', speed:1.70, phase:'ALMOST EVERY DAY',
    note:'He is running. She is laughing. The household has seen this before.'},
 ];
-// which pose this house has earned
-function escortPose(){
-  const t=myBedTitle();
-  const ai=ARD_TITLES.indexOf(t.ard), ki=KID_TITLES.indexOf(t.kids);
-  const aN=ai/(ARD_TITLES.length-1), kN=ki/(KID_TITLES.length-1);
+/* ONE ladder, so a married child's couple is graded on exactly the same
+   scale as your own house — theirs from the forecast the augurs read at
+   the wedding, yours from what has actually happened since. */
+function escortPoseFor(ard, kids){
+  const a=pickTitle(ARD_TITLES, ard||0), k=pickTitle(KID_TITLES, kids||0);
+  const aN=ARD_TITLES.indexOf(a)/(ARD_TITLES.length-1);
+  const kN=KID_TITLES.indexOf(k)/(KID_TITLES.length-1);
   const heat=Math.max(aN,kN);                       // the louder of the two facts
   const i=clamp(Math.floor(heat*ESCORT_POSES.length), 0, ESCORT_POSES.length-1);
   return ESCORT_POSES[i];
+}
+// which pose YOUR house has earned
+function escortPose(){
+  const t=myBedTitle();
+  const days=Math.max(1,(G.day||0)-(G.marriedDay===undefined?0:G.marriedDay));
+  return escortPoseFor((G.woohooAll||0)/Math.max(1,days/3),
+                       (G.children||[]).filter(c=>!c.dead).length);
+}
+/* both halves of a married child's couple, described the way the sprites
+   want to be told, and sorted into who is carrying whom */
+function coupleLooks(ch){
+  const kid=grownLook(ch), sp=ch.spouse||{};
+  const noble=(G.socialClass==='imperial'||G.royal||G.socialClass==='elite'||G.senate);
+  const spLook={
+    self:false, male:!!sp.male, name:sp.name, eth:'roman', age:sp.age||28,
+    skin: sp.skin || '#caa06a',
+    dress: sp.male? shade(G.tunic||'#7a2f22',-10) : shade(sp.dress||'#8a2f5a',-8),
+    hair: sp.hair || (sp.male? '#3a2618' : '#5a3a1e'),
+    hairStyle: sp.male? 'caesar' : 'crown',
+    beard: sp.male? 'stubble' : 'none',
+    outfit:'tunic', jewel:(!sp.male && noble), crown:false, scars:[],
+    rank: noble?'noble':'peasant', tier: noble?'elite':'common',
+    looks: sp.looks===undefined? 5 : sp.looks,
+    body: sp.body || {face:5,hairq:5,bust:5,waist:5,booty:5,legs:5,secret:5},
+  };
+  return { him: kid.male? kid : spLook, her: kid.male? spLook : kid };
 }
 /* HER, CARRIED — purpose-built, because a rotated standing figure does not
    work. drawWifeFig's silhouette is dominated by the flare of the gown; turn
@@ -18263,6 +18308,7 @@ function drawEscort(){
   ctx.textAlign='center';
   if(E.ph==='walk'){
     pixelText(E.pose.note, W/2, 28, 'rgba(255,214,190,.9)', 1.0);
+    pixelText(E.pose.phase, W/2, 42, 'rgba(255,150,190,.85)', 0.80);
     pixelText(E.pose.lab, E.x, FY-84, '#ff9ad8', 1.1);
   } else if(E.ph==='barred'){
     // the door, shut, with somebody behind it
@@ -18274,6 +18320,66 @@ function drawEscort(){
   } else {
     pixelText('♥', E.x, FY-84, '#ff9ad8', 1.3);
   }
+  ctx.textAlign='left';
+}
+/* ---------------------------------------------------------------------
+   YOUR CHILDREN'S OWN MARRIAGES, crossing your hall
+   ---------------------------------------------------------------------
+   A married pair living under your roof do not teleport into the room
+   they are occupying — they walk there, past you, in whichever hold
+   THEIR marriage has earned. Same five poses, graded on the forecast the
+   augurs read at their wedding rather than on your record.
+
+   Ambient: it never locks your controls and never interrupts anything.
+   --------------------------------------------------------------------- */
+function kidCoupleForecast(ch){
+  if(ch.forecast) return ch.forecast;
+  try{ return suitorForecast(ch.spouse||{}, ch); }catch(e){ return {ard:2, kids:2}; }
+}
+function kidWalkDue(){
+  const D=DM; if(!D) return false;
+  if(D.kidWalk || D.escort || D.scene || D.slap || D.rslap || D.tempt
+     || D.husb || D.drop || D.rise || D.ardor) return false;
+  const rooms=roomsOccupiedToday();
+  if(!Object.keys(rooms).length) return false;
+  if((D.t||0) - (D.lastKidWalkT===undefined? -9999 : D.lastKidWalkT) < 1500) return false;
+  return Math.random() < 0.0026;
+}
+function startKidWalk(){
+  const D=DM; if(!D) return false;
+  const rooms=roomsOccupiedToday(), keys=Object.keys(rooms);
+  if(!keys.length) return false;
+  const room=pick(keys), occ=rooms[room], ch=occ.ref;
+  if(!ch || !ch.spouse) return false;
+  const f=kidCoupleForecast(ch);
+  const tx=(ROOM_DOOR_X[room]===undefined? 414 : ROOM_DOOR_X[room]);
+  const from=(tx>240)? 40+Math.random()*60 : 400+Math.random()*50;
+  D.lastKidWalkT=D.t;
+  D.kidWalk={ t:0, room, ch, occ, pose:escortPoseFor(f.ard, f.kids),
+              looks:coupleLooks(ch), x:from, tx, startX:from };
+  return true;
+}
+function updateKidWalk(dt){
+  const D=DM, K=D.kidWalk; if(!K) return;
+  K.t+=dt;
+  const sp=0.95*(K.pose.speed||1)*dt;
+  const d=K.tx-K.x;
+  K.x += Math.sign(d)*Math.min(Math.abs(d), sp);
+  if(Math.abs(K.tx-K.x)<2 || K.t>1400){
+    D.kidWalk=null;
+    try{ sfx('door'); }catch(e){}
+  }
+}
+function drawKidWalk(){
+  const D=DM, K=D.kidWalk; if(!K) return; const FY=214;
+  const dir=(K.tx>=K.startX)? 1 : -1;
+  // a shade behind the player's own business, so it never competes with it
+  ctx.globalAlpha=0.90;
+  drawEscortPair(K.x, FY, D.t, K.pose, dir, K.looks.him, K.looks.her);
+  ctx.globalAlpha=1;
+  ctx.textAlign='center';
+  pixelText(kidName(K.ch)+' & '+K.occ.spouse, K.x, FY-92, 'rgba(232,195,74,.78)', 0.70);
+  pixelText(K.pose.phase, K.x, FY-84, 'rgba(255,150,190,.72)', 0.62);
   ctx.textAlign='left';
 }
 /* ---------------------------------------------------------------------
@@ -18396,6 +18502,13 @@ function roomOccupant(room){ return roomsOccupiedToday()[room] || null; }
 /* THE DOOR ITSELF — one routine, so every door in the house is the same
    piece of joinery: architrave, two leaves, sunk panels, ring handles,
    hinges and a threshold. `busy` gives it the whole occupied performance. */
+/* the WHERE menu occupies the bottom strip of the screen, exactly where the
+   doors print the names of whoever is behind them — so with the menu up the
+   threshold labels ran straight through the cards. They stand down while it
+   is open; the ♥ OCCUPIED plate on the door face itself is well clear. */
+function placeMenuUp(){
+  return !!(DM && DM.ardor && (DM.ardor.ph==='ask' || DM.ardor.ph==='go'));
+}
 function drawDoor(x, y, w, h, T, o){
   o=o||{};
   const wood   = o.wood   || '#c07830';
@@ -18472,7 +18585,8 @@ function drawDoor(x, y, w, h, T, o){
     ctx.textAlign='center';
     pixelText('♥ OCCUPIED', x+w/2, py+1,
       'rgba(255,170,205,'+(0.75+0.25*Math.sin(T*0.12)).toFixed(2)+')', 0.72);
-    if(busy.name) pixelText(busy.name+' & '+busy.spouse, x+w/2, y+h+9, 'rgba(232,195,74,.85)', 0.68);
+    if(busy.name && !placeMenuUp())
+      pixelText(busy.name+' & '+busy.spouse, x+w/2, y+h+9, 'rgba(232,195,74,.85)', 0.68);
     ctx.textAlign='left';
   }
 }
@@ -21673,7 +21787,9 @@ window.__SS = {
   roomsOccupiedToday, roomOccupant, drawDoor, HOUSE_ROOMS, tryWardrobe, tryPoolInvite, openTree,
   ARD_TITLES, KID_TITLES, bedTitle, myBedTitle, pickTitle,
   sfx, blip, hiss, audioBus, revSend,
-  ESCORT_POSES, escortPose, drawEscortPair, startEscort, updateEscort, drawEscort, drawCarriedFem,
+  ESCORT_POSES, escortPose, escortPoseFor, coupleLooks, drawEscortPair,
+  startEscort, updateEscort, drawEscort, drawCarriedFem,
+  kidWalkDue, startKidWalk, updateKidWalk, drawKidWalk, kidCoupleForecast,
   ROOM_COMPLAINTS, maybeRoomComplaint, updateRoomComplaint, drawRoomComplaint, ROOM_DOOR_X,
   makeCheatSuitor, summonCheatSuitor,
   openSuitorHall, openWeddingChoice, buildSuitorCard, buildKidHousesCard, SUITOR_STYLE,
