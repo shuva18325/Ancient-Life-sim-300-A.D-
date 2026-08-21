@@ -2944,9 +2944,20 @@ function kidGrown(c){ return c && (G.day-(c.born||0))>=40; }
 function bornToThePurple(){
   return !!(G && (G.socialClass==='imperial' || G.emperor || (G.family && G.family.kin)));
 }
+// Prisca → Priscus · Valeria → Valerius · Longina → Longinus
+function manNomen(n){
+  n=String(n||'');
+  if(/ia$/.test(n))  return n.slice(0,-2)+'ius';
+  if(/na$/.test(n))  return n.slice(0,-1)+'us';
+  if(/lla$/.test(n)) return n.slice(0,-1)+'us';
+  if(/a$/.test(n))   return n.slice(0,-1)+'us';
+  return n;
+}
 function makeBride(eth, noble, quality, opts){
   opts=opts||{};
   const D=BRIDE[eth]||BRIDE.roman;
+  // who this person IS: stated by the caller, else "the opposite of the player"
+  const wantMale = (opts.male!==undefined)? !!opts.male : !!(G && G.isFemale);
   // QUALITY 0-10 drives looks, wits and traits. Nobles skew higher; paid matches are guaranteed high.
   if(quality===undefined) quality = clamp(Math.round((noble? rnd(3,8) : rnd(1,6)) + (G&&G.marryRolls? Math.min(2.5,G.marryRolls*0.18):0)), 0, 10);
   const bodyRoll = rollBody(quality);
@@ -2978,7 +2989,7 @@ function makeBride(eth, noble, quality, opts){
     /* makeBride does not know the sex — callers set w.male afterwards — so the
        roll is done blind and fixTraitsForSex (via ensureLook) swaps out
        anything that turned out to belong to the other one. */
-    quality, looks, smarts, traits: rollTraits(quality, opts.male), flaws: rollFlaws(quality),
+    quality, looks, smarts, traits: rollTraits(quality, wantMale), flaws: rollFlaws(quality),
     quirks: rollQuirks(),          // and the middle tier, which quality does not buy you out of
     boons: rollBoons(quality), banes: rollBanes(quality),   // and the two rare outer bands
     name: pick(D.names)+' '+pick(D.surn),
@@ -3031,7 +3042,18 @@ function makeBride(eth, noble, quality, opts){
   b.dowryCoin=b.dowryCoin||0; b.dowryFood=b.dowryFood||0; b.dowrySoldiers=b.dowrySoldiers||0;
   b.approval=b.approval||0; b.favor=b.favor||0; b.honor=b.honor||0; b.pop=b.pop||0; b.tradeCoin=b.tradeCoin||0; b.tradeFood=b.tradeFood||0;
   b.hairStyle = pick(HAIR_F_BY_ETH[eth]||HAIR_F_BY_ETH.roman);
-  if(G && G.isFemale){ b.male=true; b.name=pick(GROOM_NAMES[eth]||GROOM_NAMES.roman)+' '+pick(D.surn);
+  /* THIS ONLY EVER ASKED WHETHER THE **PLAYER** WAS A WOMAN. Every other
+     caller was fine with that, but a suitor for your DAUGHTER has to be a man
+     regardless of which sex you are playing — and without this he came out
+     with a woman's name, a woman's hairstyle and no beard, drawn by the male
+     routine. opts.male states it outright; nobody who does not pass it sees
+     any change. */
+  if(wantMale){ b.male=true;
+    /* the surname list is the FEMININE form — a man called "Decimus Prisca"
+       is half a man and half his sister. Roman nomina decline: Prisca →
+       Priscus, Valeria → Valerius. Only touch the Latin endings; anything
+       else (a Germanic or Parthian name) is left exactly as it is. */
+    b.name=pick(GROOM_NAMES[eth]||GROOM_NAMES.roman)+' '+manNomen(pick(D.surn));
     b.age = (opts.ageNear!==undefined)
       ? clamp(b.age + ri(0,4), 18, 64)             // a matched pair stays a matched pair
       : clamp(b.age + ri(5,13), 18, 58);           // otherwise Roman husbands ran a decade ahead
@@ -5141,7 +5163,7 @@ function elevateWife(rank){
   refreshStatbar(); saveQuiet(); openVilla();
 }
 // fill in any fields missing from older saves
-function migrate(g){ const d={honor:50,food:4,mount:0,slaves:0,hasVilla:false,boat:false,favor:0,soldiers:0,hidden:[],plotTier:0,emperor:false,approval:50,legions:0,rivals:0,retired:false,detachments:[],day:0,titles:{},clears:{},socialClass:'gladiator',army:{},armyGear:0,armyTrain:0,hasOrganizer:false,generals:[],wife:null,married:false,marryPrompted:false,children:[],pregnant:null,lastLoveDay:-9,injury:null,lastDebateDay:-9,office:0,path:null,parthia:50,parthiaPact:false,wifeRel:50,lastTalkDay:-9,isFemale:false,lineage:[],hygiene:70,wifePhys:45,hasPool:false,hasWardrobe:false,legacy:null,lastFeastDay:-9,loveDay:-1,loveQuick:0,loveLong:0,loveNight:0,loveVigil:0,venusUntil:-1,lastWashDay:-9,lastPoolDay:-9,lastWardrobeDay:-9,lastKidsDay:-9,lastBathDay:-9,pila:0,bow:null,bowsOwned:[],nemesis:null,rivalsList:[],trophies:[],nemesisCount:0,pendingDeath:false,ageBase:0,wonProvinceByFight:false,familyMan:false,infamy:0,gladiatrixStage:0,pardoned:false,lastNoteDay:-9,lastNoteReply:'',regalia:[],marryRolls:0,hasBodyMap:false,hasSecretMap:false,jealousy:0,lastJealousDay:-9,traits:[],flaws:[],looks:5,smarts:5,advocate:false,tutorialDone:false,patrons:[],rivalAdv:null,landmarks:[],faction:null,oratory:1,casesWon:0,casesLost:0,renown:0,senate:false,royal:false,lastCaseDay:-9,skills:{footwork:0,guard:0,blade:0,wind:0,throwing:0},scars:[],fatigue:0,lastTrainDay:-9,tribune:false,rank:0,campaigns:0,legionRep:0,lastCampaignDay:-9,units:{legionary:0,auxilia:0,cavalry:0,archers:0,engineers:0},supply:0,sieges:0,body:null,family:null,provinces:{},complaints:[],leniency:50,lastCalloutDay:-9,lastGiftDay:-9,giftsTaken:0,calloutWins:0,crownWorn:false,court:null,lastCoupDay:-99,herbs:{},herbLore:0,ill:null,midwife:false,titlesWorn:[],warExhaust:0,lastExhaustWhy:'',titleRites:[],tombs:[],inheritedFrom:null,hairStyle:null,hairCol:null,beardStyle:null,outfit:null,courtLog:{},lastAskDay:-9,retirePromise:null,promiseBreaks:0,promiseFights:0,tutor:false,freedmen:0,askLog:{},temptHeld:0,temptTook:0,slapDay:-9,slapCount:0,slapsAll:0,doorShut:0,caughtByHouse:0,romanticAll:0,clearedHall:0,lastFamilyDay:-9,namedHeir:null,willSplit:false,purpleWatch:0}; for(const k in d){ if(g[k]===undefined) g[k]=d[k]; }
+function migrate(g){ const d={honor:50,food:4,mount:0,slaves:0,hasVilla:false,boat:false,favor:0,soldiers:0,hidden:[],plotTier:0,emperor:false,approval:50,legions:0,rivals:0,retired:false,detachments:[],day:0,titles:{},clears:{},socialClass:'gladiator',army:{},armyGear:0,armyTrain:0,hasOrganizer:false,generals:[],wife:null,married:false,marryPrompted:false,children:[],pregnant:null,lastLoveDay:-9,injury:null,lastDebateDay:-9,office:0,path:null,parthia:50,parthiaPact:false,wifeRel:50,lastTalkDay:-9,isFemale:false,lineage:[],hygiene:70,wifePhys:45,hasPool:false,hasWardrobe:false,legacy:null,lastFeastDay:-9,loveDay:-1,loveQuick:0,loveLong:0,loveNight:0,loveVigil:0,venusUntil:-1,lastWashDay:-9,lastPoolDay:-9,lastWardrobeDay:-9,lastKidsDay:-9,lastBathDay:-9,pila:0,bow:null,bowsOwned:[],nemesis:null,rivalsList:[],trophies:[],nemesisCount:0,pendingDeath:false,ageBase:0,wonProvinceByFight:false,familyMan:false,infamy:0,gladiatrixStage:0,pardoned:false,lastNoteDay:-9,lastNoteReply:'',regalia:[],marryRolls:0,hasBodyMap:false,hasSecretMap:false,jealousy:0,lastJealousDay:-9,traits:[],flaws:[],looks:5,smarts:5,advocate:false,tutorialDone:false,patrons:[],rivalAdv:null,landmarks:[],faction:null,oratory:1,casesWon:0,casesLost:0,renown:0,senate:false,royal:false,lastCaseDay:-9,skills:{footwork:0,guard:0,blade:0,wind:0,throwing:0},scars:[],fatigue:0,lastTrainDay:-9,tribune:false,rank:0,campaigns:0,legionRep:0,lastCampaignDay:-9,units:{legionary:0,auxilia:0,cavalry:0,archers:0,engineers:0},supply:0,sieges:0,body:null,family:null,provinces:{},complaints:[],leniency:50,lastCalloutDay:-9,lastGiftDay:-9,giftsTaken:0,calloutWins:0,crownWorn:false,court:null,lastCoupDay:-99,herbs:{},herbLore:0,ill:null,midwife:false,titlesWorn:[],warExhaust:0,lastExhaustWhy:'',titleRites:[],tombs:[],inheritedFrom:null,hairStyle:null,hairCol:null,beardStyle:null,outfit:null,courtLog:{},lastAskDay:-9,retirePromise:null,promiseBreaks:0,promiseFights:0,tutor:false,freedmen:0,askLog:{},temptHeld:0,temptTook:0,slapDay:-9,slapCount:0,slapsAll:0,doorShut:0,caughtByHouse:0,romanticAll:0,clearedHall:0,lastFamilyDay:-9,namedHeir:null,willSplit:false,purpleWatch:0,kidHouses:[],weddings:0}; for(const k in d){ if(g[k]===undefined) g[k]=d[k]; }
   if(g.wife) ensureQuirks(g.wife);          // a spouse saved before the five bands existed
   if(g.quirks===undefined) g.quirks=rollQuirks();   // and a player from before THEY had any
   if(!g.hairStyle){ const male=!g.isFemale, eth='roman';
@@ -11526,20 +11548,29 @@ function drawWifeFig(c,x,y,w,ph,mode){
   // ================= GOWN =================
   if(mode==='god'){
     // THE GOD WALK — she gathers the stola in one fist and sweeps, formal and unhurried
-    P(-hipW, top, hipW*2, 16, dress); P(-hipW, top, hipW*2, 2, dHi);
-    // the gathered fall of cloth, lifted on her right
-    for(let i=0;i<7;i++){ const t=i/6; P(-hipW+2+i*2, top+14, 2, Math.round(10-t*9), dress); }
+    P(-hipW, top, hipW*2, 20, dress); P(-hipW, top, hipW*2, 2, dHi);
+    // the gathered fall of cloth, lifted on her right — down to the legs, not short of them
+    for(let i=0;i<7;i++){ const t=i/6; P(-hipW+2+i*2, top+18, 2, Math.round(9-t*7), dress); }
     P(hipW-3, top+8, 5, 12, dHi);                   // the lifted fold catching the light
     P(-hipW-1, top+14, 3, 8, dSh);
   } else {
-    P(-hipW, top, hipW*2, 18+ (running?-2:0), dress);         // skirt of the gown
+    /* THE GOWN DID NOT REACH HER LEGS. The skirt was drawn 18 tall from
+       top = yy-26-legLen, so its hem landed at yy-8-legLen — while the legs
+       begin at yy-legLen. That is an eight-pixel band of pure background
+       between the dress and the knees on EVERY standing woman in the game,
+       which reads as a floating gown over a pair of disconnected shins.
+       26 is the distance from `top` down to the top of the legs; 27 puts a
+       one-pixel overlap there so there is no seam either. */
+    const skirtH = 27 + (running? -2 : 0);
+    P(-hipW, top, hipW*2, skirtH, dress);                      // skirt of the gown
     P(-hipW, top, hipW*2, 2, dHi);
-    P(-hipW-1+hJig*0.5, top+8, 2, 10, dSh);                    // side folds sway with the hips
-    P( hipW-1+hJig*0.5, top+8, 2, 10, dSh);
-    if(walking){ P(-2+stride*0.6, top+12, 4, 8, dSh); }        // the hem parts as she steps
+    P(-hipW-1+hJig*0.5, top+9, 2, skirtH-11, dSh);             // side folds sway with the hips
+    P( hipW-1+hJig*0.5, top+9, 2, skirtH-11, dSh);
+    if(walking){ P(-2+stride*0.6, top+14, 4, skirtH-15, dSh); } // the hem parts as she steps
   }
   // a NOBLE gown carries the gold hem and trim it carries in her portrait
-  if(noble){ P(-hipW, top+16, hipW*2, 1, '#e8c34a'); P(-hipW, top, 1, 18, '#e8c34a'); }
+  if(noble){ P(-hipW, top+(mode==='god'?16:25), hipW*2, 1, '#e8c34a');
+             P(-hipW, top, 1, (mode==='god'?18:27), '#e8c34a'); }
   // ================= HIPS AND THE BOOTY, BY TIER =================
   // FLAT · RAISED · ELEVATED · FAT · COLOSSAL — five silhouettes, not one
   // block scaled up. Drawn behind her so it reads from any angle.
@@ -11867,7 +11898,10 @@ function updateDomus(dt){
     else if(nearPool) D.scene={kind:'bath',t:0};
     else if(nearWard) tryWardrobe();
     else if(nearDoor){
-      if(!G.married) toast('An empty bed, neatly made. The house waits for a family.',2200);
+      const busy=houseGuestBusy();
+      if(busy) toast('🚪 The door is shut and it is not yours today — '+busy.name
+        +' and '+busy.spouse+' are in there. Nobody says anything at supper.',4200);
+      else if(!G.married) toast('An empty bed, neatly made. The house waits for a family.',2200);
       else if(loveLeft(bedLen)<=0) toast('“AGAIN?!” — no '+bedLen+' sessions left today.',2200);
       else if(!spouseWilling()) toast('“Not tonight.” — win the heart first.',2200);
       else { spendLove(bedLen); saveQuiet(); DM=null; startBedScene('fun',bedLen); return; }
@@ -12296,6 +12330,8 @@ function drawHusbandMove(){
     H.landed? 'bend' : 'idle');                   // she takes it, and the bend rings on its own
   if(H.landed) drawSlapAfter(D.x, FY, playerLook(), H.t-16, H.kind,
     !!(H.v && (H.v.bond||0)>=0));
+  if(H.landed) drawReactFace(D.x, FY, playerLook(),
+    reactKindFor(H.v, H.kind==='romantic'), H.t-16);
   // HIM, arriving on his own account
   ctx.save(); ctx.translate(H.x, FY);
   if(D.x < H.x) ctx.scale(-1,1);
@@ -12363,6 +12399,115 @@ function drawElbowOver(x, y, look, t){
 /* THE COLOUR IT LEAVES. A slap that lands well leaves a mark and a face that
    has an opinion about it; the other kind leaves the same mark and a different
    opinion. Both were a white ring and nothing else. */
+/* =====================================================================
+   REACTION FACES
+   ---------------------------------------------------------------------
+   The "blush" was two 3x2 pink rectangles at a hardcoded offset, drawn at
+   the same place whatever happened and whoever it happened to — so a
+   loving slap, a furious one and one she returns all read identically,
+   and on a husband they landed in the middle of his beard.
+
+   These are real faces. Each kind redraws the whole expression — brows,
+   eyes, mouth, colour — over the figure's ACTUAL head box, which is
+   computed from the same measurements the sprite was built from.
+   ===================================================================== */
+function figHeadBox(look){
+  const B=(look&&look.body)||{}, gv=(id,d)=>B[id]===undefined?d:B[id];
+  if(look && look.male){
+    // drawHusbandFig: head sits at -56-headH, headW/headH off the face score
+    const fa=gv('face',6);
+    const headW=Math.round(10+fa*0.30);
+    const headH=13+(fa>=9?4:fa>=7?3:fa>=5?2:fa>=3?1:0);
+    return {x:-headW/2, y:-56-headH, w:headW, h:headH, male:true};
+  }
+  // drawWifeFig: top = -26-legLen, head box at top-38, 9 wide, 10 tall
+  const lg=gv('legs',6), legLen=Math.round(9+lg*0.55), top=-26-legLen;
+  return {x:-4, y:top-38, w:9, h:10, male:false};
+}
+/* kind → how the face is set. Every one of these is a different expression,
+   not the same face in a different colour. */
+const REACT_FACES={
+  sting:  {blush:'#e0604a', blushA:0.85, tint:'#d0574a', tintA:0.20},
+  swoon:  {blush:'#f07a9a', blushA:0.95, tint:'#e0708a', tintA:0.16},
+  blush:  {blush:'#e0708a', blushA:0.70, tint:'#e0708a', tintA:0.10},
+  scowl:  {blush:'#c04a3a', blushA:0.55, tint:'#a83a2a', tintA:0.14},
+  smirk:  {blush:'#e08a6a', blushA:0.45, tint:'#d0806a', tintA:0.06},
+};
+function reactKindFor(v, romantic){
+  const k=(v&&v.k)||'ok';
+  if(k==='bad'||k==='cold'||k==='enough') return 'scowl';
+  if(k==='return') return 'smirk';
+  if(romantic) return 'swoon';
+  if(k==='love') return 'swoon';
+  return 'blush';
+}
+/* t runs 0..~90 from the moment of contact. The face SETTLES: it arrives
+   hard on the first few frames and eases back toward neutral. */
+function drawReactFace(x, y, look, kind, t, boxOv){
+  if(t<0 || t>96) return;
+  const F=REACT_FACES[kind]||REACT_FACES.blush;
+  /* a POSE can move the head somewhere figHeadBox knows nothing about — the
+     bent pose turns it back over her shoulder — so a caller that has drawn
+     its own head passes the box it actually used. */
+  const hb=boxOv||figHeadBox(look);
+  const skin=look.skin||(hb.male?'#caa06a':'#e6bd94');
+  const hx=x+hb.x, hy=y+hb.y, hw=hb.w, hh=hb.h;
+  // the face sits in the lower two-thirds of the head box, hair takes the top
+  const eyeY=Math.round(hy+hh*0.42), mouthY=Math.round(hy+hh*0.70);
+  const cx=Math.round(hx+hw/2);
+  const rise=clamp(t/6,0,1), fall=clamp(1-(t-18)/70,0,1);
+  const amt=rise*Math.max(0,fall);
+  if(amt<=0.02) return;
+  const P=(a,b,w2,h2,c2,al)=>{ ctx.globalAlpha=(al===undefined?1:al)*amt;
+    ctx.fillStyle=c2; ctx.fillRect(Math.round(a),Math.round(b),Math.round(w2),Math.round(h2));
+    ctx.globalAlpha=1; };
+  // a wash of colour over the whole face first, so the expression sits IN the skin
+  P(hx+1, hy+Math.round(hh*0.30), hw-2, Math.round(hh*0.55), F.tint, F.tintA);
+  const eL=cx-3, eR=cx+1;
+  if(kind==='sting'){
+    // eyes screwed shut, mouth open, one cheek taking it much harder
+    P(eL,eyeY+1,2,1,'#241408'); P(eR,eyeY+1,2,1,'#241408');
+    P(eL-1,eyeY-1,3,1,'#3a2418'); P(eR,eyeY-1,3,1,'#3a2418');       // brows driven down
+    P(cx-1,mouthY,3,2,'#7a2f2a'); P(cx,mouthY+1,1,1,'#4a1a16');      // an open, shocked mouth
+    P(hx+hw-3,eyeY+1,3,3,F.blush,F.blushA);                          // the struck side
+    P(hx,eyeY+2,2,2,F.blush,F.blushA*0.45);
+    if(t<14){ P(hx+hw+1,hy+2,1,3,'#fff0dc',0.9); P(hx-2,hy+1,1,3,'#fff0dc',0.7); }  // shock ticks
+  } else if(kind==='swoon'){
+    // half-lidded, a real smile, and the blush all the way across
+    P(eL,eyeY,2,1,'#241408'); P(eR,eyeY,2,1,'#241408');
+    P(eL,eyeY+1,2,1,mixHex(skin,'#241408',0.30)); P(eR,eyeY+1,2,1,mixHex(skin,'#241408',0.30));
+    P(cx-2,mouthY,4,1,'#b8484f'); P(cx-3,mouthY-1,1,1,'#b8484f'); P(cx+2,mouthY-1,1,1,'#b8484f');
+    P(hx,eyeY+2,3,3,F.blush,F.blushA); P(hx+hw-3,eyeY+2,3,3,F.blush,F.blushA);
+    P(hx+1,eyeY+2,1,1,mixHex(F.blush,'#ffffff',0.4),F.blushA);
+  } else if(kind==='scowl'){
+    // brows in and down, a hard flat mouth, colour high on the cheekbones
+    P(eL,eyeY,2,2,'#241408'); P(eR,eyeY,2,2,'#241408');
+    P(eL-1,eyeY-2,3,1,'#2a1810'); P(eR,eyeY-2,3,1,'#2a1810');
+    P(eL,eyeY-1,2,1,'#2a1810'); P(eR+1,eyeY-1,2,1,'#2a1810');        // the inner ends drop
+    P(cx-2,mouthY,5,1,'#6a2a24');
+    P(hx,eyeY+1,2,2,F.blush,F.blushA); P(hx+hw-2,eyeY+1,2,2,F.blush,F.blushA);
+  } else if(kind==='smirk'){
+    // one brow up, eyes level, the mouth crooked — she is enjoying this
+    P(eL,eyeY,2,2,'#241408'); P(eR,eyeY,2,2,'#241408');
+    P(eR,eyeY-2,3,1,'#3a2418');
+    P(cx-1,mouthY,3,1,'#a8443f'); P(cx+2,mouthY-1,1,1,'#a8443f');
+    P(hx+hw-3,eyeY+2,3,2,F.blush,F.blushA);
+  } else {  // blush
+    P(eL,eyeY,2,2,'#241408'); P(eR,eyeY,2,2,'#241408');
+    P(cx-1,mouthY,3,1,'#a8524a');
+    P(hx,eyeY+2,3,2,F.blush,F.blushA); P(hx+hw-3,eyeY+2,3,2,F.blush,F.blushA);
+  }
+  // and the little airborne tell, which is per-kind too
+  if(t<44){
+    const a=clamp(1-t/44,0,1)*amt, ty=hy-6-t*0.28;
+    ctx.textAlign='center';
+    if(kind==='swoon') pixelText('♥', cx, ty, 'rgba(255,150,190,'+a.toFixed(2)+')', 1.0);
+    else if(kind==='sting') pixelText('!', cx+hw, ty+2, 'rgba(255,240,220,'+a.toFixed(2)+')', 1.0);
+    else if(kind==='scowl') pixelText('\u2731', cx, ty, 'rgba(255,120,110,'+a.toFixed(2)+')', 0.9);
+    else if(kind==='smirk') pixelText('\u266a', cx+hw*0.7, ty, 'rgba(255,208,122,'+a.toFixed(2)+')', 0.9);
+    ctx.textAlign='left';
+  }
+}
 function drawSlapAfter(x, y, look, t, kind, good){
   if(t>90) return;
   const skin=look.skin||'#e6bd94';
@@ -12376,20 +12521,11 @@ function drawSlapAfter(x, y, look, t, kind, good){
   ctx.fillStyle=mixHex(skin,'#d0574a',0.55);
   ctx.fillRect(Math.round(x-hw*0.6), Math.round(seatY), Math.round(hw*1.2), 4);
   ctx.globalAlpha=1;
-  // the blush, up at the face, arriving a beat later and lasting longer
-  if(t>10){
-    const bf=clamp((t-10)/16,0,1)*clamp(1-(t-10)/80,0,1);
-    ctx.globalAlpha=bf*0.7; ctx.fillStyle='#e0708a';
-    ctx.fillRect(Math.round(x-6), Math.round(y-legLen-2-34), 3, 2);
-    ctx.fillRect(Math.round(x+3), Math.round(y-legLen-2-34), 3, 2);
-    ctx.globalAlpha=1;
-  }
-  // and what it meant
-  if(t<52){ ctx.textAlign='center';
-    const a=clamp(1-t/52,0,1);
-    if(kind==='romantic') pixelText(good?'💞':'💢', x, y-legLen-2-46-t*0.22, 'rgba(255,180,205,'+a.toFixed(2)+')', 1.2);
-    else pixelText(good?'♥':'💢', x, y-legLen-2-46-t*0.22, good?'rgba(255,200,190,'+a.toFixed(2)+')':'rgba(255,150,140,'+a.toFixed(2)+')', 1.1);
-    ctx.textAlign='left'; }
+  /* THE BLUSH USED TO LIVE HERE — two 3x2 pink rectangles at y-legLen-34,
+     which is a woman's cheek and a man's BEARD, and identical for every
+     outcome. The whole expression is drawn by drawReactFace now, against the
+     real head box; this routine keeps only the mark, which is the part that
+     is genuinely about the body rather than the face. */
 }
 /* NOT WITH THEM IN THE ROOM. This was a toast and nothing on screen at all —
    you pressed the key and a line of text appeared somewhere else. Now she
@@ -12950,6 +13086,7 @@ function drawDrop(){
         px(D.x+2+Math.cos(a)*r, FY-30+Math.sin(a)*r*0.6, 2,2,'#fff0dc'); }
       ctx.globalAlpha=1; }
     if(X.landed) drawSlapAfter(D.x, FY, playerLook(), X.t-16, 'hand', true);
+    if(X.landed) drawReactFace(D.x, FY, playerLook(), 'sting', X.t-16);
     ctx.textAlign='center';
     pixelText(X.t<16? '~ he does not say anything ~' : '👋 he did not ask',
       W/2, 30, '#ffd0a0', 1.05);
@@ -13523,6 +13660,7 @@ function drawRomanticFem(x, y, w, k, T){
     P(shX-1, shY-ah+3, 4, 3, sSh); }
   // ---- head, TURNED BACK over her shoulder to watch him ----
   { const hdW=8, hdH=8, hx=shX-1, hy2=shY-2;
+    RF_HEAD={x:hx, y:hy2, w:hdW, h:hdH, male:false};   // so the reaction face can find it
     P(hx-2, hy2-3, 5, 4, skin);
     P(hx-hdW/2, hy2-3-hdH, hdW, hdH, skin); P(hx-hdW/2, hy2-3-hdH, hdW, 1, sHi);
     P(hx-hdW/2, hy2-3-hdH, 3, hdH, sSh);                                    // the far side of the face
@@ -13599,6 +13737,9 @@ function drawRomantic(){
       pixelText(['CRACK','SMACK','CLAP'][SW.i%3], IX+16, FY-52, 'rgba(255,236,210,'+SW.hit+')', 1.05+SW.hit*0.5);
       ctx.textAlign='left'; }
   }
+  // HER FACE, over her shoulder, for whichever strike just landed
+  if(SW.d>=0 && RF_HEAD)
+    drawReactFace(X, FY, w, reactKindFor(S.v, true), SW.d, RF_HEAD);
   ctx.textAlign='center';
   if(T<70) pixelText('~ he is not reaching for her hand ~', W/2, 34, 'rgba(255,214,190,.85)', 1.02);
   else if(T<STRIKES[0]-30) pixelText('~ … ~', W/2, 34, 'rgba(255,214,190,.7)', 1.1);
@@ -13686,7 +13827,8 @@ function drawSlap(){
     px(S.x-6,FY-32,14,2,'rgba(255,240,220,.8)');
   }
   // and what it leaves behind — the mark, the blush, and the verdict
-  if(hit) drawSlapAfter(S.x, FY, w, since, 'hand', !!(S.v && (S.v.bond||0)>=0));
+  if(hit){ drawSlapAfter(S.x, FY, w, since, 'hand', !!(S.v && (S.v.bond||0)>=0));
+    drawReactFace(S.x+shk, FY, w, reactKindFor(S.v,false), since); }
   ctx.textAlign='center';
   if(hit && since>8){
     const col = S.v.k==='love'? '#ffb0d0' : S.v.k==='return'? '#ffd07a'
@@ -13697,6 +13839,7 @@ function drawSlap(){
   ctx.textAlign='left';
 }
 let VM_SHAFT={x:0,y:0,r:0,a:0};       // set by drawVillaMale; read by the romantic swing
+let RF_HEAD=null;                     // set by drawRomanticFem; read by the reaction face
 function drawVillaMale(x, y, T, beat, cool, swing){
   const B=(G.body)||{}, gv=(id,d)=>B[id]===undefined?d:B[id];
   const skin=G.skin||'#caa06a', sSh=shade(skin,-26), sHi=shade(skin,20);
@@ -14064,26 +14207,110 @@ function openTemptAftermath(){
 }
 function drawDomus(){
   const D=DM, T=D.t, FY=214;
-  // walls, frieze, floor
-  px(-4,-4,W+8,H+8,'#2a1c12');
-  px(-4,-4,W+8,130,'#4a3626');
-  px(-4,50,W+8,4,'#7a2f4a'); px(-4,56,W+8,1,'#e8c34a');
-  for(let i=0;i<3;i++) px(-4,72+i*18,W+8,1,'#3e2c1e');
-  px(0,FY,W,H-FY,'#3a2c1e'); for(let fx=0;fx<W;fx+=22){ px(fx,FY,1,H-FY,'#2c2014'); px(fx+11,FY+6,1,H-FY-6,'#31241a'); }
-  px(0,FY-2,W,2,'#241812');
-  for(const cx of [172,252,332]){ px(cx,58,10,156,'#cfc0a2'); px(cx+1,58,3,156,'#e8dcc2'); px(cx-2,56,14,4,'#e8dcc2'); px(cx-2,210,14,4,'#b8a88a'); }
-  px(196,64,10,6,'#7a5c2e'); px(199,60,4,4,'#ffcf5a'); ctx.globalAlpha=.07; px(168,50,68,164,'#ffcf7a'); ctx.globalAlpha=1;
+  /* =====================================================================
+     THE HOUSE
+     ---------------------------------------------------------------------
+     This was four flat rectangles, three plain columns and a torch: one
+     storey, one wall colour, no depth, and it read as a shed rather than
+     the estate of a man who owns provinces. It is a proper domus now —
+     a mosaic floor, a painted dado, real fluted columns with capitals and
+     bases, a coffered ceiling, a marble impluvium, AND an upper gallery
+     with a staircase and lit doorways, which is where the grown children
+     and their spouses actually live.
+     ===================================================================== */
+  const UPPER=96;                                   // floor level of the gallery
+  // ---- the shell: three bands of wall, darkest at the top ----
+  px(-4,-4,W+8,H+8,'#241a12');
+  px(-4,-4,W+8,UPPER-8,'#3a2a1c');                  // upper storey wall
+  px(-4,UPPER-8,W+8,10,'#5a4430');                  // the floor slab between storeys
+  px(-4,UPPER-8,W+8,2,'#7a6044'); px(-4,UPPER+1,W+8,1,'#241812');
+  px(-4,UPPER+2,W+8,FY-UPPER-2,'#4e3826');          // ground-floor wall
+  // a painted dado along the bottom of the ground floor, the way a real one had
+  px(-4,FY-46,W+8,46,'#5c4230');
+  px(-4,FY-46,W+8,2,'#7c5c40');
+  for(let fx=-4; fx<W+8; fx+=34){                   // panels picked out in ochre
+    px(fx+3,FY-42,28,38,'#6a4a32'); px(fx+3,FY-42,28,1,'#8a6a48'); px(fx+3,FY-5,28,1,'#3e2c1e'); }
+  // the frieze that separates the storeys, and a Greek key run along it
+  px(-4,UPPER+4,W+8,3,'#7a2f4a'); px(-4,UPPER+8,W+8,1,'#e8c34a');
+  for(let fx=-4; fx<W+8; fx+=12){ px(fx,UPPER+4,2,3,'#a03a5e'); px(fx+6,UPPER+5,3,1,'#e8c34a'); }
+  // ---- a coffered ceiling above the gallery ----
+  for(let fx=-4; fx<W+8; fx+=26){
+    px(fx,-4,24,18,'#2e2016'); px(fx+2,-2,20,14,'#37271a'); px(fx+2,-2,20,1,'#46331f'); }
+  px(-4,14,W+8,2,'#1e150e');
+  // ---- THE MOSAIC FLOOR ----
+  px(0,FY,W,H-FY,'#4a3828');
+  for(let fx=0; fx<W; fx+=8){ for(let fy=FY; fy<H; fy+=8){
+    const odd=((fx>>3)+(fy>>3))&1;
+    px(fx,fy,7,7, odd? '#54402e' : '#463424');
+    px(fx,fy,7,1, odd? '#634c37' : '#513d2b'); } }
+  // a black-and-white guilloche band at the front of the floor
+  for(let fx=0; fx<W; fx+=16){ px(fx,FY+2,8,3,'#e8e0cc'); px(fx+8,FY+2,8,3,'#241812'); }
+  px(0,FY-2,W,2,'#241812'); px(0,FY,W,1,'#6a5236');
+  // ---- THE IMPLUVIUM: a marble catch-basin in the middle of the atrium ----
+  { const ix=196, iw=88, iy=FY+8;
+    px(ix-5,iy-2,iw+10,4,'#3a2c1e');                       // the shadow it is sunk into
+    px(ix-3,iy,  iw+6,3,'#cfc0a2'); px(ix-3,iy,iw+6,1,'#eadfc4');   // marble lip, lit
+    px(ix,  iy+3,iw,  11,'#1e4658');                       // the water, dark at depth
+    px(ix,  iy+3,iw,  2, '#2a5a72');
+    px(ix+2,iy+5,iw-4,1, '#4e8aa8');                       // a still highlight across it
+    for(let i=0;i<4;i++) px(ix+6+((T*0.4+i*23)%(iw-14)), iy+7+i*2, 7,1,'#3f7a96');
+    px(ix-3,iy+14,iw+6,2,'#b8a88a'); px(ix-3,iy+16,iw+6,1,'#8a7a5c'); }
+  // ---- COLUMNS, with capitals and bases, on both storeys ----
+  const colGround=[150,236,322], colUpper=[126,206,286,366];
+  for(const cx of colGround){
+    px(cx,UPPER+12,12,FY-UPPER-12,'#cfc0a2');       // shaft
+    px(cx+1,UPPER+12,3,FY-UPPER-12,'#e8dcc2');      // lit side
+    px(cx+9,UPPER+12,3,FY-UPPER-12,'#a89878');      // shaded side
+    for(let f=0;f<3;f++) px(cx+3+f*3,UPPER+16,1,FY-UPPER-22,'#bdae90');   // fluting
+    px(cx-3,UPPER+8,18,5,'#e8dcc2'); px(cx-3,UPPER+8,18,1,'#f6efdc');     // capital
+    px(cx-2,FY-6,16,6,'#bdae90'); px(cx-2,FY-6,16,1,'#d8c9a8'); }         // base
+  for(const cx of colUpper){
+    px(cx,20,8,UPPER-30,'#bdae90'); px(cx+1,20,2,UPPER-30,'#d8c9a8');
+    px(cx-2,16,12,5,'#d8c9a8'); px(cx-1,UPPER-12,10,4,'#a89878'); }
+  // ---- THE UPPER GALLERY: a balustrade you can see through ----
+  px(-4,UPPER-22,W+8,3,'#8a6a48'); px(-4,UPPER-22,W+8,1,'#a88a60');       // handrail
+  for(let bx=2; bx<W; bx+=11){                                            // balusters
+    px(bx,UPPER-19,3,11,'#7a5c40'); px(bx,UPPER-19,1,11,'#96775a');
+    px(bx-1,UPPER-9,5,2,'#6a4e34'); }
+  px(-4,UPPER-8,W+8,1,'#3a2a1c');
+  /* ---- THE STAIRCASE ----
+     The first cut drew seven horizontal bars of decreasing width, which is
+     not a staircase, it is a set of floating shelves — no risers, nothing
+     underneath them, and it ran straight through the bathing pool besides.
+     A real flight: each step is a RISER you see face-on with a lit TREAD on
+     top, and the wedge underneath is filled in so it stands on something.
+     It climbs the left wall ABOVE the water line, so the pool is clear. */
+  { const sx0=4, steps=7, sWide=8, sTall=13, base=190;
+    for(let i=0;i<steps;i++){
+      const x0=sx0+i*sWide, yTop=base-(i+1)*sTall;
+      px(x0, yTop+sTall, sWide, base-(yTop+sTall), '#2e2016');   // the wedge it stands on
+      px(x0, yTop, sWide, sTall, '#5a4430');                     // the riser, face-on
+      px(x0, yTop, sWide, 3, '#7c6044');                         // the tread, lit
+      px(x0, yTop+3, sWide, 1, '#3e2c1e');                       // and its shadow line
+      px(x0, yTop, 1, sTall, '#6a5238'); }
+    px(sx0, base, steps*sWide, 3, '#241812');                    // where the flight meets the floor
+    px(sx0+steps*sWide, UPPER-8, 4, base-UPPER+8, '#2e2016'); }  // the newel against the gallery
   // THE LAGOON (or the humble basin)
   if(G.hasPool){
-    px(18,196,124,4,'#cfc0a2'); px(18,196,124,1,'#e8dcc2');
-    px(22,200,116,18,'#2a5a7a'); px(22,200,116,2,'#5a9ec4');
-    for(let i=0;i<5;i++) px(26+((T*0.6+i*19)%104),203+i*3,8,1,'#4a8aae');
-    px(8,180,6,26,'#4a6a34'); px(6,172,10,10,'#5a8a3e');
-    px(144,182,6,24,'#4a6a34'); px(142,174,10,10,'#5a8a3e');
-    if((T|0)%9<1) D.steam.push({x:28+Math.random()*104,y:202,vy:0.2+Math.random()*0.15,life:44});
-  } else {
-    px(62,196,36,4,'#cfc0a2'); px(66,200,28,10,'#3a6a8a'); px(60,206,4,12,'#8a7a5c'); px(96,206,4,12,'#8a7a5c');
+    /* it used to start at y=196 with the floor at 214, so the lagoon hung
+       eighteen pixels up the WALL. It is sunk into the floor now, with a
+       kerb, a shelf of shallow water and planting either side of it. */
+    const py=FY+2;
+    px(16,py-4,128,4,'#3a2c1e');                                  // the shadow of the kerb
+    px(18,py-2,124,4,'#cfc0a2'); px(18,py-2,124,1,'#e8dcc2');     // marble kerb
+    px(22,py+2,116,20,'#1e4a68'); px(22,py+2,116,2,'#2f6a92');
+    px(24,py+4,112,1,'#5a9ec4');                                  // the still line on top
+    for(let i=0;i<5;i++) px(26+((T*0.6+i*19)%104),py+6+i*3,8,1,'#4a8aae');
+    px(18,py+22,124,2,'#b8a88a');
+    // one laurel only, at the far end — the other stood exactly where the
+    // staircase now comes down and was buried behind it
+    px(148,FY-30,6,28,'#4a6a34'); px(146,FY-38,10,10,'#5a8a3e');
+    px(147,FY-34,8,4,'#6a9a4a');
+    if((T|0)%9<1) D.steam.push({x:28+Math.random()*104,y:py+4,vy:0.2+Math.random()*0.15,life:44});
   }
+  /* the humble basin that used to stand here is gone: the atrium now has a
+     real impluvium in the middle of the floor, which is the same idea done
+     properly, and two small pools of water side by side read as a mistake. */
   // THE WARDROBE
   if(G.hasWardrobe){
     const busy=D.scene&&D.scene.kind==='wardrobe'&&D.scene.t>180&&D.scene.t<900;
@@ -14095,9 +14322,50 @@ function drawDomus(){
     px(wx-2,212,38,4,'#4a3420');
     if(busy){ if((D.scene.t|0)%12<1) px(wx+rnd(4,28),132,2,2,'#8a6640'); pixelText('♥',wx+17,124,'#e26a8a',1); }
   }
-  // BEDCHAMBER DOOR + EXIT
-  px(392,120,44,94,'#5a4028'); px(396,124,36,90,'#c07830'); px(396,124,36,3,'#e8a050'); px(426,166,3,8,'#e8c34a');
+  // BEDCHAMBER DOOR + EXIT — taller, panelled, with a real frame and a lamp
+  { const dx=392, dy=118, dw=44, dh=96;
+    px(dx-3,dy-4,dw+6,dh+8,'#4a3420'); px(dx-3,dy-4,dw+6,2,'#6a4e34');    // architrave
+    px(dx,dy,dw,dh,'#5a4028');
+    px(dx+4,dy+4,dw-8,dh-8,'#c07830'); px(dx+4,dy+4,dw-8,3,'#e8a050');
+    px(dx+6,dy+8,dw-12,(dh-20)/2,'#b06c2a'); px(dx+6,dy+8,dw-12,1,'#d89448');   // two sunk panels
+    px(dx+6,dy+12+(dh-20)/2,dw-12,(dh-20)/2-4,'#b06c2a'); px(dx+6,dy+12+(dh-20)/2,dw-12,1,'#d89448');
+    px(dx+dw-10,dy+dh/2-4,3,8,'#e8c34a'); px(dx+dw-10,dy+dh/2-4,3,2,'#fff0b0');  // the ring
+    // a hanging lamp beside it, actually lit
+    px(dx-14,dy+4,2,14,'#4a3826'); px(dx-18,dy+18,10,6,'#8a6a3a'); px(dx-17,dy+19,8,2,'#c8a050');
+    const fl=0.7+0.3*Math.sin(T*0.11);
+    ctx.globalAlpha=fl; px(dx-15,dy+16,4,4,'#ffcf5a'); ctx.globalAlpha=fl*0.16;
+    px(dx-30,dy+2,34,40,'#ffcf7a'); ctx.globalAlpha=1;
+    // WHOSE DOOR IS IT TODAY — a married child at home may already have it
+    const gb=(typeof houseGuestBusy==='function')? houseGuestBusy() : null;
+    if(gb){ ctx.textAlign='center';
+      pixelText('\u2665 '+gb.name, dx+dw/2, dy-12, 'rgba(232,140,180,.85)', 0.78);
+      ctx.textAlign='left'; } }
   px(452,110,28,104,'#241812'); px(456,114,22,100,'#160e08'); pixelText('EXIT',466,150,'#8a7a5c',1);
+  /* ---- THE UPPER FLOOR: doorways, and who is behind them ----
+     A grown child who married and stayed lives up here. The gallery is not
+     decoration — it is the reason the bedchamber is sometimes not yours. */
+  { const home=(G.children||[]).filter(c=>!c.dead && c.wed && c.livesHome).slice(0,3);
+    const slots=[62,178,300];
+    for(let i=0;i<3;i++){
+      const ux=slots[i], lit=i<home.length;
+      px(ux-3,UPPER-58,38,54,'#2a1e14');                          // the doorway recess
+      px(ux,UPPER-54,32,46, lit? '#6a4a2c' : '#241a12');
+      px(ux,UPPER-54,32,2, lit? '#8a6640' : '#2e2016');
+      if(lit){
+        const fl=0.55+0.28*Math.sin(T*0.07+i*2.1);
+        ctx.globalAlpha=fl; px(ux+3,UPPER-50,26,40,'#ffcf7a'); ctx.globalAlpha=1;
+        px(ux+3,UPPER-50,26,1,'#ffe8b0');
+        ctx.textAlign='center';
+        pixelText(kidName(home[i]), ux+16, UPPER-62, 'rgba(232,195,74,.78)', 0.72);
+        ctx.textAlign='left';
+      } else {
+        px(ux+4,UPPER-50,24,38,'#1c140d');                        // an unused room, shuttered
+        px(ux+4,UPPER-32,24,1,'#2e2016');
+      }
+    }
+    // a couple of amphorae leaning in the gallery, because a landing is never empty
+    px(408,UPPER-30,7,24,'#7a5c3a'); px(409,UPPER-30,2,24,'#96774e'); px(407,UPPER-34,9,5,'#6a4e34');
+    px(420,UPPER-26,6,20,'#6a4a30'); px(421,UPPER-26,2,20,'#86633f'); px(419,UPPER-30,8,5,'#5a4028'); }
   // clothes on the wing, splashes
   for(const p of D.props) drawFlungProp(p);
   for(const sp of D.splash) px(sp.x,sp.y,2,2,'#8ac4e0');
@@ -14138,13 +14406,18 @@ function drawDomus(){
       if(k.gone) continue;                                          // sent to the kitchen and gone
       const age=Math.floor((G.day-(k.ref.born||0))/3);            // months
       const moving = k.pause<=0 && k.turn<=0;
+      const grown = kidBand(k.ref)==='grown';
       ctx.save(); ctx.translate(k.x, FY - (moving? Math.abs(Math.sin(D.t*0.34))*1.6 : 0));
       if(k.turn>0){ const sx=Math.max(0.12, Math.abs(Math.cos((1-(k.turn/12))*Math.PI))); ctx.scale(sx,1); }
-      const sc2 = 0.62 + Math.min(0.55, age/90);                   // infant → child → half-grown
-      ctx.scale(sc2,sc2);
-      drawKidFig(ctx,0,0,k.ref.sex,age,k.ref);
+      // drawChildFigure owns the ramp AND swaps to the adult sprite when grown
+      drawChildFigure(ctx, 0, 0, k.ref, moving? D.t*0.24 : 0, moving? 'walk':'idle');
       ctx.restore();
-      if(age<9){ pixelText('👶',k.x,FY-30,'#f0c8d4',1); }          // still in arms
+      if(kidBand(k.ref)==='baby' && kidAgeYears(k.ref)<3){
+        pixelText('👶',k.x,FY-34,'#f0c8d4',1); }                     // still in arms
+      // a grown one standing in your hall is worth naming — they are a person now
+      if(grown){ ctx.textAlign='center';
+        pixelText(kidName(k.ref), k.x, FY-82, 'rgba(232,195,74,.72)', 0.78);
+        ctx.textAlign='left'; }
     }
     /* THE ROMANTIC SCENE DRAWS ITS OWN MALE. This ran unconditionally, so his
        ordinary walking sprite stayed on screen standing next to the undressed
@@ -15320,7 +15593,17 @@ function buildRegions(){
     d.style.left=r.x+'%'; d.style.top=r.y+'%';
     d.textContent=(owned?'♦ ':(G.cleared[r.id]?'✓ ':''))+(imperial?'✦ ':'')+r.id;
     const tc=travelCost(G.current,r.id);
-    d.title=r.city+(owned?' — '+G.titles[r.id]:'')+(r.id===G.current?' (you are here)':' — travel: '+tc.days+'d, '+tc.rations+' rations');
+    /* A HOUSE OF YOUR BLOOD. A child who married and moved out founded a
+       household somewhere — it belongs on the map, not just in a list. */
+    const mine=(G.kidHouses||[]).filter(h=>h.region===r.id);
+    if(mine.length){
+      d.textContent = d.textContent + ' ' + (mine.length>1? '\u2302'+mine.length : '\u2302');
+      d.style.boxShadow = (d.style.boxShadow? d.style.boxShadow+',' : '')
+        + '0 0 0 1px #e8a0d0, 0 0 6px rgba(232,160,208,.55)';
+    }
+    d.title=r.city+(owned?' — '+G.titles[r.id]:'')
+      +(mine.length? '  \u2302 '+mine.map(h=>h.name+' & '+h.spouse).join(', '):'')
+      +(r.id===G.current?' (you are here)':' — travel: '+tc.days+'d, '+tc.rations+' rations');
     d.onclick=(ev)=>{
       ev.preventDefault(); ev.stopPropagation();
       if(!unlocked){ toast('Locked — reach '+([0,0,20,45,70][r.tier])+' Popularity.'); return; }
@@ -15493,6 +15776,8 @@ function openVilla(){
   }
   buildMarriageCard(b);
   buildElevateWifeCard(b);
+  buildSuitorCard(b);
+  buildKidHousesCard(b);
   buildSuccessionCard(b);
   buildLegacyCard(b);
   // ---- PASS THE TIME: watch the house grow ----
@@ -17130,6 +17415,68 @@ function kidAgeYears(c){ return childYears(Math.max(0,(G.day||0)-(c.born||0))); 
 function kidBand(c){ const y=kidAgeYears(c);
   return y<8? 'baby' : y<14? 'child' : y<25? 'youth' : 'grown'; }
 function livingKids(){ return (G.children||[]).filter(c=>!c.dead); }
+/* =====================================================================
+   HOW BIG A CHILD IS DRAWN
+   ---------------------------------------------------------------------
+   MEASURED, because the old ramp looked plausible and was not: the height
+   was min(40, 22+months/4) and the villa's scale was 0.62+min(0.55,
+   months/90). BOTH saturate at seventy-two months — SIX YEARS OLD. A
+   thirty-five-year-old "grown" heir arguing with you about the will was
+   drawn at exactly the same forty-eight pixels as a six-year-old, 52% of
+   an adult, forever. That is why the house read as full of toddlers.
+
+   Now: babies and children keep the child sprite on a ramp that runs the
+   whole way through childhood, and a GROWN child is drawn with the adult
+   routines — the same ones their parents use — off the body, skin and
+   hair they actually inherited.
+   ===================================================================== */
+function kidDrawScale(c){
+  const y=kidAgeYears(c);
+  /* tuned against the measured adult sprites so the ramp ARRIVES at adult
+     height exactly where the adult sprite takes over at twenty-five —
+     otherwise an eighteen-year-old reads at 41% and then jumps to 91% in a
+     single birthday, which is worse than the bug it replaced. */
+  return 0.86 + clamp(y/25,0,1)*1.02;          // 0y → 0.86 … 25y → 1.88
+}
+// a grown child, described the way the adult sprites want to be told
+function grownLook(ch){
+  const male = ch.sex==='m';
+  const noble = (G.socialClass==='imperial'||G.royal||G.socialClass==='elite'||G.senate);
+  return {
+    self:false, male, name:ch.name, eth:'roman', age:kidAgeYears(ch),
+    skin: ch.skin || G.skin || '#caa06a',
+    dress: male ? shade(G.tunic||'#7a2f22', 10)
+                : shade((G.wife&&G.wife.dress)||'#8a2f5a', 12),
+    hair: ch.hair || (male? '#3a2618' : ((G.wife&&G.wife.hair)||'#5a3a1e')),
+    hairStyle: ch.hairStyle || (male? 'caesar' : 'crown'),
+    beard: male? (ch.beardStyle||(kidAgeYears(ch)>=30?'full':'stubble')) : 'none',
+    outfit: 'tunic',
+    jewel: !male && noble, crown:false, scars:[],
+    rank: noble? 'noble' : 'peasant', tier: noble? 'elite' : 'common',
+    looks: ch.looks===undefined? 5 : ch.looks,
+    body: ch.body || {face:5,hairq:5,bust:5,waist:5,booty:5,legs:5,secret:5},
+  };
+}
+/* ONE routine for drawing a child at any age, so the villa, the family card
+   and the suitor hall can never disagree about how big somebody is. */
+function drawChildFigure(c2d, x, y, ch, ph, mode){
+  if(kidBand(ch)==='grown'){
+    const look=grownLook(ch);
+    if(ch.sex==='m') drawHusbandFig(c2d, x, y, 70, look.skin, look.dress, look, ph||0, mode||'idle');
+    else drawWifeFig(c2d, x, y, look, ph||0, mode||'idle');
+    return;
+  }
+  c2d.save(); c2d.translate(x,y);
+  const sc=kidDrawScale(ch); c2d.scale(sc,sc);
+  /* drawKidFig sizes its body with `22 + age/4`, and every caller was handing
+     it (G.day - born)/3 as "months". In THIS calendar a year is 2.4 days, so
+     that expression yields years*0.8 — an eighteen-year-old arrived as 14,
+     and the ramp topped out around 25 of its 40. Feed it years*4 and the same
+     expression becomes 22+years, which is what it was always shaped for. */
+  drawKidFig(c2d, 0, 0, ch.sex, kidAgeYears(ch)*4, ch);
+  c2d.restore();
+}
+
 function kidsOfBand(b){ return livingKids().filter(c=>kidBand(c)===b); }
 function kidName(c){ return (c&&c.name? String(c.name).split(' ')[0] : 'the child'); }
 function kidHe(c){ return c&&c.sex==='m'? 'he':'she'; }
@@ -17144,6 +17491,341 @@ function heirPressure(){
   const crown=(G.emperor||G.royal)?0.35:0;
   return clamp((g-1)*0.26 + old*0.42 + rich*0.22 + crown, 0, 1);
 }
+/* =====================================================================
+   THE SUITOR HALL — marrying off a grown child
+   ---------------------------------------------------------------------
+   The only marriage a child could have was the `match` family event: three
+   lines of text and a yes/no, with no suitor in it at all. This is the
+   whole business — three named callers with real bodies and real houses,
+   a FORESIGHT panel that says what the marriage is actually likely to be,
+   and a decision about where the pair of them are going to live, which
+   the villa and the map both then have to deal with.
+   ===================================================================== */
+const SUITOR_HOUSES=['Cornelii','Valerii','Aurelii','Fabii','Claudii','Domitii',
+  'Sempronii','Vipsanii','Octavii','Licinii','Pomponii','Rufii'];
+const SUITOR_STYLE=[
+  {id:'soldier',  icon:'⚔', name:'a soldier of the legions', ard:+0.6, off:+1, coin:0.8},
+  {id:'merchant', icon:'⚖', name:'a grain merchant',         ard:-0.2, off:0,  coin:1.5},
+  {id:'advocate', icon:'📜', name:'an advocate of the courts', ard:-0.4, off:-1, coin:1.2},
+  {id:'landed',   icon:'🌾', name:'landed, and idle with it',  ard:+0.3, off:+1, coin:1.3},
+  {id:'priest',   icon:'🕯', name:'sworn to the temple',       ard:-1.0, off:-2, coin:0.7},
+  {id:'charioteer',icon:'🏇',name:'a charioteer of the Greens',ard:+1.2, off:+3, coin:0.9},
+];
+function suitorRank(){
+  return {gladiator:3.6, citizen:4.4, upper:5.8, elite:7.0, imperial:8.2}[G.socialClass] || 4.4;
+}
+function makeSuitorFor(ch){
+  const male = ch.sex==='f';                      // a daughter is called on by men
+  const q = clamp(Math.round(suitorRank() + rnd(-2.6,2.8)), 1, 10);
+  const sName = makeBride('roman', q>=7, q, {male});
+  sName.male = male;
+  ensureLook(sName);
+  sName.style = pick(SUITOR_STYLE);
+  sName.house = pick(SUITOR_HOUSES);
+  sName.age = clamp(Math.round(kidAgeYears(ch) + rnd(-4, 9)), 16, 58);
+  sName.dowryCoin = Math.round(Math.max(0, (sName.dowryCoin||0)) * sName.style.coin
+                    + q*90 + rnd(0,240));
+  return sName;
+}
+/* WHAT THIS MARRIAGE IS ACTUALLY GOING TO BE. Every number here is derived
+   from the suitor that is standing in front of you — not rolled fresh when
+   you accept — so foreseeing it is genuinely foreseeing it. */
+function suitorForecast(s, ch){
+  const B=s.body||{}, gv=(id,d)=>B[id]===undefined?d:B[id];
+  const tr=s.traits||[], qk=s.quirks||[], fl=s.flaws||[];
+  const st=s.style||SUITOR_STYLE[0];
+  // --- how often, per month ---
+  let ard = 2.2 + st.ard;
+  if(qk.includes('insatiable')) ard += 2.8;
+  if(qk.includes('devout'))     ard -= 1.2;
+  if(qk.includes('highmaint'))  ard += 0.4;
+  if(tr.includes('priapic')||tr.includes('tempting')) ard += 1.5;
+  if(tr.includes('devoted'))    ard += 0.7;
+  if(tr.includes('athletic'))   ard += 0.5;
+  if(fl.includes('cold'))       ard -= 1.6;
+  if(fl.includes('sickly'))     ard -= 0.8;
+  ard += (gv('face',5)-5)*0.12 + ((s.looks===undefined?5:s.looks)-5)*0.10;
+  ard = clamp(ard, 0.3, 8.0);
+  // --- and how many of them arrive ---
+  let fert = 1.0;
+  if(tr.includes('fertile')) fert += 0.75;
+  if(fl.includes('barren'))  fert -= 0.80;
+  if(fl.includes('sickly'))  fert -= 0.25;
+  if(qk.includes('devout'))  fert += 0.15;
+  fert = clamp(fert, 0.05, 2.0);
+  const kids = clamp(Math.round(ard * fert * 1.25), 0, 14);
+  // --- and whether you are going to have to hear about it ---
+  let off = 0;
+  if(qk.includes('shameless'))  off += 4;
+  if(qk.includes('gossip'))     off += 2;
+  if(qk.includes('tempest'))    off += 2;
+  if(qk.includes('insatiable')) off += 2;
+  if(fl.includes('drinker'))    off += 3;
+  if(fl.includes('looselip'))   off += 2;
+  if(fl.includes('shrill'))     off += 2;
+  if(fl.includes('lowborn'))    off += 1;
+  if(tr.includes('pious'))      off -= 3;
+  if(tr.includes('steady'))     off -= 2;
+  if(qk.includes('devout'))     off -= 3;
+  off += st.off;
+  off = clamp(off, 0, 12);
+  const offLab = off>=8? 'CONSTANTLY' : off>=5? 'OFTEN' : off>=3? 'NOW AND THEN' : off>=1? 'RARELY' : 'NEVER';
+  const ardLab = ard>=6? 'RELENTLESS' : ard>=4? 'OFTEN' : ard>=2.4? 'REGULARLY' : ard>=1.2? 'SELDOM' : 'BARELY AT ALL';
+  return {ard, ardLab, kids, off, offLab, fert,
+    // the estate's side of it
+    coin: Math.round(s.dowryCoin||0),
+    // and one honest sentence about the whole thing
+    verdict: (off>=8? 'A scandal with a dowry attached.'
+            : off>=5? 'You will be defending this match at dinner parties.'
+            : ard>=5? 'Grandchildren. A great many grandchildren.'
+            : kids<=1? 'A quiet house, and probably an empty one.'
+            : off<=1 && ard>=2.4? 'Unremarkable, which in a marriage is the highest praise there is.'
+            : 'A perfectly ordinary Roman marriage.') };
+}
+function suitorPortrait(s, size){
+  const cv=document.createElement('canvas'); cv.width=size||54; cv.height=Math.round((size||54)*1.34);
+  cv.style.cssText='position:relative;inset:auto;width:'+(size||54)+'px;height:'+cv.height+'px;'
+    +'flex:0 0 auto;image-rendering:pixelated;border:1px solid #e8c34a55;border-radius:3px;'
+    +'background:radial-gradient(ellipse at 50% 78%, #e8c34a22, #14100c 70%)';
+  const c=cv.getContext('2d'); c.imageSmoothingEnabled=false;
+  c.save(); c.translate(cv.width/2, cv.height-6); c.scale(0.70,0.70);
+  try{
+    if(s.male) drawHusbandFig(c,0,0,70,s.skin,s.dress,s,0,'idle');
+    else drawWifeFig(c,0,0,s,0,'idle');
+  }catch(e){}
+  c.restore();
+  return cv;
+}
+/* the room they will live in, and what that costs the house */
+function weddChild(ch, s, stay){
+  ch.wed = true;
+  ch.spouse = { name:s.name, male:!!s.male, house:s.house, style:s.style,
+                body:s.body, skin:s.skin, hair:s.hair, dress:s.dress,
+                traits:s.traits||[], quirks:s.quirks||[], flaws:s.flaws||[],
+                looks:s.looks, age:s.age };
+  ch.wedDay = G.day;
+  ch.livesHome = !!stay;
+  ch.forecast = suitorForecast(s, ch);
+  G.coin = (G.coin||0) + (s.dowryCoin||0);
+  G.weddings = (G.weddings||0) + 1;
+  G.honor = clamp((G.honor||50) + 2, 0, 100);
+  G.pop   = clamp((G.pop||0) + 2, 0, 100);
+  if(stay){
+    ch.loyal = (ch.loyal||0) + 3;
+  } else {
+    /* THEY MOVE OUT, AND THE MAP SAYS SO. A house of your blood in a
+       province you can actually travel to. */
+    const pool = REGIONS.filter(r=>regionUnlocked(r));
+    const r = pick(pool.length? pool : REGIONS);
+    G.kidHouses = G.kidHouses || [];
+    G.kidHouses.push({ name:kidName(ch), sex:ch.sex, region:r.id,
+                       spouse:String(s.name||'').split(' ')[0], day:G.day });
+    ch.livesAt = r.id;
+    ch.loyal = (ch.loyal||0) + 1;
+  }
+  saveQuiet();
+}
+/* is a married child of yours currently using the room you wanted? Seeded on
+   the DAY, so it is a stable fact about today and not a coin-flip per press. */
+function houseGuestBusy(){
+  const home=(G.children||[]).filter(c=>!c.dead && c.wed && c.livesHome);
+  if(!home.length) return null;
+  const d=(G.day||0);
+  // a third of days, and always the same child on the same day
+  const idx = (d*2654435761) % 4294967296;
+  if((idx % 3) !== 0) return null;
+  const who = home[(Math.floor(idx/3)) % home.length];
+  return who? {name:kidName(who), sex:who.sex,
+    spouse:(who.spouse&&String(who.spouse.name||'').split(' ')[0])||'their husband'} : null;
+}
+function suitorsAvailable(){
+  return livingKids().filter(c=>kidBand(c)==='grown' && !c.wed && !c.disinherited);
+}
+/* ---------------------------------------------------------------------
+   THE HALL ITSELF. Three callers, a foresight panel per caller, and the
+   question of where they are going to live.
+   --------------------------------------------------------------------- */
+let SUITORS=null;                       // {child, list:[…], seen:{}}
+function openSuitorHall(ch, keep){
+  if(!ch) return;
+  if(!keep || !SUITORS || SUITORS.child!==ch){
+    /* three DIFFERENT people. Drawing straight from the name pool three times
+       cheerfully produced two Gaii and a Gaius, which reads as a bug even
+       though it is only bad luck. Re-roll a caller whose first name or house
+       is already on the list, and give up after a bounded number of tries. */
+    const list=[], used={}, houses={};
+    for(let n=0; n<3; n++){
+      let sr=null;
+      for(let tries=0; tries<24; tries++){
+        const cand=makeSuitorFor(ch);
+        const first=String(cand.name||'').split(' ')[0];
+        if(used[first] || houses[cand.house]) continue;
+        sr=cand; used[first]=1; houses[cand.house]=1; break;
+      }
+      list.push(sr || makeSuitorFor(ch));
+    }
+    SUITORS={ child:ch, list, seen:{} };
+  }
+  state='menu'; show('scr-villa'); $('statbar').classList.remove('hide'); refreshStatbar();
+  const fem = ch.sex==='f';
+  villaHead('⚔ SUITORS FOR '+kidName(ch).toUpperCase(),
+    fem? 'Three houses have sent word. Look them over properly — you only get to do this once.'
+       : 'Three houses have offered a daughter. Look them over properly — you only get to do this once.',
+    '#e8c34a');
+  const b=$('villa-body'); b.innerHTML='';
+
+  // --- the child being married off, so you remember who this is about ---
+  { const hd=document.createElement('div'); hd.className='shopcard'; hd.style.borderColor='#e8c34a';
+    const row=document.createElement('div'); row.className='row';
+    row.style.cssText='gap:10px;align-items:center;flex-wrap:nowrap';
+    const pc=document.createElement('canvas'); pc.width=46; pc.height=62;
+    pc.style.cssText='position:relative;inset:auto;width:46px;height:62px;flex:0 0 auto;'
+      +'image-rendering:pixelated;border:1px solid #e8c34a55;border-radius:3px;'
+      +'background:radial-gradient(ellipse at 50% 78%, #e8c34a22, #14100c 70%)';
+    { const k=pc.getContext('2d'); k.imageSmoothingEnabled=false;
+      k.save(); k.translate(23,58); k.scale(0.55,0.55);
+      try{ drawChildFigure(k,0,0,ch,0,'idle'); }catch(e){} k.restore(); }
+    const tx=document.createElement('div'); tx.style.cssText='flex:1 1 auto;min-width:0;text-align:left';
+    tx.innerHTML='<b style="color:var(--gold)">'+kidName(ch)+'</b> <span class="small muted">— your '
+      +(fem?'daughter':'son')+', '+kidAgeYears(ch)+'</span>'
+      +'<div class="small muted" style="line-height:1.5;margin-top:2px">'
+      +'Whoever you choose, you are choosing the people your grandchildren come from. '
+      +'Press <b style="color:var(--gold)">🔮 FORESEE</b> on a caller to have the augurs read the match before you commit.</div>';
+    row.appendChild(pc); row.appendChild(tx); hd.appendChild(row); b.appendChild(hd); }
+
+  // --- the three callers ---
+  SUITORS.list.forEach((sr,i)=>{
+    if(sr.taken) return;
+    const card=document.createElement('div'); card.className='shopcard';
+    const st=sr.style||SUITOR_STYLE[0];
+    const row=document.createElement('div'); row.className='row mediacard';
+    row.style.cssText='gap:10px;align-items:flex-start;flex-wrap:nowrap';
+    row.appendChild(suitorPortrait(sr,54));
+    const tx=document.createElement('div'); tx.style.cssText='flex:1 1 auto;min-width:0;text-align:left';
+    const nm=String(sr.name||'—').split(' ')[0];
+    tx.innerHTML='<b style="color:var(--gold)">'+st.icon+' '+nm+' of the '+sr.house+'</b>'
+      + ' <span class="small muted">— '+st.name+', '+sr.age+'</span>'
+      + '<div class="small" style="margin-top:3px">'+traitsHtml({traits:sr.traits,flaws:sr.flaws,quirks:sr.quirks,male:!!sr.male})+'</div>'
+      + '<div class="small muted" style="margin-top:3px">Dowry offered: <b style="color:var(--gold)">'
+      + fmt(sr.dowryCoin||0)+'d</b></div>';
+    row.appendChild(tx); card.appendChild(row);
+
+    // ---- FORESIGHT ----
+    const fore=document.createElement('div');
+    fore.style.cssText='margin-top:6px;display:none;border-top:1px dashed #e8c34a44;padding-top:6px';
+    const btns=document.createElement('div'); btns.className='row gap6'; btns.style.marginTop='6px';
+    const fb=document.createElement('button'); fb.className='btn sm';
+    fb.textContent='🔮 FORESEE';
+    fb.title='The augurs read the match: how often, how many, and how much of it you will have to hear about.';
+    fb.onclick=()=>{
+      SUITORS.seen[i]=true;
+      const f=suitorForecast(sr,ch);
+      const meter=(lab,val,max,col,txt)=>{
+        const pct=clamp(val/max,0,1)*100;
+        return '<div style="margin:3px 0"><div class="small" style="display:flex;justify-content:space-between">'
+          +'<span>'+lab+'</span><b style="color:'+col+'">'+txt+'</b></div>'
+          +'<div style="height:6px;background:#000;border:1px solid #3a2c1e;border-radius:2px;overflow:hidden">'
+          +'<i style="display:block;height:100%;width:'+pct.toFixed(0)+'%;background:'+col+'"></i></div></div>';
+      };
+      fore.innerHTML=
+        '<div class="small" style="color:#c89af0;letter-spacing:1px"><b>🔮 THE AUGURS READ THE MATCH</b></div>'
+        + meter('🔥 How often they will share a bed', f.ard, 8, '#ff8a5b', f.ardLab+' (~'+f.ard.toFixed(1)+'/month)')
+        + meter('🌾 Children likely to come of it', f.kids, 14, '#5b7a32', f.kids===0?'NONE':f.kids+(f.kids===1?' child':' children'))
+        + meter('😤 How often it will offend you', f.off, 12, '#e0705b', f.offLab)
+        + '<div class="small muted" style="margin-top:4px;font-style:italic">“'+f.verdict+'”</div>';
+      fore.style.display='block'; fb.disabled=true; fb.textContent='🔮 FORESEEN';
+      try{ sfx('scroll'); }catch(e){}
+    };
+    btns.appendChild(fb);
+
+    const ab=document.createElement('button'); ab.className='btn sm gold';
+    ab.textContent='⚭ ACCEPT THIS MATCH';
+    ab.onclick=()=>openWeddingChoice(ch, sr);
+    btns.appendChild(ab);
+
+    const rb=document.createElement('button'); rb.className='btn sm';
+    rb.textContent='✖ TURN THEM AWAY';
+    rb.title='One fewer caller. The others are still waiting.';
+    rb.onclick=()=>{ sr.taken=true;
+      const left=SUITORS.list.filter(x=>!x.taken).length;
+      if(!left){ toast('You have turned every one of them away. Word gets round.',3600);
+        G.honor=clamp((G.honor||50)-1,0,100); SUITORS=null; openVilla(); return; }
+      toast('✖ '+nm+' is shown the door.',2200); openSuitorHall(ch,true); };
+    btns.appendChild(rb);
+
+    card.appendChild(fore); card.appendChild(btns); b.appendChild(card);
+  });
+
+  const back=document.createElement('div'); back.className='row gap6'; back.style.marginTop='4px';
+  const bb=document.createElement('button'); bb.className='btn sm';
+  bb.textContent='⏳ NOT THIS YEAR';
+  bb.title='Leave it. The callers will come again.';
+  bb.onclick=()=>{ SUITORS=null; toast('⏳ “Next year, then.” '+kidName(ch)+' says nothing at all.',3000); openVilla(); };
+  back.appendChild(bb); b.appendChild(back);
+}
+/* WHERE THEY LIVE — the decision the villa and the map both have to honour */
+function openWeddingChoice(ch, sr){
+  state='menu'; show('scr-villa'); $('statbar').classList.remove('hide');
+  const fem=ch.sex==='f', nm=String(sr.name||'').split(' ')[0];
+  villaHead('⚭ THE MATCH IS MADE',
+    kidName(ch)+' will marry '+nm+' of the '+sr.house+'. The only question left is the roof.', '#e8c34a');
+  const b=$('villa-body'); b.innerHTML='';
+  const opt=(icon,title,desc,warn,fn)=>{
+    const c=document.createElement('div'); c.className='shopcard';
+    c.innerHTML='<div><b style="color:var(--gold)">'+icon+' '+title+'</b></div>'
+      +'<div class="small muted" style="line-height:1.5;margin-top:2px">'+desc+'</div>'
+      +(warn? '<div class="small" style="color:#e0a05b;margin-top:3px">'+warn+'</div>':'');
+    const bt=document.createElement('button'); bt.className='btn sm gold'; bt.style.marginTop='5px';
+    bt.textContent='CHOOSE THIS'; bt.onclick=fn; c.appendChild(bt); b.appendChild(c);
+  };
+  opt('🏠','THEY STAY UNDER THIS ROOF',
+    'A wing of the villa is theirs. You keep '+(fem?'your daughter':'your son')+', you keep the grandchildren '
+    +'close, and '+kidName(ch)+' will remember that you did not simply hand '+kidHim(ch)+' over.',
+    '⚠ The house is not as empty as it was. Some nights the bedchamber will already be occupied.',
+    ()=>{ weddChild(ch,sr,true);
+      toast('⚭ '+kidName(ch)+' is married, and stays. +'+fmt(sr.dowryCoin||0)+'d dowry.',5200);
+      SUITORS=null; openVilla(); });
+  opt('🗺','THEY TAKE A HOUSE OF THEIR OWN',
+    'A household of your blood in another province — a name in a place you do not have to be. '
+    +'It will show on your map, and it will still be there when you are not.',
+    null,
+    ()=>{ weddChild(ch,sr,false);
+      const where=ch.livesAt||'the provinces';
+      toast('🗺 '+kidName(ch)+' takes a house in '+where+'. +'+fmt(sr.dowryCoin||0)+'d dowry.',5200);
+      SUITORS=null; openVilla(); });
+  const row=document.createElement('div'); row.className='row gap6'; row.style.marginTop='4px';
+  const bk=document.createElement('button'); bk.className='btn sm'; bk.textContent='◀ BACK TO THE CALLERS';
+  bk.onclick=()=>openSuitorHall(ch,true); row.appendChild(bk); b.appendChild(row);
+}
+/* the permanent way in, on the villa screen, for when you did not wait for the event */
+function buildSuitorCard(b){
+  const waiting=suitorsAvailable();
+  if(!waiting.length) return;
+  const card=document.createElement('div'); card.className='shopcard'; card.style.borderColor='#e8c34a';
+  card.innerHTML='<div><b style="color:var(--gold)">⚭ MATCHES TO BE MADE</b> '
+    +'<span class="small muted">— grown, unwed, and being talked about</span></div>';
+  const row=document.createElement('div'); row.className='row gap6'; row.style.marginTop='4px';
+  waiting.forEach(ch=>{
+    const bt=document.createElement('button'); bt.className='btn sm';
+    bt.textContent=(ch.sex==='f'?'♀ ':'♂ ')+kidName(ch).toUpperCase()+', '+kidAgeYears(ch);
+    bt.title='Receive callers for '+kidName(ch)+'.';
+    bt.onclick=()=>openSuitorHall(ch);
+    row.appendChild(bt);
+  });
+  card.appendChild(row); b.appendChild(card);
+}
+/* and the households they founded, once they have gone */
+function buildKidHousesCard(b){
+  const hs=G.kidHouses||[]; if(!hs.length) return;
+  const card=document.createElement('div'); card.className='shopcard';
+  card.innerHTML='<div><b style="color:var(--gold)">🗺 HOUSES OF YOUR BLOOD</b> '
+    +'<span class="small muted">— '+hs.length+' abroad</span></div>'
+    +'<div class="small muted" style="line-height:1.6;margin-top:3px">'
+    + hs.map(h=>(h.sex==='f'?'♀':'♂')+' <b>'+h.name+'</b> &amp; '+h.spouse+' — <span style="color:var(--gold)">'+h.region+'</span>').join('<br/>')
+    +'</div>';
+  b.appendChild(card);
+}
+
 const FAMILY_EVENTS=[
   /* ---------- CHILD: antics ---------------------------------------- */
   { id:'slaveq', band:'child', icon:'⛓', w:()=>((G.slaves||0)>0?2.4:0),
@@ -17218,6 +17900,27 @@ const FAMILY_EVENTS=[
     c:{lab:'🤝 NEGOTIATE THE TERMS', desc:'Half the dowry, and the choice stays theirs. It takes a fortnight.',
        run:(c)=>{ G.coin=(G.coin||0)+420; c.loyal=(c.loyal||0)+2; advanceDay(2);
                   return '+420d, two days of haggling, and everybody is mildly pleased.'; }} },
+
+  /* ---------- GROWN: a caller at the door -------------------------- */
+  { id:'suitor', band:'grown', icon:'⚔', w:()=>(suitorsAvailable().length? 4.2:0),
+    title:(c)=>'A SUITOR HAS ARRIVED FOR '+kidName(c).toUpperCase(),
+    line:(c)=>pick(['There is a litter in your courtyard and a man in your atrium with a gift.',
+                    'Three houses have sent word in a fortnight. This one came in person.',
+                    '“I am told '+kidName(c)+' is not yet spoken for.” He is already inside.']),
+    a:{lab:'⚔ RECEIVE THE CALLERS', desc:'See all three properly — and have the augurs read each match before you commit to any of it.',
+       run:(c)=>{ setTimeout(()=>{ try{ openSuitorHall(c); }catch(e){} }, 30);
+                  return 'They are shown in.'; }},
+    b:{lab:'💰 TAKE THE BEST OFFER, SIGHT UNSEEN', desc:'The coin is real and immediate. So is what your child will remember about it.',
+       run:(c)=>{ const three=[makeSuitorFor(c),makeSuitorFor(c),makeSuitorFor(c)];
+                  three.sort((x,y)=>(y.dowryCoin||0)-(x.dowryCoin||0));
+                  const best=three[0];
+                  weddChild(c, best, Math.random()<0.5);
+                  c.resent=(c.resent||0)+3;
+                  return kidName(c)+' is married to '+String(best.name||'').split(' ')[0]
+                       +' of the '+best.house+' for '+fmt(best.dowryCoin||0)+'d, having met '+kidHim(c)+' once.'; }},
+    c:{lab:'🚪 “NOT YET.”', desc:'Send them all away. It costs you nothing today and something later.',
+       run:(c)=>{ c.resent=(c.resent||0)+1; G.honor=clamp((G.honor||50)-1,0,100);
+                  return 'The litter leaves. '+kidName(c)+' watches it go from an upstairs window.'; }} },
 
   /* ---------- GROWN: the sharp end -------------------------------- */
   { id:'inherit', band:'grown', icon:'📜', w:()=>(kidsOfBand('grown').length>=2? 3.4:0)+heirPressure()*3,
@@ -17307,11 +18010,14 @@ function openFamilyEvent(which){
     +'border:1px solid '+bandCol+'66;border-radius:3px;background:radial-gradient(ellipse at 50% 76%, '
     +bandCol+'2e, #14100c 70%)';
   { const k2=pc.getContext('2d'); k2.imageSmoothingEnabled=false;
-    const days=Math.max(1,(G.day||0)-(c.born||0));
     k2.save(); k2.translate(27,66);
-    const sc=band==='grown'?1.30 : band==='youth'?1.16 : 1.02;
-    k2.scale(sc,sc);
-    try{ drawKidFig(k2,0,0,c.sex,Math.floor(days/3),c); }catch(e){}
+    /* the card used to scale drawKidFig by a hand-picked 1.02/1.16/1.30 — a
+       grown heir came out a slightly large toddler. It goes through the same
+       routine the villa uses now, so the person on the card is the person in
+       the hall; a grown one is the adult sprite and needs scaling DOWN to fit. */
+    const fit = kidBand(c)==='grown'? 0.62 : 1.0;
+    k2.scale(fit,fit);
+    try{ drawChildFigure(k2,0,0,c,0,'idle'); }catch(e){}
     k2.restore();
     k2.globalAlpha=0.30; k2.fillStyle=bandCol; k2.fillRect(0,68,54,4); k2.globalAlpha=1; }
   const txt=document.createElement('div'); txt.style.cssText='flex:1 1 auto;min-width:0';
@@ -20064,6 +20770,7 @@ window.__SS = {
   doSlap, slapVerdict, startSlapAnim, updateSlap, drawSlap, drawHairSmall,
   romanticVerdict, startRomantic, updateRomantic, drawRomantic, drawRomanticFem,
   kidsPresent, villaClear, privacyNeeded, privacyRefusal, clearTheVilla, BABY_YEARS,
+  figHeadBox, drawReactFace, reactKindFor, REACT_FACES,
   privacyTier, watchersPresent, qText, drawManFace, hasMyQuirk,
   DROP_PROPS, DROP_NEED, DROP_LOOKS, dropDue, startDrop, updateDrop, drawDrop,
   openIgnoredCard, husbandMoveDue, startHusbandMove, updateHusbandMove, drawHusbandMove,
@@ -20077,6 +20784,10 @@ window.__SS = {
   openWoohooGuide, closeWoohooGuide, buildWoohooGuide, WOOHOO_GUIDE,
   fixTraitsForSex, WIFE_TRAITS, rollTraits, hasTrait, openSettings, closeSettings,
   FAMILY_EVENTS, familyDue, maybeFamily, openFamilyEvent, kidBand, kidAgeYears, heirPressure,
+  kidDrawScale, grownLook, drawChildFigure, kidName, livingKids, kidsOfBand,
+  buildRegions,
+  makeSuitorFor, suitorForecast, weddChild, houseGuestBusy, suitorsAvailable,
+  openSuitorHall, openWeddingChoice, buildSuitorCard, buildKidHousesCard, SUITOR_STYLE,
   SIBLING_LINES, siblingAside, drawDomus, romanticSwing, STRIKES,
   spouseTierName, tierBadge, slapLabel, drawSlap, startSlapAnim, startRomantic, drawHusbandFig, drawVillaMale,
   livingKids, kidsOfBand,
