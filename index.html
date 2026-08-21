@@ -6981,50 +6981,282 @@ function pixelText(t,x,y,c,scale=1){
    AUDIO (tiny WebAudio blips, guarded)
    ===================================================================== */
 let AC=null, muted=!SETTINGS.sound, NOISE=null;
-function noiseBuf(){ if(NOISE) return NOISE; const n=AC.sampleRate*0.5; const b=AC.createBuffer(1,n,AC.sampleRate); const d=b.getChannelData(0); for(let i=0;i<n;i++) d[i]=Math.random()*2-1; NOISE=b; return NOISE; }
-function tone(f,d,ty,vol,slideTo){ const o=AC.createOscillator(),g=AC.createGain(); o.connect(g);g.connect(AC.destination);
-  o.type=ty||'square'; o.frequency.setValueAtTime(f,AC.currentTime); if(slideTo) o.frequency.exponentialRampToValueAtTime(slideTo,AC.currentTime+d);
-  g.gain.setValueAtTime(vol||0.06,AC.currentTime); g.gain.exponentialRampToValueAtTime(0.0001,AC.currentTime+d); o.start(); o.stop(AC.currentTime+d); }
-function noise(d,vol,lp){ const s=AC.createBufferSource(); s.buffer=noiseBuf(); const g=AC.createGain(); const f=AC.createBiquadFilter();
-  f.type='lowpass'; f.frequency.value=lp||1200; s.connect(f); f.connect(g); g.connect(AC.destination);
-  g.gain.setValueAtTime(vol||0.12,AC.currentTime); g.gain.exponentialRampToValueAtTime(0.0001,AC.currentTime+d); s.start(); s.stop(AC.currentTime+d); }
+function noiseBuf(){ if(NOISE) return NOISE; const n=AC.sampleRate*1.0; const b=AC.createBuffer(1,n,AC.sampleRate); const d=b.getChannelData(0); for(let i=0;i<n;i++) d[i]=Math.random()*2-1; NOISE=b; return NOISE; }
+/* =====================================================================
+   THE SOUND ENGINE
+   ---------------------------------------------------------------------
+   What made the old cues sound cheap was not the choice of notes — it was
+   the plumbing. Every voice went straight to destination with
+   setValueAtTime() for its gain, which is an INSTANT attack: a hard step
+   from silence to full amplitude, and a hard step is a click. Twelve of
+   them at once in a busy fight squared off against each other with no
+   headroom, and every filter was a fixed frequency, so nothing moved.
+
+   Now: a master bus with a soft-clip so stacked cues cannot go square, a
+   small convolution room so impacts have a tail instead of stopping dead,
+   real attack/decay envelopes on every voice, and filter ENVELOPES —
+   which is the thing that actually makes a percussive sound read as an
+   object being struck rather than a beep.
+   ===================================================================== */
+let MASTER=null, REVSEND=null;
+function audioBus(){
+  if(MASTER && MASTER.context===AC) return MASTER;
+  MASTER=AC.createGain(); MASTER.gain.value=0.85;
+  const shaper=AC.createWaveShaper();
+  const n=1024, curve=new Float32Array(n);
+  for(let i=0;i<n;i++){ const x=(i/(n-1))*2-1; curve[i]=Math.tanh(x*1.7)/Math.tanh(1.7); }
+  shaper.curve=curve; shaper.oversample='2x';
+  MASTER.connect(shaper); shaper.connect(AC.destination);
+  return MASTER;
+}
+// a short, dark room — enough tail that a strike lands somewhere
+function revSend(){
+  if(REVSEND && REVSEND.context===AC) return REVSEND;
+  const len=Math.floor(AC.sampleRate*0.55);
+  const b=AC.createBuffer(2,len,AC.sampleRate);
+  for(let ch=0; ch<2; ch++){ const d=b.getChannelData(ch);
+    for(let i=0;i<len;i++){ const t=i/len; d[i]=(Math.random()*2-1)*Math.pow(1-t,3.0); } }
+  const cv=AC.createConvolver(); cv.buffer=b;
+  const damp=AC.createBiquadFilter(); damp.type='lowpass'; damp.frequency.value=2600;
+  REVSEND=AC.createGain(); REVSEND.gain.value=0.30;
+  REVSEND.connect(cv); cv.connect(damp); damp.connect(audioBus());
+  return REVSEND;
+}
+/* ONE PITCHED VOICE, with a real envelope and an optional filter sweep. */
+function blip(o){
+  o=o||{};
+  const t0=AC.currentTime+(o.at||0);
+  const d=o.d||0.2, pk=(o.v===undefined?0.06:o.v), a=(o.a===undefined?0.005:o.a);
+  const osc=AC.createOscillator(), g=AC.createGain();
+  osc.type=o.type||'sine';
+  osc.frequency.setValueAtTime(Math.max(20,o.f||440), t0);
+  if(o.to) osc.frequency.exponentialRampToValueAtTime(Math.max(20,o.to), t0+d);
+  if(o.detune) osc.detune.setValueAtTime(o.detune, t0);
+  let tail=g;
+  if(o.lp){ const f=AC.createBiquadFilter(); f.type='lowpass';
+    f.frequency.setValueAtTime(o.lp,t0); f.Q.value=o.q||0.8;
+    if(o.lpTo) f.frequency.exponentialRampToValueAtTime(Math.max(60,o.lpTo), t0+d);
+    g.connect(f); tail=f; }
+  g.gain.setValueAtTime(0.0001,t0);
+  g.gain.exponentialRampToValueAtTime(Math.max(0.0002,pk), t0+a);   // attack — no click
+  g.gain.exponentialRampToValueAtTime(0.0001, t0+d);
+  osc.connect(g);
+  tail.connect(audioBus());
+  if(o.rev) tail.connect(revSend());
+  osc.start(t0); osc.stop(t0+d+0.03);
+}
+/* ONE NOISE BURST, with a filter envelope — this is what makes a hit a hit. */
+function hiss(o){
+  o=o||{};
+  const t0=AC.currentTime+(o.at||0);
+  const d=o.d||0.12, pk=(o.v===undefined?0.10:o.v), a=(o.a===undefined?0.003:o.a);
+  const src=AC.createBufferSource(); src.buffer=noiseBuf();
+  src.playbackRate.value=o.rate||1;
+  const f=AC.createBiquadFilter();
+  f.type=o.band? 'bandpass' : (o.hp? 'highpass' : 'lowpass');
+  f.frequency.setValueAtTime(Math.max(60,o.f||1200), t0);
+  f.Q.value = o.q===undefined? (o.band?1.4:0.9) : o.q;
+  if(o.to) f.frequency.exponentialRampToValueAtTime(Math.max(60,o.to), t0+d);
+  const g=AC.createGain();
+  g.gain.setValueAtTime(0.0001,t0);
+  g.gain.exponentialRampToValueAtTime(Math.max(0.0002,pk), t0+a);
+  g.gain.exponentialRampToValueAtTime(0.0001, t0+d);
+  src.connect(f); f.connect(g); g.connect(audioBus());
+  if(o.rev) g.connect(revSend());
+  src.start(t0); src.stop(t0+d+0.03);
+}
+// legacy shims — a lot of code still calls these two by name
+function tone(f,d,ty,vol,slideTo){ blip({f,d,type:ty,v:vol,to:slideTo}); }
+function noise(d,vol,lp){ hiss({d,v:vol,f:lp}); }
+/* Every cue is now layered: a TRANSIENT (what the surfaces do at the moment
+   of contact), a BODY (what the object is made of), and where sensible a
+   send into the room. A single oscillator is a beep; three layers with
+   different decay rates is a sound. */
 function sfx(kind){
   if(muted) return;
   try{
     AC=AC||new (window.AudioContext||window.webkitAudioContext)();
-    if(AC.state==='suspended') AC.resume();
-    if(kind==='hit'){ noise(0.13,0.18,900); tone(150,0.12,'sawtooth',0.07,60); }          // wet flesh thwack
-    else if(kind==='thud'){ noise(0.10,0.15,500); tone(90,0.12,'square',0.06,50); }        // elbow thud
-    else if(kind==='block'){ tone(640,0.05,'square',0.05,420); tone(900,0.08,'triangle',0.04); noise(0.05,0.06,4000); } // metal clang
-    else if(kind==='swing'){ noise(0.06,0.05,2600); }                                      // whoosh
-    else if(kind==='cheer'){ noise(0.4,0.05,1600); tone(420,0.25,'triangle',0.02,560); }   // crowd roar
-    else if(kind==='ko'){ tone(180,0.5,'sawtooth',0.08,40); noise(0.3,0.1,700); }          // knockdown
-    else if(kind==='win'){ [523,659,784,1046].forEach((f,i)=>setTimeout(()=>{try{tone(f,0.18,'square',0.06);}catch(e){}},i*90)); } // fanfare
-    else if(kind==='clap'){ noise(0.05,0.10,1100); tone(180,0.06,'square',0.025,120); }    // a rhythmic slap through the door
-    else if(kind==='moan'){ if(Math.random()<0.5) tone(210,0.5,'sine',0.05,330); else tone(320,0.55,'sine',0.045,180); } // muffled... enjoyment
-    else if(kind==='creak'){ tone(90,0.35,'sawtooth',0.02,140); }                          // the door swings
-    else if(kind==='kiss'){ noise(0.03,0.06,3200); tone(880,0.06,'sine',0.04,420); }       // a smack through the door
-    else if(kind==='giggle'){ [620,760,540].forEach((f,i)=>setTimeout(()=>{try{tone(f,0.07,'sine',0.03,f+80);}catch(e){}},i*70)); }
-    // ---- new cues for the systems added since ----
-    else if(kind==='coin'){ [1180,1560].forEach((f,i)=>setTimeout(()=>{try{tone(f,0.07,'triangle',0.05,f+300);}catch(e){}},i*55)); }  // purse
-    else if(kind==='gavel'){ noise(0.06,0.10,700); tone(150,0.16,'square',0.07,70); }                    // the court rules
-    else if(kind==='verdictWin'){ [392,523,659].forEach((f,i)=>setTimeout(()=>{try{tone(f,0.16,'triangle',0.055);}catch(e){}},i*95)); }
-    else if(kind==='verdictLose'){ [392,330,247].forEach((f,i)=>setTimeout(()=>{try{tone(f,0.2,'sine',0.05);}catch(e){}},i*110)); }
-    // ---- the herbarius: pottery, a pestle, and a wax seal giving way ----
-    else if(kind==='jar'){ noise(0.05,0.05,2200); tone(760,0.05,'triangle',0.035,900); setTimeout(()=>{try{tone(620,0.05,'triangle',0.03,720);}catch(e){}},70); }
-    else if(kind==='pestle'){ noise(0.16,0.09,420); noise(0.12,0.07,300); tone(120,0.10,'square',0.03,90); }
-    else if(kind==='cork'){ tone(300,0.04,'sine',0.07,900); setTimeout(()=>{try{noise(0.05,0.04,1600);}catch(e){}},40); }
-    else if(kind==='cough'){ noise(0.10,0.13,600); setTimeout(()=>{try{noise(0.08,0.10,520);}catch(e){}},150); }
-    else if(kind==='baby'){ [820,700,900,760].forEach((f,i)=>setTimeout(()=>{try{tone(f,0.13,'sine',0.05,f-120);}catch(e){}},i*130)); }
-    else if(kind==='hoof'){ noise(0.04,0.07,320); tone(110,0.06,'square',0.035,70); }                     // a chariot horse
-    else if(kind==='whip'){ noise(0.03,0.05,5200); tone(1400,0.04,'sawtooth',0.03,300); }                 // the crack
-    else if(kind==='wreck'){ noise(0.30,0.22,420); tone(80,0.35,'sawtooth',0.09,40); }                    // a chariot goes over
-    else if(kind==='drill'){ noise(0.05,0.07,1500); tone(260,0.07,'square',0.035,180); }                  // wood on wood in the ludus
-    else if(kind==='horn'){ [196,262].forEach((f,i)=>setTimeout(()=>{try{tone(f,0.42,'sawtooth',0.05,f);}catch(e){}},i*180)); }  // the legion's cornu
-    else if(kind==='promote'){ [523,659,784,1046,1318].forEach((f,i)=>setTimeout(()=>{try{tone(f,0.15,'triangle',0.05);}catch(e){}},i*80)); }
-    else if(kind==='scroll'){ noise(0.10,0.05,2200); }                                                    // a chart unrolling
-    else if(kind==='ui'){ tone(660,0.04,'triangle',0.025,760); }                                          // a soft click
-    else { tone(200,0.08,'square',0.05); }
+    // resume() throws on a context that is not a live realtime one
+    if(AC.state==='suspended' && typeof AC.resume==='function'){ try{ AC.resume(); }catch(e){} }
+    const R=(a,b2)=>a+Math.random()*(b2-a);
+    switch(kind){
+
+    /* ---------- THE ARENA ---------- */
+    case 'hit':            // a fist into a body: skin snap, meat, and the grunt of it
+      hiss({d:0.055, v:0.16, f:2600, to:700, band:true, q:0.9, a:0.001});
+      hiss({d:0.16,  v:0.13, f:700,  to:180, a:0.002, rev:true});
+      blip({f:140, to:52, d:0.16, type:'sine',     v:0.13, a:0.002});
+      blip({f:230, to:90, d:0.09, type:'triangle', v:0.05, a:0.002});
+      break;
+    case 'thud':           // an elbow: less skin, more weight
+      hiss({d:0.05, v:0.10, f:900, to:260, a:0.002});
+      blip({f:98, to:42, d:0.22, type:'sine', v:0.15, a:0.003, rev:true});
+      break;
+    case 'block':          // steel on steel — a real clang has inharmonic partials
+      hiss({d:0.03, v:0.10, f:5200, hp:true, a:0.001});
+      [1180, 1790, 2630, 3510].forEach((f,i)=>
+        blip({f, d:0.28-i*0.05, type:'square', v:0.032-i*0.006, a:0.001,
+              detune:R(-14,14), rev:true}));
+      blip({f:300, to:190, d:0.10, type:'triangle', v:0.04});
+      break;
+    case 'swing':          // air, not a hiss of static
+      hiss({d:0.10, v:0.055, f:520, to:2900, band:true, q:0.7, a:0.03});
+      break;
+    case 'ko':
+      hiss({d:0.35, v:0.11, f:900, to:120, a:0.004, rev:true});
+      blip({f:190, to:34, d:0.55, type:'sawtooth', v:0.10, a:0.004, lp:1400, lpTo:180});
+      break;
+    case 'cheer':          // a crowd is many voices, so: layered bands that swell
+      hiss({d:0.9, v:0.055, f:700,  to:1500, band:true, q:0.5, a:0.20, rev:true});
+      hiss({d:1.1, v:0.045, f:1800, to:900,  band:true, q:0.8, a:0.28});
+      blip({f:300, to:440, d:0.7, type:'triangle', v:0.022, a:0.25});
+      break;
+    case 'win':
+      [523,659,784,1046].forEach((f,i)=>
+        blip({f, d:0.34, type:'triangle', v:0.055, a:0.008, at:i*0.085, rev:true}));
+      [1046,1318].forEach((f,i)=>
+        blip({f, d:0.5, type:'sine', v:0.03, a:0.02, at:0.34+i*0.09, rev:true}));
+      break;
+
+    /* ---------- THE VILLA ---------- */
+    case 'clap':           // A REAL CLAP: two palms, a room, and no sine wave in sight
+      /* the old one was a lowpassed noise blip plus a square tone, which is a
+         click and a beep. A clap is a very short broadband transient with a
+         resonance around 1.2-2.4k from the cupped hands, a tiny second
+         reflection a few ms later, and a room tail. */
+      hiss({d:0.012, v:0.20, f:3400, band:true, q:0.6, a:0.0006});
+      hiss({d:0.055, v:0.17, f:1700, to:900, band:true, q:1.5, a:0.001, rev:true});
+      hiss({d:0.030, v:0.09, f:1150, band:true, q:2.2, a:0.001, at:0.009});
+      hiss({d:0.10,  v:0.05, f:420,  to:200, a:0.002, rev:true});
+      break;
+    case 'kiss':           // a small wet release, not a whistle
+      hiss({d:0.020, v:0.09, f:2400, band:true, q:1.1, a:0.001});
+      blip({f:620, to:1500, d:0.05, type:'sine', v:0.045, a:0.004});
+      hiss({d:0.05, v:0.03, f:900, to:2600, band:true, q:1.4, a:0.012});
+      break;
+    case 'moan':
+      { const base=R(180,260), fm=R(1.6,2.6);
+        blip({f:base, to:base*R(1.15,1.5), d:0.62, type:'sine',     v:0.055, a:0.09, rev:true});
+        blip({f:base*2.01, to:base*fm,     d:0.55, type:'triangle', v:0.018, a:0.12});
+        blip({f:base*0.5,                  d:0.60, type:'sine',     v:0.030, a:0.10}); }
+      break;
+    case 'giggle':         // three rising blips with vibrato-ish detune, not a scale
+      [0,1,2,3].forEach(i=>{
+        const f=[540,700,620,820][i];
+        blip({f, to:f*R(1.12,1.3), d:0.075, type:'sine', v:0.036, a:0.006,
+              at:i*0.062, detune:R(-25,25), rev:true}); });
+      break;
+    case 'creak':          // wood under load: a slow sweep with a resonant peak
+      blip({f:78, to:132, d:0.55, type:'sawtooth', v:0.028, a:0.10, lp:900, lpTo:340, q:5});
+      hiss({d:0.5, v:0.020, f:600, to:260, band:true, q:6, a:0.12});
+      break;
+    case 'door':           // a heavy leaf swinging and latching
+      blip({f:64, to:44, d:0.30, type:'sine', v:0.10, a:0.01, rev:true});
+      hiss({d:0.30, v:0.030, f:520, to:200, band:true, q:4, a:0.08});
+      hiss({d:0.05, v:0.09, f:2200, to:700, band:true, q:1.2, a:0.001, at:0.30});
+      break;
+    case 'water':          // stepping into the lagoon
+      hiss({d:0.22, v:0.10, f:600, to:2200, band:true, q:0.8, a:0.02, rev:true});
+      for(let i=0;i<4;i++) blip({f:R(700,1500), to:R(300,600), d:0.09,
+        type:'sine', v:0.028, a:0.003, at:0.02+i*0.045});
+      break;
+
+    /* ---------- THE SLAPS ---------- */
+    case 'slap':           // an open palm on skin — sharper and wetter than 'hit'
+      hiss({d:0.030, v:0.22, f:3200, to:1100, band:true, q:0.8, a:0.0006});
+      hiss({d:0.10,  v:0.14, f:1200, to:300,  a:0.0015, rev:true});
+      blip({f:180, to:70, d:0.13, type:'sine', v:0.11, a:0.002});
+      break;
+    case 'slapBig':        // the committed one, with the whole arm behind it
+      hiss({d:0.040, v:0.26, f:3800, to:900, band:true, q:0.7, a:0.0005});
+      hiss({d:0.20,  v:0.17, f:1400, to:220, a:0.0015, rev:true});
+      blip({f:150, to:46, d:0.26, type:'sine',     v:0.15, a:0.002, rev:true});
+      blip({f:300, to:110, d:0.10, type:'triangle', v:0.05, a:0.002});
+      break;
+
+    /* ---------- COIN, COURT, HERBS ---------- */
+    case 'coin':
+      [1180,1560,2100].forEach((f,i)=>blip({f, to:f*1.18, d:0.10, type:'triangle',
+        v:0.045-i*0.008, a:0.002, at:i*0.045, rev:true}));
+      hiss({d:0.05, v:0.04, f:4200, hp:true, a:0.001, at:0.02});
+      break;
+    case 'gavel':
+      hiss({d:0.035, v:0.13, f:1800, to:600, band:true, q:1.0, a:0.001});
+      blip({f:160, to:60, d:0.22, type:'sine', v:0.13, a:0.002, rev:true});
+      break;
+    case 'verdictWin':
+      [392,523,659].forEach((f,i)=>blip({f, d:0.30, type:'triangle', v:0.055,
+        a:0.008, at:i*0.095, rev:true}));
+      break;
+    case 'verdictLose':
+      [392,330,247].forEach((f,i)=>blip({f, d:0.38, type:'sine', v:0.05,
+        a:0.012, at:i*0.11, lp:1800, lpTo:500, rev:true}));
+      break;
+    case 'jar':
+      hiss({d:0.02, v:0.06, f:3000, band:true, q:1.4, a:0.001});
+      [760,1180].forEach((f,i)=>blip({f, d:0.16, type:'triangle', v:0.035,
+        a:0.002, at:i*0.055, detune:R(-10,10), rev:true}));
+      break;
+    case 'pestle':
+      hiss({d:0.13, v:0.10, f:900, to:280, a:0.002});
+      blip({f:120, to:70, d:0.13, type:'sine', v:0.06, a:0.003});
+      break;
+    case 'cork':
+      blip({f:260, to:1100, d:0.05, type:'sine', v:0.09, a:0.002});
+      hiss({d:0.06, v:0.05, f:1800, to:600, band:true, q:1.6, a:0.001, at:0.035});
+      break;
+    case 'cough':
+      hiss({d:0.10, v:0.11, f:1100, to:340, band:true, q:0.9, a:0.004});
+      hiss({d:0.09, v:0.08, f:800,  to:280, band:true, q:1.1, a:0.004, at:0.15});
+      break;
+    case 'baby':
+      [820,700,900,760].forEach((f,i)=>blip({f, to:f*R(1.1,1.35), d:0.19,
+        type:'sine', v:0.05, a:0.02, at:i*0.135, rev:true}));
+      break;
+
+    /* ---------- THE CIRCUS AND THE LEGIONS ---------- */
+    case 'hoof':
+      hiss({d:0.035, v:0.08, f:600, to:180, a:0.001});
+      blip({f:105, to:58, d:0.09, type:'sine', v:0.06, a:0.002});
+      break;
+    case 'whip':
+      hiss({d:0.012, v:0.20, f:6500, hp:true, a:0.0005});
+      hiss({d:0.07,  v:0.09, f:3200, to:900, band:true, q:0.9, a:0.001, rev:true});
+      break;
+    case 'wreck':
+      hiss({d:0.42, v:0.20, f:1400, to:180, a:0.004, rev:true});
+      blip({f:90, to:32, d:0.5, type:'sawtooth', v:0.11, a:0.005, lp:1200, lpTo:120});
+      for(let i=0;i<5;i++) hiss({d:0.09, v:0.06, f:R(1200,2600), band:true,
+        q:1.2, a:0.001, at:R(0.03,0.30)});
+      break;
+    case 'drill':
+      hiss({d:0.05, v:0.08, f:2200, to:700, band:true, q:1.0, a:0.001});
+      blip({f:250, to:150, d:0.08, type:'square', v:0.03, a:0.002});
+      break;
+    case 'horn':           // the cornu: a brass stack, not one sawtooth
+      [196,262].forEach((f,i)=>{
+        [1,2,3].forEach(h=>blip({f:f*h, d:0.55, type:h===1?'sawtooth':'triangle',
+          v:0.045/h, a:0.05, at:i*0.19, lp:2400, lpTo:1100, rev:true})); });
+      break;
+    case 'promote':
+      [523,659,784,1046,1318].forEach((f,i)=>blip({f, d:0.30, type:'triangle',
+        v:0.05, a:0.006, at:i*0.082, rev:true}));
+      break;
+
+    /* ---------- UI ---------- */
+    case 'scroll':
+      hiss({d:0.16, v:0.045, f:1400, to:3200, band:true, q:0.7, a:0.03});
+      break;
+    case 'ui':
+      blip({f:880, to:1180, d:0.045, type:'triangle', v:0.028, a:0.002});
+      break;
+    case 'deny':           // a flat, closed no
+      blip({f:220, to:150, d:0.16, type:'square', v:0.05, a:0.004, lp:900, lpTo:400});
+      break;
+
+    default:
+      blip({f:300, to:220, d:0.09, type:'triangle', v:0.045, a:0.003});
+    }
   }catch(e){}
 }
 
@@ -11887,6 +12119,8 @@ function updateDomus(dt){
   if(D.refuse) updateRefusal(dt);                     // a refusal plays over whatever else is happening
   if(D.rise){ updateRise(dt); if(D.rise && D.rise.locks) return; }
   else if(riseDue()) startRise();
+  if(D.escort){ updateEscort(dt); if(D.escort && D.escort.locks) return; }
+  if(D.gripe) updateRoomComplaint(dt);
   if(D.ardor){ updateArdor(dt); if(D.ardor && D.ardor.locks) return; }
   if(D.husb){ updateHusbandMove(dt); return; }        // he is already crossing; nothing interrupts that
   if(D.drop){ updateDrop(dt); if(D.drop && D.drop.locks) return; }
@@ -12116,6 +12350,7 @@ function updateDrop(dt){
       X.shakeT=[14,20,28][X.stage];
       X.noticed += [12,20,30][X.stage] + (G.body&&G.body.booty? G.body.booty*1.6 : 8);
       slapKick([0.42,0.72,1.15][X.stage]);
+      try{ sfx('slap'); }catch(e){}
       for(let i=0;i<1+X.stage;i++)
         D.hearts.push({x:D.x+rnd(-5,5),y:180,vy:0.5+X.stage*0.12,life:40+X.stage*10,c:'#ff9ad8'});
       if(X.stage>=2) X.stage=-1;                 // and it cycles back round
@@ -12142,6 +12377,7 @@ function updateDrop(dt){
     if(!X.landed && X.t>=16){ X.landed=true;
       const be=((G.body&&G.body.booty)||5);
       slapKick(1.05+be*0.10);
+      try{ sfx('slap'); }catch(e){}
       G.slapsAll=(G.slapsAll||0)+1; }
     if(X.t>96){ X.ph='caught'; X.t=0; X.deliberate=true; }
   } else if(X.ph==='ignored'){
@@ -12348,6 +12584,7 @@ function updateHusbandMove(dt){
     H.landed=true;
     const be=((G.body&&G.body.booty)||5);
     slapKick((H.kind==='romantic'? 1.35 : 1.0) + be*0.10);
+    try{ sfx(H.kind==='romantic'? 'slapBig' : 'slap'); }catch(e){}
     const v = H.kind==='romantic'? romanticVerdict() : slapVerdict('villa');
     H.v=v;
     G.wifeRel=clamp(G.wifeRel+(v.bond||0),0,bondCeiling());
@@ -12881,10 +13118,12 @@ function ardorSpots(){
   // the atrium is the only one the household can walk in on — so it is the only
   // one privacy can shut. A door is exactly what the other three are FOR.
   const blocked = privacyNeeded('romantic')? privacyRefusal('romantic') : null;
+  const occ=roomsOccupiedToday();
+  const taken=(r)=>occ[r]? ('taken — '+occ[r].name+' & '+occ[r].spouse) : null;
   out.push({id:'here', name:'BEND HERE',  icon:'🏛', note:'Where you are standing.',  block:blocked});
-  out.push({id:'bed',  name:'BED CHAMBER',icon:'🛏', note:'A door, and it shuts.',    block:null});
-  if(G.hasPool)     out.push({id:'pool',    name:'THE BATH',    icon:'🛁', note:'Warm, and empty at this hour.', block:null});
-  if(G.hasWardrobe) out.push({id:'wardrobe',name:'THE WARDROBE',icon:'🚪', note:'Undignified. Quick. Hers.',     block:null});
+  out.push({id:'bed',  name:'BED CHAMBER',icon:'🛏', note:'A door, and it shuts.',    block:taken('bed'), occ:!!occ.bed});
+  if(G.hasPool)     out.push({id:'pool',    name:'THE BATH',    icon:'🛁', note:'Warm, and empty at this hour.', block:taken('pool'), occ:!!occ.pool});
+  if(G.hasWardrobe) out.push({id:'wardrobe',name:'THE WARDROBE',icon:'🚪', note:'Undignified. Quick. Hers.',     block:taken('wardrobe'), occ:!!occ.wardrobe});
   out.forEach(sp=>sp.fav=(sp.id===fav));
   return out;
 }
@@ -12933,7 +13172,8 @@ function updateArdor(dt){
     if(consume('d')){ X.sel=(X.sel+1)%S.length;          try{ sfx('ui'); }catch(e){} }
     if(consume('space')||consume('attack')){
       const sp=S[X.sel];
-      if(sp.block){ toast(sp.block,3200); try{ sfx('thud'); }catch(e){} }
+      if(sp.block){ toast(sp.occ? ('🚪 '+sp.block+'. Pick another door.') : sp.block, 3200);
+        try{ sfx('deny'); }catch(e){} }
       else { X.chose=sp; X.ph='go'; X.t=0; }
     }
     if(consume('l')){ D.ardor=null; D.wifePause=0;
@@ -12964,6 +13204,12 @@ function ardorResolve(spot){
   toast('🏛 “Not in the atrium. '
     + ({bed:'Come to bed.', pool:'…the bath, then.', wardrobe:'In there. NOW.'}[place]||'Come on.')
     + '”'+tail, 3400);
+  refreshStatbar();
+  /* HE TAKES HER THERE. It used to cut straight to the scene, so the whole
+     business of crossing your own hall with your wife never happened — and
+     if the room was occupied you found out through a toast instead of by
+     standing at the door with her still in your arms. */
+  if(startEscort(place)) return;
   spendLove(bedLen); saveQuiet(); DM=null;
   startBedScene('fun', bedLen, place);
 }
@@ -13004,15 +13250,25 @@ function drawArdor(){
     const tot=n*cw+(n-1)*gap, x0=W/2-tot/2, cy=H-58;
     S.forEach((sp,i)=>{
       const cx=x0+i*(cw+gap), on=(i===X.sel), dead=!!sp.block, taken=(X.ph==='go'&&X.chose===sp);
-      px(cx,cy,cw,40, taken? '#5a4426' : on? '#3a2c1a' : '#231a12');
-      const edge = taken? '#ffe8c0' : on? '#e8c34a' : '#4a3826';
+      px(cx,cy,cw,40, taken? '#5a4426' : dead? '#2a1614' : on? '#3a2c1a' : '#231a12');
+      const edge = taken? '#ffe8c0' : dead? '#8a3a34' : on? '#e8c34a' : '#4a3826';
       px(cx,cy,cw,1,edge); px(cx,cy+39,cw,1,edge);
       px(cx,cy,1,40,edge); px(cx+cw-1,cy,1,40,edge);
-      if(sp.fav){ px(cx+cw-9,cy+3,6,6,'#ff7ab0'); px(cx+cw-8,cy+4,4,1,'#ffd0e4'); }
+      if(sp.fav && !dead){ px(cx+cw-9,cy+3,6,6,'#ff7ab0'); px(cx+cw-8,cy+4,4,1,'#ffd0e4'); }
       pixelText(sp.icon+' '+sp.name, cx+cw/2, cy+11,
-        dead? 'rgba(160,150,150,.75)' : on? '#ffce7a' : 'rgba(232,227,194,.85)', 0.9);
-      pixelText(dead? 'not with them in here' : sp.note, cx+cw/2, cy+26,
-        dead? 'rgba(200,120,120,.85)' : 'rgba(200,190,170,.7)', 0.8);
+        dead? 'rgba(190,120,116,.85)' : on? '#ffce7a' : 'rgba(232,227,194,.85)', 0.9);
+      pixelText(dead? sp.block : sp.note, cx+cw/2, cy+26,
+        dead? 'rgba(224,112,104,.95)' : 'rgba(200,190,170,.7)', 0.8);
+      /* CROSSED OUT, IN RED. A greyed label is easy to miss at this size —
+         a room you cannot have gets a line straight through it and a cross
+         in the corner, which reads instantly. */
+      if(dead){
+        px(cx+3, cy+19, cw-6, 2, 'rgba(200,60,54,.85)');
+        px(cx+3, cy+19, cw-6, 1, 'rgba(255,120,110,.9)');
+        for(let d2=0; d2<7; d2++){                       // a small ✕ in the top-left
+          px(cx+4+d2, cy+4+d2, 2, 1, '#e0705b');
+          px(cx+10-d2, cy+4+d2, 2, 1, '#e0705b'); }
+      }
     });
     if(X.ph==='ask')
       pixelText('A / D choose  ·  SPACE go  ·  L think better of it', W/2, H-13,
@@ -13611,7 +13867,8 @@ function updateRomantic(dt){
      stopped moving. */
   const be=((G.wife&&G.wife.body&&G.wife.body.booty)||5);
   for(let n=0;n<STRIKES.length;n++)
-    if(was<STRIKES[n] && S.t>=STRIKES[n]) slapKick((1.35 + be*0.10)*(n===0?1:0.82));
+    if(was<STRIKES[n] && S.t>=STRIKES[n]){ slapKick((1.35 + be*0.10)*(n===0?1:0.82));
+      try{ sfx('slapBig'); }catch(e){} }
   if(S.t>446){ const v=S.v;
     toast((v.k==='love'?'💞 ':v.k==='return'?'🔥 ':v.k==='ok'?'💞 ':'💢 ')+v.t
       +'  ('+(v.bond>=0?'+':'')+v.bond+' 💞, '+(v.phys>=0?'+':'')+v.phys+' 🔥)', 5200);
@@ -13842,6 +14099,7 @@ function updateSlap(dt){
   if(was<16 && S.t>=16){                                   // the hand lands: kick the spring
     const be=((G.wife&&G.wife.body&&G.wife.body.booty)||5);
     slapKick(0.85 + be*0.075);                             // and a bigger tier carries more of it
+    try{ sfx('slap'); }catch(e){}                          // and it is finally audible
   }
   if(S.t>132){ toast((S.v.k==='love'?'👋💞 ':S.v.k==='bad'||S.v.k==='cold'?'👋💢 ':'👋 ')
       + S.v.t + '  ('+(S.v.bond>=0?'+':'')+S.v.bond+' 💞'
@@ -14493,6 +14751,7 @@ function drawDomus(){
       else if(D.rise){ /* the rise draws him where HE is */ }
       else if(D.husb){ /* his own move draws both of them */ }
       else if(D.drop && D.drop.ph!=='fall'){ /* the drop draws him where HE is, not where he idles */ }
+      else if(D.escort){ /* the escort draws BOTH of them, in the hold */ }
       else if(w.male) drawHusbandFig(ctx,D.wifeX,FY,G.wifeRel|0,w.skin,w.dress,w,wPh,wMode);
       else drawWifeFig(ctx,D.wifeX,FY,w,wPh,wMode);
     }
@@ -14534,7 +14793,9 @@ function drawDomus(){
     if(D.husb) drawHusbandMove();                       // he crossed the room without being asked
     if(D.drop) drawDrop();                              // the floor, her, and him crossing to it
     if(D.ardor) drawArdor();                            // 🏛 and it is your own fault this time
-    if(!D.rslap && !D.husb && !D.ardor && !(D.rise && D.rise.ph!=='build')
+    if(D.escort) drawEscort();                          // he is taking her somewhere
+    if(D.gripe) drawRoomComplaint();                    // and somebody small has a grievance
+    if(!D.rslap && !D.husb && !D.ardor && !D.escort && !(D.rise && D.rise.ph!=='build')
        && !(D.drop && D.drop.ph!=='fall')){ const mv=(held.a||held.d), run=mv&&held.s, turning=(D.turn||0)>0;
       drawDomusPlayer(D.x,FY,
         turning? 1-(D.turn/14) : (mv? D.t*(run?0.6:0.35) : 0),
@@ -17772,6 +18033,289 @@ function myBedTitle(){
   // G.woohooAll counts completed scenes; a month is three days on this calendar
   const perMonth = (G.woohooAll||0) / Math.max(1, days/3);
   return bedTitle(perMonth, kids);
+}
+/* =====================================================================
+   THE ESCORT — he takes her to the room, and HOW he does it is the whole
+   character of the marriage.
+   ---------------------------------------------------------------------
+   Five poses off the same ladder that names the house. A couple who have
+   done this twice a year on the correct festivals do not walk to the
+   bedchamber the same way as a couple the neighbours have stopped
+   complaining about.
+   ===================================================================== */
+const ESCORT_POSES=[
+  {id:'stiff',    tier:0, lab:'…', speed:0.62,
+   note:'He walks a pace ahead. Neither of them says anything.'},
+  {id:'hand',     tier:1, lab:'♥', speed:0.80,
+   note:'He takes her hand at the door, the way he was taught to.'},
+  {id:'lead',     tier:2, lab:'♥', speed:1.05,
+   note:'She is walking; he is walking rather faster.'},
+  {id:'shoulder', tier:3, lab:'♥♥', speed:1.35,
+   note:'He has simply picked her up. She has stopped objecting to this.'},
+  {id:'bridal',   tier:4, lab:'♥♥♥', speed:1.70,
+   note:'He is running. She is laughing. The household has seen this before.'},
+];
+// which pose this house has earned
+function escortPose(){
+  const t=myBedTitle();
+  const ai=ARD_TITLES.indexOf(t.ard), ki=KID_TITLES.indexOf(t.kids);
+  const aN=ai/(ARD_TITLES.length-1), kN=ki/(KID_TITLES.length-1);
+  const heat=Math.max(aN,kN);                       // the louder of the two facts
+  const i=clamp(Math.floor(heat*ESCORT_POSES.length), 0, ESCORT_POSES.length-1);
+  return ESCORT_POSES[i];
+}
+/* HER, CARRIED — purpose-built, because a rotated standing figure does not
+   work. drawWifeFig's silhouette is dominated by the flare of the gown; turn
+   it eighty-five degrees and you get a purple slab with the head and legs
+   swallowed inside it. A carried body needs its own compact geometry, laid
+   out along the horizontal, with the head and the feet at opposite ends
+   where you can actually see them. */
+function drawCarriedFem(cx, cy, w, T, kind, dir){
+  const skin=w.skin||'#e6bd94', sSh=shade(skin,-26), sHi=shade(skin,20);
+  const dress=w.dress||'#a8407a', dSh=shade(dress,-24), dHi=shade(dress,26);
+  const hair=w.hair||'#5a3a1e', hHi=shade(hair,26);
+  const B=w.body||{}, gv=(id,d)=>B[id]===undefined?d:B[id];
+  const bu=gv('bust',6), be=gv('booty',6), lg=gv('legs',6);
+  const legL=Math.round(10+lg*0.5);
+  ctx.save(); ctx.translate(Math.round(cx), Math.round(cy)); if(dir<0) ctx.scale(-1,1);
+  const P=(a,b,ww,hh,c)=>{ ctx.fillStyle=c;
+    ctx.fillRect(Math.round(a),Math.round(b),Math.round(ww),Math.round(hh)); };
+  const sway=Math.sin(T*0.22)*0.9;
+
+  if(kind==='shoulder'){
+    /* head-forward over his shoulder, legs hanging down his back. Everything
+       is drawn from his shoulder point outward, so it sits on him. */
+    // --- the legs, hanging behind ---
+    P(-30,-6+sway, 15, 10, dress); P(-30,-6+sway,15,1,dHi); P(-30,3+sway,15,1,dSh);
+    P(-40,-5+sway, 11, 4, skin);  P(-40,-5+sway,11,1,sHi);        // near shin
+    P(-40,-1+sway, 11, 4, sSh);                                    // far shin
+    P(-45,-6+sway, 5, 5, '#8a5c34'); P(-45,-6+sway,5,1,'#a87446'); // sandals
+    P(-45,-1+sway, 5, 4, '#6a4426');
+    // --- the seat, over his shoulder line, by tier ---
+    const bw=Math.round(8+be*0.5);
+    P(-20,-9+sway, bw, 12, dress); P(-20,-9+sway,bw,2,dHi); P(-20,2+sway,bw,1,dSh);
+    // --- the torso, running forward ---
+    P(-9,-8+sway, 16, 10, dress); P(-9,-8+sway,16,1,dHi);
+    P(-9,1+sway, 16, 1, dSh);
+    if(bu>=4){ const q=Math.round(2+bu*0.32);                      // pressed against him
+      P(-2, 1+sway, q+3, q, dress); P(-2, 1+sway, q+3, 1, dSh); }
+    // --- the head, upright and looking back at the room ---
+    P(8,-12+sway, 8, 9, skin); P(8,-12+sway,8,1,sHi); P(15,-11+sway,1,8,sSh);
+    P(7,-14+sway, 10, 3, hair); P(7,-14+sway,10,1,hHi);            // hair, falling forward
+    P(6,-11+sway, 2, 8, hair); P(16,-11+sway, 2, 6, hair);
+    P(10,-9+sway, 2,2,'#241408'); P(13,-9+sway, 2,2,'#241408');    // eyes
+    P(11,-6+sway, 3,1,'#a8524a');                                  // and entirely unbothered
+    // --- an arm down his back ---
+    P(-13,-10+sway, 3, 12, skin); P(-13,-10+sway,1,12,sHi);
+    P(-14, 1+sway, 5, 3, skin);
+    ctx.restore(); return;
+  }
+
+  /* BRIDAL — cradled across both forearms, facing up, knees bent. */
+  P(-16,-4+sway, 34, 3, sSh);                                      // the shadow of his arms
+  // --- the legs, folded up at the knee ---
+  P(10,-7+sway, 13, 9, dress); P(10,-7+sway,13,1,dHi);             // thigh
+  P(19,-16+sway, 6, 11, dress); P(19,-16+sway,6,1,dHi);            // shin, angled up
+  P(19,-19+sway, 7, 4, skin);  P(19,-19+sway,7,1,sHi);             // her ankles
+  P(18,-22+sway, 8, 4, '#8a5c34'); P(18,-22+sway,8,1,'#a87446');   // and a sandal on top
+  // --- the seat and the small of her back ---
+  const bw2=Math.round(8+be*0.46);
+  P(2,-9+sway, bw2, 11, dress); P(2,-9+sway,bw2,2,dHi); P(2,1+sway,bw2,1,dSh);
+  // --- the torso ---
+  P(-12,-10+sway, 15, 11, dress); P(-12,-10+sway,15,2,dHi); P(-12,0+sway,15,1,dSh);
+  if(bu>=4){ const q=Math.round(2+bu*0.34);                        // facing up
+    P(-6,-12-q+sway, q+4, q+2, dress); P(-6,-12-q+sway,q+4,1,dHi); }
+  // --- the head, tipped back against his chest ---
+  P(-22,-12+sway, 9, 9, skin); P(-22,-12+sway,9,1,sHi); P(-14,-11+sway,1,8,sSh);
+  P(-24,-15+sway, 12, 4, hair); P(-24,-15+sway,12,1,hHi);
+  P(-26,-12+sway, 3, 9, hair); P(-27,-4+sway, 4, 3, hair);         // hair falling away
+  P(-20,-9+sway, 2,2,'#241408'); P(-17,-9+sway, 2,2,'#241408');
+  P(-19,-6+sway, 4,1,'#b8484f');                                   // laughing
+  // --- her arm up around his neck ---
+  P(-20,-18+sway, 3, 7, skin); P(-20,-18+sway,1,7,sHi);
+  P(-19,-21+sway, 6, 3, skin); P(-19,-21+sway,6,1,sHi);
+  ctx.restore();
+}
+/* draw the pair, mid-walk, in one of the five holds. `dir` is +1 walking
+   right. Both figures are the real sprites — the pose is in how they are
+   placed and what the arms do, not in a separate set of art. */
+function drawEscortPair(x, FY, T, pose, dir, look, wife){
+  const ph=T*0.30*(pose.speed||1);
+  const step=Math.abs(Math.sin(ph))*1.6;
+  const S2=(a)=>x+a*dir;                            // mirror the whole arrangement
+  const drawHim=(hx,hy,mode)=>{ ctx.save(); ctx.translate(hx,hy); if(dir<0) ctx.scale(-1,1);
+    drawHusbandFig(ctx,0,0,G.wifeRel|0,null,null,look,ph,mode); ctx.restore(); };
+  const drawHer=(wx,wy,mode,rot)=>{ ctx.save(); ctx.translate(wx,wy);
+    if(dir<0) ctx.scale(-1,1);
+    if(rot) ctx.rotate(rot);
+    drawWifeFig(ctx,0,0,wife,ph,mode); ctx.restore(); };
+  const skin=G.skin||'#caa06a';
+
+  if(pose.id==='stiff'){
+    // a pace ahead, not touching, and both of them very aware of it
+    drawHer(S2(-22), FY-step*0.5, 'walk');
+    drawHim(S2(0),   FY-step,     'walk');
+    ctx.textAlign='center';
+    pixelText('…', S2(-11), FY-72, 'rgba(200,200,210,.6)', 0.9);
+    ctx.textAlign='left';
+  }
+  else if(pose.id==='hand'){
+    // side by side, hands joined between them
+    drawHer(S2(-17), FY-step*0.7, 'walk');
+    drawHim(S2(0),   FY-step,     'walk');
+    const hy=FY-34;
+    px(S2(-13), hy, 13*Math.abs(dir), 2, skin);              // the joined arms
+    px(S2(-13), hy, 13*Math.abs(dir), 1, shade(skin,20));
+    px(S2(-9),  hy-1, 3, 4, skin);
+  }
+  else if(pose.id==='lead'){
+    // he has her by the wrist and is not slowing down
+    drawHer(S2(-19), FY-step*0.5, 'walk');
+    drawHim(S2(0),   FY-step,     'run');
+    const hy=FY-38;
+    px(S2(-15), hy, 15*Math.abs(dir), 2, skin);              // a taut arm between them
+    px(S2(-15), hy, 15*Math.abs(dir), 1, shade(skin,22));
+    px(S2(-16), hy-1, 3, 4, skin);                           // her wrist, caught
+    ctx.textAlign='center';
+    pixelText('!', S2(-24), FY-70, 'rgba(255,208,122,.75)', 0.85);
+    ctx.textAlign='left';
+  }
+  else if(pose.id==='shoulder'){
+    // over one shoulder, entirely off her feet
+    drawHim(S2(0), FY-step, 'walk');
+    drawCarriedFem(S2(2), FY-56-step, wife, T, 'shoulder', dir);
+    px(S2(-4), FY-50-step, 10*Math.abs(dir), 3, skin);        // his arm locked over her legs
+    px(S2(-4), FY-50-step, 10*Math.abs(dir), 1, shade(skin,20));
+  }
+  else {  // bridal
+    drawHim(S2(0), FY-step*1.3, 'run');
+    drawCarriedFem(S2(4), FY-44-step*1.3, wife, T, 'bridal', dir);
+    px(S2(-13), FY-40-step*1.3, 22*Math.abs(dir), 3, skin);   // both forearms under her
+    px(S2(-13), FY-40-step*1.3, 22*Math.abs(dir), 1, shade(skin,20));
+    if(((T|0)%9)<1) DM.hearts.push({x:S2(-2), y:FY-62, vy:0.55, life:44, c:'#ff9ad8'});
+  }
+}
+/* ---------------------------------------------------------------------
+   THE WALK ITSELF. He crosses the hall with her to whichever door, and
+   what happens when he gets there depends on whether it is free.
+   --------------------------------------------------------------------- */
+const ROOM_DOOR_X={bed:414, pool:86, wardrobe:309};
+function startEscort(room, after){
+  const D=DM; if(!D) return false;
+  if(!G.married || !G.wife || G.isFemale || G.wife.male) return false;
+  D.escort={ t:0, room, pose:escortPose(), ph:'walk',
+             x:D.x, tx:(ROOM_DOOR_X[room]===undefined?414:ROOM_DOOR_X[room]),
+             occ:roomOccupant(room), after:after||null, locks:true };
+  D.wifePause=99999;
+  try{ sfx('ui'); }catch(e){}
+  return true;
+}
+const ESCORT_TURNED_AWAY=[
+  '“…it is TAKEN.” He puts her down. Nobody has moved for several seconds.',
+  'The latch is thrown from the inside. He stares at it as though it has betrayed him personally.',
+  'He tries the handle twice, which does not help, and once more, which does not either.',
+];
+function updateEscort(dt){
+  const D=DM, E=D.escort; if(!E) return;
+  E.t+=dt;
+  if(E.ph==='walk'){
+    E.locks=true;
+    const sp=1.05*(E.pose.speed||1)*dt;
+    const d=E.tx-E.x;
+    E.x += Math.sign(d)*Math.min(Math.abs(d), sp);
+    D.x=E.x; D.wifeX=E.x-19*Math.sign(E.tx-(E.startX===undefined?(E.startX=E.x):E.startX)||1);
+    if(Math.abs(E.tx-E.x)<2){ E.ph = E.occ? 'barred' : 'enter'; E.t=0; }
+    if(E.t>900){ E.ph = E.occ? 'barred' : 'enter'; E.t=0; }   // a floor, so it cannot wedge
+  }
+  else if(E.ph==='barred'){
+    /* THE FULL HOUSE. He has carried her the whole way and the door is
+       already shut — so he is still standing there, still dressed, with
+       an armful of wife and nowhere to put her. */
+    E.locks=true;
+    if(E.t===dt || E.t<=dt){ try{ sfx('deny'); }catch(e){} }
+    if(E.t>170){
+      const o=E.occ;
+      D.escort=null; D.wifePause=0;
+      G.wifeRel=clamp(G.wifeRel-1,0,bondCeiling());
+      toast('🚪 '+pick(ESCORT_TURNED_AWAY)+'  ('+o.name+' and '+o.spouse+' are in there.)', 5200);
+      // and the children have opinions about the queue
+      if(typeof maybeRoomComplaint==='function') maybeRoomComplaint(true);
+      saveQuiet();
+    }
+  }
+  else if(E.ph==='enter'){
+    E.locks=true;
+    if(E.t>60){
+      const room=E.room, after=E.after;
+      D.escort=null; D.wifePause=0;
+      try{ sfx('door'); }catch(e){}
+      if(after){ after(room); return; }
+      if(room==='here'){ startVillaLove(D.wifeX, true, true); return; }
+      spendLove(bedLen); saveQuiet(); DM=null; startBedScene('fun', bedLen, room);
+    }
+  }
+}
+function drawEscort(){
+  const D=DM, E=D.escort; if(!E) return; const FY=214, T=D.t;
+  const dir = (E.tx>=(E.startX===undefined? E.x : E.startX))? 1 : -1;
+  const look=playerLook(), wife=G.wife;
+  drawEscortPair(E.x, FY, T, E.pose, dir, look, wife);
+  ctx.textAlign='center';
+  if(E.ph==='walk'){
+    pixelText(E.pose.note, W/2, 28, 'rgba(255,214,190,.9)', 1.0);
+    pixelText(E.pose.lab, E.x, FY-84, '#ff9ad8', 1.1);
+  } else if(E.ph==='barred'){
+    // the door, shut, with somebody behind it
+    pixelText('“…it is taken.”', W/2, 28, '#ff8a8a', 1.08);
+    if(E.occ) pixelText(E.occ.name+' & '+E.occ.spouse+' are in there',
+      W/2, 42, 'rgba(255,190,190,.85)', 0.9);
+    const k=Math.sin(T*0.7)*1.4;
+    px(E.tx-4+k, FY-70, 3, 3, '#e0705b');            // a knock that gets no answer
+  } else {
+    pixelText('♥', E.x, FY-84, '#ff9ad8', 1.3);
+  }
+  ctx.textAlign='left';
+}
+/* ---------------------------------------------------------------------
+   AND THE CHILDREN HAVE OPINIONS ABOUT THE QUEUE
+   --------------------------------------------------------------------- */
+const ROOM_COMPLAINTS=[
+  '“Dad. DAD. It is ALWAYS occupied. Tell somebody to get out so I can have my turn!”',
+  '“There are four of us and three doors and I have done the arithmetic.”',
+  '“I have been holding this scroll outside that door for an HOUR.”',
+  '“Why does everyone in this house need a ROOM all the time?”',
+  '“I am going to go and live in the stable. At least the stable is FREE.”',
+  '“Can we build another one? A whole other room? Please?”',
+];
+function maybeRoomComplaint(force){
+  const D=DM; if(!D) return false;
+  const kids=livingKids().filter(c=>kidBand(c)!=='baby' && !c.wed);
+  if(!kids.length) return false;
+  const taken=Object.keys(roomsOccupiedToday()).length;
+  if(!force && taken<2) return false;                 // one shut door is not a crisis
+  if(!force && Math.random()>0.5) return false;
+  D.gripe={ t:0, who:pick(kids), line:pick(ROOM_COMPLAINTS) };
+  try{ sfx('baby'); }catch(e){}
+  return true;
+}
+function updateRoomComplaint(dt){
+  const D=DM; if(!D.gripe) return;
+  D.gripe.t+=dt; if(D.gripe.t>300) D.gripe=null;
+}
+function drawRoomComplaint(){
+  const D=DM, C=D.gripe; if(!C) return; const FY=214, T=C.t;
+  const a=Math.min(1,T/18)*Math.min(1,(300-T)/40);
+  const kx=clamp(120+Math.sin(T*0.03)*8, 40, 440);
+  ctx.globalAlpha=a;
+  ctx.save(); ctx.translate(kx,FY);
+  try{ drawChildFigure(ctx,0,0,C.who, T*0.2, 'idle'); }catch(e){}
+  ctx.restore();
+  ctx.textAlign='center';
+  pixelText('▾', kx, FY-70, 'rgba(255,208,122,'+a.toFixed(2)+')', 1);
+  pixelText(C.line, W/2, 46, 'rgba(255,230,180,'+a.toFixed(2)+')', 0.98);
+  pixelText('— '+kidName(C.who), W/2, 58, 'rgba(232,195,74,'+(a*0.8).toFixed(2)+')', 0.8);
+  ctx.textAlign='left';
+  ctx.globalAlpha=1;
 }
 function suitorPortrait(s, size){
   const cv=document.createElement('canvas'); cv.width=size||54; cv.height=Math.round((size||54)*1.34);
@@ -21128,6 +21672,9 @@ window.__SS = {
   makeSuitorFor, suitorForecast, weddChild, houseGuestBusy, suitorsAvailable,
   roomsOccupiedToday, roomOccupant, drawDoor, HOUSE_ROOMS, tryWardrobe, tryPoolInvite, openTree,
   ARD_TITLES, KID_TITLES, bedTitle, myBedTitle, pickTitle,
+  sfx, blip, hiss, audioBus, revSend,
+  ESCORT_POSES, escortPose, drawEscortPair, startEscort, updateEscort, drawEscort, drawCarriedFem,
+  ROOM_COMPLAINTS, maybeRoomComplaint, updateRoomComplaint, drawRoomComplaint, ROOM_DOOR_X,
   makeCheatSuitor, summonCheatSuitor,
   openSuitorHall, openWeddingChoice, buildSuitorCard, buildKidHousesCard, SUITOR_STYLE,
   SIBLING_LINES, siblingAside, drawDomus, romanticSwing, STRIKES,
