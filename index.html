@@ -2655,7 +2655,7 @@ const WIFE_QUIRKS=[
    up:'she will warn you off a genuinely bad day',  down:'and forbid a genuinely good one', m:{desc:'Birds, livers, the direction of smoke. He checks.', up:'he will warn you off a genuinely bad day', down:'and forbid a genuinely good one'}},
   {id:'gossip',    name:'Queen of Gossip',   icon:'🍇', col:'#e0a0d8', ask:1.0,
    desc:'Every atrium in the district reports to her by noon.',
-   up:'you hear Rome’s news a day before Rome does', down:'and Rome hears yours the same way', m:{desc:'Every bath-house in the district reports to him by noon.', up:'you hear Rome’s news a day before Rome does', down:'and Rome hears yours the same way'}},
+   up:'you hear Rome’s news a day before Rome does', down:'and Rome hears yours the same way', m:{name:'King of Gossip', desc:'Every bath-house in the district reports to him by noon.', up:'you hear Rome’s news a day before Rome does', down:'and Rome hears yours the same way'}},
   {id:'possessive',name:'Possessive',        icon:'💗', col:'#ff7ab0', ask:1.6,
    desc:'She loves you and would like that on the record.',
    up:'the bond grows quickly and does not wander', down:'every call-out in the street costs double jealousy', m:{desc:'He loves you and would like that on the record.', up:'the bond grows quickly and does not wander', down:'every call-out in the street costs double jealousy'}},
@@ -2710,15 +2710,18 @@ const WIFE_BOONS=[
    eff:'the bond in this house does not decay, and never has'},
   {id:'goldenwomb',name:'Golden-Wombed',      icon:'🥚', col:'#ffd76a',
    desc:'Her mother bore nine. Her grandmother bore eleven.',
+   m:{name:'Sire of Sons', desc:'His father bore nine. His grandfather bore eleven.'},
    eff:'heirs come nearly twice as readily, and twins are possible'},
   {id:'medica',    name:'The Medicus’ Daughter',icon:'⚕', col:'#8ae0c0',
    desc:'She grew up handing her father the hooks.',
+   m:{name:'The Medicus’ Son', desc:'He grew up handing his father the hooks.'},
    eff:'wounds close in half the days; upkeep climbs sharply'},
   {id:'purpleborn',name:'Born to the Purple', icon:'👑', col:'#e0a0ff',
    desc:'There is imperial blood in her, and the palace has not forgotten.',
    eff:'+18 political tolerance, and the Guard thinks twice'},
   {id:'mercatrix', name:'The Merchant Queen', icon:'🏦', col:'#e8c34a',
    desc:'She runs her father’s ships and has never once lost money.',
+   m:{name:'The Merchant Prince', desc:'He runs his father’s ships and has never once lost money.'},
    eff:'the estate earns half again as much, every single day'},
 ];
 const WIFE_BANES=[
@@ -2763,6 +2766,13 @@ function hasMyTrait(id){ return !!(G && G.traits && G.traits.includes(id)); }
    for her — "a girl whose whole job is her hair" — and a man married into the
    house got it verbatim. Each one carries an `m` variant now, and three of them
    exist only for him. */
+/* a boon/bane/quirk whose wording is female-only carries an m:{} override;
+   this returns whichever form belongs to the person being described. */
+function sexText(O, field, male){
+  if(!O) return '';
+  if(male && O.m && O.m[field]) return O.m[field];
+  return O[field];
+}
 function qText(Q, field, male){
   if(male===undefined) male=!!(G && G.wife && G.wife.male);
   if(male && Q.m && Q.m[field]) return Q.m[field];
@@ -2832,25 +2842,53 @@ function traitChip(kind, icon, name, tip, col){
               + `align-items:center;justify-content:center;background:${C};color:#120c08;border-radius:1px">${K.sign}</span>`;
   return `<span title="${(tip||'').replace(/"/g,'&quot;')}" style="${base}${box}font-weight:${weight}">${badge}${icon} ${name}</span>`;
 }
+/* =====================================================================
+   A TRAIT THAT BELONGS TO THE OTHER SEX IS NOT YOURS
+   ---------------------------------------------------------------------
+   Two of the traits are sexed — 🍑 Tempting is a wife's and 🏛 Priapic is
+   a husband's — and three separate paths were handing them to the wrong
+   person. inheritDNA pooled BOTH parents' traits without knowing the
+   child's sex, so a son carried his mother's Tempting for life; the
+   "make me impossible" cheat assigned literally every trait in the table
+   regardless of who you were; and succession copied whatever the heir had
+   inherited straight onto the player.
+
+   Filtered at the source now, AND at the two render paths — the render
+   filter is what repairs a save that already has one stored.
+   ===================================================================== */
+function traitsForSex(list, male){
+  if(!Array.isArray(list)) return [];
+  return list.filter(id=>{
+    const T=traitById(id);
+    if(!T) return true;                       // unknown ids are somebody else's business
+    if(T.male   && !male) return false;
+    if(T.female &&  male) return false;
+    return true;
+  });
+}
 function traitsHtml(w){
   const out=[];
+  w=Object.assign({}, w, {traits:traitsForSex(w.traits, !!w.male)});
   for(const x of (w.boons||[])){ const B=boonById(x); if(B)
-    out.push(traitChip('boon', B.icon, B.name, B.desc+'  ▲ '+B.eff, B.col)); }
+    out.push(traitChip('boon', B.icon, sexText(B,'name',w.male),
+      sexText(B,'desc',w.male)+'  ▲ '+B.eff, B.col)); }
   for(const t of (w.traits||[])){ const T=traitById(t);
     out.push(traitChip('good', T?T.icon:'✦', T?T.name:t, T?T.desc:'')); }
   for(const q of (w.quirks||[])){ const Q=quirkById(q);
     if(!Q) continue;
-    out.push(traitChip('quirk', Q.icon, Q.name, qText(Q,'desc',w.male)+'  ▲ '+qText(Q,'up',w.male)+'   ▼ '+qText(Q,'down',w.male), Q.col)); }
+    out.push(traitChip('quirk', Q.icon, qText(Q,'name',w.male), qText(Q,'desc',w.male)+'  ▲ '+qText(Q,'up',w.male)+'   ▼ '+qText(Q,'down',w.male), Q.col)); }
   for(const f of (w.flaws||[])){ const F=flawById(f);
     out.push(traitChip('bad', F?F.icon:'✖', F?F.name:f, F?F.desc:'')); }
   for(const x of (w.banes||[])){ const N=baneById(x); if(N)
-    out.push(traitChip('bane', N.icon, N.name, N.desc+'  ▼ '+N.eff, N.col)); }
+    out.push(traitChip('bane', N.icon, sexText(N,'name',w.male),
+      sexText(N,'desc',w.male)+'  ▼ '+N.eff, N.col)); }
   if(!out.length) return '<span class="muted">nothing remarkable, good or bad</span>';
   return out.join('');
 }
 // the long form, for a screen with room for it — every chip with its own line
 function traitsDetailHtml(w){
   const rows=[];
+  w=Object.assign({}, w, {traits:traitsForSex(w.traits, !!w.male)});
   const line=(kind,icon,name,body,col)=>{
     const C=col||(kind==='good'?'#7ad48a':kind==='quirk'?'#e8c34a':'#e0705b');
     rows.push(`<div style="display:flex;gap:5px;align-items:flex-start;margin-top:3px">
@@ -2858,14 +2896,16 @@ function traitsDetailHtml(w){
       <span class="small muted" style="flex:1 1 auto">${body}</span></div>`);
   };
   for(const x of (w.boons||[])){ const B=boonById(x); if(B)
-    line('boon',B.icon,B.name,`${B.desc}<br><span style="color:#ffd76a">▲ ${B.eff}</span>`, B.col); }
+    line('boon',B.icon,sexText(B,'name',w.male),
+      `${sexText(B,'desc',w.male)}<br><span style="color:#ffd76a">▲ ${B.eff}</span>`, B.col); }
   for(const t of (w.traits||[])){ const T=traitById(t); if(T) line('good',T.icon,T.name,T.desc); }
   for(const q of (w.quirks||[])){ const Q=quirkById(q); if(Q)
-    line('quirk',Q.icon,Q.name,`${qText(Q,'desc',w.male)}<br><span style="color:#7ad48a">▲ ${qText(Q,'up',w.male)}</span>
+    line('quirk',Q.icon,qText(Q,'name',w.male),`${qText(Q,'desc',w.male)}<br><span style="color:#7ad48a">▲ ${qText(Q,'up',w.male)}</span>
        <span style="color:#e0705b">▼ ${qText(Q,'down',w.male)}</span>`, Q.col); }
   for(const f of (w.flaws||[])){ const F=flawById(f); if(F) line('bad',F.icon,F.name,F.desc); }
   for(const x of (w.banes||[])){ const N=baneById(x); if(N)
-    line('bane',N.icon,N.name,`${N.desc}<br><span style="color:#ff7a7a">▼ ${N.eff}</span>`, N.col); }
+    line('bane',N.icon,sexText(N,'name',w.male),
+      `${sexText(N,'desc',w.male)}<br><span style="color:#ff7a7a">▼ ${N.eff}</span>`, N.col); }
   if(!rows.length) return '<span class="muted">nothing remarkable, good or bad</span>';
   return rows.join('');
 }
@@ -2922,7 +2962,9 @@ function rollTraits(quality, male){
   return out;
 }
 // DNA — a child draws looks, wits and traits from BOTH parents, with a little chance of its own
-function inheritDNA(){
+function inheritDNA(male){
+  /* `male` is the child's sex. Without it the pool below mixed both parents'
+     traits blind, and a son inherited his mother's wife-only Tempting. */
   const w=G.wife||{}, mine={looks:G.looks===undefined?5:G.looks, smarts:G.smarts===undefined?5:G.smarts, traits:G.traits||[]};
   const wl=w.looks===undefined?5:w.looks, ws=w.smarts===undefined?5:w.smarts, wt=w.traits||[];
   const mix=(a,b)=>clamp(Math.round((a+b)/2 + rnd(-1.4,1.6)),1,10);   // averages, drifts a little either way
@@ -2932,7 +2974,10 @@ function inheritDNA(){
     const both = mine.traits.includes(t) && wt.includes(t);
     if(Math.random() < (both?0.92:0.5)) traits.push(t);
   }
-  if(!traits.length && Math.random()<0.25) traits.push(pick(WIFE_TRAITS).id);   // a trait of its own
+  if(!traits.length && Math.random()<0.25){
+    const own=WIFE_TRAITS.filter(t=>!(t.male&&!male) && !(t.female&&male));
+    if(own.length) traits.push(pick(own).id);                                   // a trait of its own
+  }
   // flaws run in families too
   const fpool=[...new Set([...(G.flaws||[]), ...(w.flaws||[])])], flaws=[];
   for(const f of fpool){ const both=(G.flaws||[]).includes(f) && (w.flaws||[]).includes(f);
@@ -2945,7 +2990,8 @@ function inheritDNA(){
     const a=(mb[id]===undefined?5:Math.min(mb[id],10)), b2=(fb[id]===undefined?5:Math.min(fb[id],10));
     body[id]=clamp(Math.round((a+b2)/2 + rnd(-1.6,1.8)),1,10);
   });
-  return {looks:mix(mine.looks,wl), smarts:mix(mine.smarts,ws), traits, flaws, body,
+  return {looks:mix(mine.looks,wl), smarts:mix(mine.smarts,ws),
+    traits:traitsForSex(traits, !!male), flaws, body,
     _face:body.face, _hairq:body.hairq, _build:body.bust,
     skin:(Math.random()<0.5? (G&&G.skin) : (w&&w.skin)) || (G&&G.skin) || '#caa06a',
     hair:(Math.random()<0.5? '#3a2618' : (w&&w.hair)) || '#3a2618' };
@@ -8144,7 +8190,7 @@ function openCheats(){
       x.style.borderColor='#ff7ae0'; x.style.color='#ff7ae0'; x.title=title||'';
       x.onclick=()=>{ fn(); refreshStatbar(); saveQuiet(); }; r0.appendChild(x); };
     big('⛧ MAKE **ME** IMPOSSIBLE','Every part of your own body past the human maximum — and it shows on every chart and every scene.',()=>{
-      G.body=rollPlayerBody(!G.isFemale, 10, true); G.smarts=10; G.traits=WIFE_TRAITS.map(t=>t.id); G.flaws=[];
+      G.body=rollPlayerBody(!G.isFemale, 10, true); G.smarts=10; G.traits=traitsForSex(WIFE_TRAITS.map(t=>t.id), !G.isFemale); G.flaws=[];
       G.hasBodyMap=true; syncPlayerLooks();
       toast(G.isFemale
         ? '⛧ A WAIST THAT DEFIES ANATOMY, huge above, and a booty that enters the room first. Nobody has ever looked like this.'
@@ -8164,7 +8210,7 @@ function openCheats(){
       openBodyMap(w,'map');
     });
     big('⛧ BOTH OF US','The pair of you, past the rule. The shadow-play will not know what to do with itself.',()=>{
-      G.body=rollPlayerBody(!G.isFemale, 10, true); G.smarts=10; G.traits=WIFE_TRAITS.map(t=>t.id); G.flaws=[]; syncPlayerLooks();
+      G.body=rollPlayerBody(!G.isFemale, 10, true); G.smarts=10; G.traits=traitsForSex(WIFE_TRAITS.map(t=>t.id), !G.isFemale); G.flaws=[]; syncPlayerLooks();
       if(!G.wife){ G.wife=makeBride('roman',true,10); G.married=true; G.marryPrompted=true; }
       const w=G.wife; w.tier='impossible'; w.quality=11; w.looks=IMPOSSIBLE_V; w.smarts=10; w.build='statuesque';
       w.body=makeImpossibleBody(); w.jewel=true; w.rank='noble'; w.traits=WIFE_TRAITS.map(t=>t.id); w.flaws=[];
@@ -8209,10 +8255,10 @@ function openCheats(){
     G.wifeRel=100; G.wifePhys=100; G.hygiene=100; G.jealousy=0; G.hasBodyMap=true;
     toast('⛧ SHE IS NOT PHYSICALLY POSSIBLE. Huge above, huge behind, a waist like a wasp — and every gift of blood at once.',5200); });
   btn(r,'+1 CHILD',()=>{ const son=Math.random()<0.5;
-    G.children.push(Object.assign({name:(son?pick(['Titus','Lucius','Gaius']):pick(['Julia','Livia','Aurelia']))+' '+G.name.split(' ')[0]+(son?'i filius':'a'), sex:son?'m':'f', born:G.day, rel:100}, inheritDNA())); });
+    G.children.push(Object.assign({name:(son?pick(['Titus','Lucius','Gaius']):pick(['Julia','Livia','Aurelia']))+' '+G.name.split(' ')[0]+(son?'i filius':'a'), sex:son?'m':'f', born:G.day, rel:100}, inheritDNA(son))); });
   btn(r,'FAMILY MAN TITLE',()=>{ G.familyMan=true; });
   btn(r,'⛧ MY OWN BODY — IMPOSSIBLE',()=>{ G.body=rollPlayerBody(!G.isFemale, 10, true); G.looks=IMPOSSIBLE_V; G.smarts=10;
-    G.traits=WIFE_TRAITS.map(t=>t.id); G.flaws=[]; G.hasBodyMap=true;
+    G.traits=traitsForSex(WIFE_TRAITS.map(t=>t.id), !G.isFemale); G.flaws=[]; G.hasBodyMap=true;
     toast(G.isFemale
       ? '⛧ A WAIST THAT DEFIES ANATOMY, huge above, and a booty that enters the room first. Nobody has ever looked like this.'
       : '⛧ THE BIGGEST, THE BROADEST, THE STRONGEST — and a measure no rule in Rome is long enough for.',5600); });
@@ -16798,7 +16844,10 @@ function succession(ch, path){
   // ---- DNA: the heir carries the blood of both parents into her own life ----
   G.looks = ch.looks===undefined?5:ch.looks;
   G.smarts= ch.smarts===undefined?5:ch.smarts;
-  G.traits= ch.traits||[]; G.flaws= ch.flaws||[];
+  /* `fem` is the HEIR's sex; G.isFemale is still the dead player's at this
+     point in the handover, so filtering against it would carry the wrong
+     sexed trait onto a daughter succeeding a father. */
+  G.traits= traitsForSex(ch.traits||[], !fem); G.flaws= ch.flaws||[];
   G.quirks= ch.quirks || rollQuirks();          // the heir is their own person too
   // ---- the daughter's chosen road ----
   const wasRoyal = !!(G.emperor || (G.titles && Object.keys(G.titles).length));
@@ -17649,20 +17698,57 @@ function treeNoble(b,H,kinCard,PRANK,KIN,KINCOL,opBar){
             +'<div class="small muted">🔥 '+f.ardLab.toLowerCase()+' · 🌾 '+f.kids+' expected'
             +' · 😤 '+f.offLab.toLowerCase()+'</div></div>' : '')
       + '<div class="small">'+traitsHtml(sp)+'</div>';
-    // ---- 12 · STANDING, and what you can spend it on ----
+    // ---- 12 · STANDING, drawn as a real gauge with the thresholds on it ----
     const st=inlawStanding(h.child), lab=standingLabel(st);
-    const sb=document.createElement('div'); sb.className='small'; sb.style.marginTop='4px';
-    sb.innerHTML='🤝 standing: '+opBar(st)+' <b style="color:'+lab.c+'">'+lab.t+'</b>';
+    const sb=document.createElement('div'); sb.style.marginTop='5px';
+    const ticks=[...new Set(INLAW_FAVOURS.map(f=>f.need+favourSurcharge(h.child)))].sort((a,b2)=>a-b2);
+    sb.innerHTML='<div class="small" style="display:flex;justify-content:space-between">'
+      +'<span>🤝 STANDING</span><b style="color:'+lab.c+'">'+lab.t+' · '+st+'</b></div>'
+      +'<div style="position:relative;height:10px;background:#120d08;border:1px solid #3a2c1e;'
+      +'border-radius:2px;overflow:hidden;margin-top:2px">'
+      +'<i style="display:block;height:100%;width:'+st+'%;background:linear-gradient(90deg,'
+        +(st>=65?'#4e7a34,#8ac06a':st>=45?'#8a6512,#e8c34a':'#7a3020,#e0705b')+')"></i>'
+      + ticks.map(t=>'<i style="position:absolute;left:'+t+'%;top:0;width:1px;height:100%;'
+          +'background:rgba(255,246,220,'+(st>=t?'.75':'.30')+')"></i>').join('')
+      +'</div>';
     info.appendChild(sb);
-    const acts=document.createElement('div'); acts.className='row gap6';
-    acts.style.cssText='display:flex;flex-wrap:wrap;gap:4px;margin-top:4px';
+    // ---- 11 · WHAT THIS HOUSE IS LIKE, and what that is worth ----
+    const fx=inlawTraitsOf(h.child), fl=inlawFlawsOf(h.child);
+    if(fx.length || fl.length){
+      const strip=document.createElement('div');
+      strip.style.cssText='margin-top:5px;padding:4px 5px;border:1px solid #e8c34a2e;'
+        +'border-radius:3px;background:linear-gradient(#e8c34a0d,#e8c34a03)';
+      strip.innerHTML='<div class="small" style="color:var(--gold);letter-spacing:.5px">'
+        +'⚙ WHAT THIS HOUSE DOES FOR YOU</div>'
+        + (fx.length? fx.map(f=>'<div class="small" style="margin-top:2px">'
+            +'<span style="display:inline-block;min-width:74px;color:'+f.col+'"><b>'+f.icon+' '+f.lab+'</b></span> '
+            +'<span class="muted">'+f.note+'</span>'
+            +(f.every? ' <span style="color:#8a6a4a">· about every '+f.every+' days</span>':'')
+            +'</div>').join('')
+          : '<div class="small muted" style="margin-top:2px">Nothing in particular. They are pleasant and they are not useful.</div>')
+        + fl.map(f=>'<div class="small" style="margin-top:2px">'
+            +'<span style="display:inline-block;min-width:74px;color:'+f.col+'"><b>'+f.icon+' '+f.lab+'</b></span> '
+            +'<span class="muted">'+f.note+'</span></div>').join('');
+      info.appendChild(strip);
+    }
+    // ---- 12 · the favours, as tiles rather than a row of grey buttons ----
+    const acts=document.createElement('div');
+    acts.style.cssText='display:grid;grid-template-columns:repeat(auto-fit,minmax(104px,1fr));'
+      +'gap:4px;margin-top:5px';
     INLAW_FAVOURS.forEach(fv=>{
-      const gate=favourAvailable(h.child,fv);
-      const x=document.createElement('button'); x.className='btn sm';
-      x.textContent=fv.icon+' '+fv.lab;
-      x.style.fontSize='9px'; x.style.padding='4px 6px';
+      const gate=favourAvailable(h.child,fv), cost=fv.cost+favourSurcharge(h.child);
+      const need=fv.need+favourSurcharge(h.child);
+      const x=document.createElement('button');
+      x.className='btn sm';
+      x.style.cssText='display:flex;flex-direction:column;align-items:flex-start;gap:1px;'
+        +'padding:5px 6px;text-transform:none;letter-spacing:0;line-height:1.25;'
+        +'font-size:9.5px;text-align:left;'
+        +(gate.ok? 'border-color:#8a6512;' : 'opacity:.5;');
+      x.innerHTML='<span style="font-size:12px">'+fv.icon+'</span>'
+        +'<b style="color:'+(gate.ok?'var(--gold)':'#8a7a66')+'">'+fv.lab.replace(/^ASK (FOR |THEM TO )?/,'')+'</b>'
+        +'<span style="opacity:.75">'+(gate.ok? '−'+cost+' standing' : 'needs '+need)+'</span>';
       x.disabled=!gate.ok;
-      x.title = gate.ok? fv.what+'  (costs '+fv.cost+' standing)' : gate.why;
+      x.title = gate.ok? fv.what+'   (costs '+cost+' standing)' : gate.why;
       x.onclick=()=>{ const msg=askFavour(h.child,fv);
         toast(msg,5200); refreshStatbar(); openTree('noble'); };
       acts.appendChild(x);
@@ -19045,62 +19131,114 @@ function updatePeek(dt){
    rotated, it is its own arrangement — she is seated and turned away, he is
    caught mid-motion with a garment, and both heads come round toward the
    door you just opened. */
+/* THE PAIR, AND THEY ARE NOT IN THE SAME STATE AS EACH OTHER.
+   The first cut stood them both bolt upright side by side and dressed them
+   identically off one tier, so every look was the same look. Each of them
+   now has their own undress step and their own POSTURE — she is sitting,
+   kneeling on the bed, or reaching; he is standing, stooped, or already
+   sat down beside her — and the two run one step apart, so one of them is
+   always further along than the other. That gap is the whole picture. */
+const PEEK_HER=[
+  { pose:'sit',   strip:0, note:'seated on the edge, hands in her lap' },
+  { pose:'sit',   strip:1, note:'hair down, still dressed' },
+  { pose:'kneel', strip:1, note:'up on the bed, gown loosened' },
+  { pose:'kneel', strip:2, note:'gown off one shoulder' },
+  { pose:'reach', strip:3, note:'reaching for him, and not dressed for company' },
+];
+const PEEK_HIM=[
+  { pose:'stand', strip:0, note:'both hands still on the belt' },
+  { pose:'stand', strip:1, note:'belt off, tunic still on' },
+  { pose:'stoop', strip:2, note:'tunic coming over his head' },
+  { pose:'sit',   strip:3, note:'shirt off, sat down beside her' },
+  { pose:'sit',   strip:3, note:'and he does not stop for the door' },
+];
 function drawPeekPair(cx, fy, P, T){
-  const him=P.looks.him, her=P.looks.her, tier=P.stage.tier;
-  const startle=clamp(1-(T-PEEK_OPEN)/22,0,1);        // they both flinch at the light
-  const jolt=startle*2.2*Math.sin(T*0.9);
-  // ---- HER: seated on the edge of whatever the room has, half turned ----
-  ctx.save(); ctx.translate(Math.round(cx-22+jolt*0.5), Math.round(fy));
-  /* the tier extras live INSIDE the same scale as the figure — drawn outside
-     it they sat at the unscaled coordinates and her loose hair landed above
-     her head like a hat. */
-  ctx.save(); ctx.scale(1.14,1.14);
-  try{ drawWifeFig(ctx, 0, 0, her, T*0.06, 'idle'); }catch(e){}
-  const hs=her.skin||'#e6bd94';
-  if(tier>=1){                                        // the pins are out, the hair is down
-    const hair=her.hair||'#5a3a1e';
-    px(-10,-40,5,15,hair); px(6,-40,5,13,hair);       // it falls either side of her face
-    px(-10,-40,5,2,shade(hair,26)); px(6,-40,5,2,shade(hair,26));
-  }
-  if(tier>=2){                                        // a garment already off, over her arm
-    const dr=shade(her.dress||'#a8407a',-16);
-    px(-17,-22,11,9,dr); px(-17,-22,11,2,shade(dr,26));
-  }
-  // her arm up, caught mid-unpinning
-  px(7,-38,4,10,hs); px(7,-38,1,10,shade(hs,20));
-  px(6,-42,7,4,hs);
-  ctx.restore();
-  ctx.restore();
-  // ---- HIM: standing, a tunic over his head or already in his hand ----
-  ctx.save(); ctx.translate(Math.round(cx+22-jolt*0.5), Math.round(fy));
-  ctx.save(); ctx.scale(1.14,1.14);
-  try{ drawHusbandFig(ctx, 0, 0, 70, null, null, him, T*0.06, 'idle'); }catch(e){}
+  const him=P.looks.him, her=P.looks.her, tier=clamp(P.stage.tier||0,0,4);
+  const startle=clamp(1-(T-PEEK_OPEN)/24,0,1);         // they both flinch at the light
+  const jolt=startle*2.4*Math.sin(T*0.9);
+  const breathe=Math.sin(T*0.05)*0.6;
+  /* ONE STEP APART. She leads at the lower rungs, he catches up at the top —
+     so you never walk in on two people doing the identical thing. */
+  const hi=clamp(tier + (tier<3? 1 : 0), 0, 4);        // her step
+  const mi=clamp(tier - (tier<4? 1 : 0), 0, 4);        // his step
+  const HER=PEEK_HER[hi], HIM=PEEK_HIM[mi];
+  const hs=her.skin||'#e6bd94', hHair=her.hair||'#5a3a1e';
   const ms=him.skin||'#caa06a', tun=him.dress||G.tunic||'#7a2f22';
-  if(tier<=1){
-    // both hands at the belt, not yet committed to anything
+
+  // ================= HER =================
+  ctx.save();
+  ctx.translate(Math.round(cx-24+jolt*0.5), Math.round(fy+breathe));
+  ctx.save();
+  if(HER.pose==='sit')        ctx.translate(0,-9);      // up on the bed edge
+  else if(HER.pose==='kneel') ctx.translate(0,-13);
+  else                        ctx.translate(-3,-11);
+  ctx.scale(1.14, HER.pose==='sit'? 0.82 : HER.pose==='kneel'? 0.72 : 1.06);
+  try{ drawWifeFig(ctx, 0, 0, her, T*0.05, 'idle'); }catch(e){}
+  // --- her own undress step, inside the same transform so it lines up ---
+  if(HER.strip>=1){                                    // pins out, hair loose either side
+    px(-10,-40,5,15,hHair); px(6,-40,5,13,hHair);
+    px(-10,-40,5,2,shade(hHair,26)); px(6,-40,5,2,shade(hHair,26));
+  }
+  if(HER.strip>=2){                                    // the gown off one shoulder
+    px(-11,-34,9,7,hs); px(-11,-34,9,2,shade(hs,22));
+    const dr=shade(her.dress||'#a8407a',-18);
+    px(-16,-27,10,10,dr); px(-16,-27,10,2,shade(dr,24));
+  }
+  if(HER.strip>=3){                                    // and it is over the rail, not on her
+    px(-20,-20,9,8,shade(her.dress||'#a8407a',-26));
+    px(-13,-30,13,12,hs); px(-13,-30,13,2,shade(hs,20));
+  }
+  // arms, by posture
+  if(HER.pose==='sit'){ px(7,-36,4,10,hs); px(6,-40,7,4,hs); }          // one hand up at her hair
+  else if(HER.pose==='kneel'){ px(-14,-24,4,9,hs); px(9,-24,4,9,hs); }  // both hands down on the bed
+  else { px(9,-38,13,4,hs); px(9,-38,13,1,shade(hs,22));                // reaching across to him
+         px(20,-40,5,5,hs); }
+  ctx.restore(); ctx.restore();
+
+  // ================= HIM =================
+  ctx.save();
+  ctx.translate(Math.round(cx+24-jolt*0.5), Math.round(fy-breathe));
+  ctx.save();
+  if(HIM.pose==='sit')        ctx.translate(0,-9);
+  else if(HIM.pose==='stoop') ctx.translate(0,-2);
+  ctx.scale(1.14, HIM.pose==='sit'? 0.82 : HIM.pose==='stoop'? 0.94 : 1);
+  try{ drawHusbandFig(ctx, 0, 0, 70, null, null, him, T*0.05, 'idle'); }catch(e){}
+  if(HIM.strip===0){                                   // hands still on the belt
     px(-7,-28,14,3,shade(tun,-34));
     px(-10,-29,4,6,ms); px(6,-29,4,6,ms);
-  } else if(tier<=3){
-    // the tunic is coming over his head — arms up, face inside it
+  } else if(HIM.strip===1){                            // the belt is off and in one hand
+    px(-11,-26,4,10,ms);
+    px(-17,-18,7,3,shade(tun,-40)); px(-17,-15,3,7,shade(tun,-40));
+    px(7,-28,4,7,ms);
+  } else if(HIM.strip===2){                            // over the head, face inside it
     px(-9,-56,18,13,tun); px(-9,-56,18,3,shade(tun,24));
-    px(-12,-50,4,13,ms); px(8,-50,4,13,ms);
-  } else {
-    // it is already on the floor and he is entirely unbothered about the door
-    px(-19,-4,17,5,tun); px(-19,-4,17,2,shade(tun,22));
-    px(-11,-32,4,12,ms); px(7,-32,4,12,ms);
+    px(-12,-50,4,13,ms);  px(8,-50,4,13,ms);
+    px(-6,-40,12,12,ms);  px(-6,-40,12,2,shade(ms,20));  // the bared chest under it
+  } else {                                             // shirt off, and it is on the floor
+    px(-20,-3,18,5,tun); px(-20,-3,18,2,shade(tun,22));
+    px(-7,-42,14,17,ms); px(-7,-42,14,2,shade(ms,22));
+    px(-7,-33,14,1,shade(ms,-24)); px(-2,-40,1,13,shade(ms,-18)); // a little definition
+    if(HIM.pose==='sit'){ px(-13,-30,5,10,ms); px(-16,-22,8,4,ms); } // an arm out behind her
+    else { px(-12,-34,4,12,ms); px(8,-34,4,12,ms); }
   }
-  ctx.restore();
-  ctx.restore();
-  // ---- and both faces come round to the door ----
+  ctx.restore(); ctx.restore();
+
+  // ---- and both heads come round to the door you just opened ----
   if(startle>0.02){
     ctx.globalAlpha=startle;
     ctx.textAlign='center';
-    pixelText('!', cx-20, fy-64, '#ffd08a', 1.1);
-    pixelText('!', cx+20, fy-66, '#ffd08a', 1.1);
+    pixelText('!', cx-24, fy-58, '#ffd08a', 1.05);
+    pixelText('!', cx+24, fy-62, '#ffd08a', 1.05);
     ctx.textAlign='left';
     ctx.globalAlpha=1;
   }
+  // ---- and the caption says who is where, because they are not the same ----
+  ctx.textAlign='center';
+  pixelText(HER.note, cx, fy+8,  'rgba(255,190,214,.72)', 0.60);
+  pixelText(HIM.note, cx, fy+15, 'rgba(190,214,255,.72)', 0.60);
+  ctx.textAlign='left';
 }
+
 /* THE ROOM ITSELF. Everything here is proportional to the frame — the first
    cut used fixed pixel sizes inside a 268-wide opening, so the bed was a
    thumbnail in the corner and the top half of the room was dead brown. */
@@ -19459,8 +19597,9 @@ const INLAW_FAVOURS=[
       return '🕊 They lean on the '+f.house+'. The heat drops to '+f.heat+'.'; } },
 ];
 function favourAvailable(ch,fv){
-  const st=inlawStanding(ch);
-  if(st<fv.need) return {ok:false, why:'Standing '+st+' of '+fv.need+' — they do not owe you this yet.'};
+  const st=inlawStanding(ch), need=fv.need+favourSurcharge(ch);
+  if(st<need) return {ok:false, why:'Standing '+st+' of '+need+' — they do not owe you this yet.'
+    +(favourSurcharge(ch)? ' (a proud house charges more.)' : '')};
   const last=(ch.spouse.lastFavour===undefined? -99 : ch.spouse.lastFavour);
   if(G.day-last < 6) return {ok:false, why:'You asked them four days ago. Let it breathe.'};
   return {ok:true};
@@ -19468,11 +19607,114 @@ function favourAvailable(ch,fv){
 function askFavour(ch, fv){
   const gate=favourAvailable(ch,fv); if(!gate.ok) return gate.why;
   ch.spouse.lastFavour=G.day;
-  setStanding(ch, inlawStanding(ch)-fv.cost);
+  setStanding(ch, inlawStanding(ch)-fv.cost-favourSurcharge(ch));
   const msg=fv.run(ch);
   saveQuiet();
   return msg+'  <span class="muted">— and the '+ch.spouse.house+' are '
     +standingLabel(inlawStanding(ch)).t.toLowerCase()+' now.</span>';
+}
+/* =====================================================================
+   11 · WHAT THE IN-LAWS ARE ACTUALLY LIKE
+   ---------------------------------------------------------------------
+   The NOBLE register listed a spouse's traits and they did precisely
+   nothing — decorative chips on a card. A house you are tied to has a
+   character, and that character should arrive at your door: the
+   well-connected one puts your name in the right rooms, the wealthy one
+   sends chests, the fierce one sends men and picks fights on your
+   behalf, and the cold one lets the whole alliance go quietly stale.
+
+   Each fires on its own clock out of houseDayTick, scaled by how well
+   they think of you — a house that is barely civil does very little for
+   you no matter how well connected it is.
+   ===================================================================== */
+const INLAW_TRAIT_FX=[
+  { id:'connected', icon:'🏛', col:'#c89af0', lab:'OPENS DOORS',
+    note:'Their name in the right rooms, whether you asked or not.',
+    every:9, run:(ch,st)=>{ G.favor=(G.favor||0)+1; G.renown=(G.renown||0)+Math.round(18*st);
+      return 'a word in the right ear (+1 favour, +'+Math.round(18*st)+' renown)'; } },
+  { id:'wealthy',   icon:'💰', col:'#e8c34a', lab:'SENDS CHESTS',
+    note:'Money arrives with no note and no expectation of thanks.',
+    every:7, run:(ch,st)=>{ const n=Math.round((140+ri(0,260))*st);
+      G.coin=(G.coin||0)+n; return 'a chest of '+fmt(n)+'d'; } },
+  { id:'noble',     icon:'👑', col:'#e8a0d0', lab:'LENDS ITS NAME',
+    note:'Being connected to them is worth something on its own.',
+    every:11, run:(ch,st)=>{ G.honor=clamp((G.honor||50)+1,0,100);
+      G.approval=clamp((G.approval||50)+Math.round(2*st),0,100); return 'the family name spoken well of (+honour)'; } },
+  { id:'fierce',    icon:'🗡', col:'#e0705b', lab:'SENDS MEN',
+    note:'They like a fight and they like being asked.',
+    every:10, run:(ch,st)=>{ const n=Math.round(60*st)+ri(0,40);
+      G.soldiers=(G.soldiers||0)+n; try{ syncArmy&&syncArmy(); }catch(e){}
+      return n+' of their clients under arms'; } },
+  { id:'thrifty',   icon:'🌾', col:'#8ac06a', lab:'KEEPS YOU FED',
+    note:'They run a tight estate and the surplus comes to you.',
+    every:6, run:(ch,st)=>{ const n=Math.max(1,Math.round(3*st)); G.food=(G.food||0)+n;
+      return n+' rations from their stores'; } },
+  { id:'healer',    icon:'🌿', col:'#7ad48a', lab:'SENDS A PHYSICIAN',
+    note:'Somebody in that house actually knows what they are doing.',
+    every:8, run:(ch,st)=>{ if(G.injury && st>0.5){ const nm=G.injury.name; G.injury=null;
+        return 'their physician closes your '+nm; }
+      G.hygiene=clamp((G.hygiene||70)+6,0,100); return 'salves and clean linen'; } },
+  { id:'charming',  icon:'🎭', col:'#ffb0d0', lab:'CHARMS ROME FOR YOU',
+    note:'They are liked, and some of it rubs off on the family they married into.',
+    every:8, run:(ch,st)=>{ G.pop=clamp((G.pop||0)+Math.round(2*st),0,100);
+      return 'your house talked about warmly for once (+popularity)'; } },
+  { id:'shrewd',    icon:'🦊', col:'#e0a05b', lab:'HEADS OFF TROUBLE',
+    note:'They hear things early and they tell you.',
+    every:9, run:(ch,st)=>{ const L=feudsList(); if(!L.length) return null;
+      L.sort((a,b2)=>b2.heat-a.heat); const f=L[0];
+      f.heat=clamp(f.heat-Math.round(14*st),0,100);
+      return 'a quiet word that cools the '+f.house; } },
+  { id:'fertile',   icon:'🌾', col:'#a8d46a', lab:'A FULL NURSERY',
+    note:'Grandchildren arrive sooner than the augurs allowed for.',
+    every:0, run:null },                       // read by grandkidTick, not a tick of its own
+];
+/* the flaws bite too — an alliance is not automatically an asset */
+const INLAW_FLAW_FX=[
+  { id:'cold',   icon:'🧊', col:'#7aa8c0', lab:'LETS IT GO STALE',
+    note:'Nobody in that house writes first. Standing slips on its own.' },
+  { id:'cruel',  icon:'🩸', col:'#e0705b', lab:'MAKES ENEMIES',
+    note:'They pick fights you then have to be associated with.' },
+  { id:'proud',  icon:'🦚', col:'#e0a05b', lab:'TAKES OFFENCE',
+    note:'Every favour you ask costs a little more than it should.' },
+];
+function inlawTraitsOf(ch){
+  const sp=(ch&&ch.spouse)||{}, tr=sp.traits||[];
+  return INLAW_TRAIT_FX.filter(fx=>tr.includes(fx.id));
+}
+function inlawFlawsOf(ch){
+  const sp=(ch&&ch.spouse)||{}, fl=sp.flaws||[];
+  return INLAW_FLAW_FX.filter(fx=>fl.includes(fx.id));
+}
+/* a proud house charges more for everything it does for you */
+function favourSurcharge(ch){
+  return inlawFlawsOf(ch).some(f=>f.id==='proud')? 8 : 0;
+}
+function inlawTick(){
+  (G.children||[]).filter(c=>!c.dead && c.wed && c.spouse).forEach(ch=>{
+    const st=inlawStanding(ch)/100;
+    // a house that barely tolerates you does not put itself out
+    if(st<0.30) return;
+    inlawTraitsOf(ch).forEach(fx=>{
+      if(!fx.every || !fx.run) return;
+      const key='_fx_'+fx.id;
+      const last=(ch.spouse[key]===undefined? -99 : ch.spouse[key]);
+      if((G.day-last) < fx.every) return;
+      ch.spouse[key]=G.day;
+      const what=fx.run(ch, st);
+      if(what) G.lastRaid=fx.icon+' The '+(ch.spouse.house||'house')+' send '+what
+        +'. <span class="muted">'+kidName(ch)+'’s marriage earning its keep.</span>';
+    });
+    // and the flaws
+    inlawFlawsOf(ch).forEach(fx=>{
+      if(fx.id==='cold' && Math.random()<0.16) setStanding(ch, inlawStanding(ch)-1);
+      if(fx.id==='cruel' && Math.random()<0.02){
+        const f=addFeud(ch.spouse.house==='—'? 'Rufii' : pick(SUITOR_HOUSES),
+          'The '+(ch.spouse.house||'in-laws')+' picked this fight, and Rome files it under your name.');
+        G.lastRaid='🩸 Your in-laws the '+(ch.spouse.house||'?')+' have made an enemy of the '
+          +f.house+' on your behalf. Nobody asked them to.';
+      }
+    });
+  });
 }
 /* ---------- 5 · GRANDCHILDREN, out of the forecast the augurs read ---------- */
 function grandkidTick(){
@@ -19481,7 +19723,9 @@ function grandkidTick(){
     const f=c.forecast; if(!f) return;
     const yrsWed=Math.max(0,(G.day-(c.wedDay||G.day))/2.4);
     // roughly one every other year, and never more than the augurs foresaw
-    const want=Math.min(f.kids||0, Math.floor(yrsWed/1.9));
+    // 11 · a fertile in-law brings them sooner than the augurs allowed for
+    const rate=inlawTraitsOf(c).some(x=>x.id==='fertile')? 1.35 : 1.9;
+    const want=Math.min(f.kids||0, Math.floor(yrsWed/rate));
     if((c.kids||0) >= want) return;
     c.kids=(c.kids||0)+1;
     c.grandNames=c.grandNames||[];
@@ -19500,6 +19744,7 @@ function grandkidTick(){
 /* ---------- the ledger ticks over with the days ---------- */
 function houseDayTick(){
   grandkidTick();
+  inlawTick();                       // 11 · and the in-laws do whatever they are like
   // a grudge cools on its own, slowly, and does something while it is hot
   feudsList().forEach(f=>{ f.heat=clamp(f.heat-0.7,0,100); });
   G.feuds=feudsList().filter(f=>f.heat>4);
@@ -21657,7 +21902,7 @@ function advanceDay(n){
         const son=Math.random()<0.5;
         const nm= son? (pick(['Titus','Lucius','Gaius','Marcus','Quintus','Decimus'])+' '+(G.name.split(' ')[0])+'i filius')
                      : pick(['Julia','Livia','Antonia','Claudia','Valeria','Aurelia'])+' '+(G.wife?G.wife.name.split(' ')[0]:'');
-        G.children.push(Object.assign({name:nm, sex:son?'m':'f', born:G.day}, inheritDNA()));
+        G.children.push(Object.assign({name:nm, sex:son?'m':'f', born:G.day}, inheritDNA(son)));
         G.pregnant=null;
         const prep = used.length? ' '+used.join(' and ')+' did their work, and the midwife earned her fee.'
                    : G.midwife? ' The midwife earned her fee.' : '';
@@ -23227,8 +23472,10 @@ window.__SS = {
   visitableKids, buildVisitCard, buildFeudCard,
   haggleLeverage, HAGGLE_POSTURES, openHaggle,
   rollWalkIn, fireWalkIn, drawWalkIn, CAUGHT_LINES,
-  peekKey, peekUsed, markPeeked, startPeek, updatePeek, drawPeek,
+  peekKey, peekUsed, markPeeked, startPeek, updatePeek, drawPeek, sexText,
   drawPeekPair, drawPeekRoom, PEEK_ROOM, PEEK_STAGE, PEEK_OPEN, PEEK_HOLD, PEEK_SHUT,
+  PEEK_HER, PEEK_HIM, traitsForSex,
+  INLAW_TRAIT_FX, INLAW_FLAW_FX, inlawTraitsOf, inlawFlawsOf, inlawTick, favourSurcharge,
   DOMUS_UPPER, STAIR_X0, STAIR_X1, UPPER_DOORS, domusFloorY, nearStairs, climbStairs, upperDoorAt,
   ROOM_COMPLAINTS, maybeRoomComplaint, updateRoomComplaint, drawRoomComplaint, ROOM_DOOR_X,
   makeCheatSuitor, summonCheatSuitor,
