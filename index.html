@@ -12147,16 +12147,28 @@ function drawWifeFig(c,x,y,w,ph,mode,preg){
   const stride = walking? Math.sin(ph)*(running?5.5:3.2) : 0;
   const bob    = walking? -Math.abs(Math.sin(ph))*(running?2.4:1.2) : -Math.abs(Math.sin(ph*0.5))*0.35;
   const lean   = running? 2 : 0;                  // she leans into a run
-  // JIGGLE — only a figure worth jiggling does, and a MAXED figure should be
-  // unmistakable. The old amplitudes topped out near a single pixel, which
-  // Math.round then ate entirely; these are scaled to actually read.
-  const jig    = walking? Math.sin(ph*2)* (running?1.0:0.72) : Math.sin(ph*0.9)*0.16;
+  /* JIGGLE — REWORKED. One sine drove bust AND hips at the same beat, so
+     they bounced in perfect lockstep — no two kinds of tissue actually do
+     that. Each zone now composites its OWN primary beat plus one or two
+     smaller, phase-lagged echoes at slightly detuned frequencies: the hips
+     answer the step almost at once with a quick echo behind it; the bust
+     is heavier, lands its bounce a beat LATE, and keeps ringing after the
+     hips have already settled. That lag and decay is what reads as soft
+     tissue carrying momentum, rather than a rigid part clipped to the
+     footfall. A MAXED figure should still be unmistakable — amplitudes are
+     unchanged from before, only the shape of the motion driving them. */
+  const energy = walking? (running?1.0:0.72) : 0.22;      // idle keeps a faint breathing sway
+  const gaitF  = walking? ph*(running?2.3:2.0) : ph*0.9;  // running bounces FASTER, not just bigger
+  const wag=(freq,lag)=>Math.sin(gaitF*freq-lag);
+  const hWave  = wag(1,0) + wag(2.15,1.15)*0.30;                          // quick to answer, one soft echo
+  const bWave  = wag(1,0.55) + wag(1.85,2.0)*0.34 + wag(3.05,3.3)*0.14;    // lands late, rings twice
   const bAmt   = clamp((bu-2)/8,0,1);               // a 2 barely moves; a 10 really goes
   const hAmt   = clamp((be-2)/8,0,1);
   const SJ     = slapJig();                          // and whatever the last slap is still doing
-  const bJig   = jig * bAmt * (running?7.5:5.2) + SJ*bAmt*0.55;          // bust bounce
-  const hJig   = jig * hAmt * (running?5.0:3.4) + SJ*(0.55+hAmt*1.35);   // hips — the tier decides how much
-  const bSquash= jig * bAmt * (running?1.5:1.0) + SJ*bAmt*0.18;          // and it compresses on the downbeat
+  const bJig   = bWave*bAmt*energy*(running?7.5:5.2) + SJ*bAmt*0.55;          // bust bounce
+  const hJig   = hWave*hAmt*energy*(running?5.0:3.4) + SJ*(0.55+hAmt*1.35);   // hips — the tier decides how much
+  const bSway  = bWave*bAmt*energy*(running?2.6:1.8)*0.4;                    // it does not fall straight down either
+  const bSquash= bWave*bAmt*energy*(running?1.5:1.0) + SJ*bAmt*0.18;         // and it compresses on the downbeat
   const yy=bob;
   const top = yy-26-legLen;                         // where the gown's hem sits above the feet
   // ================= LEGS (a real walk cycle, visible under the hem) =================
@@ -12242,7 +12254,7 @@ function drawWifeFig(c,x,y,w,ph,mode,preg){
      flat chest is drawn flat — there is nothing there to bounce. ---- */
   { const uT = bu>=9?4 : bu>=7?3 : bu>=5?2 : bu>=3?1 : 0;
     const bH2=Math.max(1,bustH+Math.round(bSquash));           // squashes on the fall, stretches on the rise
-    const LX=lean*0.4;
+    const LX=lean*0.4+bSway;                                    // it does not bounce straight down either
     if(uT===0){
       P(-5+LX, top-22, 11, 1, shade(dress,-18));                             // one plain fall of cloth
     } else if(uT===1){
@@ -12273,6 +12285,16 @@ function drawWifeFig(c,x,y,w,ph,mode,preg){
       P(-bustW-3+LX, top-23+bH2+bJig, bustW+2, 3, shade(dress,-46));         // heavy double underfold
       P( 1+LX,       top-23+bH2+bJig, bustW+2, 3, shade(dress,-46));
       P(-2+LX, top-27+bJig, 5, 2, skin);                                      // and skin above the neckline
+    }
+    /* A GLINT AT THE PEAK OF THE BOUNCE — the fabric catching real light at
+       the top of its swing, not just moving. Only at the crest of the wave,
+       and only once she is actually walking, so it reads as motion catching
+       the light rather than a static sparkle sitting on her the whole time. */
+    if(uT>=1 && walking){
+      const crest=clamp((bWave-0.55)/0.45,0,1);
+      if(crest>0){ c.globalAlpha=crest*0.6;
+        P(-bustW*0.5+LX, top-24+bJig, Math.max(2,Math.round(bustW*0.9)), 1, '#fff6df');
+        c.globalAlpha=1; }
     }
   }
   // ================= NECK / ARMS =================
