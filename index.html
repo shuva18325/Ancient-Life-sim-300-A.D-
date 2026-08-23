@@ -5098,7 +5098,7 @@ function freshCareer(name,origin,arch,social){
     mount:0,               // 0 on foot · 1 mule · 2 horse · 3 chariot
     slaves:0, hasVilla:false, boat:false,
     feuds:[], grandkids:0, annivYears:0, morningAfter:null, peeked:{},   // the marriage ledger
-    gravitas:60, peeksTaken:0,                                // the public face
+    gravitas:60, peeksTaken:0, parthianSide:false,              // the public face, and whose side you fight on
     favor:0, soldiers:0, hidden:[], plotTier:0,   // intrigue: favors, private army, hidden elites, overthrow progress
     emperor:false, approval:50, legions:0, rivals:0, retired:false,  // rule of Rome
     detachments:[], day:0,   // marching army detachments (with travel time)
@@ -5234,7 +5234,7 @@ function elevateWife(rank){
 }
 // fill in any fields missing from older saves
 function migrate(g){ const d={honor:50,food:4,mount:0,slaves:0,hasVilla:false,boat:false,favor:0,soldiers:0,hidden:[],plotTier:0,emperor:false,approval:50,legions:0,rivals:0,retired:false,detachments:[],day:0,titles:{},clears:{},socialClass:'gladiator',army:{},armyGear:0,armyTrain:0,hasOrganizer:false,generals:[],wife:null,married:false,marryPrompted:false,children:[],pregnant:null,lastLoveDay:-9,injury:null,lastDebateDay:-9,office:0,path:null,parthia:50,parthiaPact:false,wifeRel:50,lastTalkDay:-9,isFemale:false,lineage:[],hygiene:70,wifePhys:45,hasPool:false,hasWardrobe:false,legacy:null,lastFeastDay:-9,loveDay:-1,loveQuick:0,loveLong:0,loveNight:0,loveVigil:0,venusUntil:-1,lastWashDay:-9,lastPoolDay:-9,lastWardrobeDay:-9,lastKidsDay:-9,lastBathDay:-9,pila:0,bow:null,bowsOwned:[],nemesis:null,rivalsList:[],trophies:[],nemesisCount:0,pendingDeath:false,ageBase:0,wonProvinceByFight:false,familyMan:false,infamy:0,gladiatrixStage:0,pardoned:false,lastNoteDay:-9,lastNoteReply:'',regalia:[],marryRolls:0,hasBodyMap:false,hasSecretMap:false,jealousy:0,lastJealousDay:-9,traits:[],flaws:[],looks:5,smarts:5,advocate:false,tutorialDone:false,patrons:[],rivalAdv:null,landmarks:[],faction:null,oratory:1,casesWon:0,casesLost:0,renown:0,senate:false,royal:false,lastCaseDay:-9,skills:{footwork:0,guard:0,blade:0,wind:0,throwing:0},scars:[],fatigue:0,lastTrainDay:-9,tribune:false,rank:0,campaigns:0,legionRep:0,lastCampaignDay:-9,units:{legionary:0,auxilia:0,cavalry:0,archers:0,engineers:0},supply:0,sieges:0,body:null,family:null,provinces:{},complaints:[],leniency:50,lastCalloutDay:-9,lastGiftDay:-9,giftsTaken:0,calloutWins:0,crownWorn:false,court:null,lastCoupDay:-99,herbs:{},herbLore:0,ill:null,midwife:false,titlesWorn:[],warExhaust:0,lastExhaustWhy:'',titleRites:[],tombs:[],inheritedFrom:null,hairStyle:null,hairCol:null,beardStyle:null,outfit:null,courtLog:{},lastAskDay:-9,retirePromise:null,promiseBreaks:0,promiseFights:0,tutor:false,freedmen:0,askLog:{},temptHeld:0,temptTook:0,slapDay:-9,slapCount:0,slapsAll:0,doorShut:0,caughtByHouse:0,romanticAll:0,clearedHall:0,lastFamilyDay:-9,namedHeir:null,willSplit:false,purpleWatch:0,kidHouses:[],weddings:0,woohooAll:0,marriedDay:0,
-    feuds:[],grandkids:0,annivYears:0,morningAfter:null,peeked:{},gravitas:60,peeksTaken:0}; for(const k in d){ if(g[k]===undefined) g[k]=d[k]; }
+    feuds:[],grandkids:0,annivYears:0,morningAfter:null,peeked:{},gravitas:60,peeksTaken:0,parthianSide:false}; for(const k in d){ if(g[k]===undefined) g[k]=d[k]; }
   if(g.wife) ensureQuirks(g.wife);          // a spouse saved before the five bands existed
   if(g.quirks===undefined) g.quirks=rollQuirks();   // and a player from before THEY had any
   if(!g.hairStyle){ const male=!g.isFemale, eth='roman';
@@ -5792,14 +5792,29 @@ function makeFighter(opts){
 
 let FT=null;   // active fight context
 // roll a fresh arena opponent (used for single bouts and each skirmish wave)
-function makeArenaFoe(tier, esc, mult){
+function makeArenaFoe(tier, esc, mult, regId){
   const dm=diffMul();
   const foeHp=(88 + tier*22) * esc * (mult||1) * dm.foeHp;
   const fc=CLASSES[pick(Object.keys(CLASSES))].start;
+  /* THE MAN OPPOSITE BELONGS TO THE PROVINCE. Every foe in the empire was
+     drawn from one pool of eight Roman names before this, so Ctesiphon and
+     Lutetia both sent you a Flamma of Capua. */
+  const rid = regId || (FT && FT.region && (FT.region.id||FT.region)) || G.current;
+  let nm;
+  try{ nm=theatreFoeName(rid); }catch(e){ nm=pick(FOE_NAMES)+' '+pick(FOE_TITLES); }
+  const key=THEATRE_OF[rid]||'italia';
+  // the local fighters dress in local colours; Rome's men wear Rome's red
+  const romanHere = (key==='persia' && !G.parthianSide);
+  const TUN = romanHere? ['#7a2f22','#8a3a26','#6a2a1e']
+    : ({ africa:['#c8a04a','#a8683a','#8a5a2a'], asia:['#3a5a8a','#7a3a5a','#4a7a6a'],
+         persia:['#8a3a5a','#c8a02a','#4a5a9a'], germania:['#4a5a3a','#6a4a2a','#3a4a4a'],
+         iberia:['#c8442a','#8a4a6a','#a06a3a'], gallia:['#3a6a5a','#5a4a7a','#6a6a3a'],
+         italia:['#2f4a7a','#4a2f5a','#2f5a3a','#5a4a2f','#5a2f2f'] })[key]
+      || ['#2f4a7a','#4a2f5a','#2f5a3a'];
   return makeFighter({
     isPlayer:false, x:340, facing:-1, dmgMul:dm.foeDmg,
-    maxHp:foeHp, hp:foeHp, name:pick(FOE_NAMES)+' '+pick(FOE_TITLES),
-    skin:pick(SKIN), tunic:pick(['#2f4a7a','#4a2f5a','#2f5a3a','#5a4a2f','#5a2f2f']),
+    maxHp:foeHp, hp:foeHp, name:nm,
+    skin:pick(SKIN), tunic:pick(TUN),
     gear:{
       weapon:gearOf('weapon',fc.weapon),shield:gearOf('shield',fc.shield),
       helmet:gearOf('helmet',fc.helmet),armor:gearOf('armor',fc.armor),
@@ -5937,6 +5952,10 @@ function nemesisBriefBlock(){
 }
 function startFight(region, briefData){
   checkPromise();                     // she said one more year, and she is counting
+  /* AN AWAY CROWD. East of the Euphrates a Roman is the foreigner, and the
+     terraces are not roaring for him — the mood starts low and every cheer
+     has to be taken off them rather than handed over. */
+  window.__AWAY = (typeof crowdIsHostile==='function') && crowdIsHostile(region.id);
   const tier=region.tier;
   // player fighter from career loadout
   const cls=CLASSES[G.cls];
@@ -5958,10 +5977,12 @@ function startFight(region, briefData){
     setTimeout(()=>{ if(FT&&!FT.over) banner(FT.p.x,FT.p.y-64,'💫 BLESSED OF VENUS','#ffd0da'); },1100); }
   // foe scales with tier + popularity (battle escalation)
   const esc = 1 + (G.pop/100)*0.5;
-  const foe = briefData.venatio ? makeBeast(region, esc) : makeArenaFoe(tier, esc, 1);
+  const foe = briefData.venatio ? makeBeast(region, esc) : makeArenaFoe(tier, esc, 1, region.id);
   FT={
     region, brief:briefData, p, foe,
-    crowd:50, time:0, over:false, result:null,
+    // an away crowd starts against you and has to be won over the hard way
+    crowd: (window.__AWAY? 22 : 50), away: !!window.__AWAY,
+    time:0, over:false, result:null,
     rigged:briefData.rigged||false, forbiddenEquipped:briefData.forbiddenEquipped||false,
     hired:briefData.hired||false, ambush:briefData.ambush||false, provisioned:!!G.provisioned,
     upperHelp:!!briefData.upperHelp,
@@ -6470,7 +6491,7 @@ function endFight(won){
       if(!FT || state!=='fight') return;
       gt.corpses.push({x:clamp(loser.x,26,W-26), skin:loser.skin, tunic:loser.tunic});
       gt.left--; gt.wave++;
-      FT.foe=makeArenaFoe(FT.region.tier, 1+(G.pop/100)*0.5, 1+gt.wave*0.12);
+      FT.foe=makeArenaFoe(FT.region.tier, 1+(G.pop/100)*0.5, 1+gt.wave*0.12, FT.region.id);
       FT.foe.x = FT.p.x<W/2? W-50 : 50; FT.foe.facing = FT.foe.x>FT.p.x?-1:1;
       FT.p.hp=Math.min(FT.p.maxHp, FT.p.hp+FT.p.maxHp*0.16); FT.p.stamina=FT.p.maxStamina;
       $('hud-e-name').textContent=FT.foe.name.toUpperCase();
@@ -6810,6 +6831,177 @@ function drawPitBg(){
   px(258,GROUND-4,7,4,'#cfc4ae'); px(259,GROUND-3,2,2,'#241c12'); px(263,GROUND-3,1,2,'#241c12');  // skull
   px(320,GROUND-2,16,2,'#7a5630'); px(334,GROUND-4,5,3,'#9aa4ae');                                  // broken spear
 }
+/* =====================================================================
+   THE THEATRES OF THE EMPIRE
+   ---------------------------------------------------------------------
+   drawArena read `t.region` into a variable and then never used it, so
+   every amphitheatre from Britannia to Persis was the same building with
+   the same sand, the same awning and the same crowd. Rome did not build
+   one arena seven hundred times; it built in whatever the province had,
+   for whoever lived there, and the provinces had extremely different
+   opinions about what a killing-floor should look like.
+
+   Seven theatres. Each carries its own stone, sand, sky, crowd, banner
+   and skyline — and its own fighters, because you do not meet the same
+   men in Lutetia that you meet in Ctesiphon.
+   ===================================================================== */
+const ARENA_THEATRES={
+  italia:{
+    name:'THE FLAVIAN STONE', where:'Italia',
+    sand:'#d8c089', sandDk:'#b89a63', sandLt:'#eeddb0',
+    stone:'#c9b28a', stoneSh:'#9a8460', stoneHi:'#e4d3ae',
+    sky:'#7fa8c8', awning:true, awnA:'#a52828', awnB:'#c8b088',
+    crowdHot:['#c8a24a','#a52828','#7d5aa0','#4a7a8c','#b9976a','#c8a9a0','#8a9a5a','#946a4a'],
+    crowdCold:['#887766','#776655','#665544','#558855','#775555','#6a5a6a','#557788','#776644'],
+    banner:'#a52828', bannerMark:'SPQR', skyline:'arches',
+    note:'The Flavian pattern in travertine. Every other arena is a copy of this one.' },
+  africa:{
+    name:'THE SUN-BLEACHED BOWL', where:'Africa & Aegyptus',
+    sand:'#e8d49a', sandDk:'#c4ab6c', sandLt:'#f6e9bc',
+    stone:'#ddc79a', stoneSh:'#b09466', stoneHi:'#f0e0b8',
+    sky:'#e2c88a', awning:true, awnA:'#d8b048', awnB:'#e8dcc0',
+    crowdHot:['#e0b45a','#c86a3a','#8a6a3a','#d8c090','#a05a3a','#e8d0a0','#7a5a3a','#c8a06a'],
+    crowdCold:['#a8956e','#98865e','#88764e','#b0a080','#907a5a','#a09070','#88785a','#b8a888'],
+    banner:'#c86a3a', bannerMark:'AFR', skyline:'palms',
+    note:'Thysdrus. Limestone the colour of the desert, and a sun the awning barely holds.' },
+  asia:{
+    name:'THE GREEK THEATRE', where:'Asia Minor & Achaea',
+    sand:'#cfc3a4', sandDk:'#a89a7c', sandLt:'#e6dcc2',
+    stone:'#e2e0d6', stoneSh:'#b2b0a6', stoneHi:'#f6f4ec',
+    sky:'#8fc0d8', awning:false, awnA:'#8fb8c8', awnB:'#e2e0d6',
+    crowdHot:['#c8b46a','#8a3a5a','#4a7a8c','#d8c8a8','#6a8a5a','#b06a8a','#5a6a9a','#c8a07a'],
+    crowdCold:['#9a9488','#8a8478','#7a7468','#a09a8e','#8a8090','#7a8490','#909088','#a09888'],
+    banner:'#5a6a9a', bannerMark:'ΑΣΙΑ', skyline:'colonnade',
+    note:'A Greek theatre with the orchestra floored over. Marble, and an audience that reviews you.' },
+  persia:{
+    name:'THE KING’S GROUND', where:'Persia & Mesopotamia',
+    sand:'#d0a878', sandDk:'#a8825a', sandLt:'#e8c69a',
+    stone:'#a86a4a', stoneSh:'#7a4630', stoneHi:'#c88a62',
+    sky:'#c89a6a', awning:false, awnA:'#8a3a5a', awnB:'#c88a4a',
+    crowdHot:['#8a3a5a','#c8a02a','#4a5a9a','#a85a2a','#6a3a7a','#d8b84a','#2a6a6a','#9a4a3a'],
+    crowdCold:['#8a7a6a','#7a6a5a','#6a5a4a','#9a8a7a','#7a6a7a','#5a6a7a','#8a7a5a','#6a5a5a'],
+    banner:'#c8a02a', bannerMark:'𐎧', skyline:'ziggurat',
+    note:'No amphitheatre. A brick court under the palace wall, and the King of Kings is watching.' },
+  germania:{
+    name:'THE TIMBER RING', where:'Germania & the North',
+    sand:'#9a8a68', sandDk:'#786a4c', sandLt:'#b4a482',
+    stone:'#6a5236', stoneSh:'#4a3722', stoneHi:'#8a6c48',
+    sky:'#8a98a4', awning:false, awnA:'#6a7280', awnB:'#8a8a7a',
+    crowdHot:['#8a6a4a','#6a7a4a','#9a5a3a','#7a6a5a','#5a6a3a','#a07a5a','#6a5a4a','#8a8a5a'],
+    crowdCold:['#6a6258','#5a5248','#4a4238','#726a5e','#5a5a4a','#68604e','#7a7060','#5e564a'],
+    banner:'#6a7a4a', bannerMark:'LEG', skyline:'pines',
+    note:'Oak posts and packed earth behind the frontier fort. It rains. Nobody leaves.' },
+  iberia:{
+    name:'THE RED ROCK', where:'Hispania',
+    sand:'#e0b48a', sandDk:'#b88a62', sandLt:'#f0cea8',
+    stone:'#c07a5a', stoneSh:'#94553a', stoneHi:'#dc9c78',
+    sky:'#9ab8cc', awning:true, awnA:'#c8442a', awnB:'#f0e4d0',
+    crowdHot:['#c8442a','#e0c060','#8a4a6a','#d8a070','#5a7a5a','#e8d0b0','#a05a4a','#c88a5a'],
+    crowdCold:['#a08878','#907868','#806858','#b09888','#8a7878','#98806a','#a89484','#88705e'],
+    banner:'#c8442a', bannerMark:'HISP', skyline:'aqueduct',
+    note:'Italica. Red sandstone, lime-washed white, and a province that takes its bulls seriously.' },
+  gallia:{
+    name:'THE GREY STONE', where:'Gallia & Britannia',
+    sand:'#c0b090', sandDk:'#9a8c6e', sandLt:'#d8cbaa',
+    stone:'#9aa0a0', stoneSh:'#6e7474', stoneHi:'#bcc2c0',
+    sky:'#93a6b4', awning:true, awnA:'#3a6a5a', awnB:'#c8c8b8',
+    crowdHot:['#3a6a5a','#a85a3a','#c8b46a','#6a5a8a','#8a9a6a','#c0a888','#5a7a8a','#9a6a4a'],
+    crowdCold:['#7a8078','#6a7068','#5a6058','#8a908a','#70787a','#828878','#6e746a','#7e8478'],
+    banner:'#3a6a5a', bannerMark:'GAL', skyline:'oaks',
+    note:'Arelate. Grey stone, green banners, and a crowd that will stand in the rain all day for this.' },
+};
+const THEATRE_OF={
+  'Italia':'italia', 'Dalmatia':'italia', 'Illyricum':'italia', 'Creta':'italia',
+  'Insulae Baleares & Sicilia':'italia', 'Achaea':'asia',
+  'Africa Proconsularis':'africa', 'Aegyptus':'africa',
+  'Asia Minor':'asia', 'Cyprus':'asia', 'Syria Palaestina':'asia',
+  'Mesopotamia':'persia', 'Babylonia':'persia', 'Persis':'persia',
+  'Sogdiana':'persia', 'Arabia Petraea':'persia',
+  'Germania Magna':'germania', 'Gepidia':'germania', 'Bosporan Kingdom':'germania',
+  'Hispania Baetica':'iberia',
+  'Gallia':'gallia', 'Britannia':'gallia',
+};
+function theatreOf(regionId){
+  return ARENA_THEATRES[THEATRE_OF[regionId]||'italia'] || ARENA_THEATRES.italia;
+}
+/* WHO YOU MEET THERE. You do not fight the same men in Lutetia that you
+   fight in Ctesiphon — and east of the Euphrates, the man across the sand
+   is a Roman, and the crowd is not on your side. */
+const THEATRE_FOES={
+  italia:{ names:['Verus','Priscus','Flamma','Spiculus','Hermes','Tetraites','Commodus','Carpophorus'],
+           titles:['of Capua','the Unbeaten','of the Ludus Magnus','the Net','of Roma','the Column'],
+           crowdFor:'you' },
+  africa:{ names:['Masinissa','Juba','Hiempsal','Gulussa','Bagrada','Zabullus','Iarbas','Micipsa'],
+           titles:['of Thysdrus','the Lion-Killer','of Carthage','the Sand-Born','of Leptis','the Dry'],
+           crowdFor:'you' },
+  asia:{   names:['Diomedes','Kleitos','Nikandros','Pergamos','Lysandros','Xanthos','Theron','Milon'],
+           titles:['of Pergamon','the Wrestler','of Ephesus','the Olympian','of Smyrna','the Patient'],
+           crowdFor:'you' },
+  persia:{ names:['Artabanus','Vologases','Surena','Pacorus','Orodes','Tiridates','Gotarzes','Mithradates'],
+           titles:['of Ctesiphon','the Horse-Archer','of the Immortals','the King’s Man','of Susa','the Cataphract'],
+           crowdFor:'them',
+           romanFoes:{ names:['Marcus Lucilius','Titus Varro','Gnaeus Sabinus','Decimus Pollio',
+                              'Aulus Rufinus','Publius Cato','Servius Galba','Lucius Crassus'],
+                       titles:['of the Third Legion','the Centurion','of the Eagles','the Deserter',
+                               'of Antioch','the Primus Pilus'] } },
+  germania:{ names:['Arminius','Segestes','Thusnelda','Chariovalda','Marbod','Inguiomer','Sigimer','Baldr'],
+             titles:['of the Cherusci','the Axe','of the Marcomanni','the Wolf-Cloak','of the Chatti','the Silent'],
+             crowdFor:'them' },
+  iberia:{ names:['Viriathus','Indibilis','Mandonius','Retogenes','Caros','Audax','Ditalco','Minurus'],
+           titles:['of Numantia','the Bull-Dancer','of Italica','the Falcata','of Corduba','the Slinger'],
+           crowdFor:'you' },
+  gallia:{ names:['Vercingetorix','Ambiorix','Dumnorix','Litaviccus','Comm','Boduognat','Cingetorix','Eporedorix'],
+           titles:['of the Arverni','the Long Sword','of Arelate','the Oak','of the Aedui','the Rain-Born'],
+           crowdFor:'you' },
+};
+/* east of the Euphrates you are the foreigner, and the man opposite is the
+   one Rome sent. `G.parthianSide` flips who the crowd is roaring for. */
+function theatreFoeName(regId){
+  const key=THEATRE_OF[regId]||'italia';
+  const T=THEATRE_FOES[key]||THEATRE_FOES.italia;
+  const src=(key==='persia' && !G.parthianSide && T.romanFoes)? T.romanFoes : T;
+  return pick(src.names)+' '+pick(src.titles);
+}
+function crowdIsHostile(regId){
+  const key=THEATRE_OF[regId]||'italia';
+  const T=THEATRE_FOES[key]||THEATRE_FOES.italia;
+  if(key==='persia') return !G.parthianSide;      // a Roman in Ctesiphon is the away side
+  return T.crowdFor==='them';
+}
+/* WHAT YOU CAN SEE OVER THE RIM. Only the open-air grounds get one — an
+   awning hides the horizon, which is half of why Italia feels enclosed and
+   Persia does not. */
+function drawTheatreSkyline(TH){
+  const y=11;
+  if(TH.skyline==='palms'){
+    for(let i=0;i<6;i++){ const x=18+i*82+((i*29)%20);
+      px(x,y,2,9,'#6a5a2a');                                     // trunk
+      for(let f=0;f<5;f++){ const a=-0.9+f*0.45;
+        px(x-6+Math.cos(a)*7, y-1+Math.sin(a)*3, 7,2, f%2?'#5a7a3a':'#4a6a30'); } }
+  } else if(TH.skyline==='ziggurat'){
+    for(let i=0;i<3;i++){ const x=40+i*170, w2=76;
+      for(let s2=0;s2<4;s2++) px(x+s2*7, y+7-s2*2, w2-s2*14, 3, s2%2?'#8a5a3a':'#9a6a44');
+      px(x+w2/2-3, y-2, 6, 4, '#c8a02a'); }                       // the fire on top
+  } else if(TH.skyline==='pines'){
+    for(let i=0;i<9;i++){ const x=12+i*56+((i*17)%14), h2=8+((i*7)%5);
+      px(x+2,y+h2-2,2,4,'#4a3a24');
+      for(let s2=0;s2<3;s2++) px(x-s2, y+h2-3-s2*3, 6+s2*2, 3, s2%2?'#2f4a2c':'#3a5a34'); }
+  } else if(TH.skyline==='colonnade'){
+    px(0,y+8,W,3,'#d8d6cc');
+    for(let x=10;x<W;x+=34){ px(x,y,4,9,'#e8e6dc'); px(x,y,4,1,'#fbfaf4'); px(x-1,y-2,6,2,'#e8e6dc'); }
+    px(0,y-3,W,2,'#c8c6bc');
+  } else if(TH.skyline==='aqueduct'){
+    px(0,y+2,W,4,'#b8846a'); px(0,y+2,W,1,'#d8a486');
+    for(let x=6;x<W;x+=40){ px(x,y+6,8,7,'#b8846a'); px(x+2,y+8,4,5,shade(TH.sky,-14)); }
+  } else if(TH.skyline==='oaks'){
+    for(let i=0;i<7;i++){ const x=20+i*70+((i*23)%16);
+      px(x+4,y+6,3,6,'#4a3a24');
+      px(x-2,y,16,7,'#3f5c34'); px(x,y-2,11,4,'#4a6a3c'); }
+  } else {  // arches — a second storey of the building itself, seen over the rim
+    for(let x=4;x<W;x+=30){ px(x,y-1,26,11,shade(TH.stone,-16));
+      px(x+4,y+2,18,8,shade(TH.stoneSh,-24)); px(x+4,y+2,18,1,'#000'); }
+  }
+}
 function drawArena(){
   const t=FT;
   const shk=SETTINGS.shake? t.shake : 0;
@@ -6822,16 +7014,47 @@ function drawArena(){
   if(t.siege){ drawVillaBg(); }
   else if(t.pit){ drawPitBg(); }
   else {
-    // sky band + VELARIUM: striped canvas awning stretched over the rim
-    px(-4,-4,W+8,12,imperial?'#2a1d40':'#b88a4a');
-    for(let x=-4,i=0;x<W+4;x+=22,i++){ px(x,-4,22,9,i%2?'#c8b088':'#a52828'); px(x,3,22,2,i%2?'#a8926c':'#7a1414');
-      px(x,5,22,1,'rgba(0,0,0,.35)'); }                                  // stripes + awning shadow
-    for(let x=10;x<W;x+=48){ px(x,2,2,9,'#5a4028'); px(x,2,2,1,'#8a6a44'); } // rigging poles
+    /* ---- THE THEATRE DECIDES THE BUILDING ---- */
+    const TH=theatreOf(reg && reg.id ? reg.id : reg);
+    FT._th=TH;
+    if(TH.awning){
+      // VELARIUM: striped canvas stretched over the rim, in this province's colours
+      px(-4,-4,W+8,12,imperial?'#2a1d40':shade(TH.awnA,-26));
+      for(let x=-4,i=0;x<W+4;x+=22,i++){
+        px(x,-4,22,9,i%2?TH.awnB:TH.awnA);
+        px(x,3,22,2,i%2?shade(TH.awnB,-18):shade(TH.awnA,-26));
+        px(x,5,22,1,'rgba(0,0,0,.35)'); }
+      for(let x=10;x<W;x+=48){ px(x,2,2,9,'#5a4028'); px(x,2,2,1,'#8a6a44'); }
+    } else {
+      /* open to the sky. The stand is one tier shallower here so there is
+         actually a horizon to see — with four rows starting at y=10 the sky
+         band and the whole skyline were drawn and then immediately painted
+         over by the crowd. */
+      px(-4,-4,W+8,26,TH.sky);
+      px(-4,20,W+8,3,shade(TH.sky,-18));
+      for(let i=0;i<7;i++){ const cx2=((i*79)%W);            // a few flat clouds
+        ctx.globalAlpha=0.22; px(cx2,2+((i*13)%6),26,3,'#ffffff'); ctx.globalAlpha=1; }
+      drawTheatreSkyline(TH);
+    }
+    FT._ctop = TH.awning? 10 : 24;
+    FT._crows= TH.awning? 4  : 3;
     // crowd tiers (seating)
     drawCrowd();
-    const seatBottom=10+4*14+3; // ~69
+    /* the province's own standard over the gate, so you always know whose
+       ground you are standing on */
+    { const bx=W/2-30, by=(FT._ctop||10)+(FT._crows||4)*14-6;
+      px(bx, by, 60, 3, shade(TH.banner,-30));
+      px(bx+2, by+3, 56, 12, TH.banner);
+      px(bx+2, by+3, 56, 1, shade(TH.banner,28));
+      px(bx+2, by+14, 56, 1, shade(TH.banner,-34));
+      ctx.textAlign='center';
+      pixelText(TH.bannerMark, W/2, by+12, 'rgba(255,246,220,.92)', 0.72);
+      ctx.textAlign='left'; }
+    const seatBottom=(FT._ctop||10)+(FT._crows||4)*14+3;
     const wallTop=seatBottom, wallH=GROUND-wallTop;
-    const wallC=imperial?'#4a3a2e':'#8a6a46', wallSh=imperial?'#352a22':'#6b5236', wallHi=imperial?'#5a4636':'#a07a52';
+    const wallC=imperial?'#4a3a2e':TH.stone,
+          wallSh=imperial?'#352a22':TH.stoneSh,
+          wallHi=imperial?'#5a4636':TH.stoneHi;
     px(0,wallTop,W,wallH,wallC);
     px(0,wallTop,W,3,wallHi);
     px(0,wallTop+3,W,2,wallSh);
@@ -6896,8 +7119,20 @@ function drawArena(){
     px(W-32,GROUND-26,36,24,'#3a2614'); px(W-32,GROUND-26,36,2,'#5a3f28');
     px(W-6,GROUND-14,10,6,'#a08a5a'); px(W-6,GROUND-13,10,1,'#c8b488');                   // bronze ram beak
   }
-  else { px(0,GROUND,W,H-GROUND,'#d8b271'); px(0,GROUND,W,3,'#c79a55');
-    for(let i=0;i<70;i++){ px((i*97)%W,GROUND+4+((i*53)%(H-GROUND-6)),1,1,'#c79a55'); } }
+  else {
+    /* THE SAND IS NOT THE SAME SAND. Thysdrus is desert-pale, Ctesiphon is
+       river-brown, Germania is packed mud that has been rained on. */
+    const TH=FT._th || theatreOf(t.region && t.region.id ? t.region.id : t.region);
+    px(0,GROUND,W,H-GROUND,TH.sand);
+    px(0,GROUND,W,3,TH.sandDk);
+    px(0,GROUND+3,W,1,TH.sandLt);
+    for(let i=0;i<70;i++) px((i*97)%W,GROUND+4+((i*53)%(H-GROUND-6)),1,1,TH.sandDk);
+    // raked lines and the darker patches where it has been used already
+    for(let x=0;x<W;x+=6) px(x,GROUND+7+((x*7)%5),4,1,TH.sandLt);
+    for(let i=0;i<9;i++){ ctx.globalAlpha=0.16;
+      px(((i*137)%W), GROUND+10+((i*41)%(H-GROUND-16)), 22, 4, TH.sandDk); }
+    ctx.globalAlpha=1;
+  }
   // NAUMACHIA rigging: a mast + yard + shroud lines rising over the deck
   if(t.naumachia){ px(W/2-2,52,4,GROUND-52,'#6a4a2c'); px(W/2-2,52,1,GROUND-52,'#8a6a44');
     px(W/2-42,66,84,3,'#5a3f28'); px(W/2-42,66,84,1,'#6e4a2c');
@@ -6972,10 +7207,13 @@ function drawShadow(f){
 }
 function drawCrowd(){
   const mood=FT.crowd, tt=FT.time;
-  const HOTC=['#c8a24a','#a52828','#7d5aa0','#4a7a8c','#b9976a','#c8a9a0','#8a9a5a','#946a4a'];
-  const COLDC=['#887766','#776655','#665544','#558855','#775555','#6a5a6a','#557788','#776644'];
-  for(let row=0;row<4;row++){
-    const y=10+row*14;
+  /* THE CROWD DRESSES LOCALLY. A Gallic terrace and an Egyptian one were the
+     same eight togas in eight colours before this. */
+  const TH=FT._th || theatreOf(FT.region && FT.region.id ? FT.region.id : FT.region);
+  const HOTC=TH.crowdHot, COLDC=TH.crowdCold;
+  const top=FT._ctop||10, rows=FT._crows||4;
+  for(let row=0;row<rows;row++){
+    const y=top+row*14;
     px(0,y,W,14,row%2?'#6a5238':'#5a442e');
     for(let ax=44;ax<W;ax+=96){ px(ax,y,6,14,'#46341f'); px(ax,y,6,1,'#5a442c'); }   // aisle stairways
     for(let x=4+((row*7)%14);x<W;x+=12){
@@ -15112,8 +15350,12 @@ function drawDomus(){
     if(D.kidWalk) drawKidWalk();                        // and so is somebody else's husband
     if(D.escort) drawEscort();                          // he is taking her somewhere
     if(D.gripe) drawRoomComplaint();                    // and somebody small has a grievance
-    if(D.peek) drawPeek();                              // your one look, and then the latch
-    if(!D.rslap && !D.husb && !D.ardor && !D.escort && !(D.rise && D.rise.ph!=='build')
+    /* THE ONE LOOK IS DRAWN LAST OF ALL — see the end of this block. It used
+       to be drawn here, which put the player sprite, the hall labels and
+       whatever else follows straight on TOP of the lit frame: a figure
+       standing in the middle of somebody else's bedchamber at full
+       brightness, which is exactly the "leftover model" it looked like. */
+    if(!D.peek && !D.rslap && !D.husb && !D.ardor && !D.escort && !(D.rise && D.rise.ph!=='build')
        && !(D.drop && D.drop.ph!=='fall')){ const mv=(held.a||held.d), run=mv&&held.s, turning=(D.turn||0)>0;
       const pfy=domusFloorY();                          // the gallery is a floor too
       drawDomusPlayer(D.x,pfy,
@@ -15189,7 +15431,9 @@ function drawDomus(){
             && watchersAbsorbed(privacyTier()==='strict')>0)
       prompt = (prompt||'') + (prompt?'   ·   ':'')
              + '🏛 '+discretionTier().name.toLowerCase()+' — nobody is near enough to mind';
-    if(prompt){ ctx.textAlign='center'; pixelText(prompt,W/2,H-6,'#e8c34a',1); }
+    if(!D.peek && prompt){ ctx.textAlign='center'; pixelText(prompt,W/2,H-6,'#e8c34a',1); }
+    // ---- and NOW the one look, over the top of every last thing in the hall ----
+    if(D.peek) drawPeek();
   } else if(sc.kind==='bath'){
     const T2=sc.t, skin=G.skin||'#caa06a';
     px(78,190,10,10,skin); px(78,188,10,3,G.isFemale?'#3a2618':'#3a2618');           // head above the water
@@ -16504,6 +16748,7 @@ function openVilla(){
   buildMarriageCard(b);
   buildElevateWifeCard(b);
   buildSuitorCard(b);
+  try{ buildParthiaCard(b); }catch(e){}
   try{ buildGravitasCard(b); }catch(e){}
   buildDiscretionCard(b);
   try{ buildFeudCard(b); }catch(e){}
@@ -20792,6 +21037,47 @@ function buildGravitasCard(b){
   b.appendChild(dc);
   return true;
 }
+/* =====================================================================
+   TAKING THE KING'S SALT
+   ---------------------------------------------------------------------
+   Rome and Ctesiphon both bought fighters, and men crossed. Standing in a
+   Parthian province you can change which side of the sand you are on:
+   fight FOR the King of Kings and the man opposite is a Roman, and the
+   terraces are suddenly roaring for you instead of at you.
+   ===================================================================== */
+function inParthia(){ return (THEATRE_OF[G.current]||'')==='persia'; }
+function buildParthiaCard(b){
+  if(!inParthia()) return false;
+  const on=!!G.parthianSide;
+  const card=document.createElement('div'); card.className='shopcard';
+  card.style.borderColor = on? '#c8a02a' : '#8a3a5a';
+  card.innerHTML='<div><b style="color:'+(on?'#c8a02a':'#8a3a5a')+'">𐎧 THE KING’S GROUND — '+G.current+'</b></div>'
+    +'<div class="small muted" style="line-height:1.55">'
+    +(on
+      ? 'You fight under the King of Kings. The man they send out against you is a Roman, '
+        +'and for once the terraces are on your side of it.'
+      : 'You are the foreigner here. The crowd starts against you — <b>22</b> where it would be 50 '
+        +'in Italia — and every cheer has to be taken off them.')
+    +'</div>'
+    +'<div class="small" style="margin-top:3px">crowd at the opening bell: '
+    +'<b style="color:'+(on?'#7ad48a':'#e0705b')+'">'+(on?50:22)+'/100</b>'
+    +' · you face: <b>'+(on? 'Rome’s men' : 'the King’s')+'</b></div>';
+  const bt=document.createElement('button'); bt.className='btn sm'+(on?'':' gold'); bt.style.marginTop='4px';
+  bt.textContent = on? '🦅 GO BACK TO ROME’S SALT' : '𐎧 TAKE THE KING’S SALT';
+  bt.title = on? 'Fight under the eagles again. In Ctesiphon that makes you the away side.'
+    : 'Change sides. Rome will hear about it — but the crowd here will not be against you any more.';
+  bt.onclick=()=>{
+    G.parthianSide=!on;
+    if(G.parthianSide){ G.honor=clamp((G.honor||50)-6,0,100); gravitasHit(8,'public'); }
+    else { G.honor=clamp((G.honor||50)+3,0,100); }
+    toast(G.parthianSide
+      ? '𐎧 You take the King’s salt. Rome notices. (−6 honour, −gravitas) '
+        +'The next man across the sand will be wearing Roman red.'
+      : '🦅 You are Rome’s again. In this province that makes you the foreigner.', 5200);
+    refreshStatbar(); saveQuiet(); openVilla();
+  };
+  card.appendChild(bt); b.appendChild(card); return true;
+}
 /* WHAT THE MONEY BOUGHT — the thing wealth does that the coin counter does
    not show you: how much of your household is far enough away to not mind. */
 function buildDiscretionCard(b){
@@ -23956,6 +24242,8 @@ window.__SS = {
   PEEK_HER, PEEK_HIM, traitsForSex,
   peekHeat, peekReactFor, PEEK_REACT, HEAT_HIM, HEAT_HER, peekAct, PEEK_ACTS,
   gravitas, gravitasRaw, setGravitas, gravitasTier, gravitasHit, gravitasTick, GRAVITAS_TIERS,
+  ARENA_THEATRES, THEATRE_OF, theatreOf, THEATRE_FOES, theatreFoeName, crowdIsHostile,
+  drawTheatreSkyline, makeArenaFoe, inParthia, buildParthiaCard, drawArena, drawCrowd,
   kidDecorum, setDecorum, decorumTier, DECORUM_TIERS, teachDecorum, teachableKids, blurtTick,
   buildGravitasCard,
   INLAW_TRAIT_FX, INLAW_FLAW_FX, inlawTraitsOf, inlawFlawsOf, inlawTick, favourSurcharge,
