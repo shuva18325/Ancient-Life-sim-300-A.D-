@@ -2328,8 +2328,14 @@ function opinionsOfYou(){
   const held=Object.keys(G.titles||{}).length;
   out.push({who:'The mob',        icon:'👥', val:clamp(Math.round((G.pop||0)*0.6 + (G.approval||50)*0.4 + bp.opinion),0,100),
             note:'They love a winner and they love a beautiful house. You are '+(bp.beauty>=8?'both':'one of the two')+'.'});
-  out.push({who:'The Senate',     icon:'🏛', val:clamp(Math.round(40 + (G.senate?18:0) + (G.office||0)*6 + (G.renown||0)/12 + bp.opinion*0.6 - (G.infamy||0)*0.3),0,100),
-            note:G.isFemale? 'They have opinions about a woman with power. Some are even sincere.' : 'They count your clients and your creditors.'});
+  /* THE SENATE IS MEASURING GRAVITAS. It was the one body in Rome that
+     genuinely did not care what you got up to and cared enormously whether
+     anybody could prove it, so the public face weighs heavily here. */
+  const grv=(typeof gravitas==='function')? gravitas() : 60;
+  out.push({who:'The Senate',     icon:'🏛', val:clamp(Math.round(28 + (G.senate?18:0) + (G.office||0)*6 + (G.renown||0)/12 + bp.opinion*0.6 - (G.infamy||0)*0.3 + (grv-50)*0.30),0,100),
+            note:(grv<35? 'They have heard the stories, and they enjoyed them, and they will not forget them.'
+              : grv>=75? 'A man of weight. They let you speak second.'
+              : (G.isFemale? 'They have opinions about a woman with power. Some are even sincere.' : 'They count your clients and your creditors.'))});
   out.push({who:'The legions',    icon:'🦅', val:clamp(Math.round(30 + (G.legionRep||0)*0.6 + (G.soldiers||0)/120 + (G.campaigns||0)*3),0,100),
             note:'Soldiers follow pay, victory and a name they can shout.'});
   out.push({who:'The provinces',  icon:'🌍', val:clamp(Math.round(45 + held*3 - provUnrestAvg()*0.5 + bp.opinion*0.4),0,100),
@@ -5092,6 +5098,7 @@ function freshCareer(name,origin,arch,social){
     mount:0,               // 0 on foot · 1 mule · 2 horse · 3 chariot
     slaves:0, hasVilla:false, boat:false,
     feuds:[], grandkids:0, annivYears:0, morningAfter:null, peeked:{},   // the marriage ledger
+    gravitas:60, peeksTaken:0,                                // the public face
     favor:0, soldiers:0, hidden:[], plotTier:0,   // intrigue: favors, private army, hidden elites, overthrow progress
     emperor:false, approval:50, legions:0, rivals:0, retired:false,  // rule of Rome
     detachments:[], day:0,   // marching army detachments (with travel time)
@@ -5227,7 +5234,7 @@ function elevateWife(rank){
 }
 // fill in any fields missing from older saves
 function migrate(g){ const d={honor:50,food:4,mount:0,slaves:0,hasVilla:false,boat:false,favor:0,soldiers:0,hidden:[],plotTier:0,emperor:false,approval:50,legions:0,rivals:0,retired:false,detachments:[],day:0,titles:{},clears:{},socialClass:'gladiator',army:{},armyGear:0,armyTrain:0,hasOrganizer:false,generals:[],wife:null,married:false,marryPrompted:false,children:[],pregnant:null,lastLoveDay:-9,injury:null,lastDebateDay:-9,office:0,path:null,parthia:50,parthiaPact:false,wifeRel:50,lastTalkDay:-9,isFemale:false,lineage:[],hygiene:70,wifePhys:45,hasPool:false,hasWardrobe:false,legacy:null,lastFeastDay:-9,loveDay:-1,loveQuick:0,loveLong:0,loveNight:0,loveVigil:0,venusUntil:-1,lastWashDay:-9,lastPoolDay:-9,lastWardrobeDay:-9,lastKidsDay:-9,lastBathDay:-9,pila:0,bow:null,bowsOwned:[],nemesis:null,rivalsList:[],trophies:[],nemesisCount:0,pendingDeath:false,ageBase:0,wonProvinceByFight:false,familyMan:false,infamy:0,gladiatrixStage:0,pardoned:false,lastNoteDay:-9,lastNoteReply:'',regalia:[],marryRolls:0,hasBodyMap:false,hasSecretMap:false,jealousy:0,lastJealousDay:-9,traits:[],flaws:[],looks:5,smarts:5,advocate:false,tutorialDone:false,patrons:[],rivalAdv:null,landmarks:[],faction:null,oratory:1,casesWon:0,casesLost:0,renown:0,senate:false,royal:false,lastCaseDay:-9,skills:{footwork:0,guard:0,blade:0,wind:0,throwing:0},scars:[],fatigue:0,lastTrainDay:-9,tribune:false,rank:0,campaigns:0,legionRep:0,lastCampaignDay:-9,units:{legionary:0,auxilia:0,cavalry:0,archers:0,engineers:0},supply:0,sieges:0,body:null,family:null,provinces:{},complaints:[],leniency:50,lastCalloutDay:-9,lastGiftDay:-9,giftsTaken:0,calloutWins:0,crownWorn:false,court:null,lastCoupDay:-99,herbs:{},herbLore:0,ill:null,midwife:false,titlesWorn:[],warExhaust:0,lastExhaustWhy:'',titleRites:[],tombs:[],inheritedFrom:null,hairStyle:null,hairCol:null,beardStyle:null,outfit:null,courtLog:{},lastAskDay:-9,retirePromise:null,promiseBreaks:0,promiseFights:0,tutor:false,freedmen:0,askLog:{},temptHeld:0,temptTook:0,slapDay:-9,slapCount:0,slapsAll:0,doorShut:0,caughtByHouse:0,romanticAll:0,clearedHall:0,lastFamilyDay:-9,namedHeir:null,willSplit:false,purpleWatch:0,kidHouses:[],weddings:0,woohooAll:0,marriedDay:0,
-    feuds:[],grandkids:0,annivYears:0,morningAfter:null,peeked:{}}; for(const k in d){ if(g[k]===undefined) g[k]=d[k]; }
+    feuds:[],grandkids:0,annivYears:0,morningAfter:null,peeked:{},gravitas:60,peeksTaken:0}; for(const k in d){ if(g[k]===undefined) g[k]=d[k]; }
   if(g.wife) ensureQuirks(g.wife);          // a spouse saved before the five bands existed
   if(g.quirks===undefined) g.quirks=rollQuirks();   // and a player from before THEY had any
   if(!g.hairStyle){ const male=!g.isFemale, eth='roman';
@@ -13794,10 +13801,19 @@ function fireWalkIn(sc){
   G.caughtByHouse=(G.caughtByHouse||0)+1;
   G.wifeRel=clamp((G.wifeRel||0)-ri(2,5),0,bondCeiling());
   G.honor=clamp((G.honor||50)-1,0,100);
+  /* THE ROMAN PART. Being seen by your own household is a household matter —
+     unless the child who saw it has never been taught to keep the family
+     face, in which case it is on its way to the forum. */
+  const dec=kidDecorum(c);
+  const where=(dec<40)? 'public' : 'household';
+  const bite=gravitasHit(ri(4,9), where);
   try{ sfx('deny'); }catch(e){}
   toast('🚪 <b>'+kidName(c)+' walks in.</b> '+W.line[0]+'  '+W.line[1]
     +'  <span class="muted">(−♥, −1 honour'
-    +(discretionTier().i<=1? ' — a bigger house would have swallowed this' : '')+')</span>', 6200);
+    +(bite? ', −'+bite+' gravitas' : '')
+    +(discretionTier().i<=1? ' — a bigger house would have swallowed this' : '')+')</span>'
+    +(dec<40? '<br><b style="color:#e0705b">And '+kidName(c)+' has never been taught the face.'
+              +' This will be repeated.</b>' : ''), 6600);
   saveQuiet();
 }
 function startVillaLove(atX, invited, force){
@@ -16488,6 +16504,7 @@ function openVilla(){
   buildMarriageCard(b);
   buildElevateWifeCard(b);
   buildSuitorCard(b);
+  try{ buildGravitasCard(b); }catch(e){}
   buildDiscretionCard(b);
   try{ buildFeudCard(b); }catch(e){}
   buildKidHousesCard(b);
@@ -19118,6 +19135,50 @@ const PEEK_STAGE=[
    ===================================================================== */
 const HEAT_HIM=['nothing to see yet','thinking about it','very obviously ready','past discussing it'];
 const HEAT_HER=['composed','warming to it','flushed to the collarbone','not waiting much longer'];
+/* =====================================================================
+   AND WHAT THEY WERE ACTUALLY DOING
+   ---------------------------------------------------------------------
+   The undress ladder says how far the clothes had got; the heat says how
+   keen each of them is. Neither says what you actually walked in on. The
+   ACT does — and it is rolled separately, so the same tier gives you a
+   different tableau on a different day: kissing, one bent over the bed,
+   one down on their knees, one carried up against the wall, or the pair
+   of them simply asleep and you have interrupted nothing at all.
+   ===================================================================== */
+const PEEK_ACTS=[
+  { id:'talk',   min:0, icon:'💬', lab:'MID-ARGUMENT',
+    note:'They were talking. They have stopped talking.',
+    her:{dx:-26, dy:0,  rot:0,    lean:0}, him:{dx:26, dy:0, rot:0, lean:0} },
+  { id:'kiss',   min:0, icon:'💋', lab:'KISSING',
+    note:'Neither of them heard the latch. One of them still has not.',
+    her:{dx:-12, dy:0,  rot:0,    lean:-2}, him:{dx:12, dy:0, rot:0, lean:2} },
+  { id:'lap',    min:1, icon:'🪑', lab:'ONE IN THE OTHER’S LAP',
+    note:'There is a perfectly good second chair and it is not being used.',
+    her:{dx:-14, dy:-14, rot:0,   lean:0}, him:{dx:10, dy:-2, rot:0, lean:0} },
+  { id:'bent',   min:2, icon:'🛏', lab:'ONE BENT OVER THE BED',
+    note:'You have walked in on a shape that does not need explaining.',
+    her:{dx:-30, dy:-4, rot:1.35, lean:0}, him:{dx:16, dy:0, rot:0, lean:-3} },
+  { id:'wall',   min:2, icon:'🧱', lab:'UP AGAINST THE WALL',
+    note:'A plaster wall, and it has been taking weight for some time.',
+    her:{dx:-28, dy:-16, rot:0,   lean:0}, him:{dx:6,  dy:0, rot:0, lean:-4} },
+  { id:'kneel',  min:3, icon:'🙇', lab:'ONE ON THEIR KNEES',
+    note:'Nobody looks up for a moment. Then everybody does.',
+    her:{dx:-14, dy:-2, rot:0,    lean:0, crouch:0.55}, him:{dx:14, dy:0, rot:0, lean:0} },
+  { id:'sleep',  min:0, icon:'😴', lab:'ASLEEP, BOTH OF THEM',
+    note:'You have interrupted nothing whatsoever. Somehow that is worse.',
+    her:{dx:-30, dy:-18, rot:1.5, lean:0}, him:{dx:14, dy:-18, rot:1.5, lean:0} },
+];
+function peekAct(P){
+  const tier=clamp(P.stage.tier||0,0,4);
+  const pool=PEEK_ACTS.filter(a=>tier>=a.min);
+  // seeded on day + room so the same door gives the same scene all day
+  const h=((G.day||0)*40503 + String(P.room).charCodeAt(0)*7919 + tier*131) % 4294967296;
+  // 'sleep' is a rare joke, not a seventh of everything
+  const useSleep = (h%37)===0;
+  if(useSleep) return PEEK_ACTS.find(a=>a.id==='sleep');
+  const real=pool.filter(a=>a.id!=='sleep');
+  return real[(h>>5) % real.length];
+}
 function peekHeat(P){
   const f=(typeof kidCoupleForecast==='function' && P.occ && P.occ.ref)
     ? kidCoupleForecast(P.occ.ref) : {ard:2};
@@ -19176,6 +19237,7 @@ function startPeek(room, occ){
            phase:pose.phase, shut:false,
            react:peekReactFor(occ.ref), reacted:false };
   D.peek.heat=peekHeat(D.peek);
+  D.peek.act =peekAct(D.peek);
   try{ sfx('dooropen'); }catch(e){}
   saveQuiet();
   return true;
@@ -19195,11 +19257,40 @@ function updatePeek(dt){
     if(!P.shut){ P.shut=true; try{ sfx('doorshut'); }catch(e){} try{ sfx('deny'); }catch(e){} }
   }
   if(P.t>=PEEK_SHUT){
-    const o=P.occ;
+    const o=P.occ, ch=o.ref;
     D.peek=null;
+    /* AND THEY ARE FURIOUS ABOUT IT. Opening that door was free before,
+       which made it a curiosity rather than a decision. It is a decision
+       now: the couple resent it, the house talks about it, and your own
+       public face is worth a little less by supper. */
+    let bits=[];
+    if(ch && ch.spouse){
+      const st=inlawStanding(ch), drop=ri(7,14);
+      setStanding(ch, st-drop);
+      bits.push('−'+drop+' standing with the '+(ch.spouse.house||'house'));
+    }
+    if(ch){ ch.rel=clamp((ch.rel===undefined?55:ch.rel)-ri(3,8),0,100);
+      bits.push('−♥ with '+o.name); }
+    // your own household saw you do it; a shut door would have cost nothing
+    const bite=gravitasHit(ri(3,7), 'household');
+    if(bite) bits.push('−'+bite+' gravitas');
+    G.peeksTaken=(G.peeksTaken||0)+1;
+    /* and once in a while it does not stay in the house */
+    let leaked='';
+    if(Math.random() < clamp(0.12 + (G.peeksTaken||0)*0.04, 0, 0.45)){
+      const out=gravitasHit(ri(6,12), 'public');
+      G.approval=clamp((G.approval||50)-ri(1,3),0,100);
+      leaked='<br><b style="color:#e0705b">🗣 And it does not stay in the house. '
+        +'By evening it is a story in the colonnade about a man who opens doors.'
+        +' (−'+out+' gravitas, −approval)</b>';
+    }
     toast('🔒 The door goes shut in your face and the latch goes across. '
-      +o.name+' and '+o.spouse+' have made their position clear. '
-      +'<span class="muted">That was your one look at '+(PEEK_ROOM[P.room]||{name:'that room'}).name.toLowerCase()+' today.</span>', 5200);
+      +o.name+' and '+o.spouse+' have made their position clear.'
+      +(bits.length? '  <span class="muted">('+bits.join(' · ')+')</span>' : '')
+      + leaked
+      +'<br><span class="muted">That was your one look at '
+      +(PEEK_ROOM[P.room]||{name:'that room'}).name.toLowerCase()+' today.</span>', 6400);
+    saveQuiet();
   }
 }
 /* THE COUPLE, GETTING READY. Purpose-built: this is not the walking pair
@@ -19248,19 +19339,25 @@ function drawPeekPair(cx, fy, P, T){
   const hi=clamp(tier + (tier<3? 1 : 0), 0, 4);
   const mi=clamp(tier - (tier<4? 1 : 0), 0, 4);
   const HER=PEEK_HER[hi], HIM=PEEK_HIM[mi];
+  const A=P.act||PEEK_ACTS[0];
   const hs=her.skin||'#e6bd94', hHair=her.hair||'#5a3a1e';
   const ms=him.skin||'#caa06a', tun=him.dress||G.tunic||'#7a2f22';
   /* a mortified pair pull AWAY from the door; a shameless one does not move */
   const shy=(R.id==='devout'||R.id==='highmaint')? held*5 : 0;
 
   // ================= HER =================
-  const herX=Math.round(cx-24+jolt*0.5-shy);
-  ctx.save(); ctx.translate(herX, Math.round(fy+breathe));
+  const herX=Math.round(cx+A.her.dx+jolt*0.5-shy);
+  ctx.save(); ctx.translate(herX, Math.round(fy+breathe+(A.her.dy||0)));
   ctx.save();
   if(HER.pose==='sit')        ctx.translate(0,-9);
   else if(HER.pose==='kneel') ctx.translate(0,-13);
   else                        ctx.translate(-3,-11);
-  ctx.scale(1.14, HER.pose==='sit'? 0.82 : HER.pose==='kneel'? 0.72 : 1.06);
+  /* the ACT can lay her over, tip her back or drop her down — this is what
+     makes the same undress tier read as a different scene on a different day */
+  if(A.her.rot) ctx.rotate(A.her.rot);
+  if(A.her.lean) ctx.translate(A.her.lean,0);
+  ctx.scale(1.14*(A.her.crouch? 1 : 1),
+    (HER.pose==='sit'? 0.82 : HER.pose==='kneel'? 0.72 : 1.06)*(A.her.crouch||1));
   try{ drawWifeFig(ctx, 0, 0, her, T*0.05, 'idle'); }catch(e){}
   if(HER.strip>=1){
     px(-10,-40,5,15,hHair); px(6,-40,5,13,hHair);
@@ -19301,12 +19398,14 @@ function drawPeekPair(cx, fy, P, T){
   ctx.restore(); ctx.restore();
 
   // ================= HIM =================
-  const himX=Math.round(cx+24-jolt*0.5+shy);
-  ctx.save(); ctx.translate(himX, Math.round(fy-breathe));
+  const himX=Math.round(cx+A.him.dx-jolt*0.5+shy);
+  ctx.save(); ctx.translate(himX, Math.round(fy-breathe+(A.him.dy||0)));
   ctx.save();
   if(HIM.pose==='sit')        ctx.translate(0,-9);
   else if(HIM.pose==='stoop') ctx.translate(0,-2);
-  ctx.scale(1.14, HIM.pose==='sit'? 0.82 : HIM.pose==='stoop'? 0.94 : 1);
+  if(A.him.rot) ctx.rotate(A.him.rot);
+  if(A.him.lean) ctx.translate(A.him.lean,0);
+  ctx.scale(1.14, (HIM.pose==='sit'? 0.82 : HIM.pose==='stoop'? 0.94 : 1)*(A.him.crouch||1));
   try{ drawHusbandFig(ctx, 0, 0, 70, null, null, him, T*0.05, 'idle'); }catch(e){}
   if(HIM.strip===0){
     px(-7,-28,14,3,shade(tun,-34));
@@ -19340,16 +19439,12 @@ function drawPeekPair(cx, fy, P, T){
   ctx.restore();
 
   // ================= WHO IS AHEAD, SAID OUT LOUD =================
-  const gap=Math.abs(HEAT.him-HEAT.her);
+  /* only the two per-person notes live in here, INSIDE the opening. The
+     heat read, the act and the gap are laid out by drawPeek with the rest
+     of the stack — drawn from here they landed on top of the names. */
   ctx.textAlign='center';
-  pixelText(HER.note, cx, fy+8,  'rgba(255,190,214,.72)', 0.60);
-  pixelText(HIM.note, cx, fy+15, 'rgba(190,214,255,.72)', 0.60);
-  // the arousal read, coloured to whoever is further gone
-  const aheadCol = HEAT.him>HEAT.her? '#9ab8ff' : '#ffb0cc';
-  pixelText('♀ '+HEAT_HER[HEAT.her]+'   ·   ♂ '+HEAT_HIM[HEAT.him],
-    cx, fy+23, 'rgba(255,236,214,.85)', 0.62);
-  if(gap>=2) pixelText('— one of them is a long way ahead of the other —',
-    cx, fy+30, aheadCol, 0.56);
+  pixelText(HER.note, cx, fy+6,  'rgba(255,190,214,.72)', 0.58);
+  pixelText(HIM.note, cx, fy+12, 'rgba(190,214,255,.72)', 0.58);
   ctx.textAlign='left';
 
   // ================= AND HOW THEY TOOK IT =================
@@ -19524,17 +19619,26 @@ function drawPeek(){
     ctx.textAlign='center';
     const a=(P.ph==='shut')? clamp(open,0,1) : 1;
     pixelText('👁 '+R.name, W/2, fy2-14, 'rgba(255,224,170,'+(0.95*a).toFixed(2)+')', 1.05);
-    pixelText(P.occ.name+' & '+P.occ.spouse, W/2, fy2+FH+14, 'rgba(255,214,190,'+(0.9*a).toFixed(2)+')', 0.86);
-    pixelText(P.stage.lab, W/2, fy2+FH+24, 'rgba(255,150,190,'+(0.9*a).toFixed(2)+')', 0.74);
+    // ---- the stack under the opening, in order and without collisions ----
+    const HT=P.heat||{him:1,her:1}, ACT=P.act||PEEK_ACTS[0];
+    const gap=Math.abs(HT.him-HT.her);
+    pixelText('♀ '+HEAT_HER[HT.her]+'   ·   ♂ '+HEAT_HIM[HT.him],
+      W/2, fy2+FH+10, 'rgba(255,236,214,'+(0.88*a).toFixed(2)+')', 0.62);
+    if(gap>=2) pixelText('— one of them is a long way ahead of the other —',
+      W/2, fy2+FH+17, (HT.him>HT.her? '#9ab8ff':'#ffb0cc'), 0.54);
+    pixelText(ACT.icon+' '+ACT.lab, W/2, fy2+FH+25, 'rgba(255,208,138,'+(0.95*a).toFixed(2)+')', 0.74);
+    pixelText(P.occ.name+' & '+P.occ.spouse, W/2, fy2+FH+34, 'rgba(255,214,190,'+(0.9*a).toFixed(2)+')', 0.82);
+    pixelText(P.stage.lab, W/2, fy2+FH+42, 'rgba(255,150,190,'+(0.9*a).toFixed(2)+')', 0.70);
     if(P.ph==='hold'){
       // how they took it, in their own character
       const R2=P.react||PEEK_REACT[PEEK_REACT.length-1];
       pixelText(R2.icon+' '+R2.lab, W/2, fy2-24, R2.col, 0.80);
-      pixelText(R2.line, W/2, fy2+FH+34, 'rgba(230,214,196,.82)', 0.64);
+      pixelText(ACT.note, W/2, fy2+FH+50, 'rgba(214,206,190,.76)', 0.60);
+      pixelText(R2.line,  W/2, fy2+FH+57, 'rgba(230,214,196,.82)', 0.62);
       // a shutter countdown, so the "one look" is felt rather than explained
       const left=clamp(1-(T-PEEK_OPEN)/(PEEK_HOLD-PEEK_OPEN),0,1);
-      px(W/2-40, fy2+FH+40, 80, 2, 'rgba(255,255,255,.15)');
-      px(W/2-40, fy2+FH+40, Math.round(80*left), 2, '#ff9ad8');
+      px(W/2-40, fy2+FH+63, 80, 2, 'rgba(255,255,255,.15)');
+      px(W/2-40, fy2+FH+63, Math.round(80*left), 2, '#ff9ad8');
     }
     ctx.textAlign='left';
   }
@@ -19707,6 +19811,71 @@ function weddChild(ch, s){
     ch.loyal = (ch.loyal||0) + 1;
   }
   saveQuiet();
+}
+/* =====================================================================
+   GRAVITAS  —  THE FACE YOU WEAR OUTSIDE THE DOOR
+   ---------------------------------------------------------------------
+   The Roman rule was never "behave". It was: what happens behind your
+   own door is nobody's business, and what happens in front of witnesses
+   is everybody's. A man could keep a household of slaves, a wife he was
+   plainly delighted by and a reputation for stone-faced dignitas at the
+   same time — provided the three never met in public.
+
+   GRAVITAS is that public face. It is not morality: nothing you do in a
+   shut room touches it. It is damaged by being SEEN — caught mid-scene,
+   opening a door you should have walked past, or a child of yours who
+   has not learned to keep the family face in the street. And it is what
+   the Senate is actually measuring when it decides what you are.
+   ===================================================================== */
+/* KEPT AS A FLOAT. Rounding on every write threw away the whole daily drift:
+   60 + 0.24 rounded straight back to 60, so the public face could be lost in
+   an afternoon and never recovered a single point. gravitas() rounds for
+   display; gravitasRaw() is what the arithmetic runs on. */
+function gravitasRaw(){ if(G.gravitas===undefined) G.gravitas=60; return clamp(G.gravitas,0,100); }
+function gravitas(){ return Math.round(gravitasRaw()); }
+function setGravitas(v){ G.gravitas=clamp(v,0,100); }
+const GRAVITAS_TIERS=[
+  {min:0,  name:'A PUBLIC JOKE',        col:'#e0705b',
+   note:'They do impressions of you at dinner parties you are not invited to.'},
+  {min:25, name:'TALKED ABOUT',         col:'#e0a05b',
+   note:'Your name arrives in a room slightly before you do, and not helpfully.'},
+  {min:45, name:'UNREMARKABLE',         col:'#e8c34a',
+   note:'Nobody has anything on you. Nobody has anything to say for you either.'},
+  {min:65, name:'A MAN OF WEIGHT',      col:'#a8d46a',
+   note:'You are quoted. People straighten a little when you come in.'},
+  {min:85, name:'GRAVITAS ITSELF',      col:'#7ad48a',
+   note:'Rome cannot imagine you laughing, which is exactly the idea.'},
+];
+function gravitasTier(){
+  const v=gravitas(); let t=GRAVITAS_TIERS[0];
+  for(const g of GRAVITAS_TIERS) if(v>=g.min) t=g;
+  return Object.assign({v, i:GRAVITAS_TIERS.indexOf(t)}, t);
+}
+/* WHERE YOU ARE STANDING DECIDES WHAT IT COSTS. This is the whole rule in
+   one function: a shut door is free, your own hall is cheap, the street is
+   not. Everything that can embarrass you routes through it. */
+function gravitasHit(base, where){
+  const w=where||'public';
+  const mult = w==='private'? 0            // behind a door: Rome does not get a vote
+             : w==='household'? 0.45       // your own people saw. They talk, but they are yours.
+             : w==='guests'? 0.85
+             : 1;                          // the street
+  // a big house muffles the household tier as well — the same walls, again
+  const muffle = (w==='household')? clamp(1 - discretionTier().i*0.18, 0.3, 1) : 1;
+  const n=base*mult*muffle;
+  if(n<=0) return 0;
+  setGravitas(gravitasRaw()-n);
+  return Math.round(n*10)/10;
+}
+/* and it comes back, slowly, if you give Rome nothing new to talk about */
+function gravitasTick(){
+  if(G.gravitas===undefined) G.gravitas=60;
+  const wellRaised=(G.children||[]).filter(c=>!c.dead && (c.decorum||0)>=70).length;
+  const shame     =(G.children||[]).filter(c=>!c.dead && kidBand(c)!=='baby' && (c.decorum||0)<30).length;
+  let drift=0.14 + wellRaised*0.06 - shame*0.10;
+  drift += ((G.honor||50)-50)*0.004;
+  drift -= feudHeat()*0.004;
+  setGravitas(gravitasRaw()+drift);
 }
 /* =====================================================================
    THE MARRIAGE LEDGER  —  standing, favours, feuds, and grandchildren
@@ -19897,6 +20066,82 @@ function inlawTick(){
     });
   });
 }
+/* =====================================================================
+   TEACHING THEM THE FACE
+   ---------------------------------------------------------------------
+   A Roman child was drilled in exactly the thing this game has been
+   modelling all along: be stone in the street, be a person at home. It
+   is a skill, it is taught, and a child who never learns it will one day
+   say something perfectly true in front of somebody important.
+
+   DECORUM is not obedience and it is not affection — you can have a
+   child who adores you and humiliates you, and the drilling itself costs
+   you a little of the adoring.
+   ===================================================================== */
+function kidDecorum(c){ if(!c) return 0; if(c.decorum===undefined) c.decorum=ri(20,45); return clamp(Math.round(c.decorum),0,100); }
+function setDecorum(c,v){ if(c) c.decorum=clamp(Math.round(v),0,100); }
+const DECORUM_TIERS=[
+  {min:0,  name:'SAYS EVERYTHING',   col:'#e0705b', note:'Whatever is in the house is in the street by evening.'},
+  {min:30, name:'LEARNING',          col:'#e0a05b', note:'Gets it right about half the time, and the half is not predictable.'},
+  {min:55, name:'HOLDS THE FACE',    col:'#e8c34a', note:'Can sit through a dinner and give nothing away.'},
+  {min:78, name:'STONE IN PUBLIC',   col:'#7ad48a', note:'Perfect in the street, and still a person at your own table.'},
+];
+function decorumTier(c){
+  const v=kidDecorum(c); let t=DECORUM_TIERS[0];
+  for(const d of DECORUM_TIERS) if(v>=d.min) t=d;
+  return Object.assign({v}, t);
+}
+const DECORUM_DRILL=[
+  ['“Somebody insults your father in the forum. What does your face do?”','“Nothing.”','“Again. Slower.”'],
+  ['“You are asked at dinner what your mother said this morning.”','“I do not recall.”','Good. Every time.'],
+  ['“A consul makes a joke. It is not funny.”','“I laugh once. Not twice.”','That is the whole of it.'],
+  ['“Someone tells you a rumour about this house.”','“I look bored.”','You look bored. You do NOT correct them.'],
+  ['“You are angry in the street.”','“Then I am angry at home instead.”','Yes.'],
+];
+function teachableKids(){
+  return livingKids().filter(c=>kidBand(c)!=='baby' && kidDecorum(c)<100);
+}
+function teachDecorum(c){
+  if(!c) return null;
+  const before=kidDecorum(c);
+  // clever children take to it faster; a hot-tempered one fights it
+  const smart=(c.smarts===undefined?5:c.smarts);
+  const hard=(c.flaws||[]).includes('proud') || (c.flaws||[]).includes('cruel');
+  const gain=clamp(Math.round(6 + smart*0.9 + rnd(-2,3) - (hard?4:0)), 1, 18);
+  setDecorum(c, before+gain);
+  // it is drilling, not affection, and they know the difference
+  c.rel=clamp((c.rel===undefined?55:c.rel) - ri(0,3), 0, 100);
+  c.drilledDay=G.day;
+  return {before, after:kidDecorum(c), gain, line:pick(DECORUM_DRILL)};
+}
+/* ---- AND THE ONES WHO NEVER LEARNED IT SAY SOMETHING IN PUBLIC ---- */
+const KID_BLURTS=[
+  c=>'“'+kidName(c)+' told the whole colonnade what goes on in your bedchamber. In detail. With gestures.”',
+  c=>'“Somebody asked '+kidName(c)+' whether the rumours were true, and '+kidName(c)+' said yes and then improved on them.”',
+  c=>'“'+kidName(c)+' corrected a senator, at volume, about something the senator was right about.”',
+  c=>'“'+kidName(c)+' repeated, verbatim, a thing you said about the Prefect that you said at home.”',
+  c=>'“Your child was asked how the household is. Your child answered honestly. At length.”',
+];
+function blurtTick(){
+  if(!G.children) return;
+  /* `!c.livesHome===false` parses as `(!c.livesHome)===false`, which threw
+     out every child whose livesHome was undefined — i.e. all of them — so
+     this never fired once. A child who has MOVED OUT is somebody else's
+     embarrassment now; everyone still under this roof counts. */
+  const loose=livingKids().filter(c=>kidBand(c)!=='baby' && kidDecorum(c)<40
+    && c.livesHome!==false);
+  if(!loose.length) return;
+  // the worse they are, and the more there are, the likelier it is
+  const worst=loose.reduce((a,c)=>Math.min(a,kidDecorum(c)),100);
+  const chance=clamp(0.006 + (40-worst)*0.0009 + (loose.length-1)*0.002, 0, 0.045);
+  if(Math.random()>=chance) return;
+  const c=pick(loose);
+  const bite=gravitasHit(ri(5,11), 'public');
+  G.approval=clamp((G.approval||50)-ri(1,3),0,100);
+  c.blurts=(c.blurts||0)+1;
+  G.lastRaid='🗣 '+pick(KID_BLURTS)(c)+'  <span class="muted">(−'+bite+' gravitas. '
+    +kidName(c)+' has never been taught the face.)</span>';
+}
 /* ---------- 5 · GRANDCHILDREN, out of the forecast the augurs read ---------- */
 function grandkidTick(){
   if(!G.children) return;
@@ -19926,6 +20171,8 @@ function grandkidTick(){
 function houseDayTick(){
   grandkidTick();
   inlawTick();                       // 11 · and the in-laws do whatever they are like
+  gravitasTick();                    // the public face mends, slowly, if you let it
+  blurtTick();                       // unless a child of yours opens their mouth
   // a grudge cools on its own, slowly, and does something while it is hot
   feudsList().forEach(f=>{ f.heat=clamp(f.heat-0.7,0,100); });
   G.feuds=feudsList().filter(f=>f.heat>4);
@@ -20493,6 +20740,57 @@ function buildSuitorCard(b){
     row.appendChild(bt);
   });
   card.appendChild(row); b.appendChild(card);
+}
+/* =====================================================================
+   THE FACE, AND TEACHING IT — the villa's own card for both
+   ===================================================================== */
+function buildGravitasCard(b){
+  const T=gravitasTier(), kids=teachableKids();
+  const card=document.createElement('div'); card.className='shopcard';
+  card.style.borderColor=T.col;
+  card.innerHTML='<div><b style="color:'+T.col+'">🗿 GRAVITAS — '+T.name+'</b> '
+    +'<span class="small muted">what Rome thinks you are</span></div>'
+    +'<div style="height:8px;background:#120d08;border:1px solid #3a2c1e;border-radius:2px;'
+    +'overflow:hidden;margin:3px 0"><i style="display:block;height:100%;width:'+T.v+'%;'
+    +'background:linear-gradient(90deg,#5a4326,'+T.col+')"></i></div>'
+    +'<div class="small muted" style="font-style:italic">'+T.note+'</div>'
+    +'<div class="small muted" style="margin-top:4px;line-height:1.55">'
+    +'<b style="color:var(--gold)">Behind a shut door nothing you do touches this.</b> '
+    +'It is damaged by being <i>seen</i> — walked in on, opening a door you should have passed, '
+    +'or a child who repeats the house in the street. Rome does not mind what you are. '
+    +'It minds knowing.</div>';
+  b.appendChild(card);
+  if(!kids.length) return true;
+  // ---- and the drilling ----
+  const dc=document.createElement('div'); dc.className='shopcard';
+  dc.innerHTML='<div><b style="color:var(--gold)">🎭 TEACH THEM THE FACE</b> '
+    +'<span class="small muted">— stone in the street, a person at your own table</span></div>';
+  kids.forEach(c=>{
+    const t=decorumTier(c), cd=G.day-(c.drilledDay===undefined?-99:c.drilledDay);
+    const row=document.createElement('div');
+    row.style.cssText='margin-top:5px;padding-top:4px;border-top:1px dashed #e8c34a22';
+    row.innerHTML='<div class="small">'+(c.sex==='m'?'♂':'♀')+' <b>'+kidName(c)+'</b>'
+      +' <span class="muted">, '+kidAgeYears(c)+'</span> — <b style="color:'+t.col+'">'+t.name+'</b>'
+      +' <span class="muted">('+t.v+'/100)</span>'
+      +(c.blurts? ' <span style="color:#e0705b">· has embarrassed you '+c.blurts+'×</span>':'')+'</div>'
+      +'<div style="height:6px;background:#120d08;border:1px solid #3a2c1e;margin:2px 0">'
+      +'<i style="display:block;height:100%;width:'+t.v+'%;background:'+t.col+'"></i></div>'
+      +'<div class="small muted" style="font-style:italic">'+t.note+'</div>';
+    const bt=document.createElement('button'); bt.className='btn sm'; bt.style.marginTop='3px';
+    bt.textContent='🎭 DRILL '+kidName(c).toUpperCase();
+    bt.disabled = cd<2;
+    bt.title = cd<2? 'You drilled them today. Let it settle.'
+      : 'An hour of questions with the wrong answers corrected. They will like you slightly less and cost you a great deal less.';
+    bt.onclick=()=>{
+      const r=teachDecorum(c); if(!r) return;
+      toast('🎭 '+r.line[0]+'  <i>'+r.line[1]+'</i>  '+r.line[2]
+        +'  <b>('+kidName(c)+' '+r.before+' → '+r.after+' decorum)</b>', 5600);
+      refreshStatbar(); saveQuiet(); openVilla();
+    };
+    row.appendChild(bt); dc.appendChild(row);
+  });
+  b.appendChild(dc);
+  return true;
 }
 /* WHAT THE MONEY BOUGHT — the thing wealth does that the coin counter does
    not show you: how much of your household is far enough away to not mind. */
@@ -23656,7 +23954,10 @@ window.__SS = {
   peekKey, peekUsed, markPeeked, startPeek, updatePeek, drawPeek, sexText,
   drawPeekPair, drawPeekRoom, PEEK_ROOM, PEEK_STAGE, PEEK_OPEN, PEEK_HOLD, PEEK_SHUT,
   PEEK_HER, PEEK_HIM, traitsForSex,
-  peekHeat, peekReactFor, PEEK_REACT, HEAT_HIM, HEAT_HER,
+  peekHeat, peekReactFor, PEEK_REACT, HEAT_HIM, HEAT_HER, peekAct, PEEK_ACTS,
+  gravitas, gravitasRaw, setGravitas, gravitasTier, gravitasHit, gravitasTick, GRAVITAS_TIERS,
+  kidDecorum, setDecorum, decorumTier, DECORUM_TIERS, teachDecorum, teachableKids, blurtTick,
+  buildGravitasCard,
   INLAW_TRAIT_FX, INLAW_FLAW_FX, inlawTraitsOf, inlawFlawsOf, inlawTick, favourSurcharge,
   DOMUS_UPPER, STAIR_X0, STAIR_X1, UPPER_DOORS, domusFloorY, nearStairs, climbStairs, upperDoorAt,
   ROOM_COMPLAINTS, maybeRoomComplaint, updateRoomComplaint, drawRoomComplaint, ROOM_DOOR_X,
