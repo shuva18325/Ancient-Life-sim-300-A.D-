@@ -7204,6 +7204,17 @@ function sfx(kind){
         blip({f:base*2.01, to:base*fm,     d:0.55, type:'triangle', v:0.018, a:0.12});
         blip({f:base*0.5,                  d:0.60, type:'sine',     v:0.030, a:0.10}); }
       break;
+    case 'gasp':           // the intake of breath when a door opens that should not have
+      { const base=R(300,420);
+        hiss({f:2600, to:900, d:0.13, v:0.055, a:0.010, band:true, q:0.7});   // the breath itself
+        blip({f:base, to:base*1.34, d:0.20, type:'sine', v:0.045, a:0.020, rev:true});
+        blip({f:base*1.98, d:0.14, type:'triangle', v:0.014, a:0.030}); }
+      break;
+    case 'scramble':       // cloth grabbed at speed, and something knocked over
+      { hiss({f:3400, to:1200, d:0.16, v:0.050, a:0.006, band:true, q:0.5});
+        hiss({f:2200, to:700,  d:0.20, v:0.038, a:0.010, band:true, q:0.8, at:0.07});
+        blip({f:150, to:80, d:0.18, type:'triangle', v:0.045, a:0.004, at:0.12}); }
+      break;
     case 'giggle':         // three rising blips with vibrato-ish detune, not a scale
       [0,1,2,3].forEach(i=>{
         const f=[540,700,620,820][i];
@@ -19091,6 +19102,63 @@ const PEEK_STAGE=[
   { tier:3, lab:'WELL PAST HALFWAY',      note:'You have interrupted something with momentum.' },
   { tier:4, lab:'YOU ARE VERY LATE',      note:'They do not stop. One of them waves.' },
 ];
+/* =====================================================================
+   THEY ARE NOT IN THE SAME STATE AS EACH OTHER
+   ---------------------------------------------------------------------
+   The undress ladder said how far the CLOTHES had got. It said nothing
+   about the people in them, so both halves of every couple read as
+   equally keen. Each of them now carries their own HEAT, derived but
+   deliberately unequal — one of them is always further gone than the
+   other, and which one it is depends on the pair, not on a coin flip.
+
+   His is drawn with the villa's own arousal renderer (drawTunicBump),
+   so a peek and the Priapic scene agree with each other. Hers is her
+   own set of tells: the flush, the disarranged hair, the hand at her
+   collar and the way she is holding herself.
+   ===================================================================== */
+const HEAT_HIM=['nothing to see yet','thinking about it','very obviously ready','past discussing it'];
+const HEAT_HER=['composed','warming to it','flushed to the collarbone','not waiting much longer'];
+function peekHeat(P){
+  const f=(typeof kidCoupleForecast==='function' && P.occ && P.occ.ref)
+    ? kidCoupleForecast(P.occ.ref) : {ard:2};
+  const tier=clamp(P.stage.tier||0,0,4);
+  // a stable per-day, per-room seed so the same door gives the same answer
+  const h=((G.day||0)*2654435761 + String(P.room).length*7919 + tier*104729) % 4294967296;
+  const lean=(h>>7)%2;                          // which of them is ahead today
+  const base=tier*0.75 + clamp((f.ard||2)/8,0,1)*1.4;
+  let him=clamp(Math.round(base + (lean? 0.9 : -0.7)), 0, 3);
+  let her=clamp(Math.round(base + (lean? -0.7 : 0.9)), 0, 3);
+  /* NEVER LEVEL — and the bump has to go DOWN when it cannot go up, or a
+     pair who are both at the ceiling stay identical, which is exactly the
+     case (top tier, high ardour) you most want to read as lopsided. */
+  if(him===her){
+    if(lean){ if(him<3) him++; else her--; }
+    else     { if(her<3) her++; else him--; }
+    him=clamp(him,0,3); her=clamp(her,0,3);
+  }
+  return {him, her, lean};
+}
+/* HOW THEY TAKE BEING WALKED IN ON. Their quirks decide it, so the same
+   door gives a different scene depending on who is behind it. */
+const PEEK_REACT=[
+  { id:'shameless', icon:'😏', lab:'ENTIRELY UNBOTHERED', col:'#ffb0d0',
+    line:'Neither of them stops. One of them waves.', sfx:'giggle', freeze:0.25 },
+  { id:'devout',    icon:'🕯', lab:'MORTIFIED',           col:'#e0705b',
+    line:'A sheet goes up like a shield and somebody invokes a god by name.', sfx:'scramble', freeze:1 },
+  { id:'tempest',   icon:'⚡', lab:'FURIOUS',             col:'#e0a05b',
+    line:'“OUT.” Something is thrown. It is not close, but it is thrown.', sfx:'deny', freeze:1 },
+  { id:'possessive',icon:'💗', lab:'CLOSES THE GAP',      col:'#ff7ab0',
+    line:'One of them puts an arm across the other and stares at you until you go.', sfx:'gasp', freeze:0.8 },
+  { id:'highmaint', icon:'💅', lab:'AFFRONTED',           col:'#e8c34a',
+    line:'“Does this house not KNOCK?” — asked with real feeling.', sfx:'gasp', freeze:0.9 },
+  { id:'_default',  icon:'😳', lab:'CAUGHT',              col:'#ffd08a',
+    line:'Both of them freeze. Nobody has a good idea about what to do next.', sfx:'gasp', freeze:1 },
+];
+function peekReactFor(ch){
+  const q=(ch && ch.spouse && ch.spouse.quirks)||[];
+  for(const r of PEEK_REACT){ if(r.id!=='_default' && q.includes(r.id)) return r; }
+  return PEEK_REACT[PEEK_REACT.length-1];
+}
 function startPeek(room, occ){
   const D=DM; if(!D || D.peek) return false;
   if(!occ || !occ.ref) return false;
@@ -19105,7 +19173,9 @@ function startPeek(room, occ){
   D.peek={ t:0, room, occ, ph:'open',
            looks:coupleLooks(occ.ref),
            stage:PEEK_STAGE[clamp(pose.tier||0,0,PEEK_STAGE.length-1)],
-           phase:pose.phase, shut:false };
+           phase:pose.phase, shut:false,
+           react:peekReactFor(occ.ref), reacted:false };
+  D.peek.heat=peekHeat(D.peek);
   try{ sfx('dooropen'); }catch(e){}
   saveQuiet();
   return true;
@@ -19115,6 +19185,11 @@ function updatePeek(dt){
   const D=DM, P=D.peek; if(!P) return;
   P.t+=dt;
   if(P.ph==='open' && P.t>=PEEK_OPEN){ P.ph='hold'; }
+  // the beat where they realise the door is open, and answer it in character
+  if(!P.reacted && P.t>=PEEK_OPEN+8){
+    P.reacted=true;
+    try{ sfx(P.react.sfx||'gasp'); }catch(e){}
+  }
   if(P.ph==='hold' && P.t>=PEEK_HOLD){
     P.ph='shut';
     if(!P.shut){ P.shut=true; try{ sfx('doorshut'); }catch(e){} try{ sfx('deny'); }catch(e){} }
@@ -19154,89 +19229,179 @@ const PEEK_HIM=[
 ];
 function drawPeekPair(cx, fy, P, T){
   const him=P.looks.him, her=P.looks.her, tier=clamp(P.stage.tier||0,0,4);
-  const startle=clamp(1-(T-PEEK_OPEN)/24,0,1);         // they both flinch at the light
-  const jolt=startle*2.4*Math.sin(T*0.9);
+  const HEAT=P.heat||{him:1,her:1,lean:0};
+  const R=P.react||PEEK_REACT[PEEK_REACT.length-1];
+  const since=T-PEEK_OPEN;
+  /* TWO CLOCKS. `flash` is the instant of recognition and it is over in half
+     a second. `held` is how they go on behaving for the rest of the look —
+     the first cut only had the flash, so by the time you were actually
+     looking at the frame every reaction rendered identically. */
+  const freeze=(R.freeze===undefined?1:R.freeze);
+  /* `freeze` scales only how hard they JUMP. It must not dim the persistent
+     in-character visual as well — a shameless pair barely startle, but the
+     raised hand is their whole reaction and was coming out at 22% alpha. */
+  const flash=clamp(1-since/26,0,1)*freeze;
+  const held =clamp(0.40+0.60*clamp(1-since/150,0,1),0,1);
+  const startle=flash;
+  const jolt=flash*2.4*Math.sin(T*0.9);
   const breathe=Math.sin(T*0.05)*0.6;
-  /* ONE STEP APART. She leads at the lower rungs, he catches up at the top —
-     so you never walk in on two people doing the identical thing. */
-  const hi=clamp(tier + (tier<3? 1 : 0), 0, 4);        // her step
-  const mi=clamp(tier - (tier<4? 1 : 0), 0, 4);        // his step
+  const hi=clamp(tier + (tier<3? 1 : 0), 0, 4);
+  const mi=clamp(tier - (tier<4? 1 : 0), 0, 4);
   const HER=PEEK_HER[hi], HIM=PEEK_HIM[mi];
   const hs=her.skin||'#e6bd94', hHair=her.hair||'#5a3a1e';
   const ms=him.skin||'#caa06a', tun=him.dress||G.tunic||'#7a2f22';
+  /* a mortified pair pull AWAY from the door; a shameless one does not move */
+  const shy=(R.id==='devout'||R.id==='highmaint')? held*5 : 0;
 
   // ================= HER =================
+  const herX=Math.round(cx-24+jolt*0.5-shy);
+  ctx.save(); ctx.translate(herX, Math.round(fy+breathe));
   ctx.save();
-  ctx.translate(Math.round(cx-24+jolt*0.5), Math.round(fy+breathe));
-  ctx.save();
-  if(HER.pose==='sit')        ctx.translate(0,-9);      // up on the bed edge
+  if(HER.pose==='sit')        ctx.translate(0,-9);
   else if(HER.pose==='kneel') ctx.translate(0,-13);
   else                        ctx.translate(-3,-11);
   ctx.scale(1.14, HER.pose==='sit'? 0.82 : HER.pose==='kneel'? 0.72 : 1.06);
   try{ drawWifeFig(ctx, 0, 0, her, T*0.05, 'idle'); }catch(e){}
-  // --- her own undress step, inside the same transform so it lines up ---
-  if(HER.strip>=1){                                    // pins out, hair loose either side
+  if(HER.strip>=1){
     px(-10,-40,5,15,hHair); px(6,-40,5,13,hHair);
     px(-10,-40,5,2,shade(hHair,26)); px(6,-40,5,2,shade(hHair,26));
   }
-  if(HER.strip>=2){                                    // the gown off one shoulder
+  if(HER.strip>=2){
     px(-11,-34,9,7,hs); px(-11,-34,9,2,shade(hs,22));
     const dr=shade(her.dress||'#a8407a',-18);
     px(-16,-27,10,10,dr); px(-16,-27,10,2,shade(dr,24));
   }
-  if(HER.strip>=3){                                    // and it is over the rail, not on her
+  if(HER.strip>=3){
     px(-20,-20,9,8,shade(her.dress||'#a8407a',-26));
     px(-13,-30,13,12,hs); px(-13,-30,13,2,shade(hs,20));
   }
-  // arms, by posture
-  if(HER.pose==='sit'){ px(7,-36,4,10,hs); px(6,-40,7,4,hs); }          // one hand up at her hair
-  else if(HER.pose==='kneel'){ px(-14,-24,4,9,hs); px(9,-24,4,9,hs); }  // both hands down on the bed
-  else { px(9,-38,13,4,hs); px(9,-38,13,1,shade(hs,22));                // reaching across to him
-         px(20,-40,5,5,hs); }
+  /* ---- HER OWN HEAT. Not his renderer: a flush that climbs from the
+     collarbone to the face, hair pushed out of the way, and a hand that
+     ends up at her own throat. ---- */
+  if(HEAT.her>=1){
+    const fl=0.16+0.13*HEAT.her+0.04*Math.sin(T*0.09);
+    ctx.globalAlpha=clamp(fl,0,0.62);
+    px(-9,-33,18,6,'#e0607a');                                  // chest and throat
+    if(HEAT.her>=2){ px(-7,-46,5,4,'#e0607a'); px(3,-46,5,4,'#e0607a'); }   // and the cheeks
+    ctx.globalAlpha=1;
+  }
+  if(HEAT.her>=2){                                              // hair pushed back off her face
+    px(-13,-47,4,6,hHair); px(10,-47,4,5,hHair);
+  }
+  if(HEAT.her>=3){                                              // and she is not sitting still
+    const arch=Math.sin(T*0.11)*1.3;
+    px(-8,-30+arch,16,3,shade(hs,-14));
+    ctx.globalAlpha=0.55; px(-2,-52,4,4,'#ffd0dc'); ctx.globalAlpha=1;
+  }
+  // arms, by posture — and at full heat one hand is at her own collar
+  if(HEAT.her>=2){ px(2,-40,4,9,hs); px(0,-44,7,4,hs); }
+  else if(HER.pose==='sit'){ px(7,-36,4,10,hs); px(6,-40,7,4,hs); }
+  else if(HER.pose==='kneel'){ px(-14,-24,4,9,hs); px(9,-24,4,9,hs); }
+  else { px(9,-38,13,4,hs); px(9,-38,13,1,shade(hs,22)); px(20,-40,5,5,hs); }
   ctx.restore(); ctx.restore();
 
   // ================= HIM =================
-  ctx.save();
-  ctx.translate(Math.round(cx+24-jolt*0.5), Math.round(fy-breathe));
+  const himX=Math.round(cx+24-jolt*0.5+shy);
+  ctx.save(); ctx.translate(himX, Math.round(fy-breathe));
   ctx.save();
   if(HIM.pose==='sit')        ctx.translate(0,-9);
   else if(HIM.pose==='stoop') ctx.translate(0,-2);
   ctx.scale(1.14, HIM.pose==='sit'? 0.82 : HIM.pose==='stoop'? 0.94 : 1);
   try{ drawHusbandFig(ctx, 0, 0, 70, null, null, him, T*0.05, 'idle'); }catch(e){}
-  if(HIM.strip===0){                                   // hands still on the belt
+  if(HIM.strip===0){
     px(-7,-28,14,3,shade(tun,-34));
     px(-10,-29,4,6,ms); px(6,-29,4,6,ms);
-  } else if(HIM.strip===1){                            // the belt is off and in one hand
+  } else if(HIM.strip===1){
     px(-11,-26,4,10,ms);
     px(-17,-18,7,3,shade(tun,-40)); px(-17,-15,3,7,shade(tun,-40));
     px(7,-28,4,7,ms);
-  } else if(HIM.strip===2){                            // over the head, face inside it
+  } else if(HIM.strip===2){
     px(-9,-56,18,13,tun); px(-9,-56,18,3,shade(tun,24));
     px(-12,-50,4,13,ms);  px(8,-50,4,13,ms);
-    px(-6,-40,12,12,ms);  px(-6,-40,12,2,shade(ms,20));  // the bared chest under it
-  } else {                                             // shirt off, and it is on the floor
+    px(-6,-40,12,12,ms);  px(-6,-40,12,2,shade(ms,20));
+  } else {
     px(-20,-3,18,5,tun); px(-20,-3,18,2,shade(tun,22));
     px(-7,-42,14,17,ms); px(-7,-42,14,2,shade(ms,22));
-    px(-7,-33,14,1,shade(ms,-24)); px(-2,-40,1,13,shade(ms,-18)); // a little definition
-    if(HIM.pose==='sit'){ px(-13,-30,5,10,ms); px(-16,-22,8,4,ms); } // an arm out behind her
+    px(-7,-33,14,1,shade(ms,-24)); px(-2,-40,1,13,shade(ms,-18));
+    if(HIM.pose==='sit'){ px(-13,-30,5,10,ms); px(-16,-22,8,4,ms); }
     else { px(-12,-34,4,12,ms); px(8,-34,4,12,ms); }
   }
-  ctx.restore(); ctx.restore();
-
-  // ---- and both heads come round to the door you just opened ----
-  if(startle>0.02){
-    ctx.globalAlpha=startle;
-    ctx.textAlign='center';
-    pixelText('!', cx-24, fy-58, '#ffd08a', 1.05);
-    pixelText('!', cx+24, fy-62, '#ffd08a', 1.05);
-    ctx.textAlign='left';
-    ctx.globalAlpha=1;
+  ctx.restore();
+  /* ---- HIS HEAT, through the villa's own renderer, so a peek and the
+     Priapic scene agree with one another. Outside the vertical squash so
+     the proportions do not get crushed with the pose. ---- */
+  if(HEAT.him>=1){
+    const stage=Math.round(clamp(HEAT.him,0,3)/3*(RISE_STAGES-1));
+    const yOff=(HIM.pose==='sit')? -9 : (HIM.pose==='stoop')? -2 : 0;
+    ctx.save(); ctx.translate(0,yOff); ctx.scale(1.06,1.06);
+    try{ drawTunicBump(0, 0, him, stage, T, 1, HIM.strip<2); }catch(e){}
+    ctx.restore();
   }
-  // ---- and the caption says who is where, because they are not the same ----
+  ctx.restore();
+
+  // ================= WHO IS AHEAD, SAID OUT LOUD =================
+  const gap=Math.abs(HEAT.him-HEAT.her);
   ctx.textAlign='center';
   pixelText(HER.note, cx, fy+8,  'rgba(255,190,214,.72)', 0.60);
   pixelText(HIM.note, cx, fy+15, 'rgba(190,214,255,.72)', 0.60);
+  // the arousal read, coloured to whoever is further gone
+  const aheadCol = HEAT.him>HEAT.her? '#9ab8ff' : '#ffb0cc';
+  pixelText('♀ '+HEAT_HER[HEAT.her]+'   ·   ♂ '+HEAT_HIM[HEAT.him],
+    cx, fy+23, 'rgba(255,236,214,.85)', 0.62);
+  if(gap>=2) pixelText('— one of them is a long way ahead of the other —',
+    cx, fy+30, aheadCol, 0.56);
   ctx.textAlign='left';
+
+  // ================= AND HOW THEY TOOK IT =================
+  // the instant of recognition
+  if(flash>0.02){
+    ctx.globalAlpha=flash;
+    ctx.textAlign='center';
+    if(R.id!=='shameless'){ pixelText('!', herX, fy-58, R.col, 1.05); pixelText('!', himX, fy-62, R.col, 1.05); }
+    ctx.textAlign='left';
+    ctx.globalAlpha=1;
+  }
+  /* and then each of them goes on behaving in character for the whole look */
+  if(held>0.03){
+    if(R.id==='devout'){
+      // the sheet stays up. It is the only thing between you and a scandal.
+      const h2=Math.round(34*held)+12;
+      ctx.globalAlpha=clamp(held*1.05,0,0.94);
+      px(cx-33, fy-50, 60, h2, '#e8dcc8');
+      px(cx-33, fy-50, 60, 2, '#fff6e4');
+      px(cx-33, fy-50+h2-2, 60, 2, shade('#e8dcc8',-30));
+      for(let i=0;i<4;i++) px(cx-25+i*15, fy-48, 1, h2-4, shade('#e8dcc8',-14));  // folds
+      ctx.globalAlpha=1;
+    }
+    else if(R.id==='shameless'){
+      // a raised hand, and neither of them has stopped
+      ctx.globalAlpha=clamp(held,0,0.95); ctx.textAlign='center';
+      pixelText('🖐', cx+26, fy-64+Math.sin(T*0.14)*1.6, '#ffd08a', 0.95);
+      ctx.textAlign='left'; ctx.globalAlpha=1;
+    }
+    else if(R.id==='tempest'){
+      // something is in the air, on its way to you, and not going to reach
+      const k=(T*0.06)%1, tx=cx+18-k*46, ty=fy-58+Math.sin(k*3.14159)*-16+k*22;
+      ctx.globalAlpha=clamp(held,0,0.95);
+      px(tx, ty, 5, 4, '#c07830'); px(tx, ty, 5, 1, '#e0965a');
+      ctx.textAlign='center'; pixelText('💢', herX, fy-66, '#e0705b', 0.85); ctx.textAlign='left';
+      ctx.globalAlpha=1;
+    }
+    else if(R.id==='possessive'){
+      // an arm thrown across the other one, and a stare
+      ctx.globalAlpha=clamp(held,0,0.9);
+      px(cx-18, fy-40, 40, 4, him.skin||'#caa06a');
+      px(cx-18, fy-40, 40, 1, shade(him.skin||'#caa06a',22));
+      ctx.textAlign='center'; pixelText('👁', cx, fy-70, '#ff7ab0', 0.8); ctx.textAlign='left';
+      ctx.globalAlpha=1;
+    }
+    else if(R.id==='highmaint'){
+      ctx.globalAlpha=clamp(held,0,0.9); ctx.textAlign='center';
+      pixelText('💅', herX-6, fy-64, '#e8c34a', 0.85);
+      pixelText('“…”', himX, fy-66, 'rgba(220,206,190,.8)', 0.7);
+      ctx.textAlign='left'; ctx.globalAlpha=1;
+    }
+  }
 }
 
 /* THE ROOM ITSELF. Everything here is proportional to the frame — the first
@@ -19330,8 +19495,21 @@ function drawPeek(){
   if(open>0.42){
     ctx.save();
     ctx.beginPath(); ctx.rect(fx,fy2,FW,FH); ctx.clip();
-    // stood on the room's floor line, a shade right of centre so the bed reads behind them
-    drawPeekPair(fx+FW*0.60, fy2+FH-Math.round(FH*0.10), P, T);
+    const pcx=fx+FW*0.60, pfy=fy2+FH-Math.round(FH*0.10);
+    /* THE LAMP IS ON ONE SIDE, SO THEY THROW SHADOWS. Two soft blocks on the
+       back wall, leaning away from the light and swaying with its flicker —
+       it is what stops the pair looking pasted onto a flat panel. */
+    { const fl=0.68+0.22*Math.sin(T*0.11)+0.08*Math.sin(T*0.29);
+      const lean=6*fl;
+      ctx.globalAlpha=0.24*fl;
+      px(pcx-40-lean, pfy-Math.round(FH*0.46), 26, Math.round(FH*0.46), '#100a06');
+      px(pcx+6-lean,  pfy-Math.round(FH*0.52), 28, Math.round(FH*0.52), '#100a06');
+      ctx.globalAlpha=1; }
+    drawPeekPair(pcx, pfy, P, T);
+    // a vignette inside the opening, so the eye goes to the middle of it
+    { const g2=ctx.createRadialGradient(fx+FW/2, fy2+FH/2, FH*0.30, fx+FW/2, fy2+FH/2, FH*0.95);
+      g2.addColorStop(0,'rgba(0,0,0,0)'); g2.addColorStop(1,'rgba(8,5,3,.58)');
+      ctx.fillStyle=g2; ctx.fillRect(fx,fy2,FW,FH); }
     ctx.restore();
   }
   // the jamb, and the two leaves closing back over it
@@ -19349,7 +19527,10 @@ function drawPeek(){
     pixelText(P.occ.name+' & '+P.occ.spouse, W/2, fy2+FH+14, 'rgba(255,214,190,'+(0.9*a).toFixed(2)+')', 0.86);
     pixelText(P.stage.lab, W/2, fy2+FH+24, 'rgba(255,150,190,'+(0.9*a).toFixed(2)+')', 0.74);
     if(P.ph==='hold'){
-      pixelText(P.stage.note, W/2, fy2+FH+34, 'rgba(220,206,190,.78)', 0.66);
+      // how they took it, in their own character
+      const R2=P.react||PEEK_REACT[PEEK_REACT.length-1];
+      pixelText(R2.icon+' '+R2.lab, W/2, fy2-24, R2.col, 0.80);
+      pixelText(R2.line, W/2, fy2+FH+34, 'rgba(230,214,196,.82)', 0.64);
       // a shutter countdown, so the "one look" is felt rather than explained
       const left=clamp(1-(T-PEEK_OPEN)/(PEEK_HOLD-PEEK_OPEN),0,1);
       px(W/2-40, fy2+FH+40, 80, 2, 'rgba(255,255,255,.15)');
@@ -23475,6 +23656,7 @@ window.__SS = {
   peekKey, peekUsed, markPeeked, startPeek, updatePeek, drawPeek, sexText,
   drawPeekPair, drawPeekRoom, PEEK_ROOM, PEEK_STAGE, PEEK_OPEN, PEEK_HOLD, PEEK_SHUT,
   PEEK_HER, PEEK_HIM, traitsForSex,
+  peekHeat, peekReactFor, PEEK_REACT, HEAT_HIM, HEAT_HER,
   INLAW_TRAIT_FX, INLAW_FLAW_FX, inlawTraitsOf, inlawFlawsOf, inlawTick, favourSurcharge,
   DOMUS_UPPER, STAIR_X0, STAIR_X1, UPPER_DOORS, domusFloorY, nearStairs, climbStairs, upperDoorAt,
   ROOM_COMPLAINTS, maybeRoomComplaint, updateRoomComplaint, drawRoomComplaint, ROOM_DOOR_X,
