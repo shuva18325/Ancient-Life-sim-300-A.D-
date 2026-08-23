@@ -8934,11 +8934,11 @@ function openPortrait(){
   c.fillStyle='#3a2c1e'; c.fillRect(0,222,480,28); for(let fx=0;fx<480;fx+=24){c.fillStyle='#2c2014';c.fillRect(fx,222,1,28);}
   // the family, gathered
   const bond=G.wifeRel|0, spouseMale=!!(G.wife&&G.wife.male);
-  if(G.wife && !spouseMale){ const wc=document.createElement('canvas'); wc.width=wc.height=148; drawBridePortrait(wc,G.wife,true);
+  if(G.wife && !spouseMale){ const wc=document.createElement('canvas'); wc.width=wc.height=148; drawBridePortrait(wc,G.wife,true,wifePregMonth());
     c.drawImage(wc, 186,106, 148*0.78,148*0.78); }                                                       // the domina
   else if(G.isFemale){ // the head of the house is herself the domina — paint HER at the center, on HER OWN scores
     const me=Object.assign(playerLook(), {build:'curvy',neckline:'fine',rank:'noble',adj:'Roman',jewel:true});
-    const wc=document.createElement('canvas'); wc.width=wc.height=148; drawBridePortrait(wc,me,true);
+    const wc=document.createElement('canvas'); wc.width=wc.height=148; drawBridePortrait(wc,me,true,selfPregMonth());
     c.drawImage(wc, 186,106, 148*0.78,148*0.78); }
   // her lord at her side — drawn on HIS measurements, face tier and all
   if(spouseMale){ c.save(); c.translate(324,224); c.scale(1.95,1.95);
@@ -9996,6 +9996,20 @@ function conceiveChance(base, w, tierFert){
     + (hasQuirk('nightowl')?0.07:0) + (hasBoon('goldenwomb')?0.34:0)
     - (hasFlaw('barren')?0.28:0) - (hasFlaw('sickly')?0.10:0)
     + (tierFert||0);
+}
+/* WHO IS ACTUALLY CARRYING. G.pregnant is one flag on G regardless of which
+   of the pair it is, and the game already picks a side in the toast the
+   moment it happens: "YOU are with child" when G.isFemale, "SHE is with
+   child" otherwise. These two match that wording exactly, so the villa
+   sprite and the family portrait bump the same person the announcement
+   named — never both, never neither. */
+function wifePregMonth(){
+  if(!G.pregnant || G.isFemale) return 0;
+  return clamp(9-Math.ceil((G.pregnant.due-G.day)/3),1,9);
+}
+function selfPregMonth(){
+  if(!G.pregnant || !G.isFemale) return 0;
+  return clamp(9-Math.ceil((G.pregnant.due-G.day)/3),1,9);
 }
 // the villa's own try, on the same odds a quick session gets
 function villaConceive(){
@@ -11943,8 +11957,8 @@ function domusExit(){ DM=null; $('statbar').classList.remove('hide'); openVilla(
 // THE DOMINA, drawn from her actual measurements. mode: idle | walk | run | god
 // Her BODY SCORES drive the sprite — a FLAT 1 is visibly flat, a COLOSSAL 10 is not.
 // A fine figure also gets real jiggle on the step.
-function drawWifeFig(c,x,y,w,ph,mode){
-  mode=mode||'idle'; ph=ph||0;
+function drawWifeFig(c,x,y,w,ph,mode,preg){
+  mode=mode||'idle'; ph=ph||0; preg=preg||0;
   const P=(a,b2,ww,h,col)=>{c.fillStyle=col;c.fillRect(Math.round(x+a),Math.round(y+b2),Math.round(ww),Math.round(h));};
   const skin=w.skin||'#e6bd94', sSh=shade(skin,-26), dress=w.dress||'#eae4d6', hair=w.hair||'#5a3a1e';
   const dSh=shade(dress,-22), dHi=shade(dress,26);
@@ -12200,8 +12214,27 @@ function drawWifeFig(c,x,y,w,ph,mode){
     if(bT>=4){ P(-2, hy+2, 4, deep-3, shade(dress,-30)); }            // colossal: a real cleft down the middle
     if(bT===0){ P(-hipW+1+hj, hy+2, (hipW-1)*2, 5, dress); }          // FLAT: barely wider than her waist
   }
-  // ================= WAIST (cinched) =================
-  P(-waistW/2, top-13, waistW, 8, shade(dress,-8));
+  // ================= WAIST — cinched, unless she is carrying =================
+  if(preg>0){
+    /* SHE IS CARRYING. The waist does not cinch, it rounds — and it grows
+       with the same nine months G.pregnant.due already counts down (month
+       1 barely shows; month 9 is unmistakable). Drawn as a CURVE — a row
+       at a time, narrow at top and bottom and fullest through the middle
+       — rather than a rectangle, which read as a block bolted onto her
+       torso instead of a belly. */
+    const term=clamp(preg/9,0.15,1);
+    const maxw=Math.max(2,Math.round(waistW*0.5+hipW*0.6*term));
+    const bh3=Math.round(9+term*7), by0=top-17;
+    for(let i=0;i<bh3;i++){
+      const rw=Math.max(1,Math.round(1+maxw*Math.sin((i/(bh3-1))*Math.PI)));
+      P(-rw, by0+i, rw*2, 1, dress);
+    }
+    P(-Math.round(maxw*0.45), by0+Math.round(bh3*0.28), 1, Math.round(bh3*0.5), dHi);  // lit near flank
+    P(Math.round(maxw*0.40), by0+Math.round(bh3*0.32), 1, Math.round(bh3*0.42), dSh);  // shaded far flank
+    if(noble) P(-1, by0+bh3-2, 2, 3, '#e8c34a');                   // the sash, riding under the swell now
+  } else {
+    P(-waistW/2, top-13, waistW, 8, shade(dress,-8));
+  }
   // ================= BODICE + BUST =================
   P(-6+lean*0.4, top-24, 12, 12, dress); P(-6+lean*0.4, top-24, 12, 2, dHi);
   /* ---- THE BUST, ON THE SAME FIVE RUNGS AS THE REAR: FLAT · RAISED · GOOD ·
@@ -13725,34 +13758,51 @@ function ardorBlockedWhy(){
 }
 function drawArdorIcon(x,y,t){
   if(typeof ardorReady!=='function' || !ardorReady()) return;
+  const D=DM;
+  /* IT USED TO HANG OVER HIS HEAD FOR THE WHOLE HALL — "GET HARD" floating
+     above him next to the slaves, next to the kids, in a screenshot of the
+     kitchen with nobody around. It is an invitation to walk over to HER; now
+     it only exists once he already has, the same 26px window every other
+     prompt at her side already uses (the slap prompt, the romantic prompt). */
+  if(!D || Math.abs(x-D.wifeX)>=26) return;
   const on = (typeof ardorAvailableNow==='function') && ardorAvailableNow();
   const bob = on? Math.sin(t*0.05)*2 : 0;
-  /* the first draft sat AT head height (y-64) and overlapped the hair, with a
-     flame and an L crammed into the same 10x10 badge fighting each other.
+  const sway = Math.round((on? Math.sin(t*0.045)*1.6 : Math.sin(t*0.018)*0.6));  // it HANGS, and it swings
+  /* the first draft sat AT head height (y-64) and overlapped the hair.
      Measured against a real figure: head top sits around y-58 to y-62 for
-     most builds, so the badge needs real clearance above that — and one
-     legible glyph beats two illegible ones. */
-  const cy = y-84+bob;
+     most builds, so the charm needs real clearance above that. */
+  const cy = y-84+bob, cx = x+sway;
   const glow = on? (0.7+0.3*Math.sin(t*0.09)) : 0.55;
   ctx.save(); ctx.globalAlpha=glow;
-  const gold='#e8c34a', dim='#7a7264', ring=on? gold : dim;
-  const plate=on? '#3a2e10' : '#20201c';
-  // a small diamond badge — plate, then the ring drawn OVER it
-  px(x-6,cy-6,12,12, plate);
-  px(x-3,cy-7,6,1,ring); px(x-3,cy+6,6,1,ring);
-  px(x-7,cy-3,1,6,ring); px(x+6,cy-3,1,6,ring);
-  px(x-6,cy-6,1,1,ring); px(x+5,cy-6,1,1,ring);
-  px(x-6,cy+5,1,1,ring); px(x+5,cy+5,1,1,ring);
-  // four short rays, so it reads as "a mark" and not just a frame — brighter
-  // and longer only once a press would actually land
-  const rl=on?3:1, rc=on? '#ffe8a0' : dim;
-  px(x-1,cy-9-rl,2,rl,rc); px(x-1,cy+8,2,rl,rc);
-  px(x-9-rl,cy-1,rl,2,rc); px(x+8,cy-1,rl,2,rc);
+  const bronze='#c8933a', bronzeHi='#f0d484', bronzeSh='#8a5c22';
+  const dim='#7a7264', dimHi='#9a9488', dimSh='#4a4438';
+  const met=on?bronze:dim, metHi=on?bronzeHi:dimHi, metSh=on?bronzeSh:dimSh;
+  /* A TINTINNABULUM — a real Roman bronze charm, hung over a doorway or a
+     hearth for luck: a ring to hang it by, a winged shaft, a bell at the
+     tip. Soldiers wore smaller versions as pendants. Not a system emoji —
+     built from the same px() rectangles as everything else in this game,
+     and it is exactly the kind of thing Rome actually hung here. */
+  px(cx-6,cy-17,13,26, on? 'rgba(58,46,16,.55)':'rgba(32,32,28,.5)');  // a soft plate, so it reads over anything
+  // the ring it hangs from
+  px(cx-2,cy-15,4,1,met); px(cx-2,cy-11,4,1,met);
+  px(cx-3,cy-14,1,3,met); px(cx+2,cy-14,1,3,met);
+  // the shaft, lit on one side
+  px(cx-1,cy-10,3,8,met); px(cx-1,cy-10,1,8,metHi); px(cx+1,cy-10,1,8,metSh);
+  // two swept wings, partway down — the tell that this is a CHARM, not a tool
+  px(cx-4,cy-6,3,1,met); px(cx-5,cy-5,2,1,met); px(cx-5,cy-6,1,1,metHi);
+  px(cx+2,cy-6,3,1,met); px(cx+4,cy-5,2,1,met); px(cx+5,cy-6,1,1,metHi);
+  // the rounded bronze tip
+  px(cx-2,cy-2,5,3,met); px(cx-2,cy-2,5,1,metHi); px(cx-1,cy+1,3,1,metSh);
+  // a bell hung off it, swinging its own beat, slightly out of phase
+  const bsway=Math.round((on? Math.sin(t*0.045+0.7)*1.1 : 0));
+  px(cx+bsway,cy+2,1,2,met);
+  px(cx-1+bsway,cy+4,3,3,met); px(cx-1+bsway,cy+4,3,1,metHi);
+  px(cx+bsway,cy+7,1,1,metSh);                                     // the clapper, just showing
   ctx.restore();
   ctx.textAlign='center';
-  pixelText('L', x, cy, on? '#ffe8a0' : 'rgba(200,196,186,.8)', 1.15);
-  if(on) pixelText('GET HARD', x, cy-16, '#ffce7a', 0.85);
-  else{ const why=ardorBlockedWhy(); if(why) pixelText(why, x, cy-14, 'rgba(255,170,150,.9)', 0.72); }
+  if(on) pixelText('GET HARD', x, cy-20, '#ffce7a', 0.85);
+  else{ const why=ardorBlockedWhy(); if(why) pixelText(why, x, cy-20, 'rgba(255,170,150,.9)', 0.72); }
+  pixelText('L', x, cy+15, on? '#ffe8a0' : 'rgba(200,196,186,.8)', 1.0);
   ctx.textAlign='left';
 }
 function drawDrop(){
@@ -15336,7 +15386,7 @@ function drawDomus(){
       else if(D.drop && D.drop.ph!=='fall'){ /* the drop draws him where HE is, not where he idles */ }
       else if(D.escort){ /* the escort draws BOTH of them, in the hold */ }
       else if(w.male) drawHusbandFig(ctx,D.wifeX,FY,G.wifeRel|0,w.skin,w.dress,w,wPh,wMode);
-      else drawWifeFig(ctx,D.wifeX,FY,w,wPh,wMode);
+      else drawWifeFig(ctx,D.wifeX,FY,w,wPh,wMode,wifePregMonth());
     }
     /* ---- THE NEXT GENERATION, underfoot and growing ----
        Not during the romantic one. You send them out, they take a couple of
@@ -16032,8 +16082,9 @@ function drawCardPortrait(cnv,A,sex,rank){
 }
 // FULL-BODY portrait of a prospective wife — contrapposto pose, figure on show
 // pass bare=true for a transparent figure sprite (cutscenes)
-function drawBridePortrait(cnv,b,bare){
+function drawBridePortrait(cnv,b,bare,preg){
   if(!ADULT) bare=false;   // never render the unclothed variant with mature content off
+  preg=preg||0;
   const c=cnv.getContext('2d'); c.imageSmoothingEnabled=false;
   const CW=cnv.width,CH=cnv.height;
   if(bare) c.clearRect(0,0,CW,CH);
@@ -16172,13 +16223,32 @@ function drawBridePortrait(cnv,b,bare){
   P(hips-8,hipTop,2,hipBot-hipTop,dSh);                                        // front hip shadow
   // girdle low on the hips
   P(bx0+1,hipTop,hips+bw2-2,2,noble?gold:shade(dress,-52)); if(noble)P(0,hipTop,2,2,goldHi);
-  // ================= WAIST =================
+  // ================= WAIST — or the belly, if she is carrying =================
   const wx=-(waistW/2)|0;
-  P(wx,bustBot+1,waistW,hipTop-bustBot-1,dress);
-  P(wx,bustBot+1,1,hipTop-bustBot-1,dSh); P(wx+waistW-1,bustBot+1,1,hipTop-bustBot-1,dSh);
-  P(wx+2,bustBot+1,1,hipTop-bustBot-1,dHi);
-  // cinched sash under the bust
-  P(wx-1,bustBot,waistW+2,2,noble?gold:shade(dress,-52)); if(noble)P(0,bustBot,2,2,goldHi);
+  if(preg>0){
+    /* SHE IS CARRYING. The same nine months G.pregnant.due counts down for
+       the household's announcement — month 1 barely shows, month 9 fills
+       the waist column and pushes past it. Drawn row by row as a CURVE,
+       narrow where it meets the bust and the hips and fullest between —
+       a rectangle here read as a growth, not a belly. */
+    const term=clamp(preg/9,0.15,1);
+    const maxw=Math.max(2,Math.round(waistW*0.5+hips*0.5*term));
+    const by1=bustBot+1, bh4=hipTop-bustBot-1;
+    for(let i=0;i<bh4;i++){
+      const rw=Math.max(1,Math.round(1+maxw*Math.sin((i/(bh4-1))*Math.PI)));
+      P(-rw,by1+i,rw*2,1,dress);
+    }
+    P(-Math.round(maxw*0.45),by1+Math.round(bh4*0.28),1,Math.round(bh4*0.5),dHi);   // lit near flank
+    P(Math.round(maxw*0.40),by1+Math.round(bh4*0.32),1,Math.round(bh4*0.42),dSh);   // shaded far flank
+    P(wx-1,bustBot,waistW+2+Math.round(maxw*0.7),2,noble?gold:shade(dress,-52));
+    if(noble)P(0,bustBot,2,2,goldHi);
+  } else {
+    P(wx,bustBot+1,waistW,hipTop-bustBot-1,dress);
+    P(wx,bustBot+1,1,hipTop-bustBot-1,dSh); P(wx+waistW-1,bustBot+1,1,hipTop-bustBot-1,dSh);
+    P(wx+2,bustBot+1,1,hipTop-bustBot-1,dHi);
+    // cinched sash under the bust
+    P(wx-1,bustBot,waistW+2,2,noble?gold:shade(dress,-52)); if(noble)P(0,bustBot,2,2,goldHi);
+  }
   /* ============ BUST — FIVE DRAWN TIERS, exactly as the rear has ============
      FLAT · RAISED · GOOD · BIG · HUGE. Each is its own piece of art, not one
      shape scaled: a flat chest gets a plain bodice with no cups to part and no
@@ -24703,7 +24773,7 @@ window.__SS = {
   spouseTierName, tierBadge, slapLabel, drawSlap, startSlapAnim, startRomantic, drawHusbandFig, drawVillaMale,
   livingKids, kidsOfBand,
   slapKick, slapJigTick, slapJig, slapLive,
-  conceiveChance, villaConceive,
+  conceiveChance, villaConceive, wifePregMonth, selfPregMonth,
   figureScore, selfStage, stageIndex, courtBonus, courtCultivateCost, COURT_LEVERS, SHADOW_STAGES, shadowStage,
   drawHusbandFigTest:drawHusbandFig, drawGroomPortrait, briadeImg, openPortrait,
   drawKinPortrait, kinLook, kinInherit, kinAge, ageMarks, greyHair, agedSkin, mixHex,
