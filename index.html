@@ -1284,6 +1284,50 @@ function coverageOf(w){
   if(age>=44) cov=clamp(cov+0.12,0,1);
   return clamp(cov, 0, 1);
 }
+/* =====================================================================
+   TRIBAL RANK — a chieftain's wife did not dress like a herdsman's
+   ---------------------------------------------------------------------
+   The coverage system said money buys CLOTH, which is the Roman rule and
+   only the Roman rule. Among the tribes money did not buy more cloth at
+   all \u2014 it bought METAL. The Celtic and Germanic elite are unmistakable
+   in the archaeology by weight of gold and bronze on the body: torcs at
+   the throat (the Snettisham and Vix finds), heavy penannular brooches
+   pinning the cloak at the shoulder, arm-rings, and cloth that is dyed and
+   CHECKED rather than undyed homespun. The silhouette barely changes.
+   The wealth is worn, not wrapped.
+   ===================================================================== */
+function isTribal(cultId){ return cultId==='celt' || cultId==='germanic'; }
+/* 0..1 — how much metal and colour this house puts on its women. */
+function tribalRank(w){
+  const c=personCulture(w);
+  if(!isTribal(c.id)) return 0;
+  /* BLENDED, not maxed. Taking max() of the bride's own house tier sent
+     every noble match straight to the top rung and the two middle rungs
+     were unreachable — a four-step ladder with two steps missing. Her
+     birth is a FLOOR and a contribution; the house you have built her
+     into is the rest of it. */
+  const mine=classRank();
+  const born = (w && (w.tier==='imperial'))? 0.95
+             : (w && w.tier==='elite')? 0.78
+             : (w && w.rank==='noble')? 0.58
+             : (w && w.tier==='rich')? 0.42 : 0.14;
+  return clamp(mine*0.55 + born*0.45, 0, 1);
+}
+function tribalTier(w){
+  const r=tribalRank(w);
+  return r>=0.78? {i:3, name:'A CHIEFTAIN\u2019S WIFE', note:'Gold at the throat, gold on both arms, and a cloak nobody else in the settlement owns.'}
+       : r>=0.52? {i:2, name:'OF THE FIRST FAMILIES', note:'A heavy brooch, a torc, and cloth that has been dyed on purpose.'}
+       : r>=0.26? {i:1, name:'A FREE HOUSEHOLD',      note:'One good brooch, and the wool is checked rather than plain.'}
+       : {i:0, name:'THE COMMON RUN', note:'Undyed homespun, pinned with iron, and no metal worth taking.'};
+}
+/* the checked cloth the tribes are actually known for */
+function tribalCloth(P, x, y, w2, h2, base, T){
+  const a=shade(base,16), b2=shade(base,-24);
+  P(x,y,w2,h2,base);
+  for(let i=0;i<w2;i+=6){ P(x+i,y,2,h2,a); }
+  for(let j=0;j<h2;j+=6){ P(x,y+j,w2,2,b2); }
+  for(let i=0;i<w2;i+=6){ for(let j=0;j<h2;j+=6){ P(x+i,y+j,2,2,shade(base,30)); } }
+}
 function coverageBand(w){
   const c=coverageOf(w);
   return c>=0.90? 'wrapped' : c>=0.72? 'covered' : c>=0.55? 'modest'
@@ -1418,6 +1462,444 @@ const MORES = {
   },
 };
 function moresOf(id){ return MORES[id] || MORES.roman; }
+/* =====================================================================
+   THE MOS — WHAT ROME ACTUALLY OBJECTED TO, AND WHY
+   ---------------------------------------------------------------------
+   This is the part that was wrong before, and it was wrong in a way that
+   matters: the game treated "being seen" as the only sin, which is a
+   modern assumption. Rome did not rank acts by how far they went. It
+   ranked them on TWO axes that have nothing to do with our instincts:
+
+   1 · THE PENETRATION MODEL. A free adult male citizen \u2014 a VIR \u2014 was
+       required to be the one doing the penetrating, always, whoever the
+       partner was. To be penetrated made him a PATHICUS, and that word
+       ended careers: it was the standing insult Late Republican senators
+       threw at each other precisely because it destroyed VIRTUS. The sex
+       of the partner was close to irrelevant. The DIRECTION was everything.
+
+   2 · THE MOUTH. This is the big one and the game had none of it. Romans
+       held that performing oral sex left the mouth permanently polluted \u2014
+       OS IMPURUM, the filthy mouth \u2014 and they meant it literally: such a
+       mouth was thought to defile what it breathed on. It was catastrophic
+       because the mouth was the organ of ORATORY, of the courts, of the
+       Senate, and of the kiss of greeting between citizens. A man under
+       that charge could not share a cup. Catullus builds Carmen 80 out of
+       the accusation; Martial made a career of it. CUNNILINGUS ranked as
+       the most degrading thing a Roman man could be accused of, worse than
+       being penetrated, because it combined both axes at once.
+
+   3 · AND THE STATUS OF THE OTHER PERSON decided whether it was a crime at
+       all. With your own slave or a registered prostitute: nothing, no
+       offence, not remarked on. With a freeborn Roman: STUPRUM.
+
+   WHICH MEANS: from behind is unremarkable. Her on top is a small matter
+   of a matrona forgetting her dignity. His mouth is a career-ending
+   pollution that money cannot buy off \u2014 the ONE thing in Rome rank does
+   not shield, which is why Martial could mock rich men for it.
+
+   AND NOWHERE ELSE HELD ANY OF THIS. Egypt had no concept of virginity,
+   put erotic art in temples and tombs, and the Turin papyrus lays out
+   twelve positions with no apparent embarrassment at all. Greece kept
+   savage rules for WIVES and almost none at the symposium. Germania did
+   not care what you did \u2014 only whether you were faithful, and there the
+   penalty was the harshest of the seven.
+   ===================================================================== */
+const ACTS = [
+  { id:'mos',     name:'MORE MAIORUM',      latin:'mos maiorum',
+    short:'The way of the elders',
+    gloss:'What everyone assumes happens and nobody remarks on. There is no story here, and that is the point of it.' },
+  { id:'supine',  name:'THE NATURAL MANNER', latin:'mulier subtus',
+    short:'Her beneath',
+    gloss:'Ovid, Ars Amatoria, advising a man to pick by her figure: \u201cshe who is noteworthy in face, let her be supine.\u201d Rome\u2019s default, and Rome\u2019s idea of proper.' },
+  { id:'aversa',  name:'MORE FERARUM',      latin:'coitus a tergo',
+    short:'From behind',
+    gloss:'\u201cIn the manner of beasts.\u201d Named in the poets without embarrassment and shown on lamps, cups and wall-paintings all over Italy. He is still the one acting, so the model is satisfied and Rome has nothing to say.' },
+  { id:'astride', name:'MULIER EQUITANS',   latin:'mulier equitans',
+    short:'She rides',
+    gloss:'She is above and she is the one moving \u2014 which inverts the direction Rome built its whole scheme on. Ovid recommends it; a MATRONA doing it is a small forgetting of dignity, and the sort of thing a hostile poet remembers.' },
+  { id:'oralHer', name:'FELLATIO',          latin:'fellatio',
+    short:'Her mouth',
+    gloss:'OS IMPURUM \u2014 the filthy mouth. To perform it was held to pollute the mouth permanently. Receiving it read as dominance; the shame fell entirely on whoever gave it, and Rome expected that to be a slave or a prostitute, never a wife.' },
+  { id:'oralHim', name:'CUNNILINGUS',       latin:'cunnilingus',
+    short:'His mouth',
+    gloss:'The most degrading charge that could be laid against a Roman man, worse than being penetrated: it makes him the one serving, AND it ruins the mouth he speaks in the Senate with. Martial built whole books on the accusation.' },
+];
+const ACT_BY_ID={}; ACTS.forEach(a=>ACT_BY_ID[a.id]=a);
+/* TABOO, 0..1, by people. 0 = nobody would remark on it. 1 = it ends you.
+   These are not vibes; each column is defensible from the sources and the
+   ROWS DISAGREE WITH EACH OTHER ON PURPOSE, because the peoples did. */
+const TABOO = {
+  //            mos  supine aversa astride oralHer oralHim
+  roman:     { mos:0.00, supine:0.00, aversa:0.06, astride:0.30, oralHer:0.72, oralHim:0.95 },
+  greek:     { mos:0.00, supine:0.00, aversa:0.04, astride:0.20, oralHer:0.45, oralHim:0.70 },
+  egyptian:  { mos:0.00, supine:0.00, aversa:0.02, astride:0.05, oralHer:0.10, oralHim:0.12 },
+  persian:   { mos:0.00, supine:0.00, aversa:0.10, astride:0.35, oralHer:0.55, oralHim:0.62 },
+  celt:      { mos:0.00, supine:0.00, aversa:0.03, astride:0.06, oralHer:0.20, oralHim:0.22 },
+  germanic:  { mos:0.00, supine:0.00, aversa:0.03, astride:0.05, oralHer:0.18, oralHim:0.18 },
+  numidian:  { mos:0.00, supine:0.00, aversa:0.05, astride:0.18, oralHer:0.35, oralHim:0.42 },
+};
+/* WHAT EACH PEOPLE SAYS ABOUT THE TWO THAT DIVIDE THEM. */
+const TABOO_VOICE = {
+  roman:    'The mouth is how a citizen speaks in the courts and greets his equals. Rome will not drink after a mouth that has done that.',
+  greek:    'Sharper about it than Egypt and softer than Rome — and what happens at a symposium is not what happens in the women\u2019s rooms.',
+  egyptian: 'No concept of virginity, erotic scenes painted in the tombs, and a papyrus at Thebes that walks through twelve positions without apology.',
+  persian:  'A matter of rank, like everything else here. What a satrap does is a satrap\u2019s business.',
+  celt:     'The tribes did not build a moral system out of this. They built one out of loyalty.',
+  germanic: 'Tacitus is explicit: they do not care what you do. They care, terribly, whether you were faithful.',
+  numidian: 'Between the houses, and shame travels the coast faster than a ship.',
+};
+/* ---- OS IMPURUM: the one stain money does not wash off ----
+   Martial mocked RICH men for this, which is the tell: the lex Iulia
+   loophole shielded a senator who used a slave, but nothing shielded a
+   senator whose mouth was suspect. So this deliberately ignores
+   classRank() where every other exposure in the game respects it. */
+/* =====================================================================
+   HOW FAR ROME'S OPINION ACTUALLY REACHES
+   ---------------------------------------------------------------------
+   This is the distinction the first cut got wrong, and it turns out the
+   sources draw it very sharply:
+
+   THE LAW TRAVELS. Augustan marriage and adultery legislation was NOT a
+   thing that stopped at the Italian coast. The Gnomon of the Idios Logos
+   \u2014 the rulebook for the imperial administrator in Egypt \u2014 devotes
+   something like 26 of its 62 chapters to Augustan marriage law, policing
+   who may marry whom across Romans, astoi and Egyptians, backed by the
+   provincial census. If you are a citizen, adulterium follows you to the
+   Nile.
+
+   THE REPUTATION DOES NOT. OS IMPURUM was never a statute. There is no
+   court, no penalty, no magistrate \u2014 it is INVECTIVE, and specifically
+   LATIN invective: Catullus and Martial, epigram and dinner-party malice,
+   an audience of Latin-speaking men who can end each other over a rumour.
+   That machinery is concentrated exactly where that audience is, which is
+   Rome and Italia, and it thins with every mile from the Palatine. In a
+   Greek city in Asia there is nobody whose opinion can do that to you.
+
+   So: the LAW is carried by legalExposure(), which does not care where you
+   are. The SHAME is carried by this, which cares enormously.
+   ===================================================================== */
+/* =====================================================================
+   WHERE MEN ACTUALLY FOUGHT — and it was NOT an amphitheatre everywhere
+   ---------------------------------------------------------------------
+   The game called every venue in the empire a colosseum, and outside the
+   Latin west that is simply wrong.
+
+   THE WEST built the thing on purpose. Purpose-built stone amphitheatres
+   dominate Italia, Gaul, Iberia and AFRICA — Thysdrus (El Djem) is one of
+   the largest in the whole empire, so North Africa keeps its arena.
+
+   THE GREEK EAST DID NOT BUILD THEM. Those cities already had a stadium
+   and a theatre and they simply used those: purpose-built amphitheatres
+   are rare in the east and instead older Greek theatres were converted for
+   gladiators and beast shows. At Aphrodisias they threw a curved wall
+   across the running track of the STADIUM to close off one end for the
+   fights. So in Asia and Achaea you fight on a running track with a wall
+   built across it, or on an orchestra floor in front of tiered Greek seats.
+
+   PERSIA HAD NO SUCH THING AT ALL. The Parthian and Sasanian nobility had
+   three occupations — fighting, feasting and THE HUNT — and their spectacle
+   was the royal game-park, the archery butts, and CHOVGAN, the mounted ball
+   game, played by teams of nobles (Shapur II is recorded learning it at
+   seven). Nobody in Ctesiphon paid to watch a man die on sand.
+
+   GERMANIA HAD NO VENUE AND NO PROFESSIONALS. Tacitus, Germania 24: naked
+   youths dance among swords and levelled spears for the pleasure of the
+   watchers and NOTHING ELSE — "they are not professionals or paid." And
+   Germania 10: to read the outcome of a serious war they take a captive of
+   the enemy nation and match him against a champion of their own, each
+   armed in his native style, and the result is the omen. That is the
+   nearest thing to a match out there, and it is a rite, not a show.
+
+   THE CELTS settled it at the table. Posidonius, quoted in Athenaeus:
+   the hind quarter — the CHAMPION'S PORTION — went to the bravest man
+   present, and a dispute over who that was was settled by single combat
+   on the spot, to the death.
+   ===================================================================== */
+const VENUES = {
+  amphitheatre: {
+    id:'amphitheatre', name:'THE AMPHITHEATRE', kind:'arena',
+    verb:'fights', crowd:1.0, roofed:false, sand:true, tiers:'oval',
+    note:'Purpose-built stone, an oval of sand, and the whole town in the seats.',
+    src:'The western provinces built these on purpose. Thysdrus in Africa is among the largest anywhere.',
+  },
+  stadium: {
+    id:'stadium', name:'THE STADIUM', kind:'arena',
+    verb:'fights', crowd:0.85, roofed:false, sand:true, tiers:'long',
+    note:'A running track with a curved wall thrown across one end to pen the fighting in.',
+    src:'The Greek east did not build amphitheatres. At Aphrodisias they walled off the stadium instead.',
+  },
+  theatre: {
+    id:'theatre', name:'THE CONVERTED THEATRE', kind:'arena',
+    verb:'fights', crowd:0.80, roofed:false, sand:true, tiers:'semicircle',
+    note:'An old Greek theatre with the orchestra floor turned over to blood.',
+    src:'Existing theatres across the Greek east were adapted for gladiators and beast shows.',
+  },
+  maydan: {
+    id:'maydan', name:'THE KING\u2019S MAYDAN', kind:'court',
+    verb:'rides against', crowd:0.45, roofed:false, sand:false, tiers:'none',
+    note:'A royal ground: the game-park wall on one side, the archery butts on the other, and the chovgan field between.',
+    src:'Parthian and Sasanian nobles hunted, shot and played chovgan. There were no amphitheatres in Persia.',
+  },
+  holt: {
+    id:'holt', name:'THE SWORD-DANCE', kind:'rite',
+    verb:'stands against', crowd:0.30, roofed:false, sand:false, tiers:'none',
+    note:'A clearing, levelled spears, and men who are not paid and never were.',
+    src:'Tacitus 24: naked youths dance among swords and spears \u2014 "they are not professionals or paid."',
+  },
+  omen: {
+    id:'omen', name:'THE CAPTIVE\u2019S COMBAT', kind:'rite',
+    verb:'is matched against', crowd:0.35, roofed:false, sand:false, tiers:'none',
+    note:'A captive of the enemy nation against a champion of ours, each in his own gear. The result is the omen.',
+    src:'Tacitus 10: this is how they forecast the issue of a serious war.',
+  },
+  feast: {
+    id:'feast', name:'THE CHAMPION\u2019S PORTION', kind:'rite',
+    verb:'disputes the portion with', crowd:0.40, roofed:true, sand:false, tiers:'none',
+    note:'The hind quarter goes to the bravest man at the table, and anyone may dispute it where he stands.',
+    src:'Posidonius, in Athenaeus: the dispute was settled by single combat, to the death.',
+  },
+};
+/* WHICH ONE THIS PROVINCE ACTUALLY HAS. */
+const VENUE_OF = {
+  italia:'amphitheatre', africa:'amphitheatre', iberia:'amphitheatre', gallia:'amphitheatre',
+  asia:'stadium',
+  persia:'maydan',
+  germania:'holt',
+};
+/* IF ROME HAS BEEN THERE LONG ENOUGH, ROME HAS BUILT ONE.
+   The first cut keyed the venue off CULTURE alone and produced nonsense:
+   it sent you to a Celtic feast-hall duel in Hispania Baetica and in
+   Gallia, two of the most thoroughly Romanised provinces in the empire.
+   Nîmes, Arles and Lyon all have amphitheatres standing today, and so do
+   Mérida, Italica and Tarragona. By 300 AD those are Roman towns with
+   Roman arenas in them. The rite belongs to the places Rome never
+   digested \u2014 free Germania, the Parthian east, and the far north. */
+const VENUE_REGION = {
+  /* Romanised, and it shows in the stonework */
+  'Italia':'amphitheatre', 'Gallia':'amphitheatre', 'Gallia Narbonensis':'amphitheatre',
+  'Gallia Lugdunensis':'amphitheatre', 'Hispania Baetica':'amphitheatre',
+  'Hispania Tarraconensis':'amphitheatre', 'Lusitania':'amphitheatre',
+  'Africa Proconsularis':'amphitheatre', 'Numidia':'amphitheatre',
+  'Mauretania':'amphitheatre', 'Cyrenaica':'amphitheatre',
+  'Dalmatia':'amphitheatre', 'Pannonia':'amphitheatre', 'Noricum':'amphitheatre',
+  'Raetia':'amphitheatre', 'Moesia':'amphitheatre', 'Dacia':'amphitheatre',
+  'Britannia':'amphitheatre',            // Chester, Caerleon, London all had one
+  'Germania Inferior':'amphitheatre', 'Germania Superior':'amphitheatre',
+  /* the Greek east used what it already had */
+  'Achaea':'stadium', 'Macedonia':'stadium', 'Thracia':'stadium',
+  'Asia Minor':'stadium', 'Bithynia':'stadium', 'Galatia':'stadium',
+  'Cappadocia':'stadium', 'Cilicia':'theatre', 'Syria':'theatre',
+  'Syria Palaestina':'theatre', 'Judaea':'theatre', 'Aegyptus':'theatre',
+  /* and the places Rome never held */
+  'Germania Magna':'holt', 'Sarmatia':'holt',
+  'Caledonia':'feast', 'Hibernia':'feast',
+  'Persis':'maydan', 'Parthia':'maydan', 'Mesopotamia':'maydan', 'Armenia':'maydan',
+  'Arabia':'maydan',
+};
+function venueHere(regionId){
+  const save=(typeof G!=='undefined'&&G)? G.current : null;
+  if(regionId && typeof G!=='undefined' && G) G.current=regionId;
+  let vid=null;
+  try{
+    // a NAMED province wins: it is a fact about what is standing there
+    vid=VENUE_REGION[G.current];
+    if(!vid){
+      // otherwise fall back on whose land it is
+      const cult=localCulture().id;
+      vid = cult==='celt'? 'feast' : cult==='germanic'? 'holt'
+          : cult==='persian'? 'maydan' : cult==='greek'? 'stadium'
+          : cult==='egyptian'? 'theatre' : null;
+    }
+    if(!vid){
+      const th=(typeof THEATRE_OF!=='undefined' && G)? THEATRE_OF[G.current] : null;
+      vid=VENUE_OF[th]||'amphitheatre';
+    }
+  }catch(e){}
+  if(save!==null && typeof G!=='undefined' && G) G.current=save;
+  return VENUES[vid]||VENUES.amphitheatre;
+}
+function venueName(regionId){ return venueHere(regionId).name; }
+/* is this a paying SHOW, or a rite that nobody sells tickets to? */
+function venueIsShow(regionId){ return venueHere(regionId).kind==='arena'; }
+const REPUTATION_REACH = {
+  /* the Palatine itself: every rival you have has dinner here */
+  'Italia':1.00,
+  /* the Latin West — the same language, the same invective, fewer rivals */
+  'Hispania Baetica':0.55, 'Hispania Tarraconensis':0.50, 'Lusitania':0.45,
+  'Gallia':0.55, 'Gallia Narbonensis':0.60, 'Gallia Lugdunensis':0.50,
+  'Britannia':0.30, 'Dalmatia':0.50, 'Pannonia':0.42, 'Noricum':0.42,
+  'Raetia':0.40, 'Moesia':0.40, 'Dacia':0.30,
+  'Africa Proconsularis':0.55, 'Numidia':0.42, 'Mauretania':0.35, 'Cyrenaica':0.35,
+  /* THE GREEK EAST — a different language and a different set of insults.
+     Nobody here is writing Latin epigrams about your mouth. */
+  'Achaea':0.22, 'Macedonia':0.24, 'Thracia':0.26,
+  'Asia Minor':0.18, 'Bithynia':0.20, 'Galatia':0.20, 'Cappadocia':0.20,
+  'Cilicia':0.20, 'Syria':0.24, 'Syria Palaestina':0.24, 'Judaea':0.24,
+  'Aegyptus':0.20, 'Arabia':0.18,
+  /* beyond the frontier there is no Roman audience at all */
+  'Germania Magna':0.05, 'Germania Inferior':0.30, 'Germania Superior':0.30,
+  'Persis':0.04, 'Parthia':0.04, 'Mesopotamia':0.10, 'Armenia':0.10,
+  'Sarmatia':0.05, 'Caledonia':0.05, 'Hibernia':0.05,
+};
+function reputationReach(){
+  if(typeof G==='undefined' || !G) return 1;
+  const r=REPUTATION_REACH[G.current];
+  if(r!==undefined) return r;
+  // anything unlisted: fall back on how Roman the local people are
+  const here=localCulture().id;
+  return here==='roman'? 0.75 : here==='greek'? 0.22 : here==='egyptian'? 0.20
+       : here==='numidian'? 0.45 : here==='persian'? 0.05 : 0.12;
+}
+function reachBand(){
+  const v=reputationReach();
+  return v>=0.85? ['UNDER EVERY EYE IN ROME','#e0524a']
+       : v>=0.45? ['THE LATIN WEST — word travels','#e0894a']
+       : v>=0.15? ['THE GREEK EAST — nobody here writes Latin epigrams','#a8c06a']
+       : ['BEYOND THE FRONTIER — there is no Roman audience at all','#8ac06a'];
+}
+function actTabooRaw(actId, cultureId){
+  const T=TABOO[cultureId||localCulture().id] || TABOO.roman;
+  const v=T[actId];
+  return (v===undefined? 0 : v);
+}
+function isOralAct(actId){ return actId==='oralHer' || actId==='oralHim'; }
+function actTaboo(actId){
+  /* WHERE YOU ARE STANDING DECIDES THIS, AND NOTHING ELSE DOES.
+     Not your people, and specifically NOT your wife's — an Egyptian wife
+     does not make cunnilingus safe on the Palatine and a Roman wife does
+     not make it dangerous in Ephesus. The thing that ends you is an
+     audience of Latin-speaking rivals, and that audience is in Rome. */
+  const raw=actTabooRaw(actId) * reputationReach();
+  if(isOralAct(actId)) return clamp(raw,0,1);   // rank buys NOTHING here, on purpose
+  // everything else is bought off the ordinary way, by standing
+  const M=localMores();
+  const shield=(M.classImmunity===undefined?0.5:M.classImmunity)*classRank()*0.7;
+  return clamp(raw*(1-shield), 0, 1);
+}
+/* WHO WEARS IT. Rome loaded the whole of it onto whoever performed, and
+   expected that never to be the wife of a citizen. */
+function actFallsOn(actId){
+  if(actId==='oralHer') return 'her';
+  if(actId==='oralHim') return 'you';
+  if(actId==='astride') return 'her';
+  return 'neither';
+}
+function actLabel(actId){ const A=ACT_BY_ID[actId]; return A? A.name : actId; }
+function actBand(v){
+  return v>=0.80? ['RUINOUS','#e0524a'] : v>=0.55? ['GRAVE','#e0894a']
+       : v>=0.30? ['TALKED ABOUT','#e0c04a'] : v>=0.10? ['A SMALL THING','#a8c06a']
+       : ['UNREMARKABLE','#8ac06a'];
+}
+/* ---- and the lasting mark, which is the whole historical point ---- */
+function osImpurum(){ return clamp(G.osImpurum||0, 0, 100); }
+function markOsImpurum(n){
+  G.osImpurum=clamp(osImpurum()+n, 0, 100);
+  return G.osImpurum;
+}
+function osImpurumTier(){
+  const v=osImpurum();
+  return v>=70? {i:3, name:'NOTORIOUS',  note:'They do not drink after you. The greeting-kiss is refused in the open, and everyone sees it refused.'}
+       : v>=40? {i:2, name:'WHISPERED',  note:'A cup gets wiped before it comes back to you. Twice now somebody has turned a cheek instead.'}
+       : v>=15? {i:1, name:'A RUMOUR',   note:'One epigram, one dinner, one man who will not let it go.'}
+       : {i:0, name:'CLEAN', note:'Nothing anybody can say about your mouth.'};
+}
+/* IT FADES, BUT SLOWLY, AND ONLY IF NOTHING FEEDS IT. */
+/* =====================================================================
+   RESOLVING AN ACT — does anyone find out, and what does it cost
+   ---------------------------------------------------------------------
+   Two separate rolls, because the sources separate them: WHETHER the
+   household hears (that is your walls, your slaves, your discretion tier
+   \u2014 the system the game already had) and WHAT IT MEANS if they do (that
+   is the taboo table, which is the part that was missing). A slave who
+   sees you from behind has nothing to tell anyone. A slave who can say
+   what your mouth did has your career in their hands, and in Rome that was
+   quite literally true.
+   ===================================================================== */
+function actWitnessChance(){
+  // the discretion machinery already answers this: who is close enough
+  let seen=0;
+  try{ seen=watchersPresent(privacyTier()==='strict'); }catch(e){ seen=1; }
+  if(seen<=0) return 0.04;                      // walls are never perfect
+  return clamp(0.16 + seen*0.13, 0, 0.85);
+}
+/* THE PRICE. Returns everything the caller needs to narrate it. */
+function resolveAct(actId, opts){
+  opts=opts||{};
+  const A=ACT_BY_ID[actId] || ACT_BY_ID.mos;
+  const here=localCulture(), tab=actTaboo(actId), raw=actTabooRaw(actId);
+  const out={ id:actId, act:A, taboo:tab, raw, culture:here,
+              heard:false, gravitas:0, os:0, bond:0, lines:[] };
+  if(tab<=0.001 && !isOralAct(actId)){
+    out.lines.push('Nothing anybody would think to mention.');
+    return out;
+  }
+  const heard = (opts.forceHeard!==undefined)? opts.forceHeard
+              : (Math.random() < actWitnessChance());
+  out.heard=heard;
+  if(!heard){
+    out.lines.push('The house heard nothing, and what the house does not hear did not happen.');
+    // it still nags at HER if it is something her own people would mind
+    const hers=personCulture(G.wife||{});
+    const herTab=actTabooRaw(actId, hers.id);
+    if(herTab>0.5){ out.bond=-Math.round(herTab*4);
+      out.lines.push('She says nothing about it. She is '+hers.adj+', and her people would have minded.'); }
+    return out;
+  }
+  /* ---- IT GOT OUT ---- */
+  const falls=actFallsOn(actId);
+  const g=Math.round(tab*22);
+  out.gravitas=g;
+  try{ gravitasHit(g, 'household'); }catch(e){}
+  if(isOralAct(actId)){
+    /* THE MOUTH. This is the one that leaves a mark, and the one that
+       does not care how rich you are \u2014 Martial mocked rich men for
+       exactly this, which is how we know rank did not shield it. */
+    const mine=(actId==='oralHim');
+    /* THE STAIN IS THE REPUTATION, so it has to obey reputationReach() like
+       everything else about reputation does. Using the unscaled culture
+       rating here put 16 points of os impurum on a man in Persis, where the
+       reach is 4/100 and there is nobody to say it — a stain with no mouth
+       to come out of. `tab` is the reach-scaled figure. */
+    const bite=Math.round(tab*(mine?26:14));
+    if(mine){ out.os=markOsImpurum(bite);
+      out.lines.push('\ud83d\udde3 OS IMPURUM. Somebody in this house can now say what your mouth has done, '
+        +'and in '+(G.current||'Rome')+' that is a thing men say out loud.');
+      out.lines.push(osImpurumTier().note);
+    } else {
+      out.os=markOsImpurum(Math.round(bite*0.5));
+      out.lines.push('\ud83d\udde3 It is HER mouth they will talk about, and they will talk about it as yours to answer for.');
+    }
+  } else if(actId==='astride'){
+    out.lines.push('\ud83d\udc41 A matrona was above her husband and moving, and a slave saw it. '
+      +'It is a small thing. Small things are what hostile men remember.');
+  } else {
+    out.lines.push('\ud83d\udc41 Somebody saw. It is the sort of thing that gets mentioned once and dropped.');
+  }
+  const band=actBand(tab);
+  out.lines.push('\u2696 Among '+here.people+' this rates as '+band[0]+'. \u2212'+g+' gravitas.');
+  return out;
+}
+/* WHAT SHE THINKS OF BEING ASKED. Her culture, not yours. */
+function actHerView(actId){
+  const w=G.wife; if(!w) return null;
+  const hers=personCulture(w);
+  const t=actTabooRaw(actId, hers.id);
+  const mine=personCulture({self:true});
+  return { culture:hers, taboo:t,
+    ok: t<0.25,
+    line: t>=0.7? 'Her people would put her out of the temples for it.'
+        : t>=0.45? 'She would be doing it knowing what her own people call her for it.'
+        : t>=0.22? 'Her people would raise an eyebrow. Not much more than that.'
+        : 'Where she comes from this is simply not a subject.',
+    clash: Math.abs(t - actTabooRaw(actId, mine.id)) >= 0.35 };
+}
+function osImpurumTick(){
+  if(!G.osImpurum) return;
+  const here=localCulture().id;
+  // it simply is not a thing outside the cultures that believed in it
+  const believed=(TABOO[here]||TABOO.roman).oralHim >= 0.4;
+  G.osImpurum=clamp(G.osImpurum - (believed? 0.06 : 0.35), 0, 100);
+}
 function localMores(){ return moresOf(localCulture().id); }
 /* HOW MUCH THE LAW WHERE YOU LIVE ACTUALLY BITES YOU, 0..1.
    In Rome a man of rank was legally untouchable in a way a poor man was
@@ -5457,6 +5939,7 @@ function freshCareer(name,origin,arch,social){
     mount:0,               // 0 on foot · 1 mule · 2 horse · 3 chariot
     slaves:0, hasVilla:false, boat:false,
     feuds:[], grandkids:0, annivYears:0, morningAfter:null, peeked:{},   // the marriage ledger
+    osImpurum:0, lastAct:null,        // the mouth, and what was last asked for
     gravitas:60, peeksTaken:0, parthianSide:false,              // the public face, and whose side you fight on
     favor:0, soldiers:0, hidden:[], plotTier:0,   // intrigue: favors, private army, hidden elites, overthrow progress
     emperor:false, approval:50, legions:0, rivals:0, retired:false,  // rule of Rome
@@ -5592,7 +6075,7 @@ function elevateWife(rank){
   refreshStatbar(); saveQuiet(); openVilla();
 }
 // fill in any fields missing from older saves
-function migrate(g){ const d={honor:50,food:4,mount:0,slaves:0,hasVilla:false,boat:false,favor:0,soldiers:0,hidden:[],plotTier:0,emperor:false,approval:50,legions:0,rivals:0,retired:false,detachments:[],day:0,titles:{},clears:{},socialClass:'gladiator',army:{},armyGear:0,armyTrain:0,hasOrganizer:false,generals:[],wife:null,married:false,marryPrompted:false,children:[],pregnant:null,lastLoveDay:-9,injury:null,lastDebateDay:-9,office:0,path:null,parthia:50,parthiaPact:false,wifeRel:50,lastTalkDay:-9,isFemale:false,lineage:[],hygiene:70,wifePhys:45,hasPool:false,hasWardrobe:false,legacy:null,lastFeastDay:-9,loveDay:-1,loveQuick:0,loveLong:0,loveNight:0,loveVigil:0,venusUntil:-1,lastWashDay:-9,lastPoolDay:-9,lastWardrobeDay:-9,lastKidsDay:-9,lastBathDay:-9,pila:0,bow:null,bowsOwned:[],nemesis:null,rivalsList:[],trophies:[],nemesisCount:0,pendingDeath:false,ageBase:0,wonProvinceByFight:false,familyMan:false,infamy:0,gladiatrixStage:0,pardoned:false,lastNoteDay:-9,lastNoteReply:'',regalia:[],marryRolls:0,hasBodyMap:false,hasSecretMap:false,jealousy:0,lastJealousDay:-9,traits:[],flaws:[],looks:5,smarts:5,advocate:false,tutorialDone:false,patrons:[],rivalAdv:null,landmarks:[],faction:null,oratory:1,casesWon:0,casesLost:0,renown:0,senate:false,royal:false,lastCaseDay:-9,skills:{footwork:0,guard:0,blade:0,wind:0,throwing:0},scars:[],fatigue:0,lastTrainDay:-9,tribune:false,rank:0,campaigns:0,legionRep:0,lastCampaignDay:-9,units:{legionary:0,auxilia:0,cavalry:0,archers:0,engineers:0},supply:0,sieges:0,body:null,family:null,provinces:{},complaints:[],leniency:50,lastCalloutDay:-9,lastGiftDay:-9,giftsTaken:0,calloutWins:0,crownWorn:false,court:null,lastCoupDay:-99,herbs:{},herbLore:0,ill:null,midwife:false,titlesWorn:[],warExhaust:0,lastExhaustWhy:'',titleRites:[],tombs:[],inheritedFrom:null,hairStyle:null,hairCol:null,beardStyle:null,outfit:null,courtLog:{},lastAskDay:-9,retirePromise:null,promiseBreaks:0,promiseFights:0,tutor:false,freedmen:0,askLog:{},temptHeld:0,temptTook:0,slapDay:-9,slapCount:0,slapsAll:0,doorShut:0,caughtByHouse:0,romanticAll:0,clearedHall:0,lastFamilyDay:-9,namedHeir:null,willSplit:false,purpleWatch:0,kidHouses:[],weddings:0,woohooAll:0,marriedDay:0,
+function migrate(g){ const d={honor:50,food:4,mount:0,slaves:0,hasVilla:false,boat:false,favor:0,soldiers:0,hidden:[],plotTier:0,emperor:false,approval:50,legions:0,rivals:0,retired:false,detachments:[],day:0,titles:{},clears:{},socialClass:'gladiator',army:{},armyGear:0,armyTrain:0,hasOrganizer:false,generals:[],wife:null,married:false,marryPrompted:false,children:[],pregnant:null,lastLoveDay:-9,injury:null,lastDebateDay:-9,office:0,path:null,parthia:50,parthiaPact:false,wifeRel:50,lastTalkDay:-9,isFemale:false,lineage:[],hygiene:70,wifePhys:45,hasPool:false,hasWardrobe:false,legacy:null,lastFeastDay:-9,loveDay:-1,loveQuick:0,loveLong:0,loveNight:0,loveVigil:0,venusUntil:-1,lastWashDay:-9,lastPoolDay:-9,lastWardrobeDay:-9,lastKidsDay:-9,lastBathDay:-9,pila:0,bow:null,bowsOwned:[],nemesis:null,rivalsList:[],trophies:[],nemesisCount:0,pendingDeath:false,ageBase:0,wonProvinceByFight:false,familyMan:false,infamy:0,gladiatrixStage:0,pardoned:false,lastNoteDay:-9,lastNoteReply:'',regalia:[],marryRolls:0,hasBodyMap:false,hasSecretMap:false,jealousy:0,lastJealousDay:-9,traits:[],flaws:[],looks:5,smarts:5,advocate:false,tutorialDone:false,patrons:[],rivalAdv:null,landmarks:[],faction:null,oratory:1,casesWon:0,casesLost:0,renown:0,senate:false,royal:false,lastCaseDay:-9,skills:{footwork:0,guard:0,blade:0,wind:0,throwing:0},scars:[],fatigue:0,lastTrainDay:-9,tribune:false,rank:0,campaigns:0,legionRep:0,lastCampaignDay:-9,units:{legionary:0,auxilia:0,cavalry:0,archers:0,engineers:0},supply:0,sieges:0,body:null,family:null,provinces:{},complaints:[],leniency:50,lastCalloutDay:-9,lastGiftDay:-9,giftsTaken:0,calloutWins:0,crownWorn:false,court:null,lastCoupDay:-99,herbs:{},herbLore:0,ill:null,midwife:false,titlesWorn:[],warExhaust:0,lastExhaustWhy:'',titleRites:[],tombs:[],inheritedFrom:null,hairStyle:null,hairCol:null,beardStyle:null,outfit:null,courtLog:{},lastAskDay:-9,retirePromise:null,promiseBreaks:0,promiseFights:0,tutor:false,freedmen:0,askLog:{},temptHeld:0,temptTook:0,slapDay:-9,slapCount:0,slapsAll:0,doorShut:0,caughtByHouse:0,romanticAll:0,clearedHall:0,lastFamilyDay:-9,namedHeir:null,willSplit:false,purpleWatch:0,kidHouses:[],weddings:0,woohooAll:0,marriedDay:0,osImpurum:0,lastAct:null,
     feuds:[],grandkids:0,annivYears:0,morningAfter:null,peeked:{},gravitas:60,peeksTaken:0,parthianSide:false}; for(const k in d){ if(g[k]===undefined) g[k]=d[k]; }
   if(g.wife) ensureQuirks(g.wife);          // a spouse saved before the five bands existed
   if(g.quirks===undefined) g.quirks=rollQuirks();   // and a player from before THEY had any
@@ -12700,10 +13183,17 @@ function drawWifeFig(c,x,y,w,ph,mode,preg){
                      P(-7+lean*0.6, top-41, 2, 9, clothC); P(5+lean*0.6, top-41, 2, 9, cSh); }
     }
     // her people's metal — a torc is not a necklace and a wesekh is not a torc
-    if(CU.jewel==='torc'){ P(-4+LX2, top-29, 9, 2, '#d8b45a'); P(-4+LX2, top-29, 9, 1, '#f0d888'); }
+    if(CU.jewel==='torc' || CU.jewel==='fibula'){
+      // the same four tribal rungs the plate uses, at sprite scale
+      const TT=tribalTier(w), met=TT.i>=2? '#d8b45a':'#b0803a', metHi=TT.i>=2? '#f6e29a':'#d0a464';
+      if(TT.i>=1){ P(-4+LX2, top-29, 9, 2, met); P(-4+LX2, top-29, 9, 1, metHi); }
+      if(TT.i>=2){ P(-6+LX2, top-27, 2, 2, met); P(5+LX2, top-27, 2, 2, met); }
+      if(TT.i>=3){ P(-7+LX2, top-28, 3, 3, met); P(5+LX2, top-28, 3, 3, met);
+                   P(-9+LX2, top-18, 2, 2, met); P(7+LX2, top-18, 2, 2, met);
+                   P(-7+LX2, top-28, 1, 1, metHi); P(7+LX2, top-28, 1, 1, metHi); }
+    }
     else if(CU.jewel==='collar'){ for(let r2=0;r2<2;r2++)
       P(-4+LX2, top-30+r2*2, 9, 2, r2? '#e0b83a':'#2f8aa0'); }
-    else if(CU.jewel==='fibula'){ P(-6+LX2, top-26, 2, 2, '#c8a44a'); P(5+LX2, top-26, 2, 2, '#c8a44a'); }
     else if(CU.jewel==='silver'){ P(-4+LX2, top-29, 9, 1, '#cfd4da'); P(-1+LX2, top-28, 3, 2, '#e8ecf0'); }
   }
   // ================= NECK / ARMS =================
@@ -15553,8 +16043,28 @@ function openTemptAftermath(){
    down the middle of the floor, roof-trees instead of columns, wattle and
    daub between the posts, and woodland going back into the dark outside.
    ===================================================================== */
+/* WHICH HOUSE YOU ACTUALLY LIVE IN.
+   THIS WAS A BUG AND A BAD ONE: it read playerCulture(), which is your
+   BLOOD, so a Celtic-born gladiator who had made his fortune and settled
+   on the Palatine was shown living in a timber longhouse in the middle of
+   Rome. Nobody built a longhouse in Italia. Where your house STANDS decides
+   what your house is — the province of the legacy seat if you have planted
+   one, otherwise wherever you are living now. A Celt in Rome lives in a
+   Roman house; a Roman who has settled beyond the Rhine lives in a hall,
+   because that is what there is to live in out there. */
+function hallProvince(){
+  if(typeof G==='undefined' || !G) return 'Italia';
+  if(G.legacy && G.legacy.prov) return G.legacy.prov;
+  return G.current || 'Italia';
+}
 function hallStyle(){
-  try{ return playerCulture().hall || 'atrium'; }catch(e){ return 'atrium'; }
+  try{
+    const prov=hallProvince();
+    const save=G.current; G.current=prov;
+    const style=(localCulture().hall)||'atrium';
+    G.current=save;
+    return style;
+  }catch(e){ return 'atrium'; }
 }
 function drawForestShell(FY, T, UPPER){
   /* ---- the world outside: deep woodland, receding into the dark ----
@@ -16958,17 +17468,34 @@ function drawBridePortrait(cnv,b,bare,preg){
     }
     /* 4 · HER PEOPLE'S METAL, not Rome's. A torc is not a necklace and a
        wesekh collar is not a torc. */
-    if(CU.jewel==='torc'){
-      P(-5,-53,11,2,'#d8b45a'); P(-5,-53,11,1,'#f0d888');
-      P(-6,-52,2,3,'#c8a44a'); P(5,-52,2,3,'#c8a44a');                     // the finials at the throat
+    if(CU.jewel==='torc' || CU.jewel==='fibula'){
+      /* ---- THE TRIBAL LADDER, AND IT IS MADE OF METAL, NOT CLOTH ----
+         Among the tribes rank was WORN. A chieftain's wife is not more
+         wrapped than a herdsman's; she is hung with gold. Four rungs, each
+         adding weight rather than coverage. */
+      const TT=tribalTier(b), gold2='#d8b45a', goldHi2='#f6e29a', bronze='#b0803a';
+      const met=TT.i>=3? gold2 : TT.i>=2? gold2 : bronze;
+      const metHi=TT.i>=2? goldHi2 : '#d0a464';
+      if(TT.i>=1){                                                        // the torc itself
+        P(-5,-53,11,2,met); P(-5,-53,11,1,metHi);
+        P(-6,-52,2,3,met); P(5,-52,2,3,met);                              // the finials at the throat
+      }
+      if(TT.i>=2){                                                        // a second, heavier ring
+        P(-6,-51,13,1,met); P(-6,-51,13,1,metHi);
+        P(-7,-56,3,3,met); P(5,-56,3,3,met);                              // and a shoulder brooch
+        P(-6,-55,1,1,metHi); P(6,-55,1,1,metHi);
+      }
+      if(TT.i>=3){
+        P(-8,-46,3,2,met); P(6,-46,3,2,met);                              // arm-rings, both arms
+        P(-8,-46,3,1,metHi); P(6,-46,3,1,metHi);
+        P(-9,-58,4,3,met); P(6,-58,4,3,met);                              // a great penannular at each shoulder
+        P(-8,-57,2,1,metHi); P(7,-57,2,1,metHi);
+        P(-3,-50,7,1,met);                                                // a chain slung between them
+      }
     } else if(CU.jewel==='collar'){
       for(let r2=0;r2<3;r2++){ const wdt=11-r2*2;
         P(-Math.round(wdt/2)+1,-54+r2*2,wdt,2, r2%2?'#2f8aa0':'#e0b83a'); }  // the wesekh, banded
       P(-4,-49,9,1,'#c8963a');
-    } else if(CU.jewel==='fibula'){
-      P(-6,-51,3,3,'#c8a44a'); P(4,-51,3,3,'#c8a44a');                     // brooches at both shoulders
-      P(-5,-50,1,1,'#f0d888'); P(5,-50,1,1,'#f0d888');
-      P(-3,-51,7,1,'#b8944a');                                             // and the chain between them
     } else if(CU.jewel==='silver'){
       P(-5,-53,11,1,'#cfd4da'); P(-2,-52,5,2,'#e8ecf0'); P(0,-51,2,1,'#9aa4b0');
     }
@@ -17486,6 +18013,7 @@ function openVilla(){
   try{ buildGravitasCard(b); }catch(e){}
   buildDiscretionCard(b);
   try{ buildMoresCard(b); }catch(e){}
+  try{ buildActCard(b); }catch(e){}
   try{ buildFeudCard(b); }catch(e){}
   buildKidHousesCard(b);
   buildSuccessionCard(b);
@@ -21528,6 +22056,7 @@ function houseDayTick(){
   grandkidTick();
   inlawTick();                       // 11 · and the in-laws do whatever they are like
   gravitasTick();                    // the public face mends, slowly, if you let it
+  try{ osImpurumTick(); }catch(e){}  // and the mouth, far more slowly, and only where it is not believed in
   blurtTick();                       // unless a child of yours opens their mouth
   // a grudge cools on its own, slowly, and does something while it is hot
   feudsList().forEach(f=>{ f.heat=clamp(f.heat-0.7,0,100); });
@@ -22199,6 +22728,82 @@ function buildParthiaCard(b){
    a German clearing has three completely different prices, and in two of
    those three your RANK changes the price and in the third it does not.
    ===================================================================== */
+/* =====================================================================
+   THE CHOICE — and it prints the price BEFORE you take it
+   ---------------------------------------------------------------------
+   The whole point of a taboo system is that the player can see the shape
+   of it and decide. Each act shows what the people around you call it,
+   what your WIFE'S people call it (which is frequently not the same
+   thing), and whether your rank shields you \u2014 which for the two oral
+   acts it deliberately does not.
+   ===================================================================== */
+function buildActCard(b){
+  if(!G.married || !G.wife) return;
+  if(typeof ADULT!=='undefined' && !ADULT) return;
+  const here=localCulture(), mine=playerCulture();
+  const card=document.createElement('div'); card.className='shopcard';
+  card.style.borderColor='#8a6f35';
+  const os=osImpurumTier();
+  card.innerHTML='<div><b style="color:var(--gold)">\ud83d\udcdc THE MOS \u2014 what is remarked on here</b> '
+    +'<span class="small muted">\u2014 '+(G.current||'Rome')+', among '+here.people+'</span></div>'
+    +'<div class="small muted" style="line-height:1.5;margin-top:2px">'
+    +'Rome did not rank these by how far they went. It ranked them by WHO WAS ACTING '
+    +'and by WHAT HAPPENED TO THE MOUTH \u2014 the organ a citizen pleads and greets with. '
+    +'Everywhere else scored them completely differently.</div>'
+    +'<div class="small" style="margin-top:4px;font-style:italic;color:#c8a45a">'
+    +(TABOO_VOICE[here.id]||'')+'</div>'
+    /* THE ONE LINE THAT EXPLAINS THE WHOLE TABLE: it is the AUDIENCE that
+       decides, and the audience is in Rome. */
+    +'<div class="small" style="margin-top:5px;padding:4px;border:1px solid #4a3c28;border-radius:3px">'
+    +'\ud83d\udc41 <b style="color:'+reachBand()[1]+'">'+reachBand()[0]+'</b> '
+    +'<span class="muted">\u00b7 reach '+Math.round(reputationReach()*100)+'/100</span><br>'
+    +'<span class="small muted">Adultery is a STATUTE and it follows a citizen everywhere \u2014 the Gnomon of '
+    +'the Idios Logos enforced Augustan marriage law in Egypt. This is not that. This is INVECTIVE, in Latin, '
+    +'and it only reaches as far as the men who write it.</span></div>'
+    + (os.i>0? '<div class="small" style="margin-top:5px;padding:4px;border:1px solid #7a3a3a;border-radius:3px">'
+        +'\ud83d\udde3 <b style="color:#e0524a">OS IMPURUM \u2014 '+os.name+'</b> '
+        +'<span class="muted">('+Math.round(osImpurum())+'/100)</span><br>'
+        +'<span class="small muted">'+os.note+'</span></div>' : '');
+  const list=document.createElement('div'); list.style.marginTop='5px';
+  ACTS.forEach(A=>{
+    const t=actTaboo(A.id), rawv=actTabooRaw(A.id), band=actBand(t);
+    const her=actHerView(A.id);
+    const shielded=(!isOralAct(A.id) && rawv>0.02)? Math.round((1-t/Math.max(0.001,rawv))*100) : 0;
+    const row=document.createElement('div');
+    row.className='small';
+    row.style.cssText='margin-top:5px;padding:4px 5px;border-left:3px solid '+band[1]
+      +';background:rgba(0,0,0,.25);line-height:1.55';
+    row.innerHTML='<b style="color:var(--gold)">'+A.name+'</b> '
+      +'<span class="muted" style="font-style:italic">'+A.latin+'</span> \u00b7 '
+      +'<b style="color:'+band[1]+'">'+band[0]+'</b>'
+      +'<div class="muted" style="margin-top:1px">'+A.gloss+'</div>'
+      /* the rank warning is a ROME warning — it has no business appearing
+         beside an act this province does not care about in the first place */
+      + (isOralAct(A.id)
+          ? (t>=0.12
+              ? '<div style="color:#e0894a;margin-top:2px">\u26a0 Rank buys none of this off. Martial mocked rich men for it by name.</div>'
+              : '<div style="color:#8ac06a;margin-top:2px">\ud83d\udc41 There is nobody here who would carry the story anywhere it could hurt you.</div>')
+          : (shielded>=12? '<div style="color:#8ac06a;margin-top:2px">\ud83d\udee1 Your standing takes '+shielded+'% of it off.</div>' : ''))
+      /* ONLY when it tells you something. The first cut printed her view on
+         every single row, so an Egyptian wife repeated the same sentence six
+         times down the card and it read as a bug. It appears where the two
+         peoples DISAGREE, or where her own would mind regardless. */
+      + ((her && (her.clash || her.taboo>=0.22))
+          ? '<div style="margin-top:2px;color:'+(her.clash?'#e0c04a':'#9a8f7c')+'">'
+            +(her.clash? '\u26a1 ':'')+'<b>She is '+her.culture.adj+'.</b> '+her.line+'</div>'
+          : '');
+    list.appendChild(row);
+  });
+  card.appendChild(list);
+  if(here.id!==mine.id){
+    const n=document.createElement('div'); n.className='small';
+    n.style.cssText='margin-top:5px;color:#c8a45a';
+    n.textContent='\ud83e\udded You are '+mine.adj+' living under '+here.adj
+      +' eyes. Where you STAND sets this table \u2014 not where you are from, and not where SHE is from.';
+    card.appendChild(n);
+  }
+  b.appendChild(card);
+}
 function buildMoresCard(b){
   const here=localCulture(), M=localMores();
   const exp=legalExposure(), rank=classRank();
@@ -24914,13 +25519,23 @@ function openBrief(reg,imperial){
     ? `IMPERIAL SPECTACLE in <b>Roma</b> — Emperor <b>Septimius Severus</b> watches from the pulvinar. Win and your name is carved into history.`
     : tier>=4 ? `A brutal frontier death-match near <b>${reg.city}</b>, ${reg.id}. The Parthian border is close; mercy is rare.`
     : tier>=3 ? `A grand provincial spectacle at <b>${reg.city}</b> in ${reg.id}.`
-    : `An arena match at <b>${reg.city}</b>, ${reg.id}.`;
-  $('brief-title').textContent = imperial? 'IMPERIAL SPECTACLE — ROMA' : (tierName(tier)+' — '+reg.id).toUpperCase();
+    : `A match at <b>${reg.city}</b>, ${reg.id}.`;
+  /* NAME THE PLACE FOR WHAT IT IS. The brief called everything from
+     Ctesiphon to the Rhine an arena; Persia had no amphitheatre and
+     Germania had no venue at all. */
+  const VEN=(function(){ try{ return venueHere(reg.id); }catch(e){ return null; } })();
+  $('brief-title').textContent = imperial? 'IMPERIAL SPECTACLE — ROMA'
+    : ((VEN? VEN.name : tierName(tier))+' — '+reg.id).toUpperCase();
   $('brief-body').innerHTML=
     `<div>${flavour}</div>
      <div class="row gap6"><span class="pill">Region tier ${tier}</span>
        <span class="pill">Crowd: ${escDesc}</span>
        <span class="pill">Purse ≈ ${purse} denarii</span></div>
+     ${VEN? `<div class="small" style="margin-top:3px;padding:4px;border-left:3px solid #8a6f35">
+        <b style="color:var(--gold)">${VEN.name}</b>
+        ${VEN.kind!=='arena'? ' <span style="color:#c8a45a">\u2014 not a show. Nobody sells a ticket to this.</span>':''}
+        <div class="muted">${VEN.note}</div>
+        <div class="muted" style="font-style:italic;font-size:.92em">${VEN.src}</div></div>` : ''}
      <div class="small muted">Battle escalation: foes scale with your Popularity (${G.pop}/100).</div>
      ${govBlock(reg)}${gladiatrixBriefBlock()}${nemesisBriefBlock()}`;
   const gb=$('brief-claim'); if(gb) gb.onclick=()=>{ claimProvince(reg); openBrief(reg,imperial); refreshStatbar(); };
@@ -25496,8 +26111,14 @@ window.__SS = {
   conceiveChance, villaConceive, wifePregMonth, selfPregMonth,
   CULTURES, CULTURE_IDS, cultureById, ARCH_CULTURE, playerCulture, personCulture,
   MORES, moresOf, localMores, legalExposure, exposureSplit, buildMoresCard,
+  ACTS, ACT_BY_ID, TABOO, TABOO_VOICE, actTaboo, actTabooRaw, isOralAct, actFallsOn,
+  actLabel, actBand, osImpurum, markOsImpurum, osImpurumTier, osImpurumTick,
+  actWitnessChance, resolveAct, actHerView, buildActCard,
+  REPUTATION_REACH, reputationReach, reachBand,
+  VENUES, VENUE_OF, VENUE_REGION, venueHere, venueName, venueIsShow,
   classRank, dressModeOf, coverageOf, coverageBand, localCulture, fashionOffence,
-  hallStyle, drawForestShell,
+  isTribal, tribalRank, tribalTier, tribalCloth,
+  hallStyle, hallProvince, drawForestShell,
   figureScore, selfStage, stageIndex, courtBonus, courtCultivateCost, COURT_LEVERS, SHADOW_STAGES, shadowStage,
   drawHusbandFigTest:drawHusbandFig, drawGroomPortrait, briadeImg, openPortrait,
   drawKinPortrait, kinLook, kinInherit, kinAge, ageMarks, greyHair, agedSkin, mixHex,
