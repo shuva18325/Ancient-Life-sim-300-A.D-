@@ -19985,7 +19985,11 @@ function grownLook(ch){
   const male = ch.sex==='m';
   const noble = (G.socialClass==='imperial'||G.royal||G.socialClass==='elite'||G.senate);
   return {
-    self:false, male, name:ch.name, eth:'roman', age:kidAgeYears(ch),
+    /* your own child is your own BLOOD — this said eth:'roman' flat, same
+       bug as coupleLooks() had, so a Celtic or Egyptian player's grown
+       children all painted as Roman on the family portrait. */
+    self:false, male, name:ch.name, eth:(function(){ try{ return playerCulture().id; }catch(e){ return 'roman'; } })(),
+    age:kidAgeYears(ch),
     skin: ch.skin || G.skin || '#caa06a',
     dress: male ? shade(G.tunic||'#7a2f22', 10)
                 : shade((G.wife&&G.wife.dress)||'#8a2f5a', 12),
@@ -21028,6 +21032,27 @@ const PEEK_ACTS=[
     note:'You have interrupted nothing whatsoever. Somehow that is worse.',
     her:{dx:-30, dy:-18, rot:1.5, lean:0}, him:{dx:14, dy:-18, rot:1.5, lean:0} },
 ];
+/* WHICH POSE THIS SCENE ACTUALLY SHOWS, WEIGHTED BY WHOSE HOUSE THIS IS.
+   Three of the seven poses correspond to something the mos table actually
+   rates: LAP is her astride, BENT is from behind, KNEEL is a mouth. A
+   Roman couple should turn up bent-over far more than kneeling — coitus a
+   tergo is shown on lamps and cups all over Italy, os impurum ends
+   careers. An Egyptian household has no such taboo and kneel is just
+   another pose to them. TALK / KISS / WALL / SLEEP carry no such rating
+   (nothing in the sources scores an embrace or a wall by nationality) and
+   stay exactly as likely as they always were. */
+const PEEK_ACT_MAP={ lap:'astride', bent:'aversa', kneel:null };
+function peekActWeight(actId, cultA, cultB){
+  if(actId==='kneel'){
+    const a=(actTabooRaw('oralHer',cultA)+actTabooRaw('oralHim',cultA))/2;
+    const b=(actTabooRaw('oralHer',cultB)+actTabooRaw('oralHim',cultB))/2;
+    return clamp(1-((a+b)/2)*0.82, 0.10, 1);
+  }
+  const mapped=PEEK_ACT_MAP[actId];
+  if(mapped===undefined) return 1;
+  const a=actTabooRaw(mapped,cultA), b=actTabooRaw(mapped,cultB);
+  return clamp(1-((a+b)/2)*0.82, 0.10, 1);
+}
 function peekAct(P){
   const tier=clamp(P.stage.tier||0,0,4);
   const pool=PEEK_ACTS.filter(a=>tier>=a.min);
@@ -21037,7 +21062,19 @@ function peekAct(P){
   const useSleep = (h%37)===0;
   if(useSleep) return PEEK_ACTS.find(a=>a.id==='sleep');
   const real=pool.filter(a=>a.id!=='sleep');
-  return real[(h>>5) % real.length];
+  // WHOSE HOUSE. P.looks is coupleLooks(occ.ref) — one side is the child's
+  // own blood, the other the spouse's actual resolved culture.
+  let cultA='roman', cultB='roman';
+  try{
+    if(P.looks){ cultA=(P.looks.her&&P.looks.her.eth)||cultA; cultB=(P.looks.him&&P.looks.him.eth)||cultB; }
+  }catch(e){}
+  const weights=real.map(a=>peekActWeight(a.id,cultA,cultB));
+  const total=weights.reduce((sum,w)=>sum+w,0);
+  // a second, well-separated derivative of the SAME seed, so the choice
+  // stays exactly as deterministic (same door, same day -> same scene)
+  let roll=(((h^0x9e3779b9)>>>0)%100000/100000)*total;
+  for(let i=0;i<real.length;i++){ roll-=weights[i]; if(roll<=0) return real[i]; }
+  return real[real.length-1];
 }
 function peekHeat(P){
   const f=(typeof kidCoupleForecast==='function' && P.occ && P.occ.ref)
@@ -21656,7 +21693,7 @@ function suitorPortrait(s, size){
    choice screen: which one happens is simply which child this is. */
 function weddChild(ch, s){
   ch.wed = true;
-  ch.spouse = { name:s.name, male:!!s.male, house:s.house, style:s.style,
+  ch.spouse = { name:s.name, male:!!s.male, house:s.house, style:s.style, eth:s.eth,
                 body:s.body, skin:s.skin, hair:s.hair, dress:s.dress,
                 traits:s.traits||[], quirks:s.quirks||[], flaws:s.flaws||[],
                 looks:s.looks, age:s.age, rank:s.rank, tier:s.tier,
@@ -26119,7 +26156,7 @@ window.__SS = {
   rollWalkIn, fireWalkIn, drawWalkIn, CAUGHT_LINES,
   peekKey, peekUsed, markPeeked, startPeek, updatePeek, drawPeek, sexText,
   drawPeekPair, drawPeekRoom, PEEK_ROOM, PEEK_STAGE, PEEK_OPEN, PEEK_HOLD, PEEK_SHUT,
-  PEEK_HER, PEEK_HIM, traitsForSex,
+  PEEK_HER, PEEK_HIM, traitsForSex, PEEK_ACT_MAP, peekActWeight,
   peekHeat, peekReactFor, PEEK_REACT, HEAT_HIM, HEAT_HER, peekAct, PEEK_ACTS,
   gravitas, gravitasRaw, setGravitas, gravitasTier, gravitasHit, gravitasTick, GRAVITAS_TIERS,
   ARENA_THEATRES, THEATRE_OF, theatreOf, THEATRE_FOES, theatreFoeName, crowdIsHostile,
