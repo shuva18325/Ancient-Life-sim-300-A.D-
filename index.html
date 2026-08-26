@@ -155,7 +155,7 @@
     <span class="stat">🏛 <b id="s-name">—</b></span>
     <span class="stat">⭐ Glory <b id="s-glory">0</b></span>
     <span class="stat">🔥 Pop <b id="s-pop">0</b>/100</span>
-    <span class="stat">🪙 <b id="s-coin">0</b> denarii</span>
+    <span class="stat" id="s-coin-wrap"><span id="s-coin-ic">🪙</span> <b id="s-coin">0</b> <span id="s-coin-name">denarii</span></span>
     <span class="stat">⚖ Honor <b id="s-honor">50</b></span>
     <span class="stat">🍖 <b id="s-food">0</b></span>
     <span class="stat">🧼 <b id="s-hyg">70</b></span>
@@ -351,7 +351,7 @@
   <div id="scr-villa" class="screen center">
     <div class="panel pad col gap scrollbox" style="width:min(94%,560px);max-height:92%;">
       <h2 id="villa-h2" style="color:var(--gold)">YOUR VILLA &amp; FARM</h2>
-      <div id="villa-sub" class="small muted">A country estate worked by slaves earns denarii and rations after every
+      <div id="villa-sub" class="small muted">A country estate worked by slaves earns coin and rations after every
         bout — win or lose. More slaves, more wealth.</div>
       <div id="villa-body" class="col gap"></div>
       <div class="row" style="justify-content:flex-end;"><button class="btn gold" id="btn-villa-back">◀ BACK</button></div>
@@ -733,7 +733,7 @@ function show(id){document.querySelectorAll('.screen').forEach(s=>s.classList.re
    FARM. show() puts the default back every time the screen is raised; a caller
    that is not the villa names itself on the line after. */
 const VILLA_H='YOUR VILLA & FARM';
-const VILLA_S='A country estate worked by slaves earns denarii and rations after every bout — win or lose. More slaves, more wealth.';
+const VILLA_S='A country estate worked by slaves earns coin and rations after every bout — win or lose. More slaves, more wealth.';
 function villaHead(t, sub, col){
   const h=$('villa-h2'), s2=$('villa-sub');
   if(h){ h.textContent=t||VILLA_H; h.style.color=col||'var(--gold)'; }
@@ -1745,6 +1745,279 @@ MORES.korean = {
   caught:'It goes to the head of the house, and he is also your commander.',
 };
 function moresOf(id){ return MORES[id] || MORES.roman; }
+/* =====================================================================
+   RIGGING THE BOUT — the fee gets you in the room, the man costs extra
+   ---------------------------------------------------------------------
+   What was here was one button, one price, and a foe silently given 45% of
+   his hit points. You never saw who you were being handed and you never
+   made a choice, which is not what fixing a fight is.
+
+   HOW IT WORKS NOW, and it is the way it would actually have worked: you
+   bribe the LANISTA, who owns the men and who makes the pairings. The
+   first payment buys nothing but the conversation — thirty and he walks you
+   down the cells. THEN you pick, and the price of the man is the inverse of
+   how dangerous he is: the ox nobody wants is nearly free, and the reed
+   that any fool could put down costs a fortune, because every coward in the
+   province has already asked for him.
+
+   THE GROUNDING. Pairings were the editor's to make and a lanista's men
+   were expensive capital he had every reason to protect — a dead star was a
+   ruinous loss, and the familia was rented, not given. Sortitio (drawing
+   lots for pairs) existed precisely because everyone knew the alternative
+   was arrangement. Rigged and arranged bouts are complained about in the
+   sources; this is that complaint made playable.
+
+   AND IT COSTS YOU. A fixed win pays a fraction of the purse, and the
+   EASIER the man you bought, the likelier the crowd smells it — because the
+   mob could see the same thing you could.
+   ===================================================================== */
+const RIG_FEE=30;
+const RIG_BUILDS=[
+  { id:'ox', name:'THE OX', tag:'big', threat:1.00,
+    hp:1.60, dmg:1.40, spd:0.60, reach:1.12, size:1.26,
+    look:'Sixteen stone of him, and a neck you could moor a boat to.',
+    lanista:'“Him? Him you can have for the fee alone. Nobody asks me twice for that one.”',
+    warn:'He will not be hurried and he does not go down.' },
+  { id:'middling', name:'THE MIDDLING MAN', tag:'medium', threat:0.62,
+    hp:1.05, dmg:1.00, spd:0.96, reach:1.00, size:1.04,
+    look:'Ordinary height, ordinary reach, ordinary everything.',
+    lanista:'“A working man. Wins some. You will have to actually fight him.”',
+    warn:'Nothing about him is a gift and nothing is a trap.' },
+  { id:'even', name:'THE EVEN HAND', tag:'balanced', threat:0.46,
+    hp:1.00, dmg:0.94, spd:1.06, reach:1.02, size:1.00,
+    look:'Nothing outstanding — and, more to the point, nothing missing.',
+    lanista:'“No weakness in him at all. That is worth something, and it is worth it to YOU.”',
+    warn:'There is no gap in his guard to aim at.' },
+  { id:'reed', name:'THE REED', tag:'small', threat:0.10,
+    hp:0.50, dmg:0.58, spd:1.40, reach:0.86, size:0.80,
+    look:'Half a man. Quick, and quick is the whole of it.',
+    lanista:'“That one costs. Every coward in the province has already asked me for him.”',
+    warn:'Two clean strikes and he is finished. If you can catch him.' },
+];
+function rigBuild(id){ return RIG_BUILDS.find(b=>b.id===id) || RIG_BUILDS[1]; }
+/* THE WEAKER THE MAN, THE MORE HE COSTS. Straight inverse of his threat. */
+function rigManPrice(B, tier){
+  return Math.max(10, Math.round((34 + (tier||1)*46) * (1.12 - B.threat)));
+}
+/* and how likely the mob is to work out what you did */
+function rigSuspicion(B){ return clamp(0.10 + (1-B.threat)*0.42, 0.06, 0.56); }
+/* what a fixed win is worth — buying the ox is barely cheating, buying the
+   reed is theft and the purse reflects it */
+function rigPurseMul(B){ return clamp(0.28 + B.threat*0.52, 0.25, 0.85); }
+/* ---- AND YOU LOOK AT HIM FIRST. The whole point of the rework: the man is
+   drawn to his own build, so "the big one" is visibly the big one. ---- */
+function drawRigCandidate(cnv, B, skinC, tunC){
+  const c=cnv.getContext('2d'); c.imageSmoothingEnabled=false;
+  const W2=cnv.width, H2=cnv.height;
+  const g=c.createLinearGradient(0,0,0,H2); g.addColorStop(0,'#2a1d12'); g.addColorStop(1,'#120c08');
+  c.fillStyle=g; c.fillRect(0,0,W2,H2);
+  c.fillStyle='#3a2c20'; for(let i=0;i<H2;i+=4) c.fillRect(0,i,W2,1);
+  const skin=skinC||'#caa06a', sSh=shade(skin,-38), sHi=shade(skin,26);
+  const tun=tunC||'#7a2f22', tSh=shade(tun,-34), tHi=shade(tun,24);
+  const m='#c2cad4', ms='#6f7a87', mh='#eef4fa';
+  c.save(); c.translate(W2/2, H2-5);
+  const S2=Math.min(W2,H2)/62; c.scale(S2,S2);
+  const P=(x,y,w,h,col)=>{ c.fillStyle=col; c.fillRect(Math.round(x),Math.round(y),Math.round(w),Math.round(h)); };
+  /* every measurement comes off the build, so the four are genuinely four
+     different men and not one man with a label changed */
+  const bulk=B.size, tall=0.86+B.size*0.16;
+  const shW=Math.round(9*bulk+2), gut=Math.round(3*bulk), legL=Math.round(17*tall);
+  const trunkH=Math.round(20*tall), headR=Math.round(4.6+bulk*0.9);
+  const top=-legL-trunkH;
+  // the shadow he stands in
+  c.globalAlpha=0.34; c.fillStyle='#0b0705';
+  c.beginPath(); c.ellipse(0,-1,shW*1.1,2.4,0,0,7); c.fill(); c.globalAlpha=1;
+  // legs — a heavy man stands wide, a light one narrow
+  const stanceW=Math.round(2+bulk*2.4), legW=Math.round(3+bulk*1.6);
+  P(-stanceW-legW,-legL,legW,legL,sSh); P(stanceW,-legL,legW,legL,skin);
+  P(stanceW,-legL,1,legL,sHi);
+  P(-stanceW-legW-1,-2,legW+2,2,'#6a4426'); P(stanceW-1,-2,legW+2,2,'#8a5c34');
+  // the loincloth
+  P(-shW*0.7,-legL-6,shW*1.4,8,tun); P(-shW*0.7,-legL-6,shW*1.4,2,tHi);
+  // trunk, tapering the way that build tapers
+  for(let i=0;i<trunkH;i++){ const t=i/(trunkH-1);
+    const hw=Math.round(shW*(1-t*0.30) + gut*Math.sin(t*3.14159)*0.5);
+    P(-hw, top+i, hw*2, 1, skin);
+    P(-hw, top+i, 1, 1, sHi); P(hw-1, top+i, 1, 1, sSh); }
+  // chest mass and belly — the ox has both, the reed has neither
+  P(-shW*0.7, top+3, shW*0.6, Math.round(3+bulk*2), sHi);
+  P( shW*0.1, top+3, shW*0.6, Math.round(3+bulk*2), sHi);
+  if(bulk>1.05) P(-shW*0.55, top+trunkH-7, shW*1.1, 4, shade(skin,-14));
+  if(bulk<0.9){ for(let r=0;r<3;r++) P(-shW*0.5, top+8+r*3, shW, 1, sSh); }   // ribs on the thin one
+  // arms
+  const armW=Math.round(2+bulk*2.2), armL=Math.round(13*tall);
+  P(-shW-armW, top+2, armW, armL, sSh); P(shW, top+2, armW, armL, skin);
+  P(shW, top+2, 1, armL, sHi);
+  // a blade in the near hand, sized to him
+  P(shW+armW-1, top+2+armL-2, Math.round(3+bulk*2), 2, m);
+  P(shW+armW+Math.round(2+bulk*2), top+1+armL-2, Math.round(7*bulk), 2, m);
+  P(shW+armW+Math.round(2+bulk*2), top+1+armL-2, Math.round(7*bulk), 1, mh);
+  // neck and head
+  P(-2, top-3, 5, 4, skin);
+  P(-headR, top-3-headR*2, headR*2, headR*2, skin);
+  P(-headR, top-3-headR*2, headR*2, 1, sHi);
+  P(headR-1, top-2-headR*2, 1, headR*2-1, sSh);
+  P(-headR+1, top-3-headR*2, headR*2-2, 2, ms);                    // a plain iron cap
+  P(-headR+1, top-4-headR*2, headR*2-2, 1, m);
+  P(-2, top-headR-2, 2, 2, '#100c08'); P(1, top-headR-2, 2, 2, '#100c08');
+  c.restore();
+  // and his threat, written on him
+  c.fillStyle='rgba(0,0,0,.55)'; c.fillRect(0,H2-9,W2,9);
+  const barW=Math.round((W2-10)*B.threat);
+  c.fillStyle= B.threat>0.75? '#e0524a' : B.threat>0.4? '#e8c34a' : '#8ad07a';
+  c.fillRect(5,H2-6,barW,3);
+  c.fillStyle='rgba(255,255,255,.18)'; c.fillRect(5,H2-6,W2-10,3);
+}
+/* =====================================================================
+   THE COIN IN YOUR HAND — and it is not a denarius everywhere
+   ---------------------------------------------------------------------
+   Every purse in this game said "denarii" and drew a Roman silver disc,
+   including in Luoyang, on the Orkhon and in Madurai. Four of those are
+   wrong and one of them is wrong in an interesting way.
+
+   HAN CHINA · the WUZHU (五銖, "five grain"), first cast in 118 BC under
+   Wu of Han and still the standard coin four centuries later — one of the
+   longest-lived coins ever struck anywhere. It is CAST bronze, not struck
+   silver: round, with a SQUARE HOLE through the middle so a thousand of
+   them can be strung on a cord (a 貫 guan). You count in 錢 qian, and a
+   large sum is counted in strings, not in coins.
+
+   THE STEPPE · no coinage at all, and that is not poverty, it is a
+   different economy. The Xianbei and the Xiongnu reckoned in HERDS, and
+   what the Han court actually sent north as tribute and bribe was BOLTS OF
+   SILK — counted in 匹 pi — along with grain and wine. Silk was the
+   currency of the frontier precisely because it was portable, divisible,
+   and something the steppe could not make.
+
+   THE KUSHAN · and here is the good part. Vima Kadphises struck a GOLD
+   coinage, and its weight standard is the Roman aureus, and the name of the
+   coin is दीनार DINARA — which is the Latin DENARIUS, borrowed whole.
+   Roman gold came east down the trade routes and came out the other end as
+   Kushan gold with a Kushan king on it. So in Gandhara the game's own word
+   is very nearly right, and it is right for a reason worth knowing.
+
+   TAMILAKAM · Roman coin arrived in such quantity that the hoards are still
+   coming out of the ground in Tamil Nadu, and Pliny complained about where
+   the gold was going. Alongside it the Tamil kings issued their own square
+   and round punch-marked copper. The unit is the KASU.
+
+   KOREA · Gaya's whole importance was iron, and it sold iron to Han, to
+   the commanderies and across the water. Iron BARS circulated as a store of
+   value the way bullion does.
+   ===================================================================== */
+const CURRENCY = {
+  denarius: { id:'denarius', name:'denarii', one:'denarius', short:'d', kind:'struck',
+    metal:'#cfd6de', metalHi:'#f2f6fa', metalSh:'#7a848e',
+    note:'Struck silver, three to the day-wage of a legionary, with the Emperor’s head on it.',
+    src:'The denarius of Severus is already badly debased — about 50% silver and falling.' },
+  wuzhu: { id:'wuzhu', name:'qián', one:'qián', short:'錢', kind:'cash',
+    metal:'#a8763a', metalHi:'#d8a860', metalSh:'#6a4520',
+    note:'Cast bronze, round, with a square hole — a thousand of them on one cord is a string.',
+    src:'The wuzhu was cast from 118 BC and outlasted the dynasty that made it.' },
+  bolt: { id:'bolt', name:'bolts', one:'bolt', short:'匹', kind:'cloth',
+    metal:'#e0d2b0', metalHi:'#f6efdc', metalSh:'#a89468',
+    note:'There is no coin out here. There is silk, and there are horses, and silk travels better.',
+    src:'Han subsidies to the steppe were paid in bolts of silk, grain and wine — not in cash.' },
+  dinara: { id:'dinara', name:'dīnāra', one:'dīnāra', short:'दी', kind:'struck',
+    metal:'#e8c34a', metalHi:'#fff0b0', metalSh:'#a8862e',
+    note:'Struck gold on the Roman aureus standard — and the name is the Latin denarius, borrowed whole.',
+    src:'Vima Kadphises struck the first Kushan gold; Roman bullion came east and left as Kushan coin.' },
+  kasu: { id:'kasu', name:'kāsu', one:'kāsu', short:'க', kind:'punch',
+    metal:'#b8863a', metalHi:'#e0b46a', metalSh:'#704c1c',
+    note:'Square punch-marked copper of the three crowned kings — and a great deal of Roman gold besides.',
+    src:'Roman coin hoards keep coming out of the ground in Tamil Nadu. Pliny knew where the gold went.' },
+  iron: { id:'iron', name:'iron bars', one:'iron bar', short:'鐵', kind:'bar',
+    metal:'#8f98a2', metalHi:'#c4ccd4', metalSh:'#4e555c',
+    note:'Gaya sells iron to everyone in three seas, and the bars themselves pass as money.',
+    src:'Korean iron was the region’s export and its store of value at once.' },
+};
+const CURRENCY_OF = {
+  roman:'denarius', greek:'denarius', celt:'denarius', germanic:'denarius',
+  numidian:'denarius', persian:'denarius', egyptian:'denarius',
+  han:'wuzhu', korean:'wuzhu',
+  steppe:'bolt',
+  kushan:'dinara',
+  tamil:'kasu',
+};
+/* WHOSE MONEY IS IN YOUR PURSE. Where you STAND decides it — a Roman in
+   Luoyang is paid in qian like everybody else in Luoyang. */
+/* a few REGIONS overrule their culture, because the local trade did */
+const CURRENCY_REGION = { 'Gaya':'iron', 'Tarim Basin':'bolt', 'Ordos':'bolt' };
+function currencyHere(){
+  try{
+    const byReg = (typeof G!=='undefined' && G)? CURRENCY_REGION[G.current] : null;
+    if(byReg) return CURRENCY[byReg];
+    return CURRENCY[CURRENCY_OF[localCulture().id]] || CURRENCY.denarius;
+  }catch(e){ return CURRENCY.denarius; }
+}
+function coinWord(n){ const C=currencyHere();
+  return fmt(n)+' '+((Math.abs(n)===1)? C.one : C.name); }
+function coinShortStr(n){ const C=currencyHere(); return fmt(n)+C.short; }
+/* ---- AND IT IS DRAWN. A cast bronze cash with a square hole through it is
+   not a struck silver disc with a head on it, and a bolt of silk is not a
+   coin at all. Each one gets its own 16px sprite, cached as a data URI so
+   the stat bar can carry it as an <img> without redrawing every frame. ---- */
+function drawCoinIcon(cnv, curId){
+  const C=CURRENCY[curId]||CURRENCY.denarius;
+  const c=cnv.getContext('2d'); c.imageSmoothingEnabled=false;
+  const S=cnv.width; c.clearRect(0,0,S,S);
+  const k=S/16;
+  const P=(x,y,w,h,col)=>{ c.fillStyle=col; c.fillRect(Math.round(x*k),Math.round(y*k),Math.round(w*k),Math.round(h*k)); };
+  const disc=(cx,cy,r,fill,hi,sh)=>{ for(let y=-r;y<=r;y++){ const w=Math.floor(Math.sqrt(r*r-y*y));
+    P(cx-w,cy+y,w*2,1, y<-r*0.3? hi : y>r*0.35? sh : fill); } };
+  if(C.kind==='cash'){
+    // WUZHU — round, cast bronze, with a square hole and the rim raised
+    disc(8,8,7,C.metal,C.metalHi,C.metalSh);
+    P(5,5,6,6,'#120c07');                                   // the square hole
+    P(5,5,6,1,C.metalSh); P(5,10,6,1,C.metalHi);            // its raised collar
+    P(1,7,2,1,C.metalHi); P(13,8,2,1,C.metalSh);            // the rim catching light
+    P(6,2,1,2,C.metalSh); P(9,2,1,2,C.metalSh);             // 五銖 strokes, suggested
+    P(6,12,4,1,C.metalSh);
+  } else if(C.kind==='cloth'){
+    // A BOLT OF SILK — rolled, banded, and tied
+    P(2,5,12,7,C.metal); P(2,5,12,1,C.metalHi); P(2,11,12,1,C.metalSh);
+    P(2,5,1,7,C.metalHi); P(13,5,1,7,C.metalSh);
+    P(5,5,1,7,C.metalSh); P(9,5,1,7,C.metalSh);             // the cord ties
+    P(2,4,12,1,'#c8a34a'); P(4,3,3,1,'#e0bc64');            // and the selvedge
+    P(1,8,1,2,C.metalSh); P(14,8,1,2,C.metalSh);            // the roll's ends
+  } else if(C.kind==='bar'){
+    // AN IRON BAR — a wedge-shaped ingot, hammered
+    P(2,6,12,5,C.metal); P(2,6,12,1,C.metalHi); P(2,10,12,1,C.metalSh);
+    P(2,6,1,5,C.metalHi); P(13,7,1,3,C.metalSh);
+    for(let i=0;i<4;i++) P(4+i*2,7,1,3,C.metalSh);          // hammer marks
+    P(1,7,1,3,C.metalSh); P(14,7,1,3,C.metalSh);
+  } else if(C.kind==='punch'){
+    // PUNCH-MARKED — a square blank with symbols beaten into it
+    P(3,3,10,10,C.metal); P(3,3,10,1,C.metalHi); P(3,12,10,1,C.metalSh);
+    P(3,3,1,10,C.metalHi); P(12,3,1,10,C.metalSh);
+    P(5,5,2,2,C.metalSh); P(9,6,2,2,C.metalSh);             // the punches themselves
+    P(6,9,3,1,C.metalSh); P(7,10,1,2,C.metalSh);
+    P(5,5,1,1,C.metalHi); P(9,6,1,1,C.metalHi);
+  } else {
+    // STRUCK — a disc with a head in profile on it
+    disc(8,8,7,C.metal,C.metalHi,C.metalSh);
+    P(6,4,5,7,C.metalHi);                                   // the head
+    P(6,4,5,1,C.metalSh);
+    P(5,6,1,4,C.metalHi);                                   // the profile's brow and nose
+    P(10,7,1,1,C.metalSh); P(6,11,4,1,C.metalSh);           // and the neck
+    P(1,7,2,1,C.metalHi); P(13,8,2,1,C.metalSh);
+    if(C.id==='dinara'){ P(11,3,2,2,C.metalHi); P(3,12,2,2,C.metalHi); }   // the Kushan flame-shoulders
+  }
+}
+let _COINIMG={};
+function coinIconURI(curId,size){
+  const key=curId+'@'+(size||16);
+  if(_COINIMG[key]) return _COINIMG[key];
+  const cv=document.createElement('canvas'); cv.width=cv.height=(size||16);
+  drawCoinIcon(cv,curId);
+  return (_COINIMG[key]=cv.toDataURL());
+}
+function coinIconHTML(size){
+  const S=size||14;
+  try{ return '<img src="'+coinIconURI(currencyHere().id,16)+'" width="'+S+'" height="'+S
+    +'" style="image-rendering:pixelated;vertical-align:-2px" alt="">'; }
+  catch(e){ return '🪙'; }
+}
 /* =====================================================================
    THE MOS — WHAT ROME ACTUALLY OBJECTED TO, AND WHY
    ---------------------------------------------------------------------
@@ -6514,7 +6787,16 @@ function refreshStatbar(){
     $('s-name').title = tl? 'Titles worn: '+tl : 'No titles worn.'; }
   $('s-glory').textContent=G.glory;
   $('s-pop').textContent=G.pop;
-  $('s-coin').textContent=G.coin;
+  /* THE PURSE, IN THE MONEY OF THE PLACE YOU ARE STANDING. This said
+     "denarii" and drew a Roman silver disc in Luoyang, on the Orkhon and in
+     Madurai. */
+  $('s-coin').textContent=fmt(G.coin);
+  { const CU=currencyHere();
+    const nm=$('s-coin-name'); if(nm) nm.textContent=CU.name;
+    const ic=$('s-coin-ic');
+    if(ic){ try{ ic.innerHTML='<img src="'+coinIconURI(CU.id,16)+'" width="14" height="14" '
+        +'style="image-rendering:pixelated;vertical-align:-2px" alt="">'; }catch(e){ ic.textContent='🪙'; } }
+    const wr=$('s-coin-wrap'); if(wr) wr.title=CU.note+'  —  '+CU.src; }
   $('s-honor').textContent=G.honor;
   $('s-food').textContent=G.food;
   $('s-mount').textContent=MOUNTS[G.mount].short;
@@ -6580,7 +6862,10 @@ function drawGladiator(f){
   ctx.save();
   const lean = clamp(f.vx*0.035,-0.45,0.45) + f.rot;
   ctx.translate(f.x, f.y);
-  ctx.scale(f.facing*1.35,1.35);
+  /* THE MAN'S OWN BUILD. Rigging lets you pick an ox or a reed, and it would
+     be a poor joke if they were drawn at identical size. */
+  const _sc=1.35*(f.scale||1);
+  ctx.scale(f.facing*_sc,_sc);
   ctx.rotate(lean);
   const C=paletteFor(f);
   // pass 1: chunky dark outline (every rect stamped 1px larger) — pass 2: the sprite
@@ -6710,7 +6995,7 @@ function drawSlashFx(f,C){
   if(!f.atk || f.atkType==='elbow') return;
   const p=1-(f.atkT/f.atkDur);
   if(p<0.12||p>0.95) return;
-  const reach=(f.gear.weapon.reach||28)*0.9 + (f.atkType==='thrust'?16:8);
+  const reach=((f.gear.weapon.reach||28)*(f.reachMul||1))*0.9 + (f.atkType==='thrust'?16:8);
   const sx=5, sy=-30;                                   // shoulder pivot
   const a = f.atkType==='thrust' ? -0.08 : lerp(-1.45,1.05,Math.min(1,p*1.5));
   ctx.save();
@@ -6842,6 +7127,34 @@ function drawHelmet2(id,C){
     px(-1,-50,2,3,C.bronze); px(-2,-51,4,2,C.bronzeHi);     // top knob
     px(-7,-46,2,3,C.bronze); px(5,-46,2,3,C.bronze);        // cheek bumps
     px(-3,-43,3,2,'#000'); px(1,-43,3,2,'#000');
+  } else if(id==='dou_mou'){
+    // HAN: small riveted plates, and a lamellar curtain to the shoulders
+    px(-5,-47,10,7,m); px(-5,-47,10,2,mh); px(4,-46,1,6,ms);
+    for(let i=0;i<4;i++) px(-4+i*3,-46,1,1,mh);             // the rivets
+    for(let ry=0;ry<3;ry++) for(let rx=0;rx<6;rx++)          // the neck curtain
+      px(-6+rx*2+(ry%2),-40+ry*2,2,2,(rx+ry)%2?ms:m);
+    px(-3,-43,3,2,'#000'); px(1,-43,3,2,'#000');
+    px(-1,-51,2,5,'#c52a2a'); px(-2,-52,4,2,'#e04a4a');     // a short red plume
+  } else if(id==='steppe_cap'){
+    px(-5,-46,10,6,'#7a6a52'); px(-5,-46,10,2,'#9a8a6a'); px(4,-45,1,5,'#5a4a34');
+    px(-5,-41,10,2,m); px(-5,-41,10,1,mh);                  // the iron band
+    px(-6,-39,2,5,'#7a6a52'); px(4,-39,2,5,'#7a6a52');      // ear flaps
+    px(-1,-50,2,5,'#7a6a52'); px(-2,-51,3,2,'#a83a3a');     // the peak and its tuft
+    px(-3,-43,3,2,'#000'); px(1,-43,3,2,'#000');
+  } else if(id==='kushan_helm'){
+    px(-4,-48,8,8,m); px(-4,-48,8,2,mh); px(3,-47,1,7,ms);
+    px(-1,-53,2,6,m); px(-2,-54,3,2,mh); px(-1,-55,2,2,gold);   // the tall crown
+    px(-5,-41,10,2,gold); px(-5,-41,10,1,shade(gold,30));       // the browband
+    for(let ry=0;ry<3;ry++) for(let rx=0;rx<6;rx++)              // the mail aventail
+      px(-6+rx*2+(ry%2),-39+ry*2,1,1,(rx+ry)%2?mh:ms);
+    px(-3,-43,3,2,'#000'); px(1,-43,3,2,'#000');
+  } else if(id==='sirastrana'){
+    px(-5,-46,10,7,'#c8a870'); px(-5,-46,10,1,'#e0c48c');
+    for(let i=0;i<3;i++) px(-5,-44+i*2,10,1,'#a8885a');      // the quilting
+    px(-5,-48,10,2,m); px(-5,-48,10,1,mh);                   // the iron band over it
+    px(-6,-40,3,5,'#c8a870'); px(3,-40,3,5,'#c8a870');       // laced cheek-pieces
+    px(-1,-52,2,4,gold); px(-2,-53,3,2,shade(gold,30));      // the gilded crest-boss
+    px(-3,-43,3,2,'#000'); px(1,-43,3,2,'#000');
   } else if(id==='persian_helm'){
     px(-4,-47,8,7,m); px(-4,-47,8,2,mh);
     px(-1,-53,2,7,m); px(-2,-53,3,2,mh);                    // conical point
@@ -6901,6 +7214,23 @@ function drawShield2(f,C){
     for(let i=0;i<7;i++) px(-6,-10+i*3,14,1,'#d8c89a');
     for(let i=0;i<6;i++) px(-6+i*3,-10,1,20,'#d8c89a');
     ctx.globalAlpha=1;
+  } else if(sh==='gou_xiang'){
+    // NOT A SHIELD — a hooked bar you trap the other man's blade with
+    px(-2,-11,4,20,C.metal); px(-2,-11,4,1,C.metalHi); px(1,-11,1,20,C.metalSh);
+    px(-5,-14,6,3,C.metal); px(-5,-14,6,1,C.metalHi); px(-7,-13,2,4,C.metal);   // the hook
+    px(-2,9,4,5,C.metal); px(-1,13,2,3,C.metalSh);                              // and the spike
+    px(-3,-3,6,4,'#7a5630'); px(-3,-3,6,1,'#9a7448');                           // the grip
+  } else if(sh==='steppe_targe'){
+    for(let i=0;i<8;i++){ const w=(10-Math.abs(3.5-i)*1.5)|0;
+      px((-w/2)|0,-8+i*2,w,2, i<4?'#a8483a':'#7a2f26'); }
+    px(-2,-2,4,4,'#3a2a18'); px(-1,-1,2,2,C.metal);
+    px(-4,-7,2,1,'#e0c088'); px(2,3,2,1,'#e0c088');
+  } else if(sh==='dhal'){
+    for(let i=0;i<11;i++){ const w=(12-Math.abs(5-i)*1.1)|0;
+      px((-w/2)|0,-10+i*2,w,2, i<5?'#c89a5a':'#8a6236'); }
+    px(-4,-6,2,2,C.gold); px(2,-6,2,2,C.gold);
+    px(-4,2,2,2,C.gold); px(2,2,2,2,C.gold);              // the four brass bosses
+    px(-1,-2,3,3,shade('#8a6236',-24));
   }
   ctx.restore();
 }
@@ -6967,6 +7297,98 @@ function drawWeapon2(id,C){
   else if(id==='rudis_ferrea'){ px(-1,-1,3,3,wood); px(2,-1,11,2,ms); px(2,-2,11,1,m); px(13,-1,1,2,ms); }
   else if(id==='bipennis'){ px(-1,-1,15,2,wood); px(-1,-2,15,1,woodHi); px(11,-6,3,12,m); px(8,-7,4,5,m); px(8,-7,4,1,mh); px(13,-7,4,5,m); px(16,-7,1,5,ms); px(8,2,4,5,m); px(13,2,4,5,m); }
   else if(id==='hasta_argentea'){ px(-1,-1,32,2,'#7a6a4a'); px(-1,-2,32,1,'#a89a6a'); px(31,-3,10,4,'#e8eef4'); px(31,-3,10,1,'#ffffff'); px(41,-1,3,2,'#e8eef4'); px(28,-2,2,4,gold); }
+  /* ================= THE EASTERN ARSENAL, DRAWN =================
+     All ten of these were falling through to `px(0,-1,12,2,m)` — a plain
+     grey bar twelve pixels long. A Han crossbow, a ring-pommel sabre and a
+     throwing discus are not the same object and were all being drawn as
+     the same object. Each one is built around the single feature that
+     identifies it in the archaeology. */
+  else if(id==='nu'){
+    // THE NU — the stock runs back to the shoulder, the PROD crosses it at
+    // the front, and the cast-bronze trigger housing sits proud on top.
+    px(-2,-1,22,3,wood); px(-2,-2,22,1,woodHi);                       // the tiller
+    px(-2,-2,3,4,shade(wood,-24));                                    // the butt
+    px(16,-9,2,19,'#6a4a2a'); px(16,-9,2,1,'#8a6a3a');                // the prod, across the stock
+    px(15,-9,1,6,shade(wood,-30)); px(15,4,1,6,shade(wood,-30));      // its recurved tips
+    px(17,-8,1,17,'#3a2a18');                                         // the string
+    px(6,-4,5,3,m); px(6,-4,5,1,mh); px(6,-2,5,1,ms);                 // the bronze trigger housing
+    px(8,-1,2,4,ms);                                                  // and the trigger itself
+    px(11,-2,6,1,shade(m,-10));                                       // the bolt groove
+    px(18,-1,4,2,m); px(18,-2,4,1,mh);                                // a bolt on the rail
+  }
+  else if(id==='huan_dao'){
+    // THE RING-POMMEL SABRE. The RING is the whole point of the name.
+    px(-4,-2,3,4,m); px(-4,-2,3,1,mh); px(-3,-1,1,2,'#120c07');       // 環首 — the ring
+    px(-1,-1,3,3,wood); px(-1,-2,3,1,'#8a7a5a');                      // the grip
+    px(2,-2,2,4,ms);                                                  // a plain guard
+    px(4,-1,16,2,m); px(4,-2,16,1,mh); px(4,0,16,1,ms);               // straight, single-edged
+    px(20,-1,3,1,m); px(20,0,2,1,ms);                                 // the clipped point
+  }
+  else if(id==='ji'){
+    // THE JI — a spear point with a dagger-axe blade branching off it
+    px(-1,-1,26,2,wood); px(-1,-2,26,1,woodHi);
+    px(25,-3,7,4,m); px(25,-3,7,1,mh); px(32,-1,3,2,m);               // the thrusting head
+    px(22,-8,2,7,m); px(22,-8,2,1,mh);                                // the branch, standing up
+    px(20,-9,4,2,m); px(20,-9,4,1,mh); px(18,-9,2,1,ms);              // and its hooking blade
+    px(24,-1,2,2,'#8a2020'); px(23,1,4,2,'#8a2020');                  // the red tassel below the head
+  }
+  else if(id==='qiang'){
+    px(-1,-1,30,2,wood); px(-1,-2,30,1,woodHi);
+    px(29,-2,8,3,m); px(29,-2,8,1,mh); px(37,-1,3,1,m);               // a long leaf point
+    px(27,-3,2,5,ms);                                                 // the collar
+    px(24,-1,3,3,'#a82020'); px(23,1,5,2,'#8a2020'); px(24,-1,3,1,'#c84a4a');   // the horsehair tassel
+  }
+  else if(id==='steppe_bow'){
+    // A RECURVE, STRUNG — the double curve is the identifying line
+    for(let i=0;i<7;i++){ const yy=-14+i*2, xx=Math.round(Math.abs(yy)*0.16);
+      px(xx,yy,2,2,'#6a4a2a'); px(xx,yy,1,1,'#8a6a3a'); }
+    for(let i=0;i<7;i++){ const yy=2+i*2, xx=Math.round(Math.abs(yy)*0.16);
+      px(xx,yy,2,2,'#6a4a2a'); px(xx,yy,1,1,'#8a6a3a'); }
+    px(0,-2,2,4,'#4a3418');                                            // the grip
+    px(3,-16,1,3,'#8a6a3a'); px(3,13,1,3,'#8a6a3a');                   // the recurved siyahs
+    px(2,-15,1,30,'#2a1e12');                                          // the string
+    px(2,-1,7,1,'#c8b088'); px(8,-2,3,2,m); px(8,-2,3,1,mh);           // an arrow on it
+  }
+  else if(id==='steppe_sabre'){
+    px(-1,-1,3,3,'#5a4a3a'); px(-1,-2,3,1,'#8a7a5a'); px(-2,-2,2,4,ms);
+    for(let i=0;i<13;i++){ const yy=-1-((i*0.5)|0); px(2+i,yy,2,2,m); px(2+i,yy,1,1,mh); }
+    px(14,-8,2,2,m);                                                   // the up-swept tip
+  }
+  else if(id==='kontos'){
+    // TWO-HANDED, AND ABSURDLY LONG — held at the third, not the butt
+    px(-14,-1,50,2,wood); px(-14,-2,50,1,woodHi);
+    px(-14,-2,3,4,shade(wood,-30));                                    // the counterweighted butt
+    px(-2,-2,3,4,'#4a3418'); px(6,-2,3,4,'#4a3418');                   // the two grips
+    px(36,-3,10,4,m); px(36,-3,10,1,mh); px(46,-1,4,2,m);              // a long armour-piercing head
+    px(34,-3,2,5,ms);
+  }
+  else if(id==='khanda'){
+    // BROAD, STRAIGHT, AND HEAVIER TOWARD THE TIP
+    px(-2,-2,4,5,wood); px(-2,-3,4,1,gold);                            // the basket-ish grip
+    px(2,-3,2,7,ms); px(2,-3,2,1,m);                                   // the plate guard
+    for(let i=0;i<16;i++){ const h=2+Math.round(i*0.16);               // it WIDENS as it goes
+      px(4+i,-1-Math.round(i*0.08),2,h,m); px(4+i,-1-Math.round(i*0.08),1,1,mh); }
+    px(19,-3,3,6,m); px(19,-3,3,1,mh); px(22,-2,1,4,ms);               // the blunt spatulate tip
+    px(4,-1,15,1,shade(m,-14));                                        // the reinforcing rib
+  }
+  else if(id==='ankusha'){
+    // THE ELEPHANT-GOAD — a spike forward, a hook curling back
+    px(-1,-1,20,2,wood); px(-1,-2,20,1,woodHi);
+    px(19,-1,7,2,m); px(19,-2,7,1,mh); px(26,-1,2,1,m);                // the spike
+    px(18,-6,2,5,m); px(18,-6,2,1,mh);                                 // the hook's shank
+    px(15,-7,4,2,m); px(15,-7,4,1,mh); px(14,-6,1,3,ms);               // and its curl, coming back
+    px(16,-1,2,2,gold);                                                // the ferrule
+  }
+  else if(id==='chakram'){
+    // A SHARPENED STEEL RING, spun off the finger
+    for(let a=0;a<20;a++){ const th=a/20*6.283;
+      const xx=Math.round(6+Math.cos(th)*6), yy=Math.round(Math.sin(th)*6);
+      px(xx,yy,2,2, (yy<0? mh : (yy>2? ms : m))); }
+    for(let a=0;a<12;a++){ const th=a/12*6.283;
+      const xx=Math.round(6+Math.cos(th)*3.4), yy=Math.round(Math.sin(th)*3.4);
+      px(xx,yy,1,1, shade(m,-30)); }                                   // the inner edge
+    px(5,-7,3,1,'#fff6df');                                            // and the light on the rim
+  }
   else { px(0,-1,12,2,m); }
 }
 
@@ -7183,7 +7605,8 @@ function startFight(region, briefData){
     // an away crowd starts against you and has to be won over the hard way
     crowd: (window.__AWAY? 22 : 50), away: !!window.__AWAY,
     time:0, over:false, result:null,
-    rigged:briefData.rigged||false, forbiddenEquipped:briefData.forbiddenEquipped||false,
+    rigged:briefData.rigged||false, rigBuild:briefData.rigBuild||null,
+    forbiddenEquipped:briefData.forbiddenEquipped||false,
     hired:briefData.hired||false, ambush:briefData.ambush||false, provisioned:!!G.provisioned,
     upperHelp:!!briefData.upperHelp,
     siege:briefData.siege||null, plot:briefData.plot||null, rival:briefData.rival||false, nemesis:briefData.nemesis||false,
@@ -7208,7 +7631,23 @@ function startFight(region, briefData){
   FT.wifeWatch = !!(G.married && G.wife && !FT.siege && Math.random() < ((G.wifeRel||50)>=90? 1 : 0.2 + (G.wifeRel||50)/300));
   if(FT.wifeWatch){ p.dmgMul=(p.dmgMul||1)*(1.05+(G.wifeRel||50)/1000+((G.wifeRel||50)>=90?0.05:0)); p.maxStamina+=15; p.stamina=p.maxStamina;
     setTimeout(()=>{ if(FT&&FT.wifeWatch&&!FT.over) banner(FT.p.x, FT.p.y-56,'♥ SHE IS WATCHING','#e26a8a'); },700); }
-  if(FT.rigged){ foe.maxHp*=0.45; foe.hp=foe.maxHp; foe.ai.aggr*=0.5; foe.ai.react*=2; }
+  /* THE MAN YOU PICKED IS THE MAN YOU GET. This flattened every fixed bout
+     to one 45%-health opponent regardless — so buying the ox and buying the
+     reed produced literally the same fight. */
+  if(FT.rigged){
+    const B=rigBuild(FT.rigBuild||'middling');
+    /* 0.72 left THE OX on 165hp against an unrigged man's 143 — so the
+       cheapest option in the cells was secretly the hardest fight in the
+       game, which makes the whole menu a trap. Every man you buy is now at
+       worst neutral against not rigging at all. */
+    foe.maxHp*=B.hp*0.60; foe.hp=foe.maxHp;      // he is told to lose, whoever he is
+    foe.dmgMul=(foe.dmgMul||1)*B.dmg;
+    foe.spdMul=(foe.spdMul||1)*B.spd;
+    foe.scale=(foe.scale||1)*B.size;             // and he LOOKS the size you paid for
+    foe.reachMul=(foe.reachMul||1)*B.reach;
+    foe.ai.aggr*=0.5+ (1-B.threat)*0.1; foe.ai.react*=1.6+(1-B.threat)*0.8;
+    FT.rigThreat=B.threat;
+  }
   if(FT.ambush){ foe.hp=foe.maxHp*0.55; foe.hurt=20; foe.vx=-foe.facing*4; foe.vy=-3; foe.onGround=false; }  // you struck first
   if(FT.hired){ p.maxHp*=2.2; p.hp=p.maxHp; p.dmgMul=2.4; foe.ai.aggr*=0.7; }                                  // a brawny substitute
   if(FT.upperHelp){ FT.crowd=68; foe.maxHp*=0.7; foe.hp=foe.maxHp; foe.ai.aggr*=0.75; foe.ai.react*=1.4; }      // eques: the editor quietly tilts the bout
@@ -7252,7 +7691,7 @@ function weaponReach(f){
   let r=f.gear.weapon.reach;
   if(f.atkType==='thrust') r+=10;
   if(f.atkType==='elbow') r=16;
-  return r;
+  return r*(f.reachMul||1);          // a bigger man's arm is a longer arm
 }
 function tryHit(att,def){
   if(!att.atk || att.atkHit) return;
@@ -7522,7 +7961,8 @@ function beastLunge(f,dir){
 function beastBite(f){
   if(f.atk||f.atkCd>0) return;
   f.stance = Math.random()<0.7?'mid':(Math.random()<0.5?'high':'low');  // mostly a body maul, sometimes high/low
-  f.atk=true; f.atkType='slash'; f.atkHit=false; f.atkDur=14; f.atkT=f.atkDur; f.atkCd=f.atkDur+ri(8,16);
+  f.atk=true; f.atkType='slash'; f.atkHit=false;
+  f.atkDur=Math.max(4,Math.round(14/(f.spdMul||1))); f.atkT=f.atkDur; f.atkCd=f.atkDur+ri(8,16);
   sfx('thud');
 }
 function beastAI(f,opp,dt){
@@ -7565,8 +8005,8 @@ function doAttack(f,type){
   const cost = type==='thrust'?16:type==='elbow'?9:12;
   if(f.stamina<cost) return;
   f.atk=true; f.atkType=type; f.atkHit=false;
-  f.atkDur = Math.round((type==='thrust'?22:type==='elbow'?12:18)/f.gear.weapon.spd);
-  if(type==='elbow') f.atkDur=12;
+  f.atkDur = Math.max(4, Math.round((type==='thrust'?22:type==='elbow'?12:18)/(f.gear.weapon.spd*(f.spdMul||1))));
+  if(type==='elbow') f.atkDur=Math.max(4, Math.round(12/(f.spdMul||1)));
   f.atkT=f.atkDur; f.stamina-=cost; f.atkCd=f.atkDur+8;
   if(type==='thrust'){ f.vx+=f.facing*2.5; } // lunge
   sfx('swing');
@@ -7803,13 +8243,23 @@ function finishFight(won){
   if(won){
     const mult=(0.6+crowdLove/100*1.4);
     glory=Math.round((12+tier*8)*mult);
-    coin=Math.round((25+tier*22)*mult*provBonus*(FT.rigged||FT.hired?0.4:1)*((SOCIAL[G.socialClass]||SOCIAL.gladiator).purse));
+    const _rigMul = FT.rigged? rigPurseMul(rigBuild(FT.rigBuild||'middling')) : 1;
+    coin=Math.round((25+tier*22)*mult*provBonus*(FT.rigged? _rigMul : (FT.hired?0.4:1))*((SOCIAL[G.socialClass]||SOCIAL.gladiator).purse));
     popDelta=Math.round((4+tier*2)*(crowdLove/60))*(FT.rigged?0:1);
     honorDelta = 4;
     if(FT.provisioned) note+='Well-provisioned, you fought fresh — a richer purse. ';
     if(FT.forbiddenEquipped){ popDelta-=4; honorDelta-=6; note+='The mob jeers your forbidden arms. '; coin=Math.round(coin*0.7);}
     if(FT.hired){ glory=Math.round(glory*0.2); popDelta=Math.max(0,popDelta-2); honorDelta=-14; note+='A hired champion bled for you — the coin is yours, but your name earns nothing. '; }
-    else if(FT.rigged){ honorDelta=-12; note+='A fixed bout — little glory, and whispers spread. '; if(Math.random()<0.3){popDelta-=8; honorDelta-=6; note+='Some swear it was rigged! ';} }
+    else if(FT.rigged){
+      /* AND THE EASIER THE MAN, THE LOUDER THE WHISPERS. A flat 30% chance
+         meant buying the ox and buying the reed carried identical risk; the
+         mob could see the difference perfectly well. */
+      const B=rigBuild(FT.rigBuild||'middling');
+      honorDelta=-Math.round(6+(1-B.threat)*12);
+      note+='A fixed bout — little glory, and whispers spread. ';
+      if(Math.random()<rigSuspicion(B)){
+        popDelta-=Math.round(5+(1-B.threat)*9); honorDelta-=Math.round(4+(1-B.threat)*7);
+        note+='They took one look at '+B.name.toLowerCase()+' and knew. Some swear it was rigged! '; } }
     if(FT.ambush){ honorDelta-=10; note+='You struck from the shadows beforehand — effective, but dishonourable. '; }
     if(FT.gauntlet){ const n=FT.gauntlet.total; glory=Math.round(glory*(1+n*0.45)); coin=Math.round(coin*(1+n*0.55));
       popDelta+=n; note+='You felled '+n+' men in the pits — the tale spreads like fire. '; }
@@ -7865,7 +8315,7 @@ function finishFight(won){
     note+=(G.married&&!G.hasVilla?'Your wife’s house sends ':'Your estate sends ')+slaveCoin+' denarii'+(slaveFood?' and '+slaveFood+' rations':'')+'. '; }
   // provinces you govern pay tribute
   const trib=provinceTribute();
-  if(trib>0){ G.coin+=trib; note+='Your provinces render '+fmt(trib)+' denarii in tribute. '; }
+  if(trib>0){ G.coin+=trib; note+='Your provinces render '+coinWord(trib)+' in tribute. '; }
   // offices & pacts pay their dues
   if(G.office>=1){ G.coin+=8; note+='The quaestorship skims +8d. '; }
   if(G.office>=2 && won){ G.pop=clamp(G.pop+2,0,100); note+='As aedile your games swell the mob (+2 pop). '; }
@@ -7893,14 +8343,14 @@ function showResult(won,r){
     `<div>${r.note||''}</div>`+ battle +
     (won?`<div class="row center gap" style="margin-top:6px;flex-wrap:wrap">
        <span class="pill">⭐ +${r.glory} Glory</span>
-       <span class="pill">🪙 ${r.coin>=0?'+':''}${r.coin} denarii</span>
+       <span class="pill">${coinIconHTML()} ${r.coin>=0?'+':''}${coinWord(r.coin)}</span>
        <span class="pill">🔥 ${r.popDelta>=0?'+':''}${r.popDelta} Pop</span>
        <span class="pill">⚖ ${r.honorDelta>=0?'+':''}${r.honorDelta} Honor</span>
      </div><div class="small muted">${verdict} Crowd approval: ${Math.round(r.crowdLove)}%</div>`
     :`<div class="row center gap" style="margin-top:6px;flex-wrap:wrap">
        <span class="pill">🔥 ${r.popDelta} Pop</span>
        <span class="pill">⚖ ${r.honorDelta>=0?'+':''}${r.honorDelta} Honor</span>
-       <span class="pill">🪙 ${r.coin} denarii</span>
+       <span class="pill">${coinIconHTML()} ${coinWord(r.coin)}</span>
      </div>`)+
     (G.imperialDone?`<div class="small" style="color:var(--gold);margin-top:8px">
        You have conquered the sand of every province and triumphed before
@@ -8110,6 +8560,77 @@ const ARENA_THEATRES={
     banner:'#3a6a5a', bannerMark:'GAL', skyline:'oaks',
     note:'Arelate. Grey stone, green banners, and a crowd that will stand in the rain all day for this.' },
 };
+/* =====================================================================
+   THE EASTERN GROUNDS — and NOT ONE OF THEM IS AN AMPHITHEATRE
+   ---------------------------------------------------------------------
+   Every eastern region was falling through THEATRE_OF to 'italia', so a
+   bout in Luoyang, on the Orkhon and at Madurai was fought inside the
+   Flavian amphitheatre in travertine. There was no colosseum in any of
+   those places and there was never going to be one.
+
+   HAN · JIAODI. Han spectacle was the 百戲 baixi, the "hundred
+   entertainments" — wrestling, tumbling, strength contests, staged at
+   court and in the market. The setting is a cleared square inside a
+   TIMBER courtyard: red-lacquered columns, bracket sets, grey tile roofs
+   with upturned eaves, and galleries of officials seated by rank. No
+   stone bowl, no sand pit, no gate for beasts.
+
+   THE STEPPE · THE NERGE. There is no building at all, and that is the
+   entire point. The drive-hunt is cavalry manoeuvre practised at scale —
+   a ring of riders closing on a hundred miles of grass. The "crowd" is
+   mounted and it is also the army. Gers on the skyline, open sky, and a
+   horizon instead of a wall.
+
+   SOUTH ASIA · THE RANGA. A staked ground before the royal pavilion:
+   cloth canopies on poles, banners, and the king seated under the biggest
+   of them. Elephants at the edge of the field, because they are half the
+   spectacle.
+
+   KOREA · THE FORT GROUND. Goguryeo is mountain forts and mounted
+   archers, and its whole history is fighting Han commanderies. The ground
+   is the level bailey inside a rampart of stone footing and timber
+   palisade, with pine on the ridge above.
+   ===================================================================== */
+ARENA_THEATRES.han={
+  name:'THE JIAODI GROUND', where:'the Han provinces',
+  build:'timber',
+  sand:'#b8a684', sandDk:'#98866a', sandLt:'#d4c4a4',
+  stone:'#8a3a2e', stoneSh:'#5a241c', stoneHi:'#b05244',      // lacquered timber, not stone
+  sky:'#9ab8c8', awning:false, awnA:'#8a3a2e', awnB:'#d8c8a8',
+  crowdHot:['#8a2f3a','#2f4a7a','#e8e0cc','#3a6a4a','#c8a34a','#5a3a7a','#a85a2a','#2a6a7a'],
+  crowdCold:['#8a8074','#7a7064','#6a6054','#948a7e','#7a7484','#6a7480','#84806e','#94897a'],
+  banner:'#8a2f3a', bannerMark:'漢', skyline:'pagoda',
+  note:'A cleared square under tiled eaves. The hundred entertainments, and officials seated by rank.' };
+ARENA_THEATRES.steppe={
+  name:'THE GREAT HUNT', where:'the Xianbei grass',
+  build:'none',
+  sand:'#8a9a5c', sandDk:'#6a7a44', sandLt:'#a8b878',          // grass, not sand
+  stone:'#7a8a52', stoneSh:'#5a6a3a', stoneHi:'#9aaa6a',
+  sky:'#b8d0e0', awning:false, awnA:'#6a4a8a', awnB:'#c8b088',
+  crowdHot:['#6a4a8a','#8a6a3a','#2f5a6a','#a8483a','#c8a34a','#4a5a7a','#8a4a5a','#6a7a4a'],
+  crowdCold:['#7a7462','#6a6454','#5a5448','#847c68','#6a6a72','#5a6a6a','#78745e','#88806a'],
+  banner:'#6a4a8a', bannerMark:'☰', skyline:'gers',
+  note:'No building, no seats, no ticket. A ring of riders closing on the grass, which is how they rehearse a war.' };
+ARENA_THEATRES.india={
+  name:'THE KING’S RANGA', where:'Kushan & Tamilakam',
+  build:'cloth',
+  sand:'#d8b878', sandDk:'#b09456', sandLt:'#eed4a0',
+  stone:'#c8342a', stoneSh:'#8a1e18', stoneHi:'#e05a4a',       // canopy cloth
+  sky:'#e0c890', awning:true, awnA:'#c8342a', awnB:'#e8b83a',
+  crowdHot:['#e8b83a','#c8342a','#2f7a6a','#e8dcc0','#7a2f8a','#d86a2a','#3a5a8a','#c8a34a'],
+  crowdCold:['#a0947c','#90846c','#80745c','#a89c84','#8a8090','#7a8480','#948c74','#a49a80'],
+  banner:'#c8342a', bannerMark:'श्री', skyline:'pavilion',
+  note:'A staked ground before the royal pavilion, and an elephant that has been fed arrack.' };
+ARENA_THEATRES.korea={
+  name:'THE FORT GROUND', where:'the three kingdoms',
+  build:'rampart',
+  sand:'#a89878', sandDk:'#88785a', sandLt:'#c4b494',
+  stone:'#8a8a80', stoneSh:'#5a5a52', stoneHi:'#b0b0a4',
+  sky:'#a8c4d8', awning:false, awnA:'#2f5a7a', awnB:'#c8b088',
+  crowdHot:['#2f5a7a','#c8342a','#e8dcc0','#3a6a4a','#c8a34a','#7a3a5a','#4a6a8a','#8a5a2a'],
+  crowdCold:['#7a7a70','#6a6a60','#5a5a52','#8a8a80','#70707a','#606a70','#7c7a68','#8c8a76'],
+  banner:'#2f5a7a', bannerMark:'高', skyline:'fortpine',
+  note:'The level bailey inside a rampart. Mountain forts, mounted archers, and a standing quarrel with Liaodong.' };
 const THEATRE_OF={
   'Italia':'italia', 'Dalmatia':'italia', 'Illyricum':'italia', 'Creta':'italia',
   'Insulae Baleares & Sicilia':'italia', 'Achaea':'asia',
@@ -8120,6 +8641,15 @@ const THEATRE_OF={
   'Germania Magna':'germania', 'Gepidia':'germania', 'Bosporan Kingdom':'germania',
   'Hispania Baetica':'iberia',
   'Gallia':'gallia', 'Britannia':'gallia',
+  /* ---- THE EAST. Without these every eastern region fell through to
+     'italia' and the bout was fought inside the Colosseum. ---- */
+  'Luoyang':'han', 'Chang’an':'han', 'Ji Province':'han', 'Jing Province':'han',
+  'Wu':'han', 'Yi Province':'han', 'Liaodong':'han',
+  'Xianbei Steppe':'steppe', 'Ordos':'steppe', 'Tarim Basin':'steppe',
+  'Gandhara':'india', 'Bactria':'india', 'Mathura':'india', 'Malwa':'india',
+  'Deccan':'india', 'Chola Country':'india', 'Pandya Country':'india', 'Funan':'india',
+  'Goguryeo':'korea', 'Baekje':'korea', 'Gaya':'korea',
+  'Wa':'korea',            // shut, and never reachable — but it must not fall to the Colosseum
 };
 function theatreOf(regionId){
   return ARENA_THEATRES[THEATRE_OF[regionId]||'italia'] || ARENA_THEATRES.italia;
@@ -8154,6 +8684,20 @@ const THEATRE_FOES={
            titles:['of the Arverni','the Long Sword','of Arelate','the Oak','of the Aedui','the Rain-Born'],
            crowdFor:'you' },
 };
+/* WHO YOU MEET IN THE EAST. Without these every eastern bout drew a Flamma
+   of Capua out of the Italian pool. */
+THEATRE_FOES.han={ names:['Dian Wei','Xu Chu','Zhang Liao','Gan Ning','Wen Chou','Yan Liang','Pang De','Ji Ling'],
+  titles:['of Luoyang','the Tiger','of Ye','the Halberdier','of Chang’an','the Bell-Ringer','of Jing'],
+  crowdFor:'you' };
+THEATRE_FOES.steppe={ names:['Tanshihuai','Kebineng','Budugen','Suli','Modu','Yuwen','Tuoba','Murong'],
+  titles:['of the Orkhon','the Horse-Archer','of the hordes','who shoots retreating','of the Ordos','the Wolf'],
+  crowdFor:'them' };
+THEATRE_FOES.india={ names:['Vasudeva','Huvishka','Kanishka','Gautamiputra','Nedunjeliyan','Karikala','Rudradaman','Pulumavi'],
+  titles:['of Purushapura','the Elephant-Rider','of Mathura','the Lance','of Uraiyur','whom the poets praise','of Ujjain'],
+  crowdFor:'you' };
+THEATRE_FOES.korea={ names:['Gogukcheon','Eulpaso','Myeongnim','Bugwi','Suseong','Sansang','Yuri','Daemusin'],
+  titles:['of Gungnae','the Fort-Holder','of Hanseong','the Iron-Seller','of Gimhae','who took the pass'],
+  crowdFor:'you' };
 /* east of the Euphrates you are the foreigner, and the man opposite is the
    one Rome sent. `G.parthianSide` flips who the crowd is roaring for. */
 function theatreFoeName(regId){
@@ -8197,6 +8741,46 @@ function drawTheatreSkyline(TH){
     for(let i=0;i<7;i++){ const x=20+i*70+((i*23)%16);
       px(x+4,y+6,3,6,'#4a3a24');
       px(x-2,y,16,7,'#3f5c34'); px(x,y-2,11,4,'#4a6a3c'); }
+  } else if(TH.skyline==='pagoda'){
+    // HAN — tiled roofs with UPTURNED eaves, seen over the courtyard wall
+    for(let i=0;i<4;i++){ const x=26+i*118;
+      for(let t2=0;t2<2;t2++){ const w2=64-t2*16, yy=y+6-t2*7, xx=x+t2*8;
+        px(xx,yy,w2,4,'#4a4a52'); px(xx,yy,w2,1,'#6a6a76');          // grey tile
+        px(xx-5,yy+1,6,2,'#4a4a52'); px(xx+w2-1,yy+1,6,2,'#4a4a52'); // the eaves lifting
+        px(xx-6,yy-1,3,3,'#5a5a66'); px(xx+w2+3,yy-1,3,3,'#5a5a66');
+        for(let r2=0;r2<w2;r2+=5) px(xx+r2,yy,2,4,'#3a3a44'); }      // the tile ribs
+      px(x+8,y+10,6,5,'#8a3a2e'); px(x+50,y+10,6,5,'#8a3a2e'); }     // lacquered columns
+  } else if(TH.skyline==='gers'){
+    // THE STEPPE — felt tents on the ridge, smoke, and riders on the skyline
+    for(let i=0;i<5;i++){ const x=24+i*96+((i*31)%22);
+      px(x,y+5,24,7,'#d8d0bc'); px(x,y+5,24,1,'#f0e8d4');
+      px(x+2,y+2,20,4,'#c8c0ac'); px(x+8,y-1,8,3,'#b8b0a0');         // the domed felt
+      px(x+10,y-3,3,3,'#8a8078');                                    // the smoke hole
+      ctx.globalAlpha=0.35; px(x+10,y-8,3,6,'#cfcfcf'); ctx.globalAlpha=1;
+      px(x+9,y+9,2,3,'#7a3a3a'); }                                   // the door, facing south
+    for(let i=0;i<7;i++){ const x=14+i*70+((i*19)%30);               // riders on the ridge
+      px(x,y+13,5,3,'#4a3a28'); px(x+3,y+11,2,3,'#3a2a18'); px(x+1,y+16,1,2,'#3a2a18'); }
+  } else if(TH.skyline==='pavilion'){
+    // SOUTH ASIA — cloth canopies on poles, and an elephant at the edge
+    for(let i=0;i<4;i++){ const x=30+i*112;
+      px(x,y+4,58,3,'#c8342a'); px(x,y+4,58,1,'#e05a4a');
+      for(let sc=0;sc<58;sc+=8) px(x+sc,y+7,6,3,sc%16?'#e8b83a':'#c8342a');   // the scalloped valance
+      px(x+2,y+10,3,6,'#8a6a3a'); px(x+53,y+10,3,6,'#8a6a3a');                // the poles
+      px(x+26,y-1,4,6,'#e8b83a'); px(x+25,y-3,6,3,'#f2d46a'); }               // a finial
+    { const x=W-70;                                                            // the elephant
+      px(x,y+6,26,10,'#8a8a8e'); px(x,y+6,26,2,'#a0a0a4');
+      px(x+24,y+4,9,8,'#8a8a8e'); px(x+31,y+8,3,9,'#7a7a7e');                  // head and trunk
+      px(x+22,y+4,4,6,'#9a9a9e'); px(x+3,y+15,3,4,'#6a6a6e'); px(x+19,y+15,3,4,'#6a6a6e');
+      px(x+6,y+3,14,4,'#c8342a'); px(x+6,y+3,14,1,'#e8b83a'); }                // its caparison
+  } else if(TH.skyline==='fortpine'){
+    // KOREA — a timber palisade on a stone footing, pine on the ridge above
+    px(0,y+9,W,5,'#7a6a52'); px(0,y+9,W,1,'#9a8a6a');
+    for(let x=2;x<W;x+=7){ px(x,y+4,4,6,'#6a5a42'); px(x,y+3,4,2,'#8a7a5a'); px(x+3,y+4,1,6,'#4a3e2e'); }
+    for(let x=0;x<W;x+=88){ px(x,y+1,16,13,'#8a8a80'); px(x,y+1,16,2,'#b0b0a4');    // the stone towers
+      px(x+4,y+5,8,5,'#4a4a44'); px(x+2,y-2,12,3,'#4a4a52'); }                      // and their tiled caps
+    for(let i=0;i<8;i++){ const x=8+i*62+((i*23)%18);                                // pine on the ridge
+      px(x+3,y-1,2,5,'#4a3a24');
+      for(let s2=0;s2<3;s2++) px(x-s2, y-4-s2*3, 8+s2*2, 3, s2%2?'#2f4a2c':'#3a5a34'); }
   } else {  // arches — a second storey of the building itself, seen over the rim
     for(let x=4;x<W;x+=30){ px(x,y-1,26,11,shade(TH.stone,-16));
       px(x+4,y+2,18,8,shade(TH.stoneSh,-24)); px(x+4,y+2,18,1,'#000'); }
@@ -8238,8 +8822,13 @@ function drawArena(){
     }
     FT._ctop = TH.awning? 10 : 24;
     FT._crows= TH.awning? 4  : 3;
+    /* ---- AND ON THE GRASS THERE ARE NO SEATS. The nerge has no building,
+       no tiers and no spectators who are not also participants, so the whole
+       seating block is skipped and the ridge is drawn instead. ---- */
+    if(TH.build==='none'){ FT._crows=0; FT._ctop=24; }
+    if(TH.build==='timber'){ FT._crows=3; FT._ctop=22; }
     // crowd tiers (seating)
-    drawCrowd();
+    if(FT._crows>0) drawCrowd();
     /* the province's own standard over the gate, so you always know whose
        ground you are standing on */
     { const bx=W/2-30, by=(FT._ctop||10)+(FT._crows||4)*14-6;
@@ -8250,45 +8839,133 @@ function drawArena(){
       ctx.textAlign='center';
       pixelText(TH.bannerMark, W/2, by+12, 'rgba(255,246,220,.92)', 0.72);
       ctx.textAlign='left'; }
-    const seatBottom=(FT._ctop||10)+(FT._crows||4)*14+3;
+    const seatBottom=(FT._ctop||10)+(FT._crows||0)*14+3;
     const wallTop=seatBottom, wallH=GROUND-wallTop;
     const wallC=imperial?'#4a3a2e':TH.stone,
           wallSh=imperial?'#352a22':TH.stoneSh,
           wallHi=imperial?'#5a4636':TH.stoneHi;
-    px(0,wallTop,W,wallH,wallC);
-    px(0,wallTop,W,3,wallHi);
-    px(0,wallTop+3,W,2,wallSh);
-    for(let x=6;x<W;x+=48){
-      px(x,wallTop+6,6,wallH-6,wallHi);
-      px(x+1,wallTop+6,1,wallH-6,'#d8c089');
-      px(x+4,wallTop+6,2,wallH-6,wallSh);
-      const ax=x+12, ay=wallTop+14, aw=30, ah=wallH-24;
-      if(aw>0&&ah>0){ px(ax,ay,aw,ah,wallSh); px(ax,ay,aw,2,'#000'); px(ax+2,ay+3,aw-4,3,wallC);
-        // spectators peering from the arches
-        px(ax+5,ay+4,4,5,'#876'); px(ax+6,ay+2,3,3,pick(SKIN));
-        px(ax+aw-10,ay+4,4,5,'#765'); px(ax+aw-9,ay+2,3,3,pick(SKIN)); }
+    const BUILD=TH.build||'stone';
+    /* =================================================================
+       WHAT IS ACTUALLY STANDING BEHIND THE FIGHTERS
+       -----------------------------------------------------------------
+       This drew a travertine wall with arched vomitoria, marble statues in
+       niches, a Roman porta and a podium hung with SPQR devices — in
+       Luoyang, on the Orkhon and at Madurai as well as in Capua. Four of
+       those places never had any of it. The building branches now.
+       ================================================================= */
+    if(BUILD==='none'){
+      // THE NERGE — open grass to the horizon, and the ring of riders IS the crowd
+      px(0,wallTop,W,wallH,'#8a9a5c');
+      for(let b2=0;b2<4;b2++){ const yy=wallTop+b2*Math.max(2,(wallH/4)|0);
+        px(0,yy,W,2, b2%2? '#7e8e52':'#94a466'); }                       // bands of grass receding
+      for(let i=0;i<70;i++){ const gx2=(i*53)%W, gy2=wallTop+((i*37)%Math.max(1,wallH));
+        px(gx2,gy2,1,2, (i%3)? '#6a7a44':'#a8b878'); }                   // tussocks
+      // the ring of riders, drawn small and far off along the rim
+      for(let i=0;i<14;i++){ const rx=6+i*34+((i*17)%14), ry=wallTop+2+((i*11)%5);
+        px(rx,ry+3,7,3,'#4a3a28'); px(rx+1,ry+6,1,2,'#3a2a18'); px(rx+5,ry+6,1,2,'#3a2a18');
+        px(rx+5,ry,2,4,'#6a4a8a'); px(rx+5,ry-2,2,2,pick(SKIN));          // rider and mount
+        if(i%3===0){ px(rx+7,ry-1,4,1,'#8a6a3a'); }                       // a raised bow
+      }
+      // and a rope line staked across the grass, which is the only boundary there is
+      px(0,GROUND-9,W,1,'#c8b088');
+      for(let x=10;x<W;x+=54){ px(x,GROUND-12,2,12,'#6a5238'); px(x,GROUND-12,2,1,'#8a6a44'); }
+    } else if(BUILD==='timber'){
+      // HAN — a courtyard: plastered wall, red-lacquered posts, a tiled gallery over it
+      px(0,wallTop,W,wallH,'#d8cdb4'); px(0,wallTop,W,2,'#eee4cc');       // whitewashed plaster
+      px(0,wallTop+wallH-4,W,4,'#8a7a5e');
+      for(let x=8;x<W;x+=44){                                             // the lacquered columns
+        px(x,wallTop,7,wallH-4,'#8a3a2e'); px(x,wallTop,2,wallH-4,'#b05244');
+        px(x+5,wallTop,2,wallH-4,'#5a241c');
+        px(x-3,wallTop-1,13,4,'#4a4a52'); px(x-3,wallTop-1,13,1,'#6a6a76');   // the bracket set above
+        px(x-5,wallTop+1,4,2,'#4a4a52'); px(x+8,wallTop+1,4,2,'#4a4a52'); }   // dougong arms
+      for(let x=26;x<W;x+=44){                                            // latticed screens between
+        px(x,wallTop+6,18,wallH-16,'#6a5238');
+        for(let ly=wallTop+8; ly<wallTop+wallH-12; ly+=4) px(x+1,ly,16,1,'#a8977a');
+        for(let lx=x+2; lx<x+17; lx+=4) px(lx,wallTop+8,1,wallH-22,'#a8977a'); }
+      // THE GATE is a moon-arch in the courtyard wall, not a Roman porta
+      { const gx=W/2-15, gw=30, gTop=wallTop+6;
+        px(gx,gTop,gw,GROUND-gTop-12,'#241a10');
+        for(let a2=0;a2<gw;a2++){ const h2=Math.round(Math.sqrt(Math.max(0,(gw/2)*(gw/2)-(a2-gw/2)*(a2-gw/2))));
+          px(gx+a2, gTop-h2+2, 1, h2, '#241a10'); px(gx+a2, gTop-h2+2, 1, 2, '#8a3a2e'); }
+        px(gx-3,gTop-2,gw+6,3,'#8a3a2e'); px(gx-3,gTop-2,gw+6,1,'#b05244'); }
+      // the barrier is a low timber rail, and there is no sand pit
+      px(0,GROUND-11,W,11,'#8a6a44'); px(0,GROUND-11,W,2,'#a8886a');
+      px(0,GROUND-5,W,2,'#6a5238');
+      for(let x=0;x<W;x+=26) px(x,GROUND-11,3,11,'#5a4028');
+      for(let x=30;x<W;x+=120){ px(x,GROUND-10,12,8,'#8a2f3a'); px(x,GROUND-10,12,1,'#c8545e');
+        px(x+4,GROUND-8,4,4,'#e8c34a'); }                                 // a hanging silk streamer
+    } else if(BUILD==='cloth'){
+      // SOUTH ASIA — canopies, not masonry. Poles, cloth, and the king's own pavilion
+      px(0,wallTop,W,wallH,'#c8a878'); px(0,wallTop,W,2,'#e0c090');       // the packed-earth back
+      for(let x=0;x<W;x+=64){                                             // striped canopy panels
+        for(let sc=0;sc<64;sc+=8) px(x+sc,wallTop,7,10, (sc%16)? '#e8b83a':'#c8342a');
+        px(x,wallTop+10,64,2,'#8a1e18');
+        px(x+2,wallTop+12,4,wallH-14,'#8a6a3a'); }                        // the poles holding them
+      // THE ROYAL PAVILION, centre, and it is the tallest thing on the field
+      { const px0=W/2-40, pw=80;
+        px(px0,wallTop-6,pw,4,'#c8342a'); px(px0,wallTop-6,pw,1,'#e05a4a');
+        for(let sc=0;sc<pw;sc+=8) px(px0+sc,wallTop-2,6,3, (sc%16)? '#e8b83a':'#c8342a');
+        px(px0+pw/2-3,wallTop-11,6,6,'#e8b83a'); px(px0+pw/2-4,wallTop-13,8,3,'#f2d46a');
+        px(px0+4,wallTop+2,4,wallH-4,'#8a6a3a'); px(px0+pw-8,wallTop+2,4,wallH-4,'#8a6a3a');
+        px(px0+10,wallTop+4,pw-20,wallH-8,'#7a2f26');                     // the shaded interior
+        px(px0+pw/2-6,wallTop+8,12,10,'#e8b83a'); px(px0+pw/2-5,wallTop+7,10,2,'#f2d46a'); }  // the king, seated
+      // the boundary is a line of staked posts with cord between them
+      px(0,GROUND-10,W,2,'#c8b088');
+      for(let x=8;x<W;x+=40){ px(x,GROUND-14,3,14,'#8a6a3a'); px(x,GROUND-14,3,2,'#a8886a');
+        px(x,GROUND-15,3,2,'#c8342a'); }
+    } else if(BUILD==='rampart'){
+      // KOREA — stone footing, timber palisade on top, and a gate of squared beams
+      px(0,wallTop,W,wallH,'#8a8a80'); px(0,wallTop,W,2,'#b0b0a4');
+      for(let ry=0;ry<Math.max(1,(wallH/6)|0);ry++)                       // coursed stone
+        for(let rx=0;rx<W;rx+=13) px(rx+((ry%2)?6:0),wallTop+2+ry*6,12,5,(rx/13+ry)%2?'#7e7e74':'#8f8f85');
+      px(0,wallTop,W,3,'#6a6a62');
+      for(let x=0;x<W;x+=9){ px(x,wallTop-7,6,8,'#6a5a42'); px(x,wallTop-8,6,2,'#8a7a5a');
+        px(x+5,wallTop-7,1,8,'#4a3e2e'); }                                // the palisade
+      { const gx=W/2-16, gw=32, gTop=wallTop+4;
+        px(gx-4,gTop-6,gw+8,7,'#6a5a42'); px(gx-4,gTop-6,gw+8,2,'#8a7a5a');
+        px(gx,gTop,gw,GROUND-gTop-12,'#241a10');
+        for(let gy=gTop+3;gy<GROUND-16;gy+=7) px(gx+2,gy,gw-4,3,'#4a3e2e');
+        px(gx-3,gTop,3,GROUND-gTop-12,'#8a8a80'); px(gx+gw,gTop,3,GROUND-gTop-12,'#8a8a80'); }
+      px(0,GROUND-12,W,12,'#6a5a42'); px(0,GROUND-12,W,2,'#8a7a5a');
+      for(let x=0;x<W;x+=22) px(x,GROUND-12,3,12,'#4a3e2e');
+      for(let x=34;x<W;x+=110){ px(x,GROUND-11,12,8,'#2f5a7a'); px(x,GROUND-11,12,1,'#5a8ab0');
+        px(x+4,GROUND-9,4,4,'#e8c34a'); }
+    } else {
+      px(0,wallTop,W,wallH,wallC);
+      px(0,wallTop,W,3,wallHi);
+      px(0,wallTop+3,W,2,wallSh);
+      for(let x=6;x<W;x+=48){
+        px(x,wallTop+6,6,wallH-6,wallHi);
+        px(x+1,wallTop+6,1,wallH-6,'#d8c089');
+        px(x+4,wallTop+6,2,wallH-6,wallSh);
+        const ax=x+12, ay=wallTop+14, aw=30, ah=wallH-24;
+        if(aw>0&&ah>0){ px(ax,ay,aw,ah,wallSh); px(ax,ay,aw,2,'#000'); px(ax+2,ay+3,aw-4,3,wallC);
+          // spectators peering from the arches
+          px(ax+5,ay+4,4,5,'#876'); px(ax+6,ay+2,3,3,pick(SKIN));
+          px(ax+aw-10,ay+4,4,5,'#765'); px(ax+aw-9,ay+2,3,3,pick(SKIN)); }
+      }
+      // PORTA (the great arched gate the fighters enter by) at centre
+      const gx=W/2-14, gw=28, gTop=wallTop+8;
+      px(gx,gTop,gw,GROUND-gTop-14,'#241a10');
+      px(gx-3,gTop,3,GROUND-gTop-14,'#d8c089'); px(gx+gw,gTop,3,GROUND-gTop-14,'#d8c089');   // jambs
+      px(gx-3,gTop-4,gw+6,4,'#d8c089'); px(gx-3,gTop-4,gw+6,1,'#f2e2a4');                    // lintel
+      px(gx+2,gTop+4,2,GROUND-gTop-20,'#3c2c1a'); px(gx+gw-4,gTop+4,2,GROUND-gTop-20,'#3c2c1a'); // gate timbers
+      for(let gy=gTop+6;gy<GROUND-18;gy+=6) px(gx+6,gy,gw-12,2,'#171008');                    // portcullis bars
+      // marble statues in niches at the quarter points
+      for(const nx of [W/4-8, 3*W/4-8]){
+        px(nx,wallTop+10,16,wallH-22,wallSh); px(nx+1,wallTop+11,14,wallH-24,'#2e2418');
+        px(nx+5,wallTop+16,6,14,'#d8ccb4'); px(nx+5,wallTop+14,6,4,'#e8dfc9');               // torso+head
+        px(nx+3,wallTop+18,3,8,'#c8bca2'); px(nx+10,wallTop+18,3,8,'#c8bca2');               // arms
+        px(nx+4,wallTop+30,8,3,'#b8ac92');                                                    // plinth
+      }
+      // podium barrier with hanging banners
+      px(0,GROUND-14,W,14,'#7a5a3a');
+      px(0,GROUND-14,W,3,'#9a7a52');
+      for(let x=0;x<W;x+=20){ px(x,GROUND-14,2,14,'#5a3f28'); }
+      for(let x=24;x<W;x+=96){ px(x,GROUND-13,14,10,imperial?'#5a2d8a':'#a52828');
+        px(x,GROUND-13,14,2,'#e8c34a'); px(x+2,GROUND-6,10,1,'#e8c34a');
+        px(x+5,GROUND-10,4,4,'#e8c34a'); }                                                    // SPQR-gold device
     }
-    // PORTA (the great arched gate the fighters enter by) at centre
-    const gx=W/2-14, gw=28, gTop=wallTop+8;
-    px(gx,gTop,gw,GROUND-gTop-14,'#241a10');
-    px(gx-3,gTop,3,GROUND-gTop-14,'#d8c089'); px(gx+gw,gTop,3,GROUND-gTop-14,'#d8c089');   // jambs
-    px(gx-3,gTop-4,gw+6,4,'#d8c089'); px(gx-3,gTop-4,gw+6,1,'#f2e2a4');                    // lintel
-    px(gx+2,gTop+4,2,GROUND-gTop-20,'#3c2c1a'); px(gx+gw-4,gTop+4,2,GROUND-gTop-20,'#3c2c1a'); // gate timbers
-    for(let gy=gTop+6;gy<GROUND-18;gy+=6) px(gx+6,gy,gw-12,2,'#171008');                    // portcullis bars
-    // marble statues in niches at the quarter points
-    for(const nx of [W/4-8, 3*W/4-8]){
-      px(nx,wallTop+10,16,wallH-22,wallSh); px(nx+1,wallTop+11,14,wallH-24,'#2e2418');
-      px(nx+5,wallTop+16,6,14,'#d8ccb4'); px(nx+5,wallTop+14,6,4,'#e8dfc9');               // torso+head
-      px(nx+3,wallTop+18,3,8,'#c8bca2'); px(nx+10,wallTop+18,3,8,'#c8bca2');               // arms
-      px(nx+4,wallTop+30,8,3,'#b8ac92');                                                    // plinth
-    }
-    // podium barrier with hanging banners
-    px(0,GROUND-14,W,14,'#7a5a3a');
-    px(0,GROUND-14,W,3,'#9a7a52');
-    for(let x=0;x<W;x+=20){ px(x,GROUND-14,2,14,'#5a3f28'); }
-    for(let x=24;x<W;x+=96){ px(x,GROUND-13,14,10,imperial?'#5a2d8a':'#a52828');
-      px(x,GROUND-13,14,2,'#e8c34a'); px(x+2,GROUND-6,10,1,'#e8c34a');
-      px(x+5,GROUND-10,4,4,'#e8c34a'); }                                                    // SPQR-gold device
   }
   // floor (black-&-white mosaic for a villa siege, sand for the arena)
   if(t.siege){ px(0,GROUND,W,H-GROUND,'#e6ddc8'); px(0,GROUND,W,2,'#f2ead8');   // pale mosaic ground
@@ -9331,7 +10008,7 @@ function finishRace(){
     <div class="row center gap" style="margin-top:6px;flex-wrap:wrap">
       <span class="pill">🏁 ${['','1st','2nd','3rd','4th'][pos]||pos+'th'} place</span>
       <span class="pill">⭐ +${glory} Glory</span>
-      <span class="pill">🪙 +${coin} denarii</span>
+      <span class="pill">${coinIconHTML()} +${coinWord(coin)}</span>
       <span class="pill">🔥 ${pop>=0?'+':''}${pop} Pop</span>
     </div>`;
 }
@@ -17902,12 +18579,98 @@ function drawCardPortrait(cnv,A,sex,rank){
     // shoulders / chest
     P(-16,-22,32,22,skin); P(-16,-22,32,3,sHi); P(13,-20,3,20,sSh); P(-16,-20,3,18,sSh);
     P(-11,-18,8,8,sHi); P(3,-18,8,8,sHi);
-    if(a==='cardiophylax'){ P(-15,-22,30,20,br); P(-15,-22,30,3,brHi); P(-2,-20,4,18,shade(br,-20)); }
+    /* ================= THE ARMOUR ON THE BODY =================
+       TWO of thirteen were drawn here. Everything else — mail, segmentata,
+       padded linen, and every single one of the four eastern cuirasses —
+       fell through and left the champion bare-chested on his own selection
+       card. That is why the eastern cards looked unfinished: they WERE. */
+    if(a==='cardiophylax'||a==='musculata'){
+      P(-15,-22,30,20,br); P(-15,-22,30,3,brHi); P(-2,-20,4,18,shade(br,-20));
+      P(-12,-19,9,7,brHi); P(3,-19,9,7,brHi);                              // pectoral relief
+      for(let i=0;i<3;i++) P(-9,-10+i*3,18,1,shade(br,-28));               // abdominals
+      if(a==='musculata'){ P(-15,-22,2,20,gold); P(13,-22,2,20,gold); } }
     else if(a==='squamata'){ for(let ry=0;ry<6;ry++){ for(let rx=-15;rx<15;rx+=3){ P(rx+(ry%2?1:0),-21+ry*3,3,3,(rx+ry)%2?m:ms);} } }
+    else if(a==='hamata'){                                                 // ring-mail: fine, dense, dull
+      P(-15,-22,30,20,ms); P(-15,-22,30,2,m);
+      for(let ry=0;ry<20;ry+=2) for(let rx=-15;rx<15;rx+=2) P(rx+((ry%4)?1:0),-21+ry,1,1,m);
+      P(-15,-4,30,3,br); P(-15,-4,30,1,brHi); }                            // the belt over it
+    else if(a==='lorica'){                                                 // segmentata: banded plate
+      for(let i=0;i<6;i++){ P(-15,-22+i*3.4,30,3,i%2?ms:m); P(-15,-22+i*3.4,30,1,mh); }
+      P(-2,-22,4,20,ms); P(-15,-22,4,20,m); P(11,-22,4,20,m);
+      for(let i=0;i<5;i++){ P(-13,-20+i*3.4,1,1,gold); P(12,-20+i*3.4,1,1,gold); } }
+    else if(a==='subarmalis'){                                             // padded linen
+      P(-15,-22,30,20,'#c8b088'); P(-15,-22,30,2,'#e0cca0');
+      for(let i=0;i<6;i++) P(-15,-20+i*3,30,1,'#a8926c');
+      P(-2,-22,2,20,'#a8926c'); }
+    else if(a==='manica'){                                                 // arm-guard only: chest is bare
+      for(let i=0;i<7;i++){ P(11,-22+i*3,7,3,i%2?m:ms); P(11,-22+i*3,7,1,mh); }
+      P(-16,-22,5,6,br); P(-16,-22,5,2,brHi); }
+    else if(a==='galerus'){                                                // one shoulder-guard, nothing else
+      P(-17,-24,8,10,br); P(-17,-24,8,2,brHi); P(-17,-16,8,2,shade(br,-30)); }
+    else if(a==='xuanjia'){                                                // 玄甲 — blackened lamellae, crimson lacing
+      P(-15,-22,30,20,'#2a2a30');
+      for(let ry=0;ry<7;ry++) for(let rx=-15;rx<15;rx+=3){
+        P(rx+(ry%2?1:0),-22+ry*3,3,3,(rx+ry)%2?'#3a3a44':'#22222a');
+        P(rx+(ry%2?1:0),-22+ry*3,1,1,'#5a5a66'); }
+      P(-15,-22,30,1,'#6a6a78');
+      P(-2,-22,4,20,'#8a2f3a'); P(-2,-22,4,1,'#c8545e');                   // the lacing down the front
+      P(-15,-6,30,3,'#7a2f22'); P(-15,-6,30,1,'#a8483a'); }                // and the belt
+    else if(a==='steppe_coat'){                                            // belted felt, crossed to one side
+      P(-15,-22,30,20,'#7a6242'); P(-15,-22,30,3,'#9a8258');
+      P(-15,-22,16,20,'#6a5438');
+      for(let ry=0;ry<20;ry+=1) P(-2+Math.round(ry*0.22),-22+ry,10,1,'#8a7050');  // the crossed lapel
+      P(-16,-8,32,5,'#4a3418'); P(-16,-8,32,1,'#6a4e30');                  // the wide belt
+      for(let i=0;i<4;i++) P(-12+i*7,-7,3,3,gold); }                       // its gold fittings
+    else if(a==='kataphraktos'){                                           // scale, and a great deal of it
+      for(let ry=0;ry<8;ry++) for(let rx=-17;rx<17;rx+=3){
+        P(rx+(ry%2?1:0),-24+ry*3,3,4,(rx+ry)%2?m:ms);
+        P(rx+(ry%2?1:0),-24+ry*3,1,1,mh); }
+      P(-17,-24,34,1,mh);
+      P(-19,-20,4,16,ms); P(17,-20,4,16,ms);                               // it wraps the arms too
+      P(-19,-20,4,1,mh); P(17,-20,4,1,mh);
+      for(let i=0;i<5;i++) P(-14+i*7,0,5,4,ms); }                          // and hangs past the belt
+    else if(a==='kavacha'){                                                // quilted cotton over iron plates
+      P(-15,-22,30,20,'#d8c49a'); P(-15,-22,30,2,'#f0e0bc');
+      for(let i=0;i<6;i++) P(-15,-20+i*3,30,1,'#b0a078');
+      P(-12,-19,10,8,m); P(2,-19,10,8,m); P(-12,-19,10,1,mh); P(2,-19,10,1,mh);
+      P(-9,-9,18,6,m); P(-9,-9,18,1,mh);                                   // the plates beneath
+      P(-2,-22,3,20,'#8a5a2a'); }
+    else if(a==='ocrea'){ P(-16,-23,6,5,br); P(10,-23,6,5,br);
+      P(-16,-23,6,1,brHi); P(10,-23,6,1,brHi); }                           // bronze at the shoulders only
     // neck + head
     P(-5,-30,10,8,skin); P(-9,-46,18,18,skin); P(-9,-46,18,3,sHi); P(7,-44,2,16,sSh);
-    // helmet (forward view)
+    /* ---- THE HELMET, AND IT IS NOT ONE GREY BOX. Every helm in the game
+       drew the same rectangle here, so a felt riding cap, a Kushan mail
+       aventail and a Praetorian galea were the same object. ---- */
     if(hid==='none'){ P(-9,-49,18,6,'#3a2618'); P(-9,-49,18,2,'#241408'); P(-11,-44,2,8,'#3a2618'); P(9,-44,2,8,'#3a2618'); }
+    else if(hid==='dou_mou'){                                              // riveted plates + lamellar curtain
+      P(-10,-49,20,15,m); P(-10,-49,20,3,mh); P(8,-48,2,14,ms);
+      for(let i=0;i<5;i++) P(-8+i*4,-47,1,1,mh);                           // the rivets
+      for(let ry=0;ry<3;ry++) for(let rx=-11;rx<11;rx+=3)
+        P(rx+(ry%2?1:0),-34+ry*3,3,3,(rx+ry)%2?ms:m);                      // the neck curtain
+      P(-9,-34,4,7,m); P(5,-34,4,7,m); }
+    else if(hid==='steppe_cap'){                                           // felt, an iron band, ear flaps
+      P(-9,-48,18,12,'#7a6a52'); P(-9,-48,18,3,'#9a8a6a'); P(7,-47,2,11,'#5a4a34');
+      P(-10,-37,20,3,m); P(-10,-37,20,1,mh);
+      P(-11,-34,4,9,'#7a6a52'); P(7,-34,4,9,'#7a6a52');
+      P(-11,-34,4,1,'#9a8a6a'); P(7,-34,4,1,'#9a8a6a'); }
+    else if(hid==='kushan_helm'){                                          // tall crown, browband, aventail
+      P(-8,-50,16,14,m); P(-8,-50,16,3,mh); P(6,-49,2,13,ms);
+      P(-10,-37,20,3,gold); P(-10,-37,20,1,'#fff0b0');
+      for(let ry=0;ry<3;ry++) for(let rx=-12;rx<12;rx+=2)
+        P(rx+(ry%2?1:0),-34+ry*3,1,1,(rx+ry)%2?mh:ms);                     // the mail hanging
+      P(-9,-34,3,7,ms); P(6,-34,3,7,ms); }
+    else if(hid==='sirastrana'){                                           // iron over quilted cotton
+      P(-10,-49,20,14,'#c8a870'); P(-10,-49,20,2,'#e0c48c');
+      for(let i=0;i<4;i++) P(-10,-46+i*3,20,1,'#a8885a');
+      P(-11,-51,22,3,m); P(-11,-51,22,1,mh);
+      P(-10,-35,6,10,'#c8a870'); P(4,-35,6,10,'#c8a870');
+      P(-10,-35,6,1,'#e0c48c'); P(4,-35,6,1,'#e0c48c'); }
+    else if(hid==='galea_secutor'||hid==='galea_aurea'){                   // smooth, near-blind
+      const gm=hid==='galea_aurea'?gold:m, gmh=hid==='galea_aurea'?'#fff0b0':mh;
+      P(-10,-49,20,18,gm); P(-10,-49,20,3,gmh); P(8,-48,2,17,shade(gm,-30));
+      P(-6,-41,4,2,'#100c08'); P(2,-41,4,2,'#100c08');
+      P(-1,-38,2,4,shade(gm,-18)); }
     else { P(-10,-49,20,16,m); P(-10,-49,20,3,mh); P(-10,-35,20,3,ms); P(-11,-33,22,3,ms);
       P(-9,-34,4,9,m); P(5,-34,4,9,m); // cheek guards
     }
@@ -17938,9 +18701,33 @@ function drawCardPortrait(cnv,A,sex,rank){
   else if(hid==='galea_secutor'){ P(-2,-52,4,4,ms); }
   else if(hid==='celtic_helm'){ P(-3,-54,6,5,br); P(-2,-56,4,3,brHi); }
   else if(hid==='persian_helm'){ P(-3,-58,6,10,m); P(-2,-58,3,3,mh); }
+  /* the eastern crests — these five had no branch at all, so a Han
+     halberdier and a Kushan cataphract came off the card bare-headed */
+  else if(hid==='dou_mou'){ for(let ry=0;ry<3;ry++) for(let rx=0;rx<5;rx++)
+      P(-6+rx*2+(ry%2),-52+ry*2,2,2,(rx+ry)%2?ms:m);
+    P(-2,-57,4,5,'#c52a2a'); P(-3,-58,6,2,'#e04a4a'); }
+  else if(hid==='steppe_cap'){ P(-5,-54,10,3,m); P(-2,-58,4,5,'#7a6a52'); P(-2,-60,4,2,'#a83a3a'); }
+  else if(hid==='kushan_helm'){ P(-3,-60,6,8,m); P(-2,-61,3,2,mh); P(-1,-63,2,2,gold);
+    P(-5,-52,10,2,gold); }
+  else if(hid==='sirastrana'){ P(-5,-55,10,2,m); P(-2,-60,4,5,gold); P(-3,-61,5,2,'#fff0b0'); }
   // weapon hint over shoulder
   const wid=A.loadout.weapon, WX=fem?15:15;
-  if(wid==='fuscina'){ P(-WX-5,-44,3,40,'#7a5630'); P(-WX-7,-46,7,3,m); P(-WX-7,-40,7,3,m); }
+  /* AND THE EASTERN KIT OVER THE SHOULDER. Only the trident had a hint, so
+     every eastern champion's card showed an empty hand. */
+  if(wid==='nu'){ P(-WX-8,-40,16,3,'#7a5630'); P(-WX-6,-48,3,17,'#6a4a2a');
+    P(-WX-5,-47,1,15,'#2a1e12'); P(-WX+7,-41,5,3,m); }
+  else if(wid==='ji'){ P(-WX-5,-52,3,44,'#7a5630'); P(-WX-6,-58,5,7,m); P(-WX-10,-52,6,3,m);
+    P(-WX-6,-50,5,3,'#8a2020'); }
+  else if(wid==='qiang'){ P(-WX-5,-52,3,44,'#7a5630'); P(-WX-6,-58,5,7,m); P(-WX-7,-49,7,4,'#a82020'); }
+  else if(wid==='kontos'){ P(-WX-6,-58,3,52,'#7a5630'); P(-WX-8,-64,7,8,m); P(-WX-8,-64,7,2,mh); }
+  else if(wid==='steppe_bow'){ for(let i=0;i<9;i++) P(-WX-6+Math.round(Math.abs(4-i)*0.5),-52+i*4,3,3,'#6a4a2a');
+    P(-WX-3,-52,1,36,'#2a1e12'); }
+  else if(wid==='khanda'){ for(let i=0;i<16;i++) P(-WX-6-((i*0.12)|0),-52+i*2,4+((i*0.12)|0),2,m);
+    P(-WX-9,-20,9,3,gold); }
+  else if(wid==='chakram'){ for(let a=0;a<16;a++){ const th=a/16*6.283;
+      P(-WX-4+Math.round(Math.cos(th)*7), -40+Math.round(Math.sin(th)*7), 3,3, Math.sin(th)<0?mh:m); } }
+  else if(wid==='huan_dao'){ P(-WX-5,-52,3,26,m); P(-WX-6,-24,5,3,ms); P(-WX-6,-20,5,4,m); }
+  else if(wid==='fuscina'){ P(-WX-5,-44,3,40,'#7a5630'); P(-WX-7,-46,7,3,m); P(-WX-7,-40,7,3,m); }
   else if(wid==='cestus'){ P(WX-2,-8,8,9,'#5a3f2a'); P(WX-1,-7,1,1,m); P(WX+2,-7,1,1,m); }
   else if(wid==='gladius_aureus'){ P(WX,-44,4,40,gold); P(WX-2,-46,8,4,'#a8862e'); }
   else if(wid==='celtic_longsword'){ P(WX,-50,3,46,m); P(WX-2,-50,7,3,'#8a7a5a'); }
@@ -18414,7 +19201,7 @@ function openCreate(){
   // social class row
   const cr=$('class-row'); cr.innerHTML='';
   SOCIAL_ORDER.forEach(k=>{ const S=SOCIAL[k]; const bt=document.createElement('button');
-    bt.className='btn sm'+(sel.social===k?' gold':''); bt.textContent=S.name+' · '+S.coin+'d';
+    bt.className='btn sm'+(sel.social===k?' gold':''); bt.textContent=S.name+' · '+S.coin+(sel.world==='east'?'':'d');
     bt.onclick=()=>{ if(sel.social!==k){ sel.social=k; sel.roll=null; } openCreate(); }; cr.appendChild(bt); });
   $('class-note').textContent=SOCIAL[sel.social].note;
   // ---- THE ROLL: your body and your blood, before the oath ----
@@ -18631,7 +19418,7 @@ function silkRun(id){
   const L=silkLeg(id);
   if(!silkOpen(id)){ toast('Nobody on this road will carry for a man who has not made the leg before it.',2800); return; }
   const stake=Math.round(silkStake()*L.cost);
-  if((G.coin||0) < stake){ toast('A bale for that leg costs '+stake+'d and you have '+(G.coin|0)+'.',2600); return; }
+  if((G.coin||0) < stake){ toast('A bale for that leg costs '+coinWord(stake)+' and you have '+coinWord(G.coin|0)+'.',2600); return; }
   const rations=Math.max(2, Math.round(L.days/9));
   if((G.food||0) < rations){ toast('That road is '+L.days+' days. It wants '+rations+' rations and you have '+(G.food|0)+'.',2800); return; }
   G.coin-=stake; G.food-=rations;
@@ -18646,7 +19433,7 @@ function silkRun(id){
       'The carriers sold it themselves and sent word that it was stolen.',
       'Plague in the caravanserai. Nothing came out of it for a month, including your goods.']);
     G.silkLost=(G.silkLost||0)+1;
-    toast('💀 THE CARAVAN DID NOT ARRIVE. '+why+'  (−'+stake+'d)', 5200);
+    toast('💀 THE CARAVAN DID NOT ARRIVE. '+why+'  (−'+coinWord(stake)+')', 5200);
     try{ sfx('deny'); }catch(e){}
   } else {
     G.silkDone[L.id]=(G.silkDone[L.id]||0)+1;
@@ -18656,8 +19443,8 @@ function silkRun(id){
     G.coin+=net;
     G.pop=clamp((G.pop||0)+1,0,100);
     G.silkNet=(G.silkNet||0)+(net-stake);
-    toast('🐫 THE CARAVAN IS BACK. '+gross+'d gross, '+cut+'d to the middlemen along the way, '
-      +net+'d in your hand — '+((net-stake)>=0?'+':'')+(net-stake)+'d on the bale.', 5200);
+    toast('🐫 THE CARAVAN IS BACK. '+coinShortStr(gross)+' gross, '+coinShortStr(cut)+' to the middlemen along the way, '
+      +coinShortStr(net)+' in your hand — '+((net-stake)>=0?'+':'')+coinShortStr(net-stake)+' on the bale.', 5200);
     try{ sfx('coin'); }catch(e){}
   }
   refreshStatbar(); saveQuiet(); openSilk();
@@ -18672,7 +19459,7 @@ function openSilk(){
   const runs=(G.silkRuns||0), lostN=(G.silkLost||0);
   head.innerHTML='Bales sent: <b style="color:var(--gold)">'+runs+'</b> · lost on the road: <b style="color:#e0705b">'
     +lostN+'</b> · net on the trade so far: <b style="color:'+(((G.silkNet||0)>=0)?'#8ad07a':'#e0705b')+'">'
-    +((G.silkNet||0)>=0?'+':'')+(G.silkNet||0)+'d</b> · a bale costs <b>'+silkStake()+'d</b> at your standing.';
+    +((G.silkNet||0)>=0?'+':'')+coinWord(G.silkNet||0)+'</b> · a bale costs <b>'+coinWord(silkStake())+'</b> at your standing.';
   b.appendChild(head);
   SILK_LEGS.forEach(L=>{
     const open=silkOpen(L.id), stake=Math.round(silkStake()*L.cost);
@@ -18683,15 +19470,15 @@ function openSilk(){
     card.innerHTML='<div style="color:var(--gold);font-size:12px;letter-spacing:1px;">'+L.icon+' '+L.name+'</div>'
       +'<div class="small muted" style="margin:3px 0 4px;line-height:1.4">'+L.note+'</div>'
       +'<div class="small" style="line-height:1.5">'
-        +'stake <b>'+stake+'d</b> · '+L.days+' days · '+rations+' rations · '
+        +'stake <b>'+coinShortStr(stake)+'</b> · '+L.days+' days · '+rations+' rations · '
         +'loss <b style="color:'+(risk>0.28?'#e0705b':risk>0.16?'#e8c34a':'#8ad07a')+'">'+Math.round(risk*100)+'%</b><br>'
-        +'if it arrives: '+gross+'d gross − <b style="color:#e0705b">'+cut+'d</b> to the middlemen ('
-        +Math.round(L.cut*100)+'%) = <b style="color:#8ad07a">'+net+'d</b> '
-        +'<span class="muted">('+((net-stake)>=0?'+':'')+(net-stake)+'d on the bale)</span></div>'
+        +'if it arrives: '+coinShortStr(gross)+' gross − <b style="color:#e0705b">'+coinShortStr(cut)+'</b> to the middlemen ('
+        +Math.round(L.cut*100)+'%) = <b style="color:#8ad07a">'+coinShortStr(net)+'</b> '
+        +'<span class="muted">('+((net-stake)>=0?'+':'')+coinShortStr(net-stake)+' on the bale)</span></div>'
       +'<div class="small muted" style="margin-top:4px;font-style:italic;opacity:.8">'+L.src+'</div>';
     const bt=document.createElement('button'); bt.className='btn sm'+(open?' gold':'');
     bt.style.marginTop='5px';
-    bt.textContent = open? ('▶ SEND A BALE · '+stake+'d')
+    bt.textContent = open? ('▶ SEND A BALE · '+coinShortStr(stake))
                          : ('🔒 make the '+silkLeg(L.need).name.toLowerCase()+' twice first');
     bt.disabled=!open;
     bt.onclick=()=>silkRun(L.id);
@@ -19080,10 +19867,10 @@ function openVilla(){
   const head=document.createElement('div'); head.className='shopcard eq';
   head.innerHTML=`<div><b style="color:var(--gold)">🏡 Villa Rustica</b></div>
     <div>Slaves: <b>${G.slaves}</b> / 8</div>
-    <div class="small">Earns <b style="color:var(--gold)">${inc.coin} denarii</b>${inc.food?' + '+inc.food+' rations':''} after every bout.</div>`;
+    <div class="small">Earns <b style="color:var(--gold)">${coinWord(inc.coin)}</b>${inc.food?' + '+inc.food+' rations':''} after every bout.</div>`;
   b.appendChild(head);
   const card=document.createElement('div'); card.className='shopcard';
-  card.innerHTML=`<div><b>Buy a slave</b> <span class="small muted">— each adds +12 denarii / bout</span></div>`;
+  card.innerHTML=`<div><b>Buy a slave</b> <span class="small muted">— each adds +${coinWord(12)} / bout</span></div>`;
   const bt=document.createElement('button'); bt.className='btn sm gold';
   const c=slaveCost(); bt.textContent='BUY SLAVE ('+c+'d)';
   bt.disabled=G.coin<c||G.slaves>=8; bt.onclick=()=>{ if(G.coin<c||G.slaves>=8)return; G.coin-=c; G.slaves++; refreshStatbar(); openVilla(); };
@@ -27023,11 +27810,13 @@ function openBrief(reg,imperial){
   $('btn-wager').textContent='🎲 WAGER: —';
   $('btn-wager').title='Stake coin on your own blood: win and it pays double, lose and the bookmakers keep it.';
   $('btn-wager').disabled = cantFight;
-  $('btn-rig').textContent=`🤝 RIG THE BOUT (${rigCost}d)`;
+  $('btn-rig').textContent='🤝 RIG THE BOUT ('+coinShortStr(RIG_FEE)+' to ask)';
   $('btn-skip').textContent=`🪙 BUY YOUR WAY PAST (${skipCost}d)`;
   $('btn-hire').textContent=`🛡 HIRE A CHAMPION (${hireCost}d)`;
   $('btn-ambush').textContent=`🗡 AMBUSH (SHADY)`;
-  $('btn-rig').disabled = G.coin<rigCost || imperial || cantFight;
+  $('btn-rig').disabled = G.coin<RIG_FEE || imperial || cantFight;
+  $('btn-rig').title = 'Pay the lanista '+coinWord(RIG_FEE)+' just to be walked down the cells. Then you pick your man, '
+    +'and the weaker he is the more he costs.';
   $('btn-skip').disabled = G.coin<skipCost || imperial || cantFight;
   $('btn-hire').disabled = G.coin<hireCost || imperial || cantFight;
   $('btn-ambush').disabled = imperial || cantFight;
@@ -27076,10 +27865,76 @@ $('btn-ambush').onclick=()=>{
   startFight(b.reg,{forbiddenEquipped:b.eqForbidden, ambush:true, imperial:false});
   toast('You waylay your foe in the dark before the bout…',1600);
 };
+/* =====================================================================
+   THE LANISTA'S CELLS — pay the fee, then pick your man
+   ===================================================================== */
+function openRigPick(){
+  const b=briefCtx; if(!b) return;
+  state='villa'; show('scr-villa'); $('statbar').classList.remove('hide'); refreshStatbar();
+  villaHead('🤝 THE LANISTA’S CELLS',
+    'You have paid for the conversation, and that is all it bought. He walks you down the row and lets you look. '
+    +'The man himself is extra — and the easier he is to put down, the more he costs, because every coward in the province has already asked for him.',
+    '#e0a24a');
+  const bd=$('villa-body'); bd.innerHTML='';
+  const tier=(b.reg && b.reg.tier)||1;
+  const head=document.createElement('div'); head.className='small muted';
+  head.innerHTML='Fee paid: <b style="color:#e0705b">'+coinShortStr(RIG_FEE)+'</b> (non-refundable) · '
+    +'in your purse: <b style="color:var(--gold)">'+coinWord(G.coin)+'</b> · '
+    +'bouts you have fixed before: <b>'+(G.rigsUsed||0)+'</b>';
+  bd.appendChild(head);
+  const grid=document.createElement('div');
+  grid.style.cssText='display:grid;gap:9px;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));margin-top:6px';
+  bd.appendChild(grid);
+  RIG_BUILDS.forEach(B=>{
+    const price=rigManPrice(B,tier), afford=G.coin>=price;
+    const card=document.createElement('div'); card.className='shopcard';
+    card.style.cssText='text-align:left;'+(afford?'':'opacity:.5;');
+    const cv=document.createElement('canvas'); cv.width=92; cv.height=104;
+    drawRigCandidate(cv,B,'#caa06a','#7a2f22');
+    const img=document.createElement('img'); img.src=cv.toDataURL();
+    img.style.cssText='width:92px;height:104px;image-rendering:pixelated;display:block;margin:0 auto 5px;border:2px solid #000;';
+    const thr=Math.round(B.threat*100);
+    const tc = B.threat>0.75? '#e0524a' : B.threat>0.4? '#e8c34a' : '#8ad07a';
+    card.innerHTML='<div style="color:var(--gold);font-size:12px;letter-spacing:1px;text-align:center">'+B.name+'</div>';
+    card.appendChild(img);
+    const info=document.createElement('div');
+    info.innerHTML='<div class="small" style="line-height:1.45">'+B.look+'</div>'
+      +'<div class="small muted" style="font-style:italic;margin:3px 0;line-height:1.4">'+B.lanista+'</div>'
+      +'<div class="small" style="line-height:1.5">'
+        +'danger <b style="color:'+tc+'">'+thr+'%</b> · '
+        +'hp ×'+B.hp.toFixed(2)+' · hit ×'+B.dmg.toFixed(2)+' · speed ×'+B.spd.toFixed(2)+'<br>'
+        +'purse if you win: <b>'+Math.round(rigPurseMul(B)*100)+'%</b> of the normal · '
+        +'they smell a fix <b style="color:#e0705b">'+Math.round(rigSuspicion(B)*100)+'%</b></div>'
+      +'<div class="small muted" style="margin-top:3px">'+B.warn+'</div>';
+    card.appendChild(info);
+    const bt=document.createElement('button'); bt.className='btn sm'+(afford?' gold':'');
+    bt.style.marginTop='5px'; bt.disabled=!afford;
+    bt.textContent = afford? ('▶ TAKE HIM · '+coinShortStr(price)) : ('needs '+coinShortStr(price));
+    bt.onclick=()=>{
+      if(G.coin<price) return;
+      G.coin-=price; G.rigsUsed=(G.rigsUsed||0)+1; refreshStatbar(); saveQuiet();
+      try{ sfx('coin'); }catch(e){}
+      toast('🤝 “'+B.name+' it is. He will be told to make it look like a fight.”', 3400);
+      startFight(b.reg,{forbiddenEquipped:b.eqForbidden, rigged:true, rigBuild:B.id, imperial:false});
+    };
+    card.appendChild(bt);
+    grid.appendChild(card);
+  });
+  const foot=document.createElement('div'); foot.className='small muted';
+  foot.style.cssText='margin-top:8px;line-height:1.5;border-top:1px solid #3a2f22;padding-top:6px;';
+  foot.innerHTML='<b style="color:var(--gold)">WHY HE WILL DO IT.</b> The men are his capital and a dead star is a '
+    +'ruinous loss, so the lanista has every reason in the world to arrange a pairing. Sortitio — drawing lots for the '
+    +'pairs — existed precisely because everybody knew what the alternative was.';
+  bd.appendChild(foot);
+  $('btn-villa-back').onclick=()=>{ openBrief(b.reg, b.imperial); };
+}
 $('btn-rig').onclick=()=>{
-  const b=briefCtx; if(G.coin<b.rigCost) return;
-  G.coin-=b.rigCost; G.rigsUsed++; refreshStatbar();
-  startFight(b.reg,{forbiddenEquipped:b.eqForbidden, rigged:true, imperial:false});
+  const b=briefCtx; if(G.coin<RIG_FEE) return;
+  /* THE FEE BUYS THE CONVERSATION AND NOTHING ELSE. It used to buy the whole
+     fix outright, at one price, against a man you never saw. */
+  G.coin-=RIG_FEE; refreshStatbar(); saveQuiet();
+  try{ sfx('coin'); }catch(e){}
+  openRigPick();
 };
 $('btn-skip').onclick=()=>{
   const b=briefCtx; if(G.coin<b.skipCost) return;
@@ -27107,12 +27962,108 @@ function drawGearIcon(cnv,cat,g){
     else if(id==='fuscina'){ P(19,10,2,24,wood); P(14,4,2,8,m); P(19,4,2,8,m); P(24,4,2,8,m); P(14,10,12,2,m); P(14,4,2,2,mh); P(24,4,2,2,mh); }
     else if(id==='sagaris'||id==='bipennis'||id==='dolabra'){ P(19,6,2,28,wood); P(19,6,1,28,'#9a7448');
       P(11,6,8,8,m); P(11,6,8,2,mh); if(id==='bipennis'){ P(21,6,8,8,m); P(27,6,2,8,ms); } else P(21,8,5,3,ms); }
-    else if(id==='sica'||id==='akinakes'||id==='falx'){ for(let i=0;i<14;i++){ const xx=20+((i*i)*0.045|0); P(xx,30-i*2,3,2,bladeC); P(xx,30-i*2,1,1,bladeH); } P(17,30,5,6,wood); P(17,30,5,2,br); }
+    else if(id==='akinakes'){                                    // SHORT, nearly straight, lobed pommel
+      P(19,10,3,14,bladeC); P(19,10,1,14,bladeH); P(21,10,1,14,bladeS); P(19,8,3,3,bladeH);
+      P(16,24,9,2,gold); P(16,24,9,1,goldHi);                    // the Persian plate guard
+      P(19,26,3,5,wood);
+      P(15,30,5,4,gold); P(21,30,5,4,gold); P(15,30,5,1,goldHi); P(21,30,5,1,goldHi); }  // the twin lobes
+    else if(id==='falx'){                                        // a GREAT scythe, curving hard
+      P(17,26,4,12,wood); P(17,26,4,2,br);                        // a long two-handed haft
+      for(let i=0;i<16;i++){ const xx=19+((i*i)*0.055|0), yy=26-i*1.7;
+        P(xx,yy,4,3,bladeC); P(xx,yy,1,1,bladeH); }
+      P(30,2,3,4,bladeH); }                                       // the wicked inward point
+    else if(id==='sica'){                                        // short, curved, hooks past a shield
+      for(let i=0;i<13;i++){ const xx=19+((i*i)*0.035|0); P(xx,29-i*1.8,3,2,bladeC); P(xx,29-i*1.8,1,1,bladeH); }
+      P(16,28,7,2,ms); P(18,30,4,6,wood); P(17,35,6,3,br); }
     else if(id==='cestus'){ P(13,14,14,13,'#5a3f2a'); P(13,14,14,3,'#7a5a38'); P(15,18,2,2,m); P(19,18,2,2,m); P(23,18,2,2,m); P(15,23,10,2,'#3a2818'); }
-    else { const L=id==='pugio'||id==='rudis_ferrea'?14:20;   // swords: vertical blade
-      P(19,4,3,L,bladeC); P(19,4,1,L,bladeH); P(21,4,1,L,bladeS); P(19,2,3,3,bladeH);
+    /* ---- THE EASTERN ARSENAL. All ten fell through to the generic sword
+       below, so a crossbow, a discus and a lance were the same icon. ---- */
+    else if(id==='nu'){                                                  // Han crossbow, seen from above
+      P(19,6,3,26,wood); P(19,6,1,26,'#9a7448');                         // the tiller
+      P(8,10,24,3,'#6a4a2a'); P(8,10,24,1,'#8a6a3a');                    // the prod across it
+      P(7,7,2,7,'#5a3a1e'); P(31,7,2,7,'#5a3a1e');                       // recurved tips
+      P(9,13,22,1,'#2a1e12');                                            // the string
+      P(16,18,7,5,m); P(16,18,7,2,mh); P(18,23,3,4,ms);                  // the bronze trigger
+      P(19,3,3,7,m); P(19,3,1,7,mh); P(18,1,5,3,mh); }                   // a bolt on the rail
+    else if(id==='huan_dao'){                                            // ring pommel = the whole name
+      P(19,4,3,20,bladeC); P(19,4,1,20,bladeH); P(21,4,1,20,bladeS); P(19,2,3,3,bladeH);
+      P(16,24,9,2,ms);                                                   // the plain guard
+      P(19,26,3,6,wood);
+      P(16,31,9,3,m); P(16,31,9,1,mh); P(19,32,3,1,'#231a10'); }         // 環首 — the ring
+    else if(id==='ji'){                                                  // spear + branching dagger-axe
+      P(19,10,2,24,wood); P(19,10,1,24,'#9a7448');
+      P(18,2,4,9,m); P(18,2,4,2,mh); P(19,0,2,3,mh);
+      P(12,8,7,2,m); P(12,8,7,1,mh); P(10,8,2,4,m);                      // the hook, standing off
+      P(17,12,6,2,'#8a2020'); P(18,14,4,2,'#a82c2c'); }                  // the red tassel
+    else if(id==='qiang'){
+      P(19,10,2,24,wood); P(19,10,1,24,'#9a7448');
+      P(18,2,4,9,m); P(18,2,4,2,mh); P(19,0,2,3,mh); P(18,11,4,2,ms);
+      P(16,13,8,3,'#a82020'); P(17,16,6,3,'#8a2020'); P(16,13,8,1,'#c84a4a'); }
+    else if(id==='steppe_bow'){                                          // the double curve, upright
+      for(let i=0;i<9;i++){ const yy=4+i*1.6, xx=13+Math.round(Math.abs(12-yy)*0.30);
+        P(xx,yy,3,2,'#6a4a2a'); P(xx,yy,1,1,'#8a6a3a'); }
+      for(let i=0;i<9;i++){ const yy=20+i*1.6, xx=13+Math.round(Math.abs(yy-28)*0.30);
+        P(xx,yy,3,2,'#6a4a2a'); P(xx,yy,1,1,'#8a6a3a'); }
+      P(13,18,3,4,'#4a3418');                                            // the grip
+      P(17,3,3,2,'#8a6a3a'); P(17,35,3,2,'#8a6a3a');                     // the siyahs
+      P(18,4,1,32,'#2a1e12');                                            // the string
+      P(19,19,14,1,'#c8b088'); P(30,17,4,3,m); P(30,17,4,1,mh); }        // an arrow nocked
+    else if(id==='steppe_sabre'){
+      for(let i=0;i<15;i++){ const xx=19+((i*i)*0.030|0); P(xx,30-i*1.7,3,2,bladeC); P(xx,30-i*1.7,1,1,bladeH); }
+      P(16,30,6,3,ms); P(17,33,4,5,wood); P(16,37,6,2,m); }
+    else if(id==='kontos'){                                              // absurdly long, two grips
+      P(19,2,3,34,wood); P(19,2,1,34,'#9a7448');
+      P(18,2,5,8,m); P(18,2,5,2,mh); P(19,0,3,3,mh);
+      P(17,16,7,3,'#4a3418'); P(17,24,7,3,'#4a3418');                    // the two hands
+      P(18,35,5,4,shade(wood,-30)); }                                    // the counterweight
+    else if(id==='khanda'){                                              // broad, widening to a blunt tip
+      for(let i=0;i<20;i++){ const w2=3+Math.round(i*0.13);
+        P(20-((w2/2)|0),4+i,w2,1,bladeC); P(20-((w2/2)|0),4+i,1,1,bladeH); }
+      P(18,2,5,3,bladeH); P(17,1,7,2,bladeC);                            // the spatulate end, uppermost
+      P(15,24,11,3,gold); P(15,24,11,1,goldHi);                          // the plate guard
+      P(18,27,5,7,wood); P(16,33,9,4,gold); }                            // and the basket grip
+    else if(id==='ankusha'){
+      P(19,14,2,20,wood); P(19,14,1,20,'#9a7448');
+      P(19,4,2,11,m); P(19,4,1,11,mh); P(19,2,2,3,mh);                   // the spike
+      P(13,8,7,2,m); P(13,8,7,1,mh); P(11,9,2,5,m); P(11,13,3,2,ms);     // the hook curling back
+      P(18,13,4,2,gold); }
+    else if(id==='chakram'){                                             // a flat steel ring
+      for(let a=0;a<40;a++){ const th=a/40*6.283;
+        P(20+Math.round(Math.cos(th)*13)-1, 20+Math.round(Math.sin(th)*13)-1, 3,3,
+          Math.sin(th)<-0.25? bladeH : Math.sin(th)>0.35? bladeS : bladeC); }
+      for(let a=0;a<28;a++){ const th=a/28*6.283;
+        P(20+Math.round(Math.cos(th)*9)-1, 20+Math.round(Math.sin(th)*9)-1, 2,2,'#231a10'); }
+      P(15,6,7,2,'#fff6df'); }                                           // light along the honed rim
+    /* ---- AND THE WESTERN BLADES WERE NOT ALL ONE BLADE EITHER. Five of them
+       shared this single branch, so a gladius, a spatha and a Celtic
+       longsword came out as pixel-identical icons — measured, not guessed.
+       Each is cut to its real length and given its own pommel. ---- */
+    else if(id==='spatha'||id==='celtic_longsword'){
+      const L=25, celt=(id==='celtic_longsword');
+      P(19,2,3,L,bladeC); P(19,2,1,L,bladeH); P(21,2,1,L,bladeS);                // long, narrow, parallel
+      P(19,1,3,2,bladeH); P(20,2,1,L,shade(bladeC,-12));                          // and a fuller down it
+      P(15,2+L,11,2,celt?'#8a7a5a':br); P(15,2+L,11,1,celt?'#b0a078':brHi);       // a slight guard
+      P(19,4+L,3,7,wood);
+      if(celt){ P(16,11+L,9,3,m); P(16,11+L,9,1,mh); P(18,14+L,5,2,ms); }        // anthropoid pommel
+      else { P(17,11+L,7,4,br); P(17,11+L,7,1,brHi); } }
+    else if(id==='pugio'){
+      P(19,8,3,12,bladeC); P(19,8,1,12,bladeH); P(21,8,1,12,bladeS);
+      P(18,11,5,5,bladeC); P(18,11,5,1,bladeH); P(22,11,1,5,bladeS);              // the WAISTED leaf blade
+      P(19,6,3,3,bladeH);
+      P(15,20,11,2,m); P(15,20,11,1,mh);                                          // a broad plate guard
+      P(19,22,3,6,wood); P(17,27,7,3,m); P(17,27,7,1,mh); }                       // and the disc pommel
+    else if(id==='rudis_ferrea'){
+      P(19,8,3,14,ms); P(19,8,1,14,m); P(19,6,3,3,m);                             // dull, blunt, honest
+      P(16,22,9,2,'#6a5238'); P(19,24,3,7,wood); P(19,24,1,7,'#9a7448');
+      P(17,30,7,3,'#5a4028');
+      P(18,12,1,6,shade(ms,-20)); }                                               // a nick in the edge
+    else { const L=20;                                       // the gladius: short, broad, wasp-waisted
+      P(18,4,5,L-4,bladeC); P(18,4,1,L-4,bladeH); P(22,4,1,L-4,bladeS);
+      P(19,4+L-4,3,4,bladeC);                                                     // it draws in to the tip
+      P(18,2,5,3,bladeH); P(20,4,1,L,shade(bladeC,-10));
       P(14,4+L,13,3,g.gold?gold:br); P(14,4+L,13,1,g.gold?goldHi:brHi);           // crossguard
-      P(19,7+L,3,7,wood); P(18,14+L,5,4,g.gold?gold:'#5a4028'); }
+      P(19,7+L,3,7,wood); P(17,14+L,7,4,g.gold?gold:'#5a4028');
+      P(18,15+L,5,1,g.gold?goldHi:'#8a6a3a'); }                                   // the round pommel
   } else if(cat==='shield'){
     if(id==='none'){ P(12,18,16,3,'#4a3a26'); }
     else if(id==='scutum'||id==='scutum_pictum'){ const col=id==='scutum_pictum'?'#7a1420':'#a52828';
@@ -27121,17 +28072,67 @@ function drawGearIcon(cnv,cat,g){
       if(id==='scutum_pictum'){ P(17,13,6,3,gold); P(16,16,8,2,gold); P(19,18,2,6,gold); P(18,10,3,3,goldHi); }
       P(17,17,6,6,'#d8c089'); P(18,18,4,4,'#f2e2a4'); }
     else if(id==='rete'){ c.globalAlpha=.95; for(let i=0;i<7;i++)P(8,8+i*4,24,1,'#d8c89a'); for(let i=0;i<7;i++)P(8+i*4,8,1,25,'#d8c89a'); c.globalAlpha=1; }
+    else if(id==='gou_xiang'){                                            // the Han hook-and-spike parry
+      P(17,10,6,20,m); P(17,10,6,2,mh); P(21,10,2,20,ms);                // a narrow bar, not a shield
+      P(14,7,9,3,m); P(14,7,9,1,mh); P(12,8,3,5,m); P(12,12,4,2,ms);     // the hook, above
+      P(17,30,6,7,m); P(19,36,2,3,ms); P(17,30,2,7,mh);                  // and the spike, below
+      P(16,18,8,4,wood); P(16,18,8,1,'#9a7448'); }                       // the grip in the middle
+    else if(id==='steppe_targe'){                                        // small, lacquered, slung
+      const R2=9; for(let yy=-R2;yy<=R2;yy++){ const w2=Math.floor(Math.sqrt(R2*R2-yy*yy));
+        P(20-w2,18+yy,w2*2,1, yy<0?'#a8483a':'#7a2f26'); }
+      P(18,16,4,4,'#3a2a18'); P(19,17,2,2,m);                            // the boss
+      for(let i=0;i<4;i++) P(12+i*5,10+i,2,2,'#e0c088');                 // painted marks
+      P(11,26,18,2,'#5a4028'); }                                         // the sling
+    else if(id==='dhal'){                                                // Indian hide buckler, four bosses
+      const R2=12; for(let yy=-R2;yy<=R2;yy++){ const w2=Math.floor(Math.sqrt(R2*R2-yy*yy));
+        P(20-w2,20+yy,w2*2,1, yy<0?'#c89a5a':'#8a6236'); }
+      [[14,14],[26,14],[14,26],[26,26]].forEach(([bx,by])=>{
+        P(bx-2,by-2,4,4,gold); P(bx-2,by-2,3,1,goldHi); });              // the four brass bosses
+      P(18,18,4,4,shade('#8a6236',-24)); }
     else { const R=id==='aspis'?13:10;                                              // round shields
       for(let yy=-R;yy<=R;yy++){ const w2=Math.floor(Math.sqrt(R*R-yy*yy)); P(20-w2,20+yy,w2*2,1, yy<0?brHi:br); }
       P(18,18,4,4,id==='caetra'?m:gold); P(19,19,2,2,goldHi); }
   } else if(cat==='helmet'){
     if(id==='none'){ P(14,16,12,10,'#8a5a36'); P(14,16,12,3,'#a87248'); }
+    else if(id==='dou_mou'){                                              // riveted plates + lamellar neck
+      P(13,10,14,12,m); P(13,10,14,3,mh); P(24,10,3,11,ms);
+      for(let i=0;i<5;i++) P(14+i*3,12,1,1,mh);                          // the rivets
+      for(let ry=0;ry<4;ry++) for(let rx=0;rx<8;rx++)                     // the neck curtain
+        P(11+rx*2+(ry%2),22+ry*2,2,2,(rx+ry)%2?ms:m);
+      P(16,16,3,2,'#000'); P(21,16,3,2,'#000');
+      P(19,5,2,6,'#c52a2a'); P(18,4,4,2,'#e04a4a'); }                     // a small red plume
+    else if(id==='steppe_cap'){                                           // felt, with an iron band
+      P(14,12,12,11,'#7a6a52'); P(14,12,12,3,'#9a8a6a'); P(24,12,2,10,'#5a4a34');
+      P(13,21,14,3,m); P(13,21,14,1,mh);                                  // the band
+      P(12,24,4,7,'#7a6a52'); P(24,24,4,7,'#7a6a52');                     // ear flaps
+      P(18,7,4,6,'#7a6a52'); P(18,7,4,2,'#9a8a6a'); P(19,4,2,4,'#a83a3a'); }  // the peak and its tuft
+    else if(id==='kushan_helm'){                                          // tall, with a mail aventail
+      P(15,8,10,14,m); P(15,8,10,3,mh); P(23,9,2,13,ms);
+      P(18,3,4,6,m); P(18,3,4,2,mh); P(19,1,2,3,gold);                    // the tall crown and finial
+      P(13,20,14,2,gold); P(13,20,14,1,goldHi);                           // the browband
+      for(let ry=0;ry<5;ry++) for(let rx=0;rx<8;rx++)                     // the aventail rings
+        P(12+rx*2+(ry%2),22+ry*2,1,1,(rx+ry)%2?mh:ms);
+      P(16,16,3,2,'#000'); P(21,16,3,2,'#000'); }
+    else if(id==='sirastrana'){                                           // iron over quilted cotton
+      P(14,11,12,11,'#c8a870'); P(14,11,12,2,'#e0c48c');
+      for(let i=0;i<4;i++) P(14,13+i*2,12,1,'#a8885a');                   // the quilting
+      P(13,9,14,3,m); P(13,9,14,1,mh);                                    // the iron band over it
+      P(12,21,5,8,'#c8a870'); P(23,21,5,8,'#c8a870');                     // laced cheek-pieces
+      P(12,21,5,1,'#e0c48c'); P(23,21,5,1,'#e0c48c');
+      P(16,16,3,2,'#000'); P(21,16,3,2,'#000');
+      P(18,5,4,5,gold); P(19,3,2,3,goldHi); }                             // and a gilded crest-boss
     else { const gm=id==='galea_praetoria'||id==='galea_aurea'?gold:m, gmh=id==='galea_praetoria'||id==='galea_aurea'?goldHi:mh;
       P(13,14,14,12,gm); P(13,14,14,3,gmh); P(24,14,3,11,shade(gm==='#e8c34a'?'#a8862e':'#6f7a87',0));
       P(12,24,16,3,ms); P(14,26,3,6,gm); P(23,26,3,6,gm);                            // cheek guards
       P(16,20,3,2,'#000'); P(21,20,3,2,'#000');
       if(id==='galea_murmillo'){ for(let i=0;i<8;i++)P(19,4+i,3,2,'#c52a2a'); P(18,3,5,3,'#e04a4a'); }
-      else if(id==='galea_thraex'||id==='galea_hoplo'){ for(let i=0;i<7;i++)P(19,5+i,3,1,gold); P(18,4,5,2,goldHi); }
+      else if(id==='galea_thraex'){                              // the GRIFFIN, and a wide brim
+        for(let i=0;i<7;i++)P(19,5+i,3,1,gold); P(18,4,5,2,goldHi);
+        P(22,3,4,3,gold); P(25,2,2,2,goldHi); P(21,6,2,2,gold);   // the griffin's head and beak
+        P(10,13,20,2,m); P(10,13,20,1,mh); }                      // the brim, right across
+      else if(id==='galea_hoplo'){                               // a plume in a tube, and a narrow brim
+        P(18,6,4,3,ms); for(let i=0;i<8;i++)P(19,2+i*0.7,3,1,i%2?'#c52a2a':'#e04a4a');
+        P(12,13,16,2,m); P(12,13,16,1,mh); }
       else if(id==='galea_praetoria'){ for(let i=0;i<6;i++)P(12+i*3,8,2,5,gold); P(12,7,17,2,goldHi); }
       else if(id==='galea_cornuta'){ P(9,10,3,6,br); P(8,7,3,4,brHi); P(28,10,3,6,br); P(29,7,3,4,brHi); }
       else if(id==='persian_helm'){ P(19,6,3,8,m); P(18,5,4,2,mh); }
@@ -27141,6 +28142,36 @@ function drawGearIcon(cnv,cat,g){
     if(id==='galerus'){ P(11,10,10,14,br); P(11,10,10,3,brHi); P(11,22,18,4,'#8a5a36'); }
     else if(id==='ocrea'){ P(15,8,4,24,br); P(21,8,4,24,br); P(15,8,4,3,brHi); P(21,8,4,3,brHi); P(15,29,4,3,brHi); P(21,29,4,3,brHi); }
     else if(id==='manica'){ for(let i=0;i<8;i++){ P(16,6+i*3,8,3,i%2?m:ms); P(16,6+i*3,8,1,mh); } }
+    else if(id==='xuanjia'){                                              // "dark armour" — blackened lamellae
+      P(13,8,14,22,'#2a2a30');
+      for(let ry=0;ry<11;ry++) for(let rx=0;rx<7;rx++){
+        P(13+rx*2,8+ry*2,2,2,(rx+ry)%2?'#3a3a44':'#22222a');
+        P(13+rx*2,8+ry*2,1,1,'#55555f'); }                                // each plate catching light
+      P(13,8,14,1,'#6a6a78');
+      P(19,8,2,22,'#8a2f3a'); P(19,8,2,1,'#c8545e');                      // the crimson lacing down the front
+      P(13,18,14,2,'#7a2f22'); }                                          // and the belt
+    else if(id==='steppe_coat'){                                          // belted felt and hide
+      P(13,8,14,22,'#7a6242'); P(13,8,14,3,'#9a8258');
+      P(19,8,2,22,'#5a4630');                                             // the crossed-over front
+      P(13,8,7,22,'#6a5438');
+      P(12,17,16,4,'#4a3418'); P(12,17,16,1,'#6a4e30');                   // the wide belt
+      for(let i=0;i<4;i++) P(14+i*4,18,2,2,gold);                         // its fittings
+      P(13,26,14,1,'#5a4630'); P(13,29,14,1,'#5a4630'); }
+    else if(id==='kataphraktos'){                                         // scale, and there is a lot of it
+      for(let ry=0;ry<13;ry++) for(let rx=0;rx<9;rx++){
+        const xx=11+rx*2+(ry%2), yy=6+ry*2;
+        P(xx,yy,2,3,(rx+ry)%2?m:ms); P(xx,yy,1,1,mh); }                   // overlapping scales
+      P(11,6,18,1,mh);
+      P(9,10,3,14,ms); P(29,10,3,14,ms);                                  // it wraps round the arms too
+      P(9,10,3,1,mh); P(29,10,3,1,mh);
+      P(13,30,14,4,ms); for(let i=0;i<5;i++) P(13+i*3,30,2,4,m); }        // and hangs to the thigh
+    else if(id==='kavacha'){                                              // quilted cotton over iron plates
+      P(13,8,14,22,'#d8c49a'); P(13,8,14,2,'#f0e0bc');
+      for(let i=0;i<7;i++) P(13,11+i*3,14,1,'#b0a078');                   // the quilting lines
+      P(15,12,4,7,m); P(21,12,4,7,m); P(15,12,4,1,mh); P(21,12,4,1,mh);   // the plates beneath
+      P(15,21,10,5,m); P(15,21,10,1,mh);
+      P(19,8,2,22,'#8a5a2a');                                            // the central binding
+      P(13,27,14,2,'#8a5a2a'); }
     else { P(13,8,14,22,'#8a5a36');                                                 // torso base
       if(id==='cardiophylax'||id==='musculata'){ P(13,8,14,22,br); P(13,8,14,3,brHi); P(15,13,4,4,brHi); P(21,13,4,4,brHi); P(19,12,2,12,shade(br,-24));
         if(id==='musculata'){ P(15,20,4,1,shade(br,-24)); P(21,20,4,1,shade(br,-24)); P(15,23,4,1,shade(br,-24)); P(21,23,4,1,shade(br,-24)); P(13,8,2,22,goldHi); } }
@@ -27548,6 +28579,10 @@ window.__SS = {
   GEAR, CLASSES, CLASS_ORDER, CLASS_ORDER_EAST, ARCHETYPES, ARCH_ORDER, ARCH_ORDER_WEST, ARCH_ORDER_EAST,
   WORLDS, WORLD_IDS, worldOfArch, worldOfRegion, regionsForWorld, regionAny, playerWorld,
   sel:()=>sel,
+  RIG_FEE, RIG_BUILDS, rigBuild, rigManPrice, rigSuspicion, rigPurseMul, drawRigCandidate, openRigPick,
+  ARENA_THEATRES, THEATRE_OF, theatreOf, drawArena, startFight, REGIONS_EAST,
+  CURRENCY, CURRENCY_OF, currencyHere, coinWord, coinShortStr, drawCoinIcon, coinIconURI,
+  drawGearIcon, drawWeapon2, drawCardPortrait, gearOf, refreshStatbar, CURRENCY_REGION,
   SILK_LEGS, SILK_STAKE_CAP, silkLeg, silkOpen, silkStake, silkOdds, silkRun, openSilk,
   HUB_EAST, HUB_WEST_LABEL, applyHub, buildRegions, travelCost,
   HALL_LIGHT, litFigure, litWife, litHusband, litBufs,
