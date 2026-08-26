@@ -8678,6 +8678,14 @@ function sfx(kind){
        A sandal is not a transient. It is a LEATHER SOLE rolling onto stone:
        a soft low body with a scuff of grit dragged across it, no high snap,
        and a longer, duller tail than a pair of palms could ever make. */
+    /* THE WIND-UP. Twenty ticks of arm going up used to be completely
+       silent, so the strike arrived out of nothing. This is the sleeve of a
+       tunic moving fast through air — broadband, rising, and gone before the
+       hand is at the top of the arc. */
+    case 'cloth':
+      hiss({d:0.16, v:0.020, f:300, to:1250, band:true, q:0.55, a:0.030, at:0.010});
+      hiss({d:0.10, v:0.010, f:900, to:2100, band:true, q:0.9,  a:0.045, at:0.055});
+      break;
     case 'step':           // one sandal on a mosaic floor
       blip({f:R(88,116), to:48, d:0.085, type:'sine', v:0.052, a:0.004, rev:true});   // the weight of the foot
       hiss({d:0.055, v:0.028, f:620, to:240, band:true, q:0.8, a:0.006, rate:R(0.92,1.08)}); // leather rolling
@@ -8943,7 +8951,14 @@ function loop(now){
   else if(state==='battle' && BT){ updateBattle(dt); drawBattle(); }
   else if(state==='wifehappy'){ updateWifeHappy(dt); if(state==='wifehappy') drawWifeHappy(); }
   else if(state==='bed' && BC){ updateBed(dt); if(BC) drawBed(); }
-  else if(state==='domus' && DM){ updateDomus(dt); if(DM) drawDomus(); }
+  else if(state==='domus' && DM){ updateDomus(dt);
+    /* THE WHOLE ROOM TAKES IT. The impact used to shake only the woman it
+       landed on, which reads as her wobbling rather than as a blow. A hard
+       contact moves the CAMERA — everything in the hall jumps together and
+       settles in about a fifth of a second. */
+    if(DM){ const sk=hallShake();
+      if(sk){ ctx.save(); ctx.translate(sk.x, sk.y); drawDomus(); ctx.restore(); }
+      else drawDomus(); } }
   else if(state==='map'||state==='travel'){ drawMapCanvas(); }
   else if(state==='title'||state==='create'||state==='help'){ drawMenuBg(now); }
   requestAnimationFrame(loop);
@@ -13167,6 +13182,139 @@ function domusExit(){ DM=null; $('statbar').classList.remove('hide'); openVilla(
 // THE DOMINA, drawn from her actual measurements. mode: idle | walk | run | god
 // Her BODY SCORES drive the sprite — a FLAT 1 is visibly flat, a COLOSSAL 10 is not.
 // A fine figure also gets real jiggle on the step.
+/* =====================================================================
+   THE HALL LIGHT — one key light, and every figure in the room answers to it
+   ---------------------------------------------------------------------
+   Every sprite in this game was flat-lit: each routine picked its own
+   shade(col,-26) for "the dark side" and its own shade(col,+20) for "the
+   light side", decided once, per garment, by hand. That is why a dozen
+   carefully-drawn figures still read as stickers on a background — nothing
+   in the room agrees about where the light is coming from, and nothing
+   casts anything.
+
+   This does it the way it is actually done. The figure is painted once into
+   an offscreen buffer, and then the SILHOUETTE of that buffer — not the
+   individual rectangles, the whole outline — is used four times:
+
+     · a CAST SHADOW, sheared away from the light and flattened onto the
+       floor, so she is standing in the room instead of in front of it
+     · a RIM LIGHT along the lit inner edge, which is the single biggest
+       reason a sprite reads as expensive
+     · an OCCLUSION line along the shaded inner edge
+     · and a BOUNCE, warm and dim, coming back up off the floor into her hem
+
+   Because it works off the rendered silhouette and never off the drawing
+   code, it costs nothing to extend: every culture's gown, every tribal
+   torc, every new eastern sprite gets the same lighting the moment it is
+   drawn, with no per-culture work at all.
+
+   Composited with destination-out against a one-pixel-shifted copy of the
+   same silhouette, so the edges are found without ever reading pixels back
+   — no getImageData anywhere in the hot path.
+   ===================================================================== */
+const HALL_LIGHT={
+  kx:-1, ky:-1,                         // the key light sits high and to the left
+  rim:'#ffeccb',  rimA:0.44,            // warm lamp-light down her lit edge
+  ao:'#1a0f18',   aoA:0.34,             // and the room's shadow down the other
+  cast:'#0b0705', castA:0.30,           // what she throws on the floor
+  bounce:'#8a5a34', bounceA:0.15,       // warm light coming back UP off the tiles
+};
+let _LITB=null;
+function litBufs(){
+  if(_LITB) return _LITB;
+  const mk=(w,h)=>{ const cv=document.createElement('canvas'); cv.width=w; cv.height=h;
+    const g=cv.getContext('2d'); g.imageSmoothingEnabled=false; return {c:cv,g}; };
+  const W2=96, H2=120;
+  _LITB={ fig:mk(W2,H2), edge:mk(W2,H2), W:W2, H:H2, AX:44, AY:112 };
+  return _LITB;
+}
+/* the sliver of silhouette that sticks out past a copy of itself shifted by
+   (ox,oy) — an inner edge, tinted, without ever growing the outline */
+function _litEdge(B, ox, oy, col){
+  const g=B.edge.g;
+  g.globalCompositeOperation='source-over'; g.globalAlpha=1;
+  g.clearRect(0,0,B.W,B.H);
+  g.drawImage(B.fig.c, 0, 0);
+  g.globalCompositeOperation='destination-out';
+  g.drawImage(B.fig.c, ox, oy);
+  g.globalCompositeOperation='source-in';
+  g.fillStyle=col; g.fillRect(0,0,B.W,B.H);
+  g.globalCompositeOperation='source-over';
+}
+let LIT_ON=true;                         // one switch, so a harness can measure the difference
+function litFigure(c, x, y, paint, opt){
+  opt=opt||{};
+  if(!LIT_ON || opt.plain){ paint(c,x,y); return; }
+  let B;
+  try{ B=litBufs(); }catch(e){ paint(c,x,y); return; }
+  const AX=B.AX, AY=B.AY, dx=Math.round(x)-AX, dy=Math.round(y)-AY;
+  try{
+    B.fig.g.globalCompositeOperation='source-over'; B.fig.g.globalAlpha=1;
+    B.fig.g.clearRect(0,0,B.W,B.H);
+    paint(B.fig.g, AX, AY);
+  }catch(e){ paint(c,x,y); return; }
+  const L=HALL_LIGHT, str=(opt.strength===undefined?1:opt.strength);
+  /* ---- 1. THE CAST SHADOW, first, because she stands ON it ----
+     Sheared away from the key light and flattened, then stamped three times
+     at falling alpha so the edge is soft rather than a hard black cut-out.
+
+     THE FIRST CUT RAN THE SHADOW OF HER WHOLE BODY AT FULL STRENGTH, and a
+     seventy-pixel figure sheared at 1:1 threw a shadow that crossed the
+     entire floor and lay over the couch — a smear, not a shadow. A real one
+     falls off with distance from the contact point, because the light is a
+     lamp in the room and not the sun. So the silhouette is masked with a
+     vertical ramp before it is sheared: solid at her feet, gone by her
+     shoulders. Shorter shear, and a contact darkening at the feet where the
+     light cannot get under her at all — which is the part that actually
+     puts weight on the floor. */
+  if(opt.shadow!==false){
+    const lift=opt.lift||0;                       // off the floor = smaller, softer, further
+    const sq=0.13+lift*0.008, sk=-0.62;
+    _litEdge(B, 0, -999, L.cast);                 // whole silhouette, tinted (nothing erased)
+    { const g=B.edge.g, gr=g.createLinearGradient(0,AY-64,0,AY);
+      gr.addColorStop(0,'rgba(0,0,0,0)'); gr.addColorStop(0.45,'rgba(0,0,0,0.42)');
+      gr.addColorStop(1,'rgba(0,0,0,1)');
+      g.globalCompositeOperation='destination-in';
+      g.fillStyle=gr; g.fillRect(0,0,B.W,B.H);
+      g.globalCompositeOperation='source-over'; }
+    c.save();
+    c.translate(Math.round(x), Math.round(y)+1);
+    c.transform(1, 0, sk, -sq, 0, 0);
+    for(let i=0;i<3;i++){
+      c.globalAlpha=L.castA*str*(1-lift*0.055)*[0.70,0.26,0.16][i];
+      c.drawImage(B.edge.c, -AX+[0,-1,1][i], -AY+[0,1,-1][i]);
+    }
+    c.restore(); c.globalAlpha=1;
+    // and the contact patch — no light gets under her feet
+    c.globalAlpha=0.34*str*(1-lift*0.10); c.fillStyle=L.cast;
+    c.beginPath(); c.ellipse(Math.round(x)+1, Math.round(y)+1, 8-lift*0.5, 2.1, 0, 0, 7); c.fill();
+    c.globalAlpha=1;
+  }
+  // ---- 2. HER, as she was painted ----
+  c.drawImage(B.fig.c, dx, dy);
+  /* ---- 3 & 4. THE OCCLUSION AND THE RIM.
+     These were the wrong way round in the first cut, and at 5x it was
+     unmistakable: _litEdge erases with a copy shifted by (ox,oy), so the
+     sliver it LEAVES is on the side OPPOSITE the shift. Passing the light
+     vector straight through therefore put the warm rim down her shaded side
+     and the cold occlusion down the side facing the lamp — every figure in
+     the game lit from the wrong direction. The shift is negated now: erase
+     AWAY from the light to keep the lit edge, and toward it to keep the
+     shaded one. ---- */
+  _litEdge(B, L.kx, L.ky, L.ao);                       // erase toward the light → far edge survives
+  c.globalAlpha=L.aoA*str; c.drawImage(B.edge.c, dx, dy);
+  _litEdge(B, -L.kx, -L.ky, L.rim);                    // erase away from it → lit edge survives
+  c.globalAlpha=L.rimA*str; c.drawImage(B.edge.c, dx, dy);
+  // ---- 5. AND THE BOUNCE — warm light coming back up off the floor ----
+  _litEdge(B, 0, -2, L.bounce);
+  c.globalAlpha=L.bounceA*str; c.drawImage(B.edge.c, dx, dy);
+  c.globalAlpha=1;
+}
+/* the wife, the husband and the children, all lit by the same lamp */
+function litWife(c,x,y,w,ph,mode,preg,opt){
+  litFigure(c,x,y,(bc,bx,by)=>drawWifeFig(bc,bx,by,w,ph,mode,preg),opt); }
+function litHusband(c,x,y,bond,sk,tn,w,ph,mode,opt){
+  litFigure(c,x,y,(bc,bx,by)=>drawHusbandFig(bc,bx,by,bond,sk,tn,w,ph,mode),opt); }
 function drawWifeFig(c,x,y,w,ph,mode,preg){
   mode=mode||'idle'; ph=ph||0; preg=preg||0;
   const P=(a,b2,ww,h,col)=>{c.fillStyle=col;c.fillRect(Math.round(x+a),Math.round(y+b2),Math.round(ww),Math.round(h));};
@@ -13381,12 +13529,41 @@ function drawWifeFig(c,x,y,w,ph,mode,preg){
   const bSquash= bWave*bAmt*energy*(running?1.5:1.0) + SJ*bAmt*0.18;         // and it compresses on the downbeat
   const yy=bob;
   const top = yy-26-legLen;                         // where the gown's hem sits above the feet
+  /* HER TIER, hoisted. The seat used to be sized down in its own block, well
+     after the skirt had already been drawn to a width that knew nothing about
+     it — so the seat came out three or four pixels PROUD of the gown on each
+     side and the two together read as a shelf with a curtain hung under it.
+     The skirt is cut from the same number now. */
+  const bTier = be>=9?4 : be>=7?3 : be>=5?2 : be>=3?1 : 0;
+  const bFlare=[0,1,2,3,4][bTier], bDeep=[6,7,8,9,10][bTier];
+  const seatW = hipW + bFlare;
   // ================= LEGS (a real walk cycle, visible under the hem) =================
+  /* THE LEGS WERE ONE COLUMN. Front leg spanned x -3..+1 and the back one
+     0..+4, so they overlapped by a pixel and read as a single seven-wide
+     post of skin with a sandal stuck on the bottom — which is most of why
+     the figure came out blocky. They are separated by a real gap now, and
+     each one TAPERS: thigh, calf, then a narrower ankle, with a sandal that
+     has a sole, a strap and a shadow under it. */
   const lF=stride, lB=-stride;
-  P(-3+lF*0.5, yy-legLen, 4, legLen, skin);         // front leg
-  P(-3+lF*0.5, yy-2, 5, 2, '#8a5c34');              // sandal
-  P( 0+lB*0.5, yy-legLen, 4, legLen, sSh);          // back leg (shaded)
-  P( 0+lB*0.5, yy-2, 5, 2, '#6a4426');
+  const leg=(ox, sk, sh, dark)=>{
+    const th=Math.max(3,Math.round(4+lg*0.05));                    // thigh
+    const cf=th, an=Math.max(2,th-1);                              // calf, ankle
+    const h1=Math.round(legLen*0.46), h2=Math.round(legLen*0.34), h3=legLen-h1-h2;
+    P(ox,            yy-legLen,        th, h1, sk);
+    P(ox,            yy-legLen,        1,  h1, sh);                // light down the front of it
+    P(ox+th-1,       yy-legLen,        1,  h1, dark);
+    P(ox,            yy-legLen+h1,     cf, h2, sk);
+    P(ox,            yy-legLen+h1,     1,  h2, sh);
+    P(ox+cf-1,       yy-legLen+h1,     1,  h2, dark);
+    P(ox+((th-an)>>1), yy-legLen+h1+h2, an, h3, sk);               // the ankle draws in
+    P(ox+((th-an)>>1), yy-legLen+h1+h2, 1,  h3, sh);
+    P(ox-1, yy-2, th+2, 2, '#8a5c34');                             // the sole
+    P(ox-1, yy-2, th+2, 1, '#a87446');
+    P(ox,   yy-4, th,   1, '#6a4426');                             // the strap over the instep
+    P(ox-1, yy,   th+2, 1, 'rgba(20,12,8,.55)');                   // and its own little shadow
+  };
+  leg(Math.round(1+lB*0.5), sSh, shade(skin,-14), shade(skin,-42));   // back leg, in shade
+  leg(Math.round(-5+lF*0.5), skin, shade(skin,22), sSh);             // front leg, lit
   // ================= GOWN =================
   if(mode==='god'){
     // THE GOD WALK — she gathers the stola in one fist and sweeps, formal and unhurried
@@ -13403,22 +13580,63 @@ function drawWifeFig(c,x,y,w,ph,mode,preg){
        which reads as a floating gown over a pair of disconnected shins.
        26 is the distance from `top` down to the top of the legs; 27 puts a
        one-pixel overlap there so there is no seam either. */
+    /* AND THE SKIRT WAS A PLANK. One fillRect, hipW*2 wide from waist to
+       hem, which is a rectangle of cloth and not a garment — no gown on
+       earth hangs with parallel sides. Drawn a row at a time now, drawing
+       IN under the hip and flaring back out toward the hem, with the fold
+       lines following that flare instead of running dead straight down it. */
     const skirtH = 27 + (running? -2 : 0);
-    P(-hipW, top, hipW*2, skirtH, dress);                      // skirt of the gown
-    P(-hipW, top, hipW*2, 2, dHi);
-    P(-hipW-1+hJig*0.5, top+9, 2, skirtH-11, dSh);             // side folds sway with the hips
-    P( hipW-1+hJig*0.5, top+9, 2, skirtH-11, dSh);
-    if(walking){ P(-2+stride*0.6, top+14, 4, skirtH-15, dSh); } // the hem parts as she steps
+    const swayK = hJig*0.5;
+    /* THE REAL SILHOUETTE OF A STOLA: widest where it is over the hip, drawn
+       in over the thigh, and flaring again to the hem. Three points, not a
+       taper — and the top one is the seat's own width, so there is no step. */
+    const wA=seatW*0.99, wB=hipW*0.80, wC=hipW*1.12;
+    const wAt=(i)=>{ const t=i/(skirtH-1);
+      const w2 = (t<0.45)? wA + (wB-wA)*(t/0.45)
+                         : wB + (wC-wB)*((t-0.45)/0.55);
+      return Math.max(2, w2 + (walking? Math.sin(t*3.0)*hipW*0.03 : 0)); };
+    for(let i=0;i<skirtH;i++){
+      const rw=wAt(i), sx=swayK*(i/(skirtH-1))*0.6;
+      P(-rw+sx, top+i, rw*2, 1, dress);
+      if(i<2) P(-rw+sx, top+i, rw*2, 1, dHi);
+      else { P(-rw+sx, top+i, 1, 1, shade(dress,12));            // the lit edge of the cloth
+             P( rw-1+sx, top+i, 1, 1, dSh); }                     // and the shaded one
+    }
+    // three folds running down it, following the flare rather than cutting across it
+    for(let f=0; f<3; f++){
+      const off=[-0.55,0.05,0.62][f];
+      for(let i=8;i<skirtH-1;i++){ const rw=wAt(i), sx=swayK*(i/(skirtH-1))*0.6;
+        P(rw*off+sx, top+i, 1, 1, f===1? shade(dress,-16) : dSh); }
+    }
+    if(walking){ // the hem parts as she steps
+      const rw=wAt(skirtH-1);
+      for(let i=Math.round(skirtH*0.55);i<skirtH;i++)
+        P(-1+stride*0.6, top+i, 3, 1, shade(dress,-34)); }
+    { const hemY=top+skirtH-1, rw=wAt(skirtH-1);                  // a hem with a lip, not a cut edge
+      P(-rw, hemY, rw*2, 1, shade(dress,-40));
+      for(let i=0;i<rw*2;i+=3) P(-rw+i, hemY-((i>>1)%2), 3, 1, dSh); }
   }
-  // a NOBLE gown carries the gold hem and trim it carries in her portrait
-  if(noble){ P(-hipW, top+(mode==='god'?16:25), hipW*2, 1, '#e8c34a');
-             P(-hipW, top, 1, (mode==='god'?18:27), '#e8c34a'); }
+  /* a NOBLE gown carries the gold hem and trim it carries in her portrait —
+     and it has to FOLLOW the flare now that the gown has one. Pinned to a
+     flat hipW it hung outside the cloth at the hem and inside it at the
+     thigh, a gold line floating beside her rather than sewn onto her. */
+  if(noble){
+    if(mode==='god'){ P(-hipW, top+16, hipW*2, 1, '#e8c34a'); P(-hipW, top, 1, 18, '#e8c34a'); }
+    else { const skirtH2=27+(running?-2:0);
+      const wA=seatW*0.99, wB=hipW*0.80, wC=hipW*1.12;
+      const wf=(i)=>{ const t=i/(skirtH2-1);
+        return (t<0.45)? wA+(wB-wA)*(t/0.45) : wB+(wC-wB)*((t-0.45)/0.55); };
+      const hemY=top+skirtH2-2, hw=wf(skirtH2-2);
+      P(-hw, hemY, hw*2, 1, '#e8c34a');                      // the gold band round the hem
+      for(let i=0;i<skirtH2-1;i++) P(-wf(i), top+i, 1, 1, '#e8c34a');   // and down the open edge
+    }
+  }
   // ================= HIPS AND THE BOOTY, BY TIER =================
   // FLAT · RAISED · ELEVATED · FAT · COLOSSAL — five silhouettes, not one
   // block scaled up. Drawn behind her so it reads from any angle.
-  { const bT = be>=9?4 : be>=7?3 : be>=5?2 : be>=3?1 : 0;
+  { const bT = bTier;
     const hj=hJig*0.55, hy=top-7-hJig*0.30;
-    const flare=[0,1,2,3,4][bT], deep=[6,7,8,9,10][bT];
+    const flare=bFlare, deep=bDeep;
     // the seat is drawn as stacked bands that TAPER, so it curves out and back
     // in again — five genuinely different silhouettes, none of them a slab
     const bands=[[0.35,0.72],[0.75,1.0],[1.0,1.0],[0.62,0.86]];       // [heightFrac, widthFrac] top→bottom
@@ -13458,7 +13676,23 @@ function drawWifeFig(c,x,y,w,ph,mode,preg){
     P(-waistW/2, top-13, waistW, 8, shade(dress,-8));
   }
   // ================= BODICE + BUST =================
-  P(-6+lean*0.4, top-24, 12, 12, dress); P(-6+lean*0.4, top-24, 12, 2, dHi);
+  /* THE BODICE WAS A 12x12 BOX. A ribcage is not a box: it is widest across
+     the chest and draws in to the waist, and the shoulders slope off it
+     rather than being cut square. Both are drawn a row at a time now, which
+     costs twelve fills and is the difference between a torso and a crate. */
+  { const LXb=lean*0.4;
+    for(let i=0;i<12;i++){
+      const t=i/11, bw=Math.round(6 - t*(waistW>4?1.6:1.2));      // chest → waist
+      P(-bw+LXb, top-24+i, bw*2, 1, dress);
+      if(i<2) P(-bw+LXb, top-24+i, bw*2, 1, dHi);
+      else { P(-bw+LXb, top-24+i, 1, 1, shade(dress,10));
+             P( bw-1+LXb, top-24+i, 1, 1, dSh); }
+    }
+    // the shoulders, sloping down and away from the neck
+    P(-6+LXb, top-25, 12, 1, dHi);
+    P(-7+LXb, top-24, 2, 2, shade(dress,6)); P(5+LXb, top-24, 2, 2, dSh);
+    P(-8+LXb, top-23, 2, 2, shade(dress,-6)); P(6+LXb, top-23, 2, 2, shade(dress,-16));
+  }
   /* ---- THE BUST, ON THE SAME FIVE RUNGS AS THE REAR: FLAT · RAISED · GOOD ·
      BIG · HUGE. Width, depth, spill and bounce all come off her score, and a
      flat chest is drawn flat — there is nothing there to bounce. ---- */
@@ -13727,13 +13961,14 @@ function playerLook(){
     rank: (kin||elite)?'noble':'peasant', tier: kin?'imperial': elite?'elite':'common',
     body:G.body||{bust:6,booty:6,waist:6,legs:6,face:6,hairq:6} };
 }
-function drawDomusPlayer(x,y,ph,mode){
+function drawDomusPlayer(x,y,ph,mode,plain){
   mode=mode||'idle';
   // your OWN rolled body, not a hardcoded set of sixes
   const mine=playerLook();
-  if(G.isFemale) drawWifeFig(ctx,x,y,mine,ph,mode);
+  const opt={plain:!!plain};
+  if(G.isFemale) litWife(ctx,x,y,mine,ph,mode,0,opt);
   // he walks, runs and turns on his OWN measurements now
-  else drawHusbandFig(ctx,x,y,G.wifeRel|0,null,null,mine,ph,mode);
+  else litHusband(ctx,x,y,G.wifeRel|0,null,null,mine,ph,mode,opt);
 }
 function tryPoolInvite(){
   const po=(typeof roomOccupant==='function')? roomOccupant('pool') : null;
@@ -15947,53 +16182,236 @@ function romanticSwing(T){
     hit=Math.exp(-u*6.0); }
   return {a, lean, hit, i, d};
 }
+/* =====================================================================
+   THE SLAP, REBUILT — the four beats an animator would actually give it
+   ---------------------------------------------------------------------
+   What was here before was a hand sliding sixteen ticks in a straight line
+   and a ring of seven white dots. Every beat of an impact was missing, and
+   an impact is almost entirely its beats:
+
+     0 …  20   ANTICIPATION  the arm draws back and UP, easing out as it
+                             reaches the top — the pause before is what
+                             makes the strike read as a strike
+    20 …  27   THE STRIKE    seven ticks, quadratic, so it is genuinely
+                             fast, and drawn as a SMEAR: the arc between
+                             last frame and this one is filled in with
+                             ghosts, because a hand moving that fast does
+                             not occupy one place per frame
+        27     CONTACT       the spring kick, a one-frame additive bloom,
+                             a directional spark burst thrown along the
+                             tangent, dust off the tiles, and the camera
+                             shake that moves the whole room
+    27 …  61   FOLLOW-THROUGH the hand carries PAST and decelerates, two
+                             ripples travel out through what it hit, and
+                             the mark blooms hot before it settles
+    61 … 132   RECOVERY      the arm comes back to his side and she rings
+                             down on the damped spring she was already on
+
+   The hand travels a real circular arc about his shoulder rather than a
+   straight line, which is the other half of why the old one read as a
+   sprite sliding sideways.
+   ===================================================================== */
+const SLAP_T={ draw:20, strike:7, follow:34, gone:78, end:132 };
+const SLAP_ANG={ rest:-0.24, back:-1.38, hit:0.62, thru:1.05 };
+const SLAP_PIV={ dx:-30, dy:-58, r:30 };
+function slapAng(T){
+  const A=SLAP_T.draw, K=SLAP_T.strike;
+  if(T<A){ const u=clamp(T/A,0,1), e=1-Math.pow(1-u,2.6);        // ease OUT into the top
+    return SLAP_ANG.rest + (SLAP_ANG.back-SLAP_ANG.rest)*e; }
+  if(T<A+K){ const u=clamp((T-A)/K,0,1), e=u*u;                  // and accelerate through
+    return SLAP_ANG.back + (SLAP_ANG.hit-SLAP_ANG.back)*e; }
+  const u=clamp((T-A-K)/SLAP_T.follow,0,1);                      // past, overshoot, back to his side
+  return SLAP_ANG.hit
+       + (SLAP_ANG.thru-SLAP_ANG.hit)*Math.sin(u*3.4)*Math.exp(-u*2.1)
+       + (SLAP_ANG.rest-SLAP_ANG.hit)*(u*u);
+}
+/* HOW MUCH OF THE ARM IS STILL IN THE PICTURE. The first cut left the hand
+   parked across her chest from the follow-through all the way to the end of
+   the beat — a hundred ticks of a disembodied forearm hanging in the air.
+   It withdraws now: past the follow-through he takes it back toward his own
+   side and it fades off, and after that it is not drawn at all. */
+function slapArmVis(T){
+  const F=SLAP_T.draw+SLAP_T.strike+SLAP_T.follow;
+  if(T<SLAP_T.draw) return {on:false, a:0, back:0};
+  if(T<F) return {on:true, a:1, back:0};
+  if(T>=SLAP_T.gone) return {on:false, a:0, back:0};
+  const u=(T-F)/(SLAP_T.gone-F);
+  return {on:true, a:1-u*u, back:u*26};                          // pulled back and fading
+}
+function slapHand(x, FY, T){
+  const a=slapAng(T), V=slapArmVis(T);
+  const px2=x+SLAP_PIV.dx-V.back, py2=FY+SLAP_PIV.dy;
+  return { a, px:px2, py:py2, vis:V.on, alpha:V.a,
+           hx:px2+Math.cos(a)*SLAP_PIV.r, hy:py2+Math.sin(a)*SLAP_PIV.r };
+}
+/* WHERE THE CAMERA IS THIS FRAME. Read once per frame by the hall. */
+function hallShake(){
+  const D=DM; if(!D) return null;
+  let amp=0, ph=0;
+  if(D.slap){ const d=D.slap.t-(SLAP_T.draw+SLAP_T.strike);
+    if(d>=0 && d<20){ amp=Math.max(0,1-d/20); amp*=amp*3.0; ph=d; } }
+  if(D.shake && D.shake.t<D.shake.d){ const q=1-D.shake.t/D.shake.d;
+    amp=Math.max(amp, q*q*D.shake.a); ph=D.shake.t; }
+  if(amp<0.12) return null;
+  return { x:Math.round(Math.sin(ph*1.35)*amp), y:Math.round(Math.cos(ph*1.9)*amp*0.55) };
+}
+function kickShake(a,d){ const D=DM; if(!D) return; D.shake={t:0, a:a||2.4, d:d||18}; }
 function startSlapAnim(atX){
   const D=DM; if(!D) return;
   if(privacyNeeded('slap')){ toast(privacyRefusal('slap'),3200);
     startRefusal('slap', privacyTier()==='strict'?'devout':privacyTier()==='mid'?'tempest':'kids'); return; }
   const v=doSlap('villa');
   if(!v) return;
-  D.slap={t:0, x:(atX===undefined? D.wifeX : atX), v};
-  D.wifePause=Math.max(D.wifePause||0, 120);
+  D.slap={t:0, x:(atX===undefined? D.wifeX : atX), v, sparks:null, dust:null};
+  D.wifePause=Math.max(D.wifePause||0, 150);
 }
 function updateSlap(dt){
   const D=DM, S=D.slap; if(!S) return;
   const was=S.t; S.t+=dt;
-  if(was<16 && S.t>=16){                                   // the hand lands: kick the spring
+  if(D.shake) D.shake.t+=dt;
+  const CT=SLAP_T.draw+SLAP_T.strike;
+  /* ---- a creak of cloth as the arm goes up, so the wind-up is audible too ---- */
+  if(was<3 && S.t>=3){ try{ sfx('cloth'); }catch(e){} }
+  if(was<CT && S.t>=CT){                                   // the hand lands: kick the spring
     const be=((G.wife&&G.wife.body&&G.wife.body.booty)||5);
     slapKick(0.85 + be*0.075);                             // and a bigger tier carries more of it
+    kickShake(2.2+be*0.13, 18);                            // and the room takes it
     try{ sfx('slap'); }catch(e){}                          // and it is finally audible
+    /* SPARKS ALONG THE TANGENT. A blow throws debris the way the hand was
+       travelling, not evenly in a circle — the old ring of seven dots was
+       the same picture whichever way the hand came in. */
+    const H=slapHand(S.x, 214, CT), tan=H.a+1.5708;
+    S.sparks=[]; const n=11+Math.round(be*0.7);
+    for(let i=0;i<n;i++){
+      const spread=(i/(n-1)-0.5)*2.1, sp=1.15+Math.random()*1.9;
+      S.sparks.push({ x:H.hx, y:H.hy, vx:Math.cos(tan+spread)*sp, vy:Math.sin(tan+spread)*sp-0.35, t:0 });
+    }
+    S.dust=[];                                             // and the tiles let go of some dust
+    for(let i=0;i<7;i++) S.dust.push({ x:S.x-8+Math.random()*16, y:212+Math.random()*3,
+      vx:(Math.random()-0.5)*0.9, vy:-0.35-Math.random()*0.55, t:0, r:1+Math.random()*2 });
   }
-  if(S.t>132){ toast((S.v.k==='love'?'👋💞 ':S.v.k==='bad'||S.v.k==='cold'?'👋💢 ':'👋 ')
+  if(S.sparks) S.sparks.forEach(p=>{ p.t+=dt; p.x+=p.vx*dt; p.y+=p.vy*dt; p.vy+=0.055*dt; p.vx*=Math.pow(0.94,dt); });
+  if(S.dust)   S.dust.forEach(p=>{ p.t+=dt; p.x+=p.vx*dt; p.y+=p.vy*dt; p.vy*=Math.pow(0.97,dt); });
+  if(S.t>SLAP_T.end){ toast((S.v.k==='love'?'👋💞 ':S.v.k==='bad'||S.v.k==='cold'?'👋💢 ':'👋 ')
       + S.v.t + '  ('+(S.v.bond>=0?'+':'')+S.v.bond+' 💞'
       + (S.v.phys? ', '+(S.v.phys>0?'+':'')+S.v.phys+' 🔥':'')+')', 4600);
     D.slap=null; }
 }
+/* ---- THE HAND ITSELF. Four fingers, a thumb and a wrist, drawn along the
+   arm's own angle instead of as three axis-aligned blocks that never turned
+   however far round the swing had come. ---- */
+/* A HAND, NOT A CLUB. The first cut was a sixteen-pixel forearm five deep
+   with four fingers laid edge to edge — at this scale it read as a rolled
+   newspaper. Slimmer, tapered from elbow to wrist, and the fingers are
+   separated by a one-pixel dark line each so four of them actually count as
+   four rather than merging into one paddle. */
+function drawSlapArm(c, H, skin, open){
+  const sSh=shade(skin,-30), sHi=shade(skin,22), sDk=shade(skin,-48);
+  c.save(); c.translate(H.hx, H.hy); c.rotate(H.a);
+  if(H.alpha!==undefined && H.alpha<1) c.globalAlpha=Math.max(0,H.alpha)*(c.globalAlpha||1);
+  const R=(a,b2,w2,h,col)=>{ c.fillStyle=col; c.fillRect(Math.round(a),Math.round(b2),Math.round(w2),Math.round(h)); };
+  // the forearm running back toward his shoulder — 4 deep at the elbow, 3 at the wrist
+  R(-17,-2, 9, 4, sSh);  R(-17,-2, 9, 1, skin);
+  R(-9,-1.5, 6, 3, skin); R(-9,-1.5, 6, 1, sHi);
+  R(-4,-2, 4, 4, skin);  R(-4,-2, 4, 1, sHi); R(-4, 1, 4, 1, sSh);        // the wrist
+  // the palm
+  R(0,-3, 5, 6, skin);   R(0,-3, 5, 1, sHi);  R(0, 2, 5, 1, sSh);
+  // four fingers, each with its own shadow line so they read as four
+  const sprd=open?1:0;
+  for(let i=0;i<4;i++){
+    const len=[3,4,4,3][i], yy=-3+i*1.5-sprd*0.5;
+    R(5, yy, len, 1, i<2? skin : shade(skin,-8));
+    R(5, yy+1, len, 0.6, sDk); }
+  R(5,-3, 4, 1, sHi);                                                      // light along the index
+  R(1, 3, 3, 2, sSh); R(1, 3, 1, 2, skin);                                 // the thumb, tucked under
+  c.restore(); c.globalAlpha=1;
+}
 function drawSlap(){
   const D=DM, S=D.slap; if(!S) return; const FY=214, T=S.t, w=G.wife;
-  const swing=clamp(T/16,0,1);                       // the hand comes across
-  const hit=T>=16, since=T-16;
-  const shk = hit? Math.max(0,1-since/22)*Math.sin(since*1.2)*2.6 : 0;
-  // the spouse takes it, and the whole figure answers. This drew drawWifeFig
-  // unconditionally, so a woman's husband was painted with the wife routine.
-  if(w.male) drawHusbandFig(ctx, S.x+shk, FY, G.wifeRel|0, w.skin, w.dress, w, 0, 'idle');
-  else drawWifeFig(ctx, S.x+shk, FY, w, 0, 'idle');
-  // his hand, arriving
-  { const skin=G.skin||'#caa06a';
-    const hx=S.x-24+swing*16, hy=FY-30-Math.sin(swing*3.14159)*7;
-    px(hx,hy,6,4,skin); px(hx,hy,6,1,shade(skin,20));
-    px(hx-5,hy+1,5,3,skin); }                         // the forearm behind it
-  if(hit && since<10){                                // the impact
-    ctx.globalAlpha=clamp(1-since/10,0,1);
-    for(let i=0;i<7;i++){ const a=(i/7)*6.283, r=3+since*1.7;
-      px(S.x+2+Math.cos(a)*r, FY-30+Math.sin(a)*r*0.6, 2,2,'#fff0dc'); }
+  const CT=SLAP_T.draw+SLAP_T.strike;
+  const hit=T>=CT, since=T-CT;
+  const striking = T>=SLAP_T.draw && T<CT;
+  const skin=G.skin||'#caa06a';
+  const H=slapHand(S.x, FY, T);
+  /* ---- HER, and she is lit like everything else in this room now.
+     A slap makes her lean AWAY on contact — the recoil that used to be a
+     sideways jitter of the whole sprite is a real weight-shift instead. ---- */
+  const recoil = hit? Math.max(0,1-since/26)*2.4 : 0;
+  const paint=(bc,bx,by)=>{ if(w.male) drawHusbandFig(bc,bx,by,G.wifeRel|0,w.skin,w.dress,w,0,'idle');
+                            else drawWifeFig(bc,bx,by,w,0,'idle'); };
+  litFigure(ctx, S.x+recoil, FY, paint);
+  /* ---- THE ARM BEHIND HER during the wind-up and in front on the way
+     through, and WITHDRAWN once the follow-through is spent ---- */
+  const armFront = H.vis;
+  /* ---- THE SMEAR. Between the last frame and this one the hand covered
+     nearly half a radian; drawing it once leaves a strobing sprite. The
+     swept arc is filled in with ghosts and a tapered streak, which is what
+     an animator draws on the two frames either side of an impact. ---- */
+  if(striking || (hit && since<5)){
+    const back=Math.max(SLAP_T.draw, T-5);
+    ctx.globalAlpha=0.30;
+    for(let i=0;i<5;i++){ const tt=back+(T-back)*(i/5);
+      const Gh=slapHand(S.x, FY, tt);
+      ctx.globalAlpha=0.07+0.15*(i/5);
+      drawSlapArm(ctx, Gh, mixHex(skin,'#fff2e0',0.35), true); }
     ctx.globalAlpha=1;
-    px(S.x-6,FY-32,14,2,'rgba(255,240,220,.8)');
+    // and the leading streak, along the arc itself
+    ctx.globalAlpha=0.40; ctx.strokeStyle='rgba(255,240,220,.55)'; ctx.lineWidth=1.6;
+    ctx.beginPath();
+    ctx.arc(H.px, H.py, SLAP_PIV.r, slapAng(back), slapAng(T), slapAng(T)<slapAng(back));
+    ctx.stroke(); ctx.globalAlpha=1;
   }
-  // and what it leaves behind — the mark, the blush, and the verdict
-  if(hit){ drawSlapAfter(S.x, FY, w, since, 'hand', !!(S.v && (S.v.bond||0)>=0));
-    drawReactFace(S.x+shk, FY, w, reactKindFor(S.v,false), since); }
+  if(armFront) drawSlapArm(ctx, H, skin, T<CT+12);
+  // ================= CONTACT =================
+  if(hit && since<3){
+    /* a real bloom, added to the light already there rather than painted
+       over it — one frame of it, which is all an impact flash ever is */
+    const q=1-since/3;
+    ctx.save(); ctx.globalCompositeOperation='lighter';
+    const rr=10+since*4;
+    const gr=ctx.createRadialGradient(H.hx,H.hy,0,H.hx,H.hy,rr);
+    gr.addColorStop(0,'rgba(255,244,222,'+(0.40*q).toFixed(3)+')');
+    gr.addColorStop(0.40,'rgba(255,200,150,'+(0.14*q).toFixed(3)+')');
+    gr.addColorStop(1,'rgba(255,186,136,0)');
+    ctx.fillStyle=gr; ctx.beginPath(); ctx.arc(H.hx,H.hy,rr,0,6.284); ctx.fill();
+    ctx.restore();
+  }
+  if(hit && S.sparks){                                   // the debris, thrown along the tangent
+    S.sparks.forEach(p=>{ const a=clamp(1-p.t/17,0,1); if(a<=0) return;
+      ctx.globalAlpha=a; px(p.x, p.y, p.t<5?2:1, p.t<5?2:1, a>0.6?'#fff4e0':'#e8b884'); });
+    ctx.globalAlpha=1;
+  }
+  if(hit && S.dust){                                     // and the tiles letting go
+    S.dust.forEach(p=>{ const a=clamp(1-p.t/34,0,1)*0.42; if(a<=0) return;
+      ctx.globalAlpha=a; ctx.fillStyle='#c8b088';
+      ctx.beginPath(); ctx.ellipse(p.x, p.y, p.r+p.t*0.06, (p.r+p.t*0.06)*0.7, 0,0,6.284); ctx.fill(); });
+    ctx.globalAlpha=1;
+  }
+  /* ---- THE RIPPLE. Two rings travelling out from the contact point through
+     what it landed on, which is the thing that says "this is soft" without
+     drawing a single new body part. ---- */
+  if(hit && since<22){
+    for(let r2=0;r2<2;r2++){
+      const t2=since-r2*5; if(t2<0) continue;
+      const q=clamp(1-t2/17,0,1); if(q<=0) continue;
+      ctx.globalAlpha=q*0.45; ctx.strokeStyle='rgba(255,226,206,.9)'; ctx.lineWidth=1;
+      ctx.beginPath(); ctx.ellipse(H.hx, H.hy, 4+t2*1.05, (4+t2*1.05)*0.62, 0, 0, 6.284); ctx.stroke();
+    }
+    ctx.globalAlpha=1;
+  }
+  // and what it leaves behind — the mark, the face, and the verdict
+  if(hit){
+    if(since<9){                                          // the mark blooms hot before it settles
+      ctx.globalAlpha=clamp(1-since/9,0,1)*0.5;
+      ctx.fillStyle='#ff9a86';
+      ctx.beginPath(); ctx.ellipse(H.hx, H.hy, 6, 4, 0,0,6.284); ctx.fill();
+      ctx.globalAlpha=1;
+    }
+    drawSlapAfter(S.x, FY, w, since, 'hand', !!(S.v && (S.v.bond||0)>=0));
+    drawReactFace(S.x+recoil, FY, w, reactKindFor(S.v,false), since);
+  }
   ctx.textAlign='center';
+  if(!hit && T<SLAP_T.draw) pixelText('~ he draws back ~', W/2, 34, 'rgba(255,214,190,.62)', 0.92);
   if(hit && since>8){
     const col = S.v.k==='love'? '#ffb0d0' : S.v.k==='return'? '#ffd07a'
               : (S.v.k==='bad'||S.v.k==='cold'||S.v.k==='enough')? '#ff8a8a' : '#ffd0da';
@@ -16827,8 +17245,10 @@ function drawDomus(){
       else if(D.husb){ /* his own move draws both of them */ }
       else if(D.drop && D.drop.ph!=='fall'){ /* the drop draws him where HE is, not where he idles */ }
       else if(D.escort){ /* the escort draws BOTH of them, in the hold */ }
-      else if(w.male) drawHusbandFig(ctx,D.wifeX,FY,G.wifeRel|0,w.skin,w.dress,w,wPh,wMode);
-      else drawWifeFig(ctx,D.wifeX,FY,w,wPh,wMode,wifePregMonth());
+      /* LIT. The lamp in this room now falls on her: a cast shadow on the
+         tiles, a rim down the side facing it, occlusion down the other. */
+      else if(w.male) litHusband(ctx,D.wifeX,FY,G.wifeRel|0,w.skin,w.dress,w,wPh,wMode);
+      else litWife(ctx,D.wifeX,FY,w,wPh,wMode,wifePregMonth());
     }
     /* ---- THE NEXT GENERATION, underfoot and growing ----
        Not during the romantic one. You send them out, they take a couple of
@@ -16848,11 +17268,14 @@ function drawDomus(){
       const age=Math.floor((G.day-(k.ref.born||0))/3);            // months
       const moving = k.pause<=0 && k.turn<=0;
       const grown = kidBand(k.ref)==='grown';
-      ctx.save(); ctx.translate(k.x, FY - (moving? Math.abs(Math.sin(D.t*0.34))*1.6 : 0));
-      if(k.turn>0){ const sx=Math.max(0.12, Math.abs(Math.cos((1-(k.turn/12))*Math.PI))); ctx.scale(sx,1); }
-      // drawChildFigure owns the ramp AND swaps to the adult sprite when grown
-      drawChildFigure(ctx, 0, 0, k.ref, moving? D.t*0.24 : 0, moving? 'walk':'idle');
-      ctx.restore();
+      { const kLift=(moving? Math.abs(Math.sin(D.t*0.34))*1.6 : 0);
+        const kTurn=(k.turn>0)? Math.max(0.12, Math.abs(Math.cos((1-(k.turn/12))*Math.PI))) : 1;
+        litFigure(ctx, k.x, FY-kLift, (bc,bx,by)=>{
+          bc.save(); bc.translate(bx,by); if(kTurn!==1) bc.scale(kTurn,1);
+          // drawChildFigure owns the ramp AND swaps to the adult sprite when grown
+          drawChildFigure(bc, 0, 0, k.ref, moving? D.t*0.24 : 0, moving? 'walk':'idle');
+          bc.restore();
+        }, {lift:kLift, strength:0.86}); }
       if(kidBand(k.ref)==='baby' && kidAgeYears(k.ref)<3){
         pixelText('👶',k.x,FY-34,'#f0c8d4',1); }                     // still in arms
       // a grown one standing in your hall is worth naming — they are a person now
@@ -26895,6 +27318,9 @@ window.__SS = {
   GEAR, CLASSES, CLASS_ORDER, CLASS_ORDER_EAST, ARCHETYPES, ARCH_ORDER, ARCH_ORDER_WEST, ARCH_ORDER_EAST,
   WORLDS, WORLD_IDS, worldOfArch, worldOfRegion, regionsForWorld, regionAny, playerWorld,
   sel:()=>sel,
+  HALL_LIGHT, litFigure, litWife, litHusband, litBufs,
+  SLAP_T, SLAP_ANG, SLAP_PIV, slapAng, slapHand, drawSlapArm, hallShake, kickShake,
+  setLit:(v)=>{ LIT_ON=!!v; }, getLit:()=>LIT_ON,
   MORES, moresOf, localMores, legalExposure, exposureSplit, buildMoresCard,
   ACTS, ACT_BY_ID, TABOO, TABOO_VOICE, actTaboo, actTabooRaw, isOralAct, actFallsOn,
   actLabel, actBand, osImpurum, markOsImpurum, osImpurumTier, osImpurumTick,
