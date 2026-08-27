@@ -8003,6 +8003,10 @@ function slotInfo(n){
 }
 let G = null;  // player career
 function freshCareer(name,origin,arch,social){
+  /* THE SILENT DEFAULT. An unknown archetype key came back as a Roman
+     legionary in the western world, which is how a chosen samurai ended up
+     in the Colosseum. It still has to return something, but it says so. */
+  if(!ARCHETYPES[arch]) try{ console.warn('freshCareer: unknown archetype '+arch+' — falling back to Roman'); }catch(e){}
   const A=ARCHETYPES[arch]||ARCHETYPES.Roman;
   /* WHICH LADDER THIS CAREER CLIMBS. An eastern champion is born onto his
      own people's rungs, not onto Rome's. */
@@ -8706,12 +8710,35 @@ function drawHead(f,C){
     px(-4,-47,8,3,'#3a2618'); px(-4,-47,8,1,'#241408'); px(-5,-44,1,4,'#3a2618');
     px(4,-43,1,3,'#3a2618');
     if(f.female){ px(4,-45,2,11,'#3a2618'); px(-6,-45,2,7,'#3a2618'); px(-2,-49,5,2,'#3a2618'); }  // her braid falls loose
-    // expressive face: whites + pupils, brows angle with fury when attacking
-    px(-3,-43,2,2,'#f2ead8'); px(1,-43,2,2,'#f2ead8');
-    px(-2,-43,1,2,'#1a1006'); px(2,-43,1,2,'#1a1006');
-    if(f.atk||f.hurt>0){ px(-3,-45,3,1,'#241408'); px(1,-44,3,1,'#241408'); } // furious brows
-    else { px(-3,-44,2,1,C.skinSh); px(1,-44,2,1,C.skinSh); }
-    px(-1,-39,3,1,f.hurt>0?'#5a1010':C.skinSh);                                // mouth (snarls when hit)
+    /* =================================================================
+       THE EYES, AND THEY ARE NOT THE SAME EYES EVERYWHERE
+       -----------------------------------------------------------------
+       A 2x2 block of white with a dark 1x2 pupil sitting in the middle of
+       it reads as a cartoon googly eye at this size, and on a bare-headed
+       samurai or a Han halberdier it looked ridiculous — round staring
+       whites on a face that should be reading as a woodblock print.
+       Eastern and Japanese figures get the line the art they come from
+       actually uses: a dark horizontal STROKE for the eye with the lid
+       above it and no white showing, which is how a face is drawn in an
+       ukiyo-e or a Han tomb tile. Western figures keep the wide staring
+       eye, because a Roman mosaic really does draw it that way.
+       ================================================================= */
+    const _ec=(typeof localCulture==='function')? (localCulture().id||'roman') : 'roman';
+    const _ink = ['han','korean','wa','ming','steppe','kushan','tamil'].indexOf(_ec)>=0;
+    if(_ink){
+      px(-3,-43,3,1,'#1a1006'); px(1,-43,3,1,'#1a1006');                       // the eye, as a stroke
+      px(-3,-44,3,1,C.skinSh);  px(1,-44,3,1,C.skinSh);                        // the lid above it
+      if(f.atk||f.hurt>0){ px(-3,-45,3,1,'#241408'); px(1,-45,3,1,'#241408'); } // the brow drops
+      px(-1,-40,1,1,C.skinSh);                                                  // and the smallest mouth
+      px(-1,-39,3,1,f.hurt>0?'#5a1010':C.skinSh);
+    } else {
+      // expressive face: whites + pupils, brows angle with fury when attacking
+      px(-3,-43,2,2,'#f2ead8'); px(1,-43,2,2,'#f2ead8');
+      px(-2,-43,1,2,'#1a1006'); px(2,-43,1,2,'#1a1006');
+      if(f.atk||f.hurt>0){ px(-3,-45,3,1,'#241408'); px(1,-44,3,1,'#241408'); } // furious brows
+      else { px(-3,-44,2,1,C.skinSh); px(1,-44,2,1,C.skinSh); }
+      px(-1,-39,3,1,f.hurt>0?'#5a1010':C.skinSh);                                // mouth (snarls when hit)
+    }
   } else drawHelmet2(id,C);
   // her braid escapes even a helm
   if(f.female && !fullFace && id!=='none'){ px(4,-42,2,10,'#2a1a10'); }
@@ -22444,14 +22471,42 @@ function openCreate(){
     card.appendChild(body);
     card.onclick=()=>{ if(shut){ toast('\ud83d\udd12 '+rankLockNote(sel.world,need)+' \u2014 choose a higher birth first.',3600); return; }
       sel.arch=key; sel.origin=A.home; $('sel-home').value=A.home;
-      $('btn-create-go').disabled=false; $('create-hint').textContent='Champion: '+A.name+' — ready to take the oath.';
       openCreate(); };
     cl.appendChild(card);
   });
+  /* =================================================================
+     AND THE OATH BUTTON IS SET FROM THE TRUTH, ONCE, AT THE END
+     -----------------------------------------------------------------
+     This was enabled inside the card's own click handler and NOWHERE
+     ELSE, so it only ever reflected the last card you clicked. Change
+     world, change rank, or come back to the screen with a card already
+     chosen and the button stayed dead — or worse, the selection had been
+     cleared underneath you and the button was still live, in which case
+     the oath ran with sel.arch === null, freshCareer fell through its
+     `|| ARCHETYPES.Roman` default, and a man who chose SAMURAI woke up
+     as a Roman murmillo standing in the Colosseum under an SPQR banner.
+     That is the bug where picking Japan spawned you in Rome.
+     ================================================================= */
+  { const A2=sel.arch? ARCHETYPES[sel.arch] : null;
+    const ok = !!A2 && archRank(sel.arch)<=_myRank && worldOfArch(sel.arch)===sel.world;
+    const go=$('btn-create-go'), hint=$('create-hint');
+    go.disabled=!ok;
+    if(hint) hint.textContent = ok
+      ? ('Champion: '+A2.name+' \u2014 ready to take the oath.')
+      : (A2? 'That life is out of reach from this birth \u2014 choose another card, or a higher rank.'
+           : 'Select a champion card to begin.');
+    if(!ok && sel.arch && A2 && worldOfArch(sel.arch)!==sel.world) sel.arch=null; }
 }
 $('btn-create-back').onclick=()=>show('scr-title');
 $('btn-create-go').onclick=()=>{
   if(!sel.arch){ toast('Choose a champion card first.'); return; }
+  /* NEVER SILENTLY BECOME A ROMAN. freshCareer falls back to ARCHETYPES.Roman
+     for an unknown key, which turned a broken selection into a completely
+     different life in a completely different world without saying a word. */
+  if(!ARCHETYPES[sel.arch] || worldOfArch(sel.arch)!==sel.world){
+    sel.arch=null; openCreate();
+    toast('That champion does not belong to this world — pick a card from the one you have chosen.',3600);
+    return; }
   const nm=($('inp-name').value||'Tiro').slice(0,14);
   const origin=$('sel-home').value||sel.origin;
   G=freshCareer(nm, origin, sel.arch, sel.social);
@@ -22472,7 +22527,27 @@ $('btn-create-go').onclick=()=>{
   G.beardStyle = sel.roll.beardStyle || (sel.sex==='f'?'none':'stubble');
   G.outfit     = (sel.social==='elite'||sel.social==='imperial')? 'toga' : 'tunic';
   G.family = makeFamily(sel.social, G.isFemale);
-  G.current = REGION_BY_ID[origin] && REGION_BY_ID[origin].tier===1 ? origin : 'Italia';
+  /* =====================================================================
+     WHERE YOU ACTUALLY WAKE UP
+     ---------------------------------------------------------------------
+     THIS IS THE BUG. It looked the birthplace up in REGION_BY_ID — the
+     ROMAN region table, and only that one — so Luoyang, Kai, Owari and
+     every other eastern and Japanese province came back undefined and fell
+     to the string 'Italia'. You picked SAMURAI, you picked KAI, you swore
+     the oath, and you woke up standing in Italia in the Colosseum with an
+     SPQR banner over the gate. Ask the right atlas, and start a career that
+     is not yet tier-1 material at the gentlest province of its OWN world.
+     ===================================================================== */
+  { const R0=(typeof regionAny==='function')? regionAny(origin) : REGION_BY_ID[origin];
+    const w0=(typeof worldOfRegion==='function')? worldOfRegion(origin) : 'west';
+    const softest=()=>{
+      const list=(typeof regionsForWorld==='function')? regionsForWorld(w0) : REGIONS;
+      let best=null;
+      for(const r of list) if(!best || (r.tier||9)<(best.tier||9)) best=r;
+      return best? best.id : (WORLDS[w0]? WORLDS[w0].home : 'Italia');
+    };
+    G.current = (R0 && R0.tier===1) ? origin : softest();
+  }
   // ---- THE WARDROBE OF RANK: an elite house or the imperial line needs no
   //      purchase and no ceremony — the crown and the robe are already yours ----
   if(sel.social==='elite' || sel.social==='imperial') G.crownWorn=true;
@@ -26209,23 +26284,143 @@ const ROOM_DOOR_X={bed:414, pool:86, wardrobe:309};
    use — so the walls that swallow your household are literally the walls
    that appear here.
    ===================================================================== */
-const HOUSE_TIERS=[
-  { min:0,  id:'insula',  name:'A RENTED ROOM',    rooms:[],
-    note:'One room over a shop, and the shop is not yours either.' },
-  { min:20, id:'domus',   name:'A SMALL DOMUS',    rooms:['culina'],
-    note:'A hearth of your own. It is the first thing that makes it a house.' },
-  { min:40, id:'atrium',  name:'A PROPER ATRIUM',  rooms:['culina','triclinium'],
-    note:'Somewhere to put guests, and a cook who is not you.' },
-  { min:62, id:'villa',   name:'A VILLA & GARDEN', rooms:['culina','triclinium','peristyle'],
-    note:'A colonnaded garden. Rome judges a man by whether he has one.' },
-  { min:82, id:'palace',  name:'A HOUSE WITH WINGS', rooms:['culina','triclinium','peristyle','lararium'],
-    note:'Wings, a shrine to your own dead, and staff you have never spoken to.' },
-];
+/* =====================================================================
+   THE HOUSE IS NOT A DOMUS EVERYWHERE
+   ---------------------------------------------------------------------
+   Five rungs from a rented room to a house with wings — and the rungs were
+   Roman, in Latin, in Luoyang and in Kai. A Han household does not want a
+   peristyle; it wants a walled courtyard with the rooms facing INWARD, and
+   the whole social grammar of the family is which room off which court you
+   are given. A steppe household does not want a building at all; it wants
+   more tents in the ring and more animals outside it. A Sengoku warrior
+   does not build a villa; he builds a fortified yakata and then, once he
+   can, an ISHIGAKI and a keep on top of it, because a house that is not
+   defensible in this century is a house somebody else lives in next year.
+
+   So the ladder is per-people, with its own five names, its own rooms and
+   its own reason each rung matters.
+   ===================================================================== */
+const HOUSE_SETS={
+  /* ---- ROME. The original, kept exactly as it was. ---- */
+  roman:{ unit:'rooms', kind:'a domus',
+    tiers:[
+      {min:0,  id:'insula', name:'A RENTED ROOM', rooms:[],
+       note:'One room over a shop, and the shop is not yours either.'},
+      {min:20, id:'domus',  name:'A SMALL DOMUS', rooms:['culina'],
+       note:'A hearth of your own. It is the first thing that makes it a house.'},
+      {min:40, id:'atrium', name:'A PROPER ATRIUM', rooms:['culina','triclinium'],
+       note:'Somewhere to put guests, and a cook who is not you.'},
+      {min:62, id:'villa',  name:'A VILLA & GARDEN', rooms:['culina','triclinium','peristyle'],
+       note:'A colonnaded garden. Rome judges a man by whether he has one.'},
+      {min:82, id:'palace', name:'A HOUSE WITH WINGS', rooms:['culina','triclinium','peristyle','lararium'],
+       note:'Wings, a shrine to your own dead, and staff you have never spoken to.'},
+    ]},
+  /* ---- HAN CHINA. Everything faces a COURTYARD and the grammar is which
+     court you are allowed into. A siheyuan is not a bigger house than a
+     one-room hut, it is a different social machine. ---- */
+  han:{ unit:'courtyards', kind:'\u5eb7\u820d a courtyard house',
+    tiers:[
+      {min:0,  id:'maowu',  name:'\u8305\u5c4b A THATCHED HUT', rooms:[],
+       note:'Rammed earth walls and a thatch roof, on land that is not yours. Two thirds of the empire lives in one.'},
+      {min:20, id:'yuanzi', name:'\u9662\u5b50 A WALLED YARD', rooms:['culina'],
+       note:'A wall, a gate, and a kitchen inside it. The wall is the point: a Chinese house is defined by what it encloses.'},
+      {min:40, id:'siheyuan',name:'\u56db\u5408\u9662 FOUR HALLS ROUND A COURT', rooms:['culina','triclinium'],
+       note:'North hall for the elders, wings east and west for the sons in order of age, south for servants. The plan IS the family hierarchy.'},
+      {min:62, id:'erjin',  name:'\u4e8c\u9032 A SECOND COURT', rooms:['culina','triclinium','peristyle'],
+       note:'An outer court for business and an inner court nobody outside the family enters. Now you have a household people wait to be admitted to.'},
+      {min:82, id:'zhaibi', name:'\u5b85\u90b8 A GREAT COMPOUND', rooms:['culina','triclinium','peristyle','lararium'],
+       note:'Three courts deep, a screen wall at the gate so no spirit or stranger walks straight in, and an ancestral hall at the back.'},
+    ]},
+  /* ---- THE STEPPE. Nobody is building anything. Wealth is the SIZE OF
+     THE RING and the number of animals outside it. ---- */
+  steppe:{ unit:'tents', kind:'an ordu',
+    tiers:[
+      {min:0,  id:'guest', name:'A CORNER OF SOMEBODY\u2019S TENT', rooms:[],
+       note:'You sleep on the west side, which is the guests\u2019 side, and it is understood you will move on.'},
+      {min:20, id:'ger',   name:'A TENT OF YOUR OWN', rooms:['culina'],
+       note:'Lattice, felt, a smoke-hole and a hearth in the middle of it. The whole thing comes down in an hour and goes on two carts.'},
+      {min:40, id:'ail',   name:'A CAMP OF KIN', rooms:['culina','triclinium'],
+       note:'Three or four tents pitched together and a herd big enough to keep them. This is the unit that actually exists out here.'},
+      {min:62, id:'ordu',  name:'A RING OF TENTS', rooms:['culina','triclinium','peristyle'],
+       note:'\u30aa\u30eb\u30c9 \u2014 the ring, pitched with your own door facing south and everybody else\u2019s facing yours. You are somebody people camp near for protection.'},
+      {min:82, id:'orda',  name:'THE GREAT ORDU', rooms:['culina','triclinium','peristyle','lararium'],
+       note:'A moving town: hundreds of tents, the herds spread over a day\u2019s ride, and a wagon-borne pavilion at the centre of it that nobody dismantles.'},
+    ]},
+  /* ---- GANDHARA. Mud-brick and schist, a courtyard, and a stupa in it. ---- */
+  kushan:{ unit:'courts', kind:'a Gandharan house',
+    tiers:[
+      {min:0,  id:'kutir', name:'A MUD-BRICK ROOM', rooms:[],
+       note:'One room off a lane in the lower town, sharing a well with nine other families.'},
+      {min:20, id:'grha',  name:'\u0917\u0943\u0939 A HOUSE WITH A COURT', rooms:['culina'],
+       note:'Diaper-masonry walls, a beaten court, and a kitchen you do not share.'},
+      {min:40, id:'vihara',name:'A HOUSE BY THE VIHARA', rooms:['culina','triclinium'],
+       note:'In the good quarter under the monastery wall, which means the monks\u2019 lending and the caravan news arrive at your gate first.'},
+      {min:62, id:'prasada',name:'\u092a\u094d\u0930\u093e\u0938\u093e\u0926 A PILLARED HOUSE', rooms:['culina','triclinium','peristyle'],
+       note:'Carved schist capitals in a frankly Greek order, because this is the one place on earth where that is normal.'},
+      {min:82, id:'stupa', name:'A HOUSE WITH ITS OWN STUPA', rooms:['culina','triclinium','peristyle','lararium'],
+       note:'You have endowed a stupa in your own courtyard and had your name cut into the base of it, which is what merit looks like when you can afford it.'},
+    ]},
+  /* ---- TAMILAKAM. The house opens on a raised veranda and the whole
+     street lives on it. ---- */
+  tamil:{ unit:'houses', kind:'a manai',
+    tiers:[
+      {min:0,  id:'kudisai',name:'A PALM-THATCH HUT', rooms:[],
+       note:'Woven palm and a mud floor, in the quarter your trade is allowed to live in.'},
+      {min:20, id:'manai', name:'\u0bae\u0ba9\u0bc8 A HOUSE WITH A THINNAI', rooms:['culina'],
+       note:'A raised veranda across the front where you sit, eat, argue and sleep in the heat. Half of Tamil social life happens on it.'},
+      {min:40, id:'mutram',name:'A HOUSE ROUND A MUTRAM', rooms:['culina','triclinium'],
+       note:'An open inner court with the sky in it and the rain coming straight down into a tank. Everything else faces it.'},
+      {min:62, id:'agra',  name:'A MERCHANT\u2019S HOUSE IN PUHAR', rooms:['culina','triclinium','peristyle'],
+       note:'On the street where the Yavana traders keep their warehouses, and the Sangam poems name that street.'},
+      {min:82, id:'aranmanai',name:'\u0b85\u0bb0\u0ba3\u0bcd\u0bae\u0ba9\u0bc8 A LORD\u2019S HOUSE', rooms:['culina','triclinium','peristyle','lararium'],
+       note:'Teak pillars, a tank, a gate a chariot turns in, and poets on the payroll to say so.'},
+    ]},
+  korean:{ unit:'quarters', kind:'a hanok',
+    tiers:[
+      {min:0,  id:'umak',  name:'A PIT-HOUSE', rooms:[],
+       note:'Dug down, thatched over, and warmer for it than anything above ground in this climate.'},
+      {min:20, id:'ondol', name:'A HOUSE WITH ONDOL', rooms:['culina'],
+       note:'Flues under the floor carrying the kitchen fire\u2019s smoke, so the room you sleep in is warm from beneath. Nobody else in the region does this.'},
+      {min:40, id:'anchae',name:'INNER AND OUTER QUARTERS', rooms:['culina','triclinium'],
+       note:'Anchae for the family, sarangchae for guests and business, and a wall between them.'},
+      {min:62, id:'fort',  name:'A HOUSE UNDER THE FORT', rooms:['culina','triclinium','peristyle'],
+       note:'Inside the walls of the sansong, which is the only address that means anything when the commanderies come.'},
+      {min:82, id:'gyeru', name:'A GREAT HOUSE OF THE FIVE', rooms:['culina','triclinium','peristyle','lararium'],
+       note:'Tiled roofs, a granary, and your own men on the wall of the fort.'},
+    ]},
+  /* ---- WA. A warrior does not build a villa. He builds something he can
+     hold, and then he builds a stone base and a keep on top of it. ---- */
+  wa:{ unit:'baileys', kind:'\u9928 a yakata',
+    tiers:[
+      {min:0,  id:'minka', name:'\u6c11\u5bb6 A FARMHOUSE', rooms:[],
+       note:'Thatch, a beaten-earth doma you work in, and a raised boarded floor you sleep on. The nitre under it is worth more than the house.'},
+      {min:20, id:'yashiki',name:'\u5c4b\u6577 A WALLED HOUSE', rooms:['culina'],
+       note:'An earth bank, a ditch and a gate. Not a castle \u2014 but nobody walks in, and in this century that is the whole difference.'},
+      {min:40, id:'yakata',name:'\u9928 A FORTIFIED HALL', rooms:['culina','triclinium'],
+       note:'A hall with a reception room in the shoin style: a floor of tatami, an alcove for the scroll, and a place for a lord to sit that is higher than the others.'},
+      {min:62, id:'yamajiro',name:'\u5c71\u57ce A HILL FORT', rooms:['culina','triclinium','peristyle'],
+       note:'Cut terraces up a ridge with a dry moat and a wooden gate. Miserable to live in, extremely hard to take, and every house of consequence had one.'},
+      {min:82, id:'hirajiro',name:'\u5e73\u57ce A CASTLE ON THE PLAIN', rooms:['culina','triclinium','peristyle','lararium'],
+       note:'A battered ISHIGAKI stone base, white plaster walls, a keep with a golden shachihoko on the ridge, and a town that grew up under it because you are where the money is.'},
+    ]},
+};
+/* whose ladder the player is climbing */
+function houseSetId(){
+  try{
+    const prov=(typeof hallProvince==='function')? hallProvince() : (G&&G.current);
+    const save=G.current; if(prov) G.current=prov;
+    const id=localCulture().id; G.current=save;
+    return HOUSE_SETS[id]? id : (HOUSE_SETS[playerCulture().id]? playerCulture().id : 'roman');
+  }catch(e){ return 'roman'; }
+}
+function houseSet(){ return HOUSE_SETS[houseSetId()] || HOUSE_SETS.roman; }
+const HOUSE_TIERS=HOUSE_SETS.roman.tiers;
 function houseTier(){
   const w=(typeof houseWealth==='function')? houseWealth() : 40;
-  let t=HOUSE_TIERS[0];
-  for(const h of HOUSE_TIERS) if(w>=h.min) t=h;
-  return Object.assign({wealth:w, i:HOUSE_TIERS.indexOf(t)}, t);
+  const SET=houseSet(), T=SET.tiers;
+  let t=T[0];
+  for(const h of T) if(w>=h.min) t=h;
+  return Object.assign({wealth:w, i:T.indexOf(t), set:SET, kind:SET.kind, unit:SET.unit}, t);
 }
 function hasRoom(id){ return houseTier().rooms.indexOf(id)>=0; }
 /* Where each alcove sits along the hall. These are hand-fitted around the
