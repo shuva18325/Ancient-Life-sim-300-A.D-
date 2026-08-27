@@ -105,6 +105,10 @@
   /* "you are here" is a ring, so it sits on top of whatever colour the tile is */
   .region.cur{box-shadow:0 0 0 2px #b0392a,0 0 0 3.5px rgba(255,250,240,.9),0 1px 3px rgba(60,40,20,.45);}
   .region.locked{filter:grayscale(.85) brightness(.92) opacity(.65);cursor:not-allowed;}
+  /* on the Japanese sheet the ink dot is drawn on the CANVAS at the true
+     seat, with a hairline to the label — so the pin's own dot comes off */
+  .region.wa::after{display:none;}
+  .region.wa{padding:0 4px 0 2px;letter-spacing:0;}
   .dot{width:10px;height:10px;background:var(--gold);border:2px solid #000;display:inline-block;}
   .toast{position:absolute;left:50%;top:46%;transform:translateX(-50%);z-index:30;
     padding:12px 18px;text-align:center;font-size:clamp(10px,2.4vw,20px);
@@ -1079,17 +1083,20 @@ const WORLD_IDS=['west','east'];
 function worldOfArch(key){ return (ARCHETYPES[key]&&ARCHETYPES[key].east)? 'east':'west'; }
 /* which regions belong to which sheet — and a shut region is never a birthplace */
 function regionsForWorld(w){
-  const list = (w==='east')
-    ? (typeof REGIONS_EAST!=='undefined'? REGIONS_EAST : [])
-    : REGIONS;
+  const list = (w==='wa')  ? (typeof REGIONS_WA!=='undefined'? REGIONS_WA : [])
+             : (w==='east')? (typeof REGIONS_EAST!=='undefined'? REGIONS_EAST : [])
+             : REGIONS;
   return list.filter(r=>!r.blocked);
 }
 function regionAny(id){
-  return REGION_BY_ID[id] || (typeof REGION_EAST_BY_ID!=='undefined'? REGION_EAST_BY_ID[id] : null) || null;
+  return REGION_BY_ID[id]
+      || (typeof REGION_EAST_BY_ID!=='undefined'? REGION_EAST_BY_ID[id] : null)
+      || (typeof REGION_WA_BY_ID!=='undefined'? REGION_WA_BY_ID[id] : null) || null;
 }
 /* which world a REGION sits in — used everywhere the game has to decide
    which atlas to draw and which peoples are neighbours */
 function worldOfRegion(id){
+  if(typeof REGION_WA_BY_ID!=='undefined' && REGION_WA_BY_ID[id]) return 'wa';
   if(typeof REGION_EAST_BY_ID!=='undefined' && REGION_EAST_BY_ID[id]) return 'east';
   return 'west';
 }
@@ -7012,6 +7019,7 @@ function freshCareer(name,origin,arch,social){
     world: A.east? 'east':'west',
     socialSet: _set,
     eastAxis: {},
+    crossedToWa:false, waEra:0,
     silkRuns:0, silkLost:0, silkNet:0, silkDone:{},
     skin:A.skin, tunic:A.tunic,
     glory:0, pop:5, coin:S.coin, level:1, xp:0,
@@ -7156,7 +7164,7 @@ function elevateWife(rank){
   refreshStatbar(); saveQuiet(); openVilla();
 }
 // fill in any fields missing from older saves
-function migrate(g){ const d={world:null,socialSet:null,eastAxis:{},silkRuns:0,silkLost:0,silkNet:0,silkDone:{},honor:50,food:4,mount:0,slaves:0,hasVilla:false,boat:false,favor:0,soldiers:0,hidden:[],plotTier:0,emperor:false,approval:50,legions:0,rivals:0,retired:false,detachments:[],day:0,titles:{},clears:{},socialClass:'gladiator',army:{},armyGear:0,armyTrain:0,hasOrganizer:false,generals:[],wife:null,married:false,marryPrompted:false,children:[],pregnant:null,lastLoveDay:-9,injury:null,lastDebateDay:-9,office:0,path:null,parthia:50,parthiaPact:false,wifeRel:50,lastTalkDay:-9,isFemale:false,lineage:[],hygiene:70,wifePhys:45,hasPool:false,hasWardrobe:false,legacy:null,lastFeastDay:-9,loveDay:-1,loveQuick:0,loveLong:0,loveNight:0,loveVigil:0,venusUntil:-1,lastWashDay:-9,lastPoolDay:-9,lastWardrobeDay:-9,lastKidsDay:-9,lastBathDay:-9,pila:0,bow:null,bowsOwned:[],nemesis:null,rivalsList:[],trophies:[],nemesisCount:0,pendingDeath:false,ageBase:0,wonProvinceByFight:false,familyMan:false,infamy:0,gladiatrixStage:0,pardoned:false,lastNoteDay:-9,lastNoteReply:'',regalia:[],marryRolls:0,hasBodyMap:false,hasSecretMap:false,jealousy:0,lastJealousDay:-9,traits:[],flaws:[],looks:5,smarts:5,advocate:false,tutorialDone:false,patrons:[],rivalAdv:null,landmarks:[],faction:null,oratory:1,casesWon:0,casesLost:0,renown:0,senate:false,royal:false,lastCaseDay:-9,skills:{footwork:0,guard:0,blade:0,wind:0,throwing:0},scars:[],fatigue:0,lastTrainDay:-9,tribune:false,rank:0,campaigns:0,legionRep:0,lastCampaignDay:-9,units:{legionary:0,auxilia:0,cavalry:0,archers:0,engineers:0},supply:0,sieges:0,body:null,family:null,provinces:{},complaints:[],leniency:50,lastCalloutDay:-9,lastGiftDay:-9,giftsTaken:0,calloutWins:0,crownWorn:false,court:null,lastCoupDay:-99,herbs:{},herbLore:0,ill:null,midwife:false,titlesWorn:[],warExhaust:0,lastExhaustWhy:'',titleRites:[],tombs:[],inheritedFrom:null,hairStyle:null,hairCol:null,beardStyle:null,outfit:null,courtLog:{},lastAskDay:-9,retirePromise:null,promiseBreaks:0,promiseFights:0,tutor:false,freedmen:0,askLog:{},temptHeld:0,temptTook:0,slapDay:-9,slapCount:0,slapsAll:0,doorShut:0,caughtByHouse:0,romanticAll:0,clearedHall:0,lastFamilyDay:-9,namedHeir:null,willSplit:false,purpleWatch:0,kidHouses:[],weddings:0,woohooAll:0,marriedDay:0,osImpurum:0,lastAct:null,
+function migrate(g){ const d={world:null,socialSet:null,eastAxis:{},crossedToWa:false,waEra:0,silkRuns:0,silkLost:0,silkNet:0,silkDone:{},honor:50,food:4,mount:0,slaves:0,hasVilla:false,boat:false,favor:0,soldiers:0,hidden:[],plotTier:0,emperor:false,approval:50,legions:0,rivals:0,retired:false,detachments:[],day:0,titles:{},clears:{},socialClass:'gladiator',army:{},armyGear:0,armyTrain:0,hasOrganizer:false,generals:[],wife:null,married:false,marryPrompted:false,children:[],pregnant:null,lastLoveDay:-9,injury:null,lastDebateDay:-9,office:0,path:null,parthia:50,parthiaPact:false,wifeRel:50,lastTalkDay:-9,isFemale:false,lineage:[],hygiene:70,wifePhys:45,hasPool:false,hasWardrobe:false,legacy:null,lastFeastDay:-9,loveDay:-1,loveQuick:0,loveLong:0,loveNight:0,loveVigil:0,venusUntil:-1,lastWashDay:-9,lastPoolDay:-9,lastWardrobeDay:-9,lastKidsDay:-9,lastBathDay:-9,pila:0,bow:null,bowsOwned:[],nemesis:null,rivalsList:[],trophies:[],nemesisCount:0,pendingDeath:false,ageBase:0,wonProvinceByFight:false,familyMan:false,infamy:0,gladiatrixStage:0,pardoned:false,lastNoteDay:-9,lastNoteReply:'',regalia:[],marryRolls:0,hasBodyMap:false,hasSecretMap:false,jealousy:0,lastJealousDay:-9,traits:[],flaws:[],looks:5,smarts:5,advocate:false,tutorialDone:false,patrons:[],rivalAdv:null,landmarks:[],faction:null,oratory:1,casesWon:0,casesLost:0,renown:0,senate:false,royal:false,lastCaseDay:-9,skills:{footwork:0,guard:0,blade:0,wind:0,throwing:0},scars:[],fatigue:0,lastTrainDay:-9,tribune:false,rank:0,campaigns:0,legionRep:0,lastCampaignDay:-9,units:{legionary:0,auxilia:0,cavalry:0,archers:0,engineers:0},supply:0,sieges:0,body:null,family:null,provinces:{},complaints:[],leniency:50,lastCalloutDay:-9,lastGiftDay:-9,giftsTaken:0,calloutWins:0,crownWorn:false,court:null,lastCoupDay:-99,herbs:{},herbLore:0,ill:null,midwife:false,titlesWorn:[],warExhaust:0,lastExhaustWhy:'',titleRites:[],tombs:[],inheritedFrom:null,hairStyle:null,hairCol:null,beardStyle:null,outfit:null,courtLog:{},lastAskDay:-9,retirePromise:null,promiseBreaks:0,promiseFights:0,tutor:false,freedmen:0,askLog:{},temptHeld:0,temptTook:0,slapDay:-9,slapCount:0,slapsAll:0,doorShut:0,caughtByHouse:0,romanticAll:0,clearedHall:0,lastFamilyDay:-9,namedHeir:null,willSplit:false,purpleWatch:0,kidHouses:[],weddings:0,woohooAll:0,marriedDay:0,osImpurum:0,lastAct:null,
     feuds:[],grandkids:0,annivYears:0,morningAfter:null,peeked:{},gravitas:60,peeksTaken:0,parthianSide:false}; for(const k in d){ if(g[k]===undefined) g[k]=d[k]; }
   if(g.wife) ensureQuirks(g.wife);          // a spouse saved before the five bands existed
   if(g.quirks===undefined) g.quirks=rollQuirks();   // and a player from before THEY had any
@@ -10089,7 +10097,8 @@ function loop(now){
       else drawDomus(); } }
   else if(state==='map'||state==='travel'){
     /* WHICH ATLAS. A man born in Luoyang was being shown the Mediterranean. */
-    if(playerWorld()==='east') drawMapCanvasEast(); else drawMapCanvas(); }
+    const _w=playerWorld();
+    if(_w==='wa') drawMapCanvasWa(); else if(_w==='east') drawMapCanvasEast(); else drawMapCanvas(); }
   else if(state==='title'||state==='create'||state==='help'){ drawMenuBg(now); }
   requestAnimationFrame(loop);
 }
@@ -19986,6 +19995,24 @@ const HUB_EAST = {
     'btn-note-map':'✍ SEND A LETTER',
   },
 };
+/* AND THE THIRD SHEET. There is no Senate here, no circus faction, no
+   commandery and no Son of Heaven — there is a shōgun nobody obeys, a
+   castle town, a free market town, and a hundred houses with crests on
+   their banners. */
+const HUB_WA = {
+  hide:['btn-circus','btn-forum','btn-legion','btn-silk'],
+  label:{
+    'btn-shop':'\u2694 THE SMITHS & THE GUN-WORKS',
+    'btn-stable':'\ud83d\udc0e HORSE & RICE',
+    'btn-villa':'\ud83c\udfef YOUR KEEP',
+    'btn-tree':'\u2694 YOUR HOUSE',
+    'btn-provinces':'\ud83c\udf3e THE PROVINCES',
+    'btn-herbs':'\ud83c\udf3f THE HERB DOCTOR',
+    'btn-titles':'\u26dc COURT RANK',
+    'btn-intrigue':'\ud83d\udde1 THE COUNCIL',
+    'btn-note-map':'\u270d SEND A RUNNER',
+  },
+};
 const HUB_WEST_LABEL={
   'btn-fightcur':'⚔ FIGHT HERE', 'btn-shop':'🛒 ARMOURY', 'btn-stable':'🐎 STABLE',
   'btn-villa':'🏡 VILLA', 'btn-tree':'🌳 THE HOUSE', 'btn-provinces':'🏛 PROVINCES',
@@ -19993,10 +20020,16 @@ const HUB_WEST_LABEL={
   'btn-note-map':'✍ WRITE HOME',
 };
 function applyHub(){
-  const east = playerWorld()==='east';
+  const _w  = playerWorld();
+  const east = _w==='east';
+  const wa   = _w==='wa';
   const set=(id,txt)=>{ const el=$(id); if(el && txt) el.textContent=txt; };
   const vis=(id,on)=>{ const el=$(id); if(el) el.style.display = on? '' : 'none'; };
-  if(east){
+  if(wa){
+    HUB_WA.hide.forEach(id=>vis(id,false));
+    for(const k in HUB_WA.label) set(k, HUB_WA.label[k]);
+    { const V=venueHere(), el=$('btn-fightcur'); if(el) el.textContent='\u2694 '+V.name; }
+  } else if(east){
     HUB_EAST.hide.forEach(id=>vis(id,false));
     for(const k in HUB_EAST.label) set(k, HUB_EAST.label[k]);
     // the fight button names the venue that is actually standing here
@@ -20009,17 +20042,27 @@ function applyHub(){
       if(el && V && V.id!=='amphitheatre') el.textContent='⚔ '+V.name; }
   }
   // the silk road is an eastern institution and appears only there
-  { let sb=$('btn-silk');
+  if(!wa){ let sb=$('btn-silk');
     if(!sb){ const host=$('btn-intrigue'); if(host && host.parentNode){
         sb=document.createElement('button'); sb.className='btn'; sb.id='btn-silk';
         sb.textContent='🐫 THE SILK ROAD';
         sb.onclick=()=>openSilk();
         host.parentNode.insertBefore(sb, host.nextSibling); } }
     if(sb) sb.style.display = east? '' : 'none'; }
+  else { const sb=$('btn-silk'); if(sb) sb.style.display='none'; }
   // and the legend under the map
   { const cap=document.querySelector('#scr-map .muted');
+    /* IT WAS DARK GREY ON A DARK-EDGED PLATE and could not be read at all.
+       A legend is furniture on the sheet, so it gets the sheet's own
+       treatment: a pale strip with ink on it. */
+    if(cap){ cap.style.cssText='position:absolute;right:6px;bottom:4px;font-size:10px;'
+      +'background:rgba(250,243,224,0.95);color:#3a2810;padding:1px 6px;border-radius:2px;'
+      +'border:1px solid rgba(120,92,50,.55);font-family:Georgia,serif;letter-spacing:.02em;'; }
     if(cap && cap.textContent.indexOf('current')>=0)
-      cap.textContent = east
+      cap.textContent = wa
+        ? '戦国 · THE COUNTRY AT WAR · ' + (G&&G.waEra? G.waEra+' ' : '')
+          + '· colour = the house that holds it · ⬡ current ⬡ ✓ cleared'
+        : east
         ? '建安 · THE JIAN’AN YEARS · ⬡ current ⬡ ✓ cleared ⬡ ⛔ shut'
         : 'IMPERIVM ROMANVM · ANNO CC · ⬡ current ⬡ ✓ cleared ⬡ ✦ imperial'; }
 }
@@ -20093,7 +20136,13 @@ function buildRegions(){
   const layer=$('region-layer'); layer.innerHTML='';
   /* HIS OWN WORLD'S PINS. This walked REGIONS unconditionally, so an eastern
      career got twenty-two Roman provinces laid over a map of Han China. */
-  const _RS = (playerWorld()==='east' && typeof REGIONS_EAST!=='undefined')? REGIONS_EAST : REGIONS;
+  const _pw=playerWorld();
+  const _RS = (_pw==='wa'   && typeof REGIONS_WA!=='undefined')?   REGIONS_WA
+            : (_pw==='east' && typeof REGIONS_EAST!=='undefined')? REGIONS_EAST : REGIONS;
+  /* THE JAPANESE SHEET LAYS ITS LABELS OUT rather than stacking them on
+     top of each other in the Kansai. */
+  const _wa = (_pw==='wa');
+  if(_wa && typeof layoutWaPins==='function' && !WA_PIN_POS.Yamashiro) layoutWaPins();
   _RS.forEach(r=>{
     const d=document.createElement('div');
     const unlocked=regionUnlocked(r);
@@ -20101,8 +20150,22 @@ function buildRegions(){
     const owned=G.titles&&G.titles[r.id];
     const shut=regionBlocked(r.id);
     d.className='region'+(unlocked?'':' locked')+(owned?' owned':(G.cleared[r.id]?' done':''))+(G.current===r.id?' cur':'')+(imperial?' imperial':'');
-    d.style.left=r.x+'%'; d.style.top=r.y+'%';
+    if(_wa && WA_PIN_POS[r.id]){ const PP=WA_PIN_POS[r.id];
+      d.style.left=PP.pct.x+'%'; d.style.top=PP.pct.y+'%'; d.classList.add('wa'); }
+    else { d.style.left=r.x+'%'; d.style.top=r.y+'%'; }
     d.textContent=(shut?'⛔ ':'')+(owned?'♦ ':(G.cleared[r.id]?'✓ ':''))+(imperial?'✦ ':'')+r.id;
+    /* WHOSE PROVINCE IT IS. A tile in the Sengoku is not neutral ground —
+       it belongs to a house, and the pin carries that house's crest and
+       that house's colour on its left edge. */
+    if(_wa && r.clan && typeof CLANS_WA!=='undefined' && CLANS_WA[r.clan]){
+      const C=CLANS_WA[r.clan];
+      d.style.borderLeft='3px solid '+C.col;
+      const mc=document.createElement('canvas'); mc.width=22; mc.height=22;
+      mc.style.cssText='width:8px;height:8px;vertical-align:-1px;margin-right:3px;';
+      const mx=mc.getContext('2d'); mx.setTransform(2,0,0,2,0,0);
+      drawMon(mx, 5.5, 5.5, 5, C.mon, C.col, null);
+      d.insertBefore(mc, d.firstChild);
+    }
     if(shut){ d.style.textDecoration='line-through'; d.style.opacity='0.55';
       d.style.filter='grayscale(1)'; }
     const tc=travelCost(G.current,r.id);
@@ -20118,7 +20181,8 @@ function buildRegions(){
         + (dau? '0 0 0 1.5px #d4568a, 0 0 5px rgba(212,86,138,.45)'
               : '0 0 0 1.5px #5b82c4, 0 0 5px rgba(91,130,196,.45)');
     }
-    d.title=r.city+(owned?' — '+G.titles[r.id]:'')
+    d.title=r.city+(_wa&&r.clan&&CLANS_WA[r.clan]? '  ·  '+CLANS_WA[r.clan].kanji+' '+CLANS_WA[r.clan].name:'')
+      +(owned?' — '+G.titles[r.id]:'')
       +(mine.length? '  \u2302 '+mine.map(h=>h.name+' & '+h.spouse
           +(h.house? ' of the '+h.house : '')).join(', '):'')
       +(r.id===G.current?' (you are here)':' — travel: '+tc.days+'d, '+tc.rations+' rations');
@@ -27522,6 +27586,365 @@ const REGION_EAST_BY_ID={}; REGIONS_EAST.forEach(r=>REGION_EAST_BY_ID[r.id]=r);
    in-world reason is the one the period itself gives. The Wei envoys who
    reached Yamatai in the 3rd century describe a crossing nobody undertook
    lightly, through people Chinese officials did not consider settled. */
+/* =====================================================================
+   THE THIRD SHEET — WA, AND THE CROSSING THAT COST THIRTEEN CENTURIES
+   ---------------------------------------------------------------------
+   The sea road was shut on purpose. Opening it does NOT put you in Yayoi
+   Japan in 200 A.D., because the whole conceit is that the crossing takes
+   what it takes: you sail from Gaya or Baekje and you make landfall in the
+   SENGOKU, the 1540s-90s. It is the one deliberate anachronism in the game
+   and it is signposted as one rather than smuggled in.
+
+   THE PERIOD, precisely. Ōnin (1467) broke shogunal authority and the
+   country came apart into provinces held by daimyō who answered to nobody.
+   Nobunaga takes Kyōto in 1568; Nagashino is 1575; Hideyoshi finishes the
+   unification in 1590. That is the window you land in.
+
+   PROVINCES ARE THE KUNI, the old provinces — Owari, Kai, Echigo, Satsuma,
+   Sagami — not modern prefectures, and every seat below is placed from a
+   real coordinate for the castle town that actually held it.
+
+   And HOKKAIDŌ is EZO: not part of Japan in this period at all, held by the
+   Ainu, with a single Japanese toehold at the Matsumae end of the Oshima
+   peninsula. It is on the sheet as what it was.
+   ===================================================================== */
+/* =====================================================================
+   THE PROJECTION — and why this sheet is turned on its side
+   ---------------------------------------------------------------------
+   Japan runs north-east to south-west. Squared up north-at-the-top into a
+   480×216 frame it is a squat horizontal smear with the entire top-left
+   quadrant — the Sea of Japan — left blank, and the latitude squashed to
+   half the scale of the longitude. That is not a Japanese map, it is a
+   Mercator inset with the corners empty.
+
+   So the frame is TURNED. The whole graticule is rotated 35° so the
+   Kagoshima-to-Sendai axis lies along the long edge of the sheet, which
+   puts the country across the full width at very nearly true proportion —
+   15.0 units of length against 7.3 of breadth, into a frame that is 2.22:1.
+
+   This is not a liberty. Gyōki-style Japanese maps, and the screen maps
+   that followed them, were drawn to whatever orientation suited the paper;
+   north is wherever the mapmaker needed it to be, and a great many of them
+   put the archipelago across the sheet exactly like this. The projection is
+   equirectangular about a standard parallel through the middle of Honshū,
+   so east-west distance is not exaggerated the way an unadjusted lon/lat
+   grid exaggerates it at 37° north.
+
+   Everything downstream — the coastlines, the province seats, the mountain
+   humps, the sea roads, the pins, the territory patchwork, the crests —
+   goes through this one function, so the sheet turns as a single piece.
+   ===================================================================== */
+const MAP_WA_PROJ={
+  lon0:137.2, lat0:37.4,              // the pivot, in the middle of Honshū
+  kx:Math.cos(37.4*Math.PI/180),      // degrees of longitude are shorter up here
+  rot:35*Math.PI/180,                 // lay the archipelago along the sheet
+  scale:26.0, ox:228, oy:125,   // measured to fit: x 21..457, y 6..210 of 480x216
+};
+function lonlatW(lon,lat){
+  const M=MAP_WA_PROJ;
+  const ex=(lon-M.lon0)*M.kx, ey=(lat-M.lat0);
+  const ca=Math.cos(M.rot), sa=Math.sin(M.rot);
+  const rx = ex*ca + ey*sa;
+  const ry = -ex*sa + ey*ca;
+  return [ M.ox + rx*M.scale, M.oy - ry*M.scale ];
+}
+function waXY(lon,lat){ const p=lonlatW(lon,lat);
+  return { x:+((p[0]/480)*100).toFixed(2), y:+((p[1]/216)*100).toFixed(2) }; }
+const REGIONS_WA = [
+  /* ---- THE HOME PROVINCES: the capital, and whoever is holding it ---- */
+  Object.assign({id:'Yamashiro',   world:'wa', tier:4, city:'Kyōto', prov:'the capital',
+    real:[135.77,35.01], note:'The Emperor is here and has no soldiers. Whoever holds Kyōto holds the fiction of legitimacy, which is worth armies.'}, waXY(135.77,35.01)),
+  Object.assign({id:'Izumi',       world:'wa', tier:4, sea:true, city:'Sakai', prov:'the free city',
+    real:[135.47,34.57], note:'A merchant city that governs ITSELF — a council of townsmen, a moat, and the gun-works that arm the whole country.'}, waXY(135.47,34.57)),
+  Object.assign({id:'Ōmi',         world:'wa', tier:4, city:'Kunitomo & Azuchi', prov:'the lake road',
+    real:[136.25,35.30], note:'Kunitomo village makes matchlocks by the thousand. Nobunaga builds Azuchi on the lake and covers its keep in gold.'}, waXY(136.25,35.30)),
+  Object.assign({id:'Settsu',      world:'wa', tier:4, sea:true, city:'Ishiyama', prov:'the warrior-monks',
+    real:[135.50,34.69], note:'The Ikkō-ikki hold a fortress-temple here and held out against Nobunaga for ELEVEN YEARS. Peasants and priests, and they nearly won.'}, waXY(135.50,34.69)),
+  /* ---- THE GREAT DAIMYŌ ---- */
+  Object.assign({id:'Owari',       world:'wa', tier:3, city:'Kiyosu', prov:'the Oda',
+    real:[136.90,35.18], note:'A small province with a violent young lord in it. Everybody underestimated him exactly once.'}, waXY(136.90,35.18)),
+  Object.assign({id:'Mikawa',      world:'wa', tier:3, city:'Okazaki', prov:'the Matsudaira',
+    real:[137.17,34.95], note:'Poor, stubborn, and it produces retainers who do not change sides. The man from here outlives everyone.'}, waXY(137.17,34.95)),
+  Object.assign({id:'Kai',         world:'wa', tier:4, city:'Kōfu', prov:'the Takeda',
+    real:[138.57,35.66], note:'Landlocked mountains and the finest cavalry in Japan. “Swift as wind, silent as forest, fierce as fire, immovable as mountain.”'}, waXY(138.57,35.66)),
+  Object.assign({id:'Echigo',      world:'wa', tier:4, sea:true, city:'Kasugayama', prov:'the Uesugi',
+    real:[138.24,37.15], note:'Snow country. Its lord fought the Takeda five times at the same river and called himself the god of war.'}, waXY(138.24,37.15)),
+  Object.assign({id:'Sagami',      world:'wa', tier:3, sea:true, city:'Odawara', prov:'the Hōjō',
+    real:[139.15,35.25], note:'The greatest castle town in the east, and a siege that ended the whole period.'}, waXY(139.15,35.25)),
+  Object.assign({id:'Aki',         world:'wa', tier:3, sea:true, city:'Yoshida-Kōriyama', prov:'the Mōri',
+    real:[132.46,34.39], note:'The Inland Sea and the fleets on it. Their lord took ten provinces by outliving and out-thinking everyone.'}, waXY(132.46,34.39)),
+  Object.assign({id:'Satsuma',     world:'wa', tier:4, sea:true, city:'Kagoshima', prov:'the Shimazu',
+    real:[130.56,31.60], note:'The far south, and the first place a Jesuit ever landed. Their infantry tactics frightened everyone who met them.'}, waXY(130.56,31.60)),
+  Object.assign({id:'Mutsu',       world:'wa', tier:3, city:'Yonezawa & Sendai', prov:'the Date',
+    real:[140.33,38.06], note:'The far north-east. Its one-eyed lord was born a generation too late and never stopped resenting it.'}, waXY(140.33,38.06)),
+  /* ---- WHERE THE OUTSIDE WORLD COMES ASHORE ---- */
+  Object.assign({id:'Tanegashima', world:'wa', tier:5, sea:true, city:'Nishinoomote', prov:'where the guns landed',
+    real:[130.99,30.73], note:'1543. A Chinese junk driven ashore with Portuguese aboard, and the lord of the island buys two matchlocks. The gun is named after this place forever.'}, waXY(130.99,30.73)),
+  Object.assign({id:'Hizen',       world:'wa', tier:4, sea:true, city:'Hirado & Nagasaki', prov:'the nanban trade',
+    real:[129.72,33.05], note:'Southern-barbarian ships. Chinese silk in, Japanese silver out, and Jesuits off the same deck.'}, waXY(129.72,33.05)),
+  Object.assign({id:'Iwami',       world:'wa', tier:4, city:'Iwami Ginzan', prov:'the silver mountain',
+    real:[132.44,35.11], note:'One silver mine producing a serious fraction of the world supply. This is WHY the Portuguese came, and why everyone here is fighting.'}, waXY(132.44,35.11)),
+  /* ---- THE REST OF THE SIXTY-ODD KUNI THAT MATTER IN THIS WINDOW ---- */
+  Object.assign({id:'Musashi',     world:'wa', tier:3, sea:true, city:'Edo', prov:'the Kantō plain',
+    real:[139.69,35.68], note:'A fishing village on a marsh with a decaying fort. In sixty years it will be the largest city on earth; right now nobody wants it.'}, waXY(139.69,35.68)),
+  Object.assign({id:'Shinano',     world:'wa', tier:4, city:'Kawanakajima', prov:'the contested middle',
+    real:[138.19,36.62], note:'The Takeda and the Uesugi fought FIVE battles on the same river flat here across eleven years and settled nothing at all.'}, waXY(138.19,36.62)),
+  Object.assign({id:'Mino',        world:'wa', tier:3, city:'Gifu', prov:'the gateway',
+    real:[136.76,35.42], note:'“Hold Mino and you hold the realm.” Nobunaga took it, renamed the castle town, and started using a seal that said so.'}, waXY(136.76,35.42)),
+  Object.assign({id:'Suruga',      world:'wa', tier:3, sea:true, city:'Sunpu', prov:'the Imagawa',
+    real:[138.38,34.98], note:'The most cultured court in the east, and its lord marched west in 1560 with twenty-five thousand men and did not come back.'}, waXY(138.38,34.98)),
+  Object.assign({id:'Kaga',        world:'wa', tier:4, sea:true, city:'Kanazawa', prov:'the peasants’ province',
+    real:[136.65,36.56], note:'百姓ノ持タル国 — “the province held by peasants”. The Ikkō-ikki threw out their lord and governed it themselves for the better part of a century.'}, waXY(136.65,36.56)),
+  Object.assign({id:'Kii',         world:'wa', tier:4, sea:true, city:'Saika', prov:'the gunners',
+    real:[135.17,34.23], note:'The Saika and Negoro bands — mercenary gunners who took the matchlock further than anyone and hired out to whoever paid.'}, waXY(135.17,34.23)),
+  Object.assign({id:'Harima',      world:'wa', tier:3, sea:true, city:'Himeji', prov:'the western road',
+    real:[134.69,34.83], note:'The road west out of the capital, and the castle that guards it.'}, waXY(134.69,34.83)),
+  Object.assign({id:'Bizen',       world:'wa', tier:3, sea:true, city:'Okayama', prov:'the Ukita',
+    real:[133.92,34.66], note:'Swordsmiths since the Kamakura, and the best blades in the country come out of this province.'}, waXY(133.92,34.66)),
+  Object.assign({id:'Nagato',      world:'wa', tier:3, sea:true, city:'Hagi', prov:'the Mōri west',
+    real:[131.40,34.41], note:'The far western tip, and the strait that everything sailing to the capital has to thread.'}, waXY(131.40,34.41)),
+  Object.assign({id:'Tosa',        world:'wa', tier:3, sea:true, city:'Kōchi', prov:'the Chōsokabe',
+    real:[133.53,33.56], note:'The rough Pacific side of Shikoku. Their lord armed farmers as part-time spearmen and took the whole island with them.'}, waXY(133.53,33.56)),
+  Object.assign({id:'Iyo',         world:'wa', tier:3, sea:true, city:'Matsuyama', prov:'the Inland Sea',
+    real:[132.77,33.84], note:'Facing the Inland Sea, and the pirate-admirals of the Murakami who taxed everything that crossed it.'}, waXY(132.77,33.84)),
+  Object.assign({id:'Bungo',       world:'wa', tier:4, sea:true, city:'Funai', prov:'the Ōtomo',
+    real:[131.61,33.24], note:'Its lord took baptism, took the name Francisco, and let the Jesuits build. Then the Shimazu came north.'}, waXY(131.61,33.24)),
+  Object.assign({id:'Higo',        world:'wa', tier:3, sea:true, city:'Kumamoto', prov:'the Kyūshū middle',
+    real:[130.71,32.80], note:'Between the Ōtomo and the Shimazu, which is a bad place for a province to be.'}, waXY(130.71,32.80)),
+  Object.assign({id:'Dewa',        world:'wa', tier:3, sea:true, city:'Akita', prov:'the far north-west',
+    real:[140.10,39.72], note:'Snow, gold-dust in the rivers, and lords the capital has never met.'}, waXY(140.10,39.72)),
+  Object.assign({id:'Tsushima',    world:'wa', tier:4, sea:true, city:'Izuhara', prov:'the Sō, and the Korea trade',
+    real:[129.29,34.20], note:'Halfway to Korea and living off that fact. The Sō hold the only licensed trade with the peninsula and forge documents when it suits them.'}, waXY(129.29,34.20)),
+  /* ---- AND THE ONE THAT IS NOT JAPAN ---- */
+  Object.assign({id:'Ezo',         world:'wa', tier:5, sea:true, city:'Matsumae', prov:'Ainu country',
+    real:[140.12,41.43], note:'Not Japan, not in this century. Ainu land, with one Japanese toehold on the southern cape trading iron for furs and salmon.'}, waXY(140.12,41.43)),
+];
+const REGION_WA_BY_ID={}; REGIONS_WA.forEach(r=>REGION_WA_BY_ID[r.id]=r);
+
+/* =====================================================================
+   THE CLANS — 1543-1590, AND WHY THE MAP IS A PATCHWORK
+   ---------------------------------------------------------------------
+   The Sengoku Jidai is not a country with provinces in it. It is roughly
+   two hundred armed houses standing on land they took, and the only thing
+   that makes a border is who can hold it this year. So the sheet cannot be
+   a single flat "Japan" the way the Roman sheet is a single flat empire —
+   it has to be a PATCHWORK, and every patch has to be somebody's.
+
+   Every house here is real, every seat is where it actually sat, and every
+   MON — the family crest — is the real design, cut down to something that
+   reads at eight pixels. The mon is the important part: in a country where
+   most soldiers could not read, the crest on the banner WAS the unit
+   identifier. It went on the nobori standard, on the sashimono flag lashed
+   to a footsoldier's back, on the lacquer of the armour, on the tents, on
+   the rice sacks. You told friend from enemy by shape at two hundred paces.
+
+   The colours are MAP colours, chosen so twenty-two territories stay apart
+   on warm paper. Where a house genuinely had a known field colour — Takeda
+   red, Shimazu black-on-white — it leans that way.
+   ===================================================================== */
+const CLANS_WA={
+  ashikaga:{ kanji:'足利', name:'Ashikaga', mon:'hikiryo', col:'#8a7a4a', seat:'Yamashiro',
+    word:'The shōgun. He holds the capital, the title, the ceremony and almost no soldiers, and every man on this map is deciding how long that matters.' },
+  oda:{ kanji:'織田', name:'Oda', mon:'mokko', col:'#3a3f78', seat:'Owari',
+    word:'A minor house from a small province with a violent young lord in it. He will burn Enryaku-ji, break the Takeda cavalry with guns, and be murdered by his own general.' },
+  takeda:{ kanji:'武田', name:'Takeda', mon:'bishi', col:'#a8322a', seat:'Kai',
+    word:'Mountain cavalry, and the best of it in Japan. 風林火山 — swift as wind, silent as forest, fierce as fire, immovable as mountain.' },
+  uesugi:{ kanji:'上杉', name:'Uesugi', mon:'suzume', col:'#2f5f9a', seat:'Echigo',
+    word:'Snow country. Their lord took the name of the god of war, fought the Takeda five times on the same river flat, and sent his enemy salt when the sea road was cut.' },
+  hojo:{ kanji:'北条', name:'Hōjō', mon:'uroko', col:'#2f6a55', seat:'Sagami',
+    word:'The Kantō plain and the greatest castle town in the east. Three generations of competent government, ended by one siege.' },
+  imagawa:{ kanji:'今川', name:'Imagawa', mon:'akadori', col:'#3f7a6a', seat:'Suruga',
+    word:'The most cultured court east of the capital. In 1560 its lord marched west with twenty-five thousand men, stopped for lunch in a narrow gorge, and did not come back.' },
+  tokugawa:{ kanji:'松平', name:'Matsudaira', mon:'aoi', col:'#8a6a1a', seat:'Mikawa',
+    word:'Poor, stubborn, and it grows retainers who do not change sides. The boy hostage from here outlives every man on this map and takes the whole thing.' },
+  mori:{ kanji:'毛利', name:'Mōri', mon:'ichimonji', col:'#7a4a9a', seat:'Aki',
+    word:'Ten provinces and the fleets of the Inland Sea, built by a man who out-thought and outlived everyone. Three arrows together do not break.' },
+  ukita:{ kanji:'宇喜多', name:'Ukita', mon:'tomoe', col:'#9a6a2a', seat:'Bizen',
+    word:'Swordsmiths since the Kamakura, and a house that changed sides at exactly the right moments until the very last one.' },
+  chosokabe:{ kanji:'長宗我部', name:'Chōsokabe', mon:'katabami', col:'#5a7a2a', seat:'Tosa',
+    word:'They armed farmers as part-time spearmen — 一領具足, "one suit of armour" — and took the whole of Shikoku with them.' },
+  murakami:{ kanji:'村上', name:'Murakami', mon:'ue', col:'#2a7a6a', seat:'Iyo',
+    word:'The pirate-admirals of the Inland Sea. They taxed everything that crossed it and a Jesuit called their chief the greatest pirate lord in Japan.' },
+  otomo:{ kanji:'大友', name:'Ōtomo', mon:'takanoha', col:'#a8582a', seat:'Bungo',
+    word:'Their lord took baptism and the name Francisco, imported cannon he called the country-destroyer, and let the Jesuits build. Then the Shimazu came north.' },
+  shimazu:{ kanji:'島津', name:'Shimazu', mon:'jumonji', col:'#8a2f4a', seat:'Satsuma',
+    word:'The far south. Their 釣り野伏せ — bait the centre, break, and close both wings on the pursuit — frightened everyone who ever met it.' },
+  matsuura:{ kanji:'松浦', name:'Matsuura', mon:'hoshi', col:'#8a4a6a', seat:'Hizen',
+    word:'Old pirates turned harbour lords. They opened Hirado to the southern barbarians and got very rich holding the door.' },
+  so:{ kanji:'宗', name:'Sō', mon:'so', col:'#3a7a8a', seat:'Tsushima',
+    word:'Halfway to Korea and living entirely off that fact. They hold the only licensed trade with the peninsula and forge the paperwork when it suits them.' },
+  date:{ kanji:'伊達', name:'Date', mon:'kuyo', col:'#4a5a7a', seat:'Mutsu',
+    word:'The far north-east. Its one-eyed lord was born a generation too late to win the country and never once stopped resenting it.' },
+  toyotomi:{ kanji:'羽柴', name:'Hashiba', mon:'kiri', col:'#c0a02a', seat:'Harima',
+    word:'A peasant with a sandal-bearer’s job who ends up ruling Japan. Nobody on this map sees it coming, least of all the men above him.' },
+  ikko:{ kanji:'一向一揆', name:'the Ikkō-ikki', mon:'lotus', col:'#b08a2a', seat:'Settsu',
+    word:'Not a house. A league of priests, farmers and townsmen under one banner: 進者往生極楽 — advance and be reborn in paradise, retreat and fall to hell.' },
+  saika:{ kanji:'雑賀衆', name:'the Saika bands', mon:'yatagarasu', col:'#6a5a2a', seat:'Kii',
+    word:'Mercenary gunners who took the matchlock further than anyone alive and hired themselves out to whoever paid. They held off Nobunaga twice.' },
+  sakai:{ kanji:'堺', name:'the Sakai council', mon:'yamaji', col:'#6a6a72', seat:'Izumi',
+    word:'A city that governs itself — thirty-six townsmen, a moat, and the gun-works that arm the entire country. A Jesuit compared it to Venice.' },
+  tanegashima:{ kanji:'種子島', name:'Tanegashima', mon:'maruten', col:'#b0402a', seat:'Tanegashima',
+    word:'A small island lordship that bought two matchlocks off a wrecked junk in 1543 and accidentally renamed war in Japan after itself.' },
+  ainu:{ kanji:'アイヌ', name:'the Ainu', mon:'moreu', col:'#7a8a8a', seat:'Ezo',
+    word:'Not Japan and not in this century. Their own language, their own gods, and one Japanese toehold on the southern cape trading iron for furs and salmon.' },
+};
+const CLAN_OF_WA={
+  Yamashiro:'ashikaga', Izumi:'sakai', 'Ōmi':'oda', Settsu:'ikko',
+  Owari:'oda', Mikawa:'tokugawa', Kai:'takeda', Echigo:'uesugi', Sagami:'hojo',
+  Aki:'mori', Satsuma:'shimazu', Mutsu:'date',
+  Tanegashima:'tanegashima', Hizen:'matsuura', Iwami:'mori',
+  Musashi:'hojo', Shinano:'takeda', Mino:'oda', Suruga:'imagawa', Kaga:'ikko',
+  Kii:'saika', Harima:'toyotomi', Bizen:'ukita', Nagato:'mori', Tosa:'chosokabe',
+  Iyo:'murakami', Bungo:'otomo', Higo:'shimazu', Dewa:'date', Tsushima:'so',
+  Ezo:'ainu',
+};
+REGIONS_WA.forEach(r=>{ r.clan=CLAN_OF_WA[r.id]||null; });
+function clanOf(regionId){
+  const c=CLAN_OF_WA[regionId]; return c? CLANS_WA[c] : null;
+}
+function clanIdOf(regionId){ return CLAN_OF_WA[regionId]||null; }
+/* who else this house holds — the reason the patchwork has big blocks in it */
+function clanHolds(clanId){
+  return REGIONS_WA.filter(r=>r.clan===clanId).map(r=>r.id);
+}
+/* =====================================================================
+   THE MON — the crest, drawn rather than lettered
+   ---------------------------------------------------------------------
+   Every one of these is the real design reduced to the fewest strokes that
+   still reads. They are drawn into a unit box of radius r around (x,y), so
+   the same function serves the map at 7px, the pin at 9px, the banner at
+   26px and the sashimono on a footsoldier's back at 5px.
+   ===================================================================== */
+function drawMon(c, x, y, r, mon, col, ring){
+  c.save(); c.translate(x,y);
+  const F=col||'#3a2a18';
+  const disc=(rr,f)=>{ c.beginPath(); c.arc(0,0,rr,0,6.2832); c.fillStyle=f; c.fill(); };
+  const ringOut=(rr,lw)=>{ c.beginPath(); c.arc(0,0,rr,0,6.2832); c.lineWidth=lw; c.strokeStyle=F; c.stroke(); };
+  const dot=(dx,dy,rr)=>{ c.beginPath(); c.arc(dx,dy,rr,0,6.2832); c.fillStyle=F; c.fill(); };
+  const dia=(dx,dy,w,h)=>{ c.beginPath(); c.moveTo(dx,dy-h); c.lineTo(dx+w,dy); c.lineTo(dx,dy+h); c.lineTo(dx-w,dy); c.closePath(); c.fillStyle=F; c.fill(); };
+  const tri=(dx,dy,w,h)=>{ c.beginPath(); c.moveTo(dx,dy-h); c.lineTo(dx+w,dy+h*0.6); c.lineTo(dx-w,dy+h*0.6); c.closePath(); c.fillStyle=F; c.fill(); };
+  const bar=(dy,w,h)=>{ c.fillStyle=F; c.fillRect(-w,dy-h/2,w*2,h); };
+  const leaf=(ang,len,wid)=>{ c.save(); c.rotate(ang);
+    c.beginPath(); c.moveTo(0,-len);
+    c.bezierCurveTo(wid,-len*0.75, wid,-len*0.10, 0,0);
+    c.bezierCurveTo(-wid,-len*0.10,-wid,-len*0.75, 0,-len);
+    c.closePath(); c.fillStyle=F; c.fill(); c.restore(); };
+  if(ring){ disc(r*1.28, ring); }
+  switch(mon){
+    case 'mokko': {                    // 木瓜 — the Oda quince, an oval of five lobes
+      c.beginPath();
+      for(let k=0;k<5;k++){ const a=-Math.PI/2+k*(6.2832/5);
+        c.arc(Math.cos(a)*r*0.60, Math.sin(a)*r*0.55, r*0.46, 0, 6.2832); }
+      c.fillStyle=F; c.fill('evenodd');
+      c.beginPath(); c.arc(0,0,r*0.30,0,6.2832); c.fillStyle=ring||'#f4ead2'; c.fill();
+      break; }
+    case 'bishi': {                    // 武田菱 — four diamonds in a diamond
+      const d=r*0.40; dia(0,-d*1.35,d*0.72,d*1.16); dia(0,d*1.35,d*0.72,d*1.16);
+      dia(-d*1.15,0,d*0.72,d*1.16); dia(d*1.15,0,d*0.72,d*1.16); break; }
+    case 'suzume': {                   // 竹に雀 — two sparrows in a bamboo ring
+      ringOut(r*0.88, Math.max(1,r*0.16));
+      [[-1,0],[1,0]].forEach(sd=>{ c.save(); c.scale(sd[0],1);
+        c.beginPath(); c.moveTo(r*0.10,-r*0.30);
+        c.quadraticCurveTo(r*0.62,-r*0.42, r*0.52,r*0.10);
+        c.quadraticCurveTo(r*0.34,r*0.34, r*0.10,-r*0.30);
+        c.closePath(); c.fillStyle=F; c.fill(); c.restore(); });
+      break; }
+    case 'uroko': {                    // 三つ鱗 — the Hōjō three scales
+      tri(0,-r*0.34,r*0.44,r*0.50); tri(-r*0.50,r*0.52,r*0.44,r*0.50); tri(r*0.50,r*0.52,r*0.44,r*0.50); break; }
+    case 'ichimonji': {                // 一文字三星 — one bar above three stars
+      bar(-r*0.52, r*0.80, Math.max(1.2,r*0.22));
+      dot(0,r*0.02,r*0.24); dot(-r*0.50,r*0.52,r*0.24); dot(r*0.50,r*0.52,r*0.24); break; }
+    case 'jumonji': {                  // 丸に十文字 — the Shimazu cross in a circle
+      ringOut(r*0.92, Math.max(1.1,r*0.19));
+      c.fillStyle=F; c.fillRect(-r*0.13,-r*0.66,r*0.26,r*1.32); c.fillRect(-r*0.66,-r*0.13,r*1.32,r*0.26); break; }
+    case 'kuyo': {                     // 九曜 — the Date nine luminaries
+      dot(0,0,r*0.34);
+      for(let k=0;k<8;k++){ const a=k*(6.2832/8); dot(Math.cos(a)*r*0.74, Math.sin(a)*r*0.74, r*0.19); } break; }
+    case 'hikiryo': {                  // 二つ引両 — two bars, the Ashikaga
+      ringOut(r*0.94, Math.max(1,r*0.15));
+      bar(-r*0.30, r*0.62, Math.max(1.2,r*0.24)); bar(r*0.30, r*0.62, Math.max(1.2,r*0.24)); break; }
+    case 'akadori': {                   // 赤鳥 — the Imagawa red-bird comb
+      c.beginPath(); c.moveTo(-r*0.66,r*0.34); c.lineTo(r*0.66,r*0.34);
+      c.lineTo(r*0.44,-r*0.20); c.quadraticCurveTo(0,-r*0.78,-r*0.44,-r*0.20);
+      c.closePath(); c.fillStyle=F; c.fill();
+      c.fillStyle=ring||'#f4ead2';
+      for(let k=-2;k<=2;k++) c.fillRect(k*r*0.24-r*0.05, -r*0.06, r*0.10, r*0.40);
+      break; }
+    case 'aoi': {                      // 三つ葉葵 — three hollyhock leaves
+      ringOut(r*0.98, Math.max(1,r*0.13));
+      for(let k=0;k<3;k++){ c.save(); c.rotate(k*2.0944);
+        c.beginPath(); c.moveTo(0,-r*0.14);
+        c.bezierCurveTo(r*0.44,-r*0.30, r*0.40,-r*0.86, 0,-r*0.80);
+        c.bezierCurveTo(-r*0.40,-r*0.86,-r*0.44,-r*0.30, 0,-r*0.14);
+        c.closePath(); c.fillStyle=F; c.fill();
+        c.fillStyle=ring||'#f4ead2'; c.fillRect(-r*0.04,-r*0.76,r*0.08,r*0.50); c.restore(); }
+      break; }
+    case 'katabami': {                 // 片喰 — wood sorrel, three hearts
+      for(let k=0;k<3;k++){ c.save(); c.rotate(k*2.0944);
+        c.beginPath(); c.moveTo(0,-r*0.12);
+        c.bezierCurveTo(r*0.52,-r*0.24, r*0.46,-r*0.92, 0,-r*0.62);
+        c.bezierCurveTo(-r*0.46,-r*0.92,-r*0.52,-r*0.24, 0,-r*0.12);
+        c.closePath(); c.fillStyle=F; c.fill(); c.restore(); }
+      break; }
+    case 'tomoe': {                    // 三つ巴 — three commas turning
+      for(let k=0;k<3;k++){ c.save(); c.rotate(k*2.0944);
+        c.beginPath(); c.arc(0,-r*0.42,r*0.30,0,6.2832); c.fillStyle=F; c.fill();
+        c.beginPath(); c.moveTo(-r*0.02,-r*0.72);
+        c.quadraticCurveTo(r*0.70,-r*0.36, r*0.06,r*0.10);
+        c.quadraticCurveTo(r*0.24,-r*0.30,-r*0.02,-r*0.72);
+        c.closePath(); c.fill(); c.restore(); }
+      break; }
+    case 'kiri': {                     // 五三桐 — the paulownia, three flower spikes
+      for(let k=-1;k<=1;k++){ const dx=k*r*0.48, ht=(k===0? r*0.98 : r*0.74);
+        c.fillStyle=F; c.fillRect(dx-r*0.07,-ht,r*0.14,ht*0.52);
+        c.fillRect(dx-r*0.19,-ht*0.92,r*0.06,ht*0.42); c.fillRect(dx+r*0.13,-ht*0.92,r*0.06,ht*0.42); }
+      for(let k=-1;k<=1;k++){ c.save(); c.translate(k*r*0.44,r*0.10); leaf(k*0.62,r*0.66,r*0.28); c.restore(); }
+      break; }
+    case 'lotus': {                    // the Ikkō banner mark — a lotus
+      dot(0,0,r*0.24);
+      for(let k=0;k<8;k++){ c.save(); c.rotate(k*0.7854); leaf(0,r*0.92,r*0.24); c.restore(); } break; }
+    case 'yatagarasu': {               // 八咫烏 — the Kumano three-legged crow
+      c.beginPath(); c.moveTo(-r*0.70,r*0.10);
+      c.quadraticCurveTo(-r*0.20,-r*0.62, r*0.34,-r*0.34);
+      c.quadraticCurveTo(r*0.86,-r*0.20, r*0.52,r*0.16);
+      c.quadraticCurveTo(r*0.05,r*0.30,-r*0.70,r*0.10); c.closePath(); c.fillStyle=F; c.fill();
+      dot(r*0.42,-r*0.34,r*0.16);
+      c.fillStyle=F; [-0.34,0,0.34].forEach(dx=>c.fillRect(dx*r-r*0.04,r*0.14,r*0.08,r*0.42));
+      break; }
+    case 'hoshi': {                    // three stars, the Matsuura
+      ringOut(r*0.94, Math.max(1,r*0.14));
+      dot(0,-r*0.42,r*0.24); dot(-r*0.42,r*0.36,r*0.24); dot(r*0.42,r*0.36,r*0.24); break; }
+    case 'so': {                       // a square within a square, the Sō
+      c.strokeStyle=F; c.lineWidth=Math.max(1,r*0.17);
+      c.strokeRect(-r*0.74,-r*0.74,r*1.48,r*1.48);
+      c.fillStyle=F; c.fillRect(-r*0.28,-r*0.28,r*0.56,r*0.56); break; }
+    case 'yamaji': {                   // the Sakai merchant mark — a mountain over a rule
+      c.strokeStyle=F; c.lineWidth=Math.max(1.2,r*0.20); c.lineJoin='round';
+      c.beginPath(); c.moveTo(-r*0.72,r*0.24); c.lineTo(0,-r*0.68); c.lineTo(r*0.72,r*0.24); c.stroke();
+      c.fillStyle=F; c.fillRect(-r*0.80,r*0.48,r*1.60,Math.max(1.2,r*0.20)); break; }
+    case 'ue': {                       // 丸に上 — the Murakami "ue" in a circle
+      ringOut(r*0.96, Math.max(1,r*0.15));
+      c.fillStyle=F;
+      c.fillRect(-r*0.09,-r*0.62,r*0.18,r*1.02);
+      c.fillRect(-r*0.09,-r*0.16,r*0.50,r*0.16);
+      c.fillRect(-r*0.62,r*0.40,r*1.24,r*0.18); break; }
+    case 'takanoha': {                 // 違い鷹の羽 — crossed hawk feathers
+      [-0.42,0.42].forEach(sg=>{ c.save(); c.rotate(sg);
+        c.beginPath(); c.moveTo(0,-r*0.92);
+        c.quadraticCurveTo(r*0.30,-r*0.20, r*0.12,r*0.86);
+        c.quadraticCurveTo(-r*0.06,r*0.30,-r*0.20,-r*0.24);
+        c.closePath(); c.fillStyle=F; c.fill(); c.restore(); }); break; }
+    case 'maruten': {                  // the island lordship — a dot in a ring
+      ringOut(r*0.86, Math.max(1.2,r*0.22)); dot(0,0,r*0.30); break; }
+    case 'moreu': {                    // モレウ — the Ainu spiral-and-chevron
+      c.strokeStyle=F; c.lineWidth=Math.max(1,r*0.17); c.lineJoin='round'; c.lineCap='round';
+      c.beginPath(); c.moveTo(-r*0.82,r*0.40); c.lineTo(-r*0.28,-r*0.44); c.lineTo(r*0.28,r*0.40); c.lineTo(r*0.82,-r*0.44);
+      c.stroke();
+      c.beginPath(); c.arc(0,-r*0.06,r*0.26,0.6,5.2); c.stroke(); break; }
+    default: { dot(0,0,r*0.52); }
+  }
+  c.restore();
+}
 const WA_REFUSAL=[
   '\ud83c\udf0a THE SEA ROAD TO WA IS SHUT.',
   'No pilot on this coast will take the crossing. They speak of a month of open water, of a strait that swallows hulls whole, and of landfalls where nobody keeps a court a civilised man would recognise.',
@@ -27529,13 +27952,145 @@ const WA_REFUSAL=[
 ];
 function regionBlocked(id){
   const r=REGION_EAST_BY_ID[id];
+  /* ONCE YOU HAVE MADE THE CROSSING WA IS NOT SHUT ANY MORE — it is simply
+     somewhere else, thirteen hundred years away. */
+  if(r && r.blocked && id==='Wa' && typeof G!=='undefined' && G && G.crossedToWa) return false;
   return !!(r && r.blocked);
 }
 function refuseBlocked(id){
   if(!regionBlocked(id)) return false;
+  /* THE SEA ROAD IS SHUT UNTIL YOU HAVE THE MEANS AND THE NERVE. It stops
+     being a wall and becomes an OFFER once you can actually mount it. */
+  if(id==='Wa' && typeof canAttemptCrossing==='function' && canAttemptCrossing()){
+    try{ openCrossing(); }catch(e){}
+    return true;
+  }
   try{ toast(WA_REFUSAL.join(' '), 6500); }catch(e){}
   try{ sfx('deny'); }catch(e){}
   return true;
+}
+/* =====================================================================
+   THE CROSSING — and what it costs is not money
+   ---------------------------------------------------------------------
+   You sail from Gaya or Baekje, which is the route the Wei envoys took in
+   the third century and the route everything else took for a thousand
+   years after. What arrives is not the ship that left.
+
+   The crossing is offered only to a career that could plausibly mount one:
+   you must be standing on the Korean coast, hold a boat, and have the
+   provisions for a voyage nobody has measured. It is deliberately the last
+   thing in the eastern game rather than a thing you stumble into.
+   ===================================================================== */
+const CROSS_PORTS=['Gaya','Baekje'];
+function canAttemptCrossing(){
+  if(typeof G==='undefined'||!G) return false;
+  if(G.crossedToWa) return true;
+  return CROSS_PORTS.indexOf(G.current)>=0 && !!G.boat && (G.food||0)>=12;
+}
+function crossingBlockReason(){
+  if(!G) return '';
+  if(CROSS_PORTS.indexOf(G.current)<0)
+    return 'No hull on this coast is going. The crossing leaves from Gaya or from Baekje and from nowhere else.';
+  if(!G.boat) return 'You do not own a ship. Nobody lends one for this.';
+  if((G.food||0)<12) return 'Twelve rations at the least. Nobody has ever come back to say how many it really takes.';
+  return '';
+}
+const CROSSING_LOG=[
+  {d:'DAY ONE',      t:'The Gaya pilot takes your money, looks at the sky, and says a word to his crew you do not catch.'},
+  {d:'DAY FOUR',     t:'Land is gone. The swell is longer out here than anything you have felt, and the hull works audibly in it.'},
+  {d:'DAY NINE',     t:'A strait that pulls. The pilot puts two men on the steering oar and stops speaking for an afternoon.'},
+  {d:'DAY SEVENTEEN',t:'Fog, and in it a bell — a big one, iron, tolling slowly a long way off. There should be nothing out here to hang a bell on.'},
+  {d:'DAY THIRTY',   t:'You are certain you have been at sea for a month. The pilot says nine days. The tally-stick agrees with him and you do not believe it.'},
+  {d:'—',            t:'And then the fog lifts.'},
+];
+const CROSSING_ARRIVAL=[
+  'You make landfall on a shore of black sand under pines, and it is WRONG.',
+  'There is a wall on the headland — a wall of fitted stone, sloped and battered like nothing built in your century, with a tower of white plaster and grey tile standing on top of it.',
+  'The men who come down the beach wear lacquered plate laced in coloured silk and carry a curved sword through the belt with a second, shorter one beside it. One of them has a matchlock over his shoulder — a tube of iron on a wooden stock, with a smouldering cord clipped to the lock.',
+  'Their language has words in it you half know, worn down. The date they give you, once you have argued it out on the sand with a stick, is more than THIRTEEN HUNDRED YEARS after the one you sailed on.',
+  'The pilot is standing in the surf laughing, or weeping. He will not go back.',
+];
+function beginCrossing(){
+  if(!canAttemptCrossing()) return false;
+  G.food=Math.max(0,(G.food||0)-12);
+  G.crossedToWa=true;
+  G.world='wa';
+  G.current='Satsuma';                 // the far south, where every outside ship came ashore
+  G.waEra=1543+ri(0,46);               // you land somewhere in the Sengoku window
+  advanceDay(30);
+  refreshStatbar(); saveQuiet();
+  return true;
+}
+function openCrossing(){
+  state='villa'; show('scr-villa'); $('statbar').classList.remove('hide'); refreshStatbar();
+  villaHead('🌊 THE SEA ROAD TO WA',
+    'It leaves from this coast and nobody has ever brought back a useful account of it. Twelve rations, a hull of your own, and a pilot who will not name a price twice.',
+    '#7ab8d0');
+  const b=$('villa-body'); b.innerHTML='';
+  const why=crossingBlockReason();
+  const card=document.createElement('div'); card.className='shopcard';
+  card.innerHTML='<div class="small" style="line-height:1.55">'
+    +'The Wei envoys went this way in the third century and the accounts they brought back are already strange. '
+    +'Everyone who has looked at this water agrees on one thing: <b>it does not take the time it should.</b>'
+    +'</div>';
+  b.appendChild(card);
+  if(why){
+    const no=document.createElement('div'); no.className='small';
+    no.style.cssText='color:#e0705b;margin-top:8px;line-height:1.5';
+    no.textContent='⛔ '+why;
+    b.appendChild(no);
+  } else {
+    const go=document.createElement('button'); go.className='btn gold'; go.style.marginTop='8px';
+    go.textContent='⛵ TAKE THE CROSSING — 12 rations, and no return';
+    go.onclick=()=>{ if(beginCrossing()) openCrossingLog(0); };
+    b.appendChild(go);
+    const warn=document.createElement('div'); warn.className='small muted';
+    warn.style.cssText='margin-top:6px;line-height:1.5';
+    warn.textContent='The pilot will not contract for a return voyage. He is not being difficult; he says there is nothing to come back to.';
+    b.appendChild(warn);
+  }
+  $('btn-villa-back').onclick=()=>enterMap();
+}
+/* the voyage, played out a page at a time, and then the shore */
+function openCrossingLog(i){
+  state='villa'; show('scr-villa'); $('statbar').classList.remove('hide');
+  const b=$('villa-body'); b.innerHTML='';
+  if(i < CROSSING_LOG.length){
+    const L=CROSSING_LOG[i];
+    villaHead('⛵ THE CROSSING', 'Open water, and a tally-stick that has stopped agreeing with anybody.', '#7ab8d0');
+    const c=document.createElement('div'); c.className='shopcard';
+    c.innerHTML='<div style="color:var(--gold);letter-spacing:2px">'+L.d+'</div>'
+      +'<div class="small" style="margin-top:5px;line-height:1.6;font-size:13px">'+L.t+'</div>';
+    b.appendChild(c);
+    const nx=document.createElement('button'); nx.className='btn gold'; nx.style.marginTop='8px';
+    nx.textContent = (i===CROSSING_LOG.length-1)? '▶ LOOK AT THE SHORE' : '▶ SAIL ON';
+    nx.onclick=()=>openCrossingLog(i+1);
+    b.appendChild(nx);
+    $('btn-villa-back').onclick=()=>openCrossingLog(i+1);
+    return;
+  }
+  villaHead('⛩ LANDFALL — AND THE YEAR IS WRONG',
+    'You sailed in the reign of Severus. The stick in the sand says otherwise.', '#e8c34a');
+  CROSSING_ARRIVAL.forEach((t,n)=>{
+    const c=document.createElement('div'); c.className='small';
+    c.style.cssText='line-height:1.65;font-size:13px;margin-top:6px'
+      +(n===0?';color:#e8c34a;font-weight:bold':'')
+      +(n===3?';color:#ff9ad8;font-weight:bold':'');
+    c.textContent=t; b.appendChild(c);
+  });
+  const yr=document.createElement('div'); yr.className='shopcard';
+  yr.style.cssText='margin-top:10px;border-color:#8a6f35';
+  yr.innerHTML='<div style="color:var(--gold);letter-spacing:2px">THE YEAR IS '+(G.waEra||1560)+'</div>'
+    +'<div class="small muted" style="margin-top:4px;line-height:1.55">'
+    +'The country is in its hundredth year without a working government. There is an Emperor in Kyōto with no soldiers, '
+    +'a Shōgun with no authority, and sixty-odd provinces held by men who answer to nobody. '
+    +'They call it the age of the country at war.</div>';
+  b.appendChild(yr);
+  const go=document.createElement('button'); go.className='btn gold'; go.style.marginTop='10px';
+  go.textContent='⛩ WALK UP THE BEACH ▶';
+  go.onclick=()=>{ try{ sfx('coin'); }catch(e){} enterMap(); };
+  b.appendChild(go);
+  $('btn-villa-back').onclick=()=>enterMap();
 }
 /* =====================================================================
    THE EASTERN SHEET — drawn from real coastlines, like the western one
@@ -27772,6 +28327,409 @@ function drawMapCanvasEast(){
     serpent:Q(94,11),                // the Bay of Bengal
     whale:Q(64,15),                  // the Arabian Sea
     junk:Q(116,15) });               // and a junk in the South China Sea
+}
+/* =====================================================================
+   THE WA SHEET — Honshū, Kyūshū, Shikoku, from real coastlines
+   ---------------------------------------------------------------------
+   Four separate landmasses for the same reason the eastern sheet needed
+   three: a single closed path down and back up the Japanese archipelago
+   crosses itself, and a self-intersecting fill swallows the Inland Sea,
+   which is the most important body of water in the country.
+
+   THE INLAND SEA is the point. Everything in this period moves on it —
+   the Mōri fleets, the Sakai trade, the guns going north from Tanegashima.
+   It has to be water and it has to read as enclosed.
+   ===================================================================== */
+
+/* ---- the four landmasses, hoisted so the territory layer can clip to them ---- */
+/* ---- HONSHŪ. The long curved spine, Shimonoseki in the south-west to
+   Tsugaru in the north-east, with the Pacific side and the Japan Sea side
+   walked separately. ---- */
+const WA_HONSHU=[
+  [130.95,33.95],[131.5,34.35],[132.3,34.35],[133.2,34.35],[134.2,34.35],[134.8,34.25],
+  [135.4,34.55],[135.9,34.35],[136.5,34.30],[136.9,34.60],[137.5,34.60],[138.2,34.60],
+  [138.8,34.65],[139.2,34.95],[139.7,35.30],[140.3,35.15],[140.85,35.75],[141.0,36.35],
+  [140.95,37.10],[141.2,38.30],[141.5,39.20],[141.8,39.90],[141.5,40.55],[141.0,41.20],
+  [140.5,41.45],[140.2,40.90],[139.9,40.20],[139.85,39.50],[139.7,38.80],[139.4,38.10],
+  [138.9,37.60],[138.2,37.15],[137.4,36.85],[136.9,37.20],[136.7,36.60],[136.2,36.30],
+  [135.9,35.75],[135.3,35.55],[134.6,35.55],[133.8,35.55],[133.0,35.45],[132.4,35.35],
+  [131.6,34.75],[131.0,34.40],
+];
+/* ---- KYŪSHŪ ---- */
+const WA_KYUSHU=[
+  [130.9,33.85],[131.3,33.65],[131.7,33.30],[131.7,32.85],[131.5,32.30],[131.4,31.60],
+  [131.0,31.35],[130.7,31.20],[130.3,31.30],[130.2,31.85],[129.9,32.35],[129.6,32.75],
+  [129.5,33.25],[129.9,33.55],[130.4,33.85],
+];
+/* ---- SHIKOKU ---- */
+const WA_SHIKOKU=[
+  [134.7,34.20],[134.3,33.95],[134.2,33.55],[133.6,33.45],[133.0,33.25],[132.7,33.00],
+  [132.4,33.30],[132.5,33.75],[133.2,34.05],[133.9,34.25],
+];
+/* ---- EZO. Not Japan. Drawn cool and pale and left mostly blank. ---- */
+const WA_EZO=[
+  [140.0,41.50],[140.7,41.75],[141.5,42.30],[142.0,42.60],[143.2,42.30],[144.4,42.95],
+  [145.3,43.30],[145.0,43.90],[144.3,44.30],[143.0,44.35],[141.8,45.15],[141.6,45.45],
+  [141.3,44.60],[140.5,43.30],[140.3,42.30],
+];
+
+/* =====================================================================
+   THE PATCHWORK — territory by colour, and a border where houses meet
+   ---------------------------------------------------------------------
+   A political fill needs province OUTLINES, and nobody has ever hand-typed
+   sixty-eight Japanese province polygons into a game. So the sheet builds
+   them: every point of land is assigned to whichever provincial seat is
+   nearest to it, which is very close to how the kuni actually divided —
+   they were drainage basins around a seat, separated by ridge lines that
+   fall exactly halfway between two valleys.
+
+   The result is coloured by the HOUSE that holds the province, not by the
+   province, so the Mōri block reads as one violet mass across three kuni
+   and the Kansai reads as the shattered mess it was. A darker rule is cut
+   wherever two different houses meet, and a fainter one where two provinces
+   of the SAME house meet, which is the distinction a real sheet draws.
+
+   It is built once into an offscreen buffer and then blitted, because the
+   map redraws every frame and a nearest-seat pass over 25,000 cells is not
+   something to do sixty times a second.
+   ===================================================================== */
+let _waTerrBuf=null;
+function waTerritory(){
+  if(_waTerrBuf) return _waTerrBuf;
+  try{
+    const W=480,H=216,CELL=2;
+    const cv=document.createElement('canvas'); cv.width=W; cv.height=H;
+    const b=cv.getContext('2d');
+    // 1. the land mask, drawn solid so we can read it back once
+    const poly=(pts)=>{ b.beginPath(); const p0=lonlatW(pts[0][0],pts[0][1]); b.moveTo(p0[0],p0[1]);
+      for(let k=1;k<pts.length;k++){ const p=lonlatW(pts[k][0],pts[k][1]); b.lineTo(p[0],p[1]); }
+      b.closePath(); b.fill(); };
+    b.fillStyle='#fff';
+    [WA_HONSHU,WA_KYUSHU,WA_SHIKOKU,WA_EZO].forEach(poly);
+    // Tanegashima and Tsushima are real islands and have to be their own patches
+    [[130.99,30.73,3.0],[129.29,34.20,2.6]].forEach(o=>{ const p=lonlatW(o[0],o[1]);
+      b.beginPath(); b.ellipse(p[0],p[1],o[2]*0.55,o[2],0,0,6.2832); b.fill(); });
+    const mask=b.getImageData(0,0,W,H).data;
+    b.clearRect(0,0,W,H);
+    // 2. the seats, in projected pixels
+    const seats=REGIONS_WA.map(r=>{ const p=lonlatW(r.real[0],r.real[1]);
+      return {id:r.id, clan:r.clan, x:p[0], y:p[1]}; });
+    const GW=Math.ceil(W/CELL), GH=Math.ceil(H/CELL);
+    const own=new Int16Array(GW*GH).fill(-1);
+    for(let gy=0;gy<GH;gy++) for(let gx=0;gx<GW;gx++){
+      const px=gx*CELL+CELL/2, py=gy*CELL+CELL/2;
+      const mi=((py|0)*W+(px|0))*4+3;
+      if(mask[mi]<128) continue;                       // sea. no province owns water.
+      let best=-1, bd=1e9;
+      for(let k=0;k<seats.length;k++){
+        const dx=seats[k].x-px, dy=seats[k].y-py, d=dx*dx+dy*dy;
+        if(d<bd){ bd=d; best=k; } }
+      own[gy*GW+gx]=best;
+    }
+    // 3. the wash
+    for(let gy=0;gy<GH;gy++) for(let gx=0;gx<GW;gx++){
+      const o=own[gy*GW+gx]; if(o<0) continue;
+      const C=CLANS_WA[seats[o].clan];
+      b.fillStyle=C? C.col : '#8a8a8a';
+      b.globalAlpha=0.50; b.fillRect(gx*CELL,gy*CELL,CELL,CELL);
+    }
+    b.globalAlpha=1;
+    // 4. the rules. Between two HOUSES it is a hard dark line; between two
+    //    provinces of the same house it is a hairline.
+    for(let gy=0;gy<GH;gy++) for(let gx=0;gx<GW;gx++){
+      const o=own[gy*GW+gx]; if(o<0) continue;
+      [[1,0],[0,1]].forEach(d=>{
+        const nx=gx+d[0], ny=gy+d[1]; if(nx>=GW||ny>=GH) return;
+        const n=own[ny*GW+nx];
+        if(n<0 || n===o) return;
+        const sameHouse = seats[n].clan===seats[o].clan;
+        b.fillStyle = sameHouse? 'rgba(90,74,48,0.28)' : 'rgba(52,36,18,0.72)';
+        const th = sameHouse? 1 : 1.4;
+        if(d[0]) b.fillRect(gx*CELL+CELL-th/2, gy*CELL, th, CELL);
+        else     b.fillRect(gx*CELL, gy*CELL+CELL-th/2, CELL, th);
+      });
+    }
+    /* 5. AND WHERE EACH HOUSE'S GROUND ACTUALLY IS. The crests were placed
+       by a hand-typed pixel nudge off the seat, which put the Murakami and
+       the Chōsokabe crests out in the Inland Sea. The patchwork already
+       knows exactly which cells belong to whom, so the crest goes at the
+       centre of mass of the land the house holds — always on its own dirt,
+       and always in the middle of the biggest part of it. */
+    const acc={};
+    for(let gy=0;gy<GH;gy++) for(let gx=0;gx<GW;gx++){
+      const o=own[gy*GW+gx]; if(o<0) continue;
+      const cid=seats[o].clan; if(!cid) continue;
+      const a=acc[cid]||(acc[cid]={n:0,x:0,y:0});
+      a.n++; a.x+=gx*CELL+CELL/2; a.y+=gy*CELL+CELL/2;
+    }
+    for(const cid in acc){ const a=acc[cid];
+      WA_CREST_AT[cid]={ x:a.x/a.n, y:a.y/a.n, cells:a.n }; }
+    /* a centroid can still fall in a bay when a house holds two lobes
+       (Mōri: Aki, Nagato and Iwami wrap the west end). Snap it to the
+       nearest cell the house actually owns. */
+    for(const cid in WA_CREST_AT){ const t=WA_CREST_AT[cid];
+      let bd=1e9, bx=t.x, by=t.y;
+      for(let gy=0;gy<GH;gy++) for(let gx=0;gx<GW;gx++){
+        const o=own[gy*GW+gx]; if(o<0||seats[o].clan!==cid) continue;
+        const px=gx*CELL+CELL/2, py=gy*CELL+CELL/2;
+        const d=(px-t.x)*(px-t.x)+(py-t.y)*(py-t.y);
+        if(d<bd){ bd=d; bx=px; by=py; } }
+      t.x=bx; t.y=by;
+    }
+    _waTerrBuf=cv; return cv;
+  }catch(e){ return null; }
+}
+const WA_CREST_AT={};
+/* the crest of every house, sitting on the land it holds */
+function drawWaCrests(c){
+  waTerritory();                                  // fills WA_CREST_AT
+  for(const id in CLANS_WA){
+    const C=CLANS_WA[id], at=WA_CREST_AT[id];
+    let x,y;
+    if(at){ x=at.x; y=at.y; }
+    else { const seat=REGION_WA_BY_ID[C.seat]; if(!seat) continue;
+           const p=lonlatW(seat.real[0],seat.real[1]); x=p[0]; y=p[1]; }
+    /* a house holding two provinces gets a slightly larger seal than one
+       holding a single island — the sheet says at a glance who is big */
+    const big = at? Math.min(1.25, 0.86+at.cells/2600) : 0.9;
+    const R=5.3*big;
+    c.save();
+    c.beginPath(); c.arc(x,y,R,0,6.2832);
+    c.fillStyle='rgba(250,244,224,0.93)'; c.fill();
+    c.lineWidth=1.0; c.strokeStyle=C.col; c.stroke();
+    drawMon(c, x, y, R*0.68, C.mon, C.col, 'rgba(250,244,224,0.97)');
+    c.restore();
+  }
+}
+
+/* =====================================================================
+   WHERE THE LABELS GO — six seats inside two degrees
+   ---------------------------------------------------------------------
+   The Roman sheet gets away with pinning a label at the province seat
+   because the provinces are the size of countries. Japan is not: Yamashiro,
+   Settsu, Izumi, Ōmi, Kii and Harima all sit within about seventy miles of
+   each other, and at this scale their labels are one illegible stack.
+
+   So the LABEL is allowed to move and the PROVINCE is not. The pins run a
+   short relaxation — overlapping pairs push apart along whichever axis they
+   overlap least, everything is pulled weakly back toward its true seat —
+   and the canvas then draws a hairline and an ink dot from each resolved
+   label to the real coordinate. It is exactly what a draughtsman does with
+   a crowded corner of a chart.
+   ===================================================================== */
+const WA_PIN_POS={};
+function layoutWaPins(){
+  const N=REGIONS_WA.map(r=>{
+    const p=lonlatW(r.real[0],r.real[1]);
+    const lab=r.id.length;
+    return { id:r.id, ax:p[0], ay:p[1], x:p[0], y:p[1],
+             hw:(lab*3.1+11)/2, hh:4.6 };
+  });
+  for(let it=0; it<700; it++){
+    /* the spring home DECAYS. Early on it keeps everything near its seat;
+       late on it lets the last few stubborn pairs finish separating, which
+       is the difference between five overlaps and none. */
+    const spring = 0.060 * Math.max(0.06, 1-it/560);
+    for(let i=0;i<N.length;i++) for(let j=i+1;j<N.length;j++){
+      const a=N[i], b=N[j];
+      const ox=(a.hw+b.hw+1.5)-Math.abs(a.x-b.x);
+      const oy=(a.hh+b.hh+1.2)-Math.abs(a.y-b.y);
+      if(ox<=0||oy<=0) continue;                       // not touching
+      if(oy<ox){ const s=(a.y<=b.y?-1:1)*oy*0.5; a.y+=s; b.y-=s; }
+      else     { const s=(a.x<=b.x?-1:1)*ox*0.5; a.x+=s; b.x-=s; }
+    }
+    // and a weak spring home, so nothing wanders off its own island
+    for(const n of N){ n.x += (n.ax-n.x)*spring; n.y += (n.ay-n.y)*spring;
+      n.x=Math.max(n.hw+2, Math.min(480-n.hw-2, n.x));
+      n.y=Math.max(n.hh+5, Math.min(216-n.hh-4, n.y)); }
+  }
+  N.forEach(n=>{ WA_PIN_POS[n.id]={ x:n.x, y:n.y, ax:n.ax, ay:n.ay,
+    pct:{ x:+(n.x/480*100).toFixed(2), y:+(n.y/216*100).toFixed(2) } }; });
+  return WA_PIN_POS;
+}
+function drawWaLeaders(c){
+  if(!WA_PIN_POS.Yamashiro) layoutWaPins();
+  c.save();
+  for(const id in WA_PIN_POS){
+    const P=WA_PIN_POS[id], R=REGION_WA_BY_ID[id]; if(!R) continue;
+    const C=R.clan? CLANS_WA[R.clan] : null;
+    const d=Math.hypot(P.x-P.ax, P.y-P.ay);
+    if(d>3.5){
+      c.beginPath(); c.moveTo(P.ax,P.ay); c.lineTo(P.x,P.y);
+      c.lineWidth=0.7; c.strokeStyle='rgba(60,42,22,0.55)'; c.setLineDash([2,1.6]);
+      c.stroke(); c.setLineDash([]);
+    }
+    // the ink dot at the true seat, ringed in the colour of whoever holds it
+    c.beginPath(); c.arc(P.ax,P.ay,2.2,0,6.2832);
+    c.fillStyle=C? C.col : '#5a4028'; c.fill();
+    c.lineWidth=0.8; c.strokeStyle='rgba(250,244,226,0.9)'; c.stroke();
+  }
+  c.restore();
+}
+function drawMapCanvasWa(){
+  mctx.setTransform(2,0,0,2,0,0);
+  const w=480,h=216;
+  mctx.imageSmoothingEnabled=true;
+  const Q=lonlatW;
+  const path=(pts,close)=>{ mctx.beginPath(); const p0=Q(pts[0][0],pts[0][1]); mctx.moveTo(p0[0],p0[1]);
+    for(let k=1;k<pts.length;k++){ const p=Q(pts[k][0],pts[k][1]); mctx.lineTo(p[0],p[1]); }
+    if(close!==false) mctx.closePath(); };
+  const fill=(pts,c)=>{ path(pts); mctx.fillStyle=c; mctx.fill(); };
+  const line=(pts,c,lw,dash)=>{ path(pts,false); mctx.lineWidth=lw||1; mctx.strokeStyle=c;
+    mctx.lineJoin='round'; mctx.lineCap='round';
+    if(dash) mctx.setLineDash(dash); mctx.stroke(); mctx.setLineDash([]); };
+  const label=(t,lon,lat,c,fs,ls)=>{ const p=Q(lon,lat); mctx.fillStyle=c; mctx.font=fs; mctx.textAlign='center';
+    if(ls){ mctx.save(); mctx.translate(p[0],p[1]); let x=-(t.length-1)*ls/2;
+      for(const ch of t){ mctx.fillText(ch,x,0); x+=ls; } mctx.restore(); }
+    else mctx.fillText(t,p[0],p[1]); };
+
+  // ===== THE SEA =====
+  /* THE SEA ON A JAPANESE SCREEN MAP IS NOT ATLAS-BLUE. It is a pale wash
+     over the same paper the land is on — measured, the first cut came out
+     blue-dominant (R157 B164), which is the exact look the plate exists to
+     avoid. */
+  /* THE SEA HAS TO BE DARKER THAN THE LAND. First cut put a pale wash on
+     the water and a pale wash on the country and the coastline disappeared
+     entirely under the plate. This is still not atlas-blue — it is a grey
+     sea-green, the colour of ink laid over paper — but it is unmistakably
+     the wet part. */
+  for(let i=0;i<5;i++){ mctx.fillStyle=['#a8b6b2','#a2b1ae','#9caca9','#96a7a4','#90a2a0'][i];
+    mctx.fillRect(0,i*(h/5),w,h/5+1); }
+  for(let i=0;i<150;i++){ mctx.fillStyle=(i%2?'rgba(120,142,140,.35)':'rgba(176,190,184,.30)');
+    mctx.fillRect((i*61)%w,(i*83)%h,5,1); }
+  const LAND='#f3ecd6', COAST='rgba(44,58,50,.78)';
+
+  const HONSHU=WA_HONSHU, KYUSHU=WA_KYUSHU, SHIKOKU=WA_SHIKOKU, EZO=WA_EZO;
+  fill(HONSHU, LAND); fill(KYUSHU, LAND); fill(SHIKOKU, LAND);
+  /* EZO IS DRAWN AS ANOTHER COUNTRY, because in this century it is one:
+     a cold grey ground, no province colour, and an open coast. */
+  fill(EZO, '#c6ccc4');
+  /* THE PATCHWORK GOES DOWN NEXT — see waTerritory() */
+  { const T=waTerritory(); if(T) mctx.drawImage(T,0,0); }
+  [HONSHU,KYUSHU,SHIKOKU,EZO].forEach(pp=>{ path(pp); mctx.lineWidth=1.1; mctx.strokeStyle=COAST; mctx.stroke(); });
+  coastHatch(mctx, Q, HONSHU, 1, 5, 2.6);
+  coastHatch(mctx, Q, KYUSHU, 1, 5, 2.4);
+
+  /* ---- THE SPINE OF MOUNTAINS. Japan is 70% mountain and the map has to
+     say so — it is why the provinces are the shape they are. ---- */
+  const hump=(lon,lat,sz)=>{ const p=Q(lon,lat);
+    mctx.fillStyle='rgba(120,130,110,.55)';
+    mctx.beginPath(); mctx.moveTo(p[0]-sz,p[1]); mctx.lineTo(p[0],p[1]-sz*1.15); mctx.lineTo(p[0]+sz,p[1]); mctx.closePath(); mctx.fill();
+    mctx.fillStyle='rgba(250,250,250,.8)';
+    mctx.beginPath(); mctx.moveTo(p[0]-sz*0.30,p[1]-sz*0.62); mctx.lineTo(p[0],p[1]-sz*1.15); mctx.lineTo(p[0]+sz*0.30,p[1]-sz*0.62); mctx.closePath(); mctx.fill(); };
+  [[138.0,36.3,4.5],[137.3,36.1,3.8],[138.7,35.9,4.2],[139.4,36.6,3.4],[136.5,35.9,3.2],
+   [140.2,39.3,3.4],[140.6,38.4,3.0],[133.4,35.0,2.8],[131.9,33.1,3.0],[133.5,33.8,2.8]]
+   .forEach(m=>hump(m[0],m[1],m[2]));
+  { const p=Q(138.73,35.36);                                        // Fuji, larger and named
+    mctx.fillStyle='rgba(110,120,130,.62)';
+    mctx.beginPath(); mctx.moveTo(p[0]-8,p[1]); mctx.lineTo(p[0],p[1]-10); mctx.lineTo(p[0]+8,p[1]); mctx.closePath(); mctx.fill();
+    mctx.fillStyle='rgba(255,255,255,.92)';
+    mctx.beginPath(); mctx.moveTo(p[0]-3.4,p[1]-5.6); mctx.lineTo(p[0],p[1]-10); mctx.lineTo(p[0]+3.4,p[1]-5.6); mctx.closePath(); mctx.fill();
+    mctx.fillStyle='rgba(70,60,40,.85)'; mctx.font='italic 5px Georgia,serif'; mctx.textAlign='center';
+    mctx.fillText('FVSI', p[0], p[1]+7); }
+
+  // ---- THE INLAND SEA, named, because everything moves on it ----
+  label('SETO — THE INLAND SEA', 133.5,33.95, 'rgba(30,58,78,.80)', 'italic 4.5px Georgia,serif');
+
+  // ---- THE NANBAN SEA ROAD: where the outside world actually arrives ----
+  line([[128.4,30.6],[129.6,31.2],[130.5,31.4],[131.0,30.75],[129.9,32.4],[129.6,33.1],
+        [130.9,33.9],[132.5,34.3],[134.5,34.4],[135.5,34.6]],
+       'rgba(150,60,50,.72)', 1.2, [5,4]);
+  label('THE NANBAN ROAD', 130.2,30.9, 'rgba(150,60,50,.9)', 'italic 5px Georgia,serif');
+
+  // ---- and the one that matters most: silver going OUT ----
+  line([[132.44,35.11],[133.6,34.6],[134.6,34.45],[135.47,34.57]], 'rgba(120,120,140,.8)', 1.4, [3,3]);
+  label('SILVER OUT', 132.9,35.6, 'rgba(80,80,104,.95)', 'italic 5px Georgia,serif');
+
+  // ---- the country names, in the manner of the sheet ----
+  label('N I P P O N', 136.2,38.4, 'rgba(78,58,28,.36)', 'bold 11px Georgia,serif', 9);
+  label('EZO', 143.0,43.9, 'rgba(70,84,84,.75)', 'italic 7px Georgia,serif', 5);
+  label('— the Ainu hold this —', 143.2,43.1, 'rgba(70,84,84,.65)', 'italic 4.5px Georgia,serif');
+  label('the age of the country at war', 141.6,35.6, 'rgba(120,60,50,.66)', 'italic 5px Georgia,serif');
+
+  /* ---- THE LEADER LINES. The Kansai has six provincial seats inside two
+     degrees of longitude and the labels sat on top of each other in a
+     stack. The label is now allowed to move; a hairline and an ink dot
+     keep it tied to where the province ACTUALLY is. ---- */
+  drawWaLeaders(mctx);
+  /* ---- THE CRESTS. The mon on the land it holds. ---- */
+  drawWaCrests(mctx);
+  /* ---- AND THE GOLD-CLOUD PLATE. A Japanese screen map does not carry a
+     wind rose and a Latin cartouche; it carries SUYARIGASUMI — the banded
+     gold clouds that mask what the picture is not showing — a vermilion
+     seal, and a cartouche in a hanging-scroll frame. ---- */
+  agePlateWa(mctx, w, h);
+}
+/* the gold-cloud treatment: the Japanese answer to the engraved plate */
+function agePlateWa(c, w, h){
+  c.save();
+  // the paper: warmer and yellower than vellum, and it is PAPER, not skin
+  /* MEASURED AND CUT BACK. At 0.44 the wash was heavier than the thing it
+     was ageing: twenty-two territory colours went under it and the sheet
+     came back as one flat sheet of butter. A plate tints the picture; it
+     does not replace it. */
+  { const g=c.createLinearGradient(0,0,w,h);
+    g.addColorStop(0,'rgba(238,214,158,0.19)');
+    g.addColorStop(0.55,'rgba(228,198,140,0.13)');
+    g.addColorStop(1,'rgba(206,172,116,0.22)');
+    c.fillStyle=g; c.fillRect(0,0,w,h); }
+  c.globalAlpha=0.030; c.fillStyle='#7a5a28';
+  for(let y=0;y<h;y+=2) c.fillRect(0,y,w,1);            // the laid lines of washi
+  c.globalAlpha=1;
+  /* SUYARIGASUMI — the banded clouds. They are not weather; they are a
+     convention for "the picture stops here", and they are gold. */
+  const band=(x0,y0,wd,ht,a)=>{
+    const g=c.createLinearGradient(x0,y0,x0+wd,y0);
+    g.addColorStop(0,'rgba(226,186,86,0)');
+    g.addColorStop(0.18,'rgba(232,196,102,'+a+')');
+    g.addColorStop(0.82,'rgba(232,196,102,'+a+')');
+    g.addColorStop(1,'rgba(226,186,86,0)');
+    c.fillStyle=g; c.fillRect(x0,y0,wd,ht);
+    c.fillStyle='rgba(198,150,54,'+(a*0.5)+')'; c.fillRect(x0+wd*0.10,y0+ht-1,wd*0.80,1);
+  };
+  /* THE CLOUDS MASK THE MARGIN, NOT THE COUNTRY. Suyarigasumi is a device
+     for "the picture stops here" — run across the middle of the sheet it
+     just fogs Honshū. These are pushed to the top and bottom edges. */
+  band(-30, 3,  250, 8,  0.50); band(170, 14, 220, 6, 0.34);
+  band(-20, 26, 130, 5,  0.24);
+  band(250, 186, 260, 9, 0.46); band(40, 202, 250, 8, 0.40);
+  band(300, 40, 220, 5, 0.20);
+  // gold flecks — kirikane, cut gold leaf scattered on the ground
+  for(let i=0;i<70;i++){ const fx=(i*97)%w, fy=(i*53)%h;
+    c.globalAlpha=0.07+((i*7)%6)*0.02; c.fillStyle='#e8c34a';
+    c.fillRect(fx, fy, 1+((i*3)%2), 1); }
+  c.globalAlpha=1;
+  /* THE CARTOUCHE, as a hanging strip rather than a European frame */
+  /* WITH THE SHEET TURNED, the whole empty half is the Sea of Japan across
+     the top. The seal takes the corner and the title strip hangs beside it,
+     which is where a Japanese plate puts them anyway. Neither may sit at
+     the bottom-left: that is Satsuma and Tanegashima, and the first cut put
+     the cartouche flat on top of both. */
+  { const bx=152, by=40, bw=104, bh=32;
+    c.fillStyle='rgba(242,226,190,0.90)'; c.fillRect(bx,by,bw,bh);
+    c.strokeStyle='rgba(70,50,24,0.85)'; c.lineWidth=1; c.strokeRect(bx+0.5,by+0.5,bw-1,bh-1);
+    c.fillStyle='rgba(150,40,32,0.9)'; c.fillRect(bx,by,bw,2);
+    c.textAlign='center'; c.fillStyle='rgba(50,34,14,0.95)';
+    c.font='bold 10px Georgia,serif'; c.fillText('日本國圖', bx+bw/2, by+15);
+    c.font='italic 5px Georgia,serif'; c.fillStyle='rgba(110,74,30,0.9)';
+    c.fillText('A MAP OF THE COUNTRY OF NIPPON', bx+bw/2, by+25); }
+  /* THE SEAL — vermilion, square, top right, as a Japanese plate carries */
+  { const sx=12, sy=10, S2=20;
+    c.fillStyle='rgba(176,42,32,0.86)'; c.fillRect(sx,sy,S2,S2);
+    c.fillStyle='rgba(242,226,190,0.92)';
+    c.fillRect(sx+3,sy+3,4,14); c.fillRect(sx+3,sy+3,14,3);
+    c.fillRect(sx+9,sy+8,8,3);  c.fillRect(sx+13,sy+8,4,9);
+    c.fillRect(sx+3,sy+14,10,3); }
+  // and the burnt rim
+  { const g=c.createRadialGradient(w*0.5,h*0.48,h*0.42, w*0.5,h*0.48,h*1.02);
+    g.addColorStop(0,'rgba(60,40,12,0)');
+    g.addColorStop(0.78,'rgba(60,40,12,0.05)');
+    g.addColorStop(1,'rgba(48,28,8,0.30)');
+    c.fillStyle=g; c.fillRect(0,0,w,h); }
+  c.fillStyle='rgba(54,32,10,0.5)';
+  for(let x=0;x<w;x+=2){ const d=1+((x*5)%4); c.fillRect(x,0,2,d); c.fillRect(x,h-d,2,d); }
+  for(let y=0;y<h;y+=2){ const d=1+((y*7)%4); c.fillRect(0,y,d,2); c.fillRect(w-d,y,d,2); }
+  c.restore(); c.textAlign='left';
 }
 /* =====================================================================
    THE PLATE — what makes a map look like a MAP of its own century
@@ -29275,7 +30233,13 @@ window.__SS = {
   ARENA_THEATRES, THEATRE_OF, theatreOf, drawArena, startFight, REGIONS_EAST,
   CURRENCY, CURRENCY_OF, currencyHere, coinWord, coinShortStr, drawCoinIcon, coinIconURI,
   drawGearIcon, drawWeapon2, drawCardPortrait, gearOf, refreshStatbar, CURRENCY_REGION,
-  agePlate, coastHatch, drawMapCanvasEast,
+  agePlate, coastHatch, drawMapCanvasEast, drawMapCanvasWa, agePlateWa,
+  REGIONS_WA, REGION_WA_BY_ID, MAP_WA_PROJ, lonlatW,
+  CLANS_WA, CLAN_OF_WA, clanOf, clanIdOf, clanHolds, drawMon,
+  waTerritory, drawWaCrests, drawWaLeaders, layoutWaPins, WA_PIN_POS, WA_CREST_AT,
+  WA_HONSHU, WA_KYUSHU, WA_SHIKOKU, WA_EZO, HUB_WA,
+  canAttemptCrossing, crossingBlockReason, beginCrossing, openCrossing, openCrossingLog,
+  CROSSING_LOG, CROSSING_ARRIVAL, worldOfRegion,
   SILK_LEGS, SILK_STAKE_CAP, silkLeg, silkOpen, silkStake, silkOdds, silkRun, openSilk,
   HUB_EAST, HUB_WEST_LABEL, applyHub, buildRegions, travelCost,
   HALL_LIGHT, litFigure, litWife, litHusband, litBufs,
