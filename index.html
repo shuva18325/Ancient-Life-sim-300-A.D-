@@ -1119,6 +1119,37 @@ const BOWS=[
   {id:'ozutsu',      name:'Ōzutsu (Hand Cannon)', cost:1700, base:178, cd:240, stamina:13, speed:14,
      wa:true, gun:true, wet:0.66, dry:0.09, train:0.005,
      desc:'A wall-gun fired off a rest or a rampart. Ōtomo Sōrin imported the big ones and called his 国崩し — the country-destroyer. Slower again, and it will knock a man off a horse through the horse.'},
+  /* =====================================================================
+     THE REST OF THE POWDER — and the honest note about rifles
+     ---------------------------------------------------------------------
+     There are no rifles here and there cannot be. Rifling exists in Europe
+     by this date but does not reach Japan in this century at all; Japanese
+     barrels stay smoothbore right through to the nineteenth. What Japan
+     DOES develop, and develops further than anyone, is the specialised
+     smoothbore — a short one you can fire off a horse, a very long heavy one
+     for shooting accurately through a castle loophole, and a whole family of
+     bore sizes with their own names. Those are the real weapons and they are
+     what is here.
+     ===================================================================== */
+  {id:'bajozutsu',   name:'Bajōzutsu (Horse Pistol)', cost:820, base:74, cd:96, stamina:4, speed:16,
+     wa:true, gun:true, wet:0.58, dry:0.05, train:0.010,
+     desc:'馬上筒 — a matchlock cut down to about two feet so a mounted man can hold it in one hand and the reins in the other. Less powder, less punch, and you can get it off again before he closes.'},
+  {id:'hazamazutsu', name:'Hazama-zutsu (Loophole Gun)', cost:1500, base:146, cd:200, stamina:9, speed:19,
+     wa:true, gun:true, wet:0.60, dry:0.04, train:0.020,
+     desc:'狭間筒 — a long, heavy, thick-walled barrel meant to be rested in a castle loophole and aimed at ONE man. It is not rifled — nothing in this country is — but the length and the weight do most of what rifling would, and this is the piece a marksman asks for.'},
+  {id:'sanganju',    name:'Sanganjū (Three-Eyed Gun)', cost:640, base:62, cd:34, stamina:5, speed:13,
+     wa:true, gun:true, wet:0.64, dry:0.11, train:0.008, burst:3, burstCd:210,
+     desc:'三眼銃 — a CHINESE weapon: three short barrels welded round one shaft, fired one after another off a single match, and then swung as a club. Crude, unreliable, and it puts three balls downrange while a matchlock is still ramming the first.'},
+  {id:'bohiya',      name:'Bōhiya (Fire Arrow)', cost:700, base:56, cd:170, stamina:7, speed:12,
+     wa:true, gun:true, fire:true, wet:0.70, dry:0.08, train:0.010,
+     desc:'棒火矢 — a heavy incendiary bolt with a wrapped, pitched head, shot out of a wide-bore tube. It is a SHIP-BURNER: the Murakami and the Mōri fleets used them, and what it does to a man is incidental to what it does to a hull.'},
+  /* ---- AND THE THROWN POWDER. Both of these are ceramic. ---- */
+  {id:'horoku',      name:'Horokubiya (Clay Bomb)', cost:520, base:132, cd:120, stamina:9, speed:7,
+     wa:true, bomb:true, wet:0.34, dry:0.03, train:0.014, blast:34,
+     desc:'焙烙火矢 — a fired clay ball packed with powder and scrap, a fuse through the neck, thrown by hand or slung. The Murakami navy rained these onto Nobunaga\u2019s ships at Kizugawaguchi and burned the fleet to the waterline.'},
+  {id:'tetsuhau',    name:'Tetsuhau (Chinese Bomb)', cost:1250, base:176, cd:150, stamina:12, speed:6,
+     wa:true, bomb:true, wet:0.30, dry:0.05, train:0.012, blast:46,
+     desc:'てつはう — the Mongol-Chinese thrown bomb, and we have them: divers pulled the ceramic shells out of the wreck at Takashima, still packed with iron scrap. Two and a half centuries old by now, imported by way of the coast, and it still takes a man\u2019s legs off.'},
 ];
 function bowOf(id){ return BOWS.find(b=>b.id===id)||null; }
 /* =====================================================================
@@ -1139,7 +1170,16 @@ function gearStockedHere(g, slot){
   try{ if(G && G.owned && G.owned[slot] && G.owned[slot].indexOf(g.id)>=0) return true; }catch(e){}
   return false;
 }
-function isGun(id){ const b=bowOf(id); return !!(b&&b.gun); }
+function isGun(id){ const b=bowOf(id); return !!(b&&(b.gun||b.bomb)); }
+/* THE THREE-EYED GUN fires three and then has to be reloaded properly, which
+   is the only reason anybody put up with how bad it was. */
+function rangedCooldown(bw, f){
+  if(!bw) return PILUM.cd;
+  if(!bw.burst) return bw.cd;
+  f._burst=(f._burst||0)+1;
+  if(f._burst>=bw.burst){ f._burst=0; return bw.burstCd; }
+  return bw.cd;
+}
 /* =====================================================================
    THE WEATHER — which exists in this game only because the gun does
    ---------------------------------------------------------------------
@@ -8682,8 +8722,16 @@ function drawThrowArm(f,C,seg){
   px(0,-2,5,4, seg?C.metal:C.skin); px(0,-2,5,1, seg?C.metalHi:C.skinHi);   // forearm
   ctx.translate(5,0); px(0,-2,3,4,C.skin); px(0,-2,3,1,C.skinHi);            // hand
   ctx.translate(3,0);
-  // the pilum stays in the fist through the wind-up and the first frames of release
-  if(f.charging>0 || f.throwT>4){ ctx.save(); ctx.rotate(-0.15); drawHeldPilum(f.gear.weapon.gold); ctx.restore(); }
+  /* WHAT IS ACTUALLY IN THE FIST. This drew a Roman javelin no matter what
+     was slung — so a man aiming a matchlock, a horse pistol or a clay bomb
+     was holding a pilum in every frame of the wind-up. */
+  if(f.charging>0 || f.throwT>4){ ctx.save(); ctx.rotate(-0.15);
+    const _bw = (f.chargeData && f.chargeData.bw) || (f.isPlayer && G.bow? bowOf(G.bow) : null);
+    if(_bw && _bw.bomb) drawHeldBomb(_bw);
+    else if(_bw && _bw.gun) drawHeldGun(_bw);
+    else if(_bw) drawHeldBow(_bw);
+    else drawHeldPilum(f.gear.weapon.gold);
+    ctx.restore(); }
   // a charge glimmer building at the head
   if(f.charging>0 && cp>0.4){ ctx.save(); ctx.rotate(-0.15); ctx.globalAlpha=cp; px(16,-1,2,2,'#fff'); px(17,-2,1,1,'#ffe9a0'); ctx.globalAlpha=1; ctx.restore(); }
   ctx.restore();
@@ -9302,11 +9350,11 @@ function releaseRanged(f){
       try{ sfx('deny'); }catch(e){}
       return;
     }
-    if(launchProjectile(f,{type: bw.gun?'ball':'arrow', base:bw.base, speed:bw.speed,
-        cd:bw.cd, stamina:bw.stamina, gold:false, W:bw})){
-      try{ sfx(bw.gun?'hit':'swing'); }catch(e){}
-      if(bw.gun) gunSmoke(f);
-    } }
+    const _ty = bw.bomb? 'bomb' : bw.fire? 'fire' : bw.gun? 'ball' : 'arrow';
+    if(launchProjectile(f,{type:_ty, base:bw.base, speed:bw.speed,
+        cd:rangedCooldown(bw,f), stamina:bw.stamina, gold:false, W:bw})){
+      try{ sfx((bw.gun||bw.bomb)?'hit':'swing'); }catch(e){}
+      if(bw.gun && !bw.bomb) gunSmoke(f); } }
   else if((G.pila|0)>0){ if(launchProjectile(f,{type:'pilum', base:PILUM.base, speed:PILUM.speed, cd:PILUM.cd, stamina:PILUM.stamina, gold:f.gear.weapon.gold})){ G.pila--; sfx('swing'); } }
 }
 function launchProjectile(f, {type, base, speed, cd, stamina, gold, W}){
@@ -9317,9 +9365,55 @@ function launchProjectile(f, {type, base, speed, cd, stamina, gold, W}){
   const targetY = zone==='head'? f.y-52 : zone==='body'? f.y-32 : f.y-12;
   const sx=f.x+f.facing*12, sy=f.y-38, foe=FT.foe;
   const frames=Math.max(6, Math.abs(foe.x-sx)/speed);        // aim straight to the chosen height (no droop)
-  FT.pila.push({ x:sx, y:sy, vx:f.facing*speed, vy:(targetY-sy)/frames,
+  /* A BOMB IS THROWN, NOT SHOT, and it is THROWN AT SOMETHING. A fixed lob
+     sailed clean over the man's head and came down a hundred and sixty
+     pixels behind him — correct physics, useless weapon. The arc is solved
+     for the distance so it lands ON him: given the horizontal speed, the
+     time to cover the gap is fixed, and the launch angle follows from
+     wanting to be at his feet when that time is up. Throw it at someone
+     standing on top of you and it goes almost straight up, which is exactly
+     what you deserve. */
+  const lob = (type==='bomb');
+  let lobVy=0;
+  if(lob){
+    const G_=0.13, D=Math.max(24, Math.abs(foe.x-sx));
+    const T=D/speed, drop=(GROUND-8)-sy;
+    lobVy = clamp((drop - 0.5*G_*T*T)/T, -7.5, -1.2);   // always an arc, never a flat throw
+  }
+  FT.pila.push({ x:sx, y:sy, vx:f.facing*speed, vy: lob? lobVy : (targetY-sy)/frames,
+    grav: lob? 0.13 : 0, spin: lob? 0 : undefined,
     facing:f.facing, aim:zone, type, base, gold:!!gold, W:W||null, hit:false, life:130 });
   return true;
+}
+/* the pot in the air, tumbling, with the fuse burning down as it goes */
+function drawFlyingBomb(pj){
+  const c=ctx; const R = (pj.W&&pj.W.id==='tetsuhau')? 4.4 : 3.8;
+  c.save(); c.translate(pj.x,pj.y);
+  c.rotate((pj.life||0)*0.22*pj.facing);
+  c.fillStyle = (pj.W&&pj.W.id==='tetsuhau')? '#6a5a4a' : '#a8724a';
+  c.beginPath(); c.arc(0,0,R,0,6.2832); c.fill();
+  c.fillStyle = (pj.W&&pj.W.id==='tetsuhau')? '#8a7a68' : '#c8946a';
+  c.beginPath(); c.arc(-1,-1,R*0.5,0,6.2832); c.fill();
+  c.fillStyle='#5a4030'; c.fillRect(-R,-0.5,R*2,0.8);
+  c.fillStyle='#3a2a18'; c.fillRect(-0.7,-R-1.8,1.4,2);
+  c.fillStyle='#ff7a2a'; c.fillRect(-0.9,-R-2.8,1.8,1.2);
+  c.restore();
+  // and it throws sparks the whole way
+  if(FT.particles && (pj.life%2===0)) FT.particles.push({x:pj.x,y:pj.y,
+    vx:rnd(-0.7,0.7),vy:rnd(-0.5,0.5),life:rnd(6,14),c:pick(['#ffb43a','#ff7a2a']),spark:true,sz:1});
+}
+/* the fire-bolt: a heavy shaft with a burning wrapped head */
+function drawFireBolt(pj){
+  const c=ctx; c.save(); c.translate(pj.x,pj.y); c.rotate(Math.atan2(pj.vy,pj.vx));
+  c.fillStyle='#160e07'; c.fillRect(-9,-2.4,17,4.8);
+  c.fillStyle='#6a4a2a'; c.fillRect(-8,-1,13,2); c.fillStyle='#8a6238'; c.fillRect(-8,-1,13,0.7);
+  c.fillStyle='#3a2a18'; c.fillRect(4,-1.8,5,3.6);                        // the pitched, wrapped head
+  c.fillStyle='#ff7a2a'; c.fillRect(5,-2.6,4,1.2); c.fillRect(6,1.4,3,1.2);
+  c.fillStyle='#fff0b0'; c.fillRect(6.5,-2.4,1.6,0.9);
+  c.fillStyle='#4a3620'; c.fillRect(-9,-2.2,2,4.4);                       // fletching
+  c.restore();
+  if(FT.particles) FT.particles.push({x:pj.x-pj.vx*0.6,y:pj.y-pj.vy*0.6,
+    vx:rnd(-0.6,0.6),vy:rnd(-1.0,-0.1),life:rnd(8,18),c:pick(['#ffb43a','#ff7a2a','#8a8278'])});
 }
 /* a lead ball is a streak and a wake, not a shaft — you do not see it, you
    see where it has been */
@@ -9331,6 +9425,60 @@ function drawBall(pj){
   c.beginPath(); c.arc(pj.x,pj.y,1.6,0,6.2832); c.fill();
   c.fillStyle='#8a8a86'; c.beginPath(); c.arc(pj.x-0.4,pj.y-0.4,0.7,0,6.2832); c.fill();
   c.restore();
+}
+/* =====================================================================
+   THE BLAST — the only area weapon in the game, and it is ceramic
+   ---------------------------------------------------------------------
+   A horoku is a fired clay ball full of powder and scrap iron. The clay is
+   not a container, it is the AMMUNITION: it is what shreds. So the damage
+   falls off with distance, it does not care which way anybody is facing,
+   and it catches whoever threw it if he was fool enough to lob it short.
+   ===================================================================== */
+function blastAt(x, y, R, pj){
+  R=R||34;
+  if(typeof FT==='undefined'||!FT) return;
+  FT.flash=Math.min(1,(FT.flash||0)+0.9);
+  FT.shake=Math.min(14,(FT.shake||0)+12);
+  FT.hitstop=Math.max(FT.hitstop||0, 9);
+  try{ sfx('hit'); }catch(e){}
+  // the fireball, the smoke, and the shards of the pot itself
+  for(let i=0;i<34;i++) FT.particles.push({x:x+rnd(-5,5),y:y+rnd(-5,5),
+    vx:rnd(-4.5,4.5),vy:rnd(-5,1.5),life:rnd(10,26),c:pick(['#fff0b0','#ffb43a','#ff7a2a','#c8452a'])});
+  for(let i=0;i<18;i++) FT.particles.push({x:x+rnd(-4,4),y:y+rnd(-4,4),
+    vx:rnd(-2.4,2.4),vy:rnd(-2.6,-0.2),life:rnd(24,48),c:pick(['#8a8278','#a09888','#6a6458'])});
+  for(let i=0;i<14;i++) FT.particles.push({x,y,vx:rnd(-5,5),vy:rnd(-5,2),
+    life:rnd(14,30),c:pick(['#b06a44','#8a5232','#cf9a6a']),spark:true,sz:1});
+  if(FT.gunSmoke){ for(let i=0;i<20;i++) FT.gunSmoke.push({x:x+rnd(-8,8),y:y+rnd(-8,8),
+    vx:rnd(-1.4,1.4),vy:-0.3-Math.random()*0.5,r:2+Math.random()*4,life:40+Math.random()*40,max:80}); }
+  // and it hurts everyone standing in it, thrower included
+  [FT.p, FT.foe].forEach(t=>{
+    if(!t) return;
+    const d=Math.hypot(t.x-x, (t.y-26)-y);
+    if(d>R) return;
+    const falloff=1-(d/R)*0.72;
+    const base=(pj&&pj.base)? pj.base : 120;
+    let dmg=Math.round(rangedDamage(base,'body', pj? pj.W : null)*falloff);
+    /* ARMOUR IS NOT MUCH USE AGAINST A CLOUD OF SCRAP IRON — it comes from
+       every direction at once and finds the gaps. */
+    dmg=Math.max(1, Math.round(dmg*(1-clamp(t.gear.armor.armor*0.35,0,0.35))));
+    t.hp-=dmg; t.hurt=18;
+    t.vx += (t.x<x? -1:1)*7*falloff; t.vy-=4*falloff; t.onGround=false;
+    if(FT.dmgnums) dmgNumber(t.x, t.y-38, dmg, falloff>0.8);
+    bleed(t.x, t.y-26, 12, t.x<x? -1:1);
+    banner(t.x, t.y-62, falloff>0.8? '\u2739 BLAST' : 'SCRAP', '#ffb43a');
+  });
+}
+/* a man who has been hit with a fire-bolt keeps burning */
+function updateBurns(){
+  if(typeof FT==='undefined'||!FT) return;
+  [FT.p, FT.foe].forEach(t=>{
+    if(!t || !t.burn || t.burn<=0) return;
+    t.burn--;
+    if(t.burn%18===0){ t.hp-=2; t.hurt=Math.max(t.hurt,4);
+      if(FT.dmgnums) dmgNumber(t.x, t.y-42, 2, false); }
+    if(t.burn%3===0) FT.particles.push({x:t.x+rnd(-5,5),y:t.y-rnd(6,40),
+      vx:rnd(-0.5,0.5),vy:rnd(-1.6,-0.5),life:rnd(10,20),c:pick(['#ffb43a','#ff7a2a','#e8c34a'])});
+  });
 }
 /* black powder is DIRTY — a Sengoku gun line disappears behind its own
    smoke inside three volleys, which is a tactical fact and not decoration */
@@ -9373,8 +9521,25 @@ function updatePila(dt){
   const foe=FT.foe;
   for(const pj of FT.pila){
     if(pj.hit){ pj.life-=dt; continue; }
+    /* A THROWN POT ARCS. Everything else in here flies flat to the height
+       the stance aimed at, which is fine for an arrow and wrong for a
+       four-pound clay ball with a fuse in it. */
+    if(pj.grav) pj.vy += pj.grav*dt;
     pj.x+=pj.vx*dt; pj.y+=pj.vy*dt; pj.life-=dt;
+    /* AND IT GOES OFF WHERE IT LANDS, not only if it hits a man. Half the
+       point of lobbing one is that it does not have to hit anybody. */
+    if(pj.type==='bomb' && pj.y>=GROUND-2){
+      pj.hit=true; pj.stuckWall=true; pj.life=0;
+      blastAt(pj.x, GROUND-18, pj.W? pj.W.blast : 34, pj);   // it goes off at shin height, not under the floor
+      continue;
+    }
     const reached = pj.vx>0? pj.x>=foe.x-6 : pj.x<=foe.x+6;
+    /* a bomb that reaches him in the air goes off on him, whatever height */
+    if(pj.type==='bomb' && reached && Math.abs(pj.x-foe.x)<20){
+      pj.hit=true; pj.stuckWall=true; pj.life=0;
+      blastAt(pj.x, pj.y, pj.W? pj.W.blast : 34, pj);
+      continue;
+    }
     if(reached && Math.abs(pj.x-foe.x)<16 && !foe.knock){
       const dy=pj.y-foe.y;                       // negative = above the feet
       let zone=null;
@@ -9397,7 +9562,10 @@ function pilumImpact(pj,zone){
   const guarded = facingThrow && foe.gear.shield.block>0 &&
     ((zone==='head'&&foe.stance==='high')||(zone==='body'&&foe.stance==='mid')||(zone==='legs'&&foe.stance==='low'));
   const arrow = pj.type==='arrow';
-  const ball  = pj.type==='ball';
+  const bomb  = pj.type==='bomb';
+  const fire  = pj.type==='fire';
+  const ball  = pj.type==='ball' || bomb || fire;
+  if(bomb){ blastAt(pj.x, pj.y, pj.W? pj.W.blast : 34, pj); }
   let dmg=rangedDamage(pj.base||PILUM.base, zone, pj.W)*(FT.p.dmgMul||1);
   // armour bites into head/body shots; legs mostly ignore it
   let mit = zone==='head'? foe.gear.helmet.armor : zone==='body'? foe.gear.armor.armor*0.8 : 0;
@@ -9427,6 +9595,12 @@ function pilumImpact(pj,zone){
   FT.hitstop=Math.max(FT.hitstop, zone==='head'?6:4);
   sfx(zone==='legs'?'thud':'hit'); if(zone==='head') setTimeout(()=>{try{sfx('cheer');}catch(e){}},120);
   FT.crowd=clamp(FT.crowd+(zone==='head'?9:zone==='body'?4:1),0,100);
+  if(fire){
+    /* AND IT BURNS. A pitched incendiary head does not stop when it lands. */
+    foe.burn=Math.max(foe.burn||0, 150);
+    for(let i=0;i<16;i++) FT.particles.push({x:foe.x+rnd(-6,6),y:foe.y+yAt+rnd(-6,6),
+      vx:rnd(-1.2,1.2),vy:rnd(-2.2,-0.3),life:rnd(16,34),c:pick(['#ffb43a','#ff7a2a','#e8c34a'])});
+  }
   if(ball){ sparks(foe.x, foe.y+yAt, 14); FT.flash=Math.min(1,FT.flash+0.35); }
   banner(foe.x, foe.y-58, (ball?'\u2609 SHOT ':'')+(zone==='head'?'☠ HEADSHOT ':zone==='body'?'BODY ':'LEG ')+'−'+dmg, z.col);
 }
@@ -9475,6 +9649,84 @@ function drawHeldPilum(gold){
   ctx.fillStyle='#3a383c'; ctx.fillRect(8,-1.7,1,1);
   const hc = gold? '#6a561f' : '#2b323b';
   ctx.fillStyle=hc; ctx.beginPath(); ctx.moveTo(11,-1.8); ctx.lineTo(19,0); ctx.lineTo(11,1.8); ctx.closePath(); ctx.fill(); // head
+}
+/* =====================================================================
+   WHAT A MATCHLOCK LOOKS LIKE, and it is not a musket
+   ---------------------------------------------------------------------
+   A tanegashima is unmistakable once you know the four things that make it:
+   · THE STOCK IS SHORT AND STRAIGHT and has almost no butt — it is braced
+     against the CHEEK, not the shoulder, which is why it looks stubby.
+   · THE BARREL IS OCTAGONAL, long, and heavier at the breech.
+   · THE LOCK IS A BRASS SERPENTINE — a little curved arm holding the
+     smouldering cord, swinging FORWARD into the pan rather than back.
+   · THE PAN HAS A LID. The hinged brass pan-cover is the Japanese answer to
+     rain and to the wind, and it is the one part everyone leaves out.
+   ===================================================================== */
+function drawHeldGun(bw){
+  const c=ctx;
+  const long = bw.id==='hazamazutsu'? 30 : bw.id==='ozutsu'? 22 : bw.id==='bajozutsu'? 13 : bw.id==='sanganju'? 15 : 21;
+  const bore = bw.id==='ozutsu'? 4 : bw.id==='hazamazutsu'? 3 : 2.6;
+  c.fillStyle='#160e07'; c.fillRect(-10,-4.2,long+16,8.4);                 // the outline
+  // the stock: short, straight, no shoulder butt
+  c.fillStyle='#6a4a2a'; c.fillRect(-9,-2.0,11,4.0);
+  c.fillStyle='#8a6238'; c.fillRect(-9,-2.0,11,1.1);
+  c.fillStyle='#4a3018'; c.fillRect(-9,-2.4,3,4.8);                        // the cheek-piece
+  c.fillStyle='#c8a24a'; c.fillRect(-9,-2.4,3,0.8);                        // and its brass cap
+  // the octagonal barrel, thicker at the breech
+  c.fillStyle='#3a3a40'; c.fillRect(2,-bore/2-0.7,long,bore+1.4);
+  c.fillStyle='#5a5a64'; c.fillRect(2,-bore/2-0.7,long,0.8);
+  c.fillStyle='#22222a'; c.fillRect(2,bore/2+0.1,long,0.6);
+  c.fillStyle='#4a4a54'; c.fillRect(2,-bore/2-0.7,4,bore+1.4);             // the heavy breech
+  c.fillStyle='#1a1a20'; c.fillRect(2+long-1,-bore/2,1.6,bore);            // the muzzle
+  // THE LOCK: a brass pan with a LID, and the serpentine over it
+  c.fillStyle='#c8a24a'; c.fillRect(3.5,-bore/2-2.4,3.6,2.0);              // the pan
+  c.fillStyle='#e8c86a'; c.fillRect(3.5,-bore/2-2.4,3.6,0.7);
+  c.fillStyle='#a8843a'; c.fillRect(3.2,-bore/2-3.0,4.4,0.8);              // its hinged cover
+  c.fillStyle='#c8a24a'; c.fillRect(7.4,-bore/2-3.6,0.9,3.2);              // the serpentine arm
+  c.fillStyle='#3a2a18'; c.fillRect(6.6,-bore/2-4.0,2.2,0.9);              // the match cord in its jaws
+  c.fillStyle='#ff7a2a'; c.fillRect(6.4,-bore/2-4.2,0.9,0.9);              // and the coal on the end
+  c.fillStyle='#c8a24a'; c.fillRect(1.4,0.6,1.6,2.6);                      // the trigger
+  if(bw.id==='sanganju'){                                                  // THREE barrels, not one
+    c.fillStyle='#3a3a40'; c.fillRect(2,-bore/2-3.4,long,bore*0.8);
+    c.fillRect(2,bore/2+0.7,long,bore*0.8);
+    c.fillStyle='#5a5a64'; c.fillRect(2,-bore/2-3.4,long,0.6); }
+  if(bw.id==='ozutsu'||bw.id==='hazamazutsu'){                             // and a rest under the long ones
+    c.fillStyle='#5a4028'; c.fillRect(2+long*0.6,bore/2+1,1.4,7);
+    c.fillRect(2+long*0.6-2,bore/2+7,5.4,1.2); }
+}
+/* the clay bomb: a fat pot, a lashed neck, and a fuse already lit */
+function drawHeldBomb(bw){
+  const c=ctx;
+  const R = bw.id==='tetsuhau'? 5.4 : 4.6;
+  c.fillStyle='#160e07'; c.beginPath(); c.arc(6,0,R+1.2,0,6.2832); c.fill();
+  c.fillStyle = bw.id==='tetsuhau'? '#6a5a4a' : '#a8724a';                 // the fired clay
+  c.beginPath(); c.arc(6,0,R,0,6.2832); c.fill();
+  c.fillStyle = bw.id==='tetsuhau'? '#8a7a68' : '#c8946a';
+  c.beginPath(); c.arc(4.6,-1.4,R*0.55,0,6.2832); c.fill();                // the light on the shoulder
+  c.fillStyle='#5a4030'; c.fillRect(2,-1,8,0.8); c.fillRect(2,1,8,0.8);    // the lashing round it
+  c.fillStyle='#3a2a18'; c.fillRect(5.2,-R-2.4,1.6,2.6);                   // the neck and the fuse
+  c.fillStyle='#ff7a2a'; c.fillRect(5.0,-R-3.4,2.0,1.4);                   // ALREADY LIT
+  c.fillStyle='#fff0b0'; c.fillRect(5.6,-R-3.2,0.9,0.9);
+  c.fillStyle='#8a6238'; c.fillRect(-6,-1.4,8,2.8);                        // and the fist round it
+  c.fillStyle='#a8804a'; c.fillRect(-6,-1.4,8,0.9);
+}
+/* and a real bow, which was also being drawn as a javelin */
+function drawHeldBow(bw){
+  const c=ctx;
+  const H = bw.id==='yumi'? 26 : 17;                                       // the yumi is enormous
+  const off = bw.id==='yumi'? 8 : 0;                                       // and gripped a THIRD up
+  c.fillStyle='#160e07'; c.fillRect(0,-H-off-1,5,H*2-off*0.6+2);
+  c.strokeStyle = bw.id==='yumi'? '#8a6a3a' : '#6a4a2a';
+  c.lineWidth=1.8; c.lineCap='round';
+  c.beginPath();
+  c.moveTo(2,-H-off); c.quadraticCurveTo(6.5,0,2,H-off*0.6); c.stroke();
+  c.strokeStyle='#2a1e12'; c.lineWidth=0.7;
+  c.beginPath(); c.moveTo(2,-H-off); c.lineTo(2,H-off*0.6); c.stroke();     // the string
+  if(bw.id==='yumi'){ c.strokeStyle='#3a2a18'; c.lineWidth=1.2;
+    for(let k=-2;k<=2;k++){ c.beginPath();
+      c.moveTo(2+Math.abs(k)*0.4, k*7-off*0.4); c.lineTo(5+Math.abs(k)*0.4, k*7-off*0.4); c.stroke(); } }  // the rattan binding
+  c.fillStyle='#c2cad4'; c.fillRect(2,-1,14,1.6);                           // an arrow on the string
+  c.fillStyle='#eef4fa'; c.fillRect(15,-1.4,3,2.4);
 }
 function drawArrow(pj){
   ctx.save(); ctx.translate(pj.x,pj.y); ctx.rotate(Math.atan2(pj.vy,pj.vx));
@@ -9632,7 +9884,7 @@ function updateFight(dt){
   tryHit(p,foe); tryHit(foe,p);
   // thrown pila in flight
   if(FT.pila.length) updatePila(dt);
-  updateGunSmoke();
+  updateGunSmoke(); updateBurns();
   // crowd drift: passivity bores them
   const dist=Math.abs(p.x-foe.x);
   if(dist>120) FT.crowd=clamp(FT.crowd-0.08*dt,0,100);
@@ -11010,7 +11262,8 @@ function drawArena(){
   drawGladiator(order[0]); drawGladiator(order[1]);
   // projectiles in flight (arrows / iron-headed javelins)
   if(t.pila && t.pila.length) for(const pj of t.pila){ if(!pj.stuckWall){
-    pj.type==='ball'? drawBall(pj) : pj.type==='arrow'? drawArrow(pj) : drawPilum(pj); } }
+    pj.type==='bomb'? drawFlyingBomb(pj) : pj.type==='fire'? drawFireBolt(pj)
+      : pj.type==='ball'? drawBall(pj) : pj.type==='arrow'? drawArrow(pj) : drawPilum(pj); } }
   drawGunSmoke(ctx);
   // particles (blood drops + sparks)
   for(const pa of t.particles){ const s=pa.sz||2; px(pa.x,pa.y,s,s,pa.c); }
@@ -31462,6 +31715,87 @@ $('btn-skip').onclick=()=>{
 // ---- shop / armoury ----
 let shopTab='weapon';
 // 40x40 pixel-art icon for a piece of gear (self-contained context)
+/* =====================================================================
+   THE RANGED RACK, DRAWN — every one of these was an emoji
+   ---------------------------------------------------------------------
+   The bow cards in the armoury carried a 🏹 and nothing else, so a Parthian
+   composite bow, a two-metre yumi, a matchlock, a horse pistol, a
+   three-barrelled Chinese hand gun and a clay bomb were all the same little
+   picture of a bow.
+   ===================================================================== */
+function drawRangedIcon(cnv, bw){
+  const c=cnv.getContext('2d'); c.imageSmoothingEnabled=false;
+  const S=40, P=(x,y,w,h,col)=>{c.fillStyle=col;c.fillRect(x|0,y|0,w|0,h|0);};
+  const bg=c.createLinearGradient(0,0,0,S);
+  bg.addColorStop(0, bw.gun||bw.bomb? '#2a1c12':'#231a10'); bg.addColorStop(1,'#120c07');
+  c.fillStyle=bg; c.fillRect(0,0,S,S);
+  c.strokeStyle = bw.bomb? '#8a5a2a' : bw.gun? '#6a6a74' : '#4a3a26';
+  c.lineWidth=2; c.strokeRect(1,1,S-2,S-2);
+  const m='#3a3a40', mh='#5a5a64', ms='#22222a', brass='#c8a24a', brassHi='#e8c86a';
+  if(bw.bomb){
+    /* THE POT. Fat, fired clay, lashed, with a fuse already burning — the
+       clay is not the container, it is the ammunition. */
+    const R = bw.id==='tetsuhau'? 12 : 11, cy=24;
+    const body = bw.id==='tetsuhau'? '#6a5a4a':'#a8724a';
+    const hi   = bw.id==='tetsuhau'? '#8a7a68':'#c8946a';
+    for(let y=-R;y<=R;y++){ const w=Math.floor(Math.sqrt(R*R-y*y));
+      P(20-w,cy+y,w*2,1, y<-R*0.35? hi : y>R*0.4? '#5a3a24' : body); }
+    P(9,cy-3,22,2,'#5a4030'); P(9,cy+3,22,2,'#5a4030');            // the lashing
+    P(9,cy-3,22,1,'#7a5a44');
+    P(17,cy-R-6,6,7,'#4a3020'); P(17,cy-R-6,6,2,'#6a4a30');        // the neck
+    P(18,cy-R-11,4,6,'#3a2a18');                                    // the fuse
+    P(17,cy-R-15,6,5,'#ff7a2a'); P(19,cy-R-16,3,4,'#fff0b0');       // and it is lit
+    if(bw.id==='tetsuhau') for(let i=0;i<5;i++) P(13+i*3,cy-2+((i*5)%7),2,2,'#3a3a40');  // the iron scrap in it
+  } else if(bw.gun){
+    /* THE MATCHLOCK. Short straight stock, octagonal barrel, brass
+       serpentine, and the hinged pan-cover nobody ever draws. */
+    const L = bw.id==='hazamazutsu'? 30 : bw.id==='ozutsu'? 24 : bw.id==='bajozutsu'? 15 : bw.id==='sanganju'? 18 : 26;
+    const bore = bw.id==='ozutsu'? 6 : bw.id==='hazamazutsu'? 5 : 4;
+    const x0 = 20-L/2;
+    P(x0-9,20-bore/2,10,bore+2,'#6a4a2a'); P(x0-9,20-bore/2,10,2,'#8a6238');   // the stock
+    P(x0-11,19-bore/2,4,bore+4,'#4a3018'); P(x0-11,19-bore/2,4,2,brass);       // the cheek-piece
+    P(x0,20-bore/2,L,bore,m); P(x0,20-bore/2,L,2,mh); P(x0,19+bore/2,L,1,ms);
+    P(x0,20-bore/2,6,bore,'#4a4a54');                                          // the heavy breech
+    P(x0+L-2,20-bore/2+1,3,bore-2,'#12121a');                                  // the muzzle
+    if(bw.id==='sanganju'){ P(x0,15-bore/2,L,bore-1,m); P(x0,15-bore/2,L,1,mh);
+      P(x0,24+bore/2-2,L,bore-1,m); }                                          // three barrels
+    P(x0+2,15-bore/2,6,4,brass); P(x0+2,15-bore/2,6,1,brassHi);                // the pan
+    P(x0+1,13-bore/2,8,2,'#a8843a');                                           // its hinged lid
+    P(x0+9,11-bore/2,2,7,brass);                                               // the serpentine
+    P(x0+7,10-bore/2,4,2,'#3a2a18');                                           // the cord in its jaws
+    P(x0+6,9-bore/2,2,2,'#ff7a2a');                                            // and the coal
+    P(x0-2,21+bore/2,3,5,brass);                                               // the trigger
+    if(bw.id==='hazamazutsu'||bw.id==='ozutsu'){                               // and a rest
+      P(x0+L*0.62,22+bore/2,3,12,'#5a4028'); P(x0+L*0.62-3,33,9,3,'#5a4028'); }
+    if(bw.fire){ P(x0+L-1,17,6,6,'#ff7a2a'); P(x0+L,18,4,3,'#fff0b0'); }       // the bolt in the muzzle
+  } else {
+    /* A BOW, and the yumi is a different object: over two metres, gripped a
+       THIRD of the way up, and bound with rattan along its whole length. */
+    const yumi=(bw.id==='yumi'), parth=(bw.id==='parthian');
+    const top = yumi? 1 : 6, bot = yumi? 39 : 34, grip = yumi? 26 : 20;
+    /* AND THE TWO WESTERN BOWS WERE THE SAME PICTURE. A steppe recurve and
+       a Parthian composite are both horn-and-sinew but they are not one
+       object: the Parthian is the deeper reflex, bound in birch bark and
+       lacquered dark, and its ears recurve HARD at the tips. */
+    const wood = yumi? '#8a6a3a' : parth? '#4a3020' : '#6a4a2a';
+    const bulgeK = yumi? 7 : parth? 9 : 6;
+    for(let y=top;y<bot;y++){
+      const t=(y-top)/(bot-top);
+      let bulge=Math.sin(t*Math.PI)*bulgeK;
+      if(parth && (t<0.14||t>0.86)) bulge=-3;              // the ears turn back the other way
+      P(11+Math.round(bulge),y,3,1, y<grip? wood : shade(wood,-16));
+      P(11+Math.round(bulge),y,1,1, shade(wood,26)); }
+    if(parth){ for(let k=0;k<9;k++) P(11+Math.round(Math.sin(((3+k*3.5)/(bot-top))*Math.PI)*9),
+      6+k*3,3,1,'#8a6a4a'); }                               // the birch-bark binding
+    for(let y=top;y<bot;y++) P(11,y,1,1, parth? '#c8bca0' : '#2a1e12');         // the string
+    if(yumi){ for(let k=0;k<7;k++){ const yy=top+3+k*5;
+      const bulge=Math.sin(((yy-top)/(bot-top))*Math.PI)*7;
+      P(11+Math.round(bulge),yy,3,1,'#2a1e12'); } }                            // the rattan bindings
+    P(11,grip-3,4,7,'#4a3620'); P(11,grip-3,4,2,'#6a5238');                    // the grip
+    P(13,19,20,2,'#c2cad4'); P(31,18,4,4,'#eef4fa');                           // an arrow on it
+    P(13,19,3,2,'#4a3620');
+  }
+}
 function drawGearIcon(cnv,cat,g){
   const c=cnv.getContext('2d'); c.imageSmoothingEnabled=false;
   const S=40, P=(x,y,w,h,col)=>{c.fillStyle=col;c.fillRect(x|0,y|0,w|0,h|0);};
@@ -31929,17 +32263,29 @@ function openShop(){
     }).forEach(bw=>{
     const owned=(G.bowsOwned||[]).includes(bw.id), equipped=G.bow===bw.id;
     const card=document.createElement('div'); card.className='shopcard'+(equipped?' eq':'');
-    const info=document.createElement('div');
-    info.innerHTML=`<div><b style="color:var(--gold)">🏹 ${bw.name}</b> <span class="tag" style="background:#8a5a2a;color:#fff">RANGED</span>${equipped?' <span class="tag" style="background:var(--gold);color:#3a2400">SLUNG</span>':''}</div>
-      <div class="small">HEAD <b style="color:${PILUM.zones.head.col}">−${rangedDamage(bw.base,'head',bw)}</b> · BODY <b style="color:${PILUM.zones.body.col}">−${rangedDamage(bw.base,'body',bw)}</b> · LEGS <b style="color:${PILUM.zones.legs.col}">−${rangedDamage(bw.base,'legs',bw)}</b> · <b style="color:var(--gold)">${bw.gun?'powder &amp; ball found':'unlimited arrows'}</b></div>
+    const top=document.createElement('div'); top.className='row gap6'; top.style.alignItems='flex-start';
+    { const ic=document.createElement('canvas'); ic.width=ic.height=40;
+      ic.style.cssText='width:44px;height:44px;image-rendering:pixelated;flex:0 0 auto;';
+      drawRangedIcon(ic,bw); top.appendChild(ic); }
+    const info=document.createElement('div'); info.style.flex='1';
+    info.innerHTML=`<div><b style="color:var(--gold)">${bw.bomb?'\u2739':bw.gun?'\u2609':'\ud83c\udff9'} ${bw.name}</b> <span class="tag" style="background:#8a5a2a;color:#fff">RANGED</span>${equipped?' <span class="tag" style="background:var(--gold);color:#3a2400">SLUNG</span>':''}</div>
+      <div class="small">${bw.bomb? 'BLAST <b style="color:#ffb43a">'+bw.blast+'px</b> · everyone in it, you included'
+        : 'HEAD <b style="color:'+PILUM.zones.head.col+'">\u2212'+rangedDamage(bw.base,'head',bw)+'</b> · BODY <b style="color:'+PILUM.zones.body.col+'">\u2212'+rangedDamage(bw.base,'body',bw)+'</b> · LEGS <b style="color:'+PILUM.zones.legs.col+'">\u2212'+rangedDamage(bw.base,'legs',bw)+'</b>'} · <b style="color:var(--gold)">${bw.bomb?'thrown in an arc':bw.gun?'powder &amp; ball found':'unlimited arrows'}</b></div>
       <div class="small muted" style="line-height:1.4">${bw.desc} Left-click ${bw.gun?'fires':'looses an arrow'} (aim with your stance); replaces the javelin while ${bw.gun?'loaded':'drawn'}.</div>`
       + (bw.gun? `<div class="small" style="margin-top:4px;border:2px solid #000;background:#160e07;padding:4px 6px;line-height:1.5">
         <div style="color:#d8c089;letter-spacing:1px">☉ WHAT IT COSTS YOU</div>
         <div><span style="color:#c8342a">RELOAD</span> ${(bw.cd/60).toFixed(1)}s between shots — a bow looses ${(bw.cd/15).toFixed(0)}× in the same time.</div>
         <div><span style="color:#5a8ab0">IN RAIN</span> ${Math.round(bw.wet*100)}% of shots do not go off at all. Dry, ${Math.round(bw.dry*100)}%.</div>
         <div><span style="color:#8a9a5a">TRAINING</span> barely matters — <b>+${(bw.train*100).toFixed(1)}%</b> a level of Throwing, against <b>+4%</b> for a bow. That is the whole reason this weapon ended the world it arrived in.</div>
-        <div><span style="color:#e8c34a">ARMOUR</span> keeps only a quarter of its value against a ball.</div></div>` : '');
-    card.appendChild(info);
+        <div><span style="color:#e8c34a">ARMOUR</span> keeps only a quarter of its value against a ball.</div>
+        ${bw.burst? '<div><span style="color:#8a9a5a">THREE BARRELS</span> — '+bw.burst+' shots at '+(bw.cd/60).toFixed(1)+'s, then '+(bw.burstCd/60).toFixed(1)+'s to reload the lot.</div>':''}
+        ${bw.fire? '<div><span style="color:#ff7a2a">IT SETS HIM ALIGHT</span> and keeps burning after it lands.</div>':''}</div>` : '')
+      + (bw.bomb? `<div class="small" style="margin-top:4px;border:2px solid #000;background:#160e07;padding:4px 6px;line-height:1.5">
+        <div style="color:#d8c089;letter-spacing:1px">\u2739 IT DOES NOT CARE WHO YOU ARE</div>
+        <div>Thrown in an ARC, so it goes over a mantlet. It goes off where it lands and takes everyone inside ${bw.blast} pixels — <b style="color:#c8342a">including you</b>.</div>
+        <div><span style="color:#5a8ab0">IN RAIN</span> ${Math.round(bw.wet*100)}% of fuses die. Dry, ${Math.round(bw.dry*100)}%.</div>
+        <div><span style="color:#e8c34a">ARMOUR</span> is very little use — scrap iron comes from every direction at once.</div></div>` : '');
+    top.appendChild(info); card.appendChild(top);
     const row=document.createElement('div'); row.className='row gap6'; row.style.marginTop='4px';
     if(equipped){ const e=document.createElement('span'); e.className='pill'; e.textContent='IN USE'; row.appendChild(e);
       const u=document.createElement('button'); u.className='btn sm'; u.textContent='▸ SLING IT (back to pila / blade)';
@@ -32287,6 +32633,8 @@ window.__SS = {
   CLANS_WA, CLAN_OF_WA, clanOf, clanIdOf, clanHolds, drawMon,
   ARCH_ORDER_WA, BRIDE_ETHS_BY_WORLD, brideEthsHere, homeBrideEth, makeBride, rollBrides, BRIDE,
   isGun, gearWorldOf, gearStockedHere, WET_CHANCE, rollWeather, isWet, misfireChance,
+  drawRangedIcon, drawHeldGun, drawHeldBomb, drawHeldBow, blastAt, rangedCooldown, updateBurns,
+  playerRanged, releaseRanged, beginRangedCharge, launchProjectile, updatePila, drawArena,
   classesForWorld, drawSashimono, drawGladiator, drawTorso, drawHelmet2, drawShield2, makeArenaFoe,
   getFT:()=>FT,
   BOWS, bowOf, rangedDamage, PILUM, VENUES, VENUE_REGION,
