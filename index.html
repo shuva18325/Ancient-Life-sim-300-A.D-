@@ -2482,6 +2482,34 @@ MORES.tamil = {
   loophole:'Patronise the right poet before the wrong one hears about it.',
   caught:'It will be in verse by the next full moon.',
 };
+/* =====================================================================
+   WA · what a household may and may not do, in this century
+   ---------------------------------------------------------------------
+   The picture everyone carries of a Japanese wife — silent, shut in,
+   answerable — is TOKUGAWA, and it is a hundred years after this. The
+   Sengoku is looser and stranger:
+
+   · She keeps her own family name and can hold property, and the law only
+     starts closing that down as houses consolidate their land.
+   · Divorce is common and not scandalous. A wife could leave, could be
+     sent back, and either way the property lists came with her — the
+     temple-divorce (enkiridera) exists because women used it.
+   · A second household is normal for a lord and is a POLITICAL fact, not a
+     moral one: every succession war this century runs through one.
+   · And the thing that IS unforgivable is not what happens in the
+     bedchamber. It is breaking the alliance the marriage sealed, or losing
+     the keep she was left holding. Those two are the offences here.
+   ===================================================================== */
+MORES.wa = {
+  adulteryLaw:0.62, doubleStandard:0.72, classImmunity:0.55,
+  /* divorce is genuinely available to both, which is not true anywhere
+     else on this list except Egypt */
+  divorceHers:0.55, divorceHis:0.85, concubine:true, womenAtTable:true, warWomen:true,
+  law:'The house code, not a magistrate. Every warrior house wrote its own kakun and enforced it itself.',
+  penalty:'Whatever the head of the house decides, and he is answering to the ALLIANCE, not to a court.',
+  loophole:'A second household is expected of a lord. Nobody calls it a crime; everybody counts the sons.',
+  caught:'The question is never what you did. The question is whether her father can use it.',
+};
 MORES.korean = {
   adulteryLaw:0.70, doubleStandard:0.70, classImmunity:0.50,
   divorceHers:0.45, divorceHis:0.80, concubine:true, womenAtTable:false, warWomen:false,
@@ -3308,6 +3336,14 @@ const TABOO = {
   kushan:    { mos:0.00, supine:0.00, aversa:0.06, astride:0.16, oralHer:0.30, oralHim:0.34 },
   tamil:     { mos:0.00, supine:0.00, aversa:0.05, astride:0.12, oralHer:0.22, oralHim:0.26 },
   korean:    { mos:0.00, supine:0.00, aversa:0.10, astride:0.32, oralHer:0.38, oralHim:0.44 },
+  /* WA is low across the board and it is not a modern liberty — this is a
+     century whose surviving erotic art (shunga, already a going concern)
+     is explicit, commercial and printed, and whose moral literature is
+     Buddhist and concerned with attachment rather than with acts. What a
+     Sengoku house polices is the ALLIANCE, not the bedchamber. */
+  wa:        { mos:0.00, supine:0.00, aversa:0.04, astride:0.10, oralHer:0.16, oralHim:0.20 },
+  nanban:    { mos:0.00, supine:0.00, aversa:0.30, astride:0.55, oralHer:0.80, oralHim:0.88 },
+  ming:      { mos:0.00, supine:0.00, aversa:0.12, astride:0.40, oralHer:0.44, oralHim:0.50 },
 };
 /* WHAT EACH PEOPLE SAYS ABOUT THE TWO THAT DIVIDE THEM. */
 const TABOO_VOICE = {
@@ -3318,6 +3354,10 @@ const TABOO_VOICE = {
   celt:     'The tribes did not build a moral system out of this. They built one out of loyalty.',
   germanic: 'Tacitus is explicit: they do not care what you do. They care, terribly, whether you were faithful.',
   numidian: 'Between the houses, and shame travels the coast faster than a ship.',
+  wa:       'Not the question this century asks. The shunga presses are running and nobody is scandalised by a print; '
+    +'what a house polices is whether the alliance holds and whether the keep is still yours in the spring.',
+  nanban:   'A Jesuit is in the house and he has opinions about every one of these, which is a new experience for everybody.',
+  ming:     'Decorum, hierarchy, and a household visibly in order. What happens inside it is inside it.',
   han:      'What is punished here is a household visibly out of order \u2014 not a specific act. There is no os impurum in Han China and no Latin epigram machine to carry it.',
   steppe:   'They have no moral system built out of this at all. They have one built out of whether you held the household together.',
   kushan:   'Greek, Persian, Indian and steppe all under one crown. There is no single rule and the court cannot afford to invent one.',
@@ -7280,27 +7320,74 @@ const COURT_RANKS={
     taste:{sweet:0.55, honest:0.80, wit:1.25, body:1.20, bold:1.15} },
 };
 // WHO WILL EVEN STAND THERE. Rank is a door, and most of them are shut.
+/* =====================================================================
+   WHERE YOU STAND, ON WHATEVER LADDER YOU ARE ON
+   ---------------------------------------------------------------------
+   Everything that gated on rank read SOCIAL_ORDER.indexOf(G.socialClass) —
+   the ROMAN ladder — so an eastern or Japanese career came back at index
+   -1, permanently below a freedman, and no amount of rice, silver or won
+   provinces ever moved it. That is why money bought you nothing in Kyōto.
+   ===================================================================== */
+function socialRankIndex(){
+  const cls=G.socialClass||'gladiator';
+  const set=(typeof socialSetFor==='function' && G.socialSet)? socialSetFor(G.socialSet) : null;
+  const order=set? set.order : SOCIAL_ORDER;
+  const i=order.indexOf(cls);
+  if(i<0) return SOCIAL_ORDER.indexOf(cls);          // a Roman career, unchanged
+  return Math.round(i/Math.max(1,order.length-1)*4); // everything else, normalised 0..4
+}
+/* AND MONEY IS A LADDER OF ITS OWN OUT HERE. Rome was frank that birth beat
+   coin — the lex Iulia would not recognise the marriage whatever you paid.
+   The east and Japan were not: 下剋上, "the low overturns the high", is a
+   word contemporaries used about their own century, a sandal-bearer ends up
+   ruling Japan, and Sakai's merchants dealt with lords as equals because
+   they had the guns. So in those two worlds wealth genuinely buys standing. */
+function wealthRungs(){
+  const w=(typeof playerWorld==='function')? playerWorld() : 'west';
+  if(w==='west') return 0;                            // Rome: birth beats coin, and says so
+  const c=(G.coin|0) + (typeof provinceTribute==='function'? provinceTribute()*4 : 0);
+  return c>=24000? 2 : c>=7000? 1 : 0;
+}
+function effectiveRank(){ return clamp(socialRankIndex()+wealthRungs(),0,4); }
 function courtAccess(id){
-  const cls=G.socialClass||'gladiator', rank=SOCIAL_ORDER.indexOf(cls);
+  const rank=effectiveRank(), born=socialRankIndex(), bought=wealthRungs();
   const off=(G.office||0), pw=(typeof powerScore==='function'? powerScore():0);
+  const w=(typeof playerWorld==='function')? playerWorld() : 'west';
+  const money = bought>0? ' (your money is carrying '+bought+' rung'+(bought>1?'s':'')+' of that)' : '';
+  const richWhy = w==='wa'
+    ? 'A merchant house in this country weighs you in koku and in silver, and finds you light. Win a name in the field, take a rank, or come back with money — here, money counts.'
+    : w==='east'
+    ? 'A house with a seal on a ribbon does not open its door to a man with no register entry. Earn a name, take a rank, or arrive rich enough that the question stops being asked.'
+    : 'A merchant house will not open the door to a nobody. Win some fame in the arena (glory + renown \u2265 400), or become a citizen.';
   if(id==='poor') return {ok:true};
   if(id==='rich'){
-    // a rich house will hear out anyone who is somebody in the city — a famous
-    // gladiator absolutely counts, which is the whole appeal of the arena
     const fame=(G.glory||0)+(G.renown||0)*2;
     if(rank>=1 || fame>=400 || off>=1) return {ok:true};
-    return {ok:false, why:'A merchant house will not open the door to a nobody. Win some fame in the arena (glory + renown ≥ 400), or become a citizen.'};
+    return {ok:false, why:richWhy};
   }
   if(id==='elite'){
-    if(rank<1) return {ok:false, why:'You are not a free citizen. Roman law did not merely frown on this match — it did not recognise it. No amount of coin buys around your station; rise to CITIZEN first.'};
+    if(rank<1) return {ok:false, why: w==='west'
+      ? 'You are not a free citizen. Roman law did not merely frown on this match \u2014 it did not recognise it. No amount of coin buys around your station; rise to CITIZEN first.'
+      : 'You are nobody in particular yet. Take a rung on the ladder, or make the money that buys one.'};
     if(rank>=2 || off>=2 || G.senate) return {ok:true};
-    return {ok:false, why:'A patrician does not converse with the unranked. Hold a real office (aedile or above), rise to the equestrian class, or take a Senate seat.'};
+    return {ok:false, why: w==='wa'
+      ? 'A house with a castle does not marry into one without. Take a rank, hold land, or be rich enough that they want the alliance anyway'+money+'.'
+      : w==='east'
+      ? 'A house of the two-thousand-picul sort will hear you when you have a seal of your own, or gold enough to be worth a favour'+money+'.'
+      : 'A patrician does not converse with the unranked. Hold a real office (aedile or above), rise to the equestrian class, or take a Senate seat.'};
   }
-  // the purple
-  if(rank<1) return {ok:false, why:'You are not a free citizen. The imperial house does not receive suitors off the street, and it certainly does not receive them off the sand.'};
+  // the top of the ladder
+  if(rank<1) return {ok:false, why: w==='west'
+    ? 'You are not a free citizen. The imperial house does not receive suitors off the street, and it certainly does not receive them off the sand.'
+    : 'The first houses do not receive strangers. Be somebody first.'};
   const need = G.isFemale? 70 : 45;
   if((rank>=4) || pw>=need) return {ok:true};
-  return {ok:false, why:'The imperial house does not receive suitors off the street. Build POWER — coin, provinces, offices, regalia — to '+need+'. You are at '+pw+'.'};
+  const topWhy = w==='wa'
+    ? 'A first house marries where it gains a province. Build POWER \u2014 koku, castles, rank, the guns \u2014 to '+need+'. You are at '+pw+'.'+money
+    : w==='east'
+    ? 'The imperial clan marries where the court gains something. Build POWER \u2014 commanderies, seals, offices \u2014 to '+need+'. You are at '+pw+'.'+money
+    : 'The imperial house does not receive suitors off the street. Build POWER \u2014 coin, provinces, offices, regalia \u2014 to '+need+'. You are at '+pw+'.';
+  return {ok:false, why:topWhy};
 }
 /* ---- WHAT YOU CAN SAY. Each option carries a TYPE (which decides how well it
    lands on this particular person) and a raw value. A boast additionally names
@@ -7949,24 +8036,122 @@ const LEGACY_INFO={
   'Britannia':{w:1,s:false,note:'cold, wet, and very far from anyone who matters — the babes would grow up in fog'},
   'Germania Magna':{w:1,s:false,note:'a forest full of men who want us dead; no place for a cradle'},
 };
-function legacyInfo(id){ return LEGACY_INFO[id]||{w:2,s:true}; }
+/* =====================================================================
+   AND YOU CANNOT SEAT YOUR NAME IN AEGYPTUS FROM KYŌTO
+   ---------------------------------------------------------------------
+   The dynastic seat offered twenty-two ROMAN provinces to every career in
+   the game, so a Han halberdier was invited to found his line in Britannia
+   and a samurai was offered Cyprus. Each world gets its own list, weighted
+   by what actually made a place worth seating a family in — and in the
+   east and in Japan that is not the same thing as in Rome.
+
+   ROME weighs GRAIN AND TAX. Egypt and Asia are the fat provinces.
+   THE EAST weighs the things a Chinese, Kushan or Tamil house wanted: a
+   capital with an examination bureau in it, a road with silk on it, a port
+   with Roman gold coming through it, or grass that carries a herd.
+   WA weighs three things and only three: RICE, because rank is counted in
+   koku; a ROAD or a HARBOUR, because that is where the money moves; and
+   DEFENSIBILITY, because a seat you cannot hold is somebody else's seat in
+   about four years.
+   ===================================================================== */
+const LEGACY_EAST={
+  'Luoyang':{w:5,s:true,note:'the capital, the bureau, the examinations and the ear of the court — every road in the empire is measured from here'},
+  'Chang\u2019an':{w:5,s:true,note:'the old capital and the head of the silk road; the caravans are weighed at your gate'},
+  'Wu':{w:4,s:true,note:'the Yangtze, the rice, the boats, and a court that has never taken orders from the north gracefully'},
+  'Chola Country':{w:4,s:true,note:'the pepper ports, and Roman gold arriving by the shipload — Pliny complained about where it was going'},
+  'Gandhara':{w:4,s:true,note:'four traditions in one city, gold on the Roman standard, and monasteries that lend money'},
+  'Ji Province':{w:3,s:true,note:'grain, iron and men; the province that decides who holds the north'},
+  'Yi Province':{w:3,s:true,note:'behind the gorges, hard to reach and harder to take, and it feeds itself'},
+  'Jing Province':{w:3,s:true},'Mathura':{w:3,s:true},'Pandya Country':{w:3,s:true},
+  'Bactria':{w:3,s:false,note:'the crossroads of everything, and everything comes through it including armies'},
+  'Baekje':{w:2,s:true,note:'the sea road to Wa and to the southern courts'},
+  'Gaya':{w:2,s:true,note:'iron in bars, sold to three seas'},
+  'Goguryeo':{w:2,s:false},'Deccan':{w:2,s:true},'Malwa':{w:2,s:true},'Liaodong':{w:2,s:false},
+  'Funan':{w:2,s:true,note:'the canal port every hull between India and China stops at'},
+  'Tarim Basin':{w:1,s:false,note:'oasis towns strung on a road through a desert that kills caravans'},
+  'Ordos':{w:1,s:false},'Xianbei Steppe':{w:1,s:false,note:'grass, and it belongs to whoever is grazing it this year'},
+};
+const LEGACY_WA={
+  'Yamashiro':{w:5,s:false,note:'\u4eac \u2014 the capital. The Emperor is here, the shogun is here, and so is every army that has ever wanted to say so. Enormous prestige, indefensible.'},
+  'Izumi':{w:5,s:true,note:'Sakai \u2014 the free city, the gun-works, the nanban money, and a moat the townsmen dug themselves'},
+  '\u014cmi':{w:5,s:true,note:'the lake, the road, Kunitomo\u2019s matchlocks and Azuchi\u2019s gold; whoever holds \u014cmi holds the way to the capital'},
+  'Mino':{w:4,s:true,note:'\u201chold Mino and you hold the realm\u201d \u2014 Nobunaga took it and then had a seal cut that said so'},
+  'Kai':{w:4,s:false,note:'landlocked mountains, poor in rice and rich in horses, and nobody comes in without permission'},
+  'Hizen':{w:4,s:true,note:'Hirado and Nagasaki \u2014 the Great Ship, Chinese silk in, Japanese silver out'},
+  'Iwami':{w:4,s:false,note:'the silver mountain itself. The richest hole in the ground in Japan and everyone knows exactly where it is.'},
+  'Owari':{w:4,s:true,note:'small, flat, wet, extremely rich in rice, and it produced the man who broke the century'},
+  'Echigo':{w:3,s:true,note:'snow country: enormous rice, a good port, and a mountain wall across the only road in'},
+  'Aki':{w:3,s:true,note:'the Inland Sea and the fleets on it'},
+  'Sagami':{w:3,s:false,note:'Odawara \u2014 the greatest castle town in the east, until the siege that ended the period'},
+  'Mutsu':{w:3,s:true,note:'vast, cold, far from the capital, and nobody in Kyoto can reach you before spring'},
+  'Bizen':{w:3,s:true,note:'the swordsmiths, and the best steel in the country comes out of this ground'},
+  'Harima':{w:3,s:true},'Settsu':{w:3,s:false,note:'Ishiyama \u2014 a fortress-temple that held out eleven years'},
+  'Kaga':{w:3,s:true,note:'\u767e\u59d3\u30ce\u6301\u30bf\u30eb\u56fd \u2014 the province the peasants hold, and they have held it a century'},
+  'Musashi':{w:2,s:true,note:'a marsh, a decaying fort and a fishing village. In sixty years it is the largest city on earth; right now nobody wants it.'},
+  'Suruga':{w:2,s:true},'Mikawa':{w:2,s:true},'Shinano':{w:2,s:false},'Bungo':{w:2,s:true},
+  'Kii':{w:2,s:false,note:'the Saika gunners, who work for money and will not be governed'},
+  'Nagato':{w:2,s:true},'Tosa':{w:2,s:false},'Iyo':{w:2,s:true},'Higo':{w:2,s:true},
+  'Satsuma':{w:2,s:true,note:'the far south \u2014 poor soil, terrifying infantry, and the first place any outside ship touches'},
+  'Dewa':{w:1,s:false},'Tsushima':{w:1,s:true,note:'a rock halfway to Korea that lives entirely off being halfway to Korea'},
+  'Tanegashima':{w:1,s:true,note:'where the guns landed, and very little else'},
+  'Ezo':{w:1,s:false,note:'not Japan. One toehold on a cape, trading iron for furs.'},
+};
+function legacySet(){
+  const w=(typeof playerWorld==='function')? playerWorld() : 'west';
+  return w==='wa'? LEGACY_WA : w==='east'? LEGACY_EAST : LEGACY_INFO;
+}
+/* AND THE THREE BUILDS ARE NAMED IN THE LOCAL IDIOM, taken straight off
+   that people's own house ladder — you do not "build a fine domus" in Kai. */
+function legacyLevels(){
+  const SET=(typeof houseSet==='function')? houseSet() : null;
+  if(!SET) return LEGACY_LEVELS;
+  const t=SET.tiers;
+  return [
+    {name:t[1].name.toLowerCase(), cost:400,  note:t[1].note},
+    {name:t[2].name.toLowerCase(), cost:1200, note:t[2].note},
+    {name:t[4].name.toLowerCase(), cost:3000, note:t[4].note},
+  ];
+}
+/* what the local word for the whole business is */
+function legacyWord(){
+  const w=(typeof playerWorld==='function')? playerWorld() : 'west';
+  return w==='wa'   ? {head:'\u672c\u62e0 THE SEAT OF THE HOUSE', verb:'RAISE', where:'Province',
+                       blurb:'Where a house SITS is the house. Rice decides what you can field, a road or a harbour decides '
+                        +'what you can sell, and defensibility decides whether your grandson still lives there. Kyoto is the '
+                        +'most prestigious address in Japan and the least holdable.'}
+       : w==='east' ? {head:'\u5bb6\u5ead THE ANCESTRAL SEAT', verb:'FOUND', where:'Commandery',
+                       blurb:'A house is seated where the registers are kept and the roads are measured from. A capital buys '
+                        +'you the bureau and the examinations; a port buys you foreign gold; the grass buys you horses and '
+                        +'the standing problem of everyone else wanting them.'}
+       : {head:'\ud83c\udfdb THE LEGACY HOUSE', verb:'BUILD', where:'Province',
+          blurb:'Plant a dynastic seat in a province and move the family into it. WHERE decides everything.'};
+}
+function legacyInfo(id){ const S=legacySet(); return S[id] || LEGACY_INFO[id] || {w:2,s:true}; }
 const LEGACY_LEVELS=[{name:'a modest family house',cost:400},{name:'a fine domus',cost:1200},{name:'a grand dynastic estate',cost:3000}];
 function legacyScore(){ if(!G.legacy) return 0; const inf=legacyInfo(G.legacy.prov);
   const gk=(G.children||[]).reduce((a,c)=>a+(c.kids||0),0);
   return inf.w*G.legacy.level*20 + gk*15 + (G.wifeRel>=90?40:0) + ((G.titles&&G.titles[G.legacy.prov])?60:0); }
-function legacyHomeProvince(w){ return ({egyptian:'Aegyptus',greek:'Achaea',persian:'Persis',celt:'Gallia',germanic:'Germania Magna',numidian:'Africa Proconsularis',roman:'Italia'})[w&&w.eth]||'Italia'; }
+function legacyHomeProvince(w){
+  const H={egyptian:'Aegyptus',greek:'Achaea',persian:'Persis',celt:'Gallia',germanic:'Germania Magna',
+    numidian:'Africa Proconsularis',roman:'Italia',
+    han:'Luoyang', steppe:'Xianbei Steppe', kushan:'Gandhara', tamil:'Chola Country', korean:'Baekje',
+    wa:'Yamashiro', nanban:'Hizen', ming:'Hizen'};
+  const id=H[w&&w.eth];
+  return (id && legacySet()[id])? id : Object.keys(legacySet())[0];
+}
 // the spouse's counsel on WHERE to plant the house — voice shifts with the bond
 function wifeLegacyAdvice(){
   const rel=G.wifeRel|0, w=G.wife, isM=w&&w.male;
-  const ranked=Object.keys(LEGACY_INFO).sort((a,b)=>legacyInfo(b).w-legacyInfo(a).w);
+  const ranked=Object.keys(legacySet()).sort((a,b)=>legacyInfo(b).w-legacyInfo(a).w);
   const rich=ranked.filter(id=>legacyInfo(id).w>=4), pick3=rich.slice(0,3);
   const home=legacyHomeProvince(w), pet= rel>=80? pick(['my love','my heart','my champion']) : rel>=45? (isM?'husband':'wife') : '';
   if(rel>=80) return '💬 '+(pet)+': “If we plant our name forever, plant it where it will GROW — '+pick3.join(', ')+'. '+
     (legacyInfo(home).note? 'And my heart leans to '+home+' — '+legacyInfo(home).note+'. ':'')+
-    'Build it rich and our children inherit an empire in miniature. But NOT Britannia — I will not raise our babies in the fog to be carried off by painted men.”';
+    'Build it rich and our children inherit something worth inheriting. But not the frontier — I will not raise our babies where the raiders ride.\u201d';
   if(rel>=45) return '💬 “You want counsel? Sensible. The gold is in '+pick3.join(', ')+' — a house there pays for itself and lifts our standing. '+
     home+' would suit us. The frontier is cheap, and you get what you pay for: raids and rain. Your choice, in the end.”';
-  return '💬 “Advice? NOW you ask. Fine — somewhere RICH, '+pick3[0]+' or '+pick3[1]+', so at least the coin makes up for the company. Bury it in Britannia and you’ll have earned the mud. That’s all you get from me today.”';
+  return '\ud83d\udcac \u201cAdvice? NOW you ask. Fine \u2014 somewhere RICH, '+pick3[0]+' or '+pick3[1]
+    +', so at least the coin makes up for the company. Bury it on the frontier and you\u2019ll have earned the mud. That\u2019s all you get from me today.\u201d';
 }
 function wifeLegacyVerdict(){
   const rel=G.wifeRel|0, w=G.wife;
@@ -23200,6 +23385,69 @@ function runVenture(v){
   refreshStatbar(); saveQuiet();
   return {ok:true, lost:false, stake, gross};
 }
+/* =====================================================================
+   THE STANDARDS — what you may and may not do here, said plainly
+   ---------------------------------------------------------------------
+   All of this existed and none of it was ever shown to the player in one
+   place. A career that crosses from Rome to Luoyang to Kyoto is crossing
+   three completely different legal and social systems, and it should be
+   possible to READ them rather than discover them by being punished.
+   ===================================================================== */
+function standardsHere(){
+  const C=(typeof localCulture==='function')? localCulture() : CULTURES.roman;
+  const M=(typeof MORES!=='undefined' && MORES[C.id])? MORES[C.id] : MORES.roman;
+  const T=(typeof TABOO!=='undefined' && TABOO[C.id])? TABOO[C.id] : TABOO.roman;
+  const V=(typeof TABOO_VOICE!=='undefined')? (TABOO_VOICE[C.id]||'') : '';
+  const w=(typeof playerWorld==='function')? playerWorld() : 'west';
+  const set=(typeof houseSet==='function')? houseSet() : null;
+  const rows=[
+    {k:'Whose law', v:M.law},
+    {k:'What it costs', v:M.penalty},
+    {k:'The way round it', v:M.loophole},
+    {k:'If you are caught', v:M.caught},
+    {k:'She may divorce you', v:M.divorceHers>=0.5? 'YES \u2014 and she keeps what she brought'
+       : M.divorceHers>=0.3? 'with difficulty, and at a price' : 'effectively not'},
+    {k:'You may divorce her', v:M.divorceHis>=0.8? 'freely' : 'with cause'},
+    {k:'A second household', v:M.concubine? 'permitted, and counted' : 'not recognised'},
+    {k:'She eats with your guests', v:M.womenAtTable? 'yes' : 'no \u2014 she keeps to the inner rooms'},
+    {k:'She fights if it comes to it', v:M.warWomen? 'yes, and it is expected of her' : 'not expected'},
+    {k:'What the house is', v:set? (set.kind+' \u2014 measured in '+set.unit) : 'a domus'},
+    {k:'What rank is counted in', v:(typeof socialSetFor==='function' && G && G.socialSet
+        && socialSetFor(G.socialSet))? socialSetFor(G.socialSet).unit : 'birth, and Rome is frank about it'},
+    {k:'Does money buy standing', v: w==='west'
+        ? 'No. Rome says so out loud: birth beats coin, and the law will not recognise the marriage whatever you pay.'
+        : ('YES \u2014 and it is carrying you '+wealthRungs()+' rung'+(wealthRungs()===1?'':'s')
+           +' up the ladder right now. 下剋上: the low overturns the high, and they had a word for it because it kept happening.')},
+  ];
+  return {culture:C, mores:M, taboo:T, voice:V, rows};
+}
+function openStandards(){
+  const S=standardsHere();
+  state='villa'; show('scr-villa'); $('statbar').classList.remove('hide'); refreshStatbar();
+  villaHead('\u2696 THE STANDARDS OF '+(S.culture.people||S.culture.name).toUpperCase(),
+    'You are a long way from where you were born, and the rules are not the rules you grew up with. '
+    +'This is what this people actually permits, punishes and shrugs at \u2014 all of it sourced, none of it invented.',
+    '#c8b070');
+  const b=$('villa-body'); b.innerHTML='';
+  { const card=document.createElement('div'); card.className='shopcard'; card.style.textAlign='left';
+    card.innerHTML='<div style="color:var(--gold);font-size:12px;letter-spacing:1px">'+S.culture.name+'</div>'
+      +'<div class="small muted" style="margin:4px 0;line-height:1.5">'+S.culture.note+'</div>'
+      +'<div class="small" style="line-height:1.5"><b style="color:#e0705b">The scandal here:</b> '+S.culture.scandal+'</div>';
+    b.appendChild(card); }
+  { const card=document.createElement('div'); card.className='shopcard'; card.style.textAlign='left';
+    const rows=S.rows.map(r=>'<div style="display:flex;gap:8px;margin:3px 0;line-height:1.45">'
+      +'<span style="width:150px;flex:0 0 auto;color:var(--gold);opacity:.9">'+r.k+'</span>'
+      +'<span style="flex:1">'+r.v+'</span></div>').join('');
+    card.innerHTML='<div class="small">'+rows+'</div>';
+    b.appendChild(card); }
+  if(S.voice){ const card=document.createElement('div'); card.className='shopcard'; card.style.textAlign='left';
+    card.innerHTML='<div><b style="color:var(--gold)">What they say about it</b></div>'
+      +'<div class="small muted" style="margin-top:3px;line-height:1.5">'+S.voice+'</div>';
+    b.appendChild(card); }
+  const back=document.createElement('button'); back.className='btn'; back.style.marginTop='8px';
+  back.textContent='\u25c0 BACK'; back.onclick=()=>enterMap();
+  b.appendChild(back);
+}
 /* the market screen itself */
 function openMarket(){
   state='villa'; show('scr-villa'); $('statbar').classList.remove('hide'); refreshStatbar();
@@ -23512,6 +23760,13 @@ function applyHub(){
         mb=document.createElement('button'); mb.className='btn'; mb.id='btn-market';
         mb.onclick=()=>openMarket();
         host.parentNode.insertBefore(mb, host.nextSibling); } }
+    /* THE STANDARDS ARE READABLE IN EVERY WORLD, because in every world
+       they are different and the player is entitled to know which. */
+    { let st=$('btn-standards');
+      if(!st){ const h3=$('btn-titles')||$('btn-shop');
+        if(h3 && h3.parentNode){ st=document.createElement('button'); st.className='btn'; st.id='btn-standards';
+          st.onclick=()=>openStandards(); h3.parentNode.insertBefore(st, h3.nextSibling); } }
+      if(st) st.textContent = wa? '\u2696 THE STANDARDS' : east? '\u2696 THE STANDARDS' : '\u2696 THE MOS MAIORVM'; }
     let sb2=$('btn-smith');
     if(!sb2){ const h2=$('btn-market')||$('btn-shop');
       if(h2 && h2.parentNode){ sb2=document.createElement('button'); sb2.className='btn'; sb2.id='btn-smith';
@@ -24096,12 +24351,16 @@ function buildBarberCard(b){
 function buildLegacyCard(b){
   if(!G.hasVilla) return;   // a man builds his farm first, his dynasty second
   const head=document.createElement('div'); head.className='small'; head.style.color='var(--gold)'; head.style.marginTop='6px';
-  head.textContent='🏛 THE LEGACY HOUSE — where your name outlives you:'; b.appendChild(head);
+  const LW=legacyWord();
+  head.textContent=LW.head+' — where your name outlives you:'; b.appendChild(head);
   const card=document.createElement('div'); card.className='shopcard'; card.style.borderColor='var(--gold)';
   if(!G.legacy){
-    card.innerHTML=`<div class="small muted">Plant a dynastic seat in a province and move the family into it. <b>WHERE decides everything.</b> A rich core (Aegyptus, Asia, Italia) pours gold &amp; influence into your house and lifts your status; a poor frontier (Britannia, Germania) barely pays — and raiders circle. Even a modest house lifts a poor man; a grand one crowns a rich one.</div>`;
-    const provs=Object.keys(LEGACY_INFO).sort((a,b2)=>legacyInfo(b2).w-legacyInfo(a).w);
-    if(!legacyPick||LEGACY_INFO[legacyPick]===undefined) legacyPick=provs[0];
+    card.innerHTML=`<div class="small muted">${LW.blurb} A rich seat pours money and standing into the house; a poor or exposed one barely pays, and somebody comes for it. Even a modest house lifts a poor man; a grand one crowns a rich one.</div>`;
+    /* THE LIST IS THIS WORLD'S LIST. It offered twenty-two Roman provinces
+       to a Han halberdier and to a samurai. */
+    const _LS=legacySet();
+    const provs=Object.keys(_LS).sort((a,b2)=>legacyInfo(b2).w-legacyInfo(a).w);
+    if(!legacyPick||_LS[legacyPick]===undefined) legacyPick=provs[0];
     const sel=document.createElement('select'); sel.style.cssText='background:#241812;color:#e8dcc2;border:1px solid var(--gold);border-radius:4px;padding:3px;font-size:11px;max-width:200px';
     provs.forEach(id=>{ const o=document.createElement('option'); o.value=id; const inf=legacyInfo(id);
       o.textContent=id+'  '+'★'.repeat(inf.w)+(inf.s?'':' ⚠frontier'); sel.appendChild(o); });
@@ -24111,11 +24370,14 @@ function buildLegacyCard(b){
     note.innerHTML=`<b style="color:var(--gold)">${legacyPick}</b> — ${'★'.repeat(inf.w)} wealth${inf.s?'':' · <span style="color:var(--blood)">⚠ frontier: raiders will come</span>'}`+
       (inf.note?`<br><span class="muted">${inf.note}</span>`:'');
     const selRow=document.createElement('div'); selRow.className='row gap6'; selRow.style.alignItems='center'; selRow.style.marginTop='4px';
-    selRow.appendChild(document.createTextNode('Province:')); selRow.appendChild(sel);
+    selRow.appendChild(document.createTextNode(LW.where+':')); selRow.appendChild(sel);
     card.appendChild(selRow); card.appendChild(note);
     const row=document.createElement('div'); row.className='row gap6'; row.style.marginTop='4px';
-    LEGACY_LEVELS.forEach((lv,i)=>{ const bt=document.createElement('button'); bt.className='btn sm'+(i===0?' gold':'');
-      bt.textContent='BUILD — '+lv.name.toUpperCase()+' ('+lv.cost+'d)'; bt.disabled=G.coin<lv.cost;
+    /* AND THE BUILD IS NAMED IN THE LOCAL IDIOM — you do not raise "a fine
+       domus" in Kai, you raise a 屋敷, then a 館, then a 平城. */
+    legacyLevels().forEach((lv,i)=>{ const bt=document.createElement('button'); bt.className='btn sm'+(i===0?' gold':'');
+      bt.textContent=LW.verb+' \u2014 '+lv.name.toUpperCase()+' ('+coinShortStr(lv.cost)+')';
+      bt.title=lv.note||''; bt.disabled=G.coin<lv.cost;
       bt.onclick=()=>{ if(G.coin<lv.cost) return; G.coin-=lv.cost; const prov=legacyPick, inf2=legacyInfo(prov);
         G.legacy={prov, level:i+1, day:G.day}; const stat=inf2.w*(i+1);
         G.approval=clamp(G.approval+Math.round(stat*0.8),0,100); G.honor=clamp(G.honor+inf2.w,0,100); G.pop=clamp(G.pop+inf2.w,0,100);
@@ -24128,15 +24390,15 @@ function buildLegacyCard(b){
       aw.textContent='💬 ASK '+(G.wife.male?'HIM':'HER')+' WHERE TO BUILD';
       aw.onclick=()=>{ toast(wifeLegacyAdvice(),7000); }; card.appendChild(aw); }
   } else {
-    const lg=G.legacy, inf=legacyInfo(lg.prov), lv=LEGACY_LEVELS[lg.level-1], inc=inf.w*lg.level*5;
-    card.innerHTML=`<div><b style="color:var(--gold)">🏛 ${lv.name} · ${lg.prov}</b> ${'★'.repeat(inf.w)}${inf.s?'':' <span style="color:var(--blood)">⚠ frontier</span>'}</div>
+    const lg=G.legacy, inf=legacyInfo(lg.prov), lv=legacyLevels()[lg.level-1], inc=inf.w*lg.level*5;
+    card.innerHTML=`<div><b style="color:var(--gold)">${LW.head.split(' ')[0]} ${lv.name} · ${lg.prov}</b> ${'★'.repeat(inf.w)}${inf.s?'':' <span style="color:var(--blood)">⚠ frontier</span>'}</div>
       <div class="small">Dividend <b style="color:var(--gold)">+${inc}d/day</b> · standing ${inf.w>=4?'greatly elevated':inf.w<=1?'barely helped':'lifted'} · legacy score <b>${legacyScore()}</b></div>
       <div class="small muted">The family name is seated here; your heir inherits its prestige at succession.</div>`;
     const row=document.createElement('div'); row.className='row gap6'; row.style.marginTop='4px';
-    if(lg.level<3){ const up=LEGACY_LEVELS[lg.level]; const ub=document.createElement('button'); ub.className='btn sm gold';
-      ub.textContent='⬆ UPGRADE — '+up.name.toUpperCase()+' ('+up.cost+'d)'; ub.disabled=G.coin<up.cost;
+    if(lg.level<3){ const up=legacyLevels()[lg.level]; const ub=document.createElement('button'); ub.className='btn sm gold';
+      ub.textContent='⬆ UPGRADE — '+up.name.toUpperCase()+' ('+coinShortStr(up.cost)+')'; ub.disabled=G.coin<up.cost;
       ub.onclick=()=>{ if(G.coin<up.cost) return; G.coin-=up.cost; lg.level++; G.approval=clamp(G.approval+inf.w,0,100); refreshStatbar(); saveQuiet();
-        toast('🏛 The house grows grander — now '+LEGACY_LEVELS[lg.level-1].name+'. Your standing rises with it.',3200); openVilla(); };
+        toast('\ud83c\udfe0 The house grows \u2014 now '+legacyLevels()[lg.level-1].name+'. Your standing rises with it.',3200); openVilla(); };
       row.appendChild(ub); }
     const feastCd=G.day-(G.lastFeastDay===undefined?-9:G.lastFeastDay), fcost=100+inf.w*40;
     const fb=document.createElement('button'); fb.className='btn sm';
@@ -34229,8 +34491,8 @@ window.__SS = {
   rangedReady, drawnWeaponName, sidearmName,
   GOKADEN, gokaden, BLADED_WA, bladeSchoolOf, bladeIsSchooled, TAMESHI, tameshiDone,
   ensureBlade, bladeMul, openSmith,
-  POWDER_SRC, powderSourcesHere, POWDER_MAX, powderHave, buyPowder,
-  VENTURES, ventureOpen, ventureStake, ventureOdds, runVenture,
+  HOUSE_SETS, houseSetId, houseSet, houseTier, LEGACY_EAST, LEGACY_WA, legacySet, legacyLevels, legacyWord,
+  socialRankIndex, wealthRungs, effectiveRank, courtAccess, standardsHere, openStandards, MORES, TABOO,
   POWDER_SRC, powderSourcesHere, POWDER_MAX, powderHave, buyPowder,
   VENTURES, ventureOpen, ventureStake, ventureOdds, runVenture,
   COIN_GRADES, MARKET_RULES, MARKET_OF, marketHere, ensurePurse, purseFace, purseHere,
