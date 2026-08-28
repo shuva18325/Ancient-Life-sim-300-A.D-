@@ -3992,13 +3992,58 @@ function inkEyes(){
    lx,rx left and right eye x   y  the top of the eye box
    w,h   the box the western eye occupied, so the wipe covers it exactly
    skin  to paint the whites out with        sh  the lid / brow colour   */
+/* HOW THE EYE IS ACTUALLY DRAWN, which is not one stroke
+   ---------------------------------------------------------------------
+   The first pass replaced the googly white with a single dark line. That
+   killed the cartoon but it undersold the art, because neither tradition
+   draws an eye with one stroke:
+
+   UKIYO-E draws a narrow almond out of TWO lines — a heavier upper lid
+   that curves down at the outer corner, and a much lighter lower line
+   under it — with a small dark iris sitting ON the upper line rather than
+   floating in a white ball. The brow is a separate soft arc that does not
+   touch the lid, and on a woman of rank it is HIKIMAYU: plucked out
+   entirely and repainted high on the forehead as a soft smudge, which is
+   why bijin-ga brows always look like they are in the wrong place.
+
+   HAN TOMB TILES and the GOGURYEO MURALS draw the almond more openly and
+   put a round pupil inside it, so their eye is a shade more legible than
+   the Japanese one. Same construction, less compression.
+
+   So: two lids, an iris on the upper one, an inner corner marked a little
+   darker, and a brow held clear above. At the very smallest sizes — a
+   child on the family screen — it degrades gracefully back to lid, iris
+   and brow, because three marks is all four pixels can hold.
+   ===================================================================== */
 function inkEyesOver(P, lx, rx, y, w, h, skin, sh){
   if(!inkEyes()) return false;
   const W=Math.max(2,w+1), mid=y+((h-1)>>1);
-  P(lx-1,y-2,W+2,h+3,skin); P(rx-1,y-2,W+2,h+3,skin);   // the whites, gone
-  P(lx,mid,W,1,'#1a1006');  P(rx,mid,W,1,'#1a1006');    // the eye — one stroke of ink
-  P(lx,mid-1,W,1,sh);       P(rx,mid-1,W,1,sh);         // the lid folded over it
-  P(lx,y-2,W,1,sh);         P(rx,y-2,W,1,sh);           // and a fine brow above
+  const INK='#1a1006', IRIS='#241608';
+  /* the Japanese lid is drawn thinner and set lower than the Chinese one;
+     the Han/Goguryeo almond opens up and shows its pupil */
+  let open=false;
+  try{ open=['han','korean','ming','kushan','tamil','steppe'].indexOf((localCulture()||{}).id)>=0; }catch(e){}
+  const lid = mixHex(sh,'#1a1006',0.45);                 // between skin-shadow and ink
+  P(lx-1,y-3,W+2,h+4,skin); P(rx-1,y-3,W+2,h+4,skin);    // the whites, gone
+  for(const ex of [lx,rx]){
+    // THE UPPER LID — the heavy line, and it drops at the outer corner
+    P(ex,mid,W,1,INK);
+    if(W>=4) P(ex+W-1,mid+1,1,1,INK);                    // the outer corner, turned down
+    // THE LOWER LINE — lighter, one row under, and shorter than the upper
+    if(h>=2 || W>=4) P(ex+1,mid+1,Math.max(1,W-2),1,lid);
+    // THE IRIS, sitting ON the upper line rather than in a white ball
+    const ix = ex + ((W>=5)?2:1);
+    P(ix,mid,1,1,IRIS);
+    if(open && W>=4){ P(ix,mid+1,1,1,IRIS); P(ix+1,mid,1,1,IRIS); }   // Han opens it wider
+    // the inner corner, a shade deeper — the mark that gives the eye a direction
+    P(ex,mid,1,1,'#0e0804');
+    /* THE BROW, held CLEAR of the lid. Two rows up on a big face, one on a
+       small one; and it is soft, not a hard rule — hikimayu was painted on
+       with a fingertip. */
+    const by = y-(h>=3?3:2);
+    P(ex,by,W,1,sh);
+    if(W>=5) P(ex+1,by-1,W-2,1,mixHex(sh,skin,0.45));    // the soft upper edge of it
+  }
   return true;
 }
 /* =====================================================================
@@ -9083,6 +9128,237 @@ function paletteFor(f){
   };
 }
 /* Detailed pixel gladiator. Local origin = feet; up is -y; faces +x. */
+/* =====================================================================
+   THE SWING YOU CAN SEE — arcs, impact, and weight
+   ---------------------------------------------------------------------
+   Every cut in this game happened in four frames of an arm rotating and
+   then it was over. There was no arc, no follow-through and no evidence a
+   blade had passed through the air at all — you read the result off the
+   health bar rather than off the picture. The one thing every side-view
+   fighting game does to fix that is the SWING TRAIL: the tip of the weapon
+   leaves a ribbon behind it that fades over about a fifth of a second, so
+   the eye reconstructs the whole path of the cut from one frame.
+
+   Gladihoppers is the obvious reference here and it is worth saying what
+   it actually does, because it is not "more particles": its fighters are
+   physical objects that get PUSHED, its blows have a wind-up you can read
+   and commit to, and the hit is sold by the target reacting — recoil,
+   stagger, a spray — not by the attacker flashing. So this adds, in that
+   order: an arc for the path, a burst at the point of contact, and a
+   reaction on the man who was hit.
+
+   The trail is kept in WORLD space on FT rather than in the arm's own
+   transform, because the arm is drawn inside two nested rotations and a
+   facing flip, and a ribbon built in there comes out inside-out when the
+   fighter turns around.
+   ===================================================================== */
+/* =====================================================================
+   THE AIR IN THE PLACE, AND THE THING YOU ARE SEEING IT OVER
+   ---------------------------------------------------------------------
+   Every ground in this game was drawn as three flat bands: crowd, wall,
+   sand. All the detail is IN those bands and none of it is between them
+   and you, so a Numidian amphitheatre in August and a wet Japanese rice
+   field read at exactly the same distance.
+
+   Two cheap things fix that and both are what a camera actually sees:
+   HAZE — hot sand and thousands of bodies put dust and shimmer in the air,
+   so everything past the fighters is very slightly washed and everything
+   below them is warmer; and a NEAR EDGE — you are watching this from
+   somewhere, and that somewhere has a rail in front of it and heads in
+   front of that. A blurred foreground is the single strongest depth cue
+   there is, and it costs about twenty rectangles.
+   ===================================================================== */
+function drawGroundHaze(c){
+  if(typeof FT==='undefined'||!FT) return;
+  const t=FT, TH=t._th||{};
+  const wet = (typeof isWet==='function')? isWet() : false;
+  const dusty = !t.naumachia && !wet;
+  /* the warm layer sitting on the sand — dust that has been kicked up all
+     afternoon and has nowhere to go */
+  if(dusty){
+    const g=c.createLinearGradient(0,GROUND-26,0,H);
+    g.addColorStop(0,'rgba(0,0,0,0)');
+    g.addColorStop(0.45,'rgba(214,178,118,.10)');
+    g.addColorStop(1,'rgba(214,178,118,.20)');
+    c.fillStyle=g; c.fillRect(0,GROUND-26,W,H-GROUND+26);
+    // and motes turning over in it
+    for(let i=0;i<26;i++){
+      const mx=((i*83 + t.time*0.35)%(W+20))-10;
+      const my=GROUND-4-((i*29 + t.time*0.11)%40);
+      c.globalAlpha=0.05+0.07*Math.abs(Math.sin(t.time*0.03+i));
+      c.fillStyle='#e8d0a0'; c.fillRect(mx|0,my|0,1,1); }
+    c.globalAlpha=1;
+  } else if(wet){
+    // rain does the opposite: it takes the dust OUT of the air and puts a
+    // cold sheen on everything low down
+    const g=c.createLinearGradient(0,GROUND-20,0,H);
+    g.addColorStop(0,'rgba(0,0,0,0)'); g.addColorStop(1,'rgba(120,150,170,.16)');
+    c.fillStyle=g; c.fillRect(0,GROUND-20,W,H-GROUND+20);
+  }
+  /* SHIMMER. Only under an open sky, because a velarium is exactly the
+     thing they stretched over a stand to stop this happening. */
+  if(dusty && TH && TH.awning===false){
+    for(let i=0;i<7;i++){
+      const yy=GROUND-3-i*4;
+      c.globalAlpha=0.045;
+      c.fillStyle='#fff2d0';
+      c.fillRect(Math.sin(t.time*0.05+i)*3, yy, W, 1); }
+    c.globalAlpha=1;
+  }
+}
+/* the near edge: a rail, and the backs of heads in front of it */
+function drawArenaForeground(c){
+  if(typeof FT==='undefined'||!FT) return;
+  const t=FT;
+  if(t.siege||t.pit) return;                     // a villa and a pit have no stands to sit in
+  const TH=t._th||{};
+  if(TH.build==='none'||TH.build==='field') return;   // and neither has an open plain
+  /* THE PODIUM RAIL, right at the bottom of the frame and slightly out of
+     focus — one dark band with a lit top edge, which at this resolution is
+     all "out of focus" needs to be. */
+  const ry=H-9;
+  c.globalAlpha=0.92; c.fillStyle='#2a1c10'; c.fillRect(0,ry,W,H-ry);
+  c.fillStyle='#4a3520'; c.fillRect(0,ry,W,2);
+  c.fillStyle='#120c06'; c.fillRect(0,ry+2,W,1);
+  c.globalAlpha=1;
+  /* AND THE HEADS. Three or four of them, big because they are near,
+     silhouetted because they are between you and the light, and drifting
+     very slightly so the front row is alive. */
+  const SK=['#3a2a1e','#2e2118','#432f20','#261c14'];
+  for(let i=0;i<4;i++){
+    const hx = 26 + i*118 + Math.sin(t.time*0.017+i*2.1)*2;
+    const hy = ry - 9 - ((i%2)?2:0);
+    c.globalAlpha=0.88;
+    c.fillStyle=SK[i%SK.length];
+    c.fillRect(hx|0, hy|0, 13, 11);                       // the head
+    c.fillRect((hx-3)|0, (hy+9)|0, 19, 9);                // the shoulders
+    c.fillStyle='#1a1208';
+    c.fillRect(hx|0, hy|0, 13, 3);                        // hair, darker still
+    c.globalAlpha=1;
+  }
+  /* a vignette, so the eye is pulled back to the middle where the fight is */
+  const vg=c.createRadialGradient(W/2,GROUND-30,40, W/2,GROUND-30, W*0.66);
+  vg.addColorStop(0,'rgba(0,0,0,0)'); vg.addColorStop(1,'rgba(0,0,0,.30)');
+  c.fillStyle=vg; c.fillRect(0,0,W,H);
+}
+/* how far past the fist a weapon actually reaches, so the ribbon is drawn
+   at the tip of the blade and not at the wrist */
+function weaponTipLen(f){
+  const w=f.gear&&f.gear.weapon; if(!w) return 14;
+  const R=w.reach||24;
+  return clamp(R*0.62, 8, 46);
+}
+function pushSwingTrail(f){
+  if(typeof FT==='undefined'||!FT) return;
+  if(!f.atk || f.atkType==='elbow') return;
+  const p=1-(f.atkT/Math.max(1,f.atkDur));
+  const ang = f.atkType==='slash'? lerp(-1.5,1.0,Math.min(1,p*1.5)) : -0.05;
+  const lunge = f.atkType==='thrust'? Math.sin(Math.min(1,p*1.6)*Math.PI)*12 : 0;
+  const L = 13 + lunge + weaponTipLen(f);
+  const wx = f.x + f.facing*(5 + Math.cos(ang)*L);
+  const wy = f.y - 32 + Math.sin(ang)*L;
+  /* THE INNER EDGE. At 0.42 of the arm the ribbon was a hair's width at
+     480x270 and read as a scratch. A blade sweeps most of its own length,
+     so the ribbon runs from a quarter of the way out to the tip. */
+  const hx = f.x + f.facing*(5 + Math.cos(ang)*L*0.26);
+  const hy = f.y - 32 + Math.sin(ang)*L*0.26;
+  FT.trails=FT.trails||[];
+  const g=f.gear.weapon;
+  FT.trails.push({ x:wx, y:wy, ix:hx, iy:hy, life:11, max:11,
+    gold:!!g.gold, wood:!!(g.poor||g.id==='bo'||g.id==='bokuto'||g.id==='konbo'||g.id==='shinai'),
+    heavy:(g.dmg||3)>=4.4, player:!!f.isPlayer });
+  if(FT.trails.length>90) FT.trails.splice(0,FT.trails.length-90);
+}
+function updateSwingTrails(dt){
+  if(typeof FT==='undefined'||!FT||!FT.trails) return;
+  for(const t of FT.trails) t.life-=dt;
+  FT.trails=FT.trails.filter(t=>t.life>0);
+}
+function drawSwingTrails(c){
+  if(typeof FT==='undefined'||!FT||!FT.trails||!FT.trails.length) return;
+  const T=FT.trails;
+  c.save(); c.lineCap='round'; c.lineJoin='round';
+  /* Drawn as QUADS between consecutive samples rather than as a stroked
+     line: a stroke of constant width reads as a wire, and a blade sweeping
+     an arc is wide at the tip and narrow at the hand. */
+  for(let i=1;i<T.length;i++){
+    const a=T[i-1], b=T[i];
+    if(a.player!==b.player) continue;                        // never join two men's cuts
+    if(Math.abs(a.x-b.x)>60 || Math.abs(a.y-b.y)>60) continue;
+    const k=Math.max(0,b.life/b.max);
+    const col = b.gold? '255,236,160' : b.wood? '226,206,168' : '226,238,248';
+    c.globalAlpha=k*k*(b.heavy?0.90:0.72);
+    c.fillStyle='rgba('+col+','+(0.55+0.45*k)+')';
+    c.beginPath(); c.moveTo(a.ix,a.iy); c.lineTo(a.x,a.y); c.lineTo(b.x,b.y); c.lineTo(b.ix,b.iy);
+    c.closePath(); c.fill();
+    // a hot inner edge on the newest part of the ribbon, so the tip reads
+    if(k>0.62){ c.globalAlpha=(k-0.62)/0.38*0.7; c.strokeStyle='rgba(255,255,255,.9)';
+      c.lineWidth=1; c.beginPath(); c.moveTo(a.x,a.y); c.lineTo(b.x,b.y); c.stroke(); }
+  }
+  c.globalAlpha=1; c.restore();
+}
+/* =====================================================================
+   AND THE HIT ITSELF
+   ---------------------------------------------------------------------
+   A landing blow used to be four sparks and a number. A hit reads when
+   three things happen on the SAME frame: a white flash at the exact point
+   of contact, a spray thrown along the line of the blow, and the man who
+   was hit moving. The first two are here; the third is the recoil already
+   in takeHit, given something to show for itself.
+   ===================================================================== */
+function impactBurst(x,y,dir,heavy,blood){
+  if(typeof FT==='undefined'||!FT) return;
+  FT.impacts=FT.impacts||[];
+  FT.impacts.push({x,y,life:heavy?9:6,max:heavy?9:6,r:heavy?13:8,dir:dir||1});
+  FT.particles=FT.particles||[];
+  const n=heavy?16:10;
+  for(let i=0;i<n;i++){
+    const sp=rnd(1.1,heavy?4.6:3.2), a=rnd(-0.95,0.95);
+    FT.particles.push({ x, y, vx:dir*Math.cos(a)*sp, vy:Math.sin(a)*sp-rnd(0.2,1.4),
+      life:rnd(6,heavy?22:15), sz:(Math.random()<0.35?2:1),
+      c: blood? pick(['#8a1d1d','#b52a2a','#6a1010']) : pick(['#fff2c8','#e8dcc2','#c8b48a']),
+      spark:!blood });
+  }
+}
+function updateImpacts(dt){
+  if(typeof FT==='undefined'||!FT||!FT.impacts) return;
+  for(const p of FT.impacts) p.life-=dt;
+  FT.impacts=FT.impacts.filter(p=>p.life>0);
+}
+function drawImpacts(c){
+  if(typeof FT==='undefined'||!FT||!FT.impacts) return;
+  for(const p of FT.impacts){
+    const k=Math.max(0,p.life/p.max);
+    /* THE CORE IS BIGGEST ON THE FIRST FRAME. The first cut had it growing
+       from nothing as the flash FADED, so the brightest moment of a blow
+       was a two-pixel dot and by the time it was any size it was already
+       transparent. A flash is an event: it arrives at full size and
+       collapses. The ring is the only part that expands outward. */
+    c.globalAlpha=Math.min(1,k*1.15); c.fillStyle='rgba(255,250,225,'+(0.45+0.55*k)+')';
+    c.beginPath(); c.arc(p.x,p.y, p.r*k*0.75+2, 0,7); c.fill();
+    c.globalAlpha=k*0.5; c.fillStyle='rgba(255,214,120,'+(0.35*k)+')';
+    c.beginPath(); c.arc(p.x,p.y, p.r*k*1.25+3, 0,7); c.fill();     // the warm halo round it
+    c.globalAlpha=k*0.7; c.strokeStyle='#fff6d0'; c.lineWidth=1.4;
+    c.beginPath(); c.arc(p.x,p.y, p.r*(1.5-k*0.9), 0,7); c.stroke(); // and the ring, running out
+    // four spokes along the line of the blow — this is what sells direction
+    c.globalAlpha=k*0.85; c.strokeStyle='rgba(255,244,200,.95)'; c.lineWidth=1.2;
+    for(let i=0;i<4;i++){ const a=(-0.72+i*0.48)*p.dir, L=p.r*(0.7+k*1.1);
+      c.beginPath(); c.moveTo(p.x,p.y);
+      c.lineTo(p.x+Math.cos(a)*L*p.dir, p.y+Math.sin(a)*L); c.stroke(); }
+  }
+  c.globalAlpha=1;
+}
+/* WHAT THE WEAPON SOUNDS LIKE GOING THROUGH THE AIR. One 'swing' was played
+   for a gladius, a six-foot oak staff, a split-bamboo shinai and an ōdachi.
+   They do not sound remotely alike and the difference is mostly pitch and
+   how much air the thing moves. */
+function swingSfx(f){
+  const g=f.gear&&f.gear.weapon; if(!g){ sfx('swing'); return; }
+  if(g.id==='shinai'||g.id==='take_naginata'||g.id==='takeyari') sfx('swing_bamboo');
+  else if(g.id==='bo'||g.id==='bokuto'||g.id==='konbo'||g.id==='kanabo'||g.poor) sfx('swing_wood');
+  else if((g.dmg||3)>=4.4 || (g.reach||24)>=46) sfx('swing_heavy');
+  else sfx('swing');
+}
 function drawGladiator(f){
   if(f.beast){ drawBeast(f); return; }
   ctx.save();
@@ -10468,6 +10744,12 @@ function tryHit(att,def){
       def.stamina-=8; def.blockFlash=8;
       att.vx += att.facing*-1.2;            // recoil
       sparks(def.x+def.facing*10, def.y-24, 8);   // shower of sparks
+      /* STEEL ON STEEL. The burst goes at the shield boss, at the height the
+         guard was actually held, and throws sparks back along the line of
+         the blow instead of a symmetrical puff. */
+      impactBurst(def.x+def.facing*11,
+                  def.y + (zone==='head'?-46 : zone==='legs'?-12 : -28),
+                  att.facing, false, false);
       if(att.isPlayer===false) FT.crowd+=1.0; else FT.crowd+=2.0; // good defence pleases mob
       sfx('block');
       FT.hitstop=Math.max(FT.hitstop,2);
@@ -10483,6 +10765,13 @@ function tryHit(att,def){
       }
       // blood: spray + ground decals
       bleed(def.x, def.y-24, 18, att.facing);
+      /* AND THE BLOW ITSELF, AT THE ZONE IT LANDED IN. A head cut and a leg
+         cut used to produce the identical picture in the middle of the
+         torso; the whole stance system is about WHERE, so the hit has to
+         show where. */
+      impactBurst(def.x + def.facing*9,
+                  def.y + (zone==='head'?-48 : zone==='legs'?-13 : -28),
+                  att.facing, dmg>22, true);
       FT.shake=Math.min(8,FT.shake+4);
       FT.hitstop=Math.max(FT.hitstop, dmg>22?5:3);   // juicy hit-stop
       FT.flash=Math.min(1,FT.flash+ (dmg>22?0.5:0.28));
@@ -11064,7 +11353,25 @@ function drawHeldGun(bw, phase, pt){
   const WOOD='#7a3a24', WOOD_HI='#a05a34', WOOD_SH='#4a2014';   // karaki — dark red hardwood
   const IRON='#33333c', IRON_HI='#585866', IRON_SH='#1c1c24';
   const BRASS='#c8a24a', BRASS_HI='#f0d078', BRASS_SH='#8a6a24';
-  c.fillStyle='#160e07'; c.fillRect(-11,-5.0,long+18,10.0);                // the outline
+  /* ---- THE OUTLINE, AND IT IS NOT A BOX ----------------------------------
+     This was ONE fillRect the size of the whole weapon, dropped down behind
+     it: a solid dark slab from the butt to past the muzzle and five pixels
+     proud of it top and bottom. Against the sand of an arena that reads as a
+     black cut-out pasted round the gun, which is exactly what it looked
+     like. An outline has to follow the SHAPE. So the silhouette is built out
+     of the same three masses the gun is — stock, barrel, lock — each drawn
+     one pixel proud of itself, and the empty air between the trigger guard
+     and the muzzle stays empty air. */
+  { const O='#160e07', E=1.0;
+    c.fillStyle=O;
+    c.fillRect(-10-E,-2.6-E,12+E*2,5.4+E*2);                               // round the stock
+    c.fillRect(-10-E,-2.6-E,3.2+E*2,5.2+E*2);                              // and the cheek-piece
+    c.fillRect(2-E,-bore/2-0.9-E,long+E*2,bore+1.8+E*2);                   // round the barrel
+    c.fillRect(2.6-E,-bore/2-4.2-E,6.4+E*2,7.0+E*2);                       // round the lock and pan
+    if(bw.id==='sanganju'){                                                 // and the other two barrels
+      c.fillRect(2-E,-bore/2-3.6-E,long+E*2,bore*0.8+E*2);
+      c.fillRect(2-E, bore/2+0.9-E,long+E*2,bore*0.8+E*2); }
+    c.fillRect(1.2-E,0.8-E,1.8+E*2,2.8+E*2); }                             // and the trigger
   // ---- the stock: short, straight, dark red, no shoulder butt ----
   c.fillStyle=WOOD;    c.fillRect(-10,-2.1,12,4.3);
   c.fillStyle=WOOD_HI; c.fillRect(-10,-2.1,12,1.1);
@@ -11169,7 +11476,12 @@ function drawHeldBow(bw){
   const c=ctx;
   const H = bw.id==='yumi'? 26 : 17;                                       // the yumi is enormous
   const off = bw.id==='yumi'? 8 : 0;                                       // and gripped a THIRD up
-  c.fillStyle='#160e07'; c.fillRect(0,-H-off-1,5,H*2-off*0.6+2);
+  /* THE OUTLINE FOLLOWS THE LIMB, not a box round it. This was one tall
+     rectangle the height of the whole bow, which behind a two-metre yumi is
+     a black plank with a bow drawn on it. Stroking the same curve a little
+     wider in the dark gives an outline the shape of the thing. */
+  c.strokeStyle='#160e07'; c.lineWidth=3.6; c.lineCap='round';
+  c.beginPath(); c.moveTo(2,-H-off); c.quadraticCurveTo(6.5,0,2,H-off*0.6); c.stroke();
   c.strokeStyle = bw.id==='yumi'? '#8a6a3a' : '#6a4a2a';
   c.lineWidth=1.8; c.lineCap='round';
   c.beginPath();
@@ -11278,7 +11590,7 @@ function doAttack(f,type){
   if(type==='elbow') f.atkDur=Math.max(4, Math.round(12/(f.spdMul||1)));
   f.atkT=f.atkDur; f.stamina-=cost; f.atkCd=f.atkDur+8;
   if(type==='thrust'){ f.vx+=f.facing*2.5; } // lunge
-  sfx('swing');
+  swingSfx(f);
 }
 function changeStance(f){
   if(f.stanceCd>0) return;
@@ -11292,7 +11604,7 @@ function physics(f,dt){
   if(f.charging>0){ f.charging-=dt; if(f.charging<=0){ f.charging=0; releaseRanged(f); } }   // wind-up completes → the throw
   f.blockFlash=Math.max(0,f.blockFlash-dt); f.stanceCd=Math.max(0,f.stanceCd-dt);
   if(f.netted>0) f.netted-=dt;
-  if(f.atk){ f.atkT-=dt; if(f.atkT<=0){ f.atk=false; } }
+  if(f.atk){ pushSwingTrail(f); f.atkT-=dt; if(f.atkT<=0){ f.atk=false; } }
   // gravity
   f.vy+=GRAV*dt;
   f.x+=f.vx*dt; f.y+=f.vy*dt;
@@ -11341,6 +11653,7 @@ function updateFight(dt){
   // thrown pila in flight
   if(FT.pila.length) updatePila(dt);
   updateGunSmoke(); updateBurns(); updateRain(dt);
+  updateSwingTrails(dt); updateImpacts(dt);
   // crowd drift: passivity bores them
   const dist=Math.abs(p.x-foe.x);
   if(dist>120) FT.crowd=clamp(FT.crowd-0.08*dt,0,100);
@@ -12742,7 +13055,11 @@ function drawArena(){
   // fighters (draw far one first)
   const order = t.p.x<t.foe.x? [t.p,t.foe]:[t.foe,t.p];
   drawShadow(t.p); drawShadow(t.foe);
+  drawGroundHaze(ctx);                        // the air over hot sand, behind everything on it
+  drawSwingTrails(ctx);                       // the arc, behind the men who made it
   drawGladiator(order[0]); drawGladiator(order[1]);
+  drawImpacts(ctx);                           // and the flash, in front of both
+  drawArenaForeground(ctx);                   // and the near rail the whole thing is seen over
   // projectiles in flight (arrows / iron-headed javelins)
   if(t.pila && t.pila.length) for(const pj of t.pila){ if(!pj.stuckWall){
     pj.type==='bomb'? drawFlyingBomb(pj) : pj.type==='fire'? drawFireBolt(pj)
@@ -12997,6 +13314,23 @@ function sfx(kind){
       break;
     case 'swing':          // air, not a hiss of static
       hiss({d:0.10, v:0.055, f:520, to:2900, band:true, q:0.7, a:0.03});
+      break;
+    /* THREE MORE VOICES IN THE AIR. One 'swing' was being played for a
+       gladius, a six-foot oak staff, a split-bamboo shinai and an ōdachi.
+       They differ mostly in how much air the thing moves and how much of
+       the object rings afterwards, so that is what these are. */
+    case 'swing_heavy':    // an ōdachi or a kanabō: slower, lower, a lot of air
+      hiss({d:0.19, v:0.085, f:260, to:1500, band:true, q:0.6, a:0.06});
+      blip({f:130, to:64, d:0.16, type:'sine', v:0.045, a:0.01});
+      break;
+    case 'swing_wood':     // oak: the air, and then the shaft ringing dully
+      hiss({d:0.11, v:0.05, f:430, to:2100, band:true, q:0.8, a:0.035});
+      blip({f:320, to:210, d:0.10, type:'triangle', v:0.035, a:0.006});
+      break;
+    case 'swing_bamboo':   // split bamboo is nearly all rattle and no air at all
+      hiss({d:0.07, v:0.035, f:1400, to:3800, band:true, q:1.2, a:0.012});
+      [1750,2400,3100].forEach((f,i)=>
+        blip({f, d:0.06-i*0.012, type:'square', v:0.020-i*0.005, a:0.001, detune:R(-30,30)}));
       break;
     case 'ko':
       hiss({d:0.35, v:0.11, f:900, to:120, a:0.004, rev:true});
@@ -20812,10 +21146,99 @@ const HAND_ON_HER = {
     ok:'“Not where they can see,” she says, without heat.',
     caught:'The whole factory compound saw, and the whole factory compound trades on gossip.' },
 };
+/* =====================================================================
+   AND HOW SHE ACTUALLY ANSWERS
+   ---------------------------------------------------------------------
+   The table above gave every culture its own law and its own two lines —
+   what happens when nobody saw, and what happens when somebody did. But
+   the verdict has EIGHT outcomes, and the other six were all written in
+   one voice: a Roman wife's. So a Kai castle-keeper whose father's house
+   is the treaty, a Han wife with the household ledger open in front of
+   her, and a steppe woman in a tent full of her own relatives all gave the
+   identical answer to being smacked.
+
+   Four more lines each, and they are the four that carry the character:
+     WARM    she is pleased and does not hide it
+     COLD    she is not, and the reply is the temperature
+     BAD     badly timed, badly aimed, or badly witnessed
+     BACK    she returns it, which several of these cultures absolutely do
+   Where a culture has nothing of its own to say it falls through to Rome's
+   line, because inventing a custom is worse than borrowing one.
+   ===================================================================== */
+const SLAP_REPLY={
+  roman:   {warm:'A yelp, a laugh, and a cushion thrown at you that misses on purpose.',
+            cold:'“Noted,” she says, to the shelf, and does not turn round.',
+            bad :'The look could take the paint off a wall. This was not the week.',
+            back:'She returns it, harder, and neither of you is sorry.'},
+  greek:   {warm:'She pulls you into the inner room by the wrist, which is her answer.',
+            cold:'She continues the sentence she was speaking to somebody else.',
+            bad :'“In the andron.” She lets that sit there.',
+            back:'She gives it back and then looks at you to see whether you understood.'},
+  egyptian:{warm:'“Mm.” She does not stop what she is doing and she does not want you to stop either.',
+            cold:'She reminds you, evenly, whose name is on the house.',
+            bad :'“I can end this marriage on any morning I choose,” she says. “Including this one.”',
+            back:'She returns it without breaking her stride, because why would she not.'},
+  persian: {warm:'One eyebrow goes up, which from her is a whole speech.',
+            cold:'She addresses you by your rank. Only your rank.',
+            bad :'“At the King’s table,” she says, “they will hear this as a story about YOU.”',
+            back:'She returns it exactly once, with great precision, and considers the account closed.'},
+  celt:    {warm:'She laughs like a gate coming off its hinges and drags you outside.',
+            cold:'She looks at you the way she looks at a bad hurley.',
+            bad :'“My brothers are in the yard,” she says. “Shall I call them in?”',
+            back:'She hits you back a great deal harder, and the hall cheers her.'},
+  germanic:{warm:'She turns round with a whole winter in her face and then grins.',
+            cold:'She says nothing. Germanic nothing is very loud.',
+            bad :'“I have been faithful,” she says. “That is the only ledger here.”',
+            back:'She returns it flat-handed and waits to see if you have a complaint.'},
+  numidian:{warm:'“In my own atrium,” she says, delighted, to nobody.',
+            cold:'She takes the cup out of your hand and drinks it herself.',
+            bad :'“Carthage will have a version of this by Thursday.”',
+            back:'She returns it and then tells the story herself, first, and better.'},
+  han:     {warm:'The brush stops. “…夜裏.” At night. The brush starts again.',
+            cold:'“失禮,” she says to the ledger, and rules a line under the column.',
+            bad :'“禮 is not a rule for the street,” she says. “It is a rule for the house.”',
+            back:'She returns it with the flat of the ledger, once, and resumes the column.'},
+  korean:  {warm:'She lets it happen, files it, and raises it later in a completely different argument.',
+            cold:'She reports it, deadpan, as though to a superior officer.',
+            bad :'“The head of the house is also your commander,” she says. “Consider that.”',
+            back:'She returns it, and her posture the whole time is a garrison’s.'},
+  wa:      {warm:'“…ふん.” She does not turn round. The account book does not stop. The ears go red.',
+            cold:'The abacus keeps going. That is the entire reply and it is enough.',
+            bad :'“My father’s house is the treaty,” she says. “Not me. Remember which is which.”',
+            back:'She puts you on the tatami with a wrist she learned on the naginata, and helps you up.'},
+  nanban:  {warm:'She crosses herself, which in this house is not a no.',
+            cold:'She says she will mention it in confession. She means it as a threat.',
+            bad :'Father Vilela has stopped walking in the passage outside.',
+            back:'She returns it and then apologises to the ceiling rather than to you.'},
+  ming:    {warm:'“Not where they can see,” she says, without any heat at all.',
+            cold:'She goes back to the tally-sticks and the tally-sticks are louder than you.',
+            bad :'“The whole compound trades on gossip and you have just given it stock.”',
+            back:'She returns it, and then writes something down, which is worse.'},
+  steppe:  {warm:'She says something back that would not survive translation and everyone laughs.',
+            cold:'She hands you a bowl of tea, which out here is not always kindness.',
+            bad :'“There are eleven people in this tent,” she says, “and nine of them are mine.”',
+            back:'She returns it off a horse, later, when you have forgotten about it.'},
+  kushan:  {warm:'“That is in the book,” she says. “Chapter seven. Do it properly.”',
+            cold:'“Prahanana is a chapter about AGREEMENT,” she says. “Read the first line of it.”',
+            bad :'“The text says: according to the custom of the country and what the two like. You have managed neither.”',
+            back:'She returns it in the correct order and tells you which sound you were supposed to make.'},
+  tamil:   {warm:'She answers in verse. It scans, and it is about you, and it is flattering.',
+            cold:'She answers in verse. It scans, and it is about you, and it is not.',
+            bad :'“Marutam,” she says — the quarrel landscape — “and in marutam the wife always wins.”',
+            back:'She returns it and composes the poem about it before you have straightened up.'},
+};
 function handOnHer(){
   let id='roman';
   try{ id=localCulture().id||'roman'; }catch(e){}
   return HAND_ON_HER[id] || HAND_ON_HER.roman;
+}
+/* her own words for one of the four outcomes, or Rome's if this people has
+   left us nothing to go on */
+function slapReply(k){
+  let id='roman';
+  try{ id=(localCulture()||{}).id||'roman'; }catch(e){}
+  const R=SLAP_REPLY[id]||SLAP_REPLY.roman;
+  return R[k] || SLAP_REPLY.roman[k];
 }
 /* how badly it lands HERE — private is nearly free almost everywhere and
    being seen is where the peoples actually disagree */
@@ -20833,12 +21256,9 @@ function slapVerdict(){
   const H=handOnHer(), exp=slapExposure();
   if(exp>=0.50 && Math.random()<exp*0.72)
     return {k:'seen', bond:-Math.round(3+exp*7), phys:-1, t:H.caught, note:H.word};
-  if(hasFlaw('cold'))       return {k:'cold',  bond:-3, phys:0,
-    t:'She does not turn round. “Noted,” she says, to the shelf.'};
-  if(warm<28)               return {k:'bad',   bond:-7, phys:-2,
-    t:'The look you get could take paint off a wall. This was not the week for it.'};
-  if(hasQuirk('tempest'))   return {k:'return',bond:+4, phys:+6,
-    t:'She turns round and returns it, harder, and neither of you is sorry.'};
+  if(hasFlaw('cold'))       return {k:'cold',  bond:-3, phys:0, t:slapReply('cold'), note:H.word};
+  if(warm<28)               return {k:'bad',   bond:-7, phys:-2, t:slapReply('bad'), note:H.word};
+  if(hasQuirk('tempest'))   return {k:'return',bond:+4, phys:+6, t:slapReply('back'), note:H.word};
   if(hasQuirk('possessive'))return {k:'love',  bond:+6, phys:+8,
     t:'“…again.” It was not a question.'};
   if(hasQuirk('devout') && festivalToday()) return {k:'bad', bond:-5, phys:0,
@@ -20846,9 +21266,8 @@ function slapVerdict(){
   if(hasTrait('tempting'))  return {k:'love',  bond:+5, phys:+7,
     t:'She was waiting for it and does not pretend otherwise.'};
   if(hasFlaw('proud') && (G.rank||0)<1) return {k:'cold', bond:-4, phys:0,
-    t:'“From a man with no rank at all.” She walks off.'};
-  if(warm>=64)              return {k:'love',  bond:+4, phys:+5,
-    t:'A yelp, a laugh, and something thrown at you that misses on purpose.'};
+    t:slapReply('cold')+' From a man with no rank at all.', note:H.word};
+  if(warm>=64)              return {k:'love',  bond:+4, phys:+5, t:slapReply('warm'), note:H.word};
   return {k:'ok', bond:+2, phys:+2, t:H.ok, note:H.word};
 }
 function doSlap(where){
@@ -37053,7 +37472,7 @@ window.__SS = {
   startVillaLove, updateVillaLove, drawVillaLove, villaLoveFinish, VILLALOVE_LEN, drawVillaMale,
   doSlap, slapVerdict, startSlapAnim, updateSlap, drawSlap, drawHairSmall,
   POSE_LORE, poseLore, poseName, drawShadowPlay,
-  HAND_ON_HER, handOnHer, slapExposure,
+  HAND_ON_HER, handOnHer, slapExposure, SLAP_REPLY, slapReply,
   SHIMMY, SHIMMY_TIER, shimmyOf, shimmyStart, shimmyTick, shimmyLive, shimmyEnv,
   shimmyHip, shimmySeat, shimmyLift, shimmyTrunk, shimmyBust, shimmyTierName, hexRGB,
   romanticVerdict, startRomantic, updateRomantic, drawRomantic, drawRomanticFem,
@@ -37136,6 +37555,9 @@ window.__SS = {
   HALL_PLAN, hallPlan, drawHall,
   GAZE_CULTURE, GAZE_VOICE, gazeVoice, gazeBase, CALLOUT_CULTURE, calloutLines,
   BODY_WORDS, bodyWordsHere, partPhrase, bodyBlurb,
+  pushSwingTrail, updateSwingTrails, drawSwingTrails, weaponTipLen,
+  impactBurst, updateImpacts, drawImpacts, swingSfx,
+  drawGroundHaze, drawArenaForeground,
   rankTier, gearGate, gearBuyable,
   drawRangedIcon, drawHeldGun, drawHeldBomb, drawHeldBow, blastAt, rangedCooldown, updateBurns,
   initRain, updateRain, drawRain, drawWetNotice, hasSidearm, switchWeapon, autoDrawBlade,
