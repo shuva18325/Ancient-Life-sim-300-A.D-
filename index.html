@@ -4382,6 +4382,9 @@ function drawBeardM(P,C,style,hx,mouthY,hw,o){
   }
 }
 // a translucent wash of a hex colour, for stubble
+/* '#e8688a' -> '232,104,138', so a tier colour can carry an alpha */
+function hexRGB(hex){ const n=parseInt(String(hex).slice(1),16);
+  return ((n>>16)&255)+','+((n>>8)&255)+','+(n&255); }
 function rgbA0(hex,a){ const n=parseInt(String(hex).slice(1),16);
   return 'rgba('+((n>>16)&255)+','+((n>>8)&255)+','+(n&255)+','+a+')'; }
 // anyone from an older save still gets the arrangement their people wore,
@@ -6146,6 +6149,109 @@ function heatColor(v){
 let bmCache={};
 function bmResetCache(){ bmCache={}; }
 function bmOnce(key, fn){ if(bmCache[key]===undefined) bmCache[key]=fn(); return bmCache[key]; }
+/* =====================================================================
+   THE SHAKE — and it is HER OWN MEASUREMENTS doing it
+   ---------------------------------------------------------------------
+   The low-shelf scene had one animation: a linear ramp into the bend,
+   the same for every woman in the game, and then she simply held it.
+   Whether she was a flat 2 or a colossal 10 the picture was identical,
+   which makes the entire body-map ladder decorative in the one scene
+   that ought to be reading it hardest.
+
+   So it is a DAMPED MASS-SPRING now, and the mass is the number.
+
+     omega = sqrt(k/m)      a bigger mass on the same mount swings SLOWER
+     A     = v / omega      and, for the same push, swings FURTHER
+
+   Both terms point the same way, which is why the two ends of the ladder
+   are not one animation played at two speeds: a flat tier is a quick,
+   shallow, tight little motion that stops almost at once, and a colossal
+   one is slow, deep, and still going four beats after she has stopped
+   driving it. And because the mass lags the thing driving it, the seat
+   visibly TRAILS the hip at the top of the ladder and does not at the
+   bottom — which is the detail that sells the weight.
+
+   Every other measurement contributes what it physically would:
+     BOOTY  the mass. Amplitude up, frequency down, decay slower.
+     WAIST  the lever. A tiny waist lets the hips swing further against a
+            trunk that is not going with them, so the isolation is cleaner.
+     LEGS   the drive. Long legs give a wider stance and a longer stroke.
+     BUST   the counterweight, a half-amplitude beat out of phase above.
+   ===================================================================== */
+const SHIMMY={t:0, dur:0, amp:0, freq:0, lag:0, decay:1, tier:0, bust:0, sway:0, stride:1};
+function shimmyOf(w){
+  const B=(w&&w.body)||{}, gv=(id,d)=>B[id]===undefined?d:B[id];
+  const be=gv('booty',5), wa=gv('waist',5), lg=gv('legs',5), bu=gv('bust',5);
+  const m=clamp(be,1,11)/10;                                  // the mass, 0.1 .. 1.1
+  const tier = be>=11?5 : be>=9?4 : be>=7?3 : be>=5?2 : be>=3?1 : 0;
+  return {
+    /* amplitude in pixels at the hip. A flat tier barely moves.
+       MEASURED AND RAISED: at 4.2 the top of the ladder swept three pixels
+       more than the bottom of it on a 480x270 canvas, which is a shiver, not
+       a shake. The figure is forty pixels tall; the motion has to be a real
+       fraction of her to survive the resolution. */
+    amp:  0.45 + m*6.4,
+    /* radians per tick. Big is SLOW — this is the half of it people never
+       animate, and it is the half that reads as weight. */
+    freq: Math.max(0.055, 0.245 - m*0.115),
+    /* how many ticks after she stops driving it that it is still going */
+    dur:  Math.round(150 + m*260),
+    decay: 1 - (0.030 - m*0.019),                              // heavier rings longer
+    /* the mass lags the hip that is driving it, and the lag grows with it */
+    lag:  m*2.4,
+    /* a tiny waist isolates the motion: the hips go and the ribs do not */
+    sway: clamp((wa-4)/6,0,1),
+    /* the counterweight above, out of phase and at a fraction of the travel */
+    bust: (bu/10)*0.42,
+    /* and long legs give a longer stroke */
+    stride: 0.85 + (lg/10)*0.45,
+    tier,
+  };
+}
+const SHIMMY_TIER=[
+  {name:'BARELY ANYTHING',  col:'#8a8a7a', note:'a shift of weight, and that is the whole of it.'},
+  {name:'A SMALL MOTION',   col:'#c8b070', note:'quick, tight, and over before you have decided what to do about it.'},
+  {name:'IT MOVES',         col:'#e8a04a', note:'enough that the room notices and pretends it did not.'},
+  {name:'IT KEEPS MOVING',  col:'#e8688a', note:'slower than you expect, and it does not stop when she does.'},
+  {name:'THE WHOLE ROOM',   col:'#e0407a', note:'deep, heavy and unhurried. The lamp flames lean.'},
+  {name:'⛧ NOT POSSIBLE',   col:'#ff7ae0', note:'physics has been asked to leave.'},
+];
+function shimmyStart(w, push){
+  const S=shimmyOf(w);
+  /* MUTATE, do not REASSIGN. `SHIMMY` is exported on __SS by value, so
+     replacing the object left every harness — and anything else holding the
+     reference — reading a dead one that never moved. */
+  SHIMMY.t=0; SHIMMY.dur=S.dur; SHIMMY.amp=S.amp*(push===undefined?1:push);
+  SHIMMY.freq=S.freq; SHIMMY.lag=S.lag; SHIMMY.decay=S.decay;
+  SHIMMY.tier=S.tier; SHIMMY.bust=S.bust; SHIMMY.sway=S.sway; SHIMMY.stride=S.stride;
+  return S;
+}
+function shimmyTick(dt){ if(SHIMMY.dur<=0) return;
+  SHIMMY.t+=dt; if(SHIMMY.t>=SHIMMY.dur){ SHIMMY.dur=0; SHIMMY.amp=0; SHIMMY.t=0; } }
+function shimmyLive(){ return SHIMMY.dur>0; }
+/* the envelope: it builds over the first fifth and rings down over the rest */
+function shimmyEnv(){
+  if(SHIMMY.dur<=0) return 0;
+  const u=clamp(SHIMMY.t/SHIMMY.dur,0,1);
+  const build=clamp(u/0.18,0,1);
+  return build*Math.pow(SHIMMY.decay, SHIMMY.t*0.10);
+}
+/* lateral travel at the HIP — the thing doing the driving */
+function shimmyHip(){ if(SHIMMY.dur<=0) return 0;
+  return Math.sin(SHIMMY.t*SHIMMY.freq)*SHIMMY.amp*shimmyEnv()*(SHIMMY.stride||1); }
+/* and at the MASS, which is behind it by the lag — this is the whole trick */
+function shimmySeat(){ if(SHIMMY.dur<=0) return 0;
+  return Math.sin((SHIMMY.t-SHIMMY.lag*4)*SHIMMY.freq)*SHIMMY.amp*shimmyEnv()*(SHIMMY.stride||1); }
+/* the vertical component: half the travel at twice the rate, which is what a
+   thing on a spring actually does when it is being swung side to side */
+function shimmyLift(){ if(SHIMMY.dur<=0) return 0;
+  return Math.abs(Math.cos(SHIMMY.t*SHIMMY.freq))*SHIMMY.amp*0.30*shimmyEnv(); }
+/* the ribs, which a tiny waist is very good at keeping OUT of it */
+function shimmyTrunk(){ if(SHIMMY.dur<=0) return 0;
+  return -shimmyHip()*(1-(SHIMMY.sway||0))*0.42; }
+function shimmyBust(){ if(SHIMMY.dur<=0) return 0;
+  return -Math.sin((SHIMMY.t-6)*SHIMMY.freq)*SHIMMY.amp*(SHIMMY.bust||0)*shimmyEnv(); }
+function shimmyTierName(){ const T=SHIMMY_TIER[clamp(SHIMMY.tier,0,5)]; return T.name; }
 /* =====================================================================
    SLAP PHYSICS — one damped spring, shared by every figure that can take one
    ---------------------------------------------------------------------
@@ -15324,6 +15430,141 @@ function drawShadowTheatre(s,T){
     ctx.globalAlpha=1; ctx.textAlign='left';
   }
 }
+/* =====================================================================
+   AND NOT EVERY COUNTRY IS DOING THE SAME THING — the pose lore
+   ---------------------------------------------------------------------
+   Seventeen positions, one running order, the same everywhere on earth,
+   with Roman names on all of them. So a household in Kyōto and a
+   household on the Nile were both playing a Roman repertoire in Latin,
+   which is exactly the thing this game spends the rest of its length
+   refusing to do.
+
+   Four of these five traditions NAMED what they did, in writing, in
+   period, and the names are the best-sourced thing on this page:
+
+   HAN CHINA · 九法 THE NINE POSTURES, out of the bedchamber literature —
+   the Mawangdui manuscripts buried in 168 BC and the later manuals that
+   the Japanese physician Tanba Yasuyori preserved wholesale in the
+   ISHINPŌ of 984, which is why we still have them at all. They are named
+   for animals: 龍翻 the dragon turning, 虎步 the tiger's tread, 猿搏 the
+   monkey's grasp, 蟬附 the cicada clinging, 龜騰 the tortoise rising,
+   鳳翔 the phoenix soaring, 兔吮毫 the rabbit licking its fur, 魚接鱗 the
+   fishes joining scales, 鶴交頸 the cranes twining necks. And the frame
+   around all nine is MEDICAL, not moral: the question the manuals ask is
+   whether a thing lengthens your life or shortens it.
+
+   THE KUSHAN AND THE SOUTH · the KAMASUTRA of Vatsyayana, compiled in
+   very nearly this century, and it is a SHASTRA — a technical treatise
+   with a syllabus. It names postures (utphallaka, vijrmbhitaka,
+   indranika), it names the embraces, and it names PRAHANANA, the striking
+   and the sounds that go with it — and then says, in as many words, that
+   what is proper depends on the custom of the country and on what the two
+   people like, and that force used on someone who has not agreed is the
+   failure. It is the least moralising row in this table and the most
+   technical.
+
+   WA · and this is the specific one. Japan's contribution is not a list
+   of postures, it is a CONVENTION OF DEPICTION: shunga — 春画, "spring
+   pictures" — already a commercial printed genre in this century, and its
+   rule is that the figures stay DRESSED. The robes are opened, never
+   removed, because the cloth is how the picture tells you who these
+   people are, and a naked body in this tradition is a body with its rank
+   taken off it. That is a real difference from every other culture here
+   and it is drawn as one.
+
+   EGYPT · the TURIN EROTIC PAPYRUS (Papyrus 55001), c. 1150 BC — twelve
+   scenes, and the honest note is that its captions do not survive in a
+   state that gives us names for the positions. What it does give us is
+   unmistakable: she is repeatedly the active party, the staging is
+   acrobatic to the point of comedy, and there is not a trace of shame
+   anywhere in it. So these are described, not named, and the source is
+   said out loud rather than dressed up in invented Egyptian.
+
+   ROME · stays exactly as it was, because the Roman list is already
+   sourced: Ovid on picking by her figure, more ferarum in the poets and
+   on the lamps, mulier equitans, and os impurum doing the rest.
+   ===================================================================== */
+const POSE_LORE = {
+  roman: { frame:'THE ROMAN REPERTOIRE',
+    src:'Ovid, the lamps, the wall-paintings, and Martial for the parts Ovid leaves out.',
+    order:null, names:null },
+  greek: { frame:'THE SYMPOSIUM AND THE INNER ROOMS',
+    src:'What happens at a symposium and what happens in the gynaikonitis are two different subjects.',
+    order:[1,0,3,2,6,4,5,7], names:null },
+  han: { frame:'九法 — THE NINE POSTURES',
+    src:'The Mawangdui manuscripts (buried 168 BC), preserved in Tanba Yasuyori’s Ishinpō of 984.',
+    order:[17,1,0,3,2,6,5,7],
+    names:{17:'龍翻 the dragon turning', 1:'鶴交頸 the cranes twining necks',
+           0:'蟬附 the cicada clinging', 3:'龜騰 the tortoise rising',
+           2:'虎步 the tiger’s tread', 6:'猿搏 the monkey’s grasp',
+           5:'鳳翔 the phoenix soaring', 4:'魚接鱗 the fishes joining scales',
+           7:'兔唄毫 the rabbit licking its fur'} },
+  korean: { frame:'房中術 — AFTER THE CHINESE MANUALS',
+    src:'The same manuals, read in a Buyŏ household along with everything else Chinese.',
+    order:[17,1,0,2,3,6,7], names:null, inherit:'han' },
+  steppe: { frame:'A FELT TENT AND NO DOORS IN IT',
+    src:'Nobody wrote a manual out here and nobody wanted one. There is a household and there are riders.',
+    order:[0,2,3,1,7], names:{0:'the ordinary night',2:'as the herds do it',3:'she is not asking permission',
+      1:'the long wintering',7:'and the fire is banked'} },
+  kushan: { frame:'THE KAMASUTRA — A TREATISE, NOT A CONFESSION',
+    src:'Vatsyayana, compiled in roughly this century, and its sixty-four arts.',
+    order:[20,3,2,0,5,4,1,6,7],
+    names:{20:'प्रहनन prahanana — the striking, and the sounds',
+           3:'indranika — named for the god’s wife', 2:'the elephant',
+           0:'the twining embrace', 5:'utphallaka — the raised',
+           4:'vijrmbhitaka — the yawning', 1:'the milk-and-water embrace',
+           6:'the mixture of sesamum with rice', 7:'and the sixty-four arts, afterwards'} },
+  tamil: { frame:'AKAM — AND EVERY MOOD HAS A LANDSCAPE',
+    src:'The Sangam anthologies and the tinai scheme of the Tolkappiyam.',
+    order:[20,0,2,3,1,5,7],
+    names:{20:'kuṟinji — the mountains, and union', 0:'the jasmine of the forest tract',
+           2:'marutam — the farmland, and the quarrel', 3:'she answers in verse',
+           1:'neytal — the shore', 5:'palai — the road, and the two of you on it',
+           7:'and the poets will decide what it meant'} },
+  /* WA. The convention is that the robes stay ON. */
+  wa: { frame:'春画 SHUNGA — AND THE ROBES STAY ON',
+    src:'A commercial printed genre by this century; the cloth is how the picture says who these people are.',
+    order:[19,2,0,3,1,5,6,7],
+    names:{19:'枝を交す the branches crossed', 2:'後ろから from behind, and the obi undone',
+           0:'抱き合い the embrace', 3:'上に she is above',
+           1:'口づけ the kiss', 5:'抱き上げ lifted',
+           6:'乱れ the disarrangement', 7:'同衾 under one quilt'} },
+  nanban: { frame:'AND THERE IS A JESUIT IN THE HOUSE',
+    src:'The mission at Hirado and Nagasaki had views, wrote them down, and was not asked.',
+    order:[0,1,7], names:{0:'and the door is bolted',1:'quietly',7:'and neither of you mentions it'} },
+  ming: { frame:'房中術 — BROUGHT IN A SHIP’S CHEST',
+    src:'The same Chinese manuals, in a Fujianese trading house on the Kūshū coast.',
+    order:[17,1,2,3,0,7], names:null, inherit:'han' },
+  egyptian: { frame:'THE TURIN PAPYRUS — TWELVE SCENES, NO SHAME IN ANY OF THEM',
+    src:'Papyrus 55001, c. 1150 BC. Its captions do not survive; the staging does, and she is the one moving.',
+    order:[18,3,2,0,5,4,1,7],
+    names:{18:'she has him where she wants him', 3:'she rides, and the papyrus is emphatic about it',
+           2:'the second scene', 0:'the lotus, and the wine jar', 5:'the acrobat',
+           4:'the harpist has not stopped playing', 1:'the eleventh scene', 7:'and nobody is embarrassed'} },
+  /* the tribes did not write it down, and inventing names for them would be
+     the one dishonest row on this page */
+  celt:     { frame:'NOBODY HERE WROTE IT DOWN', src:'The tribes built a moral system out of loyalty, not out of this.',
+              order:[0,2,3,1,4,7], names:null },
+  germanic: { frame:'ONE HUSBAND, ONE LIFE', src:'Tacitus: they do not care what you do. They care whether you were faithful.',
+              order:[0,1,2,3,7], names:null },
+  persian:  { frame:'WHAT A SATRAP DOES IS A SATRAP’S BUSINESS', src:'Rank decides it, as rank decides everything here.',
+              order:[0,1,3,2,5,7], names:null },
+  numidian: { frame:'BETWEEN THE HOUSES', src:'And shame travels the coast faster than a ship.',
+              order:[0,2,1,3,7], names:null },
+};
+function poseLore(){
+  let id='roman';
+  try{ id=localCulture().id||'roman'; }catch(e){}
+  const L=POSE_LORE[id]||POSE_LORE.roman;
+  if(L.inherit && !L.names) return Object.assign({}, POSE_LORE[L.inherit], {frame:L.frame, src:L.src, order:L.order});
+  return L;
+}
+/* what this culture calls the position it is currently on */
+function poseName(vi, fallback){
+  const L=poseLore();
+  if(L.names && L.names[vi]) return L.names[vi];
+  return fallback;
+}
 function drawShadowPlay(s,T){
   const place=s.place||'bed';
   const style = place==='pool'?'water' : place==='bath'?'marble' : 'wall';
@@ -15695,7 +15936,11 @@ function drawShadowPlay(s,T){
     bath:     [11,1,12,5,2,13],             // marble benches, steam, an echo
     wardrobe: [14,0,15,4,16],               // upright, cramped, and against the doors
   };
-  const SET = PLACE_SET[place] || PLACE_SET.bed;
+  /* AND WHICH COUNTRY'S RUNNING ORDER. The bed plays the local repertoire;
+     a pool, a bathhouse and a wardrobe are place-shaped and stay as they are,
+     because a Han manual has nothing to say about a cedar cupboard. */
+  const _LORE=poseLore();
+  const SET = (place==='bed' && _LORE.order)? _LORE.order : (PLACE_SET[place] || PLACE_SET.bed);
   const cut = s.len==='quick'? Math.max(3,SET.length-2) : SET.length;
   const step=(((T-520)/160)|0);
   const vi = SET[ ((step%cut)+cut)%cut ];
@@ -15703,7 +15948,9 @@ function drawShadowPlay(s,T){
   const POSE_NAMES=['the embrace','the kiss','from behind','the ride','the lift','the sundial','the tangle','at rest',
                     'on the pool rim','the ledge','afloat',
                     'on the warm marble','the bench','under the spout',
-                    'against the doors','pinned to the cedar','among the hanging cloth'];
+                    'against the doors','pinned to the cedar','among the hanging cloth',
+                    '\u9f8d\u7ffb the dragon turning','the Turin papyrus','\u6625\u753b the branches crossed',
+                    '\u092a\u094d\u0930\u0939\u0928\u0928 prahanana'];
   const celt=(G.wife&&G.wife.eth==='celt'), egy=(G.wife&&G.wife.eth==='egyptian');
   // ---- CURVE PRIMITIVES: silhouettes are one flat colour, so draw real curves ----
   // every mass gets a lit crown and a shaded underside in MEDIUM, so a body
@@ -15825,7 +16072,10 @@ function drawShadowPlay(s,T){
   // the nameplate is handed to the theatre to draw: pixelText writes to the
   // text overlay, which knows nothing about the camera transform, so drawing it
   // in here would put it wherever the untransformed coordinates happened to land
-  s.poseName = POSE_NAMES[vi]||'';
+  /* AND IT IS CALLED WHAT THIS COUNTRY CALLS IT. The same seventeen
+     positions were labelled in Roman English in every household on earth. */
+  s.poseName = poseName(vi, POSE_NAMES[vi]||'');
+  s.poseFrame = _LORE.frame||''; s.poseSrc = _LORE.src||'';
   s.poseFade = clamp((vt-18)/26,0,1)*clamp((150-vt)/24,0,1);
   s.poseCol  = STG.col||'#e8c34a';
 
@@ -16488,6 +16738,120 @@ function drawShadowPlay(s,T){
         ctx.restore(); } }
     HB(cx0+2,base-88,9);
   }
+  else if(vi===17){
+    /* 龍翻 THE DRAGON TURNING — the first of the Nine Postures, and the frame
+       around it is MEDICAL. The manuals are about breath, timing and whether a
+       thing lengthens your life; so this is the composed one, both of them
+       upright and facing, on a low lacquered couch with a folding screen
+       behind it, and the tempo is slow because the texts say it should be. */
+    const br=Math.sin(T*0.20)*2.2;                       // breath, not thrust
+    px(cx0-40,base-58,80,10,'#2f1a14'); px(cx0-40,base-58,80,2,'#5a2f22');   // the couch
+    px(cx0-40,base-48,4,20,'#2a1610'); px(cx0+36,base-48,4,20,'#2a1610');
+    for(let i=0;i<4;i++){ px(cx0-42+i*22,base-92,20,34,'#3a3028');           // the folding screen
+      px(cx0-42+i*22,base-92,20,2,'#5a4c3a'); px(cx0-42+i*22,base-92,1,34,'#22201c');
+      px(cx0-38+i*22,base-84,12,1,'rgba(200,180,120,.30)'); }
+    rfig({x:cx0-8, y:base-58, male:true,  face:1,  crouch:0.34,
+      legs:[[-1.35,-2,0.55],[-1.20,2,0.55]],                                  // seated, both knees folded
+      arms:[[-0.55,15,0.70],[-0.10,15,0.70]]});
+    rfig({x:cx0+7, y:base-58-br*0.3, male:false, face:-1, crouch:0.30,
+      legs:[[-1.42,-2,0.52],[-1.28,2,0.52]],
+      arms:[[-1.05,11,0.72],[-0.62,11,0.72]], headAng:0.06});
+    veil(cx0, base-84, 22, 6, 0.6);
+    ctx.globalAlpha=0.30; px(cx0-16,base-100,32,3,'#c8a34a'); ctx.globalAlpha=1;  // the lamp above
+    HB(cx0, base-104, 8);
+  }
+  else if(vi===18){
+    /* THE TURIN PAPYRUS. The thing every commentator says about it is that SHE
+       is the active one and the staging is acrobatic to the point of comedy —
+       so she is above and standing over him, and there is a wine jar and a
+       harpist's lyre lying where somebody put it down. */
+    const rd=Math.max(0,Math.sin(T*0.44)), lift=rd*5;
+    for(let i=0;i<7;i++) px(cx0-42+i*12,base-8,11,8,i%2?'#a8843e':'#c09a52');  // a reed mat
+    px(cx0-46,base-96,7,88,'#c8b07a'); px(cx0-46,base-96,7,3,'#e2cc9a');       // a lotus column
+    px(cx0-49,base-104,13,9,'#8aa86a'); px(cx0-48,base-103,11,3,'#a8c884');
+    px(cx0+34,base-22,9,14,'#8a5a3a'); px(cx0+34,base-24,9,3,'#a87a54');       // the wine jar
+    px(cx0+36,base-27,4,4,'#6a3a24');
+    rfig({x:cx0-2, y:base, male:true, face:1, crouch:0.92,                     // he is on his back
+      legs:[[-1.50,-2,0.50],[-1.62,2,0.50]],
+      arms:[[-2.10,15,0.42],[-1.05,15,0.42]], headAng:0.30});
+    rfig({x:cx0+3, y:base-16-lift, male:false, face:-1, crouch:0.16,
+      legs:[[-1.30,-2,0.62],[-1.55,2,0.62]],
+      arms:[[-1.55,11,0.55],[-1.90,11,0.55]], headAng:-0.10});
+    veil(cx0+3, base-40-lift, 24, 7, 0);
+    if(rd>0.85 && (T|0)%9<2) px(cx0+34+rnd(-2,6),base-30,2,2,'#c8a34a');       // the jar goes over
+    HB(cx0+3, base-72-lift, 9);
+  }
+  else if(vi===19){
+    /* 春画 SHUNGA — AND THE ROBES STAY ON. This is the whole point of the
+       Japanese row and it is drawn as the whole point: the figures are
+       CLOTHED, the kimono is opened and pulled off one shoulder and never
+       taken off, the obi is undone and trailing, and the picture is on tatami
+       with a byōbu screen knocked half over behind them. A naked body in this
+       tradition is a body with its rank taken off it. */
+    const kn=Math.max(0,Math.sin(T*0.40));
+    for(let i=0;i<5;i++){ px(cx0-45+i*18,base-6,17,6,i%2?'#9aa06a':'#a8ae76'); // tatami, 2:1
+      px(cx0-45+i*18,base-6,17,1,'#c0c48e'); px(cx0-45+i*18,base-2,17,1,'#3a4028'); }
+    for(let i=0;i<3;i++){ px(cx0-46+i*20,base-88,19,82,'#e8e0cc');             // the byōbu, half over
+      px(cx0-46+i*20,base-88,19,2,'#2a2018'); px(cx0-46+i*20,base-88,1,82,'#2a2018'); }
+    px(cx0+22,base-72,3,66,'#2a2018');
+    rfig({x:cx0-9, y:base, male:true, face:1, crouch:0.52+kn*0.06,
+      legs:[[-1.30,-2,0.52],[-0.95,2,0.52]],
+      arms:[[-0.62,15,0.62],[-0.05,15,0.62]]});
+    rfig({x:cx0+8, y:base, male:false, face:-1, crouch:0.60,
+      legs:[[-1.42,-2,0.50],[-1.10,2,0.50]],
+      arms:[[-1.15,11,0.60],[-0.50,11,0.72]], headAng:-0.14});
+    /* THE CLOTH, OVER BOTH OF THEM, WHICH IS THE CONVENTION */
+    /* OPENED, NOT WORN OVER THEM. The first cut drew each robe as one
+       seventeen-pixel slab across the middle of the figure and the two of
+       them disappeared behind their own clothes — which is the opposite of
+       the convention. A shunga robe is pulled OFF the shoulders and hangs to
+       either side: two narrow panels flanking the bodies, with the sleeve
+       still on the far arm and the whole front of the picture open. */
+    { const R=(G.wife&&G.wife.dress)||'#8a2f4a', RH=shade(R,26), RS=shade(R,-30);
+      ctx.globalAlpha=0.94;
+      px(cx0+15,base-54,7,46,R);  px(cx0+15,base-54,7,2,RH); px(cx0+21,base-54,1,46,RS);   // hers, fallen right
+      px(cx0+11,base-40,5,30,shade(R,-14));                                                 // and the sleeve
+      px(cx0+12,base-52,3,16,RH);
+      px(cx0-24,base-52,7,44,'#3a3a44'); px(cx0-24,base-52,7,2,'#5a5a66');                  // his, indigo, fallen left
+      px(cx0-18,base-52,1,44,'#22222a'); px(cx0-19,base-38,4,28,'#32323c');
+      /* the obi, undone, trailing off the mat — the single detail that says
+         the robes were OPENED and not removed */
+      px(cx0+6,base-30,26,4,'#c0a02a'); px(cx0+6,base-30,26,1,'#e0c452');
+      px(cx0+30,base-28,12,3,'#c0a02a'); px(cx0+40,base-26,9,3,'#a8882a');
+      ctx.globalAlpha=1; }
+    veil(cx0+1, base-60, 20, 6, 0.4);
+    HB(cx0+1, base-84, 8);
+  }
+  else if(vi===20){
+    /* प्रहनन PRAHANANA — the Kamasutra names the striking and the sounds that
+       go with it, gives them a vocabulary, and then says it depends on the
+       custom of the country and on what the two people like. She is in his lap
+       on a low charpai under a hanging lamp, which is the posture the text
+       discusses it in. */
+    const bt=Math.max(0,Math.sin(T*0.36)), hit=(T%84)<6? 1-((T%84)/6) : 0;
+    px(cx0-38,base-40,76,7,'#7a5634'); px(cx0-38,base-40,76,2,'#a07a4a');       // the charpai
+    for(let i=0;i<9;i++) px(cx0-36+i*9,base-33,2,26,'#5a4028');
+    for(let i=0;i<7;i++) px(cx0-34,base-38+i*0.6,68,1,'rgba(220,200,150,.22)'); // its woven top
+    px(cx0+2,base-108,2,22,'#5a4a2a');                                          // the hanging lamp
+    px(cx0-4,base-88,12,7,'#c8a34a'); px(cx0-3,base-87,10,2,'#e8ca7a');
+    ctx.globalAlpha=0.14+0.06*Math.sin(T*0.11); px(cx0-24,base-92,52,44,'#ffcf7a'); ctx.globalAlpha=1;
+    rfig({x:cx0-6, y:base-40, male:true, face:1, crouch:0.30,
+      legs:[[-1.48,-2,0.50],[-1.36,2,0.50]],
+      arms:[[-0.72,15,0.66],[0.10,15,0.50]]});
+    rfig({x:cx0+6, y:base-40-bt*2, male:false, face:-1, crouch:0.24,
+      legs:[[-1.10,-2,0.58],[-1.62,2,0.58]],
+      arms:[[-1.28,11,0.66],[-0.88,11,0.66]], headAng:0.10});
+    /* THE STRIKE, on its own beat, and the sound the text has a word for */
+    if(hit>0){ ctx.globalAlpha=hit*0.85;
+      px(cx0+2,base-56,11,4,'rgba(255,178,190,1)');
+      ctx.globalAlpha=hit*0.6; px(cx0-2,base-60,19,12,'rgba(255,226,208,1)');
+      ctx.globalAlpha=1;
+      if(hit>0.6){ ctx.textAlign='center';
+        pixelText('सीत्कृत', cx0, base-96, 'rgba(255,214,200,'+hit.toFixed(2)+')', 0.9);
+        ctx.textAlign='left'; } }
+    veil(cx0+1, base-58, 22, 6, 0.3);
+    HB(cx0+1, base-84, 9);
+  }
   // ---- water ripple / marble echo, painted OVER the figures ----
   if(style==='water'){ for(let yy=gy+4;yy<gy+gh;yy+=5){ ctx.globalAlpha=.08; px(gx,Math.round(yy+Math.sin((yy+T)*0.2)),gw,1,'#bfeaff'); } ctx.globalAlpha=1;
     ctx.globalAlpha=.10; px(gx,gy+gh-16,gw,16,'#0a1826'); ctx.globalAlpha=1; }                    // the surface below
@@ -17078,6 +17442,11 @@ function drawWifeFig(c,x,y,w,ph,mode,preg){
     const bT = be>=9?4 : be>=7?3 : be>=5?2 : be>=3?1 : 0;
     const flare=[0,1,2,3,4][bT], deep=[6,7,8,9,10][bT];
     const back=Math.round(lean*5);                            // hips counterweight BACKWARD
+    /* THE ISOLATION. A tiny waist is a long lever and it lets the hips travel
+       against a rib cage that is not going with them; a thick one carries the
+       whole trunk along and there is nothing to watch. shimmyTrunk() already
+       carries her waist score, so this line IS the difference between the two. */
+    const TRK=Math.round(shimmyTrunk());
     // ---- the shadow she casts, which is what puts her ON the floor ----
     { c.globalAlpha=0.26; c.fillStyle='#120b08';
       c.beginPath(); c.ellipse(x-back+lean*5, y-1, 13+lean*7, 3.2, 0,0,7); c.fill(); c.globalAlpha=1; }
@@ -17098,14 +17467,30 @@ function drawWifeFig(c,x,y,w,ph,mode,preg){
     // ---- the seat, lifted and pushed back, drawn on HER tier ----
     { const bands=[[0.35,0.74],[0.78,1.0],[1.0,1.0],[0.60,0.84]];
       const SJ2=slapJig()*(0.5+bT*0.32);            // a slap rings through the bend as well
-      let yAt=seatTop+Math.round(SJ2*0.5);
+      /* AND SO DOES THE SHAKE. The hip drives; the mass follows a beat behind
+         it, and how far behind is her own tier — which is the entire reason a
+         flat 2 and a colossal 9 do not read as one animation at two speeds. */
+      const SHx=Math.round(shimmySeat()), SHy=Math.round(shimmyLift());
+      let yAt=seatTop+Math.round(SJ2*0.5)-SHy;
       bands.forEach(([hf,wf],bi)=>{
         const bh=Math.max(1,Math.round(deep*hf*0.42*(1+lean*0.42)));
         const bw=Math.round((hipW2+flare)*wf*(1+lean*0.26)+SJ2*0.30);
-        P(-bw-back, yAt, bw*2, bh, dress);
-        if(bi===0) P(-bw-back, yAt, bw*2, 1, dHi);
-        if(bi>=1 && bT>=2){ P(-bw-back, yAt, 1, bh, dHi); P(bw-1-back, yAt, 1, bh, dSh); }
-        if(bi===3) P(-bw+1-back, yAt+bh-1, bw*2-2, 1, shade(dress,-38));   // the fold underneath it
+        /* the lower bands lag furthest — the top of the seat is nearly the
+           hip and moves with it, the underside is all mass and does not */
+        const sx=Math.round(SHx*(0.35+bi*0.24));
+        /* SQUASH AND STRETCH. At forty pixels tall the travel alone is a few
+           pixels; what the eye actually reads is the mass DEFORMING — wider at
+           the ends of the swing where it is loaded, narrower through the middle
+           where it is not. It is also what a soft mass on a spring does. */
+        const sq=Math.round(Math.abs(SHx)*0.34*(bi>=1?1:0.4));
+        P(-bw-sq-back+sx, yAt, (bw+sq)*2, bh, dress);
+        if(bi===0) P(-bw-sq-back+sx, yAt, (bw+sq)*2, 1, dHi);
+        if(bi>=1 && bT>=2){ P(-bw-sq-back+sx, yAt, 1, bh, dHi); P(bw+sq-1-back+sx, yAt, 1, bh, dSh); }
+        if(bi===3) P(-bw-sq+1-back+sx, yAt+bh-1, (bw+sq)*2-2, 1, shade(dress,-38));   // the fold underneath it
+        /* and the cloth STRETCHES on the leading side rather than sliding —
+           a highlight that runs where the gown is being pulled tight */
+        if(bT>=2 && Math.abs(SHx)>0.9)
+          P((SHx>0? bw+sq-2 : -bw-sq)-back+sx, yAt, 2, bh, SHx>0? dHi : dSh);
         yAt+=bh; });
       { const bwT=Math.round((hipW2+flare)*0.74*(1+lean*0.26));            // and a crown of light on top
         P(-bwT-back, seatTop-1, bwT*2, 1, shade(dress,34)); }
@@ -17175,7 +17560,11 @@ function drawWifeFig(c,x,y,w,ph,mode,preg){
        shoulders drop to about hip height or below, which is why the head ends
        up around her own waist. Driving it off cos() kept the shoulders ABOVE
        the hips at every stage, and she read as a table with a head on it. */
-    const shX=Math.round(-back+lean*17);
+    /* THE ISOLATION, applied. The trunk gets shimmyTrunk(), which is the
+       hip's travel inverted and scaled by how much waist she has to isolate
+       with — so at a tiny waist the ribs and head stay put while the hips go,
+       and at a thick one the whole woman rocks and there is nothing to watch. */
+    const shX=Math.round(-back+lean*17+TRK);
     // deep enough that her head comes down near her own knee, but never through the floor
     const shY=Math.min(-13, Math.round(hy-18+lean*27));
     { const N=9, hx0=-back, hy0=hy-3;
@@ -17186,11 +17575,12 @@ function drawWifeFig(c,x,y,w,ph,mode,preg){
         P(bx-bw, by-1, bw*2, 1, dHi); } }
     // what hangs forward once she is over
     if(bu>=3 && lean>0.25){ const bw2=bustW, bh2=bustH+Math.round(lean*4);
-      P(shX-bw2-1, shY+1, bw2, bh2, dress);   P(shX-bw2-1, shY+1, bw2, 1, dHi);
-      P(shX-bw2-1, shY+bh2, bw2, 1, dSh);
-      P(shX+1,     shY+1, bw2, bh2, dress);   P(shX+1,     shY+1, bw2, 1, dHi);
-      P(shX+1,     shY+bh2, bw2, 1, dSh);
-      P(shX,       shY+1, 1, bh2, shade(dress,-30)); }                      // the line between them
+      const BX=Math.round(shimmyBust());              // the counterweight above, out of phase
+      P(shX-bw2-1+BX, shY+1, bw2, bh2, dress);   P(shX-bw2-1+BX, shY+1, bw2, 1, dHi);
+      P(shX-bw2-1+BX, shY+bh2, bw2, 1, dSh);
+      P(shX+1+BX,     shY+1, bw2, bh2, dress);   P(shX+1+BX,     shY+1, bw2, 1, dHi);
+      P(shX+1+BX,     shY+bh2, bw2, 1, dSh);
+      P(shX+BX,       shY+1, 1, bh2, shade(dress,-30)); }                   // the line between them
     // ---- head: UPRIGHT, at the end of the trunk, with the hair falling down ----
     P(shX-2, shY-3, 5, 4, skin); P(shX-2, shY-3, 5, 1, shade(skin,16));   // neck
     P(shX-4, shY-11, 8, 8, skin); P(shX-4, shY-11, 8, 1, shade(skin,22));
@@ -17728,6 +18118,7 @@ function updateDomus(dt){
   if(D.sib){ D.sib.t+=dt; if(D.sib.t>270) D.sib=null; }
   if(D.rslap){ updateRomantic(dt); return; }
   if(D.slap){ updateSlap(dt); return; }
+  shimmyTick(dt);                            // it rings on after the scene lets go
   if(D.tempt){ updateTempt(dt); if(D.tempt && D.tempt.locks) return; }
   else if(temptDue()) startTempt();
   if(D.refuse) updateRefusal(dt);                     // a refusal plays over whatever else is happening
@@ -19211,9 +19602,17 @@ function startTempt(){
 }
 function updateTempt(dt){
   const D=DM, X=D.tempt; X.t+=dt;
+  shimmyTick(dt);
   if(X.ph==='bend'){                        // five stages, and she does not hurry
     X.k=clamp(X.t/150,0,1);
-    if(X.t>210){ X.ph='approach'; X.t=0; }
+    /* AND THEN SHE MOVES. The scene used to hold the bend for sixty ticks and
+       hand off — one picture, identical for every woman in the game, in the
+       one scene that ought to be reading the body map hardest. Now the bend
+       ENDS in a shake, and the shake is a damped mass-spring with her own
+       measurements in it: heavier is slower and deeper and rings longer, a
+       tiny waist isolates it to the hips, long legs lengthen the stroke. */
+    if(X.t>190 && !X.shook){ X.shook=true; X.sh=shimmyStart(G.wife, X.invited? 1.25 : 1.0); }
+    if(X.t>190+((X.sh&&X.sh.dur)||220)*0.62){ X.ph='approach'; X.t=0; }
   } else if(X.ph==='approach'){             // he goes over. You did not ask him to.
     X.locks=true;
     const tx=X.x + (D.x < X.x? -24 : 24);
@@ -19428,9 +19827,146 @@ function updateVillaLove(dt){
    treats it exactly as badly as it deserves. It is worth real bond when
    it lands well and costs real bond when it does not, so it is not free.
    ===================================================================== */
+/* =====================================================================
+   WHAT THIS PEOPLE THINKS OF A HAND ON HER, AND WHERE
+   ---------------------------------------------------------------------
+   The slap had ONE reaction table for the whole world, which meant a
+   household in Kyōto, a household on the Orkhon and a household on the
+   Palatine all answered it in the voice of a Roman wife. They would not
+   have, and the differences are not decoration — each of these follows
+   from something the culture actually held.
+
+   ROME · not the act, the AUDIENCE. Roman anxiety about the body is
+   public, not private: what is done between a husband and his wife in
+   their own house is nobody's business and the law says so, but a matrona
+   has DIGNITAS in front of the household and a man who forgets that in
+   front of slaves has made a mistake about himself, not about her.
+
+   HAN CHINA · 禮 LI. The question is never the act, it is DECORUM and
+   whether the household is visibly in order. The bedchamber manuals are
+   medical texts with no shame in them at all; the ritual texts are
+   ferocious about conduct where the household can see. So: in private,
+   nothing. In front of servants, a real offence — against the HOUSE.
+
+   THE STEPPE · a ger has one room and no doors and everybody in it is
+   related to you. Privacy is not a thing that exists to be violated. The
+   Chinese sources are appalled by steppe informality between the sexes
+   for four centuries running, which tells you the steppe was not.
+
+   THE KUSHAN · the Kamasutra, compiled in exactly this period, discusses
+   striking and the sounds that go with it as a NAMED TECHNIQUE with a
+   vocabulary — prahanana — and then says, in as many words, that it is a
+   matter of the country's custom and of what the two people like, and
+   that force used on someone who has not agreed to it is the failure. It
+   is the most explicitly technical, least moralising row in the table.
+
+   TAMILAKAM · the akam poets have a whole mood for this. Marutam is the
+   landscape of the quarrel and the poems in it are startlingly direct
+   about the body, and the wife almost always wins the exchange. What is
+   remembered is the VERSE, not the act.
+
+   JAPAN · and this is the one worth getting right, because the picture
+   everyone carries is Tokugawa and this is a hundred years before it. The
+   shunga presses are already running: explicit, commercial, printed, and
+   nobody is scandalised by a print. What a Sengoku house polices is not
+   the bedchamber, it is the ALLIANCE. And the wife of a warrior house is
+   not a decorative person — she runs the castle when he is away, she is
+   trained on the naginata, and she keeps her own family name. So the
+   answer here is not shock and it is not permission: it is that she is a
+   party to a treaty and she will answer you as one.
+
+   KOREA · Han decorum as the written standard, over a lineage that is
+   also a garrison, so it goes to the head of the house — who is also your
+   commander.
+
+   THE PORTUGUESE IN THE PORTS · a Jesuit is in the house and he has
+   opinions about every single thing on this list, which is a genuinely
+   new experience for everybody involved.
+   ===================================================================== */
+const HAND_ON_HER = {
+  roman: { seen:0.55, priv:0.05,
+    word:'A matrona has dignitas in front of the household. In private, Rome has nothing to say.',
+    ok:'“…Careful.” She is smiling at the wall, where you cannot see it.',
+    caught:'Two slaves saw that. She will not mention it and will not forget it.' },
+  greek: { seen:0.62, priv:0.10,
+    word:'A wife belongs to the inner rooms and what happens there stays there. Where guests can see is another matter entirely.',
+    ok:'She says nothing at all, in the particular way that means something.',
+    caught:'In the andron. In front of guests. You have made a mistake about yourself.' },
+  egyptian:{ seen:0.18, priv:0.02,
+    word:'She owns her property, signs her own contracts and can end the marriage on any morning she likes. That is the whole of the answer.',
+    ok:'“Mm,” she says, and goes back to what she was doing.',
+    caught:'Nobody in this house finds it remarkable. Egypt is not a scandalised country.' },
+  persian:{ seen:0.58, priv:0.12,
+    word:'Rank, like everything else here. What a satrap does in his own house is a satrap’s business; what he does in front of the court is the court’s.',
+    ok:'She raises one eyebrow, which from her is a great deal.',
+    caught:'It will be at the King’s table within the week.' },
+  celt:  { seen:0.20, priv:0.04,
+    word:'Her brothers are the law here and they are not interested in a joke. They are interested in whether you stand beside her.',
+    ok:'She laughs, and hits you back harder than you hit her.',
+    caught:'Her kin heard it from the yard and are delighted.' },
+  germanic:{ seen:0.16, priv:0.03,
+    word:'Tacitus is explicit that they do not care what you do. They care, terribly, whether you were faithful.',
+    ok:'She turns round with a look that has a whole winter in it, and then grins.',
+    caught:'The hall is one room. The hall has already made a noise about it.' },
+  numidian:{ seen:0.44, priv:0.08,
+    word:'Between the houses, and shame travels the coast faster than a ship.',
+    ok:'“In my own atrium,” she says, to nobody.', caught:'Carthage will hear a version of this by Thursday.' },
+  /* ---- THE EAST ---- */
+  han:   { seen:0.78, priv:0.06,
+    word:'禮 LI. Not the act — the DECORUM. The bedchamber manuals are medical and have no shame in them; the ritual texts are ferocious about conduct the household can see.',
+    ok:'“…失禮.” Improper. She does not look up from the ledger.',
+    caught:'A servant saw. In this house that is a matter of ritual order, and the clerks write everything down.' },
+  steppe:{ seen:0.10, priv:0.03,
+    word:'A ger has one room, no doors, and everyone in it is related to you. Privacy is not a thing that exists here to be violated.',
+    ok:'She says something in reply that would not survive translation.',
+    caught:'Everybody in the tent saw. Nobody in the tent is remotely surprised.' },
+  kushan:{ seen:0.30, priv:0.05,
+    word:'The Kamasutra names it — prahanana — gives it a vocabulary, and then says plainly that it depends on the custom of the country and on what the two people like. Force on someone who has not agreed is the failure; nothing else on the list is.',
+    ok:'“That is in the book,” she says. “Chapter seven. Do it properly.”',
+    caught:'It is discussed the way a performance is discussed — as a matter of skill.' },
+  tamil: { seen:0.26, priv:0.04,
+    word:'The akam poets have a landscape for this. Marutam is the quarrel, the poems in it are startlingly direct, and the wife almost always wins the exchange.',
+    ok:'She answers in verse. It scans, and it is about you.',
+    caught:'A poet heard. It will be recited at the next feast and you will be sitting there.' },
+  korean:{ seen:0.70, priv:0.07,
+    word:'Han decorum as the written standard, over a lineage that is also a garrison.',
+    ok:'She lets it go, and files it.',
+    caught:'It goes to the head of the house, who is also your commander.' },
+  /* ---- WA. Not Tokugawa. A hundred years before Tokugawa. ---- */
+  wa:    { seen:0.34, priv:0.04,
+    word:'The shunga presses are running and nobody is scandalised by a print. What a house polices is the ALLIANCE — and she is a party to it, she keeps her own name, she runs the keep when you are away and she is trained on the naginata.',
+    ok:'“…ふん.” She does not turn round. The account book does not stop.',
+    caught:'Her women saw, so her father’s house will hear a version of it, and her father’s house is the treaty.' },
+  nanban:{ seen:0.88, priv:0.62,
+    word:'There is a Jesuit in this house and he has opinions about every item on this list, which is a new experience for everybody.',
+    ok:'She crosses herself, which is not a no.',
+    caught:'Father Vilela was in the passage. He has stopped walking.' },
+  ming:  { seen:0.78, priv:0.06,
+    word:'Decorum, hierarchy, and a household visibly in order. What happens inside it is inside it.',
+    ok:'“Not where they can see,” she says, without heat.',
+    caught:'The whole factory compound saw, and the whole factory compound trades on gossip.' },
+};
+function handOnHer(){
+  let id='roman';
+  try{ id=localCulture().id||'roman'; }catch(e){}
+  return HAND_ON_HER[id] || HAND_ON_HER.roman;
+}
+/* how badly it lands HERE — private is nearly free almost everywhere and
+   being seen is where the peoples actually disagree */
+function slapExposure(){
+  const H=handOnHer();
+  let seen=0;
+  try{ seen=watchersPresent(privacyTier()==='strict'); }catch(e){ seen=0; }
+  return seen>0? H.seen : H.priv;
+}
 function slapVerdict(){
   const w=G.wife||{}, bond=G.wifeRel|0, phys=(G.wifePhys===undefined?45:G.wifePhys)|0;
   const warm=(bond+phys)/2;
+  /* WHOSE HOUSE YOU ARE STANDING IN. Every branch below was written in the
+     voice of a Roman wife and handed to a household in Kyōto unchanged. */
+  const H=handOnHer(), exp=slapExposure();
+  if(exp>=0.50 && Math.random()<exp*0.72)
+    return {k:'seen', bond:-Math.round(3+exp*7), phys:-1, t:H.caught, note:H.word};
   if(hasFlaw('cold'))       return {k:'cold',  bond:-3, phys:0,
     t:'She does not turn round. “Noted,” she says, to the shelf.'};
   if(warm<28)               return {k:'bad',   bond:-7, phys:-2,
@@ -19447,7 +19983,7 @@ function slapVerdict(){
     t:'“From a man with no rank at all.” She walks off.'};
   if(warm>=64)              return {k:'love',  bond:+4, phys:+5,
     t:'A yelp, a laugh, and something thrown at you that misses on purpose.'};
-  return {k:'ok', bond:+2, phys:+2, t:'“…Careful.” She is smiling at the wall, where you cannot see it.'};
+  return {k:'ok', bond:+2, phys:+2, t:H.ok, note:H.word};
 }
 function doSlap(where){
   if(!G.married || !G.wife) return null;
@@ -19680,17 +20216,72 @@ function startRomantic(atX){
   D.rslap={t:0, x:(atX===undefined? D.wifeX : atX), v};
   D.wifePause=Math.max(D.wifePause||0, 300);
 }
+/* =====================================================================
+   AND THE ROMANTIC ONE GETS THE SAME REWORK — with its own character
+   ---------------------------------------------------------------------
+   The angry slap was rebuilt into five beats with a smear, directional
+   sparks, dust off the tiles, a camera shake and a mark that blooms hot
+   before it settles. This one kept a spring kick and a sound effect, and
+   that was the whole of its impact — which is backwards, because this is
+   the one that is supposed to land harder.
+
+   It is NOT the angry one with pink particles. The differences are the
+   point and every one of them is a decision about what the beat MEANS:
+
+     THE ANGRY ONE   the hand withdraws. He has made his point and taken
+                     it back. Grey dust off the floor, a white spark
+                     burst, and the room jolts once.
+     THIS ONE        the hand STAYS. Nothing is being taken back. The
+                     ring-down is twice as long, the sparks are warm and
+                     they drift UP rather than falling, the room does not
+                     jolt so much as sway, and her own mass-spring is what
+                     carries the aftermath — so how long it goes on for is
+                     her tier, not a constant.
+   ===================================================================== */
 function updateRomantic(dt){
   const D=DM, S=D.rslap; if(!S) return;
   const was=S.t; S.t+=dt;
-  /* EVERY strike kicks, not just the first. The spring was fired once at 230
-     and never again, so the second and third landed on a body that had already
-     stopped moving. */
+  shimmyTick(dt);
   const be=((G.wife&&G.wife.body&&G.wife.body.booty)||5);
-  for(let n=0;n<STRIKES.length;n++)
-    if(was<STRIKES[n] && S.t>=STRIKES[n]){ slapKick((1.35 + be*0.10)*(n===0?1:0.82));
-      try{ sfx('slapBig'); }catch(e){} }
-  if(S.t>446){ const v=S.v;
+  const bT= be>=9?4 : be>=7?3 : be>=5?2 : be>=3?1 : 0;
+  for(let n=0;n<STRIKES.length;n++){
+    if(!(was<STRIKES[n] && S.t>=STRIKES[n])) continue;
+    const first=(n===0);
+    /* ---- THE CRACK ---- */
+    slapKick((1.35 + be*0.10)*(first?1:0.82));
+    /* HER OWN MASS TAKES IT. This is the thing the angry slap cannot do:
+       the aftermath of a romantic one is not a fixed ring-down, it is HER
+       ringing on her own spring, and a colossal tier is still going four
+       beats after a flat one has stopped. Each strike re-drives it. */
+    shimmyStart(G.wife, first? 1.0 : 0.78);
+    /* THE ROOM SWAYS rather than jolting — softer, longer, lower. */
+    kickShake(1.5+bT*0.42, 34);
+    try{ sfx('slapBig'); }catch(e){}
+    /* WARM SPARKS, AND THEY GO UP. A blow throws debris along the tangent
+       and it falls; this is not that. */
+    S.sparks=(S.sparks||[]);
+    const cnt=8+bT*3;
+    for(let i=0;i<cnt;i++){
+      const a=(-0.35 - Math.random()*2.45), sp=0.5+Math.random()*1.25;
+      S.sparks.push({ x:S.x+rnd(-7,7), y:214-30-rnd(0,10),
+        vx:Math.cos(a)*sp*1.15, vy:Math.sin(a)*sp*0.9-0.30, t:0,
+        c: Math.random()<0.5? '#ffb8d4' : (Math.random()<0.5? '#ffd8a8':'#ffe9cf') });
+    }
+    /* AND HEARTS, which the angry one only gets when a door is shut. */
+    for(let i=0;i<2+bT;i++)
+      D.hearts.push({x:S.x+rnd(-9,9), y:214-40, vy:0.36+Math.random()*0.28,
+        life:70+bT*10, c:'#ff9ad8'});
+    /* THE MARK BLOOMS. Recorded here and drawn hot-then-settling. */
+    S.mark={t:0, i:n};
+  }
+  if(S.sparks) S.sparks.forEach(p=>{ p.t+=dt; p.x+=p.vx*dt; p.y+=p.vy*dt;
+    p.vy+=0.012*dt; p.vx*=Math.pow(0.965,dt); });
+  if(S.mark) S.mark.t+=dt;
+  /* AND IT DOES NOT END ON A COUNTER. The scene used to close at a flat 446
+     whatever had just happened; it waits for her to stop moving now, which is
+     the whole reason the mass-spring is in this at all. */
+  const floor=446, ceil=620;
+  if(S.t>floor && (!shimmyLive() || S.t>ceil)){ const v=S.v;
     toast((v.k==='love'?'💞 ':v.k==='return'?'🔥 ':v.k==='ok'?'💞 ':'💢 ')+v.t
       +'  ('+(v.bond>=0?'+':'')+v.bond+' 💞, '+(v.phys>=0?'+':'')+v.phys+' 🔥)', 5200);
     D.rslap=null; D.wifePause=0; }
@@ -19723,7 +20314,11 @@ function drawRomanticFem(x, y, w, k, T){
      Held to a little wider than the stance, which is what the pose is FOR. */
   const hipW=Math.max(5,Math.round(5+be*0.42));
   const legLen=Math.round(11+lg*0.52);
-  const SJ=slapJig()*(0.5+bT*0.30);                      // she takes the spring too
+  /* SHE TAKES THE SPRING — and her OWN spring as well. slapJig is the hit
+     itself; shimmySeat is the mass afterwards, and it is the mass afterwards
+     that carries her tier rather than a constant. */
+  const SJ=slapJig()*(0.5+bT*0.30) + shimmySeat()*0.72;
+  const SQ=Math.round(Math.abs(shimmySeat())*0.34);
   // the shadow, and the wall she is braced on
   { ctx.globalAlpha=0.26; ctx.fillStyle='#120b08';
     ctx.beginPath(); ctx.ellipse(x+lean*3, y-1, 12+lean*6, 3, 0,0,7); ctx.fill(); ctx.globalAlpha=1; }
@@ -19857,6 +20452,29 @@ function drawRomantic(){
     if(SW.hit>0.45){ ctx.textAlign='center';
       pixelText(['CRACK','SMACK','CLAP'][SW.i%3], IX+16, FY-52, 'rgba(255,236,210,'+SW.hit+')', 1.05+SW.hit*0.5);
       ctx.textAlign='left'; }
+  }
+  /* ---- THE WARM SPARKS, drifting UP. The angry slap throws grey debris
+     along the tangent and it falls; this one does the opposite, on purpose. ---- */
+  if(S.sparks) S.sparks.forEach(pt=>{
+    const life=clamp(1-pt.t/62,0,1); if(life<=0) return;
+    ctx.globalAlpha=life*life*0.9;
+    px(Math.round(pt.x), Math.round(pt.y), 1+(life>0.6?1:0), 1+(life>0.6?1:0), pt.c);
+    ctx.globalAlpha=1; });
+  /* ---- THE MARK. It blooms hot on contact and settles to a warm print. ---- */
+  if(S.mark){ const m=S.mark.t;
+    const hot=clamp(1-m/14,0,1), settle=clamp(1-m/150,0,1);
+    const my=FY-30, mx=X-4;
+    if(settle>0){
+      ctx.globalAlpha=settle*0.42;
+      px(mx-1, my-1, 11, 6, 'rgba(226,138,150,1)');
+      ctx.globalAlpha=settle*0.30;
+      px(mx, my, 9, 4, 'rgba(255,178,190,1)');
+      /* four fingers, for the first fifty ticks, before it spreads */
+      if(m<50){ ctx.globalAlpha=settle*0.34;
+        for(let f=0;f<4;f++) px(mx+1+f*2, my, 1, 4, 'rgba(255,200,206,1)'); }
+      ctx.globalAlpha=1; }
+    if(hot>0){ ctx.globalAlpha=hot*0.8;
+      px(mx-3, my-3, 15, 10, 'rgba(255,226,208,1)'); ctx.globalAlpha=1; }
   }
   // HER FACE, over her shoulder, for whichever strike just landed
   if(SW.d>=0 && RF_HEAD)
@@ -20393,8 +21011,22 @@ function drawTempt(){
   if(X.ph==='bend'||X.ph==='approach'||X.ph==='resist'||X.ph==='look'||X.ph==='invited'){
     drawWifeFig(ctx, X.x, FY, w, X.ph==='bend'? X.k : 1, 'bend');
   } else drawWifeFig(ctx, X.x, FY, w, 1, 'bend');
-  if(X.ph==='bend' && X.k>0.45){ ctx.textAlign='center';
+  if(X.ph==='bend' && X.k>0.45 && !X.shook){ ctx.textAlign='center';
     pixelText('…', X.x, FY-46, 'rgba(255,214,190,.7)', 1); ctx.textAlign='left'; }
+  /* NAME IT. The body map already grades her on this exact axis and the scene
+     was the one place that never said the number out loud. */
+  if(X.shook && shimmyLive()){
+    const T=SHIMMY_TIER[clamp(SHIMMY.tier,0,5)];
+    ctx.textAlign='center';
+    const a=(0.55+0.45*Math.abs(Math.sin(SHIMMY.t*SHIMMY.freq))).toFixed(2);
+    pixelText(T.name, X.x, FY-52, 'rgba('+hexRGB(T.col)+','+a+')', 1.04);
+    pixelText(T.note, W/2, 42, 'rgba(255,214,200,.72)', 0.92);
+    ctx.textAlign='left';
+    /* and the lamp light leans with it, which is the cheapest possible way to
+       say that something with weight is moving in the room */
+    if(SHIMMY.tier>=3){ const g=Math.abs(shimmyHip())*0.05;
+      ctx.globalAlpha=clamp(g,0,0.16); px(0,120,W,H-120,'#ffcf7a'); ctx.globalAlpha=1; }
+  }
   if(X.ph==='invited'){ ctx.textAlign='center';
     pixelText('“Well? Are you going to stand there?”', W/2, 40, '#ffd0da', 1.05);
     for(let i=0;i<5;i++){ const hy=(D.t*0.6+i*17)%40;
@@ -35502,6 +36134,10 @@ window.__SS = {
   TEMPT_PROPS, quirkAside, promiseDaysLeft, promiseBroken, checkPromise, checkPromiseKept,
   startVillaLove, updateVillaLove, drawVillaLove, villaLoveFinish, VILLALOVE_LEN, drawVillaMale,
   doSlap, slapVerdict, startSlapAnim, updateSlap, drawSlap, drawHairSmall,
+  POSE_LORE, poseLore, poseName, drawShadowPlay,
+  HAND_ON_HER, handOnHer, slapExposure,
+  SHIMMY, SHIMMY_TIER, shimmyOf, shimmyStart, shimmyTick, shimmyLive, shimmyEnv,
+  shimmyHip, shimmySeat, shimmyLift, shimmyTrunk, shimmyBust, shimmyTierName, hexRGB,
   romanticVerdict, startRomantic, updateRomantic, drawRomantic, drawRomanticFem,
   kidsPresent, villaClear, privacyNeeded, privacyRefusal, clearTheVilla, BABY_YEARS,
   figHeadBox, drawReactFace, reactKindFor, REACT_FACES,
