@@ -9872,7 +9872,8 @@ function setAdult(on){ ADULT=!!on; try{ localStorage.setItem(ADULT_KEY, on?'1':'
 const SETTINGS_KEY='SANDSTEEL_SETTINGS';
 const SETTINGS=(function(){ const d={sound:true,shake:true,difficulty:'normal',
     bluntBody:false,      // the chart draws the real game model instead of the diagram
-    blunt:false};         // and the marriage cards say what they mean
+    blunt:false,          // and the marriage cards say what they mean
+    rkUnlocked:false};    // THE RKRAI SHORE — a secret fourth world, typed into being in Settings
   try{ return Object.assign(d, JSON.parse(localStorage.getItem(SETTINGS_KEY)||'{}')); }catch(e){ return d; } })();
 function saveSettings(){ try{ localStorage.setItem(SETTINGS_KEY, JSON.stringify(SETTINGS)); }catch(e){} }
 const DIFF={ easy:{name:'Easy', foeHp:0.72, foeDmg:0.75}, normal:{name:'Normal', foeHp:1, foeDmg:1}, brutal:{name:'Brutal', foeHp:1.34, foeDmg:1.3} };
@@ -25283,6 +25284,39 @@ function buildSettings(){
     + ' Turn them OFF if they ever cover a button.',
     tLabel, touchPref!=='off',
     ()=>{ const i=tOrder.indexOf(touchPref); setTouchPref(tOrder[(i+1)%tOrder.length]); buildSettings(); });
+  /* =====================================================================
+     A FOURTH COAST, IF YOU ASK PROPERLY
+     ---------------------------------------------------------------------
+     THE RKRAI SHORE does not belong on the world card next to three
+     sourced histories — it is an invented people, and the honest place
+     for an invention is a secret you have to go looking for, not a fourth
+     tab beside Rome. It stays completely real once you are standing on
+     it; getting there is the only part that is a joke, and the joke is
+     that the coast only answers if you ask it nicely, IN FULL, IN CAPS.
+     ===================================================================== */
+  { const wrap=document.createElement('div'); wrap.style.cssText='margin-top:10px;padding-top:8px;border-top:1px dashed #4a3a26;text-align:left';
+    if(SETTINGS.rkUnlocked){
+      wrap.innerHTML='<div class="small" style="color:#8fc0cf"><b>🗝 SOMETHING WASHED UP</b>'
+        +'<div class="muted" style="margin-top:2px">THE RKRAI SHORE is on the world card now, next to the other three.</div></div>';
+    } else {
+      wrap.innerHTML='<div class="small muted" style="font-style:italic">There is a rumour of a fourth coast, if you ask it the right way.</div>';
+      const row=document.createElement('div'); row.className='row gap6'; row.style.marginTop='5px';
+      const inp=document.createElement('input'); inp.type='text'; inp.placeholder='ask it something';
+      inp.style.cssText='flex:1;background:#14100c;border:1px solid #4a3a26;color:#e8dcc2;padding:4px 6px;border-radius:3px;letter-spacing:1px;min-width:0';
+      const go=document.createElement('button'); go.className='btn sm'; go.textContent='ASK';
+      const tryIt=()=>{
+        if(inp.value.trim()==='PLEASE'){
+          SETTINGS.rkUnlocked=true; saveSettings();
+          try{sfx('coin');}catch(e){}
+          toast('🗝 The coast answers. THE RKRAI SHORE is on the world card now.',4200);
+          buildSettings();
+        } else { try{sfx('thud');}catch(e){} inp.value=''; inp.placeholder='...nothing happens'; }
+      };
+      go.onclick=tryIt; inp.onkeydown=(e)=>{ if(e.key==='Enter') tryIt(); };
+      row.appendChild(inp); row.appendChild(go); wrap.appendChild(row);
+    }
+    b.appendChild(wrap);
+  }
 }
 /* =====================================================================
    THE WOOHOO GUIDE
@@ -26846,7 +26880,11 @@ function openCreate(){
   // ---- WHICH WORLD YOU ARE BORN INTO ----
   const wr=$('world-row');
   if(wr){ wr.innerHTML='';
-    WORLD_IDS.forEach(k=>{ const W=WORLDS[k];
+    /* THE RKRAI SHORE ONLY SHOWS UP HERE ONCE ASKED FOR — see the Settings
+       screen. If a career already exists on that coast (an older save, or
+       a saved game from before this existed) it plays exactly as normal;
+       this only hides the button that STARTS a new one. */
+    WORLD_IDS.filter(k=>k!=='rk' || SETTINGS.rkUnlocked || sel.world==='rk').forEach(k=>{ const W=WORLDS[k];
       const bt=document.createElement('button'); bt.className='btn sm'+(sel.world===k?' gold':'');
       bt.textContent=(k==='east'?'\u2630 ':k==='rk'?'\u2743 ':'\u2721 ')+W.name;
       bt.title=W.blurb;
@@ -28481,22 +28519,50 @@ const HUB_WEST_LABEL={
   'btn-herbs':'🌿 HERBARIUS', 'btn-titles':'⚜ TITLES', 'btn-intrigue':'🗡 INTRIGUE',
   'btn-note-map':'✍ WRITE HOME',
 };
+/* AND THE FOURTH SHEET, WHICH WAS FALLING THROUGH TO ROME'S. `applyHub`
+   branched on `wa` and `east` and nothing else, so a Rkrai game reached
+   the final `else` and got the Roman hub whole: a chariot-racing CIRCUS
+   button (a coast that has never seen a horse race), ARMOURY, STABLE,
+   VILLA, HERBARIUS, and a map caption reading IMPERIVM ROMANVM under a
+   headland in 900. There is no Senate, no forum and no circus faction
+   here — there is a weighing floor, a post with notches cut in it, and a
+   country that counts everything on a split stick. */
+const HUB_RK = {
+  hide:['btn-circus','btn-forum','btn-legion','btn-silk'],
+  label:{
+    'btn-fightcur':null,                                  // set from the venue itself
+    'btn-shop':'⚔ THE RACK',
+    'btn-stable':'🦌 THE HERD & THE RACKS',
+    'btn-villa':'🏠 YOUR POST',
+    'btn-tree':'🌳 YOUR KIN',
+    'btn-provinces':'🗺 THE FOUR PROVINCES',
+    'btn-herbs':'🌿 THE HEALER',
+    'btn-titles':'✇ NOTCHES & RANK',
+    'btn-intrigue':'⚖ THE ARBITRATION',
+    'btn-note-map':'✍ SEND WORD',
+  },
+};
 function applyHub(){
   const _w  = playerWorld();
   const east = _w==='east';
   const wa   = _w==='wa';
+  const rk   = _w==='rk';
   const set=(id,txt)=>{ const el=$(id); if(el && txt) el.textContent=txt; };
   const vis=(id,on)=>{ const el=$(id); if(el) el.style.display = on? '' : 'none'; };
   if(wa){
     HUB_WA.hide.forEach(id=>vis(id,false));
     for(const k in HUB_WA.label) set(k, HUB_WA.label[k]);
-    { const V=venueHere(), el=$('btn-fightcur'); if(el) el.textContent='\u2694 '+V.name; }
+    { const V=venueHere(), el=$('btn-fightcur'); if(el) el.textContent='⚔ '+V.name; }
   } else if(east){
     HUB_EAST.hide.forEach(id=>vis(id,false));
     for(const k in HUB_EAST.label) set(k, HUB_EAST.label[k]);
     // the fight button names the venue that is actually standing here
     { const V=venueHere(), el=$('btn-fightcur');
       if(el) el.textContent = (V.kind==='rite'? '⚔ ' : '⚔ ')+V.name; }
+  } else if(rk){
+    HUB_RK.hide.forEach(id=>vis(id,false));
+    for(const k in HUB_RK.label) set(k, HUB_RK.label[k]);
+    { const V=venueHere(), el=$('btn-fightcur'); if(el) el.textContent='⚔ '+V.name; }
   } else {
     vis('btn-circus', true);
     for(const k in HUB_WEST_LABEL) set(k, HUB_WEST_LABEL[k]);
@@ -28574,6 +28640,8 @@ function applyHub(){
           + '· colour = the house that holds it · ⬡ current ⬡ ✓ cleared'
         : east
         ? '建安 · THE JIAN’AN YEARS · ⬡ current ⬡ ✓ cleared ⬡ ⛔ shut'
+        : rk
+        ? 'THE RKRAI SHORE · A COLD 900 · ⬡ current ⬡ ✓ cleared · colour = the province that holds it'
         : 'IMPERIVM ROMANVM · ANNO CC · ⬡ current ⬡ ✓ cleared ⬡ ✦ imperial'; }
 }
 function enterMap(){
@@ -41135,7 +41203,7 @@ window.__SS = {
   canAttemptCrossing, crossingBlockReason, beginCrossing, openCrossing, openCrossingLog,
   CROSSING_LOG, CROSSING_ARRIVAL, worldOfRegion,
   SILK_LEGS, SILK_STAKE_CAP, silkLeg, silkOpen, silkStake, silkOdds, silkRun, openSilk,
-  HUB_EAST, HUB_WEST_LABEL, applyHub, buildRegions, travelCost,
+  HUB_EAST, HUB_WEST_LABEL, HUB_RK, applyHub, buildRegions, travelCost,
   HALL_LIGHT, litFigure, litWife, litHusband, litBufs,
   SLAP_T, SLAP_ANG, SLAP_PIV, slapAng, slapHand, drawSlapArm, hallShake, kickShake,
   setLit:(v)=>{ LIT_ON=!!v; }, getLit:()=>LIT_ON,

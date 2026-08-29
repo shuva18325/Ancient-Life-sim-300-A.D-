@@ -239,6 +239,31 @@ and she is not binding. **A son is not arranged for** — five callers instead
 of three, drawn the way this coast admits they are drawn, and he weighs your
 suggestion against what he wants and will say no to you in front of everybody.
 
+### ~~The world hub was the Roman hub~~ — DONE
+`applyHub()` branched on `wa` and `east` and nothing else, so a Rkrai game
+fell into the Roman `else` and inherited it whole: a chariot-racing
+**CIRCUS** button on a coast that has never seen a horse race, **ARMOURY /
+STABLE / VILLA / HERBARIUS / TITLES / INTRIGUE**, and a map legend reading
+**IMPERIVM ROMANVM · ANNO CC** under a headland in 900. A new `HUB_RK` table
+hides the circus, the forum, the legion button and the silk road, and labels
+the rest in the coast's own words — THE RACK, THE HERD & THE RACKS, YOUR
+POST, YOUR KIN, THE FOUR PROVINCES, THE HEALER, NOTCHES & RANK, THE
+ARBITRATION, SEND WORD — and the map legend now reads THE RKRAI SHORE · A
+COLD 900. The fight button already read the real venue name off
+`venueHere()` (THE SHINGLE, THE LONG FLOOR, THE POST-YARD, THE ICE-EDGE);
+only the buttons around it were Rome's.
+
+### ~~The fourth world sat on the card next to three sourced histories~~ — DONE
+Moved behind a Settings easter egg rather than removed: it is an invented
+people and does not belong beside three sheets that are checked against
+sources, but hiding it entirely would waste the whole thing that got built.
+`SETTINGS.rkUnlocked` gates it out of the `WORLD_IDS` row in `openCreate()`;
+Settings carries a quiet, unlabelled prompt — "there is a rumour of a fourth
+coast, if you ask it the right way" — that only answers to the literal,
+case-sensitive string `PLEASE`. Once unlocked it stays unlocked (saved to
+`localStorage` with the rest of Settings) and the world card behaves exactly
+as it did before this — same one disclaimer, same everything.
+
 ### Still open here
 - The bedchamber poses have a Rkrai pose (`vi===21`) and a Rkrai hall, but
   the six wife-titles do not yet change what is DRAWN — only what it is worth.
