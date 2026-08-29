@@ -11,7 +11,7 @@ grounds produce nine distinct pictures" is.
 
 ## 1 — GAPS THAT ARE VISIBLE RIGHT NOW
 
-### 1.1 The husband's romantic scene does not exist
+### ~~1.1 The husband's romantic scene does not exist~~ — DONE
 `startRomantic()` refuses outright when `G.wife.male` is true and says so in
 a toast: *"the scene is not drawn yet."* A player who chose to be a woman
 gets a locked door where everyone else gets the scene. `drawRomanticFem` is
@@ -19,11 +19,18 @@ a woman braced on a wall and `drawVillaMale` is *you* — with a husband the
 scene would paint him twice. Needs its own two figures.
 **Done when:** a female player gets a scene, and it is a different picture
 from the male one in all nine bends.
+**Result:** `drawRomanticFig` carries both bodies through the same culture
+bend. Four cultures × two bodies = eight distinct pictures, zero collisions.
 
-### 1.2 The AI never holds a gun
+### ~~1.2 The AI never holds a gun~~ — DONE
 `drawArm2` routes to the two-handed gun stance only for `f.isPlayer`. Fight
 a Teppō and he swings a matchlock like a sword through the whole reload.
 **Done when:** a foe with a gun shows all four beats, same as the player.
+**Result:** a Teppō carries a matchlock, a Taishō the horse pistol, an Ikki
+the clay bomb. He shoots at range, backs off through the reload and draws
+inside a sword's length. Caught on the way: his shots were landing on
+*himself*, because every projectile in the file assumed the shooter was the
+player and the target was `FT.foe`.
 
 ### 1.3 Beasts have no swing arc
 `pushSwingTrail` bails on `atkType==='elbow'` and beasts use `beastBite`,
@@ -46,6 +53,21 @@ reads as a bug. It should say why.
 ## 2 — THINGS THAT ARE STILL ROMAN IN NON-ROMAN PLACES
 
 This has been the through-line of the whole project and it is not finished.
+
+**A full screen sweep now runs clean.** `romsweep.cjs` walks every screen in
+Luoyang and in Kai and greps the rendered text for forty Roman words. Both
+worlds report clean. What it found and what was done:
+the public-face meter said *"what Rome thinks you are"* (now 面子 / 世間体 /
+whatever that culture calls it, with its own rule underneath); the barber
+said *Rome dyed its hair constantly* (now camellia oil, gallnut, lime-water);
+the clothier said *Rome had views on who was allowed to wear what* (now Han
+sumptuary law, 身分, bone-rank); the cut list offered **THE ROMAN CROP** in
+Kai and the clothier stocked a **toga** (both now filtered to the culture's
+own pool); two purses were counted in denarii on a Japanese screen; the Han
+bath-house handed you a **strigil**, which is Greco-Roman — 澡豆 bath-beans
+now; and a free **gladius** was on the rack in every world, because
+`gearStockedHere` exempted anything with `cost:0` and the starter sword is
+free.
 
 ### 2.1 The pool, the bath and the wardrobe are Roman everywhere
 `drawShadowPlay` builds a real per-culture room for `place==='bed'` via
