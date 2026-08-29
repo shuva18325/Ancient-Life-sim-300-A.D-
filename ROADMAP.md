@@ -21,6 +21,13 @@ scene would paint him twice. Needs its own two figures.
 from the male one in all nine bends.
 **Result:** `drawRomanticFig` carries both bodies through the same culture
 bend. Four cultures × two bodies = eight distinct pictures, zero collisions.
+**And then it still did not work in the game**, because `W` routed a woman
+away from `startRomantic` entirely — a guard added back when the art did not
+exist. Both directions run now: `W` and your spouse braces (his body, the
+culture's bend); or he crosses on his own and ASKS — "「そこの柱に。」— the
+post, not the screen" — and if you say yes, you are the one braced. The
+scene carries `bender`, because drawing `G.wife` unconditionally is right
+when you asked and exactly wrong when he did.
 
 ### ~~1.2 The AI never holds a gun~~ — DONE
 `drawArm2` routes to the two-handed gun stance only for `f.isPlayer`. Fight
