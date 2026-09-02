@@ -264,7 +264,71 @@ case-sensitive string `PLEASE`. Once unlocked it stays unlocked (saved to
 `localStorage` with the rest of Settings) and the world card behaves exactly
 as it did before this — same one disclaimer, same everything.
 
+### ~~The six titles had no faces~~ — DONE
+The table and the requirement existed and the only way a player ever saw
+one was to marry at random and discover she happened to clear a number.
+There are **six of these offices on the whole coast**, they are SEATED, and
+the holders are known by name — so the go-between now brings them by name.
+`RK_TITLED_WIVES` is the six: **Rhaunek Talik** (the seat), **Ulvanne Ruun**
+(the bosom, and the storehouse audit), **Taqrun Denik** (the reach, and the
+long run), **Kanne Harra** (love, with a caseload and a fee), **Harra Ruun**
+(the voice, one plait per settlement) and **Uvrak Denik** (the cold, who
+came out of the bad winter the same shape). Each is built through
+`makeBride` like anybody else and then has exactly one number forced — the
+one her office is seated on — so she cannot be holding a title she does not
+carry. Which of the six you are offered is gated by your own rung.
+
+### ~~And the graphics for them~~ — DONE
+A seventh garment cut, `parka`, and it is the first on that list built for
+cold rather than drape: a sealed tube of hide with no opening below the
+neck, flaring hard below the waist into the wide rounded lower body the
+women's cut actually has — so **it follows the figure exactly where the six
+offices are read off it**, and a Mesteri Rhaunek's is visibly wider through
+the seat than a Mesteri Taqrun's from across a floor. The office is dyed
+into the YOKE as a device (six of them, one per Mastery), the ruff arcs over
+the shoulders and frames the face, and she stands in a **plank house with
+her own house-post behind her**, notches cut where they can be counted,
+instead of the marble alcove and Tyrian curtain she was standing in.
+Six distinct portraits of six, and the marriage card carries the office, the
+number, the household quirk and her own line.
+
+### ~~The arena was Rome's~~ — DONE
+`THEATRE_OF` had **no entry for any of the seven Rkrai regions**, so
+`theatreOf()` hit its `||'italia'` default and every bout on that coast was
+fought inside the Colosseum. Four grounds now, matching the venues the game
+already names: **THE SHINGLE** (the beach below Leokanis, boats up on racks
+and the drying frames behind), **THE LONG FLOOR** (inside a plank house, the
+fire trench down the middle and the light coming through the smoke-hole),
+**THE POST-YARD** (four great houses' posts and the arbiter's staff planted
+in the ground) and **THE ICE EDGE** (pressure ridges, black water, and no
+crowd because there is nowhere out there to stand). Each has its own `build`
+kind with its own structure — they were briefly borrowing the Han courtyard,
+the Wa dōjō and the steppe nerge — its own skyline, its own foe names, and a
+crowd standing on a bank rather than seated in a terrace with aisle
+stairways cut into it, because nobody there built seating.
+
+### ~~And the house was Rome's~~ — DONE
+`CULTURES.rkrai` had no `hall` key, so `hallStyle()` returned `'atrium'` and
+the house on that coast was a Roman domus with a marble catch-basin in the
+middle of the floor. `drawPlankShell` now: split cedar walls lashed in
+courses, rafters running out overhead, the smoke-hole that is the only
+daylight in the building (and the shaft it throws down the middle), the
+house-post standing inside the door, the household's working gear and its
+split tally-sticks hung on the walls, raised sleeping platforms along both
+sides, and the fire trench running the length of the floor.
+
+### ~~Four quirks were named in Rome and never left~~ — DONE
+A wife on the Rkrai shore was **VESTAL-STRICT** after a Roman priestly
+college; an insatiable one in Luoyang "was raised on Ovid"; a Queen of
+Gossip in Kai heard "Rome's news a day before Rome does" out of "every
+atrium in the district". `QUIRK_LOCAL` overrides only the rows that
+actually name Rome, through the single `qText` chokepoint — Ambitious and
+Possessive are not Roman ideas and are left alone.
+
 ### Still open here
+- The house SHELL is Rkrai now but the furniture inside it is not: the
+  staircase, the cedar wardrobe and the kitchen alcove still draw Roman.
+  Same family as 2.1.
 - The bedchamber poses have a Rkrai pose (`vi===21`) and a Rkrai hall, but
   the six wife-titles do not yet change what is DRAWN — only what it is worth.
 - `RK_MASTERIES` has ten entries and the map has four provinces; the

@@ -2367,6 +2367,7 @@ function brideEthsHere(){
 function homeBrideEth(){
   const w=(typeof playerWorld==='function')? playerWorld() : 'west';
   if(w==='wa') return 'wa';
+  if(w==='rk') return 'rkrai';
   if(w==='east'){ try{ return localCulture().id; }catch(e){ return 'han'; } }
   return 'roman';
 }
@@ -2434,6 +2435,10 @@ const CULTURES = {
      ===================================================================== */
   rkrai: {
     id:'rkrai', name:'RKRAI', adj:'Rkrai', people:'the Rkrai', invented:true,
+    /* WITHOUT THIS `hallStyle()` returned 'atrium' and the house on that
+       coast was a Roman domus with a marble catch-basin in the middle of
+       the floor, in a country with neither marble nor rain worth catching. */
+    hall:'plankhouse',
     coverRich:0.92, coverPoor:0.88,
     garment:'a parka and hide skirt', under:'the gut-skin shirt', over:'parka', head:'a beaded band',
     jewel:'carved bone and traded amber', cloth:['#2f5f6a','#8a3a2a','#c8a34a','#4a5a3a'],
@@ -6961,7 +6966,7 @@ function rollBanes(quality){
   return Math.random()<chance? [pick(WIFE_BANES).id] : [];
 }
 function quirkById(id){ return WIFE_QUIRKS.find(t=>t.id===id); }
-function quirkLabel(id){ const t=quirkById(id); return t? t.icon+' '+t.name : id; }
+function quirkLabel(id){ const t=quirkById(id); return t? t.icon+' '+qText(t,'name') : id; }
 function hasQuirk(id){ return !!(G && G.wife && G.wife.quirks && G.wife.quirks.includes(id)); }
 function hasMyQuirk(id){ return !!(G && G.quirks && G.quirks.includes(id)); }
 function hasMyTrait(id){ return !!(G && G.traits && G.traits.includes(id)); }
@@ -6976,8 +6981,72 @@ function sexText(O, field, male){
   if(male && O.m && O.m[field]) return O.m[field];
   return O[field];
 }
+/* =====================================================================
+   THE QUIRKS WERE NAMED IN ROME AND NEVER LEFT
+   ---------------------------------------------------------------------
+   Four of them carry the city in the text itself: a wife on the Rkrai
+   shore was being called VESTAL-STRICT after a Roman priestly college, an
+   INSATIABLE one in Luoyang "was raised on Ovid and took it as
+   instruction", and a QUEEN OF GOSSIP in Kai heard "Rome's news a day
+   before Rome does" out of "every atrium in the district".
+
+   Only the rows that actually name Rome are overridden. A quirk called
+   Ambitious or Possessive is not a Roman idea and is left alone —
+   translating everything would be worse, not better, because it would
+   imply the differences are decorative when in fact they are only in the
+   places where Rome was being assumed.
+   ===================================================================== */
+const QUIRK_LOCAL={
+  han:{
+    devout:{name:'禮-Strict', desc:'The ritual calendar is not a suggestion, and she keeps it exactly.'},
+    insatiable:{desc:'She read the bedchamber manuals as a technical education, which is how they were written.'},
+    gossip:{name:'Queen of the Ward', desc:'Every courtyard in the ward reports to her by noon.',
+      up:'you hear the commandery’s news a day before the commandery does',
+      down:'and the commandery hears yours the same way'},
+  },
+  wa:{
+    devout:{name:'戒 Observant', desc:'The temple calendar is not a suggestion, and she keeps it exactly.'},
+    insatiable:{desc:'She read the shunga as instruction, which is roughly how it was sold.'},
+    gossip:{name:'Queen of the Castle Town', desc:'Every house under the walls reports to her by noon.',
+      up:'you hear the province’s news a day before the province does',
+      down:'and the province hears yours the same way'},
+  },
+  steppe:{
+    devout:{name:'Sky-Strict', desc:'What the sky is owed is owed on the day it is owed.'},
+    insatiable:{desc:'Nobody on this grass ever taught her there was a question here.'},
+    gossip:{name:'Queen of the Camp', desc:'Every tent in the camp reports to her by noon.',
+      up:'you hear the confederation’s news a day before it does',
+      down:'and it hears yours the same way'},
+  },
+  kushan:{
+    devout:{name:'Vow-Strict', desc:'The observance is not a suggestion, and she keeps it exactly.'},
+    insatiable:{desc:'She read the shastra as a syllabus, which is what it is.'},
+    gossip:{name:'Queen of the Bazaar', desc:'Every stall on the road reports to her by noon.',
+      up:'you hear the court’s news a day before the court does',
+      down:'and the court hears yours the same way'},
+  },
+  rkrai:{
+    devout:{name:'Equinox-Strict', desc:'What is owed to the Ten is owed on the day it is owed, and she counts the days.'},
+    insatiable:{desc:'Kan holds appetite and there is an office for it. She has read its case-roll and found it permissive.'},
+    gossip:{name:'Queen of the Long Floor', desc:'Every house on this stretch of coast reports to her before the fire is banked.',
+      up:'you hear the coast’s news a day before the coast does',
+      down:'and the coast hears yours the same way'},
+    shameless:{desc:'The office is public and the holder is looked at on purpose. She has never once wondered whether anyone was watching, and would find the question strange.'},
+  },
+};
+QUIRK_LOCAL.ming=QUIRK_LOCAL.han;
+QUIRK_LOCAL.korean=QUIRK_LOCAL.han;
+QUIRK_LOCAL.tamil=QUIRK_LOCAL.kushan;
+QUIRK_LOCAL.nanban=QUIRK_LOCAL.wa;
 function qText(Q, field, male){
   if(male===undefined) male=!!(G && G.wife && G.wife.male);
+  /* THE LOCAL WORDING WINS, and it wins BEFORE the masculine form, because
+     a man's row that says "Rome" is exactly as wrong as a woman's. */
+  try{
+    let cid='roman'; try{ cid=(localCulture()||{}).id||'roman'; }catch(e){}
+    const L=QUIRK_LOCAL[cid] && QUIRK_LOCAL[cid][Q.id];
+    if(L && L[field]!==undefined) return L[field];
+  }catch(e){}
   if(male && Q.m && Q.m[field]) return Q.m[field];
   return Q[field];
 }
@@ -7419,7 +7488,10 @@ function makeBride(eth, noble, quality, opts){
 // The rich eastern courts (Aegyptus, Persia) demand far more standing than a village father.
 const NOBLE_PRICE={roman:900, greek:900, celt:500, germanic:500, numidian:650, persian:1800, egyptian:2200,
   han:1600, steppe:600, kushan:1900, tamil:1700, korean:900,
-  wa:1400, nanban:2400, ming:2000};
+  wa:1400, nanban:2400, ming:2000,
+  /* A GREAT HOUSE ON THIS COAST IS FOUR NOTCHES AND A CARVED HEAD, and
+     there are about thirty of them. The price is standing, not silver. */
+  rkrai:1500};
 function allianceTier(){ return G.coin + G.glory*4 + titlesCount()*800 +
   (G.socialClass==='elite'?2200:G.socialClass==='upper'?1100:0) + (G.office||0)*400; }
 /* =====================================================================
@@ -8712,6 +8784,26 @@ function statPips(w){
 }
 function rollBrides(minQ){
   const tier=allianceTier();
+  /* ---- ON THE RKRAI SHORE THE LIST IS NOT ANONYMOUS. There are six
+     looks-titles on the whole coast, the holders are seated and known by
+     name from Kraiq-Harra to the ice edge, and a go-between who brought
+     you four unnamed women when a Mesteri was available would not be
+     working again. Whichever of the six your rung can actually be offered
+     comes first, by name and office; the rest of the list is ordinary. ---- */
+  if(typeof rkHere==='function' && rkHere()){
+    const offered = rkTitledOffered().slice();
+    // shuffle so the same face is not always at the top of the list
+    for(let i=offered.length-1;i>0;i--){ const j=(Math.random()*(i+1))|0;
+      const t=offered[i]; offered[i]=offered[j]; offered[j]=t; }
+    const take = Math.min(offered.length, minQ>=6? 3 : 2);
+    const out=[];
+    for(let i=0;i<take;i++){
+      const w=makeRkTitledWife(offered[i].id, minQ? clamp(Math.round(rnd(minQ,Math.min(10,minQ+1.5))),1,10) : undefined);
+      if(w) out.push(w);
+    }
+    while(out.length<4) out.push(makeBride('rkrai', tier>=1200 || Math.random()<0.3, minQ, undefined));
+    return out;
+  }
   /* A GO-BETWEEN BRINGS YOU DAUGHTERS OF HOUSES THAT HAVE HEARD OF YOURS.
      This offered a Roman first and then three more out of a Mediterranean
      list, whichever world you were standing in — so a career in Kyōto was
@@ -13338,6 +13430,49 @@ ARENA_THEATRES.korea={
    crest on it. Twenty-two houses, so the same six grounds come out
    twenty-two different ways depending on whose dirt you are standing on.
    ===================================================================== */
+/* ===================================================================
+   THE RKRAI SHORE — four grounds, and not one of them is a show.
+   The Mastery of War exists to END wars, so nobody on this coast built
+   a place to stage them. What they have instead are four working
+   surfaces that a settlement gets decided on: a beach, a house floor,
+   the yard in front of the posts, and the edge of the ice.
+   =================================================================== */
+ARENA_THEATRES.rk_shingle={
+  name:'THE SHINGLE', where:'the beach below Leokanis', build:'shingle',
+  sand:'#8e8578', sandDk:'#6b6458', sandLt:'#a9a094',
+  stone:'#7a7266', stoneSh:'#565046', stoneHi:'#98907f',
+  sky:'#7e97a6', awning:false, awnA:'#43505c', awnB:'#9aa8b0',
+  crowdHot:['#8a2f4a','#c0a02a','#2f6a72','#6a7a8a','#3a2f6a','#7a6242','#9a2f5a','#4a6a2a'],
+  crowdCold:['#5c584e','#4a463e','#6a6558','#3e3a34','#585448','#6e6a5c','#4e4a42','#7a7466'],
+  banner:'#2f6a72', bannerMark:'⚓', skyline:'shore',
+  note:'Wet grey stones the size of a fist, the boats drawn up behind, and the whole settlement standing on the bank because there is nowhere else to stand.' };
+ARENA_THEATRES.rk_longfloor={
+  name:'THE LONG FLOOR', where:'inside a plank house', build:'plankhall',
+  sand:'#7a6242', sandDk:'#57452d', sandLt:'#967b56',
+  stone:'#5e4a30', stoneSh:'#3e3020', stoneHi:'#7d6544',
+  sky:'#2a2218', awning:false, awnA:'#3a2e20', awnB:'#5c4a34',
+  crowdHot:['#c0a02a','#8a2f4a','#2f6a72','#a8402a','#6a7a8a','#4a6a2a','#9a2f5a','#c8a04a'],
+  crowdCold:['#4e4438','#3e362c','#5a5044','#332c24','#484034','#544a3c','#3a3228','#605648'],
+  banner:'#8a2f4a', bannerMark:'✇', skyline:'planks',
+  note:'A fire down the middle of the floor and families along both sides of it. Nobody paid to be here and nobody is leaving.' };
+ARENA_THEATRES.rk_postyard={
+  name:'THE POST-YARD', where:'in front of the house-posts', build:'postyard',
+  sand:'#877c63', sandDk:'#655c47', sandLt:'#a0947a',
+  stone:'#6a5638', stoneSh:'#463726', stoneHi:'#87704c',
+  sky:'#8ba2a8', awning:false, awnA:'#4a5a5e', awnB:'#a8b8bc',
+  crowdHot:['#c0a02a','#8a2f4a','#4a6a2a','#2f6a72','#7a6242','#6a7a8a','#a8402a','#3a2f6a'],
+  crowdCold:['#5a5346','#484236','#6a6252','#3c362c','#524b3e','#645c4c','#443e34','#726a58'],
+  banner:'#c0a02a', bannerMark:'▌', skyline:'posts',
+  note:'The carved posts of four great houses at your back, each with its notches cut where anyone can count them, and the arbiter standing between.' };
+ARENA_THEATRES.rk_iceedge={
+  name:'THE ICE EDGE', where:'past the last safe footing', build:'iceedge',
+  sand:'#cfdbe2', sandDk:'#a8b8c4', sandLt:'#eaf2f6',
+  stone:'#b8c8d4', stoneSh:'#8ea0ae', stoneHi:'#dfeaf0',
+  sky:'#a8bccb', awning:false, awnA:'#6a8090', awnB:'#c8d8e2',
+  crowdHot:['#8a2f4a','#2f6a72','#c0a02a','#6a7a8a','#3a2f6a','#4a6a2a','#a8402a','#7a6242'],
+  crowdCold:['#8494a0','#6e7e8a','#9aa8b2','#5e6c76','#7a8892','#8c9aa4','#66747e','#a2aeb6'],
+  banner:'#8fc0cf', bannerMark:'❄', skyline:'ice',
+  note:'Aq takes. There is no crowd out here because there is nowhere for one to stand, and everybody involved knows the arrangement.' };
 ARENA_THEATRES.wa_castle={
   name:'THE CASTLE GROUND', where:'the keeps of Nippon', build:'castle',
   sand:'#c8bfa4', sandDk:'#a49a80', sandLt:'#e0d8bc',
@@ -13430,6 +13565,14 @@ const THEATRE_OF={
   'Tosa':'wa_field', 'Iyo':'wa_port', 'Bungo':'wa_port',
   'Higo':'wa_castle', 'Dewa':'wa_field', 'Tsushima':'wa_port',
   'Ezo':'wa_field',
+  /* ---- THE RKRAI SHORE. Without these all seven fell through to
+     'italia' and a bout on that coast was fought in the Colosseum. The
+     mapping matches the one venueHere() already uses, so the ground you
+     are told you are standing on is the ground that gets drawn. ---- */
+  'Leokanis':'rk_shingle', 'Taqruna':'rk_iceedge',
+  'Uvrak Plateau':'rk_postyard', 'Nalkut River':'rk_longfloor',
+  'Sivra Forest':'rk_longfloor', 'Kraunivik':'rk_postyard',
+  'Kraiq-Harra':'rk_longfloor',
 };
 function theatreOf(regionId){
   return ARENA_THEATRES[THEATRE_OF[regionId]||'italia'] || ARENA_THEATRES.italia;
@@ -13499,6 +13642,32 @@ THEATRE_FOES.wa_range={ names:['Magoichi','Sugonimo','Tokitaka','Kunitomo','Nego
 THEATRE_FOES.wa_port={ names:['Sōrin','Harunobu','Sumitada','Yoshishige','Ryūzōji','Nakaba','Kiyohide','Tōan'],
   titles:['who took baptism','of the factory','the Silk-Broker','of Hirado','the Harbour-Master','who counts the silver'],
   crowdFor:'you' };
+/* ---- AND THE MAN OPPOSITE ON THE RKRAI SHORE. Without these four rows
+   THEATRE_FOES fell through to 'italia' and a settlement on a beach in 900
+   was being decided against Verus of Capua. Four grounds, four kinds of
+   opponent: the shingle is the whole settlement watching, the long floor
+   is a house matter, the post-yard is two houses arguing about notches,
+   and the ice edge has nobody watching at all. ---- */
+THEATRE_FOES.rk_shingle={
+  names:['Kraun','Aqal','Torvak','Denik','Nalkir','Sivrek','Uqtar','Harran'],
+  titles:['of Kraunivik','the Water-Hand','who came off the boats','of the shingle',
+          'Talik','who is owed a settlement','of Taqrunaq-Port'],
+  crowdFor:'you' };
+THEATRE_FOES.rk_longfloor={
+  names:['Leok','Harran','Kaiq','Denik','Uvrak','Sivrek','Nalkir','Talik'],
+  titles:['of this house','who eats at this fire','Ruun','of Nalkut-Ruun',
+          'who was counted short','of Kraiq-Harra','the Named Hand'],
+  crowdFor:'you' };
+THEATRE_FOES.rk_postyard={
+  names:['Torvak','Ruun','Uvrak','Kraun','Arbek','Talik','Leok','Harra'],
+  titles:['of the great house','whose notch is disputed','of Uvrak-Talik',
+          'Harra-Ruun','who will not be weighed','of the plateau','the Herd-Holder'],
+  crowdFor:'you' };
+THEATRE_FOES.rk_iceedge={
+  names:['Aqal','Aqalik','Taqrun','Kraiq','Uvra','Sivra','Nalk','Torv'],
+  titles:['who went out anyway','past the edge','the Harpooner','of Taqruna',
+          'whom Aq did not take','who has made the long run','the Far Launching'],
+  crowdFor:'you' };
 /* east of the Euphrates you are the foreigner, and the man opposite is the
    one Rome sent. `G.parthianSide` flips who the crowd is roaring for. */
 function theatreFoeName(regId){
@@ -13551,6 +13720,52 @@ function drawTheatreSkyline(TH){
         px(xx-6,yy-1,3,3,'#5a5a66'); px(xx+w2+3,yy-1,3,3,'#5a5a66');
         for(let r2=0;r2<w2;r2+=5) px(xx+r2,yy,2,4,'#3a3a44'); }      // the tile ribs
       px(x+8,y+10,6,5,'#8a3a2e'); px(x+50,y+10,6,5,'#8a3a2e'); }     // lacquered columns
+  } else if(TH.skyline==='shore'){
+    /* THE BEACH BELOW LEOKANIS — skin boats drawn up on their racks, the
+       drying frames behind them, and the smoke of the town going straight
+       up because there is no wind today, which is why this is happening. */
+    px(0,y+11,W,4,'#5a5348'); px(0,y+11,W,1,'#78705f');            // the bank
+    for(let i=0;i<5;i++){ const x=18+i*98+((i*23)%22);
+      px(x,y+4,34,4,'#6a5a44'); px(x,y+4,34,1,'#8a7658');          // an upturned hull
+      px(x+2,y+8,30,2,'#4a3f30');
+      px(x-2,y+5,4,2,'#3a3226'); px(x+32,y+5,4,2,'#3a3226');       // the rack it sits on
+      px(x+4,y+10,2,5,'#4a3f30'); px(x+28,y+10,2,5,'#4a3f30'); }
+    for(let i=0;i<7;i++){ const x=8+i*70;                          // the drying frames
+      px(x,y-2,2,13,'#5e5040'); px(x+22,y-2,2,13,'#5e5040');
+      px(x,y-2,24,2,'#6e6048');
+      for(let f=0;f<4;f++) px(x+3+f*5,y+1,3,7,f%2?'#8a6a4a':'#7a5c40'); }
+  } else if(TH.skyline==='planks'){
+    /* INSIDE. There is no sky — the far wall of the house, the smoke-hole
+       above the fire, and the roof beams running out over your head. */
+    px(0,y-6,W,20,'#3a2e20');
+    for(let x=0;x<W;x+=9){ px(x,y-6,8,20,(x/9)%2? '#4e4030':'#443626');
+      px(x,y-6,8,1,'#63523e'); px(x+8,y-6,1,20,'#241c12'); }
+    for(let x=0;x<W;x+=64) px(x,y+2,58,2,'#2a2118');               // the lashing courses
+    { const sx=W/2-16; px(sx,y-6,32,7,'#0d0a07');                  // the smoke-hole
+      px(sx,y-6,32,1,'#8a7a58'); px(sx,y+1,32,1,'#5a4a34');
+      ctx.globalAlpha=0.30; px(sx+6,y-6,20,7,'#c8d8e2'); ctx.globalAlpha=1; }
+    px(0,y+12,W,3,'#2a2118'); px(0,y+12,W,1,'#4a3c2c');            // the beam over the floor
+  } else if(TH.skyline==='posts'){
+    /* THE POST-YARD. Four great houses' posts, each with its notches cut
+       where anybody can count them, and a carved head on the tall one. */
+    px(0,y+12,W,3,'#4a4236'); px(0,y+12,W,1,'#665c4a');
+    for(let i=0;i<5;i++){ const x=26+i*112, n=1+((i*3)%4);
+      px(x,y-4,11,19,'#6a5638'); px(x,y-4,3,19,'#87704c'); px(x+9,y-4,2,19,'#463726');
+      for(let k=0;k<n;k++){ const ny=y+9-k*4;
+        px(x-1,ny,13,2,'#332818'); px(x-1,ny,13,1,'#9a8058'); }
+      if(n>=4){ px(x-1,y-9,13,6,'#7a6242'); px(x-1,y-9,13,1,'#9a8058');
+        px(x+1,y-7,2,2,'#241a10'); px(x+7,y-7,2,2,'#241a10'); } }
+  } else if(TH.skyline==='ice'){
+    /* PAST THE LAST SAFE FOOTING. Pressure ridges shoved up where two
+       floes met, open black water beyond them, and nothing else at all. */
+    px(0,y+9,W,6,'#12222c');                                       // the open water
+    for(let i=0;i<W;i+=7){ ctx.globalAlpha=0.35;
+      px(i,y+10+((i*5)%3),5,1,'#4a6a7a'); ctx.globalAlpha=1; }
+    for(let i=0;i<9;i++){ const x=6+i*56+((i*19)%14), h2=5+((i*11)%7);
+      px(x,y+9-h2,9,h2,'#cfdbe2'); px(x,y+9-h2,9,1,'#f2f8fb');
+      px(x+7,y+9-h2,2,h2,'#9fb0bc');
+      px(x-3,y+7-Math.round(h2*0.4),5,Math.round(h2*0.4)+2,'#bccbd5'); }
+    px(0,y+15,W,2,'#e6eef3');
   } else if(TH.skyline==='keep'){
     // roofs of the castle town below the walls, in tile
     for(let i=0;i<8;i++){ const x=6+i*62+((i*13)%18), w2=44;
@@ -13672,6 +13887,15 @@ function drawArena(){
     if(TH.build==='dohyo'){  FT._crows=4; FT._ctop=16; }
     if(TH.build==='range'){  FT._crows=1; FT._ctop=30; }
     if(TH.build==='port'){   FT._crows=2; FT._ctop=26; }
+    /* ---- THE RKRAI SHORE. Nobody sells a ticket to any of these. The
+       shingle is the whole settlement standing on the bank, the long floor
+       is the families along both sides of the fire, the post-yard is two
+       houses and an arbiter, and the ice edge has nobody at all because
+       there is nowhere out there to stand. ---- */
+    if(TH.build==='shingle'){   FT._crows=2; FT._ctop=26; }
+    if(TH.build==='plankhall'){ FT._crows=1; FT._ctop=34; }
+    if(TH.build==='postyard'){  FT._crows=1; FT._ctop=30; }
+    if(TH.build==='iceedge'){   FT._crows=0; FT._ctop=24; }
     // crowd tiers (seating)
     if(FT._crows>0) drawCrowd();
     /* the province's own standard over the gate, so you always know whose
@@ -13712,7 +13936,94 @@ function drawArena(){
        Luoyang, on the Orkhon and at Madurai as well as in Capua. Four of
        those places never had any of it. The building branches now.
        ================================================================= */
-    if(BUILD==='none'){
+    if(BUILD==='shingle'){
+      /* THE BEACH BELOW LEOKANIS. No building at all — a bank of wet grey
+         stones, the boats up on their racks behind it, and the settlement
+         standing on the shelf above because there is nowhere else. */
+      px(0,wallTop,W,wallH,'#6f6a5e'); px(0,wallTop,W,2,'#8b8477');
+      for(let b2=0;b2<5;b2++) px(0,wallTop+b2*Math.max(2,(wallH/5)|0),W,1,
+        b2%2? '#645e52':'#7c7568');                                   // the bank in receding shelves
+      for(let i=0;i<150;i++){ const gx2=(i*37)%W, gy2=wallTop+((i*23)%Math.max(1,wallH));
+        px(gx2,gy2,2,1,(i%4)? '#5d5749':'#928a7a'); }                 // and it is all stones
+      // the boats, up on racks, keel to the weather
+      for(let i=0;i<4;i++){ const bx2=14+i*128, by2=wallTop+5;
+        px(bx2,by2,44,6,'#6a5a44'); px(bx2,by2,44,2,'#8a7658');
+        px(bx2+2,by2+6,40,2,'#443a2c');
+        px(bx2-2,by2+2,4,9,'#3a3226'); px(bx2+42,by2+2,4,9,'#3a3226'); }
+      // the drying frames behind, hung with the run
+      for(let x=6;x<W;x+=58){ px(x,wallTop+16,2,wallH-18,'#5e5040');
+        px(x+26,wallTop+16,2,wallH-18,'#5e5040'); px(x,wallTop+16,28,2,'#6e6048');
+        for(let f=0;f<5;f++) px(x+3+f*5,wallTop+19,3,9,f%2?'#8a6a4a':'#7a5c40'); }
+      // and the water's edge, which is the only boundary the ground has
+      px(0,GROUND-8,W,3,'#2f4a55'); px(0,GROUND-8,W,1,'#5a7d88');
+      for(let x=0;x<W;x+=11) px(x+((x*3)%5),GROUND-9,5,1,'#87a8b2');
+    } else if(BUILD==='postyard'){
+      /* IN FRONT OF THE HOUSE-POSTS. Four great houses' posts standing in
+         a line, each with its notches cut where anybody can count them,
+         and the arbiter's own staff planted in the middle of the ground. */
+      px(0,wallTop,W,wallH,'#7d7360'); px(0,wallTop,W,2,'#968b76');
+      for(let i=0;i<90;i++){ const gx2=(i*61)%W, gy2=wallTop+((i*29)%Math.max(1,wallH));
+        px(gx2,gy2,1,1,(i%3)? '#6c6252':'#8f8672'); }                  // trodden earth
+      // the plank wall of the yard
+      px(0,wallTop,W,Math.max(6,(wallH*0.42)|0),'#4e4030');
+      for(let x=0;x<W;x+=9){ px(x,wallTop,8,Math.max(6,(wallH*0.42)|0),(x/9)%2?'#584930':'#4a3c2c');
+        px(x,wallTop,8,1,'#6b5942'); }
+      // THE POSTS, and the notches are the whole point
+      for(let i=0;i<4;i++){ const pxx=26+i*118, n=1+((i*3)%4), pt=wallTop+2;
+        px(pxx,pt,12,GROUND-pt-6,'#6a5638'); px(pxx,pt,3,GROUND-pt-6,'#87704c');
+        px(pxx+10,pt,2,GROUND-pt-6,'#463726');
+        for(let k=0;k<n;k++){ const ny=GROUND-14-k*8;
+          px(pxx-1,ny,14,3,'#332818'); px(pxx-1,ny,14,1,'#9a8058'); }
+        if(n>=4){ px(pxx-1,pt-7,14,7,'#7a6242'); px(pxx-1,pt-7,14,1,'#9a8058');
+          px(pxx+1,pt-5,3,3,'#241a10'); px(pxx+8,pt-5,3,3,'#241a10'); } }
+      // the arbiter's staff, planted, and nobody speaks who is not holding it
+      { const sx2=W/2-1; px(sx2,GROUND-34,3,34,'#6a5238'); px(sx2,GROUND-34,1,34,'#a08050');
+        px(sx2-3,GROUND-40,9,7,'#4a3620'); px(sx2-1,GROUND-38,2,2,'#e8dcc2');
+        px(sx2+3,GROUND-38,2,2,'#e8dcc2');
+        for(let k=0;k<4;k++) px(sx2-2,GROUND-30+k*6,7,2,'#a8402a'); }
+    } else if(BUILD==='plankhall'){
+      /* THE LONG FLOOR, INSIDE. Split cedar plank walls, the fire trench
+         down the middle, the families seated along both sides of it, and
+         the smoke going up through a hole in the roof. */
+      px(0,wallTop,W,wallH,'#3f3325');
+      for(let x=0;x<W;x+=10){ px(x,wallTop,9,wallH,(x/10)%2? '#4e4030':'#443626');
+        px(x,wallTop,9,1,'#63523e'); px(x+9,wallTop,1,wallH,'#241c12'); }
+      for(let y=wallTop+7;y<GROUND-4;y+=14) px(0,y,W,2,'#2a2118');       // the lashing courses
+      // hides and gear hung along the wall, which is where a house keeps them
+      for(let i=0;i<6;i++){ const hx=22+i*78, hy=wallTop+5;
+        px(hx,hy,16,14,i%2?'#6a4a2e':'#5a5a52'); px(hx,hy,16,2,i%2?'#8a6444':'#7e7e72');
+        px(hx+7,hy-3,2,4,'#3a2e20'); }
+      // the fire trench, and it is the only light in here
+      px(W/2-40,GROUND-9,80,9,'#2a2018'); px(W/2-40,GROUND-9,80,1,'#4a3c2c');
+      for(let i=0;i<7;i++){ const fx=W/2-32+i*10;
+        px(fx,GROUND-8,6,4,'#6a3a1e'); px(fx+1,GROUND-9,4,3,'#c8642a');
+        px(fx+2,GROUND-12,2,3,'#e8a03a'); }
+      ctx.globalAlpha=0.22; px(W/2-26,wallTop,52,GROUND-wallTop,'#c8b8a0'); ctx.globalAlpha=1;
+      // the boarded floor either side of it
+      px(0,GROUND-4,W,4,'#7a6242'); px(0,GROUND-4,W,1,'#9a7f58');
+      for(let x=0;x<W;x+=13) px(x,GROUND-4,1,4,'#57452d');
+    } else if(BUILD==='iceedge'){
+      /* PAST THE LAST SAFE FOOTING. Pressure ridges shoved up where two
+         floes met, black water beyond, and no crowd because there is
+         nowhere out here for one to stand. */
+      px(0,wallTop,W,wallH,'#c3d2dc'); px(0,wallTop,W,2,'#e8f1f6');
+      for(let b2=0;b2<5;b2++) px(0,wallTop+b2*Math.max(2,(wallH/5)|0),W,1,
+        b2%2? '#b3c3ce':'#d5e2ea');
+      // the open water behind it
+      px(0,wallTop,W,Math.max(5,(wallH*0.30)|0),'#16262f');
+      px(0,wallTop+Math.max(5,(wallH*0.30)|0),W,2,'#e8f1f6');
+      for(let i=0;i<W;i+=6){ ctx.globalAlpha=0.4;
+        px(i,wallTop+2+((i*7)%Math.max(2,(wallH*0.24)|0)),4,1,'#4e7182'); ctx.globalAlpha=1; }
+      // the pressure ridges
+      for(let i=0;i<11;i++){ const rx=4+i*46+((i*17)%16), h2=6+((i*13)%9);
+        const ry=wallTop+Math.max(5,(wallH*0.30)|0);
+        px(rx,ry-h2,10,h2,'#dae6ee'); px(rx,ry-h2,10,1,'#ffffff');
+        px(rx+8,ry-h2,2,h2,'#a3b5c2'); px(rx-3,ry-Math.round(h2*0.5),5,Math.round(h2*0.5),'#c8d6e0'); }
+      // and cracks running through the floe you are standing on
+      for(let i=0;i<5;i++){ const cx2=30+i*94;
+        for(let k=0;k<10;k++) px(cx2+Math.round(Math.sin(k*0.9)*7), GROUND-11+k, 2,1,'#9db0bd'); }
+      px(0,GROUND-2,W,2,'#eef5f9');
+    } else if(BUILD==='none'){
       // THE NERGE — open grass to the horizon, and the ring of riders IS the crowd
       px(0,wallTop,W,wallH,'#8a9a5c');
       for(let b2=0;b2<4;b2++){ const yy=wallTop+b2*Math.max(2,(wallH/4)|0);
@@ -14200,10 +14511,24 @@ function drawCrowd(){
   const TH=FT._th || theatreOf(FT.region && FT.region.id ? FT.region.id : FT.region);
   const HOTC=TH.crowdHot, COLDC=TH.crowdCold;
   const top=FT._ctop||10, rows=FT._crows||4;
+  /* AND THEY ARE NOT ALWAYS SITTING IN A BUILDING. On the Rkrai shore
+     nobody built seating, because nobody built a place to stage a fight —
+     the settlement stands on the bank, or along the two sides of a house
+     floor, and a row of timber benches with AISLE STAIRWAYS cut into them
+     is an amphitheatre, which is exactly what that coast does not have. */
+  const RKB = TH.build==='shingle'||TH.build==='postyard'||TH.build==='plankhall';
   for(let row=0;row<rows;row++){
     const y=top+row*14;
+    if(RKB){
+      const bank = TH.build==='plankhall'? (row%2?'#463626':'#3f3325')
+                 : (row%2?'#6f6a5e':'#5f5a4e');
+      px(0,y,W,14,bank); px(0,y,W,1,shade(bank,18));
+      for(let i=0;i<26;i++){ const sx2=(i*19+row*11)%W;
+        px(sx2,y+9+((i+row)%4),2,1,shade(bank,-22)); }               // the ground they stand on
+    } else {
     px(0,y,W,14,row%2?'#6a5238':'#5a442e');
     for(let ax=44;ax<W;ax+=96){ px(ax,y,6,14,'#46341f'); px(ax,y,6,1,'#5a442c'); }   // aisle stairways
+    }
     for(let x=4+((row*7)%14);x<W;x+=12){
       const h=(x*7+row*13)%97;                                    // stable per-spectator hash
       /* AND THE TERRACES ARE LOCAL TOO. A Sengoku shrine crowd drawn out
@@ -24406,6 +24731,113 @@ function drawCourtyardShell(FY, T, UPPER, cold){
   // a low stone step up into the hall, and two drum-shaped plinths on it
   px(60,FY+4,360,5,'#b0a898'); px(60,FY+4,360,2,'#c8c0b0');
 }
+function drawPlankShell(FY, T, UPPER){
+  /* =====================================================================
+     THE RKRAI PLANK HOUSE
+     ---------------------------------------------------------------------
+     Not an atrium and not a longhouse either. A Rkrai house is a rectangle
+     of split cedar planks lashed to a frame, dug down a little so the
+     floor is below the wind, with a fire trench running the whole length
+     of it and the families along both sides. There is no window: the only
+     daylight in the building comes down the smoke-hole, which means the
+     room is lit in one shaft at the middle and dark at both ends, and the
+     whole social geography of the house follows that — the nearer the
+     fire, the higher you are.
+
+     What is on the walls is the household's WORKING GEAR, hung where it
+     dries: parkas, harpoons, drying racks, and the split tally-sticks of
+     every bargain the house is holding. There is nothing decorative in
+     here at all except the post, and the post is a legal document.
+     ===================================================================== */
+  px(-4,-4,W+8,H+8,'#1a1610');
+  // ---- THE ROOF, and the beams running out over your head ----
+  { const g=ctx.createLinearGradient(0,-4,0,UPPER+30);
+    g.addColorStop(0,'#241c14'); g.addColorStop(1,'#3a2e20');
+    ctx.fillStyle=g; ctx.fillRect(-4,-4,W+8,UPPER+34); }
+  for(let bx=-10;bx<W+12;bx+=52){                       // the rafters, running away from us
+    ctx.strokeStyle='#4a3c2c'; ctx.lineWidth=3;
+    ctx.beginPath(); ctx.moveTo(bx,-4); ctx.lineTo(bx+26,UPPER+30); ctx.stroke();
+    ctx.strokeStyle='#5e4c36'; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(bx+1,-4); ctx.lineTo(bx+27,UPPER+30); ctx.stroke(); }
+  px(-4,UPPER+24,W+8,6,'#2a2118'); px(-4,UPPER+24,W+8,2,'#4a3c2c');   // the great tie-beam
+  /* ---- THE SMOKE-HOLE. The only daylight in the building, and the only
+     reason you can see anything at either end of the room. ---- */
+  { const cx=240, hw=42;
+    px(cx-hw,-4,hw*2,UPPER+16,'#0a0806');
+    px(cx-hw,-4,hw*2,3,'#8a7a58');
+    px(cx-hw,UPPER+13,hw*2,3,'#5a4a34');
+    px(cx-hw,-4,3,UPPER+16,'#5a4a34'); px(cx+hw-3,-4,3,UPPER+16,'#5a4a34');
+    ctx.fillStyle='#9fb8c8'; ctx.fillRect(cx-hw+4,-4,hw*2-8,16);
+    ctx.fillStyle='#c8dce8'; ctx.fillRect(cx-hw+14,-4,hw*2-28,9);
+    // and the shaft of it coming down into the room
+    const sh=ctx.createLinearGradient(0,UPPER,0,FY+40);
+    sh.addColorStop(0,'rgba(220,235,245,0.26)'); sh.addColorStop(1,'rgba(220,235,245,0)');
+    ctx.fillStyle=sh; ctx.beginPath();
+    ctx.moveTo(cx-hw+6,UPPER+14); ctx.lineTo(cx+hw-6,UPPER+14);
+    ctx.lineTo(cx+hw+34,FY+44); ctx.lineTo(cx-hw-34,FY+44); ctx.closePath(); ctx.fill();
+    // smoke drifting up through it
+    for(let k=0;k<5;k++){ const sy=UPPER+8-((T*0.5+k*22)%40);
+      ctx.globalAlpha=0.14; px(cx-16+Math.sin((T*0.02)+k)*10, sy, 26, 5, '#d8e4ec');
+      ctx.globalAlpha=1; } }
+  // ---- THE WALLS: split cedar, lashed, dark ----
+  const wt=UPPER+30;
+  px(-4,wt,W+8,FY-wt,'#3f3325');
+  for(let x=-6;x<W+8;x+=13){
+    px(x,wt,12,FY-wt,((x/13)|0)%2? '#4e4030':'#443626');
+    px(x,wt,12,1,'#63523e'); px(x+12,wt,1,FY-wt,'#241c12'); }
+  for(let y=wt+9;y<FY-2;y+=17) px(-4,y,W+8,2,'#2a2118');     // the root-cord lashing courses
+  px(-4,wt-3,W+8,4,'#2a2118'); px(-4,wt-3,W+8,1,'#5c4a34');
+  /* ---- THE HOUSE-POST, standing inside the door, which is where the rank
+     of everybody in this building can be read off one piece of wood. ---- */
+  { const pxx=54, pt=wt+2;
+    px(pxx,pt,20,FY-pt,'#6a5638'); px(pxx,pt,5,FY-pt,'#87704c'); px(pxx+16,pt,4,FY-pt,'#463726');
+    for(let k=0;k<4;k++){ const ny=FY-26-k*16;
+      px(pxx-2,ny,24,5,'#332818'); px(pxx-2,ny,24,2,'#9a8058'); }
+    px(pxx-3,pt-13,26,14,'#7a6242'); px(pxx-3,pt-13,26,2,'#9a8058');
+    px(pxx+2,pt-9,5,5,'#241a10'); px(pxx+13,pt-9,5,5,'#241a10');
+    px(pxx+6,pt-3,8,3,'#241a10');
+    px(pxx-8,pt-11,6,11,'#5e4a30'); px(pxx+21,pt-11,6,11,'#5e4a30'); }
+  // ---- WHAT IS HUNG ON THE WALLS, because everything here is working gear ----
+  { const hang=(hx,hy,w2,h2,c,hi)=>{ px(hx,hy,w2,h2,c); px(hx,hy,w2,2,hi);
+      px(hx+((w2/2)|0)-1,hy-5,2,6,'#3a2e20'); };
+    hang(122,wt+12,30,34,'#6a4a2e','#8e6a44');                 // a trader's coat
+    hang(168,wt+16,26,28,'#5a5a52','#7e7e72');                 // a sealskin
+    hang(352,wt+12,30,36,'#a08a5e','#c8ac80');                 // a caribou parka
+    hang(398,wt+18,24,26,'#2e2620','#4e4238');                 // smoke leathers
+    // harpoons and a herd-spear laid up on the pegs
+    for(let k=0;k<3;k++){ const yy=wt+8+k*13;
+      px(212,yy,116,3,'#7a5630'); px(212,yy,116,1,'#a8845a');
+      px(322,yy-2,8,7,'#8a94a0'); px(322,yy-2,8,2,'#c0c8d2');
+      px(206,yy-1,5,5,'#3a2e20'); px(328,yy-1,5,5,'#3a2e20'); }
+    // AND THE TALLY-STICKS — every bargain this house is holding, split and hung
+    for(let k=0;k<9;k++){ const tx=436+((k%3)*9), ty=wt+10+((k/3)|0)*16;
+      px(tx,ty,4,14,(k%2)?'#c8b48a':'#a89068'); px(tx,ty,4,1,'#e8dcc2');
+      for(let n=0;n<3;n++) px(tx,ty+3+n*4,4,1,'#5e4a30'); }
+    px(432,wt+6,32,2,'#3a2e20'); }
+  // ---- THE FLOOR: boards, dug down, with the fire trench down the middle ----
+  px(0,FY,W,H-FY,'#7a6242');
+  for(let x=0;x<W;x+=15){ px(x,FY,14,H-FY,(x/15)%2? '#7a6242':'#6e5738');
+    px(x,FY,14,1,'#9a7f58'); px(x+14,FY,1,H-FY,'#4e3f28'); }
+  px(0,FY,W,3,'#57452d'); px(0,FY,W,1,'#9a7f58');
+  /* THE SLEEPING PLATFORMS, raised a hand off the floor along both walls,
+     which is where a family actually lives — the nearer the fire the
+     better the place, and the argument about who sleeps where is one of
+     the few this country never manages to settle. */
+  { [[6,'#8a2f4a'],[104,'#2f6a72'],[318,'#c0a02a'],[416,'#4a6a2a']].forEach(([bx,c])=>{
+      px(bx,FY+16,86,8,'#5e4a30'); px(bx,FY+16,86,2,'#7d6544');
+      px(bx+2,FY+10,82,7,c); px(bx+2,FY+10,82,2,shade(c,28));
+      for(let k=0;k<4;k++) px(bx+8+k*20,FY+12,10,4,shade(c,-26));
+      px(bx,FY+24,4,10,'#463726'); px(bx+82,FY+24,4,10,'#463726'); }); }
+  // THE FIRE TRENCH — the length of the house, and everything is arranged on it
+  { const tx=150, tw=180;
+    px(tx,FY+30,tw,14,'#2a2018'); px(tx,FY+30,tw,2,'#4a3c2c');
+    px(tx-4,FY+30,4,14,'#5e4a30'); px(tx+tw,FY+30,4,14,'#5e4a30');
+    for(let k=0;k<8;k++){ const fl=4+Math.sin(T*0.14+k*1.3)*3;
+      px(tx+12+k*21, FY+34-fl, 7, fl+7, k%2?'#ff9a2a':'#ffc44a');
+      px(tx+14+k*21, FY+34-fl-2, 3, 4, '#ffe08a'); }
+    px(tx+6,FY+40,tw-12,4,'#6a3a1e');
+    ctx.globalAlpha=0.16; px(tx-24,FY-6,tw+48,54,'#ffbf6a'); ctx.globalAlpha=1; }
+}
 function drawGerShell(FY, T, UPPER){
   /* THE STEPPE. You are INSIDE the tent: the walls curve, the poles all
      run to one point, and that point is a hole with the sky in it. */
@@ -24594,6 +25026,7 @@ function drawDomus(){
   else if(_HS==='ger'){ drawGerShell(FY,T,UPPER); }
   else if(_HS==='shoin'){ drawShoinShell(FY,T,UPPER); }
   else if(_HS==='pillared'){ drawPillaredShell(FY,T,UPPER); }
+  else if(_HS==='plankhouse'){ drawPlankShell(FY,T,UPPER); }
   else {
   // ---- the shell: three bands of wall, darkest at the top ----
   px(-4,-4,W+8,H+8,'#241a12');
@@ -26341,6 +26774,102 @@ function drawBrideCut(P, cut, o){
     P(-8,HEM-9,7,9,'#4a3018'); P(2,HEM-9,7,9,'#3a2412');             // and boots under the hem
     P(-8,HEM-9,7,1,'#6a4828'); P(2,HEM-9,7,1,'#5a3a20');
     P(-14,HEM-2,29,3,DS);
+  } else if(cut==='parka'){
+    /* ---- THE RKRAI SHORE. Nothing else on this list is close. A parka is
+       not a gown and not a coat: it is a sealed tube of hide that goes on
+       over the head, with no opening below the neck, because an opening is
+       where the cold gets in. Its decoration lives in exactly three places
+       — the YOKE across the shoulders, the HEM band, and the RUFF, which
+       is the most expensive thing most people on that coast will ever own
+       and is read like a coat of arms.
+
+       And it is NOT a straight column. The woman's cut on this coast flares
+       hard below the waist into a wide rounded lower body, so the parka
+       follows the figure exactly where the six offices are read off it —
+       a Mesteri Rhaunek's is visibly wider through the seat than a Mesteri
+       Taqrun's, from across a floor, which is the entire point of an office
+       that is seated on a body. The title is dyed into the yoke as well, so
+       there are two ways to read her and neither requires asking. ---- */
+    const TT = o.rkTitle? RK_WIFE_TITLE_BY_ID[o.rkTitle] : null;
+    const band = o.rkBand || D;                              // the Mastery's own colour
+    const bandHi = shade(band, 34), bandSh = shade(band, -34);
+    const HIP = o.hips||11, REAR = o.rear||3, WST = o.waistW||6, BD = o.bd||8;
+    /* IT NEVER DRAWS IN PAST THE WIDEST PART OF HER ABOVE IT — a sealed
+       garment that pinched to a small waist left her ribs showing at the
+       sides through a gap, which is the one thing a parka cannot do. */
+    const MIDW = Math.max(11, Math.round(BD*0.62)+6, WST+6);
+    const SHOULD = -50, WAIST = -34;                          // where it narrows and where it lets go
+    // ---- THE BODY OF IT, following her ----
+    for(let y=TOP; y<HEM+1; y++){
+      let w;
+      if(y < WAIST){                                          // shoulder down to the waist: gently in
+        const t=(y-TOP)/(WAIST-TOP);
+        w = 14 - Math.round(t*(14-MIDW));
+      } else {                                                // and then OUT over the hips
+        const t=(y-WAIST)/((HEM+1)-WAIST);
+        const ease=Math.sin(Math.min(1,t*1.15)*1.5708);       // fast at first, settling at the hem
+        w = Math.round(MIDW + ease*((HIP+4)-MIDW));
+      }
+      const back = (y>WAIST)? Math.round(REAR*0.85*Math.sin(Math.min(1,(y-WAIST)/14)*3.1416)) : 0;
+      P(-w-back+1, y, w*2+back-1, 1, D);
+      if(y%7===0) P(-w-back+1, y, w*2+back-1, 1, shade(D,6));  // the hide's own grain
+      if(y>WAIST) P(-w-back+1, y, 2, 1, DS);                   // the shaded back edge
+      P(w-2, y, 2, 1, DH);
+    }
+    // ---- THE YOKE, and the office is dyed into it ----
+    P(-13,-48,26,8,band); P(-13,-48,26,2,bandHi); P(-13,-41,26,1,bandSh);
+    for(let x=-11;x<12;x+=4){ P(x,-47,2,2,mixHex(band,'#1a1208',0.55));
+      P(x+2,-44,1,2,mixHex(band,'#f4ecd8',0.5)); }
+    // ---- AND ITS EMBLEM, one per Mastery, on a pale field so it reads ----
+    if(TT){
+      const F='#f2ead6', I=mixHex(band,'#140e06',0.62);
+      P(-9,-39,19,11,mixHex(band,'#1a1208',0.35));            // the panel it is sewn onto
+      P(-9,-39,19,1,bandHi); P(-9,-29,19,1,'#140e06');
+      P(-9,-39,1,11,'#140e06'); P(9,-39,1,11,'#140e06');
+      const E=TT.id;
+      if(E==='seat'){                                          // RHAUNA: a seated wedge that will not move
+        P(-5,-37,11,6,F); P(-5,-37,11,1,'#fff');
+        P(-7,-32,15,2,I); P(-3,-35,7,2,I); }
+      else if(E==='bosom'){                                    // ULVA: two full stores over a tally
+        P(-6,-37,5,5,F); P(2,-37,5,5,F);
+        P(-6,-37,5,1,'#fff'); P(2,-37,5,1,'#fff');
+        for(let k=0;k<5;k++) P(-6+k*3,-31,1,2,I); }
+      else if(E==='reach'){                                    // TAQ: out, and back
+        P(-7,-35,15,2,F); P(-7,-36,2,4,F); P(6,-36,2,4,F);
+        P(-2,-38,4,8,I); P(-1,-38,2,8,F); }
+      else if(E==='love'){                                     // KAN: the case-roll, split and rebound
+        P(-6,-37,13,7,F); P(-1,-37,2,7,I);
+        P(-6,-34,13,1,I); P(-6,-37,13,1,'#fff'); }
+      else if(E==='voice'){                                    // HARR: one plait per settlement
+        for(let k=0;k<5;k++){ P(-7+k*3,-37,2,7,F); P(-7+k*3,-34,2,1,I); } }
+      else{                                                    // UVRA: a mark cut in an ear, and it waits
+        P(-6,-37,13,5,F); P(-6,-37,13,1,'#fff');
+        P(-1,-35,3,1,I); P(-4,-31,9,2,I); }
+    }
+    // ---- the sleeves: wide at the shoulder, closed at the wrist ----
+    P(-19,TOP+4,7,20,shade(D,-8));  P(-19,TOP+4,7,2,DH);
+    P(12,TOP+4,7,20,shade(D,-16));
+    P(-19,TOP+22,7,3,band); P(12,TOP+22,7,3,band);            // the cuff bands
+    // ---- THE HEM, banded, and as wide as she actually is ----
+    { const wEnd = HIP+4, bk = Math.round(REAR*0.5);
+      P(-wEnd-bk+1, HEM-5, (wEnd*2)+bk, 5, band);
+      P(-wEnd-bk+1, HEM-5, (wEnd*2)+bk, 1, bandHi);
+      for(let x=-wEnd+1;x<wEnd-1;x+=5) P(x,HEM-4,2,3,mixHex(band,'#1a1208',0.5));
+      P(-wEnd-bk+1, HEM, (wEnd*2)+bk, 2, DS); }
+    // ---- boots, because nobody stands barefoot on that shingle ----
+    P(-9,HEM-1,8,3,'#4a3a24'); P(2,HEM-1,8,3,'#3e2f1c');
+    P(-9,HEM-1,8,1,'#6a5638');
+    // ---- AND THE RUFF, last, sitting ON the shoulders and framing the face ----
+    { const ruff = noble? '#efe6cc' : '#b8a488', ruffSh = shade(ruff,-34);
+      for(let i=-14;i<15;i++){
+        const d=Math.abs(i)/14;
+        const top = SHOULD - Math.round((1-d*d)*7);           // an arc, high in the middle
+        const h   = Math.round(5 + (1-d)*4);
+        P(i, top, 1, h, (i%3)? ruff : ruffSh);
+        P(i, top, 1, 1, '#f8f2e2');
+        if(Math.abs(i)>4 && i%2===0) P(i, top-1, 1, 1, mixHex(ruff,'#fff',0.5)); }
+      P(-6,SHOULD-1,13,2,shade(ruff,-22));                     // the shadow it throws on the neck
+    }
   } else if(cut==='gown'){
     /* SPAIN AND PORTUGAL IN THE 1500s: a stiffened conical bodice, a ruff at
        the throat, and a farthingale that makes the skirt a rigid cone with
@@ -26381,7 +26910,8 @@ function drawBridePortrait(cnv,b,bare,preg){
   else {
   // backdrop: noble = purple-draped marble alcove; peasant = plaster wall + window
   const bg=c.createLinearGradient(0,0,0,CH);
-  if(b.rank==='warrior'){ bg.addColorStop(0,'#3a1620'); bg.addColorStop(.6,'#2a1016'); bg.addColorStop(1,'#14080a'); }
+  if(b.eth==='rkrai'){ bg.addColorStop(0,'#1b2c33'); bg.addColorStop(.55,'#14212a'); bg.addColorStop(1,'#0a1116'); }
+  else if(b.rank==='warrior'){ bg.addColorStop(0,'#3a1620'); bg.addColorStop(.6,'#2a1016'); bg.addColorStop(1,'#14080a'); }
   else if(b.rank==='noble'){ bg.addColorStop(0,'#33203e'); bg.addColorStop(.6,'#221430'); bg.addColorStop(1,'#120a18'); }
   else { bg.addColorStop(0,'#3a2c1c'); bg.addColorStop(.6,'#2a1e12'); bg.addColorStop(1,'#160f08'); }
   c.fillStyle=bg; c.fillRect(0,0,CW,CH);
@@ -26390,6 +26920,34 @@ function drawBridePortrait(cnv,b,bare,preg){
   const P=(x,y,w,hh,col)=>{c.fillStyle=col;c.fillRect(Math.round(x),Math.round(y),Math.round(w),Math.round(hh));};
   // scenery
   if(bare){}
+  else if(b.eth==='rkrai'){
+    /* ---- A PLANK HOUSE, AND THE POST AT THE FRONT OF IT. She was
+       standing in a marble alcove with a Tyrian curtain, on a coast that
+       has neither marble nor Tyre. Split cedar planks lashed to a frame,
+       a smoke-hole, and the HOUSE-POST — which is the archive, the deed
+       and the rank all in one object, and is the only thing in the room
+       anybody would call decorated. ---- */
+    for(let px2=-40;px2<40;px2+=9){                                   // the split planks
+      P(px2,-74,8,74,(px2/9)%2? '#5a4a36':'#4e4030');
+      P(px2,-74,8,1,'#75604a'); P(px2+8,-74,1,74,'#2e2418');
+      for(let ky=-66;ky<-4;ky+=15) P(px2+1,ky,6,1,'#3a2e20'); }       // the root-cord lashings
+    P(-42,-78,86,5,'#3a2e20'); P(-42,-79,86,2,'#5c4a34');             // the roof beam
+    /* THE HOUSE-POST — notches cut in the front of it, one per rank, and
+       a carved head at the top for a great house. Anybody on that coast
+       can read her standing off this without asking. */
+    { const notches = b.rank==='noble'? 4 : b.rank==='warrior'? 3 : 2;
+      P(20,-72,10,72,'#6a5638'); P(20,-72,3,72,'#87704c'); P(28,-72,2,72,'#463726');
+      for(let n=0;n<notches;n++){ const ny=-16-n*11;
+        P(19,ny,12,4,'#3a2e1c'); P(19,ny,12,1,'#9a8058'); }
+      if(notches>=4){                                                 // the carved head
+        P(19,-80,12,9,'#7a6242'); P(19,-80,12,2,'#9a8058');
+        P(21,-77,3,3,'#241a10'); P(26,-77,3,3,'#241a10');
+        P(23,-73,4,2,'#241a10'); P(17,-79,3,7,'#5e4a30'); P(30,-79,3,7,'#5e4a30'); } }
+    // the gravel floor of the house, and a fire-trench down the middle
+    for(let fx=-40;fx<40;fx+=7){ P(fx,-3,6,3,'#4a4238'); P(fx,-3,6,1,'#61574a'); }
+    P(-16,-4,26,4,'#2a2018'); P(-14,-3,22,2,'#6a3a1e'); P(-10,-3,6,2,'#c8642a');
+    P(-6,-6,3,3,'#8a4a20'); P(1,-7,2,2,'#a85a24');                    // and the smoke off it
+  }
   else if((b.eth==='wa'||b.eth==='han'||b.eth==='ming'||b.eth==='korean') && (b.rank==='noble'||b.rank==='warrior')){
     /* AND SHE IS NOT STANDING IN A MARBLE ALCOVE. A fluted column and a
        Tyrian curtain is a specific room in a specific empire, and it was
@@ -26759,11 +27317,14 @@ function drawBridePortrait(cnv,b,bare,preg){
        and a farthingale that makes the skirt a rigid cone.
      ===================================================================== */
   const GARMENT_CUT={ wa:'kimono', han:'hanfu', korean:'hanbok',
-    kushan:'sari', tamil:'sari', ming:'hanfu', nanban:'gown', steppe:'kaftan' };
+    kushan:'sari', tamil:'sari', ming:'hanfu', nanban:'gown', steppe:'kaftan',
+    rkrai:'parka' };
   const CUT=GARMENT_CUT[b.eth];
   if(CUT && !bare) drawBrideCut(P, CUT, {
     dress, dSh, dHi, dMid, skin, sSh, sHi, gold, goldHi, noble,
-    hipTop, hipBot, bustTop, bd, hips, rear, waistW, preg });
+    hipTop, hipBot, bustTop, bd, hips, rear, waistW, preg,
+    /* the office she holds, so the yoke can carry it */
+    rkTitle: b.rkTitleForced||null, rkBand: b.dress });
   // ================= FRONT ARM (akimbo — hand on hip) =================
   P(4,-51,4,3,skin); P(4,-51,4,1,sHi);                                        // shoulder
   P(6,-49,3,5,skin); P(8,-45,3,5,skin); P(8,-45,1,5,sHi);                      // upper arm angled out
@@ -35791,6 +36352,22 @@ function openMarry(forced){
     const st=lookStage(w.looks===undefined?5:w.looks);
     const info=document.createElement('div'); info.style.flex='1'; info.innerHTML=
       `<div><b style="color:var(--gold)">${w.name}</b> ${tierBadge(w.tier, w.male)}</div>
+       ${(()=>{ /* THE OFFICE, AND THE NUMBER IT IS SEATED ON. Six of these
+            exist on the whole coast and the card should say so before it
+            says anything else about her. */
+         if(!w.rkTitled) return '';
+         const T=RK_WIFE_TITLE_BY_ID[w.rkTitleForced]; if(!T) return '';
+         const PN=(BODY_PARTS.find(p=>p.id===T.part)||{}).name||T.part;
+         const v=(w.body||{})[T.part];
+         return `<div style="margin:3px 0;padding:3px 5px;border:1px solid #ff8ad0;border-radius:3px;background:#2a0e1e">
+           <div style="color:#ff8ad0;letter-spacing:1px"><b>★ ${T.title}</b>
+             <span class="small muted">— ${T.god}, of ${w.house}</span></div>
+           <div class="small" style="margin-top:2px">Seated on <b style="color:#ff8ad0">${PN.toUpperCase()} ${v}</b>
+             <span class="muted">— the office wants ${T.need}, and she has the looks of it. There are six of these on the whole coast.</span></div>
+           <div class="small" style="margin-top:2px;color:#e8c34a"><b>⚡ IN THE HOUSE:</b> ${T.quirk}</div>
+           ${w.rkVoice? '<div class="small muted" style="margin-top:2px;font-style:italic">'+w.rkVoice+'</div>':''}
+         </div>`; })()}
+       ${w.rkBlurb? '<div class="small muted" style="line-height:1.5;margin-bottom:2px">'+w.rkBlurb+'</div>':''}
        <div class="small">${w.adj} ${w.rank}${w.age!==undefined?', <b>'+w.age+'</b>':''} · <span class="muted">${w.male? 'a lord of his people'+(w.jewel?', gold-ringed':'') : w.build+' of figure'+(w.jewel?', richly adorned':'')}${w.age>=34?(w.male?' · greying at the temples':' · a widow, and no longer young'):''}</span></div>
        <div class="small" style="color:#c8a86a">${w.male
           ? '💇 '+hairStyleName(w.hairStyle||hairStyleFallback(w),true)+' · '+beardName(w.beard||beardFallback(w))+' · 👘 '+outfitName(w.outfit||outfitFallback(w))
@@ -37206,6 +37783,103 @@ const RK_WIFE_TITLES=[
    fx:{food:2, hardy:0.20, slap:1.1}},
 ];
 const RK_WIFE_TITLE_BY_ID={}; RK_WIFE_TITLES.forEach(t=>RK_WIFE_TITLE_BY_ID[t.id]=t);
+/* =====================================================================
+   AND THE SIX WOMEN WHO CURRENTLY HOLD THEM
+   ---------------------------------------------------------------------
+   The titles existed as a table and a requirement, and the only way a
+   player ever saw one was to marry somebody at random and discover that
+   she happened to clear a number. That is backwards. There are six of
+   these offices on the whole coast, they are SEATED, and the people
+   holding them are known by name from Kraiq-Harra to the ice edge — so
+   the go-between brings you THEM, by name, with the office attached and
+   the body that got her the office.
+
+   Each carries the number she is seated on, which is the whole of the
+   qualification and is stated out loud at the seating. The rest of her
+   body is rolled like anybody else's: a Mesteri Rhaunek is seated on the
+   seat and on nothing else, and the coast would find it strange to
+   pretend otherwise.
+   ===================================================================== */
+const RK_TITLED_WIVES=[
+  {id:'seat', name:'Rhaunek Talik', house:'Uvrak-Talik', title:'seat',
+   dress:'#8a2f4a', hair:'#2a1a0e', build:'ample', age:24,
+   blurb:'Seated on the seat, and seated hard. She was carried to the seating on a plank by four Talik men because the office is public and the holder is looked at on purpose, and she has not been argued out of anything since.',
+   voice:'“I am not moving. You may build round me.”',
+   traits:['steady'], quirks:['shameless'], flaws:[]},
+  {id:'bosom', name:'Ulvanne Ruun', house:'Nalkut-Ruun', title:'bosom',
+   dress:'#c0a02a', hair:'#1e1408', build:'curvy', age:26,
+   blurb:'Ulva holds the bosom and therefore the storehouse, and the Rkrai do not think those are two ideas. She audits four smoke-houses and closed one of them last winter, out loud, in front of the people who filled it.',
+   voice:'“Say the number again. Slowly.”',
+   traits:['steady'], quirks:['highmaint'], flaws:[]},
+  {id:'reach', name:'Taqrun Denik', house:'Taqrunaq-Port', title:'reach',
+   dress:'#2f6a72', hair:'#3a2412', build:'statuesque', age:22,
+   blurb:'She runs the relay. Kraiq-Harra to the capital on foot in two days with what has to arrive, and she has never once failed to arrive. Gone half the month and back completely when she is back.',
+   voice:'“Two days. I have done it in less and I am not telling you when.”',
+   traits:['athletic'], quirks:['insatiable'], flaws:[]},
+  {id:'love', name:'Kanne Harra', house:'Leokanis', title:'love',
+   dress:'#9a2f5a', hair:'#241408', build:'curvy', age:27,
+   blurb:'The Mastery of Love, which on this coast is an office with a caseload and a fee. Two houses a week come to her with the question and she rules on it, and she is expected to be good at the subject — that is written into the appointment and it is not a euphemism.',
+   voice:'“Bring the question. Bring the fee. I have heard worse than yours this morning.”',
+   traits:['tempting'], quirks:['insatiable'], flaws:[]},
+  {id:'voice', name:'Harra Ruun', house:'Kraiq-Harra', title:'voice',
+   dress:'#3a2f6a', hair:'#1e1408', build:'shapely', age:29,
+   blurb:'One plait per settlement held in memory, and she is carrying the county in her hair. Every bride-price, every boundary, every formally logged insult, recited exactly on demand. Nobody lies to her twice.',
+   voice:'“You said it on the ninth day of the thaw. I can give you the hour.”',
+   traits:['steady','pious'], quirks:['gossip'], flaws:[]},
+  {id:'cold', name:'Uvrak Denik', house:'Uvrak Plateau', title:'cold',
+   dress:'#6a7a8a', hair:'#2a1a0e', build:'shapely', age:25,
+   blurb:'She came out of the bad winter of four years back the same shape she went into it, which on this coast is read as endurance and as evidence her house was run properly, and both readings are correct. She holds the herd-marks.',
+   voice:'“I planned for it in the spring. Everyone else was celebrating the run.”',
+   traits:['steady'], quirks:['devout'], flaws:[]},
+];
+const RK_TITLED_BY_ID={}; RK_TITLED_WIVES.forEach(w=>RK_TITLED_BY_ID[w.id]=w);
+/* build one of them as a full bride object. Everything the rest of the
+   game needs (looks, traits, dowry, portrait fields) comes from makeBride
+   exactly as it does for anybody else; what is overridden is her NAME, her
+   office, and the one number the office is seated on. */
+function makeRkTitledWife(id, quality){
+  const T=RK_TITLED_BY_ID[id]; if(!T) return null;
+  const TT=RK_WIFE_TITLE_BY_ID[id];
+  const q = quality===undefined? clamp(Math.round(rnd(6,9)),1,10) : quality;
+  const b = makeBride('rkrai', true, q, {male:false});
+  b.name   = T.name;
+  b.house  = T.house;
+  b.age    = T.age + ri(-2,3);
+  b.build  = T.build;
+  b.dress  = T.dress;
+  b.hair   = T.hair;
+  b.rank   = 'noble';
+  b.tier   = 'rich';
+  /* THE ONE NUMBER THE OFFICE IS SEATED ON. It must clear the requirement
+     or she could not be holding the title, and the coast is entirely
+     literal about this — so it is set, not hoped for. */
+  b.body = b.body || {};
+  b.body[TT.part] = clamp(TT.need + ri(0,2), 1, 10);
+  /* and the title is HELD, not merely qualified for — rkWifeTitle already
+     honours rkTitleForced, which is what a seating is. */
+  b.rkTitleForced = id;
+  b.rkTitled = true;
+  b.rkBlurb  = T.blurb;
+  b.rkVoice  = T.voice;
+  b.traits = (T.traits||[]).slice();
+  b.quirks = (T.quirks||[]).slice();
+  b.flaws  = (T.flaws ||[]).slice();
+  try{ b.looks = clamp(Math.round(BODY_PARTS.reduce((a,P)=>a+(b.body[P.id]===undefined?5:b.body[P.id]),0)/BODY_PARTS.length),1,10); }catch(e){}
+  try{ ensureLook(b); }catch(e){}
+  b.hairStyle='braid';
+  b.perk = 'Seated to '+TT.title+'. '+TT.duty;
+  return b;
+}
+/* WHICH OF THE SIX A HOUSE AT YOUR RUNG COULD ACTUALLY BE OFFERED. A
+   Mastery is seated from a rung upward and the holder does not marry
+   downward out of it — a blank post is not shown the Mastery of Love. */
+function rkTitledOffered(){
+  const ri2=rkRankIdx();
+  return RK_TITLED_WIVES.filter(w=>{
+    const T=RK_WIFE_TITLE_BY_ID[w.id];
+    return ri2 >= (T.rank||0);
+  });
+}
 /* THE FOUR THAT ARE NOT LOOKS-TITLES, named so the distinction is on the
    screen rather than implied by absence. */
 const RK_EARNED_TITLES=['war','sea','wood','count'];
@@ -41144,6 +41818,7 @@ window.__SS = {
   RK_RANKS, rkRank, rkRankIdx, RK_VENUES, drawMapCanvasRk, provGovList,
   RK_GOVERN, rkHead, rkHere, SLAP_BUTTON, RK_WIFE_TITLES, RK_WIFE_TITLE_BY_ID, RK_EARNED_TITLES,
   rkTitlesFor, rkWifeTitle, rkTitleNearMiss, rkTitleFx, RK_TAQRUN_NEED,
+  RK_TITLED_WIVES, RK_TITLED_BY_ID, makeRkTitledWife, rkTitledOffered,
   rkTaqrunClaim, rkTaqrunSeated, RK_COURT, rkAgeVerdict, rkMotherRead, rkCallerCount, slapCap,
   RK_SUITOR_STYLE, EAST_SUITOR_STYLE, WA_SUITOR_STYLE, suitorStyleList,
   openTheTen,
@@ -41168,7 +41843,7 @@ window.__SS = {
   isGun, gearWorldOf, gearStockedHere, WET_CHANCE, rollWeather, isWet, misfireChance,
   inkEyes, inkEyesOver, INK_EYE_CULTURES,
   gunPhase, muzzleFlash, drawGunArms, rangedWords, rangedShelfName,
-  HALL_PLAN, hallPlan, drawHall,
+  HALL_PLAN, hallPlan, drawHall, drawPlankShell, hallStyle, QUIRK_LOCAL,
   GAZE_CULTURE, GAZE_VOICE, gazeVoice, gazeBase, CALLOUT_CULTURE, calloutLines,
   FACE_WORD, gravitasWord, DYE_WORD, dyeWord, CLOTH_WORD, clothWord,
   FACE_RULE, faceRule, highBornLabel, highBornNote,
