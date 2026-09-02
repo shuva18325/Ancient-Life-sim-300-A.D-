@@ -325,7 +325,54 @@ atrium in the district". `QUIRK_LOCAL` overrides only the rows that
 actually name Rome, through the single `qText` chokepoint — Ambitious and
 Possessive are not Roman ideas and are left alone.
 
+### ~~Alaska seeped into Rome~~ — DONE
+`openTheTen()` had no world guard of its own — the hub button was hidden
+outside the Rkrai world, but anything that reached the function another way
+put THE TEN AND THE RKRAUN in front of a Roman. And the hidden button kept
+its **text**, so THE RKRAUN sat in the Roman DOM waiting for anything that
+made a hidden button visible again. The screen refuses outside the coast
+now and the label is blanked with it. `rkleak.cjs` is the mirror of
+`romsweep.cjs` — it walks Rome, Luoyang and Kai through eighteen screens
+looking for fifty Rkrai words, and all three report clean.
+
+### ~~The villa dress was the Roman gown recoloured~~ — DONE
+**THE ULVIK.** The parka is for weather and it is a serious object — sealed,
+hooded, ruffed, built to keep a person alive. It also, necessarily, hides the
+person inside it, which on this coast is a problem nowhere else on this map
+has: six of the ten Masteries are seated on the evidence of a body and a
+woman holding one is supposed to be LOOKED AT. So the house has a second
+garment. Short, sleeveless, tanned inner hide, belted low and wide across
+the hips in **the colour of whatever Mastery the house holds**, and cut away
+high at the back — a Mesteri Rhaunek is *advised* into one at her seating, in
+the same breath as the rest of her duties, and `openTheTen()`'s titles tab
+says so. Coverage is forced low indoors as well, because `coverRich:0.92` is
+true of the parka and was hanging a palla and a veil over the ulvik.
+
+### ~~And the bend was everybody else's bend~~ — DONE
+Everywhere else the bend is a tease whose entire mechanism is the hem riding
+up the back of the thigh. The ulvik is already short and already cut away, so
+that animation has nothing to do. What happens here instead is structural:
+she commits early rather than easing in (braced on a post you do not
+deliberate), the knees stay straighter, and **the cut travels** — at rest the
+hide sits across the middle of the seat, and bent over the post it has ridden
+up over the crown of it, with the wide beaded belt tipping off the level and
+catching light as it goes.
+
+### ~~And so was the arousal~~ — DONE
+`drawTunicBump` is built around a TUNIC: loose cloth that tents and drapes off
+the point. A Rkrai man indoors is in a stiff belted hide kilt over bare legs —
+there is no drape in it. `drawKiltLift` hinges the front panel at the belt and
+swings it out as one piece, the belt visibly takes the strain, and the bare
+thigh is what gets exposed. The tells changed too: everywhere else the last
+stage is a failure of the clothing and he is embarrassed — a sweat bead, a
+look away. Kan holds appetite, the Mastery of it takes a fee, and this coast
+treats the subject as a matter of record, so he does not look away.
+
 ### Still open here
+- The seat block in `drawWifeFig` is four axis-aligned bands built to sit
+  UNDER a gown. Drawn bare under the ulvik it is legible and it is the right
+  silhouette, but the top edge still reads slightly as a shelf rather than a
+  curve. Rebuilding it properly means touching all sixteen cultures.
 - The house SHELL is Rkrai now but the furniture inside it is not: the
   staircase, the cedar wardrobe and the kitchen alcove still draw Roman.
   Same family as 2.1.

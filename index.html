@@ -7052,6 +7052,69 @@ function qText(Q, field, male){
 }
 // HOLLOW is a hard ceiling, not a slow drag — whatever you do, it stops at 45.
 function bondCeiling(){ return hasBane('hollow')? 45 : 100; }
+/* =====================================================================
+   THE KILT, WHICH DOES NOT TENT
+   ---------------------------------------------------------------------
+   Stiff hide over bare legs, held by a wide belt. There is no cloth to
+   drape and nothing to make a wedge out of — the front panel HINGES at
+   the belt and swings out as one piece, the belt itself pulls and shows
+   it, and the bare thigh underneath is what actually gets exposed. Three
+   things move where the tunic had one.
+   ===================================================================== */
+function drawKiltLift(x, y, w, stage, T, dir, decent){
+  if(decent) stage=Math.min(stage, RISE_STAGES-2);
+  const B=(w&&w.body)||{}, gv=(id,d)=>B[id]===undefined?d:B[id];
+  const len=gv('secret',5), lg=gv('legs',6);
+  const skin=w.skin||'#c08a5e';
+  const hideC=mixHex(w.dress||w.tunic||'#6a4a2e','#4a3826',0.45);
+  const hideHi=mixHex(hideC,'#ffffff',0.26), hideSh=mixHex(hideC,'#120a06',0.44);
+  const band=(typeof rkOfficeBand==='function')? rkOfficeBand(G&&G.wife) : '#8a6a3a';
+  const bandHi=mixHex(band,'#ffffff',0.34), bandSh=mixHex(band,'#120a06',0.40);
+  const legLen=Math.round(15+lg*0.62), hipY=y-18-legLen+11;
+  const k=clamp(stage/(RISE_STAGES-1),0,1);
+  const bare=stage>=RISE_STAGES-1;
+  const P=(a,b2,ww,h,c2)=>{ ctx.fillStyle=c2;
+    const ax = dir>0? (x+a) : (x-a-ww);
+    ctx.fillRect(Math.round(ax),Math.round(b2),Math.round(ww),Math.round(h)); };
+  /* ---- THE PANEL, hinged at the belt and swung out as ONE stiff piece.
+     It does not taper the way a tent does, because hide does not. ---- */
+  const swing=Math.max(2, Math.round((3.0+len*0.86)*k));      // how far the front kicks out
+  const panelH=Math.max(4, Math.round(7+len*0.30));           // and how deep the panel is
+  const lift=Math.round(swing*0.55);
+  for(let i=0;i<swing;i++){
+    const t2=i/Math.max(1,swing-1);
+    const yy=hipY-Math.round(t2*lift);
+    P(1+i, yy+panelH-Math.round(t2*2), 1, 2, hideSh);         // its own shadow on the thigh
+    P(1+i, yy, 1, panelH-Math.round(t2*2), bare? skin : hideC);
+    P(1+i, yy, 1, 1, bare? mixHex(skin,'#ffffff',0.24) : hideHi);
+  }
+  const tipY=hipY-lift;
+  if(bare){
+    const th=Math.max(2,Math.round(2.0+len*0.22));
+    P(1+swing, tipY-1, th, th+1, mixHex(skin,'#c07a68',0.42));
+    P(1+swing, tipY-1, th, 1,    mixHex(skin,'#ffffff',0.28));
+  } else if(stage>=2){
+    P(1+swing, tipY, 2, Math.max(2,panelH-3), hideSh);        // the stiff edge of the hide, standing proud
+    P(1+swing, tipY, 2, 1, hideHi);
+  }
+  /* ---- THE BELT TAKES THE STRAIN, and on this coast the belt is the part
+     everybody can read, because it carries the house's Mastery. ---- */
+  { const bw2=Math.round(7+k*3);
+    P(-3, hipY-3, bw2, 4, band);
+    P(-3, hipY-3, bw2, 1, bandHi);
+    P(-3, hipY,   bw2, 1, bandSh);
+    for(let q=0;q<bw2;q+=3) P(-3+q, hipY-2, 1, 2, bandHi);    // the bead courses
+    if(stage>=2){ P(-3+bw2-1, hipY-4, 2, 6, bandSh);          // it pulls up at the near end
+                  P(-3+bw2-1, hipY-4, 2, 1, bandHi); } }
+  /* ---- AND HE IS NOT EMBARRASSED. Kan holds appetite, the Mastery of it
+     takes a fee, and the coast treats the whole subject as a matter of
+     record. No sweat bead, no looking away — he is simply not hiding it,
+     which visitors find the single most disorienting thing here. ---- */
+  if(stage>=2 && ((T|0)%44)<22){ ctx.textAlign='center';
+    pixelText('◆', x-9*dir, hipY-26, 'rgba(255,180,220,.72)', 0.85); ctx.textAlign='left'; }
+  if(stage>=3 && ((T|0)%34)<18){ ctx.textAlign='center';
+    pixelText('KAN', x+13*dir, hipY-30, 'rgba(255,214,190,.62)', 0.62); ctx.textAlign='left'; }
+}
 /* Quirks do NOT follow quality — that is the point of them. A flawless
    senator's daughter is exactly as likely to be insatiable, or to check
    the birds before she lets you leave the house, as a baker's girl is. */
@@ -20165,6 +20228,17 @@ function drawWifeFig(c,x,y,w,ph,mode,preg){
   const hairHi=shade(hair,30), hairSh=shade(hair,-26);
   const B=w.body||{}, gv=(id,d)=>B[id]===undefined?d:B[id];
   const bu=gv('bust',6), be=gv('booty',6), wa=gv('waist',6), lg=gv('legs',6);
+  /* ---- INDOORS ON THE RKRAI SHORE SHE IS IN A DIFFERENT GARMENT. See
+     RK_HOUSE: the parka is for weather and it hides the person wearing it,
+     which is a problem in a country where six of the ten Masteries are
+     seated on the evidence of a body. The ulvik is the answer. ---- */
+  const RKD    = (typeof rkHouseDress==='function') && rkHouseDress(w);
+  const RKBAND = RKD? rkOfficeBand(w) : null;
+  const RKBHI  = RKD? shade(RKBAND, 30) : null;
+  const RKBSH  = RKD? shade(RKBAND,-34) : null;
+  const hide   = RKD? mixHex(dress,'#4a3826',0.62) : dress;      // tanned inner hide — DARK, so the cut reads
+  const hideSh = RKD? shade(hide,-26) : dSh;
+  const hideHi = RKD? shade(hide, 24) : dHi;
   // ---- measurements → pixels ----
   const bustW = Math.round(2 + bu*0.62);          // 2.6 flat → 8.2 huge
   const bustH = Math.round(3 + bu*0.42);
@@ -20188,8 +20262,11 @@ function drawWifeFig(c,x,y,w,ph,mode,preg){
        (a bent-over person's head still reads as a head), and the hair falls
        straight down under gravity — which is most of what sells it. */
     const k=clamp(ph,0,1);
-    const lean=k*k*(3-2*k);                                   // ease in and out of the bend
-    const kneeBend=Math.sin(k*Math.PI)*2.2;
+    /* THE RKRAI ARCH GOES FURTHER, and it goes further EARLY — braced on a
+       post you commit at once, where a woman reaching for a low shelf is
+       still deciding at the halfway point. */
+    const lean = RKD? Math.pow(k,0.72)*1.12 : k*k*(3-2*k);
+    const kneeBend=Math.sin(k*Math.PI)*(RKD?1.3:2.2);         // braced legs stay straighter
     const legL2=Math.max(6,legLen-kneeBend);
     const hy=-legL2-2;                                        // the hip line
     const bT = be>=9?4 : be>=7?3 : be>=5?2 : be>=3?1 : 0;
@@ -20219,6 +20296,11 @@ function drawWifeFig(c,x,y,w,ph,mode,preg){
     const hipW2=Math.max(4,Math.round(hipW*0.60*(1-lean*0.10)));
     // ---- the seat, lifted and pushed back, drawn on HER tier ----
     { const bands=[[0.35,0.74],[0.78,1.0],[1.0,1.0],[0.60,0.84]];
+      /* AND THE CUT TRAVELS. At rest the hide sits across the middle of the
+         seat; bent over the post it has ridden up over the crown of it and
+         there is nothing above the belt but her. One number, and it is the
+         whole difference between this bend and everybody else's. */
+      const RCUT = RKD? (0.46 - lean*0.34) : 1;
       const SJ2=slapJig()*(0.5+bT*0.32);            // a slap rings through the bend as well
       /* AND SO DOES THE SHAKE. The hip drives; the mass follows a beat behind
          it, and how far behind is her own tier — which is the entire reason a
@@ -20236,9 +20318,24 @@ function drawWifeFig(c,x,y,w,ph,mode,preg){
            the ends of the swing where it is loaded, narrower through the middle
            where it is not. It is also what a soft mass on a spring does. */
         const sq=Math.round(Math.abs(SHx)*0.34*(bi>=1?1:0.4));
-        P(-bw-sq-back+sx, yAt, (bw+sq)*2, bh, dress);
-        if(bi===0) P(-bw-sq-back+sx, yAt, (bw+sq)*2, 1, dHi);
-        if(bi>=1 && bT>=2){ P(-bw-sq-back+sx, yAt, 1, bh, dHi); P(bw+sq-1-back+sx, yAt, 1, bh, dSh); }
+        /* THE CUT, IN THE BEND. RCUT has ridden up with the arch, so which
+           bands are hide and which are her changes as she goes over — the
+           thing the room is actually watching on this coast. */
+        const bandT2=(yAt-seatTop)/Math.max(1,deep);
+        const bareB = RKD && bandT2>=RCUT;
+        const cA2 = RKD? (bareB? skin : hide) : dress;
+        const cH2 = RKD? (bareB? shade(skin,18) : hideHi) : dHi;
+        const cS2 = RKD? (bareB? shade(skin,-24) : hideSh) : dSh;
+        P(-bw-sq-back+sx, yAt, (bw+sq)*2, bh, cA2);
+        if(bi===0) P(-bw-sq-back+sx, yAt, (bw+sq)*2, 1, cH2);
+        if(bi>=1 && bT>=2){ P(-bw-sq-back+sx, yAt, 1, bh, cH2); P(bw+sq-1-back+sx, yAt, 1, bh, cS2); }
+        /* AND THE BELT TIPS. It is wide and it is beaded and it does not stay
+           level when she goes over the post — it rides and it catches light. */
+        if(RKD && bandT2<RCUT && bandT2+ (bh/Math.max(1,deep))>=RCUT){
+          const bandC=rkOfficeBand(w);
+          P(-bw-sq-back+sx, yAt+bh-2, (bw+sq)*2, 3, bandC);
+          P(-bw-sq-back+sx, yAt+bh-2, (bw+sq)*2, 1, shade(bandC,32));
+          for(let q=0;q<((bw+sq)*2);q+=3) P(-bw-sq-back+sx+q, yAt+bh-1, 1, 1, shade(bandC,-30)); }
         if(bi===3) P(-bw-sq+1-back+sx, yAt+bh-1, (bw+sq)*2-2, 1, shade(dress,-38));   // the fold underneath it
         /* and the cloth STRETCHES on the leading side rather than sliding —
            a highlight that runs where the gown is being pulled tight */
@@ -20431,7 +20528,53 @@ function drawWifeFig(c,x,y,w,ph,mode,preg){
   leg(Math.round(1+lB*0.5), sSh, shade(skin,-14), shade(skin,-42));   // back leg, in shade
   leg(Math.round(-5+lF*0.5), skin, shade(skin,22), sSh);             // front leg, lit
   // ================= GOWN =================
-  if(mode==='god'){
+  if(RKD){
+    /* =================================================================
+       THE ULVIK — the indoor dress, and it is a different problem from a
+       gown. It is SHORT (the leg is meant to be under it, not inside it),
+       sleeveless, cut from soft inner hide rather than dyed cloth, and
+       belted low and wide across the hips in the colour of whatever
+       Mastery the house holds. It is cut away high at the back, which is
+       the whole reason the garment exists, and this coast is not coy
+       about saying so: the office is public and the holder is looked at
+       on purpose.
+       ================================================================= */
+    const RISE   = 9;                                // it starts up over the hip bone
+    const skirtH = 21 + RISE + (running? -1 : 0);
+    const swayK  = hJig*0.62;
+    const wA=Math.max(4,waistW+3), wB=Math.max(5,hipW*0.74), wC=Math.max(4,hipW*0.50);
+    const wAt=(i)=>{ const t=i/(skirtH-1);
+      const w2=(t<0.42)? wA+(wB-wA)*(t/0.42) : wB+(wC-wB)*((t-0.42)/0.58);
+      return Math.max(2, w2 + (walking? Math.sin(t*3.2)*hipW*0.04 : 0)); };
+    for(let i=0;i<skirtH;i++){
+      const rw=wAt(i), sx=swayK*(i/(skirtH-1))*0.7;
+      P(-rw+sx, top-RISE+i, rw*2, 1, hide);
+      if(i<2) P(-rw+sx, top-RISE+i, rw*2, 1, hideHi);
+      else { P(-rw+sx, top-RISE+i, 1, 1, shade(hide,14));
+             P( rw-1+sx, top-RISE+i, 1, 1, hideSh); }
+    }
+    /* THE HEM IS NOT LEVEL. It is cut away rising toward the back, so the
+       nearer edge sits low and the far edge climbs — the single line that
+       makes it read as a Rkrai garment rather than a short gown. */
+    { const hemY=top-RISE+skirtH-1, rw=wAt(skirtH-1);
+      for(let i=0;i<7;i++)
+        P(-rw+i*((rw*2)/7), hemY-Math.round(i*0.9), Math.ceil((rw*2)/7), 2, hideSh);
+      P(-rw, hemY, 3, 1, shade(hide,-40)); }
+    // two soft folds, following the short flare
+    for(let f=0; f<2; f++){ const off=[-0.42,0.48][f];
+      for(let i=RISE+3;i<skirtH-1;i++){ const rw=wAt(i), sx=swayK*(i/(skirtH-1))*0.7;
+        P(rw*off+sx, top-RISE+i, 1, 1, hideSh); } }
+    /* THE BELT — wide, low, beaded, and in the Mastery's own colour, which
+       is how the house's office is read from the door. */
+    { const bw=Math.round(wAt(Math.round(skirtH*0.30))*1.06), by=top-RISE+4;
+      P(-bw+swayK*0.2, by, bw*2, 4, RKBAND);
+      P(-bw+swayK*0.2, by, bw*2, 1, RKBHI);
+      P(-bw+swayK*0.2, by+3, bw*2, 1, RKBSH);
+      for(let i=-bw+2;i<bw-1;i+=3) P(i+swayK*0.2, by+1, 1, 2, RKBHI);   // the bead courses
+      P(-2+swayK*0.2, by-1, 5, 6, shade(RKBAND,-18));                    // the clasp, worn to the front
+      P(-1+swayK*0.2, by, 3, 1, '#efe6cc'); }
+  }
+  else if(mode==='god'){
     // THE GOD WALK — she gathers the stola in one fist and sweeps, formal and unhurried
     P(-hipW, top, hipW*2, 20, dress); P(-hipW, top, hipW*2, 2, dHi);
     // the gathered fall of cloth, lifted on her right — down to the legs, not short of them
@@ -20486,7 +20629,7 @@ function drawWifeFig(c,x,y,w,ph,mode,preg){
      and it has to FOLLOW the flare now that the gown has one. Pinned to a
      flat hipW it hung outside the cloth at the hem and inside it at the
      thigh, a gold line floating beside her rather than sewn onto her. */
-  if(noble){
+  if(noble && !RKD){
     if(mode==='god'){ P(-hipW, top+16, hipW*2, 1, '#e8c34a'); P(-hipW, top, 1, 18, '#e8c34a'); }
     else { const skirtH2=27+(running?-2:0);
       const wA=seatW*0.99, wB=hipW*0.80, wC=hipW*1.12;
@@ -20503,22 +20646,51 @@ function drawWifeFig(c,x,y,w,ph,mode,preg){
   { const bT = bTier;
     const hj=hJig*0.55, hy=top-7-hJig*0.30;
     const flare=bFlare, deep=bDeep;
+    /* UNDER THE ULVIK THIS IS NOT CLOTH. The seat is drawn in the gown's
+       colour everywhere else because everywhere else there is a gown over
+       it; the ulvik is cut away high at the back, so what is drawn here is
+       HER, lit as skin, with the belt sitting across the top of it. That
+       one substitution is the entire difference the culture is asking for
+       and it is legible at sprite scale, which the wording alone was not. */
+    const CUTF = 0.46;                    // how far down the seat the hide stops
+    const SB   = RKD? hide   : dress;
+    const SBHi = RKD? hideHi : dHi;
+    const SBSh = RKD? hideSh : dSh;
+    const BARE = RKD? skin : dress, BAREHi=RKD? shade(skin,18):dHi, BARESh=RKD? shade(skin,-24):dSh;
     // the seat is drawn as stacked bands that TAPER, so it curves out and back
     // in again — five genuinely different silhouettes, none of them a slab
     const bands=[[0.35,0.72],[0.75,1.0],[1.0,1.0],[0.62,0.86]];       // [heightFrac, widthFrac] top→bottom
     let yAt=hy+1;
     bands.forEach(([hf,wf],bi)=>{
       const bh=Math.max(1,Math.round(deep*hf*0.42));
-      const bw=Math.round((hipW+flare)*wf);
-      P(-bw+hj, yAt, bw*2, bh, dress);
-      if(bi===0) P(-bw+hj, yAt, bw*2, 1, dHi);                        // the lit crown
-      if(bi>=1 && bT>=2){ P(-bw+hj, yAt, 1, bh, dHi); P(bw-1+hj, yAt, 1, bh, dSh); }
+      const bw=Math.round((hipW+flare)*wf*(RKD? [0.58,0.80,0.86,0.72][bi] : 1));
+      /* UNDER THE ULVIK the band is hide down to the cut and HER below it,
+         so the garment reads as riding up over the seat rather than as
+         somebody having forgotten one. bandT is how far down the whole
+         seat this band starts. */
+      const bandT = (yAt-(hy+1))/Math.max(1,deep);
+      const isBare = RKD && bandT>=CUTF;
+      const cA = isBare? BARE   : SB;
+      const cH = isBare? BAREHi : SBHi;
+      const cS = isBare? BARESh : SBSh;
+      P(-bw+hj, yAt, bw*2, bh, cA);
+      if(bi===0) P(-bw+hj, yAt, bw*2, 1, cH);                         // the lit crown
+      if(bi>=1 && bT>=2){ P(-bw+hj, yAt, 1, bh, cH); P(bw-1+hj, yAt, 1, bh, cS); }
+      /* AND THE BAND THE CUT FALLS ACROSS is drawn in both, with the hide
+         edge sloping up toward the far side — one line, and it is the
+         whole silhouette the coast is asking for. */
+      if(RKD && !isBare && bandT+ (bh/Math.max(1,deep)) > CUTF){
+        for(let q=0;q<8;q++){ const qx=-bw+Math.round(q*(bw*2/8));
+          const drop=Math.round((q/7)*bh*0.85);
+          P(qx+hj, yAt+drop, Math.ceil(bw*2/8), bh-drop, BARE);
+          P(qx+hj, yAt+drop, Math.ceil(bw*2/8), 1, hideSh); } }
       yAt+=bh;
     });
-    P(-Math.round((hipW+flare)*0.62)+hj, yAt-1, Math.round((hipW+flare)*0.62)*2, 1, dSh);   // the fold beneath
-    if(bT>=3){ P(-hipW-flare+hj, hy+deep-3, 3, 2, dSh); P(hipW+flare-3+hj, hy+deep-3, 3, 2, dSh); }
-    if(bT>=4){ P(-2, hy+2, 4, deep-3, shade(dress,-30)); }            // colossal: a real cleft down the middle
-    if(bT===0){ P(-hipW+1+hj, hy+2, (hipW-1)*2, 5, dress); }          // FLAT: barely wider than her waist
+    P(-Math.round((hipW+flare)*0.62)+hj, yAt-1, Math.round((hipW+flare)*0.62)*2, 1, BARESh);  // the fold beneath
+    if(bT>=3){ P(-hipW-flare+hj, hy+deep-3, 3, 2, BARESh); P(hipW+flare-3+hj, hy+deep-3, 3, 2, BARESh); }
+    if(bT>=4){ P(-2, hy+2+(RKD?Math.round(deep*CUTF):0), 4, deep-3-(RKD?Math.round(deep*CUTF):0),
+                 shade(RKD?BARE:SB,-30)); }                            // colossal: a real cleft down the middle
+    if(bT===0){ P(-hipW+1+hj, hy+2, (hipW-1)*2, 5, SB); }             // FLAT: barely wider than her waist
   }
   // ================= WAIST — cinched, unless she is carrying =================
   if(preg>0){
@@ -20613,7 +20785,13 @@ function drawWifeFig(c,x,y,w,ph,mode,preg){
      backwards on purpose: the stola is the badge of a respectable citizen
      wife, so the richer the house the MORE of her the street sees none of.
      The mantle and the head-covering ride the walk cycle with her. */
-  { const CU=personCulture(w), cov=(w._cov===undefined? coverageOf(w) : w._cov);
+  { const CU=personCulture(w);
+    /* COVERAGE IS AN OUTDOOR NUMBER. CULTURES.rkrai carries coverRich 0.92,
+       which is true of the PARKA and says nothing at all about the house —
+       and left as it was it hung a palla and a veil over the ulvik, which
+       is the whole garment it is meant to be instead of. Indoors on that
+       coast the cloak comes off at the door and stays off. */
+    const cov=RKD? 0.34 : (w._cov===undefined? coverageOf(w) : w._cov);
     const clothC=(dressModeOf(w)==='roman')? dress : (CU.cloth? CU.cloth[0] : dress);
     const cSh=shade(clothC,-30), cHi=shade(clothC,26);
     const LX2=lean*0.4;
@@ -21740,6 +21918,7 @@ const RISE_LINES=[
 function drawTunicBump(x, y, w, stage, T, dir, decent){
   if(stage<=0) return;
   dir = (dir===-1)? -1 : 1;                        // it belongs on the side he is facing
+  if(typeof rkHere==='function' && rkHere()){ drawKiltLift(x,y,w,stage,T,dir,decent); return; }
   /* NOT IN FRONT OF THE HOUSEHOLD. The last stage is the one where the hem
      gives up and there is skin — which is fine behind a door and is not fine
      in an atrium with three children and the kitchen staff in it. `decent`
@@ -28417,6 +28596,16 @@ function standardsHere(){
    without ever finding out what any of it was called.
    ===================================================================== */
 function openTheTen(tab){
+  /* ONE COUNTRY'S INSTITUTION, IN ONE COUNTRY. The hub button is hidden
+     outside the Rkrai world, but the function had no guard of its own —
+     so anything that reached it another way (a stale handler, a restored
+     screen, a harness) put the Ten and the Rkraun in front of a Roman.
+     The screen refuses now rather than relying on a button being hidden. */
+  if(!rkHere()){
+    try{ toast('There is no such council here.',2200); }catch(e){}
+    try{ enterMap(); }catch(e){}
+    return;
+  }
   state='villa'; show('scr-villa'); $('statbar').classList.remove('hide'); refreshStatbar();
   const H=RK_GOVERN.head;
   villaHead('⚖ THE TEN AND THE RKRAUN',
@@ -28474,6 +28663,15 @@ function openTheTen(tab){
   }
   else if(tab==='titles'){
     const w=G&&G.wife, held=rkWifeTitle(w);
+    /* ---- THE HOUSE DRESS. The player can SEE it in the villa; this is
+       where the coast says out loud why it is a different garment. ---- */
+    card('<div style="color:#e8c34a;letter-spacing:1px"><b>◈ '+RK_HOUSE.name+'</b>'
+      +' <span class="small muted">— '+RK_HOUSE.where+'</span></div>'
+      +'<div class="small" style="margin-top:3px;line-height:1.55">'+RK_HOUSE.what+'</div>'
+      +'<div class="small muted" style="margin-top:3px;line-height:1.55">'+RK_HOUSE.why+'</div>'
+      +'<div class="small" style="margin-top:3px;line-height:1.55;color:#ff8ad0"><b>⚡ AND SHE IS ADVISED INTO ONE:</b> '
+      +RK_HOUSE.advice+'</div>'
+      +'<div class="small muted" style="margin-top:3px;font-style:italic">'+RK_HOUSE.outside+'</div>', '#e8c34a');
     card('<div><b style="color:#ff8ad0">♀ SIX TITLES YOU NEED THE LOOKS FOR</b></div>'
       +'<div class="small muted" style="margin-top:3px;line-height:1.55">Six of the ten Masteries are, on this coast and nowhere else on this map, '
       +'held by a woman on the evidence of her own body — because the six things those Masteries are ABOUT are things the Rkrai read '
@@ -29155,8 +29353,12 @@ function applyHub(){
       if(!tn){ const h5=$('btn-standards')||$('btn-titles')||$('btn-shop');
         if(h5 && h5.parentNode){ tn=document.createElement('button'); tn.className='btn'; tn.id='btn-ten';
           tn.onclick=()=>openTheTen(); h5.parentNode.insertBefore(tn, h5.nextSibling); } }
-      if(tn){ tn.style.display = (_w==='rk')? '' : 'none';
-        tn.textContent='⚖ THE TEN & THE RKRAUN'; } }
+      /* AND THE LABEL GOES WITH IT. The button was hidden outside the
+         Rkrai world but kept its text, so THE RKRAUN was sitting in the
+         Roman DOM waiting for anything that made a hidden button visible
+         again. Hidden here means blank. */
+      if(tn){ const on=(_w==='rk'); tn.style.display = on? '' : 'none';
+        tn.textContent = on? '⚖ THE TEN & THE RKRAUN' : ''; } }
     /* AND YOUR OWN HOUSE, which is a Japanese institution and appears only
        there — you cannot found a clan with a mon in Rome. */
     { let hb=$('btn-house');
@@ -37707,6 +37909,52 @@ function rkHead(){ return RK_GOVERN.head; }
 function rkHere(){
   try{ return playerWorld()==='rk'; }catch(e){ return false; }
 }
+/* =====================================================================
+   THE ULVIK — WHAT SHE WEARS INDOORS, AND WHY IT IS A DIFFERENT GARMENT
+   ---------------------------------------------------------------------
+   The parka is for outside and it is a serious object: sealed, hooded,
+   ruffed, built to keep a person alive in weather that kills. It is also,
+   necessarily, a shape that hides the person inside it — which on this
+   coast creates a problem nowhere else on this map has, because SIX of the
+   ten Masteries are seated on the evidence of a body and a woman holding
+   one is supposed to be LOOKED AT. An office you cannot see is not doing
+   its job.
+
+   So the house has its own garment. The ULVIK is short, sleeveless, cut
+   from the soft inner hide, and belted low on the hips with a wide beaded
+   band in the colour of whatever Mastery the house holds. It is cut away
+   high at the back. That is not an accident and nobody on the coast
+   pretends it is: the Mesteri Rhaunek is ADVISED into one at her seating,
+   in the same breath as the rest of her duties, because Rhauna holds the
+   seat, the office is public, and the holder is looked at on purpose.
+
+   A woman with no title wears one too — it is simply the indoor dress —
+   but hers is plain hide with a plain belt, and the difference between the
+   two is legible from the door, which is the point of everything here.
+   ===================================================================== */
+const RK_HOUSE={
+  name:'THE ULVIK', where:'indoors, and only indoors',
+  what:'Short, sleeveless, soft inner hide, belted low and wide across the hips, and cut away high at the back.',
+  why:'Six of the ten Masteries are seated on the evidence of a body. The parka is built to keep a person alive and it hides the person doing it — so the house has a second garment, and the second garment is the one the office can be read off.',
+  advice:'A Mesteri Rhaunek is advised into one at her seating, in the same breath as the rest of her duties. Rhauna holds the seat; the office is public; the holder is looked at on purpose. A house where she is not is a house the district assumes is unhappy.',
+  outside:'Nobody wears an ulvik out of doors. It would be a ridiculous thing to die in.'
+};
+/* is this woman in the indoor dress? — the villa IS indoors, so it is
+   simply whether she is of this coast */
+function rkHouseDress(w){
+  try{ return rkHere() && !!w && (w.eth==='rkrai') && !w.male; }
+  catch(e){ return false; }
+}
+/* and the belt carries the house's Mastery, if the house holds one */
+function rkOfficeBand(w){
+  try{
+    const t=rkWifeTitle(w);
+    if(t){ const C={seat:'#8a2f4a', bosom:'#c0a02a', reach:'#2f6a72',
+                    love:'#9a2f5a', voice:'#3a2f6a', cold:'#6a7a8a'};
+      return C[t.id]||'#8a6a3a'; }
+  }catch(e){}
+  return '#8a6a3a';                      // plain hide-and-bone, for a house with no office
+}
 function rkRankIdx(){
   try{
     const r=(G&&G.rkRank);
@@ -41816,7 +42064,7 @@ window.__SS = {
   REGIONS_RK, REGION_RK_BY_ID, RK_COAST, RK_MASTERIES, RK_MASTERY_BY_ID,
   RK_BEYOND, RK_INLAND_FROM, RK_INLAND_TO, rkIsCoast,
   RK_RANKS, rkRank, rkRankIdx, RK_VENUES, drawMapCanvasRk, provGovList,
-  RK_GOVERN, rkHead, rkHere, SLAP_BUTTON, RK_WIFE_TITLES, RK_WIFE_TITLE_BY_ID, RK_EARNED_TITLES,
+  RK_GOVERN, rkHead, rkHere, SLAP_BUTTON, RK_HOUSE, rkHouseDress, rkOfficeBand, drawKiltLift, RK_WIFE_TITLES, RK_WIFE_TITLE_BY_ID, RK_EARNED_TITLES,
   rkTitlesFor, rkWifeTitle, rkTitleNearMiss, rkTitleFx, RK_TAQRUN_NEED,
   RK_TITLED_WIVES, RK_TITLED_BY_ID, makeRkTitledWife, rkTitledOffered,
   rkTaqrunClaim, rkTaqrunSeated, RK_COURT, rkAgeVerdict, rkMotherRead, rkCallerCount, slapCap,
