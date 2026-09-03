@@ -378,6 +378,10 @@ treats the subject as a matter of record, so he does not look away.
   Same family as 2.1.
 - The bedchamber poses have a Rkrai pose (`vi===21`) and a Rkrai hall, but
   the six wife-titles do not yet change what is DRAWN — only what it is worth.
+  **PARTLY DONE:** the seat title now does. A Mesteri Rhaunek wears the ulvik,
+  which is cut for a body that is going to carry past it, and past the ninth
+  mark her bend has its own beat (`rkBendBeat`). The other five titles still
+  only change the numbers.
 - `RK_MASTERIES` has ten entries and the map has four provinces; the
   province-holders are named as a tier and are not yet people you can meet.
 - The Rkraun's nine-winter term is lore, not a clock. It should be a clock.

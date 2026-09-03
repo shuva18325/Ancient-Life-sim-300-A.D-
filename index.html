@@ -20218,6 +20218,34 @@ function litWife(c,x,y,w,ph,mode,preg,opt){
   litFigure(c,x,y,(bc,bx,by)=>drawWifeFig(bc,bx,by,w,ph,mode,preg),opt); }
 function litHusband(c,x,y,bond,sk,tn,w,ph,mode,opt){
   litFigure(c,x,y,(bc,bx,by)=>drawHusbandFig(bc,bx,by,bond,sk,tn,w,ph,mode),opt); }
+/* =====================================================================
+   THE SEAT PROFILE — A CURVE, NOT A STAIRCASE
+   ---------------------------------------------------------------------
+   This was four axis-aligned bands, each one width, stacked. Two things
+   were wrong with that and both showed the moment anything was drawn
+   without a gown over the top:
+
+     · four bands is FOUR HARD STEPS down the silhouette, and
+     · the top band came out at nearly full width straight off the waist,
+       which IS the shelf — a plank sticking out sideways with nothing
+       leading up to it.
+
+   It is a three-point curve now, sampled a ROW at a time: it starts at
+   her waist and grows OUT of it, swells to its widest at a height the
+   tier decides, and tucks back under toward the fold. Smoothstep at both
+   joins, so there is no corner anywhere in it. Five tiers still give five
+   genuinely different silhouettes — what changes between them is how
+   HIGH the widest row sits and how much wider than the waist it gets,
+   which is the actual difference between those bodies rather than a
+   scale factor applied to one shape.
+   ===================================================================== */
+const SEAT_PEAK=[0.34,0.40,0.46,0.50,0.55];      // where the widest row sits, by tier
+function seatWidthAt(t, bT, wTop, wMax, wBot){
+  const PK=SEAT_PEAK[clamp(bT|0,0,4)];
+  const ss=(u)=>{ u=clamp(u,0,1); return u*u*(3-2*u); };
+  return (t<PK)? wTop + (wMax-wTop)*ss(t/PK)
+               : wMax + (wBot-wMax)*ss((t-PK)/(1-PK));
+}
 function drawWifeFig(c,x,y,w,ph,mode,preg){
   mode=mode||'idle'; ph=ph||0; preg=preg||0;
   const P=(a,b2,ww,h,col)=>{c.fillStyle=col;c.fillRect(Math.round(x+a),Math.round(y+b2),Math.round(ww),Math.round(h));};
@@ -20236,9 +20264,9 @@ function drawWifeFig(c,x,y,w,ph,mode,preg){
   const RKBAND = RKD? rkOfficeBand(w) : null;
   const RKBHI  = RKD? shade(RKBAND, 30) : null;
   const RKBSH  = RKD? shade(RKBAND,-34) : null;
-  const hide   = RKD? mixHex(dress,'#4a3826',0.62) : dress;      // tanned inner hide — DARK, so the cut reads
-  const hideSh = RKD? shade(hide,-26) : dSh;
-  const hideHi = RKD? shade(hide, 24) : dHi;
+  const hide   = RKD? mixHex(dress,'#7a5a3a',0.50) : dress;      // tanned inner hide, warm — not a hole in the screen
+  const hideSh = RKD? shade(hide,-34) : dSh;                     // and it wants CONTRAST inside itself,
+  const hideHi = RKD? shade(hide, 30) : dHi;                     // or the folds in it are invisible
   // ---- measurements → pixels ----
   const bustW = Math.round(2 + bu*0.62);          // 2.6 flat → 8.2 huge
   const bustH = Math.round(3 + bu*0.42);
@@ -20270,7 +20298,7 @@ function drawWifeFig(c,x,y,w,ph,mode,preg){
     const legL2=Math.max(6,legLen-kneeBend);
     const hy=-legL2-2;                                        // the hip line
     const bT = be>=9?4 : be>=7?3 : be>=5?2 : be>=3?1 : 0;
-    const flare=[0,1,2,3,4][bT], deep=[6,7,8,9,10][bT];
+    const flare=[0,1,2,3,4][bT], deep=[6,8,9,11,12][bT];
     const back=Math.round(lean*5);                            // hips counterweight BACKWARD
     /* THE ISOLATION. A tiny waist is a long lever and it lets the hips travel
        against a rib cage that is not going with them; a thick one carries the
@@ -20288,14 +20316,23 @@ function drawWifeFig(c,x,y,w,ph,mode,preg){
     P( 1-back, -2, 5, 2, '#8a5c34');      P( 1-back, -2, 5, 1, '#a87446');
     if(lean>0.4){ P(-1-back, -legL2+1, 2, 3, sSh); P(4-back, -legL2+2, 1, 4, sSh); }   // the backs of the knees
     // ---- THE HEM RIDES UP. This is the whole tease, and it is on a curve. ----
-    const hemH=Math.round(17-lean*9);
+    /* AND THE ULVIK IS SHORT TO BEGIN WITH. A seventeen-pixel hem is a Roman
+       gown; the house garment is barely past the hip before she moves at all,
+       which is the entire reason the coast advises a Mesteri Rhaunek into one. */
+    const hemH=Math.max(3, Math.round((17-lean*9)*(RKD?0.52:1)));
     const seatTop=hy-1-Math.round(lean*6);                     // the seat climbs to become the top of her
     /* hipW is the FRONT-view flare of the gown — in profile she is nowhere near
        that wide, and using it here laid a twenty-two pixel plank across the
        screen. Profile width, pulled tighter as the cloth stretches over her. */
     const hipW2=Math.max(4,Math.round(hipW*0.60*(1-lean*0.10)));
     // ---- the seat, lifted and pushed back, drawn on HER tier ----
-    { const bands=[[0.35,0.74],[0.78,1.0],[1.0,1.0],[0.60,0.84]];
+    { /* THE SEAT IN THE BEND is the SAME PROFILE as the standing one — the
+         same seatWidthAt curve, sampled a row at a time — and then loaded:
+         the slap rings through it, the shimmy drags the lower rows a beat
+         behind the upper ones, and the whole mass squashes wider at the ends
+         of the swing. Four stacked bands put a staircase down the near edge
+         and a plank across the top of it; a row at a time it reads as one
+         soft mass being carried over the hips, which is what it is. */
       /* AND THE CUT TRAVELS. At rest the hide sits across the middle of the
          seat; bent over the post it has ridden up over the crown of it and
          there is nothing above the belt but her. One number, and it is the
@@ -20306,55 +20343,71 @@ function drawWifeFig(c,x,y,w,ph,mode,preg){
          it, and how far behind is her own tier — which is the entire reason a
          flat 2 and a colossal 9 do not read as one animation at two speeds. */
       const SHx=Math.round(shimmySeat()), SHy=Math.round(shimmyLift());
-      let yAt=seatTop+Math.round(SJ2*0.5)-SHy;
-      bands.forEach(([hf,wf],bi)=>{
-        const bh=Math.max(1,Math.round(deep*hf*0.42*(1+lean*0.42)));
-        const bw=Math.round((hipW2+flare)*wf*(1+lean*0.26)+SJ2*0.30);
-        /* the lower bands lag furthest — the top of the seat is nearly the
-           hip and moves with it, the underside is all mass and does not */
-        const sx=Math.round(SHx*(0.35+bi*0.24));
+      const DEEP2=Math.max(4, Math.round(deep*1.15*(1+lean*0.42)));
+      const wMax2=(hipW2+flare)*(1+lean*0.26)+SJ2*0.30;
+      const wTop2=Math.max(2, hipW2*0.60);                  // it GROWS out of the small of her back
+      const wBot2=Math.max(2, wMax2*0.60);                  // and tucks back under toward the fold
+      const yTop=seatTop+Math.round(SJ2*0.5)-SHy;
+      const cutR=clamp(Math.round(RCUT*(DEEP2-1)), 0, DEEP2-1);
+      for(let r=0;r<DEEP2;r++){
+        const t=r/(DEEP2-1);
+        /* the lower rows lag furthest — the top of the seat is nearly the hip
+           and travels with it, the underside is all mass and does not */
+        const sx=Math.round(SHx*(0.33+t*0.70));
         /* SQUASH AND STRETCH. At forty pixels tall the travel alone is a few
            pixels; what the eye actually reads is the mass DEFORMING — wider at
            the ends of the swing where it is loaded, narrower through the middle
            where it is not. It is also what a soft mass on a spring does. */
-        const sq=Math.round(Math.abs(SHx)*0.34*(bi>=1?1:0.4));
-        /* THE CUT, IN THE BEND. RCUT has ridden up with the arch, so which
-           bands are hide and which are her changes as she goes over — the
+        const sq=Math.round(Math.abs(SHx)*0.34*(0.40+t*0.60));
+        const w2=Math.max(1, Math.round(seatWidthAt(t,bT,wTop2,wMax2,wBot2))+sq);
+        const yy=yTop+r;
+        /* THE CUT, IN THE BEND. cutR has ridden up with the arch, so how much
+           of her is hide and how much is HER changes as she goes over — the
            thing the room is actually watching on this coast. */
-        const bandT2=(yAt-seatTop)/Math.max(1,deep);
-        const bareB = RKD && bandT2>=RCUT;
+        const bareB = RKD && r>cutR;
         const cA2 = RKD? (bareB? skin : hide) : dress;
         const cH2 = RKD? (bareB? shade(skin,18) : hideHi) : dHi;
         const cS2 = RKD? (bareB? shade(skin,-24) : hideSh) : dSh;
-        P(-bw-sq-back+sx, yAt, (bw+sq)*2, bh, cA2);
-        if(bi===0) P(-bw-sq-back+sx, yAt, (bw+sq)*2, 1, cH2);
-        if(bi>=1 && bT>=2){ P(-bw-sq-back+sx, yAt, 1, bh, cH2); P(bw+sq-1-back+sx, yAt, 1, bh, cS2); }
-        /* AND THE BELT TIPS. It is wide and it is beaded and it does not stay
-           level when she goes over the post — it rides and it catches light. */
-        if(RKD && bandT2<RCUT && bandT2+ (bh/Math.max(1,deep))>=RCUT){
-          const bandC=rkOfficeBand(w);
-          P(-bw-sq-back+sx, yAt+bh-2, (bw+sq)*2, 3, bandC);
-          P(-bw-sq-back+sx, yAt+bh-2, (bw+sq)*2, 1, shade(bandC,32));
-          for(let q=0;q<((bw+sq)*2);q+=3) P(-bw-sq-back+sx+q, yAt+bh-1, 1, 1, shade(bandC,-30)); }
-        if(bi===3) P(-bw-sq+1-back+sx, yAt+bh-1, (bw+sq)*2-2, 1, shade(dress,-38));   // the fold underneath it
-        /* and the cloth STRETCHES on the leading side rather than sliding —
-           a highlight that runs where the gown is being pulled tight */
+        P(-w2-back+sx, yy, w2*2, 1, cA2);
+        if(bT>=2){ P(-w2-back+sx, yy, 1, 1, cH2); P(w2-1-back+sx, yy, 1, 1, cS2); }
+        if(r===0) P(-w2-back+sx, yy, w2*2, 1, cH2);           // the crown of light along the top
+        /* and the surface STRETCHES on the leading side rather than sliding —
+           a highlight that runs where it is being pulled tight */
         if(bT>=2 && Math.abs(SHx)>0.9)
-          P((SHx>0? bw+sq-2 : -bw-sq)-back+sx, yAt, 2, bh, SHx>0? dHi : dSh);
-        yAt+=bh; });
-      { const bwT=Math.round((hipW2+flare)*0.74*(1+lean*0.26));            // and a crown of light on top
-        P(-bwT-back, seatTop-1, bwT*2, 1, shade(dress,34)); }
-      if(bT>=4) P(-2-back, seatTop+2, 4, deep-3, shade(dress,-30));
-      // the hem, shorter at every stage — with a HEMLINE that is not a straight cut
-      P(-hipW2-back, seatTop+2, hipW2*2, hemH, dress);
-      P(-hipW2-back, seatTop+2, hipW2*2, 2, dHi);
-      P(-hipW2-back, seatTop+3, 1, hemH-2, shade(dress,14));               // the lit edge of the cloth
-      P( hipW2-1-back, seatTop+3, 1, hemH-2, dSh);
+          P((SHx>0? w2-2 : -w2)-back+sx, yy, 2, 1, SHx>0? cH2 : cS2);
+        /* AND THE BELT TIPS. It is wide and it is beaded and it does not stay
+           level when she goes over the post — it rides, and it catches light. */
+        if(RKD && r>=cutR-2 && r<=cutR){
+          const bandC=rkOfficeBand(w);
+          P(-w2-back+sx, yy, w2*2, 1, (r===cutR-2)? shade(bandC,32) : bandC);
+          if(r===cutR) for(let q=0;q<w2*2;q+=3) P(-w2-back+sx+q, yy, 1, 1, shade(bandC,-30)); }
+      }
+      /* the fold underneath, on the curve's OWN bottom width rather than a
+         guessed fraction of a hip that is not even facing us */
+      { const wE=Math.max(2, Math.round(seatWidthAt(1,bT,wTop2,wMax2,wBot2)));
+        P(-wE+1-back+Math.round(SHx*1.03), yTop+DEEP2, wE*2-2, 1,
+          RKD? shade(skin,-34) : shade(dress,-38)); }
+      /* colossal: a real cleft, following the curve down instead of running as
+         one straight bar through the middle of it */
+      if(bT>=4){ const from=RKD? Math.min(DEEP2-2, cutR+1) : 1;
+        for(let r=from;r<DEEP2-1;r++){ const t=r/(DEEP2-1);
+          const dw=Math.max(1, Math.round(seatWidthAt(t,bT,wTop2,wMax2,wBot2)*0.13));
+          P(-dw-back+Math.round(SHx*(0.33+t*0.70)), yTop+r, dw*2, 1,
+            shade(RKD? skin : dress, -30)); } }
+      /* the hem, shorter at every stage — with a HEMLINE that is not a straight
+         cut. UNDER THE ULVIK it is the same shape in tanned hide, and there is
+         no scallop and no gold on it, because it is a working garment. */
+      const hC=RKD?hide:dress, hHi=RKD?hideHi:dHi, hSh=RKD?hideSh:dSh;
+      P(-hipW2-back, seatTop+2, hipW2*2, hemH, hC);
+      P(-hipW2-back, seatTop+2, hipW2*2, 2, hHi);
+      P(-hipW2-back, seatTop+3, 1, hemH-2, shade(hC,14));                  // the lit edge of the cloth
+      P( hipW2-1-back, seatTop+3, 1, hemH-2, hSh);
       for(let i=0;i<4;i++){ const fx=-hipW2+2+i*Math.max(2,Math.round(hipW2*0.55));
-        P(fx-back, seatTop+4, 1, hemH-3, dSh); }                           // and the folds running down it
+        P(fx-back, seatTop+4, 1, hemH-3, hSh); }                           // and the folds running down it
       { const hemY=seatTop+2+hemH;                                          // a scalloped hem, not a ruler line
-        for(let i=0;i<hipW2*2;i+=3) P(-hipW2+i-back, hemY-((i>>1)%2), 3, 1, dSh); }
-      if(noble) P(-hipW2-back, seatTop+hemH+1, hipW2*2, 1, '#e8c34a');
+        if(RKD) P(-hipW2-back, hemY, hipW2*2, 1, hSh);
+        else for(let i=0;i<hipW2*2;i+=3) P(-hipW2+i-back, hemY-((i>>1)%2), 3, 1, hSh); }
+      if(noble && !RKD) P(-hipW2-back, seatTop+hemH+1, hipW2*2, 1, '#e8c34a');
       /* ---- WHAT THE HEM HAS LEFT BEHIND ------------------------------------
          The tease was all gown and no skin: the cloth got shorter but there was
          nothing under it to see, so nothing actually happened. From stage three
@@ -20498,7 +20551,11 @@ function drawWifeFig(c,x,y,w,ph,mode,preg){
      side and the two together read as a shelf with a curtain hung under it.
      The skirt is cut from the same number now. */
   const bTier = be>=9?4 : be>=7?3 : be>=5?2 : be>=3?1 : 0;
-  const bFlare=[0,1,2,3,4][bTier], bDeep=[6,7,8,9,10][bTier];
+  /* AND IT NEEDS DEPTH TO BE A CURVE AT ALL. Thirty-two pixels across and
+     ten deep is a dinner plate on its edge; the profile can be as smooth as
+     it likes inside proportions like that and it will still read as a
+     shelf, because a shelf is what those proportions ARE. */
+  const bFlare=[0,1,2,3,4][bTier], bDeep=[6,8,10,12,14][bTier];
   const seatW = hipW + bFlare;
   // ================= LEGS (a real walk cycle, visible under the hem) =================
   /* THE LEGS WERE ONE COLUMN. Front leg spanned x -3..+1 and the back one
@@ -20527,6 +20584,73 @@ function drawWifeFig(c,x,y,w,ph,mode,preg){
   };
   leg(Math.round(1+lB*0.5), sSh, shade(skin,-14), shade(skin,-42));   // back leg, in shade
   leg(Math.round(-5+lF*0.5), skin, shade(skin,22), sSh);             // front leg, lit
+  if(RKD){
+    /* and the thigh above each of them, because the ulvik ends halfway up
+       it. Wider than the shin and drawing in toward the knee, which is the
+       shape of a thigh and not a second shin. */
+    const th=Math.max(3,Math.round(4+lg*0.05))+1;
+    const thigh=(ox, sk, sh, dk)=>{
+      const y0=top+9, h=(yy-legLen)-y0+1;
+      if(h<=0) return;
+      for(let i=0;i<h;i++){
+        const t=i/Math.max(1,h-1), tw=Math.max(2, Math.round(th-t*1.4));
+        P(ox+((th-tw)>>1), y0+i, tw, 1, sk);
+        P(ox+((th-tw)>>1), y0+i, 1, 1, sh);
+        P(ox+((th-tw)>>1)+tw-1, y0+i, 1, 1, dk);
+      }
+    };
+    thigh(Math.round(1+lB*0.5)-1, sSh,  shade(skin,-14), shade(skin,-42));
+    thigh(Math.round(-5+lF*0.5)-1, skin, shade(skin,22),  sSh);
+    P(-1, top+9, 2, 7, shade(skin,-30));                  // the shadow between them
+  }
+  /* ================= HIPS AND THE BOOTY, BY TIER =================
+     FLAT · RAISED · ELEVATED · FAT · COLOSSAL — five silhouettes, not one
+     block scaled up.
+
+     WHICH SIDE OF THE CLOTH IT GOES ON IS THE WHOLE QUESTION. Everywhere
+     else on this map the seat is a GOWN being pushed out from inside, so
+     it is drawn in the gown's colour, on top of the skirt, and it reads as
+     cloth. Under the ulvik it is HER — the shift is short, soft and cut
+     narrow, and the body wins — so it is drawn in skin and the garment
+     goes on over the top of it. Drawn last for both, it came out as a pale
+     mushroom cap balanced on a dark shift eight pixels narrower than it
+     was, which is exactly what it was. */
+  const drawSeat=()=>{ const bT = bTier;
+    const hj=hJig*0.55, hy=top-7-hJig*0.30;
+    const flare=bFlare, deep=bDeep;
+    const SB   = RKD? skin            : dress;
+    const SBHi = RKD? shade(skin, 18) : dHi;
+    const SBSh = RKD? shade(skin,-24) : dSh;
+    /* the profile, sampled a row at a time — see seatWidthAt above */
+    const wTop=Math.max(2, waistW*0.94);
+    const wMax=hipW+flare;
+    const wBot=Math.max(2, hipW*0.84);        // it tucks UNDER, and the gown carries on from there
+    const DEEP=Math.max(3, deep);
+    for(let r=0;r<DEEP;r++){
+      const t=(DEEP<=1)?0:r/(DEEP-1);
+      const w2=Math.max(1, Math.round(seatWidthAt(t,bT,wTop,wMax,wBot)));
+      const yy=hy+1+r;
+      P(-w2+hj, yy, w2*2, 1, SB);
+      P(-w2+hj, yy, 1, 1, SBHi); P(w2-1+hj, yy, 1, 1, SBSh);
+      if(r===0) P(-w2+hj, yy, w2*2, 1, SBHi);                          // the lit crown
+    }
+    /* THE FOLD BENEATH, on the curve's own bottom width rather than a
+       guessed fraction of the hip. */
+    { const wEnd=Math.max(2, Math.round(seatWidthAt(1,bT,wTop,wMax,wBot)));
+      P(-wEnd+hj, hy+DEEP, wEnd*2, 1, SBSh); }
+    /* the two dimples sit at the WIDEST row, which is where they are on a
+       person rather than three pixels off the bottom of the block */
+    if(bT>=3){ const pk=SEAT_PEAK[clamp(bT,0,4)];
+      const wp=Math.max(2, Math.round(seatWidthAt(pk,bT,wTop,wMax,wBot)));
+      const yp=hy+1+Math.round(pk*(DEEP-1));
+      P(-wp+hj, yp, 2, 2, SBSh); P(wp-2+hj, yp, 2, 2, SBSh); }
+    /* colossal: a real cleft, and it FOLLOWS the curve down rather than
+       running as one straight bar through the middle of it */
+    if(bT>=4){ for(let r=2;r<DEEP-1;r++){ const t=r/(DEEP-1);
+        const dw=Math.max(1, Math.round(seatWidthAt(t,bT,wTop,wMax,wBot)*0.13));
+        P(-dw+hj, hy+1+r, dw*2, 1, shade(SB,-30)); } }
+  };
+  if(RKD) drawSeat();        // she goes UNDER the ulvik, because the ulvik is short
   // ================= GOWN =================
   if(RKD){
     /* =================================================================
@@ -20540,33 +20664,58 @@ function drawWifeFig(c,x,y,w,ph,mode,preg){
        on purpose.
        ================================================================= */
     const RISE   = 9;                                // it starts up over the hip bone
-    const skirtH = 21 + RISE + (running? -1 : 0);
+    /* SHORT. It was twenty-one below the rise, which put its hem within three
+       pixels of the legs — a full-length gown that happened to start high, and
+       it read as one, and then it read as a lampshade. Eleven ends it a few
+       pixels under the seat, which is what the coast means by a house garment
+       and what the whole argument is about. */
+    const skirtH = 11 + RISE + (running? -1 : 0);
     const swayK  = hJig*0.62;
-    const wA=Math.max(4,waistW+3), wB=Math.max(5,hipW*0.74), wC=Math.max(4,hipW*0.50);
-    const wAt=(i)=>{ const t=i/(skirtH-1);
-      const w2=(t<0.42)? wA+(wB-wA)*(t/0.42) : wB+(wC-wB)*((t-0.42)/0.58);
+    /* IT IS CUT NARROWER THAN SHE IS, and that is not an accident of the
+       drawing — it is the garment. On a Mesteri Rhaunek the seat carries
+       out past both edges of the shift at the hip and what carries past is
+       HER, because she is already drawn and this is going on over her.
+       The peak of this curve is put at the seat's OWN widest row, so the
+       two are the same shape one inside the other rather than two guesses
+       that meet in a step. */
+    const seatPkY = (top-7)+1+SEAT_PEAK[clamp(bTier,0,4)]*(Math.max(3,bDeep)-1);
+    const PKu = clamp((seatPkY-(top-RISE))/(skirtH-1), 0.12, 0.55);
+    const ssu = (u)=>{ u=clamp(u,0,1); return u*u*(3-2*u); };
+    /* AND IT HUGS. At 0.72 of her the shift was a narrow bell with the seat
+       standing out either side of it like a pair of wings; the garment is soft
+       hide and it goes OVER her, so it takes most of her width and she carries
+       past the last of it. */
+    const wA=Math.max(4,waistW+2), wB=Math.max(wA+1, seatW*0.88), wC=Math.max(4, seatW*0.66);
+    const wAt=(i)=>{ const t=clamp(i/(skirtH-1),0,1);
+      const w2=(t<PKu)? wA+(wB-wA)*ssu(t/PKu) : wB+(wC-wB)*ssu((t-PKu)/(1-PKu));
       return Math.max(2, w2 + (walking? Math.sin(t*3.2)*hipW*0.04 : 0)); };
+    /* HOW MUCH OF EACH ROW IS ACTUALLY THERE. The hem is cut away rising
+       toward the back — the near edge hangs low and the far edge climbs —
+       so the bottom rows are partial, and the cloth is simply ABSENT above
+       the cut rather than painted over afterwards. CUT is how far the cut
+       climbs; ROOM is how many rows are left below this one to hold it. */
+    const CUTR=Math.max(2, Math.round(seatW*0.52));
+    const cutFrac=(i)=>{ const room=(skirtH-1-i);
+      if(room>=CUTR) return 1;
+      const need=room/CUTR;                       // invert the smoothstep
+      let lo=0, hi=1; for(let q=0;q<10;q++){ const m=(lo+hi)/2; if(m*m*(3-2*m)<need) lo=m; else hi=m; }
+      return (lo+hi)/2; };
     for(let i=0;i<skirtH;i++){
-      const rw=wAt(i), sx=swayK*(i/(skirtH-1))*0.7;
-      P(-rw+sx, top-RISE+i, rw*2, 1, hide);
-      if(i<2) P(-rw+sx, top-RISE+i, rw*2, 1, hideHi);
-      else { P(-rw+sx, top-RISE+i, 1, 1, shade(hide,14));
-             P( rw-1+sx, top-RISE+i, 1, 1, hideSh); }
+      const rw=wAt(i), sx=swayK*(i/(skirtH-1))*0.7, fr=cutFrac(i);
+      const wpx=Math.max(1, Math.round(rw*2*fr));
+      P(-rw+sx, top-RISE+i, wpx, 1, hide);
+      if(i<2) P(-rw+sx, top-RISE+i, wpx, 1, hideHi);
+      else { P(-rw+sx, top-RISE+i, 1, 1, shade(hide,14));            // the lit near edge
+             P(-rw+sx+wpx-1, top-RISE+i, 1, 1, fr<1? shade(hide,-40) : hideSh); }
+      if(fr<1) P(-rw+sx+wpx-2, top-RISE+i, 2, 1, hideSh);            // and the cut edge, rolled
     }
-    /* THE HEM IS NOT LEVEL. It is cut away rising toward the back, so the
-       nearer edge sits low and the far edge climbs — the single line that
-       makes it read as a Rkrai garment rather than a short gown. */
-    { const hemY=top-RISE+skirtH-1, rw=wAt(skirtH-1);
-      for(let i=0;i<7;i++)
-        P(-rw+i*((rw*2)/7), hemY-Math.round(i*0.9), Math.ceil((rw*2)/7), 2, hideSh);
-      P(-rw, hemY, 3, 1, shade(hide,-40)); }
-    // two soft folds, following the short flare
-    for(let f=0; f<2; f++){ const off=[-0.42,0.48][f];
-      for(let i=RISE+3;i<skirtH-1;i++){ const rw=wAt(i), sx=swayK*(i/(skirtH-1))*0.7;
-        P(rw*off+sx, top-RISE+i, 1, 1, hideSh); } }
+    // two soft folds, following the short flare — and stopping at the cut
+    for(let f=0; f<2; f++){ const off=[-0.42,0.34][f];
+      for(let i=RISE-2;i<skirtH-1;i++){ const rw=wAt(i), sx=swayK*(i/(skirtH-1))*0.7;
+        if((off+1)/2 <= cutFrac(i)-0.04) P(rw*off+sx, top-RISE+i, 1, 1, hideSh); } }
     /* THE BELT — wide, low, beaded, and in the Mastery's own colour, which
        is how the house's office is read from the door. */
-    { const bw=Math.round(wAt(Math.round(skirtH*0.30))*1.06), by=top-RISE+4;
+    { const bw=Math.round(wAt(5)*1.05), by=top-RISE+4;
       P(-bw+swayK*0.2, by, bw*2, 4, RKBAND);
       P(-bw+swayK*0.2, by, bw*2, 1, RKBHI);
       P(-bw+swayK*0.2, by+3, bw*2, 1, RKBSH);
@@ -20640,58 +20789,7 @@ function drawWifeFig(c,x,y,w,ph,mode,preg){
       for(let i=0;i<skirtH2-1;i++) P(-wf(i), top+i, 1, 1, '#e8c34a');   // and down the open edge
     }
   }
-  // ================= HIPS AND THE BOOTY, BY TIER =================
-  // FLAT · RAISED · ELEVATED · FAT · COLOSSAL — five silhouettes, not one
-  // block scaled up. Drawn behind her so it reads from any angle.
-  { const bT = bTier;
-    const hj=hJig*0.55, hy=top-7-hJig*0.30;
-    const flare=bFlare, deep=bDeep;
-    /* UNDER THE ULVIK THIS IS NOT CLOTH. The seat is drawn in the gown's
-       colour everywhere else because everywhere else there is a gown over
-       it; the ulvik is cut away high at the back, so what is drawn here is
-       HER, lit as skin, with the belt sitting across the top of it. That
-       one substitution is the entire difference the culture is asking for
-       and it is legible at sprite scale, which the wording alone was not. */
-    const CUTF = 0.46;                    // how far down the seat the hide stops
-    const SB   = RKD? hide   : dress;
-    const SBHi = RKD? hideHi : dHi;
-    const SBSh = RKD? hideSh : dSh;
-    const BARE = RKD? skin : dress, BAREHi=RKD? shade(skin,18):dHi, BARESh=RKD? shade(skin,-24):dSh;
-    // the seat is drawn as stacked bands that TAPER, so it curves out and back
-    // in again — five genuinely different silhouettes, none of them a slab
-    const bands=[[0.35,0.72],[0.75,1.0],[1.0,1.0],[0.62,0.86]];       // [heightFrac, widthFrac] top→bottom
-    let yAt=hy+1;
-    bands.forEach(([hf,wf],bi)=>{
-      const bh=Math.max(1,Math.round(deep*hf*0.42));
-      const bw=Math.round((hipW+flare)*wf*(RKD? [0.58,0.80,0.86,0.72][bi] : 1));
-      /* UNDER THE ULVIK the band is hide down to the cut and HER below it,
-         so the garment reads as riding up over the seat rather than as
-         somebody having forgotten one. bandT is how far down the whole
-         seat this band starts. */
-      const bandT = (yAt-(hy+1))/Math.max(1,deep);
-      const isBare = RKD && bandT>=CUTF;
-      const cA = isBare? BARE   : SB;
-      const cH = isBare? BAREHi : SBHi;
-      const cS = isBare? BARESh : SBSh;
-      P(-bw+hj, yAt, bw*2, bh, cA);
-      if(bi===0) P(-bw+hj, yAt, bw*2, 1, cH);                         // the lit crown
-      if(bi>=1 && bT>=2){ P(-bw+hj, yAt, 1, bh, cH); P(bw-1+hj, yAt, 1, bh, cS); }
-      /* AND THE BAND THE CUT FALLS ACROSS is drawn in both, with the hide
-         edge sloping up toward the far side — one line, and it is the
-         whole silhouette the coast is asking for. */
-      if(RKD && !isBare && bandT+ (bh/Math.max(1,deep)) > CUTF){
-        for(let q=0;q<8;q++){ const qx=-bw+Math.round(q*(bw*2/8));
-          const drop=Math.round((q/7)*bh*0.85);
-          P(qx+hj, yAt+drop, Math.ceil(bw*2/8), bh-drop, BARE);
-          P(qx+hj, yAt+drop, Math.ceil(bw*2/8), 1, hideSh); } }
-      yAt+=bh;
-    });
-    P(-Math.round((hipW+flare)*0.62)+hj, yAt-1, Math.round((hipW+flare)*0.62)*2, 1, BARESh);  // the fold beneath
-    if(bT>=3){ P(-hipW-flare+hj, hy+deep-3, 3, 2, BARESh); P(hipW+flare-3+hj, hy+deep-3, 3, 2, BARESh); }
-    if(bT>=4){ P(-2, hy+2+(RKD?Math.round(deep*CUTF):0), 4, deep-3-(RKD?Math.round(deep*CUTF):0),
-                 shade(RKD?BARE:SB,-30)); }                            // colossal: a real cleft down the middle
-    if(bT===0){ P(-hipW+1+hj, hy+2, (hipW-1)*2, 5, SB); }             // FLAT: barely wider than her waist
-  }
+  if(!RKD) drawSeat();      // and for everyone else it goes on TOP of the gown
   // ================= WAIST — cinched, unless she is carrying =================
   if(preg>0){
     /* SHE IS CARRYING. The waist does not cinch, it rounds — and it grows
@@ -22588,14 +22686,62 @@ const TEMPT_PROPS=[
    draw:(x,FY)=>{ px(x-8,FY-4,11,4,'#8a5c34'); px(x-8,FY-5,11,1,'#a87446');
      px(x-6,FY-7,2,3,'#6a4426'); px(x+4,FY-3,7,3,'#7a4e2c'); }},
 ];
+/* =====================================================================
+   THE BEND, ON A COAST THAT DOES NOT PRETEND
+   ---------------------------------------------------------------------
+   Everywhere else on this map the low shelf is an ALIBI. The crate really
+   was on the floor, she really was reaching for it, and both of you get to
+   go on saying so afterwards — that is the whole architecture of the beat
+   and it is why it works in a Roman atrium.
+
+   A Mesteri Rhaunek was SEATED in her office on the evidence of that exact
+   part of her, in front of the Ten, in a garment the house advised her into
+   in the same breath as the rest of her duties. Every person in the room
+   knows what she holds and how she came to hold it. Past the ninth mark the
+   alibi simply stops being offered, and what she does instead is one of two
+   things: she does it again on purpose, or she stops reaching altogether.
+
+   NOT EVERY TIME. A woman who did this every time would be a different
+   woman, not a beat — and the point of a beat is that you cannot tell in
+   advance which one you are getting. Roughly two bends in five are the
+   deliberate shake, one in three is the invitation, and the rest of the
+   time the crate really was on the floor.
+   ===================================================================== */
+const RK_BEND_NEED = 9;                     // the mark the seat has to carry
+const RK_BEND_LINES = {
+  shake:[ '“Ulvanne counts the herd. Taq counts the ground. Somebody counts this.”',
+          '“It is a seat of office. Look at it properly or do not look.”',
+          '“You have seen the tally-stick on the wall. This is the other one.”',
+          '“The Ten did not have to guess either.”' ],
+  invite:[ '“The door is shut. Kan is not owed a fee indoors.”',
+           '“I am not reaching for anything. Come here.”',
+           '“Nine winters of this and you still wait to be asked.”',
+           '“The ulvik was their idea. Coming over is yours.”' ]
+};
+function rkBendBeat(w){
+  try{
+    /* THE SAME GATE THE GARMENT USES, on purpose. Both of these lines are
+       about a woman in an ulvik holding an office she was seated in for
+       this — so the beat can only fire when she is actually wearing one,
+       and the two can never disagree about whether she is. */
+    if(typeof rkHouseDress!=='function' || !rkHouseDress(w)) return null;
+    if(!w.body) return null;
+    if((w.body.booty|0) < RK_BEND_NEED) return null;
+    const r=Math.random();
+    return r<0.40? 'shake' : r<0.72? 'invite' : null;
+  }catch(e){ return null; }
+}
 function startTempt(){
   const D=DM;
   D.lastTemptT=D.t;
-  // rarely she is not being incidental about it at all
-  const invited = Math.random() < 0.18;
+  /* and past the ninth mark, on that coast, she may not be being incidental
+     about it in the first place */
+  const beat = rkBendBeat(G.wife);
+  const invited = (beat==='invite') ? true : (Math.random() < 0.18);
   const prop = pick(TEMPT_PROPS);
   D.tempt={ ph:'bend', t:0, k:0, x:D.wifeX, hits:0, hold:100, locks:false,
-            invited, prop, shelf: D.wifeX + (D.wifeDir>0? 14 : -14) };
+            invited, prop, beat, beatLine: beat? pick(RK_BEND_LINES[beat]) : null,
+            shelf: D.wifeX + (D.wifeDir>0? 14 : -14) };
   D.wifePause=99999;                        // she is busy
 }
 function updateTempt(dt){
@@ -22610,7 +22756,16 @@ function updateTempt(dt){
        measurements in it: heavier is slower and deeper and rings longer, a
        tiny waist isolates it to the hips, long legs lengthen the stroke. */
     if(X.t>190 && !X.shook){ X.shook=true; X.sh=shimmyStart(G.wife, X.invited? 1.25 : 1.0); }
-    if(X.t>190+((X.sh&&X.sh.dur)||220)*0.62){ X.ph='approach'; X.t=0; }
+    /* AND ON THAT COAST SHE DOES IT AGAIN. The first shake is what a body
+       does when it stops moving; the second one is a decision, it is half
+       again as hard as the first, and it arrives before the first has
+       finished ringing — which is the difference between a thing happening
+       to her and a thing she is doing to you. */
+    if(X.beat==='shake' && X.shook && !X.shook2 &&
+       X.t > 190+((X.sh&&X.sh.dur)||220)*0.40){
+      X.shook2=true; X.sh=shimmyStart(G.wife, 1.62); }
+    const tail=((X.sh&&X.sh.dur)||220)*0.62 + (X.beat==='shake'? 130 : 0);
+    if(X.t>190+tail){ X.ph='approach'; X.t=0; }
   } else if(X.ph==='approach'){             // he goes over. You did not ask him to.
     X.locks=true;
     const tx=X.x + (D.x < X.x? -24 : 24);
@@ -22624,7 +22779,9 @@ function updateTempt(dt){
        point of the beat is that you can see him losing the argument. Roughly
        five and a half seconds from full now, and a hit is worth proportionally
        less so the twenty still matter. */
-    X.hold -= 0.44*dt;                                    // it goes faster than it did
+    /* and it drains faster when she MEANT it — there is no frieze to look at
+       and no crate to point to, and he knows both of those things. */
+    X.hold -= (0.44 + (X.beat==='shake'? 0.15 : 0))*dt;   // it goes faster than it did
     if(consume('space')||consume('attack')||consume('w')){ X.hits++; X.hold=Math.min(100,X.hold+2.15); }
     if(X.hits>=TEMPT_NEED){                                  // holding out is only HALF of it
       X.ph='look'; X.t=0; X.round=0;
@@ -22652,7 +22809,9 @@ function updateTempt(dt){
     X.locks=true;
     if(X.t>170){ D.tempt=null; D.wifePause=0;
       G.wifeRel=clamp(G.wifeRel+6,0,bondCeiling()); G.wifePhys=clamp((G.wifePhys||45)+9,0,100);
-      saveQuiet(); toast('🍑 She was looking back the whole time. It was never a test.',3600);
+      saveQuiet(); toast(X.beat==='invite'
+        ? '🍑 She was not reaching for anything. She never said she was.'
+        : '🍑 She was looking back the whole time. It was never a test.', 3600);
       if(loveLeft('quick')>0 && spouseWilling()) startVillaLove(X.x, true); }
   } else if(X.ph==='held'){
     X.locks=true;
@@ -24524,10 +24683,13 @@ function drawVillaLove(){
 }
 function drawTempt(){
   const D=DM, X=D.tempt; if(!X) return; const FY=214, w=G.wife;
-  // whatever it was she wanted, on the floor where she is reaching
-  (X.prop||TEMPT_PROPS[0]).draw(X.shelf, FY, D.t);
+  /* whatever it was she wanted, on the floor where she is reaching — and
+     when she has stopped pretending there is one, there is nothing there,
+     because that is the entire point of the beat. */
+  if(X.beat!=='invite') (X.prop||TEMPT_PROPS[0]).draw(X.shelf, FY, D.t);
   if(X.ph==='bend' && X.t>40 && X.t<150){ ctx.textAlign='center';
-    pixelText((X.prop||TEMPT_PROPS[0]).line, W/2, 30, 'rgba(255,222,200,.85)', 1.02); ctx.textAlign='left'; }
+    pixelText(X.beatLine || (X.prop||TEMPT_PROPS[0]).line, W/2, 30,
+      X.beat? 'rgba(255,190,214,.92)' : 'rgba(255,222,200,.85)', 1.02); ctx.textAlign='left'; }
   if(X.ph==='bend'||X.ph==='approach'||X.ph==='resist'||X.ph==='look'||X.ph==='invited'){
     drawWifeFig(ctx, X.x, FY, w, X.ph==='bend'? X.k : 1, 'bend');
   } else drawWifeFig(ctx, X.x, FY, w, 1, 'bend');
@@ -24547,8 +24709,18 @@ function drawTempt(){
     if(SHIMMY.tier>=3){ const g=Math.abs(shimmyHip())*0.05;
       ctx.globalAlpha=clamp(g,0,0.16); px(0,120,W,H-120,'#ffcf7a'); ctx.globalAlpha=1; }
   }
+  /* THE SECOND SHAKE IS NAMED. Without a word on it, a harder ring of the
+     same spring is just the first shake again and the player reads it as a
+     loop rather than as a decision — which is the one thing it is not. */
+  if(X.shook2 && shimmyLive()){ ctx.textAlign='center';
+    const p=(0.62+0.38*Math.abs(Math.sin(SHIMMY.t*SHIMMY.freq*0.7))).toFixed(2);
+    pixelText('SHE MEANT THAT ONE', X.x, FY-64, 'rgba(255,150,196,'+p+')', 1.04);
+    ctx.textAlign='left'; }
   if(X.ph==='invited'){ ctx.textAlign='center';
-    pixelText('“Well? Are you going to stand there?”', W/2, 40, '#ffd0da', 1.05);
+    /* 40 sat on top of the shimmy's own note at 42 — which is exactly when
+       this line is on screen, so the one time it mattered it was unreadable */
+    pixelText(X.beat==='invite'? X.beatLine : '“Well? Are you going to stand there?”',
+      W/2, 26, '#ffd0da', 1.05);
     for(let i=0;i<5;i++){ const hy=(D.t*0.6+i*17)%40;
       ctx.globalAlpha=clamp(1-hy/40,0,1)*0.8; pixelText('♥', X.x-10+i*5, FY-52-hy, '#e26a8a', 1); }
     ctx.globalAlpha=1; ctx.textAlign='left'; }
@@ -42064,7 +42236,8 @@ window.__SS = {
   REGIONS_RK, REGION_RK_BY_ID, RK_COAST, RK_MASTERIES, RK_MASTERY_BY_ID,
   RK_BEYOND, RK_INLAND_FROM, RK_INLAND_TO, rkIsCoast,
   RK_RANKS, rkRank, rkRankIdx, RK_VENUES, drawMapCanvasRk, provGovList,
-  RK_GOVERN, rkHead, rkHere, SLAP_BUTTON, RK_HOUSE, rkHouseDress, rkOfficeBand, drawKiltLift, RK_WIFE_TITLES, RK_WIFE_TITLE_BY_ID, RK_EARNED_TITLES,
+  RK_GOVERN, rkHead, rkHere, SLAP_BUTTON, RK_HOUSE, rkHouseDress, rkOfficeBand, drawKiltLift,
+  RK_BEND_NEED, RK_BEND_LINES, rkBendBeat, SEAT_PEAK, seatWidthAt, RK_WIFE_TITLES, RK_WIFE_TITLE_BY_ID, RK_EARNED_TITLES,
   rkTitlesFor, rkWifeTitle, rkTitleNearMiss, rkTitleFx, RK_TAQRUN_NEED,
   RK_TITLED_WIVES, RK_TITLED_BY_ID, makeRkTitledWife, rkTitledOffered,
   rkTaqrunClaim, rkTaqrunSeated, RK_COURT, rkAgeVerdict, rkMotherRead, rkCallerCount, slapCap,
