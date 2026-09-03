@@ -383,7 +383,10 @@ treats the subject as a matter of record, so he does not look away.
   cut at the back, the Ulvanne laced under, the Taqrun split to the hip, the
   Kanne banded at the throat, the Harra bare at the shoulders so the plaits
   hang clear, the Uvrak sashed rib to hip. Past the ninth mark the Rhaunek
-  bend has its own beat (`rkBendBeat`).
+  bend has its own beat (`rkBendBeat`). And SEVEN FOR HIM (`RK_CUTS_M`) — the
+  house kilt, cut to show the shoulders, the chest, the midriff, the face, the
+  hair, or the one measured at the seating; an unseated man is cut for his best
+  part instead, which the coast states out loud rather than implying.
 - ~~`RK_MASTERIES` has ten entries and the map has four provinces~~ **DONE.**
   Twelve seats (`RK_HUSB_TITLES` beside `RK_WIFE_TITLES`), every one of them
   occupied by a named holder on a stated number, and taking one means beating
