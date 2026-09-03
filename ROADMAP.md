@@ -387,6 +387,23 @@ treats the subject as a matter of record, so he does not look away.
   house kilt, cut to show the shoulders, the chest, the midriff, the face, the
   hair, or the one measured at the seating; an unseated man is cut for his best
   part instead, which the coast states out loud rather than implying.
+- ~~The Taqrun cut gestured at its office instead of drawing it~~ **DONE.**
+  The kilt is hung off the hip bones, dropped at the front, and MOULDED — a
+  rounded cross-section over four tones, scaled to his own number, so the
+  office is legible at rest rather than only implied. `K` stands it up
+  deliberately, any time, in your own hall (`rkStand`), and the cut carries a
+  duty with it: a seated Taqrun who stands GOES TO HER (`RK_TAQRUN`), she has
+  no excuse and the day's allowance stops being one (`rkWifeExcuse`), and an
+  evening that closes on a standing goes in the count — her line, the
+  district's line, and a public temper that cools on its own
+  (`rkTaqrunDayTick`, `rkPublicMood`). It is the exact inversion of the
+  women's reading, which is the point of building it.
+- ~~The sivrak was hers alone~~ **DONE.** `RK_SIVRAK_FRAME_M` — his seven
+  briefs off his own ledger, drawn as leaf courses on a twisted cord instead
+  of hide, and for Taqruna a SHEATH: two long leaves wound the length of it
+  and bound with a vine, moulded to the shape rather than laid in front of it.
+  STILL OPEN: the sivrak is asked for as one garment for the house; he cannot
+  yet be asked for one on his own, and she cannot ask him.
 - ~~`RK_MASTERIES` has ten entries and the map has four provinces~~ **DONE.**
   Twelve seats (`RK_HUSB_TITLES` beside `RK_WIFE_TITLES`), every one of them
   occupied by a named holder on a stated number, and taking one means beating
