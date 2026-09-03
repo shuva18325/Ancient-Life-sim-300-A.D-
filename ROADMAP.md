@@ -377,13 +377,23 @@ treats the subject as a matter of record, so he does not look away.
   staircase, the cedar wardrobe and the kitchen alcove still draw Roman.
   Same family as 2.1.
 - The bedchamber poses have a Rkrai pose (`vi===21`) and a Rkrai hall, but
-  the six wife-titles do not yet change what is DRAWN — only what it is worth.
-  **PARTLY DONE:** the seat title now does. A Mesteri Rhaunek wears the ulvik,
-  which is cut for a body that is going to carry past it, and past the ninth
-  mark her bend has its own beat (`rkBendBeat`). The other five titles still
-  only change the numbers.
-- `RK_MASTERIES` has ten entries and the map has four provinces; the
-  province-holders are named as a tier and are not yet people you can meet.
+  ~~the six wife-titles do not yet change what is DRAWN~~ **DONE.** There are
+  seven cuts of the ulvik (`RK_CUTS`), one per office plus the one a house
+  with no seat wears, and each does its work somewhere different: the Rhaunek
+  cut at the back, the Ulvanne laced under, the Taqrun split to the hip, the
+  Kanne banded at the throat, the Harra bare at the shoulders so the plaits
+  hang clear, the Uvrak sashed rib to hip. Past the ninth mark the Rhaunek
+  bend has its own beat (`rkBendBeat`).
+- ~~`RK_MASTERIES` has ten entries and the map has four provinces~~ **DONE.**
+  Twelve seats (`RK_HUSB_TITLES` beside `RK_WIFE_TITLES`), every one of them
+  occupied by a named holder on a stated number, and taking one means beating
+  that number, holding the notch and paying for the feast — in front of the
+  Ten, with the loser unseated in public. Nobody holds two. The four provinces
+  and the capital are held the same way (`RK_PROVINCES`): each answers to one
+  Mastery, you need a seat in it, and a held province pays every day.
+  STILL OPEN: the province-holders are named as a tier and are not yet people
+  you can meet; the seats do not yet change hands on their own while you are
+  not looking, which they should.
 - The Rkraun's nine-winter term is lore, not a clock. It should be a clock.
 
 ## 4 — SMALLER, CHEAP, WORTH DOING
