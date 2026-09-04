@@ -15299,7 +15299,12 @@ window.addEventListener('keydown',e=>{
   else if(k==='f'){ setEdge('f'); }                 // and bend for something that is not there
   else if(k==='l'){ setEdge('l'); }                 // 🏛 the ardor
   else if(k==='k'){ setEdge('k'); }                 // ◆ and the standing, which is its own act here
-  else if(k==='j'){ setEdge('j'); }                 // ◆ and the press, which is how a standing is answered
+  else if(k==='j'){ setEdge('j');                   // ◆ and the press, which is how a standing is answered
+    /* A KEY THAT DOES NOTHING OUTSIDE ONE SCREEN IS A KEY THE PLAYER
+       DECIDES IS BROKEN. J is only meaningful in the hall, so pressed
+       anywhere else it says so rather than saying nothing. */
+    try{ if(state!=='domus' && typeof rkHere==='function' && rkHere())
+      toast('◆ The press happens in your own hall. Go home first — the map is not a corridor.', 3000); }catch(e){} }
   else if(k===' '){ setEdge('space'); }
   else if(k==='arrowright'){ setEdge('elbow'); }
   else if(k==='arrowleft'){ setEdge('thrust'); }
@@ -22748,7 +22753,7 @@ function updateRkPress(dt){
     /* he crosses. Not instantly — the crossing IS the act on this coast
        and cutting it would be cutting the thing the office is named for. */
     const side=(D.x<=D.wifeX)? -1 : 1;
-    const want=D.wifeX+side*3;
+    const want=D.wifeX+side*7;
     D.x += clamp(want-D.x, -2.1*dt, 2.1*dt);
     if(Math.abs(D.x-want)<1.6 || X.t>150){
       D.x=want; X.ph='press'; X.t=0; X.side=side;
@@ -22784,12 +22789,17 @@ function updateRkPress(dt){
     X.rub = Math.sin(X.t*0.13)*(1 + ((X.tier&&X.tier.be)||5)*0.11);
     if(!X.nextStroke || X.t>=X.nextStroke){
       X.nextStroke = X.t + 24;
+      X.stroke=(X.stroke||0)+1;
       try{ shimmyStart(G.wife, 0.30+(((X.tier&&X.tier.i)||0)*0.05)); }catch(e){}
       try{ slapKick(0.20+(((X.tier&&X.tier.be)||5)*0.020)); }catch(e){}
-      if(((X.t/24)|0)%3===0){ try{ sfx('kiss'); }catch(e){} }
-      if(((X.t/24)|0)%2===0)
-        D.hearts.push({x:D.wifeX+rnd(-7,7), y:214-44, vy:0.30+Math.random()*0.22,
-                       life:60, c:'#ff9ad8'});
+      /* ---- AND IT MAKES A NOISE. Every stroke, and not the same one:
+         the contact on the beat, and her over the top of it on a slower
+         count, so it reads as a rhythm rather than a repeating sample. ---- */
+      try{ sfx(((X.stroke%2)===0)? 'slapBig' : 'kiss'); }catch(e){}
+      if((X.stroke%3)===0){ try{ sfx('moan'); }catch(e){} }
+      if((X.stroke%7)===0){ try{ sfx('giggle'); }catch(e){} }
+      D.hearts.push({x:D.wifeX+rnd(-7,7), y:214-44, vy:0.30+Math.random()*0.22,
+                     life:60, c:'#ff9ad8'});
     }
     /* AND IT STAYS. Nothing is being taken back, so the hold does not end
        on a counter — it ends when she has stopped moving, exactly as the
@@ -22901,8 +22911,10 @@ function drawRkBack(x, FY, w, o){
      separates two concentric silhouettes. */
   if(RIM){ for(let yy=K.shY; yy<FY-2; yy++){
       const w2 = yy>=K.seatY? seatW*1.02 : (yy>=K.waistY? K.waistW+2.0 : shWid+0.6);
-      P(-w2, yy, 1.2, 1, 'rgba(22,10,6,.46)');
-      P( w2-1.2, yy, 1.2, 1, 'rgba(22,10,6,.46)'); } }
+      /* the side he is standing on gets the hard edge; the far side gets
+         a softer one, because he is behind her and not beside her */
+      P(RIM<0? -w2 : w2-1.2, yy, 1.2, 1, 'rgba(22,10,6,.52)');
+      P(RIM<0? w2-1.2 : -w2, yy, 1.2, 1, 'rgba(22,10,6,.24)'); } }
   /* ---- head, and the plaits that are the index ---- */
   { const hw=3.4, hy=K.headY;
     P(-hw, hy, hw*2, K.headH, skin); P(-hw, hy, hw*2, 1, hi);
@@ -22932,10 +22944,10 @@ function drawRkBehindHim(x, FY, o){
   const band=mixHex((typeof rkOfficeBand==='function')? rkOfficeBand(G&&G.wife) : '#8a6a3a','#1a0e08',dk);
   const P=(a,b,ww,h,c)=>px(Math.round(x+a),Math.round(b),Math.max(1,Math.round(ww)),Math.max(1,Math.round(h)),c);
   const K=rkBackBones(FY, gvm('legs',5), 4, gvm('waist',5), true);
-  const shWid=K.waistW+3.4;
+  const shWid=K.waistW+4.0;
   /* legs first, then the hide over them — the house cut's own order, and
      for the same reason: hide drawn first makes a skirt, not a body */
-  { const lw=3.0, inner=1.2;
+  { const lw=3.2, inner=2.2;
     P(-inner-lw, K.hipY, lw, K.legLen, skin);
     P( inner,    K.hipY, lw, K.legLen, sh);
     P(-inner-lw, K.hipY, 1,  K.legLen, hi);
@@ -22956,7 +22968,10 @@ function drawRkBehindHim(x, FY, o){
         const u=(q+hw)/Math.max(1,hw*2-1);
         P(xx+q, yy, 1, 1, (u<0.22)? MHI : (u<0.58)? MLT : (u<0.86)? MID : MSH); } };
     const ml=Math.round(4+len*0.55), mw=Math.max(1,Math.round(1+len*0.16));
-    const y0=beltY+3;
+    /* AIMED, not hung off his own belt. He is the taller of the two and
+       his hip is above her seat, so anchoring this to his waist put the
+       whole gesture a hand's width up her back. */
+    const y0=(o.aimY!==undefined)? o.aimY : beltY+3;
     for(let i=0;i<ml;i++){
       const t=i/Math.max(1,ml-1);
       const hw=Math.max(1, Math.round((mw+1)*(1.0-t*0.16)));
@@ -23024,8 +23039,8 @@ function drawRkPress(){
      shoulder and his arms round either side of her, which is the whole
      read. Standing him off to one side made it a queue. */
   const gap = X.ph==='signal'? 32
-            : X.ph==='cross' ? Math.max(3, 32 - clamp(T/110,0,1)*29)
-            : 3 - pressK*1.2;
+            : X.ph==='cross' ? Math.max(7, 32 - clamp(T/110,0,1)*25)
+            : 7 - pressK*1.4;
   const hx = X.ph==='signal'? (PX + side*30)
            : X.ph==='cross' ? D.x
            : (PX + side*gap);
@@ -23034,8 +23049,15 @@ function drawRkPress(){
      motion rather than a picture of one. */
   const rub=(X.ph==='held')? (X.rub||0) : 0;
   let HM=null;
+  /* WHERE IT IS AIMED: the middle of her seat, which is the only place
+     this gesture has ever been aimed and was the one thing not being
+     measured. Before contact it still comes off his own belt. */
+  const AK=rkBackBones(FY, (w&&w.body&&w.body.legs)||5, (w&&w.body&&w.body.booty)||5,
+                           (w&&w.body&&w.body.waist)||5, false);
+  const aimY = AK.seatY + Math.round(AK.seatH*0.42);
   try{ HM=drawRkBehindHim(hx+rub*0.55, FY-Math.abs(rub)*0.42,
         {stand:X.stand||0, press:pressK,
+         aimY: (pressK>0? aimY : undefined),
          leaf:(typeof rkSivrakOn==='function' && rkSivrakOn('self'))}); }catch(e){}
   try{ drawRkBack(PX, FY, w, {give, rim: pressK>0? side : 0}); }catch(e){}
   /* ---- WHERE IT MEETS HER, painted ON her. Between two bodies it is
@@ -39794,12 +39816,21 @@ function rkPressOk(){
        rather than a prerequisite for it — you may still raise it on its own
        with K, and leaving it raised is still the thing that goes in the
        count, but J does the whole signal from a standing start. */
-    /* ---- AND SHE HAS TO BE THE ONE SEATED ON IT ---- */
-    { let T=null; try{ T=rkWifeTitle(G.wife); }catch(e){}
-      if(!T || T.id!=='seat') return {ok:false, mastery:true, why:
-        'This is Rhauna’s beat and it takes a MESTERI RHAUNEK. The gesture is two offices meeting — Taq holds the reach, '
-        +'Rhauna holds the seat — and addressed to a house that is not seated on the seat it is not a gesture at all, it is '
-        +'a man in a corridor with an opinion. Seat her on Rhauna first: THE SEATINGS, the women’s side, BOOTY 8+.'}; }
+    /* ---- AND SHE HAS TO CARRY RHAUNA'S MARK ---- */
+    { const be=((G.wife.body||{}).booty===undefined)?5:G.wife.body.booty;
+      const need=RK_WIFE_TITLE_BY_ID.seat.need;
+      let T=null; try{ T=rkWifeTitle(G.wife); }catch(e){}
+      const seated=!!(T && T.id==='seat');
+      /* the OFFICE is worth more, but the MARK is what makes the gesture
+         legible — the coast reads a body directly and does not wait for
+         the Ten to write it down */
+      if(!seated && be<need) return {ok:false, mastery:true, be, need, why:
+        '◆ NOT THIS HOUSE. The press is Rhauna’s beat and it takes her seat: '
+        +(G.wife.name||'she').split(' ')[0]+' is at '+be+' and Rhauna’s mark is '+need+'.'};
+      /* she carries it but is seated on a DIFFERENT office — the coast is
+         very clear that the six are not interchangeable */
+      if(T && T.id!=='seat' && be<need) return {ok:false, mastery:true, be, need, why:
+        '◆ NOT THIS HOUSE. She is a '+T.title+', not a Mesteri Rhaunek, and the six do not stand in for each other.'}; }
     if((G.hygiene|0)<25) return {ok:false, why:'“Bathe. Then cross my hall.” That one is yours and the seat does not cover it.'};
     if(G.rkPressDay===G.day && (G.rkPressToday||0)>=2)
                   return {ok:false, why:'Twice in a day is the office. A third time is a hobby, and she has said so.'};
