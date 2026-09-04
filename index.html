@@ -5384,6 +5384,7 @@ function fixTraitsForSex(w){
   const n=w.traits.length;
   if(!n) return w;
   const pool=WIFE_TRAITS.filter(t=>!(t.male&&!male) && !(t.female&&male)
+    && !(t.eth && t.eth!==(w.eth||'roman'))
     && (w.quality===undefined || w.quality>=t.min));
   if(!pool.length) return w;
   const sh=[...pool].sort(()=>Math.random()-0.5);
@@ -7036,6 +7037,9 @@ const WIFE_TRAITS=[
   {id:'shrewd',   name:'Shrewd',     icon:'⚖', min:6, desc:'She reads a contract the way a haruspex reads a liver, and finds the rot.'},
   {id:'tempting', name:'Tempting',   icon:'🍑', min:5, female:true,
    desc:'There is always something on the LOW shelf, and she never once hurries.'},
+  /* ---- AND THE RKRAI ANSWER TO IT, which is not a performance at all ---- */
+  {id:'curious',  name:'Curious',    icon:'🔎', min:4, female:true, eth:'rkrai',
+   desc:'Something has caught her eye and the rest of the room has stopped existing. She is not doing it AT you. That is the whole difference.'},
   /* THE OTHER SIDE OF IT. Tempting is a thing a wife does to a room; this is a
      thing a husband cannot help doing IN one. Priapus was a god of gardens.
      He is not thinking about gardens. */
@@ -7551,11 +7555,15 @@ function tierBadge(t, male){ const T=TIERS[t]||TIERS.common;
 function traitById(id){ return WIFE_TRAITS.find(t=>t.id===id); }
 function traitLabel(id){ const t=traitById(id); return t? t.icon+' '+t.name : id; }
 // quality 0..10 → how many traits, how good the body/mind
-function rollTraits(quality, male){
+function rollTraits(quality, male, eth){
   const out=[];
-  // a few of these belong to one sex — Tempting is hers, Priapic is his
+  /* a few of these belong to one sex — Tempting is hers, Priapic is his —
+     and one belongs to one COAST, because Curious is not a personality
+     type, it is what a country that seats an office on the seat does to
+     the idea of being looked at. */
   const pool=WIFE_TRAITS.filter(t=>quality>=t.min
-    && !(t.male && !male) && !(t.female && male));
+    && !(t.male && !male) && !(t.female && male)
+    && !(t.eth && t.eth!==eth));
   const n = quality>=9?3 : quality>=7?2 : quality>=5?1 : (Math.random()<0.35?1:0);
   const shuffled=[...pool].sort(()=>Math.random()-0.5);
   for(let i=0;i<n && i<shuffled.length;i++) out.push(shuffled[i].id);
@@ -7575,7 +7583,9 @@ function inheritDNA(male){
     if(Math.random() < (both?0.92:0.5)) traits.push(t);
   }
   if(!traits.length && Math.random()<0.25){
-    const own=WIFE_TRAITS.filter(t=>!(t.male&&!male) && !(t.female&&male));
+    const _e=(G&&G.wife&&G.wife.eth)||'roman';
+    const own=WIFE_TRAITS.filter(t=>!(t.male&&!male) && !(t.female&&male)
+      && !(t.eth && t.eth!==_e));
     if(own.length) traits.push(pick(own).id);                                   // a trait of its own
   }
   // flaws run in families too
@@ -7669,7 +7679,7 @@ function makeBride(eth, noble, quality, opts){
     /* makeBride does not know the sex — callers set w.male afterwards — so the
        roll is done blind and fixTraitsForSex (via ensureLook) swaps out
        anything that turned out to belong to the other one. */
-    quality, looks, smarts, traits: rollTraits(quality, wantMale), flaws: rollFlaws(quality),
+    quality, looks, smarts, traits: rollTraits(quality, wantMale, eth), flaws: rollFlaws(quality),
     quirks: rollQuirks(),          // and the middle tier, which quality does not buy you out of
     boons: rollBoons(quality), banes: rollBanes(quality),   // and the two rare outer bands
     name: pick(D.names)+' '+pick(D.surn),
@@ -10206,7 +10216,7 @@ function elevateWife(rank){
   refreshStatbar(); saveQuiet(); openVilla();
 }
 // fill in any fields missing from older saves
-function migrate(g){ const d={world:null,socialSet:null,eastAxis:{},crossedToWa:false,waEra:0,purseMix:null,nanban:{},powder:0,waHouse:null,blade:null,drawnBlade:false,ventDone:{},ventRuns:0,ventLost:0,ventNet:0,silkRuns:0,silkLost:0,silkNet:0,silkDone:{},honor:50,food:4,mount:0,slaves:0,hasVilla:false,boat:false,favor:0,soldiers:0,hidden:[],plotTier:0,emperor:false,approval:50,legions:0,rivals:0,retired:false,detachments:[],day:0,titles:{},clears:{},socialClass:'gladiator',army:{},armyGear:0,armyTrain:0,hasOrganizer:false,generals:[],wife:null,married:false,marryPrompted:false,children:[],pregnant:null,lastLoveDay:-9,injury:null,lastDebateDay:-9,office:0,path:null,parthia:50,parthiaPact:false,wifeRel:50,lastTalkDay:-9,isFemale:false,lineage:[],hygiene:70,wifePhys:45,hasPool:false,hasWardrobe:false,legacy:null,lastFeastDay:-9,loveDay:-1,loveQuick:0,loveLong:0,loveNight:0,loveVigil:0,venusUntil:-1,lastWashDay:-9,lastPoolDay:-9,lastWardrobeDay:-9,lastKidsDay:-9,lastBathDay:-9,pila:0,bow:null,bowsOwned:[],nemesis:null,rivalsList:[],trophies:[],nemesisCount:0,pendingDeath:false,ageBase:0,wonProvinceByFight:false,familyMan:false,infamy:0,gladiatrixStage:0,pardoned:false,lastNoteDay:-9,lastNoteReply:'',regalia:[],marryRolls:0,hasBodyMap:false,hasSecretMap:false,jealousy:0,lastJealousDay:-9,traits:[],flaws:[],looks:5,smarts:5,advocate:false,tutorialDone:false,patrons:[],rivalAdv:null,landmarks:[],faction:null,oratory:1,casesWon:0,casesLost:0,renown:0,senate:false,royal:false,lastCaseDay:-9,skills:{footwork:0,guard:0,blade:0,wind:0,throwing:0},scars:[],fatigue:0,lastTrainDay:-9,tribune:false,rank:0,campaigns:0,legionRep:0,lastCampaignDay:-9,units:{legionary:0,auxilia:0,cavalry:0,archers:0,engineers:0},supply:0,sieges:0,body:null,family:null,provinces:{},complaints:[],leniency:50,lastCalloutDay:-9,lastGiftDay:-9,giftsTaken:0,calloutWins:0,crownWorn:false,court:null,lastCoupDay:-99,herbs:{},herbLore:0,ill:null,midwife:false,titlesWorn:[],warExhaust:0,lastExhaustWhy:'',titleRites:[],tombs:[],inheritedFrom:null,hairStyle:null,hairCol:null,beardStyle:null,outfit:null,courtLog:{},lastAskDay:-9,retirePromise:null,promiseBreaks:0,promiseFights:0,tutor:false,freedmen:0,askLog:{},temptHeld:0,temptTook:0,rkSeats:null,rkSeatsTaken:0,rkMyTitleW:null,rkProv:{},rkProvTaken:0,rkSivrak:null,rkSivrakDay:-9,rkSivraksWorn:0,rkSnubs:0,rkStand:null,rkStandsRaised:0,rkTaqrunKept:0,rkTaqrunLapses:0,rkPublicMad:0,rkPressed:0,rkPressDay:-9,rkPressToday:0,rkSeatAsk:{},rkSeatAsks:0,rkSeatsYielded:0,slapDay:-9,slapCount:0,slapsAll:0,doorShut:0,caughtByHouse:0,romanticAll:0,clearedHall:0,lastFamilyDay:-9,namedHeir:null,willSplit:false,purpleWatch:0,kidHouses:[],weddings:0,woohooAll:0,marriedDay:0,osImpurum:0,lastAct:null,
+function migrate(g){ const d={world:null,socialSet:null,eastAxis:{},crossedToWa:false,waEra:0,purseMix:null,nanban:{},powder:0,waHouse:null,blade:null,drawnBlade:false,ventDone:{},ventRuns:0,ventLost:0,ventNet:0,silkRuns:0,silkLost:0,silkNet:0,silkDone:{},honor:50,food:4,mount:0,slaves:0,hasVilla:false,boat:false,favor:0,soldiers:0,hidden:[],plotTier:0,emperor:false,approval:50,legions:0,rivals:0,retired:false,detachments:[],day:0,titles:{},clears:{},socialClass:'gladiator',army:{},armyGear:0,armyTrain:0,hasOrganizer:false,generals:[],wife:null,married:false,marryPrompted:false,children:[],pregnant:null,lastLoveDay:-9,injury:null,lastDebateDay:-9,office:0,path:null,parthia:50,parthiaPact:false,wifeRel:50,lastTalkDay:-9,isFemale:false,lineage:[],hygiene:70,wifePhys:45,hasPool:false,hasWardrobe:false,legacy:null,lastFeastDay:-9,loveDay:-1,loveQuick:0,loveLong:0,loveNight:0,loveVigil:0,venusUntil:-1,lastWashDay:-9,lastPoolDay:-9,lastWardrobeDay:-9,lastKidsDay:-9,lastBathDay:-9,pila:0,bow:null,bowsOwned:[],nemesis:null,rivalsList:[],trophies:[],nemesisCount:0,pendingDeath:false,ageBase:0,wonProvinceByFight:false,familyMan:false,infamy:0,gladiatrixStage:0,pardoned:false,lastNoteDay:-9,lastNoteReply:'',regalia:[],marryRolls:0,hasBodyMap:false,hasSecretMap:false,jealousy:0,lastJealousDay:-9,traits:[],flaws:[],looks:5,smarts:5,advocate:false,tutorialDone:false,patrons:[],rivalAdv:null,landmarks:[],faction:null,oratory:1,casesWon:0,casesLost:0,renown:0,senate:false,royal:false,lastCaseDay:-9,skills:{footwork:0,guard:0,blade:0,wind:0,throwing:0},scars:[],fatigue:0,lastTrainDay:-9,tribune:false,rank:0,campaigns:0,legionRep:0,lastCampaignDay:-9,units:{legionary:0,auxilia:0,cavalry:0,archers:0,engineers:0},supply:0,sieges:0,body:null,family:null,provinces:{},complaints:[],leniency:50,lastCalloutDay:-9,lastGiftDay:-9,giftsTaken:0,calloutWins:0,crownWorn:false,court:null,lastCoupDay:-99,herbs:{},herbLore:0,ill:null,midwife:false,titlesWorn:[],warExhaust:0,lastExhaustWhy:'',titleRites:[],tombs:[],inheritedFrom:null,hairStyle:null,hairCol:null,beardStyle:null,outfit:null,courtLog:{},lastAskDay:-9,retirePromise:null,promiseBreaks:0,promiseFights:0,tutor:false,freedmen:0,askLog:{},temptHeld:0,temptTook:0,rkSeats:null,rkSeatsTaken:0,rkMyTitleW:null,rkProv:{},rkProvTaken:0,rkSivrak:null,rkSivrakDay:-9,rkSivraksWorn:0,rkSnubs:0,rkStand:null,rkStandsRaised:0,rkTaqrunKept:0,rkTaqrunLapses:0,rkPublicMad:0,rkPressed:0,rkPressDay:-9,rkPressToday:0,rkSeatAsk:{},rkSeatAsks:0,rkSeatsYielded:0,curioSeen:0,curioWoohoo:0,curioDay:-9,curioToday:0,slapDay:-9,slapCount:0,slapsAll:0,doorShut:0,caughtByHouse:0,romanticAll:0,clearedHall:0,lastFamilyDay:-9,namedHeir:null,willSplit:false,purpleWatch:0,kidHouses:[],weddings:0,woohooAll:0,marriedDay:0,osImpurum:0,lastAct:null,
     feuds:[],grandkids:0,annivYears:0,morningAfter:null,peeked:{},gravitas:60,peeksTaken:0,parthianSide:false,
     offType:false,bendToldFor:null,bendYes:0,bendNo:0,
     bodySkills:{bone:0,hide:0,thews:0}}; for(const k in d){ if(g[k]===undefined) g[k]=d[k]; }
@@ -21611,6 +21621,9 @@ function updateDomus(dt){
   /* ◆ THE PRESS. It locks the hall for its three beats — the crossing is
      the act and you do not get to change your mind halfway across it. */
   if(D.press){ updateRkPress(dt); if(D.press && D.press.locks) return; }
+  /* 🔎 AND THE CURIOUS ONE, which is a menu and therefore locks hardest */
+  if(D.curio){ updateCurio(dt); if(D.curio && D.curio.locks) return; }
+  else if(curioDue()) startCurio();
   if(D.husb){ updateHusbandMove(dt); return; }        // he is already crossing; nothing interrupts that
   if(D.bendAsk){ updateBendAsk(dt); return; }        // he has asked; the room waits on your answer
   if(D.drop){ updateDrop(dt); if(D.drop && D.drop.locks) return; }
@@ -21735,14 +21748,14 @@ function updateDomus(dt){
   /* K — AND ON ONE COAST YOU MAY SIMPLY STAND IT UP, on purpose, in your
      own hall, with nothing following from it unless you hold the seat it
      belongs to. Everywhere else this key does nothing and says why. */
-  if(!D.scene && !D.slap && !D.rslap && !D.husb && !D.ardor && !D.press && consume('k')){
+  if(!D.scene && !D.slap && !D.rslap && !D.husb && !D.ardor && !D.press && !D.curio && consume('k')){
     const R=rkStand();
     if(!R.ok) toast(R.why||'Not here.', 3000);
     else { toast(R.line, R.seated? 6200 : 4200); try{ sfx('ui'); }catch(e){} saveQuiet(); }
   }
   /* J — AND THIS IS HOW IT IS ANSWERED. K raises it and J crosses the hall,
      which on this coast is not a preliminary to the answer, it IS it. */
-  if(!D.scene && !D.slap && !D.rslap && !D.husb && !D.ardor && !D.press && consume('j')) tryRkPress();
+  if(!D.scene && !D.slap && !D.rslap && !D.husb && !D.ardor && !D.press && !D.curio && consume('j')) tryRkPress();
   // and the stairs, which are on the far left and were decorative until now
   if(!D.scene && !D.slap && !D.rslap && !D.husb && !D.ardor && !D.escort
      && nearStairs() && consume('up')) climbStairs();
@@ -21859,7 +21872,7 @@ const DROP_NEED=20;          // reaches to get it in your hand
 const DROP_LOOKS=3;          // and the looks you have to buy yourself time with
 function dropDue(){
   if(!G || !G.isFemale || !G.married || !G.wife || !G.wife.male || !ADULT) return false;
-  const D=DM; if(!D || D.scene || D.tempt || D.drop || D.slap || D.rslap || D.press) return false;
+  const D=DM; if(!D || D.scene || D.tempt || D.drop || D.slap || D.rslap || D.press || D.curio) return false;
   if((D.t||0) - (D.lastDropT===undefined? -9999 : D.lastDropT) < 2600) return false;
   return Math.random() < 0.0016;                 // the same pacing the bend runs on
 }
@@ -22103,7 +22116,7 @@ function drawSlapArm(x, y, t, from, skin){
 }
 function husbandMoveDue(){
   if(!G || !G.isFemale || !G.married || !G.wife || !G.wife.male || !ADULT) return false;
-  const D=DM; if(!D || D.scene || D.drop || D.slap || D.rslap || D.tempt || D.press) return false;
+  const D=DM; if(!D || D.scene || D.drop || D.slap || D.rslap || D.tempt || D.press || D.curio) return false;
   if((D.t||0) - (D.lastHusbT===undefined? -9999 : D.lastHusbT) < 2200) return false;
   if(!spouseWilling()) return false;
   if(hasQuirk('devout') && festivalToday()) return false;      // not today, and asking offends
@@ -22535,7 +22548,7 @@ function drawTunicBump(x, y, w, stage, T, dir, decent){
 function riseDue(){
   if(!G || !G.isFemale || !G.married || !G.wife || !G.wife.male || !ADULT) return false;
   if(!hasTrait('priapic')) return false;
-  const D=DM; if(!D || D.scene || D.drop || D.slap || D.rslap || D.tempt || D.husb || D.rise || D.press) return false;
+  const D=DM; if(!D || D.scene || D.drop || D.slap || D.rslap || D.tempt || D.husb || D.rise || D.press || D.curio) return false;
   if((D.t||0) - (D.lastRiseT===undefined? -9999 : D.lastRiseT) < 2600) return false;
   return Math.random() < 0.0018;
 }
@@ -22691,7 +22704,7 @@ function ardorReady(){
 function ardorAvailableNow(){
   if(!ardorReady()) return false;
   const D=DM; if(!D) return false;
-  if(D.scene||D.slap||D.rslap||D.tempt||D.husb||D.drop||D.rise||D.ardor||D.press) return false;
+  if(D.scene||D.slap||D.rslap||D.tempt||D.husb||D.drop||D.rise||D.ardor||D.press||D.curio) return false;
   if(loveLeft('quick')<=0) return false;
   if((G.hygiene|0)<25) return false;
   return true;
@@ -22713,6 +22726,201 @@ function ardorAvailableNow(){
            tail of it, so a woman seated on Rhauna is still moving when a
            flat tier has long stopped.
    ===================================================================== */
+/* =====================================================================
+   THE CURIOUS ONE — and the whole beat is that it is not aimed at you
+   ---------------------------------------------------------------------
+   Tempting is a performance: the low shelf, the pause, and the question
+   of whether he gets caught looking. This is the Rkrai answer and it is
+   built the other way round. Something has genuinely caught her — a mark
+   on a hull, a tally that does not add, a bird doing what birds do not —
+   and she has gone over it and stopped tracking the room. She is not
+   doing it AT you.
+
+   Which means the beat is not "will he be caught". It is: she is
+   absorbed, you are behind her, and every single thing that happens next
+   is YOUR decision. So it is a menu, it escalates, and you can stop at
+   any rung — including the rung where you look at the thing she is
+   looking at, which the coast considers a perfectly good answer and
+   which she likes more than most of the others.
+   ===================================================================== */
+const RK_CURIO={
+  name:'THE CURIOUS ONE',
+  what:'Something has caught her eye and the rest of the room has stopped existing. She is bent over it, she is not tracking you, and on this coast that is not a trap — it is a woman looking at something.',
+  rule:'She is not doing it at you. Everything that happens next is yours to decide, and the coast will read every rung of it.',
+  finds:[ 'a hull-mark on the new boat that is not the mark she cut',
+          'a tally-stick where the ninth notch has been cut twice',
+          'a gull on the ridge-pole doing something gulls do not do',
+          'a seam in the smoke-rack that has opened since the thaw',
+          'somebody else’s house-post shaving, in her own doorway',
+          'a fish in the barrel that is the wrong fish entirely' ],
+  look:[ 'She has not noticed you come in. She has not noticed the hour.',
+         'Whatever it is, it is more interesting than the room, and the room includes you.',
+         'She is entirely absorbed, and the arrangement of the rest of her is not her problem.' ],
+  /* WHAT YOU MAY DO. Each rung once; the ladder is the point. */
+  rungs:[
+    {id:'look',  key:'◎', name:'LOOK AT IT TOO',   note:'At the thing. Not at her.',
+     line:'You come and look at the mark. She says “—there, do you see it,” without turning round, and you do see it.',
+     bond:4, phys:0, once:true},
+    {id:'say',   key:'💬', name:'SAY IT',           note:'Out loud. The coast is literal.',
+     line:'“That is a fat seat.” She says “I know” to the tally-stick, and does not move.',
+     bond:2, phys:2, once:true},
+    {id:'slap',  key:'👋', name:'A HAND ON IT',     note:'It is a public office. It is also right there.',
+     line:'It lands. She says “mm” at the thing she is looking at, which is not the answer a stranger expects.',
+     bond:1, phys:3, once:true},
+    {id:'bare',  key:'❦', name:'TAKE THE UPPER OFF',note:'The ulvik unhooks at the belt. The hem stays.',
+     line:'It comes off over the belt and she lifts an arm for it without once looking away from the thing.',
+     bond:1, phys:4, once:true},
+    {id:'hard',  key:'◆', name:'STAND IT',          note:'The kilt will not be discreet about it.',
+     line:'◆ It is standing, and the kilt is cut so that this is legible from the door.',
+     bond:0, phys:2, once:true},
+  ],
+  go:'GO TO HER',
+  leave:'LEAVE HER TO IT',
+  left:[ '❄ You leave her to it. She works it out four minutes later and tells the whole house about it at supper.',
+         '❄ You leave her to it, which is the one answer on this coast nobody has ever had to defend.' ],
+  woohoo:'❦ THE UPPER IS OFF AND IT IS STANDING. On this coast that combination has exactly one meaning and neither of you has to say it.',
+};
+function curioOn(){ try{ return !!(DM && DM.curio); }catch(e){ return false; } }
+function curioReady(){
+  try{
+    if(!rkHere() || !ADULT) return false;
+    if(!(G && G.married && G.wife && !G.wife.male)) return false;
+    if(G.isFemale) return false;
+    if(!(G.wife.traits && G.wife.traits.indexOf('curious')>=0)) return false;
+    return true;
+  }catch(e){ return false; }
+}
+function curioDue(){
+  const D=DM; if(!D) return false;
+  if(!curioReady()) return false;
+  if(D.scene||D.slap||D.rslap||D.tempt||D.husb||D.drop||D.rise||D.ardor||D.press||D.curio) return false;
+  if((G.day|0)===(G.curioDay|0) && (G.curioToday||0)>=1) return false;
+  if(D.t < (D.curioNext||360)) return false;
+  return Math.random() < 0.020;
+}
+function startCurio(){
+  const D=DM; if(!D || !curioReady()) return false;
+  D.curio={ ph:'look', t:0, bend:0, bare:false, hard:false, sel:0, done:{},
+            find:pick(RK_CURIO.finds), look:pick(RK_CURIO.look),
+            bond:0, phys:0, locks:true, rub:0 };
+  D.wifePause=99999;
+  D.curioNext = D.t + 900;
+  try{ sfx('ui'); }catch(e){}
+  return true;
+}
+/* the rungs you may still take, plus GO and LEAVE, in menu order */
+function curioMenu(){
+  const X=DM&&DM.curio; if(!X) return [];
+  const out=RK_CURIO.rungs.filter(r=>!X.done[r.id]).map(r=>Object.assign({}, r));
+  if(X.hard) out.push({id:'go', key:'◆', name: X.bare? 'GO — AND THE UPPER IS OFF' : RK_CURIO.go,
+    note: X.bare? 'There is one meaning and neither of you has to say it.' : 'Behind her, and keep it there.'});
+  out.push({id:'leave', key:'✋', name:RK_CURIO.leave, note:'A perfectly good answer here.'});
+  return out;
+}
+function curioTake(id){
+  const D=DM, X=D&&D.curio; if(!X) return null;
+  if(id==='leave'){ X.ph='done'; X.t=0; X.result={k:'left', line:pick(RK_CURIO.left)}; return X.result; }
+  if(id==='go'){ X.ph = X.bare? 'woohoo' : 'rub'; X.t=0; X.stroke=0; return {k:X.ph}; }
+  const R=RK_CURIO.rungs.find(r=>r.id===id); if(!R) return null;
+  X.done[id]=true;
+  X.bond += R.bond; X.phys += R.phys;
+  if(id==='bare') X.bare=true;
+  if(id==='hard'){ X.hard=true; try{ if(!rkStandOn()) rkStand(); }catch(e){} }
+  if(id==='slap'){ try{ slapKick(1.1+((G.wife.body&&G.wife.body.booty)||5)*0.09); }catch(e){}
+                   try{ shimmyStart(G.wife, 0.9); }catch(e){}
+                   try{ sfx('slapBig'); }catch(e){} }
+  else try{ sfx('ui'); }catch(e){}
+  X.ph='act'; X.t=0; X.act=R;
+  return R;
+}
+/* AND WHAT IT ALL CAME TO. The rungs have been banking as you went; this
+   pays them, adds what the finish is worth, and says it in one line. */
+function curioResolve(kind){
+  const D=DM, X=D&&D.curio; if(!X) return null;
+  const be=((G.wife.body&&G.wife.body.booty)||5);
+  const len=(typeof ardorLen==='function')? ardorLen() : 5;
+  const bw=clamp((be-3)/7,0,1.1), pw=clamp(len/10,0,1);
+  let bond=X.bond, phys=X.phys, line='';
+  if(kind==='woohoo'){
+    bond += Math.round(3 + bw*4 + pw*3);
+    phys += Math.round(6 + bw*9 + pw*7);
+    G.woohooAll=(G.woohooAll||0)+1;
+    G.lastLoveDay=G.day;
+    try{ spendLove('quick'); }catch(e){}
+    line=RK_CURIO.woohoo;
+  } else if(kind==='rub'){
+    bond += Math.round(1 + bw*2 + pw*2);
+    phys += Math.round(3 + bw*5 + pw*4);
+    line='◆ Kept there, and she never did put the tally-stick down.';
+  } else {
+    line=(X.result&&X.result.line)||'';
+  }
+  /* the standing, if you raised one, is discharged by going to her */
+  let kept=null;
+  if(kind==='woohoo'||kind==='rub'){ try{ kept=rkTaqrunKeep(); }catch(e){}
+    if(!kept){ try{ G.rkStand=null; }catch(e){} } }
+  G.wifeRel =clamp((G.wifeRel||50)+bond, 0, (typeof bondCeiling==='function')? bondCeiling() : 100);
+  G.wifePhys=clamp((G.wifePhys===undefined?45:G.wifePhys)+phys, 0, 100);
+  G.curioDay=G.day; G.curioToday=(G.curioToday||0)+1;
+  G.curioSeen=(G.curioSeen||0)+1;
+  if(kind==='woohoo') G.curioWoohoo=(G.curioWoohoo||0)+1;
+  try{ refreshStatbar(); saveQuiet(); }catch(e){}
+  return {bond, phys, line, kept, kind};
+}
+function updateCurio(dt){
+  const D=DM, X=D.curio; if(!X) return;
+  X.t+=dt;
+  shimmyTick(dt);
+  if(X.ph==='look'){
+    X.locks=true;
+    X.bend=clamp(X.t/70,0,1);
+    if(X.t>96){ X.ph='choose'; X.t=0; X.sel=0; }
+  }
+  else if(X.ph==='choose'){
+    X.locks=true; X.bend=1;
+    const M=curioMenu();
+    if(consume('a')){ X.sel=(X.sel+M.length-1)%M.length; try{ sfx('ui'); }catch(e){} }
+    if(consume('d')){ X.sel=(X.sel+1)%M.length;          try{ sfx('ui'); }catch(e){} }
+    if(consume('space')||consume('attack')){
+      const c=M[clamp(X.sel,0,M.length-1)];
+      if(c) curioTake(c.id);
+    }
+    if(consume('j')||consume('l')) curioTake('leave');
+  }
+  else if(X.ph==='act'){
+    X.locks=true; X.bend=1;
+    if(X.t>92){ X.ph='choose'; X.t=0; X.sel=0; X.act=null; }
+  }
+  else if(X.ph==='rub' || X.ph==='woohoo'){
+    X.locks=true; X.bend=1;
+    const heavy=(X.ph==='woohoo');
+    X.rub = Math.sin(X.t*(heavy?0.20:0.13))*(1+((G.wife.body&&G.wife.body.booty)||5)*(heavy?0.14:0.11));
+    if(!X.nextStroke || X.t>=X.nextStroke){
+      X.nextStroke = X.t + (heavy? 17 : 24);
+      X.stroke=(X.stroke||0)+1;
+      try{ shimmyStart(G.wife, heavy? 0.62 : 0.30); }catch(e){}
+      try{ slapKick(heavy? 0.55 : 0.22); }catch(e){}
+      try{ sfx(((X.stroke%2)===0)? 'slapBig' : 'kiss'); }catch(e){}
+      if((X.stroke%3)===0){ try{ sfx('moan'); }catch(e){} }
+      if(heavy && (X.stroke%5)===0){ try{ kickShake(1.4,22); }catch(e){} }
+      D.hearts.push({x:D.wifeX+rnd(-8,8), y:214-46, vy:0.30+Math.random()*0.24,
+                     life:64, c:'#ff9ad8'});
+    }
+    if(!X.paid && X.t>(heavy?300:200)){ X.paid=true; X.result=curioResolve(X.ph); }
+    if(X.t>(heavy?420:300) && (!shimmyLive() || X.t>(heavy?560:440))){ X.ph='done'; X.t=0; }
+  }
+  else if(X.ph==='done'){
+    X.locks=false;
+    if(!X.paid){ X.paid=true; X.result=curioResolve('left'); }
+    if(X.t>40){
+      const R=X.result||{};
+      D.curio=null; D.wifePause=0;
+      if(R.line) toast(R.line + ((R.bond||R.phys)? '  ('+(R.bond>=0?'+':'')+(R.bond|0)+' 💞, '
+        +(R.phys>=0?'+':'')+(R.phys|0)+' 🔥)' : ''), 6000);
+      if(R.kept) setTimeout(()=>{ try{ toast(R.kept, 5000); }catch(e){} }, 3200);
+    }
+  }
+}
 function tryRkPress(){
   const D=DM; if(!D) return;
   const A=(typeof rkPressOk==='function')? rkPressOk() : {ok:false, why:'Not here.'};
@@ -22721,6 +22929,7 @@ function tryRkPress(){
   if(D.slap||D.rslap){ toast('One thing at a time — that has not landed yet.',2200); return; }
   if(D.tempt){ toast('She is already busy on the low shelf. See how THAT goes first.',2600); return; }
   if(D.husb||D.drop||D.rise||D.ardor){ toast('Something is already happening in this hall.',2400); return; }
+  if(D.curio){ toast('She is in the middle of looking at something. Answer that first.',2800); return; }
   /* THE FIRST BEAT IS THE SIGNAL, and if it is already standing the beat
      is short rather than absent — you still see what you are signalling. */
   const up=(typeof rkStandOn==='function') && rkStandOn();
@@ -22851,83 +23060,132 @@ function rkBackBones(FY, lg, be, wa, tall){
   return {legLen, hipY, seatH, seatY, waistY, shY, headH, headY,
           waistW: 3.0 + (10-wa)*0.15 + (tall?2.4:0)};
 }
-/* ---- HER ---- */
+/* ---- HER ----
+   Three things this has to do that one pose cannot: stand, LEAN (she is
+   looking at something and has forgotten the room), and be wearing the
+   ulvik or not be. All three come off the same bones, because a second
+   sprite for a second pose is how the two figures stopped matching last
+   time.
+
+     bend 0..1  she pitches over the thing she is looking at. The torso
+                foreshortens toward the camera, the shoulders travel, the
+                head drops — and the seat comes UP and gets bigger,
+                because that is what happens and it is the whole beat.
+     bare       the upper course of the ulvik is off. Skin from the belt
+                up, the plaits then falling on skin instead of cloth, and
+                the swell of her caught at the outer edge where a back
+                view can honestly show it.
+   ---- */
 function drawRkBack(x, FY, w, o){
   o=o||{};
+  const RIM=o.rim||0;                       // which side he is on: -1 left, +1 right
+  const bend=clamp(o.bend||0,0,1), bare=!!o.bare;
   const B=(w&&w.body)||{}, gv=(id,d)=>B[id]===undefined?d:B[id];
-  const be=gv('booty',5), lg=gv('legs',5), wa=gv('waist',5), hq=gv('hairq',5);
+  const be=gv('booty',5), lg=gv('legs',5), wa=gv('waist',5), hq=gv('hairq',5), bu=gv('bust',5);
   const skin=(w&&w.skin)||'#e6bd94', hi=shade(skin,18), sh=shade(skin,-24), deep=shade(skin,-42);
   const hair=mixHex((w&&w.hair)||'#3a2412','#1a1006',0.35), hHi=shade(hair,22), hSh=shade(hair,-30);
   const dress=(w&&w.dress)||'#8a2f4a', dHi=shade(dress,24), dSh=shade(dress,-34);
   const band=(typeof rkOfficeBand==='function')? rkOfficeBand(w) : '#8a6a3a';
-  const give=o.give||0, RIM=o.rim||0;
+  const give=o.give||0;
   const P=(a,b,ww,h,c)=>px(Math.round(x+a),Math.round(b),Math.max(1,Math.round(ww)),Math.max(1,Math.round(h)),c);
   const K=rkBackBones(FY, lg, be, wa, false);
   const bT = be>=9?4 : be>=7?3 : be>=5?2 : be>=3?1 : 0;
-  const seatW = 4.6 + be*0.48;                       // HALF width: 5.1 .. 9.4
+  /* THE LEAN. Everything above the belt travels; the seat goes the other
+     way. `lean` is how far the shoulders have gone over the thing she is
+     looking at, `hike` how far the seat has come up to pay for it. */
+  const lean = bend*3.4, hike = bend*(2.6+be*0.26), squash = bend*0.30;
+  const seatW = (4.6 + be*0.48) * (1 + bend*0.16);
   const shWid = K.waistW + 2.2;
-  /* ---- legs, set under the seat rather than under the shoulders ---- */
+  const seatY = K.seatY - hike, hipY = K.hipY - hike*0.55;
+  const legLen = FY - hipY;
+  /* ---- legs. Under the seat, and they straighten as she goes over ---- */
   { const lw=2.6+lg*0.10, inner=seatW*0.30;
-    P(-inner-lw, K.hipY, lw, K.legLen, skin);
-    P( inner,    K.hipY, lw, K.legLen, sh);
-    P(-inner-lw, K.hipY, 1,  K.legLen, hi);
+    P(-inner-lw, hipY, lw, legLen, skin);
+    P( inner,    hipY, lw, legLen, sh);
+    P(-inner-lw, hipY, 1,  legLen, hi);
     P(-inner-lw-0.4, FY-2, lw+1.4, 2, '#6a4a2c');
-    P( inner-0.4,    FY-2, lw+1.4, 2, '#6a4a2c'); }
-  /* ---- THE SEAT. Two masses on the five-rung ladder, and the near one
-     gives where he meets it. ---- */
-  { const cy=K.seatY+K.seatH*0.52, rh=K.seatH*0.92;
+    P( inner-0.4,    FY-2, lw+1.4, 2, '#6a4a2c');
+    if(bend>0.3){ P(-inner-lw, hipY+legLen*0.42, lw, 1, sh);      // the hamstring pulls
+                  P( inner,    hipY+legLen*0.42, lw, 1, deep); } }
+  /* ---- THE SEAT. Two masses on the five-rung ladder; the near one gives
+     where he meets it, and the whole of it rides up with the lean. ---- */
+  const seatH=K.seatH*(1+bend*0.22);
+  { const cy=seatY+seatH*0.52, rh=seatH*0.92;
     const nearX=-seatW*0.50+give*0.6, farX=seatW*0.50;
     const rw=seatW*0.58;
-    const blob=(cx2,cy2,a,b,c)=>{ for(let yy=-Math.round(b);yy<=Math.round(b);yy++){
-        const t=yy/b, hw=a*Math.sqrt(Math.max(0,1-t*t));
+    const blob=(cx2,cy2,a,b2,c)=>{ for(let yy=-Math.round(b2);yy<=Math.round(b2);yy++){
+        const t=yy/b2, hw=a*Math.sqrt(Math.max(0,1-t*t));
         if(hw>0.4) P(cx2-hw, cy2+yy, hw*2, 1, c); } };
     blob(nearX, cy, rw*(1-give*0.09), rh, skin);
     blob(farX,  cy, rw, rh, shade(skin,-7));
-    blob(nearX-rw*0.30, cy-rh*0.36, rw*0.46, rh*0.38, hi);      // the lit crown of it
-    if(bT>=3){ blob(nearX, cy+rh*0.66, rw*0.70, rh*0.28, sh);   // and the weight, hanging
+    blob(nearX-rw*0.30, cy-rh*0.36, rw*0.46, rh*0.38, hi);          // the lit crown
+    if(bT>=3){ blob(nearX, cy+rh*0.66, rw*0.70, rh*0.28, sh);
                blob(farX,  cy+rh*0.66, rw*0.70, rh*0.28, deep); }
-    P(-0.6, K.seatY+1, 1.2, K.seatH+1, deep);                    // the cleft
-    if(bT>=2) P(-1.1, K.seatY+2, 2.2, K.seatH-1, mixHex(deep,'#000000',0.34)); }
-  /* ---- the ulvik: short, and the belt carries the office ---- */
-  { const hemH=Math.max(4, K.seatY-K.waistY+4);
+    P(-0.6, seatY+1, 1.2, seatH+1, deep);
+    if(bT>=2) P(-1.1, seatY+2, 2.2, seatH-1, mixHex(deep,'#000000',0.34));
+    /* leaning over, the light rolls right round the top of it */
+    if(bend>0.35){ blob(nearX, cy-rh*0.72, rw*0.80, rh*0.24, mixHex(hi,'#ffffff',0.30));
+                   blob(farX,  cy-rh*0.72, rw*0.72, rh*0.22, hi); } }
+  /* ---- the ulvik hem and the belt that carries the office. The hem
+     rides up as she goes over, which is not a joke, it is a short hide
+     skirt on a woman bending forward. ---- */
+  const waistY=K.waistY-hike*0.85+squash*3;
+  { const hemH=Math.max(3, Math.round((seatY-waistY+4) * (1-bend*0.34)));
     for(let i=0;i<hemH;i++){ const hw=K.waistW+1.4+i*0.34;
-      P(-hw, K.waistY+i, hw*2, 1, i<2? dHi : (i%3===2? dSh : dress)); }
+      P(-hw, waistY+i, hw*2, 1, i<2? dHi : (i%3===2? dSh : dress)); }
     const bw=K.waistW+1.6;
-    P(-bw, K.waistY-3, bw*2, 3, band);
-    P(-bw, K.waistY-3, bw*2, 1, mixHex(band,'#ffffff',0.36));
-    P(-bw, K.waistY-1, bw*2, 1, mixHex(band,'#120a06',0.42));
-    for(let q=0;q<bw*2;q+=3) P(-bw+q, K.waistY-2, 1, 1, mixHex(band,'#ffffff',0.22)); }
-  /* ---- back and shoulders ---- */
-  { const rows=K.waistY-K.shY;
-    for(let i=0;i<rows;i++){ const t=i/(rows-1), hw=shWid*(1-t*0.10)+t*0.8;
-      P(-hw, K.shY+i, hw*2, 1, i<2? dHi : (i%4===3? dSh : dress)); }
-    P(-0.6, K.shY+2, 1.2, rows-3, dSh);
-    P(-shWid-1.6, K.shY+2, 2.0, rows-3, skin);                  // arms, forward and braced
-    P( shWid-0.4, K.shY+2, 2.0, rows-3, sh); }
-  /* ---- the rim he casts down her, drawn before the head so the head
-     keeps its own edge ---- */
-  /* HE IS DIRECTLY BEHIND HER, so the shadow he throws is not down one
-     side of her — it is round the whole of her outline, which is what
-     separates two concentric silhouettes. */
-  if(RIM){ for(let yy=K.shY; yy<FY-2; yy++){
-      const w2 = yy>=K.seatY? seatW*1.02 : (yy>=K.waistY? K.waistW+2.0 : shWid+0.6);
-      /* the side he is standing on gets the hard edge; the far side gets
-         a softer one, because he is behind her and not beside her */
+    P(-bw, waistY-3, bw*2, 3, band);
+    P(-bw, waistY-3, bw*2, 1, mixHex(band,'#ffffff',0.36));
+    P(-bw, waistY-1, bw*2, 1, mixHex(band,'#120a06',0.42));
+    for(let q=0;q<bw*2;q+=3) P(-bw+q, waistY-2, 1, 1, mixHex(band,'#ffffff',0.22)); }
+  /* ---- back and shoulders, foreshortened and travelling with the lean ---- */
+  const rows=Math.max(6, Math.round((waistY-K.shY)*(1-bend*0.20)));
+  const shY=waistY-rows;
+  for(let i=0;i<rows;i++){
+    const t=i/Math.max(1,rows-1);
+    const off=lean*(1-t);                                   // the top travels furthest
+    const hw=shWid*(1-t*0.10)+t*0.8;
+    const cloth = bare? (i<2? hi : (i%4===3? sh : skin))
+                      : (i<2? dHi : (i%4===3? dSh : dress));
+    P(-hw+off, shY+i, hw*2, 1, cloth);
+    if(bare){ P(-hw+off, shY+i, 1.2, 1, hi);                // a lit edge down her
+              P(hw-1.2+off, shY+i, 1.2, 1, sh); }
+  }
+  /* the spine, and the blades that only show on bare skin */
+  P(-0.6+lean*0.5, shY+2, 1.2, rows-3, bare? sh : dSh);
+  if(bare){ const bl=Math.max(2,Math.round(shWid*0.44));
+    P(-shWid*0.62+lean*0.7, shY+3, bl, 1.2, sh);
+    P( shWid*0.62-bl+lean*0.7, shY+3, bl, 1.2, sh);
+    /* AND THE SWELL OF HER, caught at the outer edge — which is all a
+       back view can honestly show and is exactly what the beat is. */
+    if(bu>=4){ const r=1.0+bu*0.30, by=shY+rows*0.42;
+      for(let q=0;q<Math.round(r);q++){
+        const t2=q/Math.max(1,r), w2=r*Math.sqrt(Math.max(0,1-t2*t2));
+        P(-shWid-w2*0.9+lean*0.4, by+q-r*0.5, w2*0.9, 1, skin);
+        P( shWid+lean*0.4,        by+q-r*0.5, w2*0.9, 1, sh); }
+      P(-shWid-r*0.8+lean*0.4, by-r*0.4, 1.2, 2, hi); } }
+  /* arms: braced on whatever she is looking at, once she is over it */
+  { const aY=shY+2, aH=Math.max(3,rows-3);
+    if(bend>0.25){ P(-shWid-1.8+lean*1.4, aY+bend*2, 2.0, aH+bend*4, skin);
+                   P( shWid-0.2+lean*1.4, aY+bend*2, 2.0, aH+bend*4, sh); }
+    else { P(-shWid-1.6, aY, 2.0, aH, skin); P( shWid-0.4, aY, 2.0, aH, sh); } }
+  /* ---- the shadow he throws, on her outline ---- */
+  if(RIM){ for(let yy=shY; yy<FY-2; yy++){
+      const w2 = yy>=seatY? seatW*1.02 : (yy>=waistY? K.waistW+2.0 : shWid+0.6);
       P(RIM<0? -w2 : w2-1.2, yy, 1.2, 1, 'rgba(22,10,6,.52)');
       P(RIM<0? w2-1.2 : -w2, yy, 1.2, 1, 'rgba(22,10,6,.24)'); } }
   /* ---- head, and the plaits that are the index ---- */
-  { const hw=3.4, hy=K.headY;
-    P(-hw, hy, hw*2, K.headH, skin); P(-hw, hy, hw*2, 1, hi);
-    P(hw-1, hy+1, 1, K.headH-2, sh);
-    P(-hw-0.6, hy-2, hw*2+1.2, 3, hair); P(-hw-0.6, hy-2, hw*2+1.2, 1, hHi);
-    /* one plait per settlement she is holding, worn over the shoulder where
-       it can be counted — and it is an index, so it is drawn thin */
+  { const hw=3.4, hy=shY-K.headH+bend*3.4, hx2=lean*1.25;
+    P(-hw+hx2, hy, hw*2, K.headH, skin); P(-hw+hx2, hy, hw*2, 1, hi);
+    P(hw-1+hx2, hy+1, 1, K.headH-2, sh);
+    P(-hw-0.6+hx2, hy-2, hw*2+1.2, 3, hair); P(-hw-0.6+hx2, hy-2, hw*2+1.2, 1, hHi);
     const n=clamp(2+Math.round(hq*0.24),2,4), fall=Math.round(6+hq*0.70);
-    for(let i=0;i<n;i++){ const px2=-hw+1.0+i*((hw*2-2.4)/Math.max(1,n-1));
-      P(px2, hy+3, 1, fall, i===0? hHi : hair);
-      for(let y=3;y<fall;y+=4) P(px2, hy+3+y, 1, 1, hSh); }
-    P(-hw+0.4, hy+3, hw*2-0.8, 1.4, hair);                       // the gather at the nape
-    P(-hw+1.0, hy+3+fall, hw*2-2.4, 1, hSh); }
+    for(let i=0;i<n;i++){ const px2=-hw+1.0+i*((hw*2-2.4)/Math.max(1,n-1))+hx2;
+      /* leaning over, the plaits swing forward and hang clear of her */
+      for(let y=0;y<fall;y++){
+        const sway=bend*y*0.30;
+        P(px2+sway, hy+3+y, 1, 1, (y%4===3)? hSh : (i===0? hHi : hair)); } }
+    P(-hw+0.4+hx2, hy+3, hw*2-0.8, 1.4, hair); }
 }
 /* ---- HIM. Same bones, two pixels taller, and the signal is the point. ---- */
 function drawRkBehindHim(x, FY, o){
@@ -22953,11 +23211,19 @@ function drawRkBehindHim(x, FY, o){
     P(-inner-lw, K.hipY, 1,  K.legLen, hi);
     P(-inner-lw-0.4, FY-2, lw+1.4, 2, '#5a3c22');
     P( inner-0.4,    FY-2, lw+1.4, 2, '#5a3c22'); }
-  /* ---- the kilt: short, moulded, and cut so the office is legible ---- */
+  /* ---- the kilt: short, moulded, and cut so the office is legible.
+     `down` drops it off the hip to the knee, where it stays in a heap of
+     its own folds rather than vanishing, because a garment that
+     disappears reads as a bug. ---- */
   const beltY=K.waistY;
+  const down=clamp(o.down||0,0,1);
   { const kl=Math.max(5, K.seatY-K.waistY+4);
-    for(let i=0;i<kl;i++){ const hw=K.waistW+1.2+i*0.30;
-      P(-hw, beltY+i, hw*2, 1, i<2? HHI : (i%3===2? HSH : HID)); } }
+    const top=beltY + down*(K.hipY-beltY+K.legLen*0.52);
+    for(let i=0;i<kl*(1+down*0.5);i++){ const hw=(K.waistW+1.2+i*0.30)*(1+down*0.26);
+      P(-hw, top+i, hw*2, 1, i<2? HHI : (i%3===2? HSH : HID)); }
+    if(down>0.4){ const hw=(K.waistW+2.4)*1.3;                 // the heap, and its shadow
+      P(-hw, top+kl*1.5-1, hw*2, 2, HSH);
+      P(-hw*0.8, top+kl*1.5+1, hw*1.6, 1, 'rgba(20,10,6,.36)'); } }
   /* ---- IT. The signal, four tones across so it is a cylinder and not a
      stripe, hanging at stand 0 and out-and-up at stand 1. ---- */
   { /* HARD contrast, because this is drawn ON the kilt rather than against
@@ -22996,10 +23262,15 @@ function drawRkBehindHim(x, FY, o){
       P(tx-hw, ty-1, hw*2+1, 1, MSH);
       P(tx-hw+1, ty, hw*2-1, 1, MHI); } }
   /* the belt, which carries the house's Mastery and takes the strain */
-  { const bw=K.waistW+1.4;
-    P(-bw, beltY-3, bw*2, 3, band);
-    P(-bw, beltY-3, bw*2, 1, mixHex(band,'#ffffff',0.34));
-    P(-bw, beltY-1, bw*2, 1, mixHex(band,'#120a06',0.40)); }
+  { const bw=K.waistW+1.4, by=beltY-3 + down*(K.hipY-beltY+K.legLen*0.52);
+    P(-bw, by, bw*2, 3, band);
+    P(-bw, by, bw*2, 1, mixHex(band,'#ffffff',0.34));
+    P(-bw, by+2, bw*2, 1, mixHex(band,'#120a06',0.40)); }
+  /* the hip the kilt was covering, once it is not */
+  if(down>0.3){ const hw=K.waistW+1.0;
+    for(let i=0;i<Math.round(K.seatY-K.waistY+5);i++)
+      P(-hw+i*0.16, beltY+i, (hw-i*0.16)*2, 1, (i<2? hi : (i%4===3? sh : skin)));
+    P(-0.6, beltY+1, 1.2, K.seatY-K.waistY+3, sh); }
   /* ---- back, shoulders, head ---- */
   { const rows=beltY-K.shY;
     for(let i=0;i<rows;i++){ const t=i/(rows-1), hw=shWid*(1-t*0.20);
@@ -23016,6 +23287,147 @@ function drawRkBehindHim(x, FY, o){
     P(-hw-0.6, hy-2.4, hw*2+1.2, 1, shade(hair,26));
     for(let i=0;i<4;i++) P(-hw+0.4+i*1.9, hy-2.4, 1, 2.6, shade(hair,-28)); }
   return {shW:shWid, beltY, hipY:K.hipY, seatY:K.seatY, headY:K.headY};
+}
+/* =====================================================================
+   THE CURIOUS ONE, DRAWN
+   ---------------------------------------------------------------------
+   The thing she is looking at is a real object in the room and it is
+   drawn first, because a woman bent over nothing is a woman posing and
+   the whole point of this beat is that she is not.
+   ===================================================================== */
+function drawCurio(){
+  const D=DM, X=D.curio; if(!X) return;
+  const FY=214, T=X.t, w=G.wife, PX=D.wifeX;
+  const heavy=(X.ph==='woohoo');
+  const dark = X.ph==='look'? clamp(T/96,0,1)*0.34 : (heavy? 0.52 : 0.40);
+  ctx.globalAlpha=0.12+dark; px(-4,-4,W+8,H+8,'#160b12'); ctx.globalAlpha=1;
+  try{ drawHall(0, 44, W, 186, T, true, 1); }catch(e){}
+  const side=(D.x<=PX)? -1 : 1;
+  /* ---- THE THING. A low rack with whatever it is on it, and a marker
+     that pulses because she has not stopped looking at it. ---- */
+  const TX=Math.round(PX - side*17), TY=FY-13;
+  px(TX-9, TY, 18, 11, '#5a4028'); px(TX-9, TY, 18, 2, '#7a5a3a');
+  px(TX-10, TY+10, 20, 3, '#3e2c1a');
+  for(let i=0;i<3;i++) px(TX-7+i*6, TY+3, 1, 7, '#46331e');
+  px(TX-5, TY-3, 10, 3, '#8a6a42'); px(TX-5, TY-3, 10, 1, '#a8865a');
+  px(TX-2, TY-5, 4, 2, '#c8b070');
+  { const a=0.45+0.35*Math.sin(T*0.09);
+    ctx.globalAlpha=a; px(TX-1, TY-9, 2, 2, '#ffd27a'); ctx.globalAlpha=1;
+    ctx.textAlign='center';
+    if(X.ph==='look'||X.ph==='choose')
+      pixelText('◆', TX, TY-12, 'rgba(255,210,122,'+a.toFixed(2)+')', 0.66);
+    ctx.textAlign='left'; }
+  { const g=ctx.createRadialGradient(PX,FY-30,6,PX,FY-30,84);
+    g.addColorStop(0,'rgba(255,190,170,'+(0.12+dark*0.24)+')');
+    g.addColorStop(1,'rgba(0,0,0,0)'); ctx.fillStyle=g; ctx.fillRect(0,60,W,H-60); }
+  /* ---- HIM. Away during the looking and the choosing; behind her the
+     moment you send him. ---- */
+  const goPh=(X.ph==='rub'||X.ph==='woohoo');
+  const pressK = goPh? clamp(T/34,0,1) : 0;
+  const rub = goPh? (X.rub||0) : 0;
+  const gap = goPh? (7 - pressK*1.4) : 30;
+  const hx  = goPh? (PX + side*gap) : (PX + side*30);
+  let HM=null;
+  const AK=rkBackBones(FY, (w&&w.body&&w.body.legs)||5, (w&&w.body&&w.body.booty)||5,
+                           (w&&w.body&&w.body.waist)||5, false);
+  const aimY=AK.seatY+Math.round(AK.seatH*0.42)-Math.round((X.bend||0)*((2.4+((w&&w.body&&w.body.booty)||5)*0.22)));
+  try{ HM=drawRkBehindHim(hx+rub*0.6, FY-Math.abs(rub)*0.4, {
+        stand: X.hard? 1 : 0, press: pressK,
+        down: heavy? clamp(T/40,0,1) : 0,
+        aimY: (pressK>0? aimY : undefined),
+        leaf:(typeof rkSivrakOn==='function' && rkSivrakOn('self'))}); }catch(e){}
+  /* ---- HER, over the thing ---- */
+  const give = pressK*(0.55+((w&&w.body&&w.body.booty)||5)*0.045);
+  try{ drawRkBack(PX, FY, w, {bend:X.bend||0, bare:X.bare, give,
+        rim: pressK>0? side : 0}); }catch(e){}
+  /* the near lip of the rack, painted back over her hands, so she is ON
+     it rather than standing behind it */
+  px(TX-10, TY+8, 20, 3, '#6a4c2e'); px(TX-10, TY+8, 20, 1, '#8a6a42');
+  /* his hands on her, once he is there */
+  if(pressK>0 && HM){
+    const hs=mixHex((G&&G.skin)||'#caa06a','#1a0e08',0.10);
+    const armY=AK.waistY+3-Math.round((X.bend||0)*2);
+    const waW=AK.waistW+2.0, reach=Math.round(4+pressK*3);
+    ctx.globalAlpha=clamp(pressK*1.5,0,1);
+    for(const sgn of [-1,1]){
+      const x0 = sgn<0? Math.round(PX-waW-reach+1) : Math.round(PX+waW-1);
+      px(x0, armY, reach, 3, sgn<0? hs : shade(hs,-18));
+      px(x0, armY, reach, 1, shade(hs, sgn<0? 20 : 4));
+      px(x0, armY+2, reach, 1, shade(hs,-28));
+      const hxx = sgn<0? x0+reach-1 : x0-2;
+      px(hxx, armY-1, 3, 4, sgn<0? hs : shade(hs,-14));
+      px(hxx, armY-1, 3, 1, shade(hs, sgn<0? 22 : 6));
+    }
+    ctx.globalAlpha=1;
+  }
+  /* the contact, painted on her seat */
+  if(pressK>0.05){
+    const be2=((w&&w.body&&w.body.booty)||5), sk2=(w&&w.skin)||'#e6bd94';
+    const len2=(typeof ardorLen==='function')? ardorLen() : 5;
+    const HIDc=mixHex((G&&G.tunic)||'#6a4a2e','#4a3826',0.42);
+    const leaf=(typeof rkSivrakOn==='function' && rkSivrakOn('self'));
+    const M2=leaf?'#4a7a30':shade(HIDc,-4), MH2=leaf?'#9fd070':shade(HIDc,86),
+          MS2=leaf?'#1a3a12':shade(HIDc,-62);
+    const cy=aimY+Math.round(rub*0.55);
+    const th=Math.max(2, Math.round(1.6+len2*0.18));
+    const into=Math.round((2.2+len2*0.24)*pressK + Math.abs(rub)*0.5);
+    const x0=Math.round(PX - into*0.5 + rub*0.45);
+    ctx.globalAlpha=clamp(pressK*1.6,0,1);
+    px(x0, cy-th-1, into+2, th*2+3, mixHex(sk2,'#7a4a3e',0.34));
+    for(let q=-th;q<=th;q++){ const u=(q+th)/Math.max(1,th*2);
+      px(x0, cy+q, into+1, 1, (u<0.26)? MH2 : (u<0.70)? M2 : MS2); }
+    px(x0, cy-th-1, into+1, 1, MS2); px(x0, cy+th+1, into+1, 1, MS2);
+    ctx.globalAlpha=1;
+  }
+  /* ---- WORDS ---- */
+  ctx.textAlign='center';
+  if(X.ph==='look'){
+    if(T>26) pixelText('🔎 '+X.find, W/2, 26, 'rgba(255,222,180,'+clamp((T-26)/40,0,0.86)+')', 0.62);
+    if(T>60) pixelText(X.look, W/2, 36, 'rgba(230,210,240,'+clamp((T-60)/36,0,0.66)+')', 0.56);
+  } else if(X.ph==='act' && X.act){
+    pixelText(X.act.key+' '+X.act.name, W/2, 26, 'rgba(255,200,220,.86)', 0.76);
+    const words=String(X.act.line).split(' '); let line='', yy=37;
+    const outl=[];
+    words.forEach(wd=>{ const t2=line?line+' '+wd:wd;
+      if(t2.length>44 && line){ outl.push(line); line=wd; } else line=t2; });
+    if(line) outl.push(line);
+    outl.slice(0,3).forEach((L,i)=>pixelText(L, W/2, yy+i*9, 'rgba(232,220,240,.78)', 0.56));
+  } else if(goPh){
+    pixelText(heavy? '❦ THE UPPER IS OFF, AND IT IS STANDING' : '◆ KEPT THERE', W/2, 26,
+      heavy? 'rgba(255,180,220,.88)' : 'rgba(255,214,190,.78)', heavy? 0.76 : 0.70);
+    if(heavy && T>90 && ((T|0)%26)<14)
+      pixelText('❦', PX, FY-84, 'rgba(255,180,220,.72)', 0.86);
+  }
+  ctx.textAlign='left';
+  /* ---- THE MENU. It is the whole feature, so it gets a real panel. ---- */
+  if(X.ph==='choose'){
+    const M=curioMenu(), n=M.length;
+    const cw=Math.min(60, Math.floor((W-24)/Math.max(1,n))-3), gapx=3;
+    const tot=n*cw+(n-1)*gapx;
+    const x0=Math.round(W/2-tot/2), y0=H-30;
+    px(0, y0-12, W, 42, 'rgba(12,7,12,.88)');
+    px(0, y0-12, W, 1, 'rgba(232,195,74,.42)');
+    ctx.textAlign='center';
+    pixelText('SHE HAS NOT NOTICED YOU. WHAT DO YOU DO?', W/2, y0-6, '#e8c34a', 0.58);
+    M.forEach((c,i)=>{
+      const cx2=x0+i*(cw+gapx), on=(i===X.sel);
+      px(cx2, y0, cw, 13, on? 'rgba(255,150,200,.24)' : 'rgba(255,255,255,.05)');
+      px(cx2, y0, cw, 1, on? '#ff9ad8' : 'rgba(255,255,255,.14)');
+      px(cx2, y0+12, cw, 1, on? '#ff9ad8' : 'rgba(255,255,255,.09)');
+      px(cx2, y0, 1, 13, on? '#ff9ad8' : 'rgba(255,255,255,.09)');
+      px(cx2+cw-1, y0, 1, 13, on? '#ff9ad8' : 'rgba(255,255,255,.09)');
+      pixelText(c.key+' '+String(c.name).replace('TAKE THE UPPER OFF','UPPER OFF')
+                                        .replace('LOOK AT IT TOO','LOOK TOO')
+                                        .replace('A HAND ON IT','A HAND')
+                                        .replace('LEAVE HER TO IT','LEAVE IT')
+                                        .replace('GO — AND THE UPPER IS OFF','GO ❦'),
+        cx2+cw/2, y0+4, on? '#fff' : '#b8a898', 0.50);
+    });
+    const selc=M[clamp(X.sel,0,M.length-1)];
+    if(selc) pixelText(selc.note, W/2, y0+18, 'rgba(230,210,240,.78)', 0.52);
+    pixelText('A / D  ·  SPACE', W/2, y0+26, 'rgba(200,180,200,.46)', 0.46);
+    ctx.textAlign='left';
+  }
 }
 function drawRkPress(){
   const D=DM, X=D.press; if(!X) return;
@@ -23414,7 +23826,7 @@ function drawArdor(){
 function ardorBlockedWhy(){
   const D=DM; if(!D) return '';
   if(D.scene) return 'busy';
-  if(D.slap||D.rslap||D.press) return 'wait';
+  if(D.slap||D.rslap||D.press||D.curio) return 'wait';
   if(D.tempt) return 'she is busy';
   if(D.husb) return 'crossing over';
   if(D.drop) return 'hands full';
@@ -24576,7 +24988,7 @@ function romanticSelf(){
    two of them are no.
    ===================================================================== */
 function askToBend(){
-  const D=DM; if(!D || D.rslap || D.scene || D.press) return false;
+  const D=DM; if(!D || D.rslap || D.scene || D.press || D.curio) return false;
   if(!G.married || !G.wife || !ADULT) return false;
   D.bendAsk={ t:0, x:D.wifeX, said:pick(bendAskLines()) };
   try{ sfx('ui'); }catch(e){}
@@ -26660,6 +27072,7 @@ function drawDomus(){
       // HE walks the halls too now, on his own measurements
       if(D.rslap){ drawRomantic(); }                    // the other kind of reminder
       else if(D.press){ /* ◆ the press draws BOTH of them, backs to the room */ }
+      else if(D.curio){ /* 🔎 and so does the curious one */ }
       else if(D.slap){ drawSlap(); }                    // she is being reminded you are in the room
       else if(D.tempt){ drawTempt(); }                  // she is busy with the low shelf
       else if(D.rise){ /* the rise draws him where HE is */ }
@@ -26680,7 +27093,7 @@ function drawDomus(){
        a transform that never unwound. It goes first now. */
     const _busyRefs=(()=>{ const r=roomsOccupiedToday();
       return Object.keys(r).map(x=>r[x].ref); })();
-    for(const k of ((D.rslap||D.press)? [] : (D.kids||[]))){
+    for(const k of ((D.rslap||D.press||D.curio)? [] : (D.kids||[]))){
       if(k.gone) continue;                                          // sent to the kitchen and gone
       /* AND NOT IF THEY ARE BEHIND A DOOR. The bedchamber said "Gaius &
          Livia — OCCUPIED" while Gaius was visibly standing in the middle of
@@ -26712,6 +27125,7 @@ function drawDomus(){
     if(D.husb) drawHusbandMove();                       // he crossed the room without being asked
     if(D.bendAsk) drawBendAsk();                        // and this is him asking
     if(D.drop) drawDrop();                              // the floor, her, and him crossing to it
+    if(D.curio) drawCurio();                            // 🔎 she is looking at something
     if(D.press) drawRkPress();                          // ◆ the crossing, the contact and the hold
     if(D.ardor) drawArdor();                            // 🏛 and it is your own fault this time
     if(D.kidWalk) drawKidWalk();                        // and so is somebody else's husband
@@ -26723,7 +27137,7 @@ function drawDomus(){
        standing in the middle of somebody else's bedchamber at full
        brightness, which is exactly the "leftover model" it looked like. */
     if(D.climb) drawClimb();                            // he is on the flight, between storeys
-    else if(!D.peek && !D.rslap && !D.press && !D.husb && !D.ardor && !D.escort && !(D.rise && D.rise.ph!=='build')
+    else if(!D.peek && !D.rslap && !D.press && !D.curio && !D.husb && !D.ardor && !D.escort && !(D.rise && D.rise.ph!=='build')
        && !(D.drop && D.drop.ph!=='fall')){ const mv=(held.a||held.d), run=mv&&held.s, turning=(D.turn||0)>0;
       const pfy=domusFloorY();                          // the gallery is a floor too
       drawDomusPlayer(D.x,pfy,
@@ -26761,7 +27175,7 @@ function drawDomus(){
     /* THE ARDOR PRINTS ITS OWN. Its place menu sits along the bottom of the
        screen, and the ordinary near-the-wife prompt was drawing straight
        through it — two different sets of key hints in the same six pixels. */
-    if(D.ardor || D.press) prompt='';
+    if(D.ardor || D.press || D.curio) prompt='';
     else if(D.drop && D.drop.ph==='fall' && Math.abs(D.x-D.drop.x)<16) prompt='SPACE: 🪮 STOOP FOR IT   ·   F: 🍑 …OR FAKE IT';
     else if(D.drop && D.drop.ph==='fall') prompt='F: 🍑 BEND FOR NOTHING AT ALL';
     else if(nearStairs()) prompt='↑ (ARROW UP): CLIMB TO THE GALLERY';
@@ -26787,7 +27201,7 @@ function drawDomus(){
       prompt='SPACE: '+((G.slapCount||0)>=slapCap()&&G.slapDay===G.day? '👋 '+slapLabel('spentShort') : slapLabel('hand'))
              +'  ·  W: '+slapLabel('romantic')+(loveLeft('quick')<=0?' (spent)':'');
     // upstairs already printed its own line — the hall's prompts do not apply
-    const _pw=(D.ardor||D.floor||D.press)? 0 : watchersPresent(privacyTier()==='strict');
+    const _pw=(D.ardor||D.floor||D.press||D.curio)? 0 : watchersPresent(privacyTier()==='strict');
     if(_pw && privacyTier()!=='easy' && !villaClear())
       prompt = 'E: '+(privacyTier()==='strict'?'🕯 CLEAR THE WHOLE VILLA':'🚸 CLEAR THE HALL')
              +' ('+_pw+' watching)'+(prompt?'   ·   '+prompt:'');
@@ -26795,7 +27209,7 @@ function drawDomus(){
       prompt = (prompt||'') + (prompt?'   ·   ':'') + '🚸 the hall is yours';
     /* THE HOUSE IS BIG ENOUGH. There ARE people under this roof — they are
        simply too far away to mind. Worth saying, or the money is invisible. */
-    else if(!D.ardor && !D.floor && !D.press && privacyTier()!=='easy' && !villaClear()
+    else if(!D.ardor && !D.floor && !D.press && !D.curio && privacyTier()!=='easy' && !villaClear()
             && watchersAbsorbed(privacyTier()==='strict')>0)
       prompt = (prompt||'') + (prompt?'   ·   ':'')
              + '🏛 '+discretionTier().name.toLowerCase()+' — nobody is near enough to mind';
@@ -30112,6 +30526,26 @@ function openTheTen(tab){
         t.onclick=()=>{ if(!PO.ok){ toast(PO.why||'Not here.',3400); return; }
           toast('◆ Close this and press J in the hall — the crossing is the act and it wants a hall to cross.',5200); };
         d.appendChild(t); } }
+    /* ---- THE CURIOUS ONE, which is a trait and not an office ---- */
+    { const has=!!(w && w.traits && w.traits.indexOf('curious')>=0);
+      card('<div style="color:#7ad08a;letter-spacing:1px"><b>🔎 '+RK_CURIO.name+'</b>'
+        +' <span class="small muted">— a trait of this coast and nowhere else</span></div>'
+        +'<div class="small" style="margin-top:3px;line-height:1.55">'+RK_CURIO.what+'</div>'
+        +'<div class="small" style="margin-top:4px;line-height:1.55"><b style="color:#e8c34a">The rule:</b> '+RK_CURIO.rule+'</div>'
+        +'<div class="small muted" style="margin-top:4px;line-height:1.55">'
+        +'Rome has <b>🍑 Tempting</b>, which is a performance: the low shelf, the pause, and the whole game is whether he is '
+        +'caught looking. This is built the other way round and it is why it belongs here — she is not performing, she is '
+        +'<i>absorbed</i>, and a coast that seats an office on the seat has no vocabulary for being embarrassed about what '
+        +'that leaves pointing at the room.</div>'
+        +'<div class="small" style="margin-top:5px;line-height:1.7">'
+        +'<span style="color:'+(has?'var(--gold)':'#7a6a58')+'">'+(has?'◈':'·')+' '
+        +(has? ((w.name||'She').split(' ')[0]+' has it.') : 'Nobody in this house has it.')+'</span>'
+        +(has? '<br><span class="muted">It comes up on its own in the hall. Five rungs, each once, and you may stop at any '
+              +'of them — including <b style="color:#7ad08a">◎ LOOK AT IT TOO</b>, which is worth more bond than any of the '
+              +'others and is not a joke.</span>' : '')
+        +'<br><span class="muted">Seen: <b style="color:#7ad08a">'+(G.curioSeen|0)+'</b>'
+        +' · went all the way: <b style="color:#ff8ad0">'+(G.curioWoohoo|0)+'</b></span>'
+        +'</div>', has? 'var(--gold)' : '#7ad08a'); }
     /* ---- AND THE ONE THAT IS NOT AN ULVIK AT ALL ---- */
     { const A=rkSivrakAsk();
       const on=(typeof rkSivrakOn==='function') && rkSivrakOn('wife');
@@ -34216,7 +34650,7 @@ function climbStairs(){
   const D=DM; if(!D) return false;
   if(D.climb) return false;                     // he is already on the treads
   if(!nearStairs()) return false;
-  if(D.scene||D.slap||D.rslap||D.tempt||D.husb||D.drop||D.rise||D.ardor||D.press||D.escort) return false;
+  if(D.scene||D.slap||D.rslap||D.tempt||D.husb||D.drop||D.rise||D.ardor||D.press||D.curio||D.escort) return false;
   /* THE FLIGHT IS ACTUALLY CLIMBED NOW. This used to flip D.floor and put
      you on the other storey in the same frame — the one bit of movement in
      the house that simply teleported. */
@@ -34359,7 +34793,7 @@ function kidWalkEligibleRooms(){
 function kidWalkDue(){
   const D=DM; if(!D) return false;
   if(D.kidWalk || D.escort || D.scene || D.slap || D.rslap || D.tempt
-     || D.husb || D.drop || D.rise || D.ardor || D.press) return false;
+     || D.husb || D.drop || D.rise || D.ardor || D.press || D.curio) return false;
   if(!kidWalkEligibleRooms().length) return false;
   if((D.t||0) - (D.lastKidWalkT===undefined? -9999 : D.lastKidWalkT) < 500) return false;
   return Math.random() < 0.006;
@@ -44780,6 +45214,8 @@ window.__SS = {
   rkSeatAsked, rkSeatAskVerdict, rkSeatYield,
   RK_WORK_TITLES, RK_WORK_BY_ID, rkIsWorkSeat, rkWorkScore, rkWorkTitle,
   rkBackBones, drawRkBack, drawRkBehindHim,
+  RK_CURIO, curioOn, curioReady, curioDue, startCurio, curioMenu, curioTake,
+  curioResolve, updateCurio, drawCurio,
   rkSivrakAsk, rkSivrakVerdict, rkSivrakWear, sivrakLeaf,
   RK_HUSB_TITLES, RK_HUSB_TITLE_BY_ID, RK_SEATING_FEE, rkSeats, rkSeatClaim, rkSeatTake,
   rkSeatTitle, rkSeatSubject, rkMeasure, rkSeatHeldBy, rkMyTitle, rkSpouseTitle,
