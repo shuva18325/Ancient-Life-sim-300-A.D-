@@ -22716,7 +22716,11 @@ function tryRkPress(){
   if(D.slap||D.rslap){ toast('One thing at a time — that has not landed yet.',2200); return; }
   if(D.tempt){ toast('She is already busy on the low shelf. See how THAT goes first.',2600); return; }
   if(D.husb||D.drop||D.rise||D.ardor){ toast('Something is already happening in this hall.',2400); return; }
-  D.press={ph:'cross', t:0, x:D.wifeX, sparks:[], locks:true};
+  /* THE FIRST BEAT IS THE SIGNAL, and if it is already standing the beat
+     is short rather than absent — you still see what you are signalling. */
+  const up=(typeof rkStandOn==='function') && rkStandOn();
+  D.press={ph:'signal', t:0, x:D.wifeX, sparks:[], locks:true, stand:up?1:0, was:up,
+           side:(D.x<=D.wifeX)? -1 : 1};
   D.wifePause=99999;
   try{ sfx('ui'); }catch(e){}
 }
@@ -22724,12 +22728,27 @@ function updateRkPress(dt){
   const D=DM, X=D.press; if(!X) return;
   X.t+=dt;
   shimmyTick(dt);
-  if(X.ph==='cross'){
+  if(X.ph==='signal'){
+    /* ---- HE STANDS IT UP, and the kilt is cut so that this is the signal
+       rather than a private fact. It comes up over the beat instead of
+       snapping, because a sprite that snaps reads as a bug. ---- */
+    X.locks=true;
+    const dur=X.was? 26 : 74;
+    X.stand=clamp(X.was? 1 : (X.t/dur), 0, 1);
+    if(!X.raised && X.stand>=0.55){
+      X.raised=true;
+      if(!rkStandOn()){ try{ rkStand(); }catch(e){} }
+      try{ sfx('ui'); }catch(e){}
+      D.hearts.push({x:D.x, y:190, vy:0.45, life:34, c:'#ffb45b'});
+    }
+    if(X.t>dur){ X.ph='cross'; X.t=0; }
+  }
+  else if(X.ph==='cross'){
     X.locks=true;
     /* he crosses. Not instantly — the crossing IS the act on this coast
        and cutting it would be cutting the thing the office is named for. */
     const side=(D.x<=D.wifeX)? -1 : 1;
-    const want=D.wifeX+side*13;
+    const want=D.wifeX+side*3;
     D.x += clamp(want-D.x, -2.1*dt, 2.1*dt);
     if(Math.abs(D.x-want)<1.6 || X.t>150){
       D.x=want; X.ph='press'; X.t=0; X.side=side;
@@ -22758,6 +22777,20 @@ function updateRkPress(dt){
   }
   else if(X.ph==='held'){
     X.locks=true;
+    /* ---- THE RUB. A held press that does not move is a photograph; the
+       coast's own word for the beat is about keeping it there, and keeping
+       something there is an action. It drives her spring on every stroke,
+       so the aftermath is her tier and not a constant. ---- */
+    X.rub = Math.sin(X.t*0.13)*(1 + ((X.tier&&X.tier.be)||5)*0.11);
+    if(!X.nextStroke || X.t>=X.nextStroke){
+      X.nextStroke = X.t + 24;
+      try{ shimmyStart(G.wife, 0.30+(((X.tier&&X.tier.i)||0)*0.05)); }catch(e){}
+      try{ slapKick(0.20+(((X.tier&&X.tier.be)||5)*0.020)); }catch(e){}
+      if(((X.t/24)|0)%3===0){ try{ sfx('kiss'); }catch(e){} }
+      if(((X.t/24)|0)%2===0)
+        D.hearts.push({x:D.wifeX+rnd(-7,7), y:214-44, vy:0.30+Math.random()*0.22,
+                       life:60, c:'#ff9ad8'});
+    }
     /* AND IT STAYS. Nothing is being taken back, so the hold does not end
        on a counter — it ends when she has stopped moving, exactly as the
        romantic slap does, and for the same reason. */
@@ -22781,6 +22814,194 @@ function updateRkPress(dt){
   if(X.sparks) X.sparks.forEach(p=>{ p.t+=dt; p.x+=p.vx*dt; p.y+=p.vy*dt;
     p.vy+=0.011*dt; p.vx*=Math.pow(0.966,dt); });
 }
+/* =====================================================================
+   THE PRESS PAIR — two sprites built for one pose
+   ---------------------------------------------------------------------
+   Both are drawn BACK TO THE ROOM on one shared skeleton, because the
+   only way two overlapping figures read at forty-six pixels is if they
+   are laid out to the same bone lengths and then differ where bodies
+   actually differ. He is two pixels taller so his head clears hers; his
+   shoulders are wider and his hips narrower; her seat is the feature and
+   is built on the same five rungs the body map and the shadow-play use,
+   so a FLAT tier and a COLOSSAL one are visibly not the same sprite.
+
+   Depth is drawn, not implied: he steps down in value as he closes (he
+   is in her shadow), she carries a hard rim down the edge he is on, and
+   his forearm is painted ON her at the end. Those three marks are what
+   turn two silhouettes into one pose.
+   ===================================================================== */
+function rkBackBones(FY, lg, be, wa, tall){
+  const legLen = 13 + Math.round(lg*0.45) + (tall?4:0);
+  const hipY   = FY - legLen;
+  const seatH  = 5 + Math.round(be*0.32);
+  const seatY  = hipY - seatH;
+  const waistY = seatY - 6;
+  const shY    = waistY - (tall? 14 : 10);
+  const headH  = 8, headY = shY - headH;
+  return {legLen, hipY, seatH, seatY, waistY, shY, headH, headY,
+          waistW: 3.0 + (10-wa)*0.15 + (tall?2.4:0)};
+}
+/* ---- HER ---- */
+function drawRkBack(x, FY, w, o){
+  o=o||{};
+  const B=(w&&w.body)||{}, gv=(id,d)=>B[id]===undefined?d:B[id];
+  const be=gv('booty',5), lg=gv('legs',5), wa=gv('waist',5), hq=gv('hairq',5);
+  const skin=(w&&w.skin)||'#e6bd94', hi=shade(skin,18), sh=shade(skin,-24), deep=shade(skin,-42);
+  const hair=mixHex((w&&w.hair)||'#3a2412','#1a1006',0.35), hHi=shade(hair,22), hSh=shade(hair,-30);
+  const dress=(w&&w.dress)||'#8a2f4a', dHi=shade(dress,24), dSh=shade(dress,-34);
+  const band=(typeof rkOfficeBand==='function')? rkOfficeBand(w) : '#8a6a3a';
+  const give=o.give||0, RIM=o.rim||0;
+  const P=(a,b,ww,h,c)=>px(Math.round(x+a),Math.round(b),Math.max(1,Math.round(ww)),Math.max(1,Math.round(h)),c);
+  const K=rkBackBones(FY, lg, be, wa, false);
+  const bT = be>=9?4 : be>=7?3 : be>=5?2 : be>=3?1 : 0;
+  const seatW = 4.6 + be*0.48;                       // HALF width: 5.1 .. 9.4
+  const shWid = K.waistW + 2.2;
+  /* ---- legs, set under the seat rather than under the shoulders ---- */
+  { const lw=2.6+lg*0.10, inner=seatW*0.30;
+    P(-inner-lw, K.hipY, lw, K.legLen, skin);
+    P( inner,    K.hipY, lw, K.legLen, sh);
+    P(-inner-lw, K.hipY, 1,  K.legLen, hi);
+    P(-inner-lw-0.4, FY-2, lw+1.4, 2, '#6a4a2c');
+    P( inner-0.4,    FY-2, lw+1.4, 2, '#6a4a2c'); }
+  /* ---- THE SEAT. Two masses on the five-rung ladder, and the near one
+     gives where he meets it. ---- */
+  { const cy=K.seatY+K.seatH*0.52, rh=K.seatH*0.92;
+    const nearX=-seatW*0.50+give*0.6, farX=seatW*0.50;
+    const rw=seatW*0.58;
+    const blob=(cx2,cy2,a,b,c)=>{ for(let yy=-Math.round(b);yy<=Math.round(b);yy++){
+        const t=yy/b, hw=a*Math.sqrt(Math.max(0,1-t*t));
+        if(hw>0.4) P(cx2-hw, cy2+yy, hw*2, 1, c); } };
+    blob(nearX, cy, rw*(1-give*0.09), rh, skin);
+    blob(farX,  cy, rw, rh, shade(skin,-7));
+    blob(nearX-rw*0.30, cy-rh*0.36, rw*0.46, rh*0.38, hi);      // the lit crown of it
+    if(bT>=3){ blob(nearX, cy+rh*0.66, rw*0.70, rh*0.28, sh);   // and the weight, hanging
+               blob(farX,  cy+rh*0.66, rw*0.70, rh*0.28, deep); }
+    P(-0.6, K.seatY+1, 1.2, K.seatH+1, deep);                    // the cleft
+    if(bT>=2) P(-1.1, K.seatY+2, 2.2, K.seatH-1, mixHex(deep,'#000000',0.34)); }
+  /* ---- the ulvik: short, and the belt carries the office ---- */
+  { const hemH=Math.max(4, K.seatY-K.waistY+4);
+    for(let i=0;i<hemH;i++){ const hw=K.waistW+1.4+i*0.34;
+      P(-hw, K.waistY+i, hw*2, 1, i<2? dHi : (i%3===2? dSh : dress)); }
+    const bw=K.waistW+1.6;
+    P(-bw, K.waistY-3, bw*2, 3, band);
+    P(-bw, K.waistY-3, bw*2, 1, mixHex(band,'#ffffff',0.36));
+    P(-bw, K.waistY-1, bw*2, 1, mixHex(band,'#120a06',0.42));
+    for(let q=0;q<bw*2;q+=3) P(-bw+q, K.waistY-2, 1, 1, mixHex(band,'#ffffff',0.22)); }
+  /* ---- back and shoulders ---- */
+  { const rows=K.waistY-K.shY;
+    for(let i=0;i<rows;i++){ const t=i/(rows-1), hw=shWid*(1-t*0.10)+t*0.8;
+      P(-hw, K.shY+i, hw*2, 1, i<2? dHi : (i%4===3? dSh : dress)); }
+    P(-0.6, K.shY+2, 1.2, rows-3, dSh);
+    P(-shWid-1.6, K.shY+2, 2.0, rows-3, skin);                  // arms, forward and braced
+    P( shWid-0.4, K.shY+2, 2.0, rows-3, sh); }
+  /* ---- the rim he casts down her, drawn before the head so the head
+     keeps its own edge ---- */
+  /* HE IS DIRECTLY BEHIND HER, so the shadow he throws is not down one
+     side of her — it is round the whole of her outline, which is what
+     separates two concentric silhouettes. */
+  if(RIM){ for(let yy=K.shY; yy<FY-2; yy++){
+      const w2 = yy>=K.seatY? seatW*1.02 : (yy>=K.waistY? K.waistW+2.0 : shWid+0.6);
+      P(-w2, yy, 1.2, 1, 'rgba(22,10,6,.46)');
+      P( w2-1.2, yy, 1.2, 1, 'rgba(22,10,6,.46)'); } }
+  /* ---- head, and the plaits that are the index ---- */
+  { const hw=3.4, hy=K.headY;
+    P(-hw, hy, hw*2, K.headH, skin); P(-hw, hy, hw*2, 1, hi);
+    P(hw-1, hy+1, 1, K.headH-2, sh);
+    P(-hw-0.6, hy-2, hw*2+1.2, 3, hair); P(-hw-0.6, hy-2, hw*2+1.2, 1, hHi);
+    /* one plait per settlement she is holding, worn over the shoulder where
+       it can be counted — and it is an index, so it is drawn thin */
+    const n=clamp(2+Math.round(hq*0.24),2,4), fall=Math.round(6+hq*0.70);
+    for(let i=0;i<n;i++){ const px2=-hw+1.0+i*((hw*2-2.4)/Math.max(1,n-1));
+      P(px2, hy+3, 1, fall, i===0? hHi : hair);
+      for(let y=3;y<fall;y+=4) P(px2, hy+3+y, 1, 1, hSh); }
+    P(-hw+0.4, hy+3, hw*2-0.8, 1.4, hair);                       // the gather at the nape
+    P(-hw+1.0, hy+3+fall, hw*2-2.4, 1, hSh); }
+}
+/* ---- HIM. Same bones, two pixels taller, and the signal is the point. ---- */
+function drawRkBehindHim(x, FY, o){
+  o=o||{};
+  const len=(typeof ardorLen==='function')? ardorLen() : 5;
+  const B=(G&&G.body)||{}, gvm=(id,d)=>B[id]===undefined?d:B[id];
+  const stand=clamp(o.stand||0,0,1), press=clamp(o.press||0,0,1);
+  const dk=0.34*press;                                   // he is in her shadow as he closes
+  const skin=mixHex((G&&G.skin)||'#caa06a','#1a0e08',dk), hi=shade(skin,18), sh=shade(skin,-26);
+  const hair=mixHex((G&&G.hairCol)||'#2a1a0e','#120a06',dk);
+  const SVK=o.leaf;
+  const HID=mixHex(SVK? '#3f6c2c' : mixHex((G&&G.tunic)||'#6a4a2e','#4a3826',0.42), '#1a0e08', dk);
+  const HHI=mixHex(HID,'#ffffff',0.24), HSH=mixHex(HID,'#120a06',0.44);
+  const band=mixHex((typeof rkOfficeBand==='function')? rkOfficeBand(G&&G.wife) : '#8a6a3a','#1a0e08',dk);
+  const P=(a,b,ww,h,c)=>px(Math.round(x+a),Math.round(b),Math.max(1,Math.round(ww)),Math.max(1,Math.round(h)),c);
+  const K=rkBackBones(FY, gvm('legs',5), 4, gvm('waist',5), true);
+  const shWid=K.waistW+3.4;
+  /* legs first, then the hide over them — the house cut's own order, and
+     for the same reason: hide drawn first makes a skirt, not a body */
+  { const lw=3.0, inner=1.2;
+    P(-inner-lw, K.hipY, lw, K.legLen, skin);
+    P( inner,    K.hipY, lw, K.legLen, sh);
+    P(-inner-lw, K.hipY, 1,  K.legLen, hi);
+    P(-inner-lw-0.4, FY-2, lw+1.4, 2, '#5a3c22');
+    P( inner-0.4,    FY-2, lw+1.4, 2, '#5a3c22'); }
+  /* ---- the kilt: short, moulded, and cut so the office is legible ---- */
+  const beltY=K.waistY;
+  { const kl=Math.max(5, K.seatY-K.waistY+4);
+    for(let i=0;i<kl;i++){ const hw=K.waistW+1.2+i*0.30;
+      P(-hw, beltY+i, hw*2, 1, i<2? HHI : (i%3===2? HSH : HID)); } }
+  /* ---- IT. The signal, four tones across so it is a cylinder and not a
+     stripe, hanging at stand 0 and out-and-up at stand 1. ---- */
+  { /* HARD contrast, because this is drawn ON the kilt rather than against
+       bare leg — the house cut's own palette vanishes into the hide here. */
+    const MID=SVK?'#3a6a28':shade(HID,-4),  MLT=SVK?'#6faa44':shade(HID,40),
+          MHI=SVK?'#9fd070':shade(HID,86),  MSH=SVK?'#1a3a12':shade(HID,-62);
+    const moulded=(xx,yy,hw)=>{ for(let q=-hw;q<hw;q++){
+        const u=(q+hw)/Math.max(1,hw*2-1);
+        P(xx+q, yy, 1, 1, (u<0.22)? MHI : (u<0.58)? MLT : (u<0.86)? MID : MSH); } };
+    const ml=Math.round(4+len*0.55), mw=Math.max(1,Math.round(1+len*0.16));
+    const y0=beltY+3;
+    for(let i=0;i<ml;i++){
+      const t=i/Math.max(1,ml-1);
+      const hw=Math.max(1, Math.round((mw+1)*(1.0-t*0.16)));
+      const hang = y0 + t*ml*0.9;                              // straight down, at rest
+      const outY = y0 - t*(2.4+len*0.34)*(1-press*0.30);       // and up, once it is the signal
+      const outX = 1 + t*(2.0+len*0.52)*(1-press*0.78);
+      const xx = Math.round(stand*outX + (1-stand)*1.2);
+      const yy = Math.round(stand*outY + (1-stand)*hang);
+      /* a dark rim first, so it is cut out of the hide rather than blended
+         into it — one pixel all round is the whole difference at this size */
+      P(xx-hw-1, yy-1, hw*2+2, 1, MSH);
+      P(xx-hw-1, yy,   1,      1, MSH);
+      P(xx+hw,   yy,   1,      1, MSH);
+      moulded(xx, yy, hw);
+      P(xx-hw, yy+hw, hw*2, 1, MSH);
+      if(SVK && (i%3===1)){ P(xx-hw, yy, hw*2, 1, '#8a7a3a'); P(xx-hw, yy, 1, 1, '#c0ac60'); }
+    }
+    /* AND THE TIP, which is what the eye actually tracks */
+    if(stand>0.25 && press<0.5){ const t=1, hw=Math.max(1,mw);
+      const tx=Math.round(1 + t*(2.0+len*0.52)*(1-press*0.78));
+      const ty=Math.round(y0 - t*(2.4+len*0.34)*(1-press*0.30));
+      P(tx-hw, ty-1, hw*2+1, 1, MSH);
+      P(tx-hw+1, ty, hw*2-1, 1, MHI); } }
+  /* the belt, which carries the house's Mastery and takes the strain */
+  { const bw=K.waistW+1.4;
+    P(-bw, beltY-3, bw*2, 3, band);
+    P(-bw, beltY-3, bw*2, 1, mixHex(band,'#ffffff',0.34));
+    P(-bw, beltY-1, bw*2, 1, mixHex(band,'#120a06',0.40)); }
+  /* ---- back, shoulders, head ---- */
+  { const rows=beltY-K.shY;
+    for(let i=0;i<rows;i++){ const t=i/(rows-1), hw=shWid*(1-t*0.20);
+      P(-hw, K.shY+i, hw*2, 1, i<2? hi : (i%5===4? sh : skin)); }
+    P(-0.6, K.shY+3, 1.2, rows-5, sh);                          // the spine
+    { const bl=Math.max(2,Math.round(shWid*0.40));               // shoulder blades
+      P(-shWid*0.62, K.shY+3, bl, 1, sh); P(shWid*0.62-bl, K.shY+3, bl, 1, sh); }
+    P(-shWid-2.0, K.shY+2, 2.4, rows-3, skin);
+    P( shWid-0.4, K.shY+2, 2.4, rows-3, sh); }
+  { const hw=3.8, hy=K.headY;
+    P(-hw, hy, hw*2, K.headH, skin); P(-hw, hy, hw*2, 1, hi);
+    P(hw-1.2, hy+1, 1.2, K.headH-2, sh);
+    P(-hw-0.6, hy-2.4, hw*2+1.2, 3.4, hair);
+    P(-hw-0.6, hy-2.4, hw*2+1.2, 1, shade(hair,26));
+    for(let i=0;i<4;i++) P(-hw+0.4+i*1.9, hy-2.4, 1, 2.6, shade(hair,-28)); }
+  return {shW:shWid, beltY, hipY:K.hipY, seatY:K.seatY, headY:K.headY};
+}
 function drawRkPress(){
   const D=DM, X=D.press; if(!X) return;
   const FY=214, T=X.t, w=G.wife, PX=D.wifeX;
@@ -22790,38 +23011,112 @@ function drawRkPress(){
   { const g=ctx.createRadialGradient(PX,FY-34,6,PX,FY-34,78);
     g.addColorStop(0,'rgba(255,190,170,'+(0.16+heat*0.16)+')');
     g.addColorStop(1,'rgba(0,0,0,0)'); ctx.fillStyle=g; ctx.fillRect(0,60,W,H-60); }
-  /* SHE IS NOT BENT OVER FOR THIS ONE. She takes it standing, which is
-     what the coast says about it and is also the whole difference between
-     this beat and the other one — so she is drawn upright, on her own
-     spring, turned to whichever side he came from. */
-  let k=0;
-  if(X.ph==='cross') k=clamp(T/110,0,1)*0.28;
-  else if(X.ph==='press') k=0.28+clamp(T/76,0,1)*0.34;
-  else k=0.62;
-  try{ drawRomanticFig(PX, FY, w, k, T, false); }catch(e){}
-  /* HIM, arriving. In the cross he is still walking; from contact on he is
-     against her and the moulded cut is doing the talking. */
+  /* ---- BOTH BACKS TO THE ROOM, which is the only way this beat draws.
+     He is BEHIND her, so he is the back layer and she is painted over him;
+     what shows at the join is exactly what the gesture is about. ---- */
   const side=X.side||((D.x<=PX)? -1 : 1);
-  const lean = X.ph==='cross'? 0 : (X.ph==='press'? clamp(T/26,0,1)*3.4 : 3.4);
-  const hx = X.ph==='cross'? D.x : (PX + side*(13 - lean));
-  try{ drawVillaMale(hx, FY, Math.min(T+(X.ph==='cross'?0:120),300), Math.max(0,lean*0.5), 0, -0.35*side); }catch(e){}
-  /* THE CONTACT BAND — the moment, and only the moment. */
-  if(X.ph==='press' && T<26){
-    const a=1-T/26;
-    ctx.globalAlpha=0.60*a; ctx.fillStyle='#efe6d6';
-    ctx.fillRect(Math.round(PX+side*10-8), Math.round(FY-32), 16, 7);
-    ctx.globalAlpha=0.28*a; ctx.fillRect(Math.round(PX+side*10-11), Math.round(FY-31), 22, 5);
-    ctx.globalAlpha=1;
-    for(let i=0;i<10;i++){ const a2=(i/10)*6.283, r=3+(1-a)*15;
-      ctx.globalAlpha=a; px(PX+side*8+Math.cos(a2)*r, FY-30+Math.sin(a2)*r*0.56, 2,2,'#fff0dc'); }
+  const pressK = X.ph==='press'? clamp(T/40,0,1) : (X.ph==='held'? 1 : 0);
+  const give   = pressK*(0.55+((w&&w.body&&w.body.booty)||5)*0.045);
+  /* how far behind her he is: a whole body away in the signal, closing
+     through the cross, and against her from contact on */
+  /* BEHIND HER, which means very nearly ON her centre line — he is the
+     taller and wider of the two, so what shows is his head over her
+     shoulder and his arms round either side of her, which is the whole
+     read. Standing him off to one side made it a queue. */
+  const gap = X.ph==='signal'? 32
+            : X.ph==='cross' ? Math.max(3, 32 - clamp(T/110,0,1)*29)
+            : 3 - pressK*1.2;
+  const hx = X.ph==='signal'? (PX + side*30)
+           : X.ph==='cross' ? D.x
+           : (PX + side*gap);
+  /* THE STROKE. He moves with it, she moves on her own spring, and the
+     contact slides — three things on one sine, which is what makes it a
+     motion rather than a picture of one. */
+  const rub=(X.ph==='held')? (X.rub||0) : 0;
+  let HM=null;
+  try{ HM=drawRkBehindHim(hx+rub*0.55, FY-Math.abs(rub)*0.42,
+        {stand:X.stand||0, press:pressK,
+         leaf:(typeof rkSivrakOn==='function' && rkSivrakOn('self'))}); }catch(e){}
+  try{ drawRkBack(PX, FY, w, {give, rim: pressK>0? side : 0}); }catch(e){}
+  /* ---- WHERE IT MEETS HER, painted ON her. Between two bodies it is
+     hidden, which is true and also hides the entire subject of the beat —
+     so the near end of it is drawn over her seat, pressed in, with her own
+     tone giving round it. This is the mark the gesture is named for. ---- */
+  if(pressK>0.05 && HM){
+    const CK=rkBackBones(FY, (w&&w.body&&w.body.legs)||5, (w&&w.body&&w.body.booty)||5,
+                             (w&&w.body&&w.body.waist)||5, false);
+    const be2=((w&&w.body&&w.body.booty)||5);
+    const seatW2=4.6+be2*0.48, sk2=(w&&w.skin)||'#e6bd94';
+    const len2=(typeof ardorLen==='function')? ardorLen() : 5;
+    const HIDc=mixHex((G&&G.tunic)||'#6a4a2e','#4a3826',0.42);
+    const leaf=(typeof rkSivrakOn==='function' && rkSivrakOn('self'));
+    const M2=leaf?'#4a7a30':shade(HIDc,-4), MH2=leaf?'#9fd070':shade(HIDc,86),
+          MS2=leaf?'#1a3a12':shade(HIDc,-62);
+    const cy=CK.seatY+Math.round(CK.seatH*0.42)+Math.round(rub*0.55);
+    const th=Math.max(2, Math.round(1.6+len2*0.18));
+    const into=Math.round((2.2+len2*0.24)*pressK + Math.abs(rub)*0.5);
+    /* he is BEHIND her now, so it enters at the cleft rather than at an
+       edge — which is where the gesture actually puts it */
+    const x0 = Math.round(PX - into*0.5 + rub*0.45);
+    ctx.globalAlpha=clamp(pressK*1.6,0,1);
+    /* the hide gives round it — a darker crescent in her own tone first */
+    px(Math.round(x0-(side<0?1:0)), cy-th-1, into+2, th*2+3, mixHex(sk2,'#7a4a3e',0.34));
+    /* then the thing itself, moulded, ending in the seat */
+    for(let q=-th;q<=th;q++){
+      const u=(q+th)/Math.max(1,th*2);
+      px(x0, cy+q, into+1, 1, (u<0.26)? MH2 : (u<0.70)? M2 : MS2);
+    }
+    px(x0, cy-th-1, into+1, 1, MS2);
+    px(x0, cy+th+1, into+1, 1, MS2);
     ctx.globalAlpha=1;
   }
+  /* ---- HIS HAND ON HER HIP, painted ON her. Everything else in this
+     sprite can be argued with; an arm that ends on the far side of her
+     cannot, and it is what turns two overlapping figures into one pose. ---- */
+  if(pressK>0 && HM){
+    const HK=rkBackBones(FY, (w&&w.body&&w.body.legs)||5, (w&&w.body&&w.body.booty)||5,
+                             (w&&w.body&&w.body.waist)||5, false);
+    const hs=mixHex((G&&G.skin)||'#caa06a','#1a0e08',0.10);
+    const armY=HK.waistY+3;                                   // on her hips, over the hem
+    const waW=HK.waistW+2.0;
+    const reach=Math.round(4+pressK*3);
+    ctx.globalAlpha=clamp(pressK*1.5,0,1);
+    /* BOTH FOREARMS, round either side of her, because a man standing
+       behind somebody has two arms and drawing one of them is what made
+       the pose read as standing next to her. */
+    for(const sgn of [-1,1]){
+      const x0 = sgn<0? Math.round(PX-waW-reach+1) : Math.round(PX+waW-1);
+      px(x0, armY, reach, 3, sgn<0? hs : shade(hs,-18));
+      px(x0, armY, reach, 1, shade(hs, sgn<0? 20 : 4));
+      px(x0, armY+2, reach, 1, shade(hs,-28));
+      const hxx = sgn<0? x0+reach-1 : x0-2;                   // and the hands, on her hips
+      px(hxx, armY-1, 3, 4, sgn<0? hs : shade(hs,-14));
+      px(hxx, armY-1, 3, 1, shade(hs, sgn<0? 22 : 6));
+      px(hxx, armY+2, 3, 1, shade(hs,-30));
+    }
+    ctx.globalAlpha=1;
+  }
+  /* THE CONTACT BAND — the moment, and only the moment. */
+  { const _K=rkBackBones(FY, (w&&w.body&&w.body.legs)||5, (w&&w.body&&w.body.booty)||5,
+                              (w&&w.body&&w.body.waist)||5, false);
+    const seatY=_K.seatY+Math.round(_K.seatH*0.5);
+    if(X.ph==='press' && T<26){
+      const a=1-T/26;
+      ctx.globalAlpha=0.60*a; ctx.fillStyle='#efe6d6';
+      ctx.fillRect(Math.round(PX-7), Math.round(seatY-3), 14, 6);
+      ctx.globalAlpha=0.28*a; ctx.fillRect(Math.round(PX-10), Math.round(seatY-2), 20, 4);
+      ctx.globalAlpha=1;
+      for(let i=0;i<10;i++){ const a2=(i/10)*6.283, r=3+(1-a)*14;
+        ctx.globalAlpha=a; px(PX+Math.cos(a2)*r, seatY+Math.sin(a2)*r*0.54, 2,2,'#fff0dc'); }
+      ctx.globalAlpha=1;
+    }
+    X.seatY=seatY; }
   /* AND IT IS STILL THERE. The band under the join does not flash off in
      the hold — that is the entire point of the beat. */
   if(X.ph==='held'){
     const a=clamp(1-(T-260)/140,0,1)*0.34;
     ctx.globalAlpha=a; ctx.fillStyle='#f0c8b0';
-    ctx.fillRect(Math.round(PX+side*9-9), Math.round(FY-31), 18, 6);
+    ctx.fillRect(Math.round(PX-8+(X.rub||0)*0.5), Math.round((X.seatY||FY-30)-2), 16, 5);
     ctx.globalAlpha=1;
   }
   if(X.sparks) X.sparks.forEach(p=>{ const a=clamp(1-p.t/90,0,1);
@@ -22833,7 +23128,7 @@ function drawRkPress(){
     const P=X.tier||{i:0};
     pixelText(RK_PRESS.beats[0], PX, FY-76, 'rgba(255,200,220,'+clamp(1-T/54,0,1)+')', 1.15+P.i*0.06);
   } else if(X.ph==='held'){
-    const b = T<90? RK_PRESS.beats[1] : (T<190? RK_PRESS.beats[2] : null);
+    const b = T<80? RK_PRESS.beats[1] : (T<210? RK_PRESS.beats[2] : null);
     if(b) pixelText(b, PX, FY-76, 'rgba(255,214,190,.72)', 0.92);
     if(X.res && X.res.meet && T>110 && T<300)
       pixelText('◆ TWO SEATS IN A DOORWAY', PX, FY-88, 'rgba(255,180,220,.66)', 0.70);
@@ -22841,6 +23136,13 @@ function drawRkPress(){
       pixelText('◆ TAQRUNA', PX, FY-88, 'rgba(255,180,220,.62)', 0.70);
   } else if(X.ph==='cross'){
     pixelText('◆ CROSSING THE HALL', PX, FY-82, 'rgba(255,180,220,.52)', 0.68);
+  } else if(X.ph==='signal'){
+    /* THE SIGNAL. It is not a private fact on this coast — the kilt is cut
+       so that it is legible, and being legible is the entire function. */
+    pixelText('◆ THE SIGNAL', PX+side*30, FY-82,
+      'rgba(255,180,220,'+(0.40+0.42*clamp(X.stand||0,0,1))+')', 0.74+0.30*clamp(X.stand||0,0,1));
+    if((X.stand||0)>0.8 && ((T|0)%22)<11)
+      pixelText('◆', PX+side*30, FY-94, 'rgba(255,180,220,.70)', 0.80);
   }
   ctx.textAlign='left';
 }
@@ -26335,6 +26637,7 @@ function drawDomus(){
       const wPh   = turning? tp : (moving? D.t*0.22 : D.t*0.05);
       // HE walks the halls too now, on his own measurements
       if(D.rslap){ drawRomantic(); }                    // the other kind of reminder
+      else if(D.press){ /* ◆ the press draws BOTH of them, backs to the room */ }
       else if(D.slap){ drawSlap(); }                    // she is being reminded you are in the room
       else if(D.tempt){ drawTempt(); }                  // she is busy with the low shelf
       else if(D.rise){ /* the rise draws him where HE is */ }
@@ -26355,7 +26658,7 @@ function drawDomus(){
        a transform that never unwound. It goes first now. */
     const _busyRefs=(()=>{ const r=roomsOccupiedToday();
       return Object.keys(r).map(x=>r[x].ref); })();
-    for(const k of (D.rslap? [] : (D.kids||[]))){
+    for(const k of ((D.rslap||D.press)? [] : (D.kids||[]))){
       if(k.gone) continue;                                          // sent to the kitchen and gone
       /* AND NOT IF THEY ARE BEHIND A DOOR. The bedchamber said "Gaius &
          Livia — OCCUPIED" while Gaius was visibly standing in the middle of
@@ -26398,7 +26701,7 @@ function drawDomus(){
        standing in the middle of somebody else's bedchamber at full
        brightness, which is exactly the "leftover model" it looked like. */
     if(D.climb) drawClimb();                            // he is on the flight, between storeys
-    else if(!D.peek && !D.rslap && !D.husb && !D.ardor && !D.escort && !(D.rise && D.rise.ph!=='build')
+    else if(!D.peek && !D.rslap && !D.press && !D.husb && !D.ardor && !D.escort && !(D.rise && D.rise.ph!=='build')
        && !(D.drop && D.drop.ph!=='fall')){ const mv=(held.a||held.d), run=mv&&held.s, turning=(D.turn||0)>0;
       const pfy=domusFloorY();                          // the gallery is a floor too
       drawDomusPlayer(D.x,pfy,
@@ -29532,14 +29835,27 @@ function openTheTen(tab){
       +'<div class="small muted" style="margin-top:5px">Your post: <b style="color:#bfe4f0">'+RK_RANKS[rkRankIdx()].name+'</b>'
       +' · Store: <b style="color:var(--gold)">'+(G.coin|0)+'d</b></div>', '#bfe4f0');
     [['m','♂ THE MEN’S SIX', RK_HUSB_TITLES, BODY_PARTS_M],
-     ['w','♀ THE WOMEN’S SIX', RK_WIFE_TITLES, BODY_PARTS]].forEach(([kind,head,list,parts])=>{
-      card('<div style="color:'+(kind==='m'?'#8fc0cf':'#ff8ad0')+';letter-spacing:2px"><b>'+head+'</b></div>',
-        kind==='m'?'#8fc0cf':'#ff8ad0');
+     ['w','♀ THE WOMEN’S SIX', RK_WIFE_TITLES, BODY_PARTS],
+     /* ---- AND THE FOUR THE COAST IS PROUDEST OF, which have been named on
+        this screen since it was written and have never once been seatable ---- */
+     ['m','⚒ THE FOUR YOU EARN — HIS SIDE', RK_WORK_TITLES.map(t=>rkWorkTitle('m',t.id)), BODY_PARTS_M],
+     ['w','⚒ THE FOUR YOU EARN — HERS',     RK_WORK_TITLES.map(t=>rkWorkTitle('w',t.id)), BODY_PARTS]
+    ].forEach(([kind,head,list,parts])=>{
+      const earned=/EARN/.test(head);
+      const hcol = earned? '#7ad08a' : (kind==='m'?'#8fc0cf':'#ff8ad0');
+      card('<div style="color:'+hcol+';letter-spacing:2px"><b>'+head+'</b></div>'
+        +(earned? '<div class="small muted" style="margin-top:3px;line-height:1.55">'
+            +'War, the water, the wood and the ledger. These are the four the Rkrai are proudest of and the four nobody is '
+            +'seated to for looking like anything — the measure is the WORK, computed off what this house has actually done, '
+            +'and it is stated as a number for exactly the same reason every other requirement on this coast is. '
+            +'The same three gates apply: beat the holder, clear the job, and get the other half of the house to agree.</div>' : ''),
+        hcol);
       list.forEach(T=>{
         const c=rkSeatClaim(kind,T.id);
         if(!c) return;
-        const pname=((parts.find(p=>p.id===T.part)||{}).name
-          || (T.part==='secret'? SECRET_PART.name : T.part)).toUpperCase();
+        const pname=T.workSeat? String(T.measure).toUpperCase()
+          : ((parts.find(p=>p.id===T.part)||{}).name
+             || (T.part==='secret'? SECRET_PART.name : T.part)).toUpperCase();
         const col = c.mine? '#e8c34a' : (c.ok? '#7ad08a' : '#8fc0cf');
         const d=card('<div style="color:'+col+';letter-spacing:1px"><b>'+T.title+'</b>'
           +(c.mine? ' <span class="small" style="color:var(--gold)">— YOURS</span>':'')+'</div>'
@@ -29554,6 +29870,9 @@ function openTheTen(tab){
           +c.held.name+'</b> on <b>'+c.held.v+'</b>'
           +(c.held.was? ' <span class="muted">(unseated '+c.held.was+')</span>':'')
           +' &nbsp;·&nbsp; this house measures <b style="color:'+(c.v>c.held.v?'#7ad08a':'#e0905b')+'">'+c.v+'</b></div>'
+          +(T.workSeat? '<div class="small muted" style="margin-top:2px;line-height:1.5">'
+              +'Not read off a body — read off what this house has <b style="color:#7ad08a">DONE</b>, which is why it has '
+              +'no cut of the ulvik and never will. Confusing the four with the six is the standard insult here.</div>' : '')
           /* ---- THE JOB IN IT, which is checked before the appointment ---- */
           +((c.cond && !c.cond.none)? '<div class="small" style="margin-top:5px;line-height:1.5;'
               +'padding:4px 5px;border-left:2px solid '+(c.cond.ok?'#7ad08a':'#e0905b')+'">'
@@ -29747,12 +30066,17 @@ function openTheTen(tab){
         +'<div class="small" style="margin-top:4px;line-height:1.55"><b style="color:#e8c34a">The rule:</b> '+RK_PRESS.rule+'</div>'
         +'<div class="small" style="margin-top:4px;line-height:1.55"><b style="color:#7ad08a">Her half of it:</b> '+RK_PRESS.hers+'</div>'
         +'<div class="small muted" style="margin-top:4px;line-height:1.55">'+RK_PRESS.bar+'</div>'
+        +'<div class="small" style="margin-top:4px;line-height:1.55"><b style="color:#e8c34a">What it pays:</b> '+RK_PRESS.pay+'</div>'
         +'<div class="small" style="margin-top:6px;line-height:1.7">'
         +'<span style="color:#ff8ad0">◆ This house reads <b>'+PT.name+'</b></span>'
-        +'<br><span class="muted">Measured at <b style="color:'+(PT.len>=8?'#7ad08a':'#e0d0c0')+'">'+PT.len+' of 10</b>'
-        +' · the seat under it: <b style="color:'+(PT.seated?'var(--gold)':'#7a6a58')+'">'
+        +'<br><span class="muted">HIS reach <b style="color:'+(PT.len>=8?'#7ad08a':'#e0d0c0')+'">'+PT.len+' of 10</b>'
+        +' · HER seat <b style="color:'+(PT.be>=8?'#7ad08a':'#e0905b')+'">'+PT.be+' of 10</b>'
+        +' <span style="color:#8fc0cf">(the office wants 8)</span></span>'
+        +'<br><span class="muted">The seat under HIM: <b style="color:'+(PT.seated?'var(--gold)':'#7a6a58')+'">'
         +(PT.seated? 'TAQRUNA — everything below is worth 85% more' : 'none — it is worth what it is worth')+'</b></span>'
-        +(hersSeat? '<br><span style="color:var(--gold)">◈ AND SHE IS SEATED ON RHAUNA. '+RK_PRESS.meet+'</span>' : '')
+        +'<br><span style="color:'+(hersSeat?'var(--gold)':'#e0905b')+'">'+(hersSeat? '◈' : '✗')
+        +' SHE IS '+(hersSeat?'':'NOT ')+'A MESTERI RHAUNEK'+(hersSeat? ' — '+RK_PRESS.meet
+            : ' — and without that there is no gesture to make. Seat her on Rhauna first: ⚖ THE SEATINGS, the women’s side, BOOTY 8+.')+'</span>'
         +'<br><span class="muted">Crossings of the hall: <b style="color:#7ad08a">'+n+'</b>'
         +' · today: <b>'+((G.rkPressDay===G.day)?(G.rkPressToday||0):0)+' of 2</b></span>'
         +'</div>'
@@ -39432,12 +39756,14 @@ function rkTaqrunDayTick(){
    ===================================================================== */
 const RK_PRESS={
   name:'THE PRESS',
-  what:'He crosses the hall and presses against her, and that IS the answer — the coast does not treat the crossing as a preliminary to something else, it treats it as the act the seat requires.',
-  rule:'A standing is answered by arriving. Whatever follows is the two of them; what the district counts is that he came.',
-  hers:'She takes it, and she takes it standing. There is no part of this she is expected to be surprised by — the house took the seat together and this is the half of it that happens in a corridor.',
-  bar:'It is not the whole evening and it is not supposed to be. It is the office being held, quickly, in the middle of a working day.',
+  what:'He stands it up where the kilt cannot make a rumour of it, he comes up BEHIND her, and he puts it against the seat and keeps it there. The coast does not treat any of that as a preliminary to something else. It is the act the two offices require of each other.',
+  rule:'TWO OFFICES, NOT ONE MAN. Taq holds the reach and Rhauna holds the seat, and this is the one gesture on the coast that is both at once — so it takes a MESTERI RHAUNEK and it will not be addressed to anybody else. Aimed at a house that is not seated on the seat it is not a gesture, it is a man in a corridor with an opinion, and the district would say so.',
+  hers:'She takes it, and she takes it standing, facing away, which is the whole arrangement. There is no part of it she is expected to be surprised by — she is seated on the seat, the seat is a public office, and this is the half of that office which happens in a corridor.',
+  bar:'It is not the whole evening and it is not supposed to be. It is the office being held, in a corridor, in the middle of a working day.',
+  pay:'BOTH LEDGERS PAY. His reach and her seat, and they multiply rather than add — a ten against an eight is not a ten. Her half is counted from the mark UP, because she could not be here at all under a seat of eight.',
   meet:'TWO SEATS IN A DOORWAY. She is seated on Rhauna and he on Taqruna, and the coast has never once managed to discuss this calmly.',
-  beats:[ 'THE PRESS', 'HELD', 'AND HELD' ],
+  beats:[ 'THE PRESS', 'HELD', 'AND KEPT THERE' ],
+  signal:'THE SIGNAL. He stands it up where the kilt cannot make a rumour of it, and that is the first half of the gesture — the coast reads the raising itself, before he has moved. Then he comes up behind her and puts it against the seat, and that is the second half and the whole answer.',
 };
 /* the tier of it — his measure, whether the seat is under him, and hers */
 function rkPressTier(){
@@ -39447,10 +39773,14 @@ function rkPressTier(){
     const w=G&&G.wife;
     const hers=(function(){ try{ const t=rkWifeTitle(w); return (t&&t.id==='seat')? t : null; }catch(e){ return null; } })();
     const be=((w&&w.body&&w.body.booty)||5);
-    let i = len>=10?4 : len>=8?3 : len>=6?2 : len>=4?1 : 0;
+    /* the rung is the PAIR: his reach and her seat, weighted evenly,
+       because the beat is not about either of them on their own */
+    const pairv=(len+be)/2;
+    let i = pairv>=9.5?4 : pairv>=8?3 : pairv>=6.5?2 : pairv>=4.5?1 : 0;
     if(seated) i=Math.min(5,i+1);
     return {len, seated, hers, be, i:clamp(i,0,5),
-      name:['A PRESS','AND HE MEANT IT','THE HALL NOTICED','THE OFFICE, HELD','TAQRUNA ARRIVES','⛧ THE WHOLE DOORWAY'][clamp(i,0,5)]};
+      name:['A PRESS','AND HE MEANT IT','THE HALL NOTICED','THE OFFICE, HELD','TAQRUNA ARRIVES','⛧ THE WHOLE DOORWAY'][clamp(i,0,5)],
+      pair:(len+be)/2};
   }catch(e){ return {len:5, seated:false, hers:null, be:5, i:0, name:'A PRESS'}; }
 }
 function rkPressOk(){
@@ -39460,7 +39790,16 @@ function rkPressOk(){
     if(G.isFemale)return {ok:false, why:'Not your half of this one.'};
     if(!(G.married && G.wife && !G.wife.male))
                   return {ok:false, why:'There is nobody in this house to cross the hall to.'};
-    if(!rkStandOn())return {ok:false, why:'Nothing is standing. Press K first — the press is an ANSWER and there is no question yet.'};
+    /* NO LONGER REQUIRES K. The standing is the first beat of the gesture
+       rather than a prerequisite for it — you may still raise it on its own
+       with K, and leaving it raised is still the thing that goes in the
+       count, but J does the whole signal from a standing start. */
+    /* ---- AND SHE HAS TO BE THE ONE SEATED ON IT ---- */
+    { let T=null; try{ T=rkWifeTitle(G.wife); }catch(e){}
+      if(!T || T.id!=='seat') return {ok:false, mastery:true, why:
+        'This is Rhauna’s beat and it takes a MESTERI RHAUNEK. The gesture is two offices meeting — Taq holds the reach, '
+        +'Rhauna holds the seat — and addressed to a house that is not seated on the seat it is not a gesture at all, it is '
+        +'a man in a corridor with an opinion. Seat her on Rhauna first: THE SEATINGS, the women’s side, BOOTY 8+.'}; }
     if((G.hygiene|0)<25) return {ok:false, why:'“Bathe. Then cross my hall.” That one is yours and the seat does not cover it.'};
     if(G.rkPressDay===G.day && (G.rkPressToday||0)>=2)
                   return {ok:false, why:'Twice in a day is the office. A third time is a hobby, and she has said so.'};
@@ -39471,13 +39810,21 @@ function rkPressOk(){
 function rkPressDo(){
   const A=rkPressOk(); if(!A.ok) return A;
   const P=rkPressTier();
-  const pw=clamp(P.len/10,0,1);
+  const pw=clamp(P.len/10,0,1);            // HIS ledger — the reach
+  /* HERS is measured ABOVE THE MARK, not from zero. She cannot be here at
+     all under a seat of 8, so scoring her out of ten spent four fifths of
+     the scale on values the gate has already excluded — a 10 and an 8 came
+     out the same number, in the one beat named for her office. */
+  const bw=clamp((P.be-7)/4, 0, 1.1);      // 8 -> .25 · 10 -> .75 · 11 -> 1.0
   /* the seat multiplies it, because for a seated man this is not a nice
      moment, it is the office being discharged in public memory */
   const mult = P.seated? 1.85 : 1.0;
   const meet = !!(P.seated && P.hers);
-  let bond = Math.round((1 + pw*3) * mult) + (meet?3:0);
-  let phys = Math.round((2 + pw*5) * mult) + (meet?4:0);
+  /* BOTH NUMBERS, and they multiply rather than add — the gesture is the
+     two of them meeting and a ten against a two is not a ten. */
+  const pair = 0.55 + pw*0.72 + bw*0.86 + pw*bw*0.60;
+  let bond = Math.round((1 + pw*2.4 + bw*3.6) * mult) + (meet?3:0);
+  let phys = Math.round((1.5 + pw*3.2 + bw*5.4) * pair * 0.68 * mult) + (meet?4:0);
   G.wifeRel =clamp((G.wifeRel||50)+bond, 0, (typeof bondCeiling==='function')? bondCeiling() : 100);
   G.wifePhys=clamp((G.wifePhys===undefined?45:G.wifePhys)+phys, 0, 100);
   G.rkPressed=(G.rkPressed||0)+1;
@@ -39487,7 +39834,7 @@ function rkPressDo(){
      exists — rkTaqrunKeep clears it, banks the count and lifts the honor. */
   let kept=null; try{ kept=rkTaqrunKeep(); }catch(e){}
   if(!kept){ try{ G.rkStand=null; }catch(e){} }
-  return {ok:true, tier:P, bond, phys, meet, kept,
+  return {ok:true, tier:P, bond, phys, meet, kept, len:P.len, be:P.be,
     line: meet? '◆ '+RK_PRESS.meet
         : P.seated? '◆ The seat is held. Nothing was negotiated and nothing had to be.'
                   : '◆ You hold no seat, so it is nobody’s business but the two of you. It was still worth crossing the hall for.'};
@@ -39527,6 +39874,16 @@ const RK_SEAT_COND={
          test:()=>{ const h=(G&&G.honor)|0; return {ok:h>=55, have:'honour '+h, need:'honour 55'}; }},
   cold: {line:'YOU MUST HAVE COME THROUGH SOMETHING. Uvra waits, and so does the plateau; a house that has not yet been cold has nothing the office is about.',
          test:()=>{ const d=(G&&G.day)|0; return {ok:d>=40, have:d+' days', need:'40 days on this coast'}; }},
+  /* ---- and the four you earn, whose jobs are the plainest of the ten ---- */
+  war:  {line:'ANYBODY CAN START ONE. Torv’s domain is the END of fighting, and the office is not handed to a house that has never stood in one — the coast wants to know you have been in the room before it asks you to clear it.',
+         test:()=>{ const w=(G&&G.wins)|0; return {ok:w>=3, have:w+' won', need:'3 bouts won'}; }},
+  sea:  {line:'YOU MUST HAVE PUT A HULL IN THE WATER. Aq takes, and the list is read by somebody who has been out on it — a Mastery of the water held by a person who has never left the quay is the one thing this coast would find genuinely funny.',
+         test:()=>{ const b=!!(G&&G.boat); return {ok:b, have:b?'a hull':'no hull', need:'a boat of your own'}; }},
+  wood: {line:'YOU MUST HAVE A POST WITH SOMETHING CUT IN IT. Sivra gives shape and the posts are the archive; a blank post is not appointed to keep the archive.',
+         test:()=>{ const r=(typeof rkRankIdx==='function')? rkRankIdx() : 0;
+                    return {ok:r>=1, have:(RK_RANKS[r]||{name:'a blank post'}).name, need:'a notch in your own post'}; }},
+  count:{line:'THE WHOLE OFFICE IS THE CLAIM THAT YOUR WEIGHT IS THE TRUE ONE. Leo weighs; a house whose word is not good is not the house that holds the weight, and the coast checks that before it checks the store.',
+         test:()=>{ const h=(G&&G.honor)|0; return {ok:h>=60, have:'honour '+h, need:'honour 60'}; }},
 };
 function rkSeatCond(kind,id){
   try{
@@ -39583,6 +39940,18 @@ const RK_SEAT_ASK={
   cold: {p:0.20, like:['steady','thrifty','greenhand'], hate:['drinker','nerves'],
          yes:'“I planned for the last one in the spring. I will plan for the next one too.”',
          no:'“Herd-marks. Every calf on the plateau and every argument about it. Not while this house is like this.”'},
+  war:  {p:0.06, like:['fierce','fearless','oldsoldier','lanista'], hate:['nerves','sickly'],
+         yes:'“Somebody has to finish them. It may as well be a house that knows what starting one costs.”',
+         no:'“Every feud on this stretch, in our hall, at our fire, for the rest of our lives. Ask me again when you have pictured that.”'},
+  sea:  {p:0.10, like:['steady','pious','athletic','devout'], hate:['nerves','homesick'],
+         yes:'“I will read the list. All of it. I know which name you are afraid of and I will read that one too.”',
+         no:'“Most of a night, out loud, in the cold, naming the drowned. No. Not this year.”'},
+  wood: {p:0.18, like:['smart','literate','greenhand','ledger','steady'], hate:['dim','looselip'],
+         yes:'“Every lineage on this stretch, cut true, in my hand. Yes — obviously yes.”',
+         no:'“If I cut one post wrong a family loses its rank and never gets it back. Not on a bond like ours.”'},
+  count:{p:0.08, like:['ledger','thrifty','shrewd','smart'], hate:['spendthrift','drinker','looselip'],
+         yes:'“One weight. For everybody, including your friends. You have understood that, I hope.”',
+         no:'“Strangers auditing this house, constantly, and we are supposed to be delighted. Not yet.”'},
 };
 function rkSeatAskVerdict(kind,id){
   const who=rkSeatConsentWho(kind,id);
@@ -39625,7 +39994,9 @@ function rkOfficeBand(w){
   try{
     const t=rkWifeTitle(w);
     if(t){ const C={seat:'#8a2f4a', bosom:'#c0a02a', reach:'#2f6a72',
-                    love:'#9a2f5a', voice:'#3a2f6a', cold:'#6a7a8a'};
+                    love:'#9a2f5a', voice:'#3a2f6a', cold:'#6a7a8a',
+                    /* the four earned ones, in the colours their guilds work in */
+                    war:'#7a2a22', sea:'#1f4a6a', wood:'#4a6a2a', count:'#8a7a2a'};
       return C[t.id]||'#8a6a3a'; }
   }catch(e){}
   return '#8a6a3a';                      // plain hide-and-bone, for a house with no office
@@ -39806,6 +40177,61 @@ function rkTitledOffered(){
 /* THE FOUR THAT ARE NOT LOOKS-TITLES, named so the distinction is on the
    screen rather than implied by absence. */
 const RK_EARNED_TITLES=['war','sea','wood','count'];
+/* ---- AND HERE THEY ARE AS ACTUAL OFFICES. One entry per Mastery, both
+   sexes off the same row, because the four earned ones genuinely do not
+   read differently between a woman and a man — that asymmetry belongs to
+   the six that are read off a body and to nothing else on this coast. ---- */
+const RK_WORK_TITLES=[
+  {id:'war', mastery:'war', fem:'MESTERI TORVAK', masc:'MASTERISHAKI TORVAK', short:'Torvak',
+   part:null, need:8, rank:1, god:'TORV, WHO ENDS IT',
+   measure:'SETTLEMENTS ENDED',
+   why:'Torv is not a war-god in the usual sense — his domain is specifically the END of fighting, because on a coast this small a feud that runs is a feud that starves everybody. The Mastery of War exists to conclude wars, and a holder who cannot get a settlement is a failed one however many raids they have won. It is measured on endings, and losses count against you because a bout you lost is a settlement somebody else wrote.',
+   duty:'To finish it. Anybody can start one.',
+   quirk:'THE HOUSE IS CALLED TO EVERY FEUD ON THIS STRETCH. Two houses stop speaking and somebody sends for you before the week is out — which is an honour, and is also your evening, repeatedly.',
+   work:()=>{ try{ return clamp(1 + (G.wins||0)*0.30 + (G.campaigns||0)*1.1 - (G.losses||0)*0.10, 1, 10); }
+              catch(e){ return 1; } },
+   fx:{fame:6, str:1}},
+  {id:'sea', mastery:'sea', fem:'MESTERI AQAL', masc:'MASTERISHAKI AQAL', short:'Aqal',
+   part:null, need:8, rank:1, god:'AQ, WHO TAKES',
+   measure:'THE WATER KNOWN',
+   why:'Aq takes. That is the whole of the theology and nobody on this coast pretends otherwise. The Mastery runs the launchings and the drownings and holds the list of names of everyone the water has had — which is read at the turn of the year and takes most of a night. It is measured on time actually spent on this coast and on whether you have ever put a hull in the water, because a list read by somebody who has not is a list read by a stranger.',
+   duty:'To read the list. All of it, every year, however long it has got.',
+   quirk:'THE YEAR TURNS ON YOUR VOICE. Most of a night, out loud, in the cold, and every house on the shore stands for it — including the ones who are only there to hear one name.',
+   work:()=>{ try{ return clamp(1 + ((G.boat)?2.6:0) + (G.day||0)/34 + (typeof rkProvList==='function'? rkProvList().length*0.9 : 0), 1, 10); }
+              catch(e){ return 1; } },
+   fx:{food:1, fame:4}},
+  {id:'wood', mastery:'wood', fem:'MESTERI SIVREN', masc:'MASTERISHAKI SIVREN', short:'Sivren',
+   part:null, need:8, rank:1, god:'SIVRA, WHO GIVES SHAPE',
+   measure:'POSTS CUT TRUE',
+   why:'Sivra gives shape, and the Mastery is the guild — carvers, boat-builders, mask-cutters, and the house-post makers who record a lineage by cutting it. There is no writing on this coast except the posts, so this office is the one that keeps the archive in existence. It is measured on your own post: the notches in it, what you have raised, and how many seatings you have stood at.',
+   duty:'To cut the posts true, because the posts are the archive.',
+   quirk:'EVERY LINEAGE ON THIS STRETCH IS IN YOUR HAND. People are polite to you in a way that has nothing to do with liking you, and everybody understands the difference.',
+   work:()=>{ try{ return clamp(1 + (typeof rkRankIdx==='function'? rkRankIdx()*1.5 : 0)
+                     + ((G.landmarks||[]).length)*0.8 + (G.rkSeatsTaken||0)*0.6, 1, 10); }
+              catch(e){ return 1; } },
+   fx:{purse:0.06, fame:5}},
+  {id:'count', mastery:'count', fem:'MESTERI LEOK', masc:'MASTERISHAKI LEOK', short:'Leok',
+   part:null, need:8, rank:2, god:'LEO, WHO WEIGHS',
+   measure:'ONE WEIGHT, KEPT',
+   why:'The capital is named for him. Leo weighs, and this Mastery is the reason the Rkrai are a country rather than four provinces that dislike each other: one measure, one weight, one price, enforced at the harbour. Dull, and the single most important office on the coast. It is measured on the store you actually run — and on your honour, because the whole office is the claim that your weight is the true one.',
+   duty:'One weight for everybody.',
+   quirk:'CAUGHT WITH TWO WEIGHTS AND YOU ARE PUT OUT OF THE COUNTRY, not killed — killing you would suggest it mattered less than it does. The house is audited by strangers, constantly, and is expected to be pleased about it.',
+   work:()=>{ try{ return clamp(1 + Math.log10((G.coin||0)+1)*1.7 + (G.food||0)/45 + Math.max(0,((G.honor||0)-50))/22, 1, 10); }
+              catch(e){ return 1; } },
+   fx:{purse:0.14, audit:true}},
+];
+const RK_WORK_BY_ID={}; RK_WORK_TITLES.forEach(t=>RK_WORK_BY_ID[t.id]=t);
+function rkIsWorkSeat(id){ return !!RK_WORK_BY_ID[id]; }
+/* the work score, which is this family's answer to "what is the measure" */
+function rkWorkScore(id){
+  const W=RK_WORK_BY_ID[id]; if(!W) return 0;
+  try{ return Math.round(W.work()); }catch(e){ return 1; }
+}
+/* one of them, dressed for whichever side of the house is sitting it */
+function rkWorkTitle(kind, id){
+  const W=RK_WORK_BY_ID[id]; if(!W) return null;
+  return Object.assign({}, W, {title: (kind==='m'? W.masc : W.fem), workSeat:true});
+}
 /* which of the six a given woman actually qualifies for, best first */
 function rkTitlesFor(w){
   if(!w) return [];
@@ -39824,6 +40250,11 @@ function rkTitlesFor(w){
 function rkWifeTitle(w){
   if(!rkHere() || !w) return null;
   if(w.rkTitleForced && RK_WIFE_TITLE_BY_ID[w.rkTitleForced]) return RK_WIFE_TITLE_BY_ID[w.rkTitleForced];
+  /* AND ONE OF THE FOUR SHE EARNED. It has no cut and no body behind it,
+     which is exactly what makes it one of the four rather than one of the
+     six — but it is the office she holds and the house wears it. */
+  if(w.rkTitleForced && typeof rkWorkTitle==='function'){
+    const WT=rkWorkTitle('w', w.rkTitleForced); if(WT) return WT; }
   const ri=rkRankIdx();
   const list=rkTitlesFor(w).filter(x=>ri>=x.t.rank);
   return list.length? list[0].t : null;
@@ -40294,8 +40725,23 @@ function rkSeats(){
       RK_HUSB_TITLES.forEach((t,i)=>{
         S.m[t.id]={name:RK_SEAT_FOLK[i%RK_SEAT_FOLK.length], v:clamp(t.need+ri(0,2),1,10), yours:false};
       });
+      /* AND THE FOUR EARNED ONES, on both sides, because they are the same
+         office whoever is sitting it. Twenty seats in the country now,
+         which is what "the Ten" has always meant: ten Masteries, a pair
+         of seats in each. */
+      RK_WORK_TITLES.forEach((t,i)=>{
+        S.w[t.id]={name:RK_SEAT_FOLK[(i+2)%RK_SEAT_FOLK.length], v:clamp(t.need+ri(0,2),1,10), yours:false};
+        S.m[t.id]={name:RK_SEAT_FOLK[(i+4)%RK_SEAT_FOLK.length], v:clamp(t.need+ri(0,2),1,10), yours:false};
+      });
       G.rkSeats=S;
     }
+    /* AN OLDER SAVE HAS A TABLE WITH FOUR HOLES IN IT. Fill them rather
+       than rebuilding, so nobody loses a seat they already sat. */
+    { const S=G.rkSeats;
+      if(S && S.w && S.m) RK_WORK_TITLES.forEach((t,i)=>{
+        if(!S.w[t.id]) S.w[t.id]={name:RK_SEAT_FOLK[(i+2)%RK_SEAT_FOLK.length], v:clamp(t.need+ri(0,2),1,10), yours:false};
+        if(!S.m[t.id]) S.m[t.id]={name:RK_SEAT_FOLK[(i+4)%RK_SEAT_FOLK.length], v:clamp(t.need+ri(0,2),1,10), yours:false};
+      }); }
     return G.rkSeats;
   }catch(e){ return null; }
 }
@@ -40317,7 +40763,9 @@ function rkMeasure(who, part){
   }catch(e){ return 0; }
 }
 function rkSeatTitle(kind,id){
-  return (kind==='m'? RK_HUSB_TITLE_BY_ID : RK_WIFE_TITLE_BY_ID)[id]||null;
+  const T=(kind==='m'? RK_HUSB_TITLE_BY_ID : RK_WIFE_TITLE_BY_ID)[id];
+  if(T) return T;
+  return rkWorkTitle(kind,id);           // and the four you earn instead
 }
 /* the whole claim, stated in numbers, because the point of this system is
    that the requirement is a NUMBER and you are allowed to see it */
@@ -40330,8 +40778,13 @@ function rkSeatClaim(kind, id){
     const subj=rkSeatSubject(kind);
     if(subj==='spouse' && !(G&&G.married&&G.wife))
       return {T,kind,id,v:0,held,fee:0,rank:rkRankIdx(),ok:false,mine:false,
-              why:['there is nobody in this house to seat — a '+T.title+' is read off a body and yours is the wrong one for it']};
-    const v=rkMeasure(subj, T.part);
+              why:[T.workSeat
+                ? 'there is nobody in this house to seat — this side of the office wants the other half of a marriage in it'
+                : 'there is nobody in this house to seat — a '+T.title+' is read off a body and yours is the wrong one for it']};
+    /* WHAT IS BEING MEASURED. Six of these read a body; the other four
+       read what the house has DONE, and the coast is loud about which is
+       which. Either way it is a number and you are allowed to see it. */
+    const v = T.workSeat? rkWorkScore(id) : rkMeasure(subj, T.part);
     const rIdx=rkRankIdx();
     const fee=RK_SEATING_FEE[clamp(T.rank,0,RK_SEATING_FEE.length-1)];
     const why=[];
@@ -44294,6 +44747,8 @@ window.__SS = {
   RK_PRESS, rkPressOk, rkPressTier, rkPressDo, tryRkPress, updateRkPress, drawRkPress,
   RK_SEAT_COND, rkSeatCond, RK_SEAT_ASK, rkSeatConsentWho, rkSeatConsent,
   rkSeatAsked, rkSeatAskVerdict, rkSeatYield,
+  RK_WORK_TITLES, RK_WORK_BY_ID, rkIsWorkSeat, rkWorkScore, rkWorkTitle,
+  rkBackBones, drawRkBack, drawRkBehindHim,
   rkSivrakAsk, rkSivrakVerdict, rkSivrakWear, sivrakLeaf,
   RK_HUSB_TITLES, RK_HUSB_TITLE_BY_ID, RK_SEATING_FEE, rkSeats, rkSeatClaim, rkSeatTake,
   rkSeatTitle, rkSeatSubject, rkMeasure, rkSeatHeldBy, rkMyTitle, rkSpouseTitle,
