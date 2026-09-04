@@ -8708,7 +8708,7 @@ function drawPartPicker(c,cnv,w,view,W2,H2,GUT){
       /* ---- WHAT THE BUTTON DID, DRAWN ON THE THING IT DID IT TO ---- */
       if(bmFlash && bmFlash.part===sel.id){
         const age=(Date.now()-bmFlash.t)/1000;
-        const a=clamp(1-age/(bmFlash.kind==='hand'? 0.95 : 0.75),0,1);
+        const a=clamp(1-age/(bmFlash.kind==='hand'? 0.95 : bmFlash.kind==='against'? 1.70 : 0.75),0,1);
         if(a>0){
           const k=1-a;
           if(bmFlash.kind==='hand'){
@@ -8740,6 +8740,53 @@ function drawPartPicker(c,cnv,w,view,W2,H2,GUT){
                 c.fillStyle='#fff0dc';
                 c.fillRect(sel.x+Math.cos(th)*rr2-1, sel.y+Math.sin(th)*rr2*0.6-1, 2, 2); }
               c.globalAlpha=1;
+            }
+          } else if(bmFlash.kind==='against'){
+            /* IT COMES IN, IT MEETS THE PART, AND IT PRESSES. Drawn to the
+               same scale as everything else on this chart — the length is
+               the length, so a 3 barely reaches and a 10 arrives early and
+               goes in deep, which is the reading you came for. */
+            const side=bmFlash.side||-1;
+            const len=bmFlash.len||5;
+            const L=6+len*2.6, TH=Math.max(3, 2+len*0.42);
+            /* travel: in over the first third, held for the rest */
+            const tin=clamp(k/0.34,0,1);
+            const into=(1.4+len*0.30)*tin;
+            const bx=sel.x + side*(sel.r + L*(1-tin) + 2) - side*into;
+            const sk=mixHex((G&&G.skin)||'#caa06a','#c07a68',0.30);
+            const HI2=shade(sk,42), LO2=shade(sk,-40), MD=shade(sk,-8);
+            c.globalAlpha=clamp(a*1.25,0,1);
+            /* the part gives where it lands */
+            if(tin>0.6){ c.fillStyle='rgba(140,60,70,.28)';
+              c.beginPath(); c.ellipse(sel.x - side*(sel.r*0.30), sel.y,
+                sel.r*0.52, sel.r*0.42, 0,0,7); c.fill(); }
+            /* the shaft, moulded across so it is a cylinder not a stripe */
+            const x0=Math.min(bx, bx+side*L), wdt=L;
+            for(let q=-TH;q<=TH;q++){
+              const u=(q+TH)/Math.max(1,TH*2);
+              c.fillStyle=(u<0.24)? HI2 : (u<0.62)? MD : (u<0.88)? sk : LO2;
+              c.fillRect(x0, sel.y+q, wdt, 1);
+            }
+            c.strokeStyle='rgba(20,10,8,.5)'; c.lineWidth=1;
+            c.strokeRect(x0+0.5, sel.y-TH+0.5, wdt-1, TH*2);
+            /* the tip, which is what the eye tracks */
+            c.fillStyle=mixHex(sk,'#c07a68',0.45);
+            c.beginPath(); c.ellipse(bx - side*0, sel.y, TH*0.7, TH*1.0, 0,0,7); c.fill();
+            c.fillStyle=HI2;
+            c.fillRect(x0, sel.y-TH, wdt, 1);
+            c.globalAlpha=1;
+            /* a calliper across what actually went in */
+            if(tin>0.9){
+              c.strokeStyle='rgba(240,220,250,.46)'; c.lineWidth=1;
+              const cy2=sel.y+TH+7;
+              const a1=sel.x - side*(sel.r*0.9), a2=bx;
+              c.beginPath();
+              c.moveTo(a1, cy2-3); c.lineTo(a1, cy2+3);
+              c.moveTo(a2, cy2-3); c.lineTo(a2, cy2+3);
+              c.moveTo(a1, cy2);   c.lineTo(a2, cy2); c.stroke();
+              c.font='bold 7px Georgia,serif'; c.textAlign='center';
+              c.fillStyle='rgba(240,220,250,.80)';
+              c.fillText('LENGTH '+len, (a1+a2)/2, cy2+9);
             }
           } else if(bmFlash.kind==='ledger'){
             /* THE RULE RUNS OUT TO THE PLATE AND BACK — the chart is a
@@ -9048,7 +9095,7 @@ function bmFlashPlay(){
   const step=()=>{
     if(state!=='bodymap' || !bmFlash){ bmFlashRAF=0; return; }
     const age=(Date.now()-bmFlash.t)/1000;
-    if(age>1.05){ bmFlash=null; bmFlashRAF=0;
+    if(age>(bmFlash.kind==='against'? 1.80 : 1.05)){ bmFlash=null; bmFlashRAF=0;
       try{ drawBodyMap($('bodymap-cv'), bodyMapSubject, bodyMapView, bodyMapT); }catch(e){}
       return; }
     try{ drawBodyMap($('bodymap-cv'), bodyMapSubject, bodyMapView, bodyMapT); }catch(e){}
@@ -9101,10 +9148,15 @@ function bmActions(w, pid){
   if(!mine && G && G.married && G.wife===w && ADULT && fem && isBooty)
     out.push({id:'slap', icon:'👋', name:'A HAND ON IT',
       note:'The same hand the villa uses, and it counts the same.'});
-  if(!mine && G && G.married && G.wife===w && ADULT && fem && isBooty
-     && typeof rkHere==='function' && rkHere())
+  /* a hand goes where a hand goes, and so does this — it was gated on one
+     coast, which meant almost nobody ever discovered the button existed.
+     Widening it dropped the OTHER restriction with it and offered the
+     thing against her face, which is not a reading anybody wants. It goes
+     where a body is: the seat, the front, the middle, the legs. */
+  const BODY_PRESS={booty:1, bust:1, waist:1, legs:1};
+  if(!mine && G && G.married && G.wife===w && ADULT && fem && BODY_PRESS[pid])
     out.push({id:'against', icon:'◆', name:'PUT IT AGAINST',
-      note:'Rhauna’s beat, from the chart. It still wants her seat and your hall.'});
+      note:'And find out what it is actually like. The reading is kept.'});
   out.push({id:'say', icon:'💬', name:'SAY IT OUT LOUD',
     note:'The plainest word the chart has for this one.'});
   return out;
@@ -9147,16 +9199,63 @@ function bmDoAction(w, pid, id, rebuild, redraw){
       redraw&&redraw(); return;
     }
     if(id==='against'){
-      const A=(typeof rkPressOk==='function')? rkPressOk() : {ok:false, why:'Not here.'};
-      if(!A.ok){ toast(A.why||'Not here.', 4200); return; }
-      bmFlash={part:pid, t:Date.now(), kind:'hand', col:'#ff9ad8', side:-1};
+      /* IT HAPPENS HERE. Telling the player to go somewhere else was the
+         one answer a chart made of measurements could not give. */
+      const len=bmMineLen();
+      const b2=(w&&w.body)||{}, v2=(b2[pid]===undefined?5:b2[pid]);
+      bmFlash={part:pid, t:Date.now(), kind:'against', col:'#ff9ad8',
+               side:(Math.random()<0.5?-1:1), len};
+      try{ sfx('rub'); }catch(e){}
+      setTimeout(()=>{ try{ sfx('hmm'); }catch(e){} }, 420);
       bmFlashPlay();
-      toast('◆ Not from a chart. Close this, stand in your own hall, and press J — '
-        +'the crossing is the act and it wants a hall to cross.', 5200);
-      redraw&&redraw(); return;
+      /* ---- AND YOU LEARN SOMETHING, WHICH IS WHAT A MEASUREMENT IS FOR ---- */
+      const R=bmFeel(w,pid);
+      if(R){
+        if(!G.bmFeltOf) G.bmFeltOf={};
+        const key=((w&&w.self)? 'self' : 'spouse')+':'+pid;
+        const fresh=!G.bmFeltOf[key];
+        G.bmFeltOf[key]=R.line;
+        G.bmFelt=(G.bmFelt||0)+1;
+        if(G && G.married && G.wife===w){
+          const gain=Math.max(1, Math.round((v2-3)*0.5 + len*0.18));
+          G.wifePhys=clamp((G.wifePhys===undefined?45:G.wifePhys)+gain,0,100);
+          if(fresh) G.wifeRel=clamp((G.wifeRel||50)+1, 0,
+            (typeof bondCeiling==='function')? bondCeiling() : 100);
+          refreshStatbar(); saveQuiet();
+          toast('◆ '+R.line+'   (+'+gain+' 🔥'+(fresh?', +1 💞 — a new reading':'')+')', 6200);
+        } else toast('◆ '+R.line, 5600);
+      }
+      rebuild&&rebuild(); redraw&&redraw(); return;
     }
   }catch(e){}
 }
+/* WHAT YOU LEARN BY TOUCHING IT. Three bands to a part, the score picks
+   the band, and once taken it is on the chart for good. */
+const BM_FEEL={
+  booty:{ hi:[ 'Heavier than it looks, and it gives and comes back. It is doing the work of a cushion and it does not know it.',
+               'Soft the whole way and then firm underneath, which is the thing nobody warns you about.',
+               'It closes round and holds. You could rest there and the coast would say you had earned it.' ],
+          mid:['Warm, even, and it gives about as far as you would expect.',
+               'Comfortable. Nothing about it is a surprise and nothing about it is a disappointment.' ],
+          lo:[ 'Not much give. You are mostly finding the bone under it.',
+               'It is warm and it is flat and that is the whole reading.' ]},
+  bust:{ hi:[ 'Soft to a degree that stops being funny and becomes a fact about the afternoon.',
+               'It spreads under any pressure at all and comes straight back. Ulva was generous.' ],
+         mid:['Warm and yielding, and holds its shape.' ],
+         lo:[ 'Firm, small, and quick about it.' ]},
+  waist:{ hi:['Hard through the middle and cool to the touch, which is what a winter well planned feels like.'],
+          mid:['Even, warm, and there is a give to it.'],
+          lo:['Soft the whole way round, and warm with it.'] },
+  legs:{ hi:['Long muscle under warm skin, and it does not move when you lean on it.'],
+         mid:['Sound, warm, and firmer than you thought.'],
+         lo:['Short, soft and warm. They carry her about and that is all they were asked to do.'] },
+  face:{ hi:['The cheekbone is a hard line under skin that is not hard at all, and she lets you keep your hand there.'],
+         mid:['Warm. She leans into it a little and neither of you mentions that.'],
+         lo:['Warm, and it is the face you know. That is worth more than the chart is able to record.'] },
+  hairq:{ hi:['Heavy in the hand. It has weight the way rope has weight, and it is warm from her.'],
+          mid:['Thick, cool at the ends and warm at the root.'],
+          lo:['Fine, and there is less of it than the hand expects.'] },
+};
 const BM_SAY={
   booty:{ hi:[ 'That is a fat seat.', 'That seat has its own weather.',
                'I can see that from the doorway and I intend to.',
@@ -9214,6 +9313,15 @@ const BM_REPLY={
          '“You could have said the other thing.”',
          'She says nothing at all, which on this coast is the whole sentence.' ],
 };
+/* the reading, and the number picks the band exactly as it does for the
+   things you say out loud */
+function bmFeel(w, pid){
+  const b=(w&&w.body)||{}, v=(b[pid]===undefined?5:b[pid]);
+  const T=BM_FEEL[pid]; if(!T) return null;
+  const band = v>=7? 'hi' : v>=4? 'mid' : 'lo';
+  const list=T[band]||T.mid||T.hi; if(!list||!list.length) return null;
+  return { v, band, line:pick(list) };
+}
 function bmSayLines(w, pid){
   const male=!!(w&&w.male);
   let T=BM_SAY[pid];
@@ -9425,11 +9533,16 @@ function openBodyMap(w,back){
       const col = v>=IMPOSSIBLE_V? '#ff7ae0' : heatColor(v);
       const head=document.createElement('div'); head.className='shopcard';
       head.style.borderColor=col;
+      const felt=(G&&G.bmFeltOf)? G.bmFeltOf[((w&&w.self)?'self':'spouse')+':'+bmPart] : null;
       head.innerHTML='<div><b style="color:'+col+'">'+String(P.name).toUpperCase()+' — '
         +partTier(bmPart,v,!!w.male).toUpperCase()+'</b> <span class="small muted">'
         +(v>=IMPOSSIBLE_V? 'beyond the rule' : v+' of 10')+'</span></div>'
         +'<div class="small muted" style="font-style:italic">'
-        +(partPhrase(bmPart, v, !!w.male) || 'Nothing the chart would remark on either way.')+'</div>';
+        +(partPhrase(bmPart, v, !!w.male) || 'Nothing the chart would remark on either way.')+'</div>'
+        +(felt? '<div class="small" style="margin-top:4px;padding:4px 5px;border-left:2px solid #ff9ad8;'
+              +'line-height:1.5"><b style="color:#ff9ad8">◆ THE READING</b> '
+              +'<span class="muted">— taken by hand, and kept</span><br>'
+              +'<span style="color:#e8dcea">'+felt+'</span></div>' : '');
       const row=document.createElement('div');
       row.className='row gap6'; row.style.flexWrap='wrap'; row.style.marginTop='4px';
       bmActions(w, bmPart).forEach(A=>{
@@ -10676,7 +10789,7 @@ function elevateWife(rank){
   refreshStatbar(); saveQuiet(); openVilla();
 }
 // fill in any fields missing from older saves
-function migrate(g){ const d={world:null,socialSet:null,eastAxis:{},crossedToWa:false,waEra:0,purseMix:null,nanban:{},powder:0,waHouse:null,blade:null,drawnBlade:false,ventDone:{},ventRuns:0,ventLost:0,ventNet:0,silkRuns:0,silkLost:0,silkNet:0,silkDone:{},honor:50,food:4,mount:0,slaves:0,hasVilla:false,boat:false,favor:0,soldiers:0,hidden:[],plotTier:0,emperor:false,approval:50,legions:0,rivals:0,retired:false,detachments:[],day:0,titles:{},clears:{},socialClass:'gladiator',army:{},armyGear:0,armyTrain:0,hasOrganizer:false,generals:[],wife:null,married:false,marryPrompted:false,children:[],pregnant:null,lastLoveDay:-9,injury:null,lastDebateDay:-9,office:0,path:null,parthia:50,parthiaPact:false,wifeRel:50,lastTalkDay:-9,isFemale:false,lineage:[],hygiene:70,wifePhys:45,hasPool:false,hasWardrobe:false,legacy:null,lastFeastDay:-9,loveDay:-1,loveQuick:0,loveLong:0,loveNight:0,loveVigil:0,venusUntil:-1,lastWashDay:-9,lastPoolDay:-9,lastWardrobeDay:-9,lastKidsDay:-9,lastBathDay:-9,pila:0,bow:null,bowsOwned:[],nemesis:null,rivalsList:[],trophies:[],nemesisCount:0,pendingDeath:false,ageBase:0,wonProvinceByFight:false,familyMan:false,infamy:0,gladiatrixStage:0,pardoned:false,lastNoteDay:-9,lastNoteReply:'',regalia:[],marryRolls:0,hasBodyMap:false,hasSecretMap:false,jealousy:0,lastJealousDay:-9,traits:[],flaws:[],looks:5,smarts:5,advocate:false,tutorialDone:false,patrons:[],rivalAdv:null,landmarks:[],faction:null,oratory:1,casesWon:0,casesLost:0,renown:0,senate:false,royal:false,lastCaseDay:-9,skills:{footwork:0,guard:0,blade:0,wind:0,throwing:0},scars:[],fatigue:0,lastTrainDay:-9,tribune:false,rank:0,campaigns:0,legionRep:0,lastCampaignDay:-9,units:{legionary:0,auxilia:0,cavalry:0,archers:0,engineers:0},supply:0,sieges:0,body:null,family:null,provinces:{},complaints:[],leniency:50,lastCalloutDay:-9,lastGiftDay:-9,giftsTaken:0,calloutWins:0,crownWorn:false,court:null,lastCoupDay:-99,herbs:{},herbLore:0,ill:null,midwife:false,titlesWorn:[],warExhaust:0,lastExhaustWhy:'',titleRites:[],tombs:[],inheritedFrom:null,hairStyle:null,hairCol:null,beardStyle:null,outfit:null,courtLog:{},lastAskDay:-9,retirePromise:null,promiseBreaks:0,promiseFights:0,tutor:false,freedmen:0,askLog:{},temptHeld:0,temptTook:0,rkSeats:null,rkSeatsTaken:0,rkMyTitleW:null,rkProv:{},rkProvTaken:0,rkSivrak:null,rkSivrakDay:-9,rkSivraksWorn:0,rkSnubs:0,rkStand:null,rkStandsRaised:0,rkTaqrunKept:0,rkTaqrunLapses:0,rkPublicMad:0,rkPressed:0,rkPressDay:-9,rkPressToday:0,rkSeatAsk:{},rkSeatAsks:0,rkSeatsYielded:0,curioSeen:0,curioWoohoo:0,curioDay:-9,curioToday:0,slapDay:-9,slapCount:0,slapsAll:0,doorShut:0,caughtByHouse:0,romanticAll:0,clearedHall:0,lastFamilyDay:-9,namedHeir:null,willSplit:false,purpleWatch:0,kidHouses:[],weddings:0,woohooAll:0,marriedDay:0,osImpurum:0,lastAct:null,
+function migrate(g){ const d={world:null,socialSet:null,eastAxis:{},crossedToWa:false,waEra:0,purseMix:null,nanban:{},powder:0,waHouse:null,blade:null,drawnBlade:false,ventDone:{},ventRuns:0,ventLost:0,ventNet:0,silkRuns:0,silkLost:0,silkNet:0,silkDone:{},honor:50,food:4,mount:0,slaves:0,hasVilla:false,boat:false,favor:0,soldiers:0,hidden:[],plotTier:0,emperor:false,approval:50,legions:0,rivals:0,retired:false,detachments:[],day:0,titles:{},clears:{},socialClass:'gladiator',army:{},armyGear:0,armyTrain:0,hasOrganizer:false,generals:[],wife:null,married:false,marryPrompted:false,children:[],pregnant:null,lastLoveDay:-9,injury:null,lastDebateDay:-9,office:0,path:null,parthia:50,parthiaPact:false,wifeRel:50,lastTalkDay:-9,isFemale:false,lineage:[],hygiene:70,wifePhys:45,hasPool:false,hasWardrobe:false,legacy:null,lastFeastDay:-9,loveDay:-1,loveQuick:0,loveLong:0,loveNight:0,loveVigil:0,venusUntil:-1,lastWashDay:-9,lastPoolDay:-9,lastWardrobeDay:-9,lastKidsDay:-9,lastBathDay:-9,pila:0,bow:null,bowsOwned:[],nemesis:null,rivalsList:[],trophies:[],nemesisCount:0,pendingDeath:false,ageBase:0,wonProvinceByFight:false,familyMan:false,infamy:0,gladiatrixStage:0,pardoned:false,lastNoteDay:-9,lastNoteReply:'',regalia:[],marryRolls:0,hasBodyMap:false,hasSecretMap:false,jealousy:0,lastJealousDay:-9,traits:[],flaws:[],looks:5,smarts:5,advocate:false,tutorialDone:false,patrons:[],rivalAdv:null,landmarks:[],faction:null,oratory:1,casesWon:0,casesLost:0,renown:0,senate:false,royal:false,lastCaseDay:-9,skills:{footwork:0,guard:0,blade:0,wind:0,throwing:0},scars:[],fatigue:0,lastTrainDay:-9,tribune:false,rank:0,campaigns:0,legionRep:0,lastCampaignDay:-9,units:{legionary:0,auxilia:0,cavalry:0,archers:0,engineers:0},supply:0,sieges:0,body:null,family:null,provinces:{},complaints:[],leniency:50,lastCalloutDay:-9,lastGiftDay:-9,giftsTaken:0,calloutWins:0,crownWorn:false,court:null,lastCoupDay:-99,herbs:{},herbLore:0,ill:null,midwife:false,titlesWorn:[],warExhaust:0,lastExhaustWhy:'',titleRites:[],tombs:[],inheritedFrom:null,hairStyle:null,hairCol:null,beardStyle:null,outfit:null,courtLog:{},lastAskDay:-9,retirePromise:null,promiseBreaks:0,promiseFights:0,tutor:false,freedmen:0,askLog:{},temptHeld:0,temptTook:0,rkSeats:null,rkSeatsTaken:0,rkMyTitleW:null,rkProv:{},rkProvTaken:0,rkSivrak:null,rkSivrakDay:-9,rkSivraksWorn:0,rkSnubs:0,rkStand:null,rkStandsRaised:0,rkTaqrunKept:0,rkTaqrunLapses:0,rkPublicMad:0,rkPressed:0,rkPressDay:-9,rkPressToday:0,rkSeatAsk:{},rkSeatAsks:0,rkSeatsYielded:0,curioSeen:0,curioWoohoo:0,curioDay:-9,curioToday:0,bmFelt:0,bmFeltOf:{},slapDay:-9,slapCount:0,slapsAll:0,doorShut:0,caughtByHouse:0,romanticAll:0,clearedHall:0,lastFamilyDay:-9,namedHeir:null,willSplit:false,purpleWatch:0,kidHouses:[],weddings:0,woohooAll:0,marriedDay:0,osImpurum:0,lastAct:null,
     feuds:[],grandkids:0,annivYears:0,morningAfter:null,peeked:{},gravitas:60,peeksTaken:0,parthianSide:false,
     offType:false,bendToldFor:null,bendYes:0,bendNo:0,
     bodySkills:{bone:0,hide:0,thews:0}}; for(const k in d){ if(g[k]===undefined) g[k]=d[k]; }
@@ -23737,6 +23850,7 @@ function drawRkBehindHim(x, FY, o){
   const band=mixHex((typeof rkOfficeBand==='function')? rkOfficeBand(G&&G.wife) : '#8a6a3a','#1a0e08',dk);
   const P=(a,b,ww,h,c)=>px(Math.round(x+a),Math.round(b),Math.max(1,Math.round(ww)),Math.max(1,Math.round(h)),c);
   const K=rkBackBones(FY, gvm('legs',5), 4, gvm('waist',5), true);
+  const down=clamp(o.down||0,0,1);
   const shWid=K.waistW+4.0;
   /* legs first, then the hide over them — the house cut's own order, and
      for the same reason: hide drawn first makes a skirt, not a body */
@@ -23751,7 +23865,6 @@ function drawRkBehindHim(x, FY, o){
      its own folds rather than vanishing, because a garment that
      disappears reads as a bug. ---- */
   const beltY=K.waistY;
-  const down=clamp(o.down||0,0,1);
   { const kl=Math.max(5, K.seatY-K.waistY+4);
     const top=beltY + down*(K.hipY-beltY+K.legLen*0.52);
     for(let i=0;i<kl*(1+down*0.5);i++){ const hw=(K.waistW+1.2+i*0.30)*(1+down*0.26);
@@ -23762,9 +23875,16 @@ function drawRkBehindHim(x, FY, o){
   /* ---- IT. The signal, four tones across so it is a cylinder and not a
      stripe, hanging at stand 0 and out-and-up at stand 1. ---- */
   { /* HARD contrast, because this is drawn ON the kilt rather than against
-       bare leg — the house cut's own palette vanishes into the hide here. */
-    const MID=SVK?'#3a6a28':shade(HID,-4),  MLT=SVK?'#6faa44':shade(HID,40),
-          MHI=SVK?'#9fd070':shade(HID,86),  MSH=SVK?'#1a3a12':shade(HID,-62);
+       bare leg — the house cut's own palette vanishes into the hide here.
+       AND ONCE THE KILT IS DOWN IT IS NOT HIDE ANY MORE. There is nothing
+       over it at that point and it was still wearing the colour of a
+       garment lying round his knees. */
+    const bare2 = down>0.45;
+    const BASE  = bare2? mixHex(skin,'#c07a68',0.30) : HID;
+    const MID=SVK&&!bare2?'#3a6a28':shade(BASE, bare2? -12 : -4),
+          MLT=SVK&&!bare2?'#6faa44':shade(BASE, bare2?  16 : 40),
+          MHI=SVK&&!bare2?'#9fd070':shade(BASE, bare2?  46 : 86),
+          MSH=SVK&&!bare2?'#1a3a12':shade(BASE, bare2? -52 : -62);
     const moulded=(xx,yy,hw)=>{ for(let q=-hw;q<hw;q++){
         const u=(q+hw)/Math.max(1,hw*2-1);
         P(xx+q, yy, 1, 1, (u<0.22)? MHI : (u<0.58)? MLT : (u<0.86)? MID : MSH); } };
@@ -23834,9 +23954,11 @@ function drawCurio(){
   const D=DM, X=D.curio; if(!X) return;
   const FY=214, T=X.t, w=G.wife, PX=D.wifeX;
   const heavy=(X.ph==='woohoo');
-  const dark = X.ph==='look'? clamp(T/96,0,1)*0.34 : (heavy? 0.52 : 0.40);
-  ctx.globalAlpha=0.12+dark; px(-4,-4,W+8,H+8,'#160b12'); ctx.globalAlpha=1;
-  try{ drawHall(0, 44, W, 186, T, true, 1); }catch(e){}
+  const dark = X.ph==='look'? clamp(T/96,0,1)*0.26 : (heavy? 0.40 : 0.30);
+  /* THE VILLA STAYS. She has leaned over something that is in YOUR HOUSE;
+     replacing the house with a generic hall is the one thing this beat
+     cannot afford. It dims, and the lamp comes up on the two of them. */
+  ctx.globalAlpha=0.10+dark; px(-4,-4,W+8,H+8,'#160b12'); ctx.globalAlpha=1;
   const side=(D.x<=PX)? -1 : 1;
   /* ---- THE THING. A low rack with whatever it is on it, and a marker
      that pulses because she has not stopped looking at it. ---- */
@@ -23899,10 +24021,15 @@ function drawCurio(){
   if(pressK>0.05){
     const be2=((w&&w.body&&w.body.booty)||5), sk2=(w&&w.skin)||'#e6bd94';
     const len2=(typeof ardorLen==='function')? ardorLen() : 5;
-    const HIDc=mixHex((G&&G.tunic)||'#6a4a2e','#4a3826',0.42);
-    const leaf=(typeof rkSivrakOn==='function' && rkSivrakOn('self'));
-    const M2=leaf?'#4a7a30':shade(HIDc,-4), MH2=leaf?'#9fd070':shade(HIDc,86),
-          MS2=leaf?'#1a3a12':shade(HIDc,-62);
+    /* SKIN AT THE FINISH. The kilt is round his knees by then; painting
+       this in the hide's colour was painting a garment that is not there. */
+    const bare2=heavy;
+    const HIDc = bare2? mixHex((G&&G.skin)||'#caa06a','#c07a68',0.30)
+                      : mixHex((G&&G.tunic)||'#6a4a2e','#4a3826',0.42);
+    const leaf=(!bare2) && (typeof rkSivrakOn==='function' && rkSivrakOn('self'));
+    const M2 =leaf?'#4a7a30':shade(HIDc, bare2? -12 : -4),
+          MH2=leaf?'#9fd070':shade(HIDc, bare2?  46 : 86),
+          MS2=leaf?'#1a3a12':shade(HIDc, bare2? -52 : -62);
     const cy=aimY+Math.round(rub*0.55);
     const th=Math.max(2, Math.round(1.6+len2*0.18));
     const into=Math.round((2.2+len2*0.24)*pressK + Math.abs(rub)*0.5);
@@ -23968,8 +24095,11 @@ function drawRkPress(){
   const D=DM, X=D.press; if(!X) return;
   const FY=214, T=X.t, w=G.wife, PX=D.wifeX;
   const heat = X.ph==='cross'? clamp(T/150,0,1)*0.5 : clamp(0.5+T/300,0,1);
-  ctx.globalAlpha=0.16+heat*0.20; px(-4,-4,W+8,H+8,'#160b12'); ctx.globalAlpha=1;
-  try{ drawHall(0, 44, W, 186, T, true, 1); }catch(e){}
+  /* AND THE VILLA STAYS HERE TOO. The whole claim of the press is that it
+     happens in your own hall, in the middle of a working day, where the
+     district can read it. Painting an anonymous room over the top made it
+     a private scene, which is the exact opposite of the office. */
+  ctx.globalAlpha=0.12+heat*0.16; px(-4,-4,W+8,H+8,'#160b12'); ctx.globalAlpha=1;
   { const g=ctx.createRadialGradient(PX,FY-34,6,PX,FY-34,78);
     g.addColorStop(0,'rgba(255,190,170,'+(0.16+heat*0.16)+')');
     g.addColorStop(1,'rgba(0,0,0,0)'); ctx.fillStyle=g; ctx.fillRect(0,60,W,H-60); }
@@ -45759,7 +45889,7 @@ window.__SS = {
   RK_CURIO, curioOn, curioReady, curioDue, startCurio, curioMenu, curioTake,
   curioResolve, updateCurio, drawCurio,
   bmHotspots, bmPartAt, bmActions, bmSayIt, bmDoAction, bmMineLen, drawPartPicker,
-  BM_SAY, BM_REPLY, bmSayLines, bmFlashPlay, wifeWalkSound, WALK_QUIP,
+  BM_SAY, BM_REPLY, BM_FEEL, bmFeel, bmSayLines, bmFlashPlay, wifeWalkSound, WALK_QUIP,
   get bmFlash(){return bmFlash;},
   get bmPart(){return bmPart;}, setBmPart:(p)=>{ bmPart=p; },
   get bmCompare(){return bmCompare;}, setBmCompare:(v)=>{ bmCompare=!!v; },
