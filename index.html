@@ -511,8 +511,9 @@
       <div id="bodymap-secret" class="col gap6" style="width:100%"></div>
       <div id="bodymap-views" class="row gap6" style="justify-content:center;flex-wrap:nowrap;overflow-x:auto;min-height:30px;width:100%"></div>
       <div id="bodymap-subviews" class="row gap6" style="justify-content:center;flex-wrap:nowrap;overflow-x:auto;min-height:30px;width:100%"></div>
-      <canvas id="bodymap-cv" width="460" height="300" style="position:static;width:min(96%,460px);height:auto;image-rendering:auto;border:2px solid var(--gold);border-radius:4px;"></canvas>
-      <div class="small muted" style="text-align:center">Pale pink is poorest · deep purple is finest. The chart never flatters.</div>
+      <canvas id="bodymap-cv" width="460" height="300" style="position:static;width:min(96%,460px);height:auto;image-rendering:auto;border:2px solid var(--gold);border-radius:4px;cursor:pointer"></canvas>
+      <div class="small muted" style="text-align:center">Pale pink is poorest · deep purple is finest. The chart never flatters.<br><span style="color:#c89af0">Click a part of the figure.</span></div>
+      <div id="bodymap-parts" class="col gap6" style="width:100%"></div>
       <button class="btn gold" id="btn-bodymap-back">◀ BACK</button>
     </div>
   </div>
@@ -8262,6 +8263,7 @@ function drawBodyMap(cnv,w,view,tms){
     c.restore();
     drawMapReadout(c,w,W2,H2,GUT,gv,male);
     drawMapScale(c,W2,H2,imp);
+    drawPartPicker(c,cnv,w,view,W2,H2,GUT);
     return;
   }
   /* ---- EVERY MASS IS MODELLED. A flat fill with an outline reads as a sticker;
@@ -8672,6 +8674,126 @@ function drawBodyMap(cnv,w,view,tms){
   }
   drawMapReadout(c,w,W2,H2,GUT,gv,male);
   drawMapScale(c,W2,H2,imp);
+  drawPartPicker(c,cnv,w,view,W2,H2,GUT);
+}
+/* =====================================================================
+   THE PART PICKER, AND THE COMPARISON
+   ---------------------------------------------------------------------
+   A ring on every part you can click, a brighter one on the part you
+   have, and — when you ask for it — the OTHER ledger laid alongside at
+   the same scale with the ratio under it. A score out of ten is not a
+   measurement until it is next to something; the secret graph already
+   knew that, which is why it pins Rome's average on its rule.
+   ===================================================================== */
+function drawPartPicker(c,cnv,w,view,W2,H2,GUT){
+  try{
+    if(view==='eyes'||view==='spouse'||view==='secret') return;
+    const H=bmHotspots(cnv,w); if(!H.length) return;
+    const sel=H.find(h=>h.id===bmPart);
+    c.save();
+    /* every part you may click: a quiet ring, so the chart reads as a
+       thing with controls on it rather than a picture */
+    H.forEach(h=>{
+      const on=(h.id===bmPart);
+      c.strokeStyle= on? 'rgba(255,210,122,.92)' : 'rgba(200,150,220,.26)';
+      c.lineWidth= on? 1.8 : 1;
+      c.setLineDash(on? [] : [2,3]);
+      c.beginPath(); c.arc(h.x, h.y, h.r*(on?0.92:0.72), 0, 7); c.stroke();
+      c.setLineDash([]);
+    });
+    if(sel){
+      const b=(w&&w.body)||{}, v=(b[sel.id]===undefined?5:b[sel.id]);
+      const male=!!(w&&w.male);
+      const col = v>=IMPOSSIBLE_V? '#ff7ae0' : heatColor(v);
+      /* the flash a hand leaves, so an action on the chart is visible ON
+         the chart and not only in a toast */
+      if(bmFlash && bmFlash.part===sel.id){
+        const a=clamp(1-(Date.now()-bmFlash.t)/620,0,1);
+        if(a>0){ c.globalAlpha=a*0.8; c.strokeStyle=bmFlash.col||'#ffd0da'; c.lineWidth=2.4;
+          c.beginPath(); c.arc(sel.x, sel.y, sel.r*(1.0+(1-a)*1.5), 0, 7); c.stroke();
+          c.globalAlpha=1; }
+      }
+      /* ON ITS OWN GROUND. Printed straight onto the figure it was the
+         one label on this chart you could not read. */
+      { c.font='bold 9px Georgia,serif'; c.textAlign='center';
+        const lab=String(sel.name).toUpperCase()+' '+(v>=IMPOSSIBLE_V?'⛧':v);
+        const lx2=clamp(sel.x, 30, (W2-GUT)-30), ly2=Math.max(12, sel.y-sel.r-4);
+        const lw2=c.measureText(lab).width+8;
+        c.fillStyle='rgba(14,8,20,.78)'; c.fillRect(lx2-lw2/2, ly2-9, lw2, 12);
+        c.strokeStyle=rgbA(col,0.5); c.lineWidth=1;
+        c.strokeRect(lx2-lw2/2+0.5, ly2-8.5, lw2-1, 11);
+        c.fillStyle=col; c.fillText(lab, lx2, ly2); }
+      /* ---- THE OTHER LEDGER, HELD UP TO IT ----
+         Free-floating bars beside the part put two six-letter labels nine
+         pixels apart and they printed straight through each other. It is a
+         PLATE now, off to one side with a ground of its own, which is how
+         every other reading on this chart is drawn and the only way two
+         labels and a verdict fit. */
+      if(bmCompare && ADULT){
+        const len=bmMineLen();
+        const FWv=W2-GUT;
+        const PW=86, PH=104;
+        /* on the opposite side of the figure from whichever half the part
+           sits in, and always inside the figure's own column */
+        let px0 = (sel.x > FWv*0.5)? (sel.x - sel.r - 10 - PW) : (sel.x + sel.r + 10);
+        px0 = clamp(px0, 4, FWv-PW-4);
+        let py0 = clamp(sel.y - PH*0.5, 34, H2-34-PH-4);
+        c.fillStyle='rgba(14,8,20,.82)'; c.fillRect(px0, py0, PW, PH);
+        c.strokeStyle='rgba(220,180,240,.34)'; c.lineWidth=1;
+        c.strokeRect(px0+0.5, py0+0.5, PW-1, PH-1);
+        c.textAlign='center';
+        c.font='bold 7px Georgia,serif'; c.fillStyle='rgba(240,220,250,.72)';
+        c.fillText('HELD UP TO IT', px0+PW/2, py0+10);
+        /* two bars on ONE unit, which is the whole point of the plate */
+        const baseY=py0+PH-26, maxH=58;
+        const unit=maxH/11;
+        const lcol = len>=IMPOSSIBLE_V? '#ff7ae0' : heatColor(len);
+        const bar=(cx2, val, cc, lab)=>{
+          const h=Math.max(2, Math.min(val,11)*unit);
+          c.fillStyle=rgbA(cc,0.50); c.fillRect(cx2-9, baseY-h, 18, h);
+          c.strokeStyle=rgbA(cc,0.95); c.lineWidth=1;
+          c.strokeRect(cx2-8.5, baseY-h+0.5, 17, h-0.5);
+          c.fillStyle=rgbA(cc,0.22);                              // a lit face down one side
+          c.fillRect(cx2-9, baseY-h, 6, h);
+          c.font='bold 9px Georgia,serif'; c.fillStyle=cc;
+          c.fillText(val>=IMPOSSIBLE_V?'⛧':String(val), cx2, baseY-h-3);
+          c.font='7px Georgia,serif'; c.fillStyle='rgba(230,214,244,.80)';
+          c.fillText(lab, cx2, baseY+9);
+        };
+        const nm=String(sel.name).toUpperCase().slice(0,6);
+        bar(px0+PW*0.30, v,   col,  nm);
+        bar(px0+PW*0.70, len, lcol, 'LENGTH');
+        /* the rule they are both standing on */
+        c.strokeStyle='rgba(240,220,250,.42)'; c.lineWidth=1;
+        c.beginPath(); c.moveTo(px0+8, baseY+0.5); c.lineTo(px0+PW-8, baseY+0.5); c.stroke();
+        for(let t2=0;t2<=10;t2+=2){ const yy=baseY-t2*unit;
+          c.strokeStyle= t2%4===0? 'rgba(240,220,250,.26)' : 'rgba(240,220,250,.12)';
+          c.beginPath(); c.moveTo(px0+4, yy+0.5); c.lineTo(px0+8, yy+0.5); c.stroke(); }
+        /* and the verdict, wrapped so it never runs off the plate */
+        const ratio = v>0? (len/v) : 1;
+        const verdict = ratio>=1.35? 'the ledger wins this'
+                      : ratio>=1.10? 'the ledger, just'
+                      : ratio>=0.90? 'nothing in it'
+                      : ratio>=0.70? 'the '+nm.toLowerCase()+', comfortably'
+                      : 'not close, and the chart does not flatter';
+        c.font='italic 7px Georgia,serif'; c.fillStyle='rgba(240,220,250,.70)';
+        { const words=verdict.split(' '); let line='', yy=py0+PH-8;
+          const rows2=[];
+          words.forEach(wd=>{ const t2=line?line+' '+wd:wd;
+            if(c.measureText(t2).width>PW-8 && line){ rows2.push(line); line=wd; } else line=t2; });
+          if(line) rows2.push(line);
+          const start=yy-(rows2.length-1)*8;
+          rows2.slice(-2).forEach((L,k)=>c.fillText(L, px0+PW/2, start+k*8)); }
+        /* a line from the plate to the part it is about */
+        c.strokeStyle='rgba(220,180,240,.30)'; c.setLineDash([2,2]);
+        c.beginPath();
+        c.moveTo(px0 + (sel.x>px0? PW : 0), py0+PH*0.5);
+        c.lineTo(sel.x + (sel.x>px0? -sel.r : sel.r), sel.y); c.stroke();
+        c.setLineDash([]);
+      }
+    }
+    c.restore(); c.textAlign='left';
+  }catch(e){}
 }
 // any colour the chart uses — rgb() from heatColor, or the flat hex the
 // IMPOSSIBLE tier is painted in — broken back into three numbers
@@ -8864,6 +8986,113 @@ function wrapSmall(c,txt,x,y,maxw,lh){
   if(line) c.fillText(line,x,yy);
 }
 let bodyMapView='front', secretAroused=false, secretSub='profile', bodyMapWalk=true, bodyMapT=0, bodyMapRAF=0;
+let bmPart=null, bmCompare=false, bmFlash=null;
+/* WHOSE MEASURE IS BEING HELD UP. Always the player's, unless the player
+   is the woman of the house, in which case it is the man she married —
+   this is a comparison between the two ledgers of one household. */
+function bmMineLen(){
+  try{
+    if(!(G&&G.isFemale)) return (typeof ardorLen==='function')? ardorLen() : 5;
+    const w=G&&G.wife; return (w&&w.body&&w.body.secret!==undefined)? w.body.secret : 5;
+  }catch(e){ return 5; }
+}
+/* THE HOTSPOTS, in canvas pixels, off the same frame drawBodyMap draws in.
+   They have to be derived rather than hardcoded, because the figure is
+   scaled to whatever the canvas is. */
+function bmHotspots(cnv, w){
+  if(!cnv || !w) return [];
+  const male=!!w.male, W2=cnv.width, H2=cnv.height;
+  const GUT=150, FW=W2-GUT, FOOT=34, TOP=34;
+  const SC=Math.min(FW/40,(H2-FOOT-TOP-4)/74), CX=FW*0.5;
+  const A = male
+    ? {face:[0,5], hairq:[0,-3], bust:[0,21], waist:[0,33], booty:[0,17], legs:[0,54], secret:[0,39]}
+    : {face:[0,5], hairq:[0,-4], bust:[0,18.6], waist:[0,29], booty:[0,34], legs:[0,54]};
+  const parts=partsFor(w);
+  const out=[];
+  parts.forEach(P=>{
+    const a=A[P.id]; if(!a) return;
+    out.push({ id:P.id, name:P.name,
+      x: CX+a[0]*SC, y: TOP+a[1]*SC, r: Math.max(11, SC*3.4) });
+  });
+  return out;
+}
+function bmPartAt(cnv, w, cx, cy){
+  const H=bmHotspots(cnv,w); let best=null;
+  for(const h of H){ const d=Math.hypot(cx-h.x, cy-h.y);
+    if(d<=h.r && (!best || d<best.d)) best={h, d}; }
+  return best? best.h : null;
+}
+/* ---- WHAT YOU MAY DO TO A PART, and every one of them is a thing the
+   game already models rather than a new noise. ---- */
+function bmActions(w, pid){
+  const out=[], mine=!!(w&&w.self), male=!!(w&&w.male);
+  const isBooty=(pid==='booty'), fem=!male;
+  out.push({id:'compare', icon:'📏', name:'HOLD THE OTHER LEDGER UP TO IT',
+    note:'Both measures, one scale, and the ratio written under them.'});
+  if(!mine && G && G.married && G.wife===w && ADULT && fem && isBooty)
+    out.push({id:'slap', icon:'👋', name:'A HAND ON IT',
+      note:'The same hand the villa uses, and it counts the same.'});
+  if(!mine && G && G.married && G.wife===w && ADULT && fem && isBooty
+     && typeof rkHere==='function' && rkHere())
+    out.push({id:'against', icon:'◆', name:'PUT IT AGAINST',
+      note:'Rhauna’s beat, from the chart. It still wants her seat and your hall.'});
+  out.push({id:'say', icon:'💬', name:'SAY IT OUT LOUD',
+    note:'The plainest word the chart has for this one.'});
+  return out;
+}
+/* the blunt word, which the chart already owns */
+function bmDoAction(w, pid, id, rebuild, redraw){
+  try{
+    if(id==='compare'){
+      bmCompare=!bmCompare;
+      if(bmCompare && !ADULT) toast('The other ledger lives behind the mature-content switch.',3000);
+      rebuild&&rebuild(); redraw&&redraw(); try{ sfx('ui'); }catch(e){}
+      return;
+    }
+    if(id==='say'){
+      const S=bmSayIt(w,pid);
+      const good=(S.v>=7), bad=(S.v<=3);
+      let bond=0;
+      if(!w.self && G && G.married && G.wife===w){
+        bond = good? 2 : bad? -2 : 1;
+        G.wifeRel=clamp((G.wifeRel||50)+bond, 0, (typeof bondCeiling==='function')? bondCeiling() : 100);
+        refreshStatbar(); saveQuiet();
+      }
+      bmFlash={part:pid, t:Date.now(), col: bad? '#e0705b' : '#9ad4ff'};
+      toast('💬 '+S.line+(bond? '  ('+(bond>0?'+':'')+bond+' 💞)' : '')
+        + (bad? '  She heard you.' : ''), 4200);
+      redraw&&redraw(); return;
+    }
+    if(id==='slap'){
+      const v=doSlap('chart');
+      if(!v){ toast(slapLabel('spent'),2600); return; }
+      { const be=((w.body&&w.body.booty)||5); slapKick(0.85+be*0.075); }
+      try{ shimmyStart(w, 1.0); }catch(e){}
+      bmFlash={part:pid, t:Date.now(), col:'#ffb0d0'};
+      startBodyMapAnim();
+      toast((v.k==='love'?'👋💞 ':v.k==='bad'||v.k==='cold'?'👋💢 ':'👋 ')+v.t
+        +'  ('+(v.bond>=0?'+':'')+v.bond+' 💞'+(v.phys?', '+(v.phys>0?'+':'')+v.phys+' 🔥':'')+')', 4600);
+      redraw&&redraw(); return;
+    }
+    if(id==='against'){
+      const A=(typeof rkPressOk==='function')? rkPressOk() : {ok:false, why:'Not here.'};
+      if(!A.ok){ toast(A.why||'Not here.', 4200); return; }
+      bmFlash={part:pid, t:Date.now(), col:'#ff9ad8'};
+      toast('◆ Not from a chart. Close this, stand in your own hall, and press J — '
+        +'the crossing is the act and it wants a hall to cross.', 5200);
+      redraw&&redraw(); return;
+    }
+  }catch(e){}
+}
+function bmSayIt(w, pid){
+  const b=(w&&w.body)||{}, v=(b[pid]===undefined?5:b[pid]), male=!!(w&&w.male);
+  const wd=(typeof bluntWord==='function')? bluntWord(pid, v, male) : null;
+  const P=partsFor(w).find(p=>p.id===pid)||{name:pid};
+  const nm=String(P.name).toLowerCase();
+  const plural=(typeof BLUNT_PLURAL!=='undefined' && BLUNT_PLURAL[pid]===1) || /s$/.test(nm);
+  const phrase=(plural? '' : (/^[aeiou]/.test(wd||'')? 'an ' : 'a ')) + (wd||'plain') + ' ' + nm;
+  return { v, phrase, line:'“That is '+phrase+'.”' };
+}
 function stopBodyMapAnim(){ if(bodyMapRAF){ cancelAnimationFrame(bodyMapRAF); bodyMapRAF=0; } }
 function startBodyMapAnim(){
   stopBodyMapAnim();
@@ -8889,6 +9118,7 @@ function bodyMapSubjects(){
   return out;
 }
 function openBodyMap(w,back){
+  if(bodyMapSubject!==w){ bmPart=null; bmCompare=false; bmFlash=null; }
   bodyMapSubject=w; bodyMapBack=back||'marry';
   state='bodymap'; show('scr-bodymap');
   const lk=w.looks===undefined?5:w.looks;
@@ -9010,6 +9240,74 @@ function openBodyMap(w,back){
         openBodyMap(w, bodyMapBack); };
       d.appendChild(bt); d.appendChild(note); sr2.appendChild(d);
     } }
+  /* =====================================================================
+     THE CHART IS NOW SOMETHING YOU CAN PUT A FINGER ON
+     ---------------------------------------------------------------------
+     The canvas is displayed at a CSS width that is not its backing width,
+     so the click has to be scaled or every hotspot is in the wrong place
+     on every screen but one.
+     ===================================================================== */
+  { const cvp=$('bodymap-cv'), pr=$('bodymap-parts');
+    const buildParts=()=>{
+      if(!pr) return; pr.innerHTML='';
+      if(bodyMapView==='eyes'||bodyMapView==='spouse'||bodyMapView==='secret') return;
+      if(!bmPart){
+        const d=document.createElement('div'); d.className='small muted';
+        d.style.textAlign='center';
+        d.textContent='No part chosen. Click the figure — the face, the chest, the waist, the seat, the legs.';
+        pr.appendChild(d); return;
+      }
+      const P=partsFor(w).find(p=>p.id===bmPart);
+      if(!P){ bmPart=null; return; }
+      const b=(w.body||{}), v=(b[bmPart]===undefined?5:b[bmPart]);
+      const col = v>=IMPOSSIBLE_V? '#ff7ae0' : heatColor(v);
+      const head=document.createElement('div'); head.className='shopcard';
+      head.style.borderColor=col;
+      head.innerHTML='<div><b style="color:'+col+'">'+String(P.name).toUpperCase()+' — '
+        +partTier(bmPart,v,!!w.male).toUpperCase()+'</b> <span class="small muted">'
+        +(v>=IMPOSSIBLE_V? 'beyond the rule' : v+' of 10')+'</span></div>'
+        +'<div class="small muted" style="font-style:italic">'
+        +(partPhrase(bmPart, v, !!w.male) || 'Nothing the chart would remark on either way.')+'</div>';
+      const row=document.createElement('div');
+      row.className='row gap6'; row.style.flexWrap='wrap'; row.style.marginTop='4px';
+      bmActions(w, bmPart).forEach(A=>{
+        const bt=document.createElement('button'); bt.className='btn sm';
+        bt.style.borderColor=col; bt.style.color=col;
+        bt.textContent=A.icon+' '+A.name; bt.title=A.note;
+        if(A.id==='compare' && bmCompare) bt.className='btn sm gold';
+        bt.onclick=()=>{ bmDoAction(w, bmPart, A.id, buildParts, redraw); };
+        row.appendChild(bt);
+      });
+      head.appendChild(row);
+      const clr=document.createElement('button'); clr.className='btn sm';
+      clr.textContent='✕ NONE'; clr.style.marginTop='4px';
+      clr.onclick=()=>{ bmPart=null; bmCompare=false; buildParts(); redraw(); };
+      head.appendChild(clr);
+      pr.appendChild(head);
+    };
+    if(cvp && !cvp.__bmWired){
+      cvp.__bmWired=true;
+      cvp.addEventListener('click', ev=>{
+        try{
+          const sub2=bodyMapSubject; if(!sub2) return;
+          if(bodyMapView==='eyes'||bodyMapView==='spouse'||bodyMapView==='secret') return;
+          const r=cvp.getBoundingClientRect();
+          const cx=(ev.clientX-r.left)*(cvp.width/r.width);
+          const cy=(ev.clientY-r.top )*(cvp.height/r.height);
+          const h=bmPartAt(cvp, sub2, cx, cy);
+          if(h){ if(bmPart!==h.id) bmCompare=false; bmPart=h.id; try{ sfx('ui'); }catch(e){} }
+          else { bmPart=null; bmCompare=false; }
+          if(cvp.__bmBuild) cvp.__bmBuild();
+          drawBodyMap(cvp, bodyMapSubject, bodyMapView, bodyMapT);
+        }catch(e){}
+      });
+    }
+    if(cvp) cvp.__bmBuild=buildParts;
+    /* a part that does not exist on this subject must not survive a
+       change of subject — a man has no Bust to click */
+    if(bmPart && !partsFor(w).some(p=>p.id===bmPart)){ bmPart=null; bmCompare=false; }
+    setTimeout(buildParts,0);
+  }
   const vr=$('bodymap-views'); vr.innerHTML='';
   const sv=$('bodymap-subviews'); if(sv) sv.innerHTML='';
   const views=[['front','◧ FRONT'],['side','◐ SIDE'],['back','◨ BACK']];
@@ -45216,6 +45514,9 @@ window.__SS = {
   rkBackBones, drawRkBack, drawRkBehindHim,
   RK_CURIO, curioOn, curioReady, curioDue, startCurio, curioMenu, curioTake,
   curioResolve, updateCurio, drawCurio,
+  bmHotspots, bmPartAt, bmActions, bmSayIt, bmDoAction, bmMineLen, drawPartPicker,
+  get bmPart(){return bmPart;}, setBmPart:(p)=>{ bmPart=p; },
+  get bmCompare(){return bmCompare;}, setBmCompare:(v)=>{ bmCompare=!!v; },
   rkSivrakAsk, rkSivrakVerdict, rkSivrakWear, sivrakLeaf,
   RK_HUSB_TITLES, RK_HUSB_TITLE_BY_ID, RK_SEATING_FEE, rkSeats, rkSeatClaim, rkSeatTake,
   rkSeatTitle, rkSeatSubject, rkMeasure, rkSeatHeldBy, rkMyTitle, rkSpouseTitle,
