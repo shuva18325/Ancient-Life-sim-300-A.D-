@@ -8798,7 +8798,10 @@ function drawPartPicker(c,cnv,w,view,W2,H2,GUT){
                centres, or the two "cushions" overlap into one blob — which
                is exactly what the previous pass did and is why it read as
                a single mass with a rod poking into it rather than two. */
-            const gap=cr*(0.70+tin*0.16);
+            /* LENGTH DECIDES HOW FAR IN IT GETS. They part further for a
+               long one because they have to — that is the whole reading. */
+            const lenK=clamp((len-3)/7,0,1);
+            const gap=cr*(0.68+tin*(0.13+lenK*0.24));
             sphere(sel.x, sel.y-gap, cr*1.10, cr*0.58, cushBase, col);
             sphere(sel.x, sel.y+gap, cr*1.10, cr*0.58, cushBase, col);
             /* where they meet: a real crease, darker as the press deepens */
@@ -8815,7 +8818,10 @@ function drawPartPicker(c,cnv,w,view,W2,H2,GUT){
             const L=11+len*3.3;
             const thBase=Math.max(3.4, 2.6+len*0.40), thTip=thBase*0.80;
             const startX=sel.x + side*(sel.r + L + 8);            // fully retracted
-            const endX  =sel.x + side*(cr*0.20);                  // pressed in, short of dead-centre
+            /* a 3 stops on the near edge of the crease; a 10 is through it
+               and out the far side, which is what "you can feel more of it"
+               actually looks like drawn to scale */
+            const endX  =sel.x - side*(cr*(lenK*0.98 - 0.26));
             const tipX  =startX + (endX-startX)*tin;
             const tailX =tipX + side*L;
             const steps=Math.max(8, Math.round(L));
@@ -8858,6 +8864,13 @@ function drawPartPicker(c,cnv,w,view,W2,H2,GUT){
               c.font='bold 7px Georgia,serif'; c.textAlign='center';
               c.fillStyle='rgba(240,220,250,.85)';
               c.fillText('LENGTH '+len, (a1+a2)/2, cy2+9);
+              /* AND HOW MUCH OF HER IT IS ACTUALLY REACHING, which is the
+                 number the player came for and the chart never printed. */
+              const vHere=(w&&w.body&&w.body[sel.id]!==undefined)? w.body[sel.id] : 5;
+              const reach=Math.round(clamp((vHere + (len-5)*0.55)*10, 0, 130))/10;
+              c.font='bold 6px Georgia,serif';
+              c.fillStyle=rgbA(col,0.92);
+              c.fillText('REACHING '+reach.toFixed(1)+' OF '+vHere, (a1+a2)/2, cy2+18);
             }
           } else if(bmFlash.kind==='ledger'){
             /* THE RULE RUNS OUT TO THE PLATE AND BACK — the chart is a
@@ -9286,21 +9299,29 @@ function bmDoAction(w, pid, id, rebuild, redraw){
       setTimeout(()=>{ try{ sfx('hmm'); }catch(e){} }, 420);
       bmFlashPlay();
       /* ---- AND YOU LEARN SOMETHING, WHICH IS WHAT A MEASUREMENT IS FOR ---- */
-      const R=bmFeel(w,pid);
+      const R=bmFeel(w,pid,len);
       if(R){
         if(!G.bmFeltOf) G.bmFeltOf={};
         const key=((w&&w.self)? 'self' : 'spouse')+':'+pid;
         const fresh=!G.bmFeltOf[key];
         G.bmFeltOf[key]=R.line;
         G.bmFelt=(G.bmFelt||0)+1;
+        if(R.deep) G.bmDeep=(G.bmDeep||0)+1;
         if(G && G.married && G.wife===w){
-          const gain=Math.max(1, Math.round((v2-3)*0.5 + len*0.18));
+          /* HER SEAT AND WHAT YOU BROUGHT TO IT, weighted about evenly,
+             and a real bonus when a big one meets a big one — because
+             that pairing is a different event and it now has its own
+             line to prove it. */
+          const gain=Math.max(1, Math.round((v2-3)*0.55 + len*0.48
+                                            + (R.deep? 4 : 0)));
           G.wifePhys=clamp((G.wifePhys===undefined?45:G.wifePhys)+gain,0,100);
           if(fresh) G.wifeRel=clamp((G.wifeRel||50)+1, 0,
             (typeof bondCeiling==='function')? bondCeiling() : 100);
           refreshStatbar(); saveQuiet();
-          toast('◆ '+R.line+'   (+'+gain+' 🔥'+(fresh?', +1 💞 — a new reading':'')+')', 6200);
-        } else toast('◆ '+R.line, 5600);
+          toast('◆ '+R.line+(R.her? '   '+R.her : '')
+            +'   (+'+gain+' 🔥'+(fresh?', +1 💞 — a new reading':'')+')',
+            R.deep? 7600 : 6200);
+        } else toast('◆ '+R.line+(R.her? '   '+R.her : ''), 5600);
       }
       rebuild&&rebuild(); redraw&&redraw(); return;
     }
@@ -9309,7 +9330,12 @@ function bmDoAction(w, pid, id, rebuild, redraw){
 /* WHAT YOU LEARN BY TOUCHING IT. Three bands to a part, the score picks
    the band, and once taken it is on the chart for good. */
 const BM_FEEL={
-  booty:{ hi:[ 'Soft — like two cushions of booty pressing against a rod, and they do not stop giving.',
+  booty:{ deep:[ 'Soft — two whole cushions of booty closing on a rod that is long enough to be worth closing on, and neither of them stops giving.',
+                 'A butt this size and a length that can actually find the middle of it: the cheeks part, take the whole run of it, and shut again behind it.',
+                 'You are past the outside of her booty and into the warm of it, and there is still more seat than there is of you.',
+                 'It goes in deep and the booty just keeps arriving. Two cushions, the whole length, and she is the one who leans back into it.',
+                 'This is what the ninth mark on the ledger was for. All of it, buried in soft, and the coast would call that a reading.' ],
+          hi:[ 'Soft — like two cushions of booty pressing against a rod, and they do not stop giving.',
                'Heavier than it looks, and the booty gives and comes back. It is doing the work of a cushion and it does not know it.',
                'Soft the whole way through and then firm underneath, which is the thing nobody warns you about with a butt this size.',
                'The whole seat closes round it and holds. You could rest there and the coast would say you had earned it.',
@@ -9394,12 +9420,50 @@ const BM_REPLY={
 };
 /* the reading, and the number picks the band exactly as it does for the
    things you say out loud */
-function bmFeel(w, pid){
+function bmFeel(w, pid, len){
   const b=(w&&w.body)||{}, v=(b[pid]===undefined?5:b[pid]);
   const T=BM_FEEL[pid]; if(!T) return null;
-  const band = v>=7? 'hi' : v>=4? 'mid' : 'lo';
-  const list=T[band]||T.mid||T.hi; if(!list||!list.length) return null;
-  return { v, band, line:pick(list) };
+  if(len===undefined) len=(typeof bmMineLen==='function')? bmMineLen() : 5;
+  /* WHAT YOU REACH, not what she has. Both numbers were on the chart and
+     only one of them was in the sentence — so a 10 seat gave the same
+     line whether you brought a 3 or a 10 to it, and the length may as
+     well not have been rolled. It is her score moved by what you brought:
+     a long one finds more of the same seat, a short one finds the outside
+     of it, and the sentence changes because the fact changed. */
+  const reach = v + (len-5)*0.55;
+  /* AND A FOURTH TIER ABOVE THE TOP ONE. A big one against a big seat is
+     not the same event as a big seat, and it had no line of its own. */
+  const deep = (v>=9 && len>=9 && T.deep && T.deep.length);
+  const band = deep? 'deep' : reach>=7.4? 'hi' : reach>=4.2? 'mid' : 'lo';
+  const list=T[band]||T.hi||T.mid; if(!list||!list.length) return null;
+  return { v, band, len, reach:Math.round(reach*10)/10, deep:!!deep,
+           line:pick(list), her:bmLenHer(len, v) };
+}
+/* HER SIDE OF IT. The chart recorded what the hand learned and never once
+   recorded what she got out of it, which for the one action on this chart
+   that involves both of them is a strange thing to leave out. Banded on
+   the length, warmed by what she is carrying to meet it. */
+const BM_LEN_HER={
+  huge:[ '“…all of it, then.” She says it to the wall and does not move away.',
+         'She goes quiet in the way that is not disapproval, and stays there.',
+         '“That is the whole of it and I can tell you exactly where it stops.”',
+         'Her breath goes out of her in one piece. She does not ask you to take it back.' ],
+  big:[ '“Mm.” She shifts back into it rather than off it.',
+        'She makes a small sound she would deny making.',
+        '“You may leave that where it is.”' ],
+  mid:[ 'She takes it the way she takes most things, which is to say she stays put.',
+        '“Fine.” It is not a complaint.' ],
+  small:[ 'She does not say anything, and it is not because she is overcome.',
+          '“Is that it, then.” It is not a question.' ],
+};
+function bmLenHer(len, v){
+  try{
+    const band = len>=9? 'huge' : len>=7? 'big' : len>=4? 'mid' : 'small';
+    let L=BM_LEN_HER[band]; if(!L||!L.length) return '';
+    /* a big seat with a small one against it has the most to say about it */
+    if(band==='small' && v>=9) return '“There is a great deal more of me than there is of that.”';
+    return pick(L);
+  }catch(e){ return ''; }
 }
 function bmSayLines(w, pid){
   const male=!!(w&&w.male);
@@ -22309,6 +22373,9 @@ function updateDomus(dt){
   /* 🔎 AND THE CURIOUS ONE, which is a menu and therefore locks hardest */
   if(D.curio){ updateCurio(dt); if(D.curio && D.curio.locks) return; }
   else if(curioDue()) startCurio();
+  /* 🐚 AND THE CLAM, which she starts and she finishes */
+  if(D.clam){ updateClam(dt); if(D.clam && D.clam.locks) return; }
+  else if(clamDue()) startClam();
   if(D.husb){ updateHusbandMove(dt); return; }        // he is already crossing; nothing interrupts that
   if(D.bendAsk){ updateBendAsk(dt); return; }        // he has asked; the room waits on your answer
   if(D.drop){ updateDrop(dt); if(D.drop && D.drop.locks) return; }
@@ -22435,14 +22502,14 @@ function updateDomus(dt){
   /* K — AND ON ONE COAST YOU MAY SIMPLY STAND IT UP, on purpose, in your
      own hall, with nothing following from it unless you hold the seat it
      belongs to. Everywhere else this key does nothing and says why. */
-  if(!D.scene && !D.slap && !D.rslap && !D.husb && !D.ardor && !D.press && !D.curio && consume('k')){
+  if(!D.scene && !D.slap && !D.rslap && !D.husb && !D.ardor && !D.press && !D.curio && !D.clam && consume('k')){
     const R=rkStand();
     if(!R.ok) toast(R.why||'Not here.', 3000);
     else { toast(R.line, R.seated? 6200 : 4200); try{ sfx('ui'); }catch(e){} saveQuiet(); }
   }
   /* J — AND THIS IS HOW IT IS ANSWERED. K raises it and J crosses the hall,
      which on this coast is not a preliminary to the answer, it IS it. */
-  if(!D.scene && !D.slap && !D.rslap && !D.husb && !D.ardor && !D.press && !D.curio && consume('j')) tryRkPress();
+  if(!D.scene && !D.slap && !D.rslap && !D.husb && !D.ardor && !D.press && !D.curio && !D.clam && consume('j')) tryRkPress();
   // and the stairs, which are on the far left and were decorative until now
   if(!D.scene && !D.slap && !D.rslap && !D.husb && !D.ardor && !D.escort
      && nearStairs() && consume('up')) climbStairs();
@@ -22460,7 +22527,7 @@ function updateDomus(dt){
 function wifeWalkSound(dt){
   try{
     const D=DM, w=G&&G.wife; if(!D||!w||w.male) return;
-    if(D.scene||D.slap||D.rslap||D.tempt||D.press||D.curio||D.ardor||D.husb) return;
+    if(D.scene||D.slap||D.rslap||D.tempt||D.press||D.curio||D.clam||D.ardor||D.husb) return;
     const be=((w.body&&w.body.booty)||5);
     const tier = be>=11?5 : be>=9?4 : be>=7?3 : be>=5?2 : be>=3?1 : 0;
     if(tier<2) return;                                   // nothing to hear, so nothing plays
@@ -23432,7 +23499,7 @@ function ardorReady(){
 function ardorAvailableNow(){
   if(!ardorReady()) return false;
   const D=DM; if(!D) return false;
-  if(D.scene||D.slap||D.rslap||D.tempt||D.husb||D.drop||D.rise||D.ardor||D.press||D.curio) return false;
+  if(D.scene||D.slap||D.rslap||D.tempt||D.husb||D.drop||D.rise||D.ardor||D.press||D.curio||D.clam) return false;
   if(loveLeft('quick')<=0) return false;
   if((G.hygiene|0)<25) return false;
   return true;
@@ -23521,7 +23588,7 @@ function curioReady(){
 function curioDue(){
   const D=DM; if(!D) return false;
   if(!curioReady()) return false;
-  if(D.scene||D.slap||D.rslap||D.tempt||D.husb||D.drop||D.rise||D.ardor||D.press||D.curio) return false;
+  if(D.scene||D.slap||D.rslap||D.tempt||D.husb||D.drop||D.rise||D.ardor||D.press||D.curio||D.clam) return false;
   /* NO MORE ONCE-A-DAY. The tick cooldown below is the only limiter, so a
      long visit gets more than one chance rather than exactly one. */
   if(D.t < (D.curioNext||160)) return false;
@@ -23650,6 +23717,417 @@ function updateCurio(dt){
     }
   }
 }
+/* =====================================================================
+   🐚 THE CLAM
+   ---------------------------------------------------------------------
+   Every other beat in this hall is something YOU start, or something she
+   does near you that you may answer. This one she starts, she finishes,
+   and the middle of it is not yours: she calls you over, she clenches,
+   and what you brought with you is held exactly where she put it until
+   she is done with it.
+
+   Two things decide it and both are already on the ledger. The SEAT is
+   the machine — nothing under the ninth mark can do this at all, which
+   is the same gate the ulvik and the bend beat answer to. The BOND is
+   how long she is willing to run it. And the length you brought decides
+   how much of you she has hold of to run it on.
+
+   It is not always affection. A grievance on the books, a bond that has
+   been slipping, a house nobody has touched in a week — and it is the
+   same act with a point being made inside it. Riding that one out is
+   how the point gets taken.
+   ===================================================================== */
+const RK_CLAM={
+  name:'THE CLAM',
+  what:'She calls you over, she does not explain, and then she clenches — and what you brought with you is not going anywhere until she has finished with it. How long that lasts is decided by her seat, by what the two of you are worth to each other, and by how much of you she has hold of.',
+  rule:'Only a seat past the ninth mark can do it. Whether it is love or a grievance is settled the moment she calls, and you do not get told which.',
+  callLove:[ '“Honey. Come here.”',
+             '“Come here. Now, and not in a moment.”',
+             '“Put that down and come here.”',
+             '“You. Here. I have decided something.”' ],
+  callMad:[ '“Come here.” There is nothing warm in it.',
+            '“Here. We are going to have a word about the crate.”',
+            '“Come HERE.” The door was already shut.',
+            '“I have been patient since the thaw. Come here.”' ],
+  seeLove:[ 'She has her back to you and a hand out behind her, and she does not look round to check that you are coming.',
+            'She is smiling at the wall, which is somehow worse than her not smiling.',
+            'She has set her feet. That is all the notice you are getting.' ],
+  seeMad:[ 'Her back is to you and her weight is already set. Nothing about the set of her is an invitation.',
+           'The hand is out, but it is out the way a magistrate’s hand is out.',
+           'She does not look round. She has been holding this since the thaw and she is not holding it any longer.' ],
+  ignore:[ '❄ You do not go. She waits four seconds longer than she needed to, and then goes back to what she was doing.',
+           '❄ You stay where you are. She does not ask twice, and on this coast nobody ever has to explain what that meant.' ],
+};
+function clamOn(){ try{ return !!(DM && DM.clam); }catch(e){ return false; } }
+function clamReady(){
+  try{
+    if(!rkHere() || !ADULT) return false;
+    if(!(G && G.married && G.wife && !G.wife.male)) return false;
+    if(G.isFemale) return false;
+    /* THE BOOTY MASTER AND NOBODY ELSE. This is a thing a seat does, and
+       a seat that does not carry the ninth mark cannot do it — the same
+       gate the ulvik and the bend beat both answer to, on purpose, so the
+       three of them can never disagree about who she is. */
+    if(((G.wife.body&&G.wife.body.booty)|0) < RK_BEND_NEED) return false;
+    return true;
+  }catch(e){ return false; }
+}
+/* WHICH ONE IT IS. She has a reason either way and the game already
+   records all of them — a snub on the books, a bond that has been
+   slipping, a house nobody has touched in a week. */
+function clamMood(){
+  try{
+    const rel=(G&&G.wifeRel!==undefined)? G.wifeRel : 50;
+    const snub=(G&&G.rkSnubs)|0;
+    let m=0.18;
+    if(snub>0) m += 0.15*Math.min(3,snub);
+    if(rel<55)  m += 0.22;
+    if(rel>=85) m -= 0.10;
+    const since=(G&&G.day||0)-((G&&G.lastLoveDay)===undefined? -99 : G.lastLoveDay);
+    if(since>6) m += 0.14;
+    return (Math.random() < clamp(m,0.05,0.80))? 'mad' : 'love';
+  }catch(e){ return 'love'; }
+}
+/* AND HOW LONG IT CONTINUES. All three numbers are in here on purpose:
+   her seat is the machine, the bond is how long she is willing to run it,
+   and the length is how much of you she has hold of to run it on. */
+function clamPulses(mad){
+  try{
+    const w=(G&&G.wife)||{}, be=((w.body&&w.body.booty)||5);
+    const rel=(G&&G.wifeRel!==undefined)? G.wifeRel : 50;
+    const len=(typeof ardorLen==='function')? ardorLen() : 5;
+    let n = 3 + Math.round((be-RK_BEND_NEED)*1.4)
+              + Math.round(clamp(rel,0,100)/24)
+              + Math.round(Math.max(0,len-6)*0.5);
+    if(mad) n=Math.max(3, n-2);            // shorter, harder, and she means it
+    return clamp(n, 3, 11);
+  }catch(e){ return 4; }
+}
+function clamDue(){
+  const D=DM; if(!D) return false;
+  if(!clamReady()) return false;
+  if(D.scene||D.slap||D.rslap||D.tempt||D.husb||D.drop||D.rise||D.ardor||D.press||D.curio||D.clam) return false;
+  if(D.t < (D.clamNext||200)) return false;
+  return Math.random() < 0.038;
+}
+function startClam(){
+  const D=DM; if(!D || !clamReady()) return false;
+  const w=G.wife, be=((w.body&&w.body.booty)||5);
+  const mood=clamMood(), mad=(mood==='mad');
+  D.clam={ ph:'call', t:0, pt:0, bend:0, locks:true, mood,
+           grip: clamp((be-5)/6, 0, 1.15),
+           need: clamPulses(mad), rode:0, flash:0, early:0,
+           cyc:  clamp(Math.round(38 - be*1.1 - (mad?5:0)), 19, 40),
+           call: pick(mad? RK_CLAM.callMad : RK_CLAM.callLove),
+           see:  pick(mad? RK_CLAM.seeMad  : RK_CLAM.seeLove) };
+  D.wifePause=99999;
+  D.clamNext=D.t+600;
+  try{ sfx(mad? 'hmm' : 'ui'); }catch(e){}
+  return true;
+}
+/* WHAT IT CAME TO. Riding the whole thing out is the win in both moods —
+   in the warm one because it is what she called you over for, and in the
+   other one because taking it is how the point gets taken. */
+function clamResolve(kind){
+  const D=DM, X=D&&D.clam; if(!X) return null;
+  const w=(G&&G.wife)||{}, be=((w.body&&w.body.booty)||5);
+  const len=(typeof ardorLen==='function')? ardorLen() : 5;
+  const mad=(X.mood==='mad');
+  const bw=clamp((be-5)/6,0,1.15), pw=clamp(len/10,0,1.05);
+  const need=Math.max(1, X.need||1), rode=X.rode||0;
+  const rf=clamp(rode/need,0,1);
+  let bond=0, phys=0, line='';
+  if(kind==='rode'){
+    bond = Math.round(3 + bw*4 + (mad? 5 : 1));
+    phys = Math.round(7 + bw*10 + pw*8);
+    G.woohooAll=(G.woohooAll||0)+1; G.lastLoveDay=G.day;
+    try{ spendLove('quick'); }catch(e){}
+    G.clamRode=(G.clamRode||0)+1;
+    if(mad){ G.rkSnubs=Math.max(0,(G.rkSnubs||0)-1);
+      line='🐚💢 All '+need+' of them, and she let go on her own terms. Whatever it was about is settled — and it is settled her way.'; }
+    else line='🐚❦ All '+need+'. She let go last, and on this coast that is the whole sentence.';
+  } else if(kind==='pulled'){
+    phys = Math.round(2 + rf*(5 + bw*6 + pw*4));
+    bond = mad? -3 : 0;
+    line = mad? '🐚 You pull out of it. She lets you, which is not the same as forgiving you for it.'
+              : '🐚 You pull out of it early. She says “mm,” and files it.';
+  } else if(kind==='missed'){
+    phys = Math.round(1 + rf*(4 + bw*5));
+    bond = 0;
+    line = rode>0 ? '🐚 She loses the rhythm of it at '+rode+' and lets go. Neither of you says anything about that.'
+                  : '🐚 She holds, waits for you to meet it, and does not get met. She lets go.';
+  } else { /* declined — you did not come, or you would not */
+    bond = mad? -5 : -2;
+    G.rkSnubs=(G.rkSnubs||0)+1;
+    line = X.ignored? pick(RK_CLAM.ignore)
+         : (mad? '❄ You do not go over. She had something to settle and you have just told her how it gets settled instead.'
+               : '❄ You do not go over. She takes her hand back in and the room is very quiet for a while.');
+  }
+  /* the standing, if one got raised for this, is discharged by going */
+  let kept=null;
+  if(kind==='rode'||kind==='pulled'||kind==='missed'){
+    try{ kept=rkTaqrunKeep(); }catch(e){}
+    if(!kept){ try{ G.rkStand=null; }catch(e){} }
+  }
+  G.wifeRel =clamp((G.wifeRel||50)+bond, 0, (typeof bondCeiling==='function')? bondCeiling() : 100);
+  G.wifePhys=clamp((G.wifePhys===undefined?45:G.wifePhys)+phys, 0, 100);
+  G.clamSeen=(G.clamSeen||0)+1;
+  if(mad) G.clamMad=(G.clamMad||0)+1;
+  try{ refreshStatbar(); saveQuiet(); }catch(e){}
+  return {bond, phys, line, kept, kind, need, rode, mood:X.mood};
+}
+/* the swell inside one pulse: she closes, HOLDS through the window, and
+   eases off after it — so the plateau you have to meet is the plateau
+   you can see her body sitting at */
+function clamSwell(k){
+  const ease=t=>0.5-0.5*Math.cos(clamp(t,0,1)*Math.PI);
+  return k<0.52? ease(k/0.52) : (k<=0.86? 1 : ease(1-(k-0.86)/0.14));
+}
+function updateClam(dt){
+  const D=DM, X=D.clam; if(!X) return;
+  X.t+=dt;
+  shimmyTick(dt);
+  const mad=(X.mood==='mad');
+  if(X.ph==='call'){
+    X.locks=true;
+    X.bend=clamp(X.t/80,0,1)*0.30;
+    if(consume('x')||consume('j')||consume('l')){
+      X.ph='done'; X.t=0; X.result=clamResolve('declined'); return; }
+    if(consume('space')||consume('attack')){
+      X.ph='come'; X.t=0; try{ sfx('ui'); }catch(e){} return; }
+    /* AND IF YOU JUST STAND THERE. Not answering is an answer here, and
+       she has already told you which one it is. */
+    if(X.t>(mad? 210 : 265)){ X.ignored=true; X.ph='done'; X.t=0;
+      X.result=clamResolve('declined'); }
+  }
+  else if(X.ph==='come'){
+    X.locks=true;
+    X.bend=0.30+clamp(X.t/54,0,1)*0.12;
+    if(X.t>54){ X.ph='clench'; X.t=0;
+      try{ if(typeof rkStandOn==='function' && !rkStandOn()) rkStand(); }catch(e){}
+      try{ sfx('cloth'); }catch(e){} }
+  }
+  else if(X.ph==='clench'){
+    X.locks=true; X.bend=0.42;
+    if(!X.snap && X.t>34){ X.snap=true;
+      try{ sfx(mad? 'slapBig' : 'kiss'); }catch(e){}
+      try{ kickShake(mad? 1.9 : 1.2, 20); }catch(e){}
+      try{ shimmyStart(G.wife, mad? 0.5 : 0.8); }catch(e){} }
+    if(X.t>74){ X.ph='hold'; X.t=0; X.pt=0; X.rode=0; }
+  }
+  else if(X.ph==='hold'){
+    X.locks=true; X.bend=0.42;
+    X.pt=(X.pt||0)+dt;
+    if(X.flash>0) X.flash-=dt;
+    const k=(X.pt/Math.max(1,X.cyc)), win=(k>=0.52 && k<=0.86);
+    if(consume('x')){ X.ph='done'; X.t=0; X.result=clamResolve('pulled'); return; }
+    if(consume('space')||consume('attack')){
+      if(win){
+        X.rode=(X.rode||0)+1; X.pt=0; X.flash=12;
+        try{ sfx((X.rode%2)? 'moan' : 'kiss'); }catch(e){}
+        try{ shimmyStart(G.wife, 0.44); }catch(e){}
+        try{ slapKick(0.28+X.grip*0.22); }catch(e){}
+        D.hearts.push({x:D.wifeX+rnd(-7,7), y:214-48, vy:0.30+Math.random()*0.22,
+                       life:60, c: mad? '#ff7a8a' : '#ff9ad8'});
+        if(X.rode>=X.need){ X.ph='done'; X.t=0; X.result=clamResolve('rode'); return; }
+        /* SHE SPEEDS UP. Each one comes round on you faster than the last,
+           so a long hold is a hold that gets harder rather than a hold
+           that gets longer. */
+        X.cyc=Math.max(16, X.cyc-1.5);
+      } else { X.early=(X.early||0)+1; try{ sfx('ui'); }catch(e){} }
+    }
+    if(k>1){ X.ph='done'; X.t=0; X.result=clamResolve('missed'); return; }
+  }
+  else if(X.ph==='done'){
+    X.locks=false;
+    if(!X.result) X.result=clamResolve('missed');
+    if(X.t>40){
+      const R=X.result||{};
+      D.clam=null; D.wifePause=0;
+      if(R.line) toast(R.line + ((R.bond||R.phys)? '  ('+(R.bond>=0?'+':'')+(R.bond|0)+' 💞, '
+        +(R.phys>=0?'+':'')+(R.phys|0)+' 🔥)' : ''), 6400);
+      if(R.kept) setTimeout(()=>{ try{ toast(R.kept, 5000); }catch(e){} }, 3400);
+    }
+  }
+}
+function drawClam(){
+  const D=DM, X=D.clam; if(!X) return;
+  const FY=214, T=X.t, w=G.wife, PX=D.wifeX;
+  const mad=(X.mood==='mad');
+  const inHold=(X.ph==='hold'), held=(X.ph==='clench'||inHold);
+  /* how hard she is closed at this instant: the clench ramps in once and
+     then the pulses take it over */
+  const sq = inHold? clamSwell((X.pt||0)/Math.max(1,X.cyc))
+           : (X.ph==='clench'? clamp((T-20)/54,0,1) : 0);
+  /* ---- THE ROOM DIMS AND THE LAMP FINDS THE TWO OF THEM ---- */
+  const dark = X.ph==='call'? clamp(T/90,0,1)*0.24 : (held? 0.42 : 0.32);
+  ctx.globalAlpha=0.10+dark; px(-4,-4,W+8,H+8, mad? '#150a0e' : '#180b12'); ctx.globalAlpha=1;
+  const side=(D.x<=PX)? -1 : 1;
+  { const g=ctx.createRadialGradient(PX,FY-34,6,PX,FY-34,88);
+    g.addColorStop(0, mad? 'rgba(255,150,160,'+(0.10+dark*0.22)+')'
+                        : 'rgba(255,190,170,'+(0.13+dark*0.26)+')');
+    g.addColorStop(1,'rgba(0,0,0,0)'); ctx.fillStyle=g; ctx.fillRect(0,60,W,H-60); }
+  /* ---- HIM. Away while she is calling; behind her from the moment you
+     answer, and drawn IN as she takes him. ---- */
+  const goPh=(X.ph==='come'||held);
+  const comeK = X.ph==='come'? clamp(T/54,0,1) : (held? 1 : 0);
+  const pressK= held? 1 : comeK;
+  const AK=rkBackBones(FY, (w&&w.body&&w.body.legs)||5, (w&&w.body&&w.body.booty)||5,
+                           (w&&w.body&&w.body.waist)||5, false);
+  const aimY=AK.seatY+Math.round(AK.seatH*0.42)-Math.round((X.bend||0)*((2.4+((w&&w.body&&w.body.booty)||5)*0.22)));
+  /* she pulls him IN as she closes — the gap is the squeeze, drawn */
+  const gap = goPh? (9.4 - comeK*1.4 - sq*2.6) : 30;
+  const hx  = PX + side*(goPh? gap : 30);
+  let HM=null;
+  try{ HM=drawRkBehindHim(hx, FY, {
+        stand: goPh? 1 : 0, press: pressK, down: 0,
+        aimY: (pressK>0? aimY : undefined),
+        leaf:(typeof rkSivrakOn==='function' && rkSivrakOn('self'))}); }catch(e){}
+  /* ---- HER. The seat CLOSES rather than gives — the give parameter is
+     what squashes the near cheek, so it is driven by the squeeze. ---- */
+  try{ drawRkBack(PX, FY, w, {bend:X.bend||0, bare:false,
+        give: sq*(0.75+((w&&w.body&&w.body.booty)||5)*0.055),
+        rim: pressK>0? side : 0}); }catch(e){}
+  /* ---- THE HAND OUT BEHIND HER, which is the whole of the invitation
+     and the whole of the summons depending on which one this is ---- */
+  if(X.ph==='call'){
+    const hs=(w&&w.skin)||'#e6bd94';
+    const armY=AK.waistY+2, reach=Math.round(5+clamp(T/70,0,1)*4);
+    const x0 = side<0? Math.round(PX-AK.waistW-2-reach) : Math.round(PX+AK.waistW+2);
+    ctx.globalAlpha=clamp(T/40,0,1);
+    px(x0, armY, reach, 2, side<0? hs : shade(hs,-16));
+    px(x0, armY, reach, 1, shade(hs, side<0? 20 : 4));
+    const hxx = side<0? x0-3 : x0+reach;
+    px(hxx, armY-1, 3, 4, hs); px(hxx, armY-1, 3, 1, shade(hs,20));
+    /* and it beckons, because a hand held still is not a summons */
+    { const b=Math.sin(T*0.14)*1.6;
+      px(hxx+Math.round(side<0? b*-1 : b), armY-2, 3, 1, shade(hs,26)); }
+    ctx.globalAlpha=1;
+  }
+  /* ---- HIS HANDS ON HER, once he is there ---- */
+  if(pressK>0.2 && HM){
+    const hs=mixHex((G&&G.skin)||'#caa06a','#1a0e08',0.10);
+    const armY=AK.waistY;
+    const waW=AK.waistW+2.0, reach=Math.round(3+pressK*2);
+    ctx.globalAlpha=clamp(pressK*1.5,0,1);
+    for(const sgn of [-1,1]){
+      const x0 = sgn<0? Math.round(PX-waW-reach+1) : Math.round(PX+waW-1);
+      px(x0, armY, reach, 3, sgn<0? hs : shade(hs,-18));
+      px(x0, armY, reach, 1, shade(hs, sgn<0? 20 : 4));
+      px(x0, armY+2, reach, 1, shade(hs,-28));
+      const hxx = sgn<0? x0+reach-1 : x0-2;
+      px(hxx, armY-1, 3, 4, sgn<0? hs : shade(hs,-14));
+      px(hxx, armY-1, 3, 1, shade(hs, sgn<0? 22 : 6));
+    }
+    ctx.globalAlpha=1;
+  }
+  /* ---- THE CONTACT, AND THE CLAMP ITSELF ----
+     The bar between them SHORTENS as she closes, because the squeeze is
+     measured in how much of him is left outside her — that is the read,
+     and a contact patch that stayed the same width all the way through
+     would be drawing a squeeze that is not happening. */
+  if(pressK>0.05){
+    const be2=((w&&w.body&&w.body.booty)||5), sk2=(w&&w.skin)||'#e6bd94';
+    const len2=(typeof ardorLen==='function')? ardorLen() : 5;
+    const HIDc=mixHex((G&&G.tunic)||'#6a4a2e','#4a3826',0.42);
+    const leaf=(typeof rkSivrakOn==='function' && rkSivrakOn('self'));
+    const M2 =leaf?'#4a7a30':shade(HIDc,-4), MH2=leaf?'#9fd070':shade(HIDc,86),
+          MS2=leaf?'#1a3a12':shade(HIDc,-62);
+    const cy=aimY;
+    const th=Math.max(2, Math.round(1.4+len2*0.15));
+    const full=2.0+len2*0.26;
+    const out=Math.max(2, Math.round(full*(1-sq*0.46)*pressK));
+    const x0=Math.round(PX - out*0.5 + (side<0? -1 : 1));
+    ctx.globalAlpha=clamp(pressK*1.6,0,1);
+    px(x0, cy-th, out+2, th*2+1, mixHex(sk2,'#7a4a3e',0.34));
+    for(let q=-th;q<=th;q++){ const u=(q+th)/Math.max(1,th*2);
+      px(x0, cy+q, out+1, 1, (u<0.26)? MH2 : (u<0.70)? M2 : MS2); }
+    px(x0, cy-th, out+1, 1, MS2); px(x0, cy+th, out+1, 1, MS2);
+    ctx.globalAlpha=1;
+    /* THE CLAMP. Two brackets closing on the contact in the band she holds
+       her office in, because on this coast that is what is doing the
+       holding. Drawn as pixel bars rather than arcs — this canvas is not
+       anti-aliased and a smooth curve reads as a bug on it. */
+    if(sq>0.04){
+      const band=(typeof rkOfficeBand==='function')? rkOfficeBand(w) : '#8a6a3a';
+      const cl =mad? mixHex(band,'#ff6a72',0.50) : mixHex(band,'#ffb6d6',0.42);
+      const cl2=shade(cl,-34);
+      const sp=Math.max(1, Math.round((3.6+be2*0.26)*(1-sq*0.42)));
+      ctx.globalAlpha=clamp((0.32+sq*0.62),0,1);
+      for(const sg of [-1,1]){
+        const yy=cy+sg*sp, wd=Math.round(6+be2*0.30);
+        px(PX-wd/2, yy, wd, 1, cl);
+        px(PX-wd/2-1, yy+sg, 2, 1, cl2);
+        px(PX+wd/2-1, yy+sg, 2, 1, cl2);
+      }
+      /* one soft shadow UNDER the jaws rather than a second pair of bars —
+         it says "gripping" without adding another horizontal line to read */
+      ctx.globalAlpha=clamp(sq*0.34,0,1);
+      px(PX-2, cy-sp+1, 4, (sp*2)-1, 'rgba(24,8,14,.55)');
+      ctx.globalAlpha=1;
+    }
+    /* the hit flash, so a ridden pulse is unmistakable */
+    if(X.flash>0){
+      ctx.globalAlpha=clamp(X.flash/12,0,1)*0.7;
+      px(PX-7, cy-6, 14, 12, mad? 'rgba(255,120,140,.30)' : 'rgba(255,180,220,.30)');
+      ctx.globalAlpha=1;
+    }
+  }
+  /* ---- THE COUNT AND THE WINDOW. Without these it is a scene that
+     wants a keypress and never says when. ---- */
+  if(inHold){
+    const k=(X.pt||0)/Math.max(1,X.cyc), win=(k>=0.52 && k<=0.86);
+    const bw2=86, bx=Math.round(W/2-bw2/2), by=52;
+    px(bx-1, by-1, bw2+2, 7, 'rgba(12,6,10,.86)');
+    px(bx, by, bw2, 5, '#241420');
+    /* the window she is actually at full clench for */
+    px(bx+Math.round(bw2*0.52), by, Math.round(bw2*0.34), 5, mad? '#4a1c26' : '#22401f');
+    /* the sweep */
+    const mx=bx+Math.round(bw2*clamp(k,0,1));
+    px(mx-1, by-2, 3, 9, win? '#9fe8a8' : (mad? '#e0705b' : '#ffb0d0'));
+    /* one pip per pulse she is going to give you */
+    const pw2=Math.min(9, Math.max(4, Math.floor(bw2/Math.max(1,X.need))-2));
+    const tot=X.need*(pw2+2)-2, px0=Math.round(W/2-tot/2);
+    for(let i=0;i<X.need;i++){
+      const on=i<(X.rode||0);
+      px(px0+i*(pw2+2), by+9, pw2, 3, on? (mad? '#ff8a94' : '#ff9ad8') : 'rgba(120,90,110,.45)');
+    }
+    ctx.textAlign='center';
+    pixelText(win? 'SPACE — MEET IT' : 'WAIT FOR THE CLENCH', W/2, by+20,
+      win? 'rgba(159,232,168,.95)' : 'rgba(210,190,210,.60)', win? 0.72 : 0.58);
+    pixelText('X — pull out', W/2, by+29, 'rgba(200,180,200,.42)', 0.52);
+    ctx.textAlign='left';
+  }
+  /* ---- WORDS ---- */
+  ctx.textAlign='center';
+  if(X.ph==='call'){
+    if(T>16) pixelText('🐚 '+X.call, W/2, 26,
+      (mad? 'rgba(255,170,175,' : 'rgba(255,214,190,')+clamp((T-16)/34,0,0.92)+')', 0.80);
+    if(T>52){
+      const words=String(X.see).split(' '); let line='', outl=[];
+      words.forEach(wd=>{ const t2=line?line+' '+wd:wd;
+        if(t2.length>46 && line){ outl.push(line); line=wd; } else line=t2; });
+      if(line) outl.push(line);
+      outl.slice(0,2).forEach((L,i)=>pixelText(L, W/2, 37+i*9,
+        'rgba(230,210,240,'+clamp((T-52)/36,0,0.66)+')', 0.56));
+    }
+    if(T>96) pixelText('SPACE — GO TO HER      ✋ X — DO NOT', W/2, 58,
+      'rgba(232,195,74,'+clamp((T-96)/30,0,0.72)+')', 0.62);
+  } else if(X.ph==='come'){
+    pixelText(mad? '💢 YOU GO OVER' : '❦ YOU GO OVER', W/2, 26,
+      mad? 'rgba(255,160,170,.86)' : 'rgba(255,200,220,.86)', 0.76);
+  } else if(X.ph==='clench'){
+    pixelText(mad? '🐚💢 SHE CLENCHES, AND HOLDS' : '🐚❦ SHE CLENCHES', W/2, 26,
+      mad? 'rgba(255,150,160,.92)' : 'rgba(255,180,220,.90)', 0.80);
+    if(T>36) pixelText(mad? 'You are not being invited. You are being KEPT.'
+                          : 'It stops being a suggestion. You are held exactly where she put you.',
+      W/2, 37, 'rgba(232,220,240,'+clamp((T-36)/30,0,0.78)+')', 0.56);
+  } else if(inHold){
+    pixelText('🐚 '+(X.rode||0)+' / '+X.need+(mad? '   — SHE IS MAKING A POINT' : ''),
+      W/2, 26, mad? 'rgba(255,150,160,.88)' : 'rgba(255,180,220,.88)', 0.76);
+  }
+  ctx.textAlign='left';
+}
 function tryRkPress(){
   const D=DM; if(!D) return;
   const A=(typeof rkPressOk==='function')? rkPressOk() : {ok:false, why:'Not here.'};
@@ -23659,6 +24137,7 @@ function tryRkPress(){
   if(D.tempt){ toast('She is already busy on the low shelf. See how THAT goes first.',2600); return; }
   if(D.husb||D.drop||D.rise||D.ardor){ toast('Something is already happening in this hall.',2400); return; }
   if(D.curio){ toast('She is in the middle of looking at something. Answer that first.',2800); return; }
+  if(D.clam){ toast('She has already called you over. Answer THAT first.',2800); return; }
   /* THE FIRST BEAT IS THE SIGNAL, and if it is already standing the beat
      is short rather than absent — you still see what you are signalling. */
   const up=(typeof rkStandOn==='function') && rkStandOn();
@@ -24572,7 +25051,7 @@ function drawArdor(){
 function ardorBlockedWhy(){
   const D=DM; if(!D) return '';
   if(D.scene) return 'busy';
-  if(D.slap||D.rslap||D.press||D.curio) return 'wait';
+  if(D.slap||D.rslap||D.press||D.curio||D.clam) return 'wait';
   if(D.tempt) return 'she is busy';
   if(D.husb) return 'crossing over';
   if(D.drop) return 'hands full';
@@ -27839,6 +28318,7 @@ function drawDomus(){
       if(D.rslap){ drawRomantic(); }                    // the other kind of reminder
       else if(D.press){ /* ◆ the press draws BOTH of them, backs to the room */ }
       else if(D.curio){ /* 🔎 and so does the curious one */ }
+      else if(D.clam){ /* 🐚 and the clam draws BOTH of them, close */ }
       else if(D.slap){ drawSlap(); }                    // she is being reminded you are in the room
       else if(D.tempt){ drawTempt(); }                  // she is busy with the low shelf
       else if(D.rise){ /* the rise draws him where HE is */ }
@@ -27859,7 +28339,7 @@ function drawDomus(){
        a transform that never unwound. It goes first now. */
     const _busyRefs=(()=>{ const r=roomsOccupiedToday();
       return Object.keys(r).map(x=>r[x].ref); })();
-    for(const k of ((D.rslap||D.press||D.curio)? [] : (D.kids||[]))){
+    for(const k of ((D.rslap||D.press||D.curio||D.clam)? [] : (D.kids||[]))){
       if(k.gone) continue;                                          // sent to the kitchen and gone
       /* AND NOT IF THEY ARE BEHIND A DOOR. The bedchamber said "Gaius &
          Livia — OCCUPIED" while Gaius was visibly standing in the middle of
@@ -27892,13 +28372,14 @@ function drawDomus(){
     if(D.bendAsk) drawBendAsk();                        // and this is him asking
     if(D.drop) drawDrop();                              // the floor, her, and him crossing to it
     /* ---- and what the hall said about the walk ---- */
-    if(D.walkQuip && !D.scene && !D.press && !D.curio){
+    if(D.walkQuip && !D.scene && !D.press && !D.curio && !D.clam){
       const q=D.walkQuip, a=clamp(Math.min(q.t/20,(150-q.t)/40),0,1)*0.80;
       if(a>0){ ctx.textAlign='center';
         pixelText(q.line, D.wifeX, 214-58, 'rgba(255,196,224,'+a.toFixed(2)+')', 0.60);
         ctx.textAlign='left'; }
     }
     if(D.curio) drawCurio();                            // 🔎 she is looking at something
+    if(D.clam)  drawClam();                             // 🐚 she called you over, and then she closed
     if(D.press) drawRkPress();                          // ◆ the crossing, the contact and the hold
     if(D.ardor) drawArdor();                            // 🏛 and it is your own fault this time
     if(D.kidWalk) drawKidWalk();                        // and so is somebody else's husband
@@ -27910,7 +28391,7 @@ function drawDomus(){
        standing in the middle of somebody else's bedchamber at full
        brightness, which is exactly the "leftover model" it looked like. */
     if(D.climb) drawClimb();                            // he is on the flight, between storeys
-    else if(!D.peek && !D.rslap && !D.press && !D.curio && !D.husb && !D.ardor && !D.escort && !(D.rise && D.rise.ph!=='build')
+    else if(!D.peek && !D.rslap && !D.press && !D.curio && !D.clam && !D.husb && !D.ardor && !D.escort && !(D.rise && D.rise.ph!=='build')
        && !(D.drop && D.drop.ph!=='fall')){ const mv=(held.a||held.d), run=mv&&held.s, turning=(D.turn||0)>0;
       const pfy=domusFloorY();                          // the gallery is a floor too
       drawDomusPlayer(D.x,pfy,
@@ -27948,7 +28429,7 @@ function drawDomus(){
     /* THE ARDOR PRINTS ITS OWN. Its place menu sits along the bottom of the
        screen, and the ordinary near-the-wife prompt was drawing straight
        through it — two different sets of key hints in the same six pixels. */
-    if(D.ardor || D.press || D.curio) prompt='';
+    if(D.ardor || D.press || D.curio || D.clam) prompt='';
     else if(D.drop && D.drop.ph==='fall' && Math.abs(D.x-D.drop.x)<16) prompt='SPACE: 🪮 STOOP FOR IT   ·   F: 🍑 …OR FAKE IT';
     else if(D.drop && D.drop.ph==='fall') prompt='F: 🍑 BEND FOR NOTHING AT ALL';
     else if(nearStairs()) prompt='↑ (ARROW UP): CLIMB TO THE GALLERY';
@@ -27974,7 +28455,7 @@ function drawDomus(){
       prompt='SPACE: '+((G.slapCount||0)>=slapCap()&&G.slapDay===G.day? '👋 '+slapLabel('spentShort') : slapLabel('hand'))
              +'  ·  W: '+slapLabel('romantic')+(loveLeft('quick')<=0?' (spent)':'');
     // upstairs already printed its own line — the hall's prompts do not apply
-    const _pw=(D.ardor||D.floor||D.press||D.curio)? 0 : watchersPresent(privacyTier()==='strict');
+    const _pw=(D.ardor||D.floor||D.press||D.curio||D.clam)? 0 : watchersPresent(privacyTier()==='strict');
     if(_pw && privacyTier()!=='easy' && !villaClear())
       prompt = 'E: '+(privacyTier()==='strict'?'🕯 CLEAR THE WHOLE VILLA':'🚸 CLEAR THE HALL')
              +' ('+_pw+' watching)'+(prompt?'   ·   '+prompt:'');
@@ -31319,6 +31800,35 @@ function openTheTen(tab){
         +'<br><span class="muted">Seen: <b style="color:#7ad08a">'+(G.curioSeen|0)+'</b>'
         +' · went all the way: <b style="color:#ff8ad0">'+(G.curioWoohoo|0)+'</b></span>'
         +'</div>', has? 'var(--gold)' : '#7ad08a'); }
+    /* ---- 🐚 THE CLAM, which is a thing a seat does ---- */
+    { const be=(w&&w.body&&w.body.booty)|0;
+      const can=(typeof clamReady==='function') && clamReady();
+      card('<div style="color:#ff8ad0;letter-spacing:1px"><b>🐚 '+RK_CLAM.name+'</b>'
+        +' <span class="small muted">— she starts it, and she finishes it</span></div>'
+        +'<div class="small" style="margin-top:3px;line-height:1.55">'+RK_CLAM.what+'</div>'
+        +'<div class="small" style="margin-top:4px;line-height:1.55"><b style="color:#e8c34a">The rule:</b> '+RK_CLAM.rule+'</div>'
+        +'<div class="small muted" style="margin-top:4px;line-height:1.55">'
+        +'Every other beat in this hall is one you start, or one she plays near you that you may answer. This is the only one '
+        +'where the middle of it is not yours: she calls, she closes, and you either meet each one as it comes or you do not.'
+        +'</div>'
+        +'<div class="small" style="margin-top:5px;line-height:1.7">'
+        +'<span style="color:'+(can?'var(--gold)':'#7a6a58')+'">'+(can?'◈':'·')+' '
+        +(can? ((w.name||'She').split(' ')[0]+' carries the mark — booty <b>'+be+'</b>, and past the ninth she can do this.')
+             : (w? ('Booty '+be+' — under the ninth mark, so no. This is a thing a SEAT does.')
+                 : 'Nobody in this house can do it.'))+'</span>'
+        +(can? '<br><span class="muted">She comes to you in the hall. <b style="color:#e8c34a">SPACE</b> goes over, '
+              +'<b style="color:#e8c34a">X</b> does not — and standing there saying nothing is its own answer. '
+              +'Once she has you, meet each clench with <b style="color:#e8c34a">SPACE</b> inside the window; '
+              +'<b style="color:#e8c34a">X</b> pulls out early. It runs to <b style="color:#ff8ad0">'
+              +((typeof clamPulses==='function')? clamPulses(false) : '—')+'</b> of them right now — her seat sets the floor, '
+              +'the bond sets how long she will keep going, and the length sets how much of you she has hold of.'
+              +'<br>Sometimes it is not affection. A grievance on the books, a bond that has been slipping, a house nobody has '
+              +'touched in a week — and then it is the same act with a point inside it, shorter and harder, and taking all of '
+              +'it is how the point gets taken.</span>' : '')
+        +'<br><span class="muted">Seen: <b style="color:#ff8ad0">'+(G.clamSeen|0)+'</b>'
+        +' · rode it out: <b style="color:#7ad08a">'+(G.clamRode|0)+'</b>'
+        +' · the other kind: <b style="color:#e0705b">'+(G.clamMad|0)+'</b></span>'
+        +'</div>', can? 'var(--gold)' : '#ff8ad0'); }
     /* ---- AND THE ONE THAT IS NOT AN ULVIK AT ALL ---- */
     { const A=rkSivrakAsk();
       const on=(typeof rkSivrakOn==='function') && rkSivrakOn('wife');
@@ -35423,7 +35933,7 @@ function climbStairs(){
   const D=DM; if(!D) return false;
   if(D.climb) return false;                     // he is already on the treads
   if(!nearStairs()) return false;
-  if(D.scene||D.slap||D.rslap||D.tempt||D.husb||D.drop||D.rise||D.ardor||D.press||D.curio||D.escort) return false;
+  if(D.scene||D.slap||D.rslap||D.tempt||D.husb||D.drop||D.rise||D.ardor||D.press||D.curio||D.clam||D.escort) return false;
   /* THE FLIGHT IS ACTUALLY CLIMBED NOW. This used to flip D.floor and put
      you on the other storey in the same frame — the one bit of movement in
      the house that simply teleported. */
@@ -35566,7 +36076,7 @@ function kidWalkEligibleRooms(){
 function kidWalkDue(){
   const D=DM; if(!D) return false;
   if(D.kidWalk || D.escort || D.scene || D.slap || D.rslap || D.tempt
-     || D.husb || D.drop || D.rise || D.ardor || D.press || D.curio) return false;
+     || D.husb || D.drop || D.rise || D.ardor || D.press || D.curio || D.clam) return false;
   if(!kidWalkEligibleRooms().length) return false;
   if((D.t||0) - (D.lastKidWalkT===undefined? -9999 : D.lastKidWalkT) < 500) return false;
   return Math.random() < 0.006;
@@ -45996,8 +46506,10 @@ window.__SS = {
   rkBackBones, drawRkBack, drawRkBehindHim,
   RK_CURIO, curioOn, curioReady, curioDue, startCurio, curioMenu, curioTake,
   curioResolve, updateCurio, drawCurio,
+  RK_CLAM, clamOn, clamReady, clamMood, clamPulses, clamDue, startClam,
+  clamResolve, clamSwell, updateClam, drawClam, setEdge,
   bmHotspots, bmPartAt, bmActions, bmSayIt, bmDoAction, bmMineLen, drawPartPicker,
-  BM_SAY, BM_REPLY, BM_FEEL, bmFeel, bmSayLines, bmFlashPlay, wifeWalkSound, WALK_QUIP,
+  BM_SAY, BM_REPLY, BM_FEEL, bmFeel, BM_LEN_HER, bmLenHer, bmSayLines, bmFlashPlay, wifeWalkSound, WALK_QUIP,
   get bmFlash(){return bmFlash;},
   get bmPart(){return bmPart;}, setBmPart:(p)=>{ bmPart=p; },
   get bmCompare(){return bmCompare;}, setBmCompare:(v)=>{ bmCompare=!!v; },
