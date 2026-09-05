@@ -8700,8 +8700,14 @@ function drawPartPicker(c,cnv,w,view,W2,H2,GUT){
     c.save();
     /* every part you may click: a quiet ring, so the chart reads as a
        thing with controls on it rather than a picture */
+    const _pressLive = !!(bmFlash && bmFlash.kind==='against'
+      && (Date.now()-bmFlash.t)/1000 < 1.70);
     H.forEach(h=>{
       const on=(h.id===bmPart);
+      /* the ring on the part being pressed comes off for the duration —
+         it is drawn under the flash and the only place it survived was
+         the gap between the two of them, i.e. dead centre of the shot */
+      if(on && _pressLive && bmFlash.part===h.id) return;
       c.strokeStyle= on? 'rgba(255,210,122,.92)' : 'rgba(200,150,220,.26)';
       c.lineWidth= on? 1.8 : 1;
       c.setLineDash(on? [] : [2,3]);
@@ -8777,19 +8783,94 @@ function drawPartPicker(c,cnv,w,view,W2,H2,GUT){
                contrast holds in diagram mode AND in the real sprite. ---- */
             const lensR=cr*1.62;
             c.globalAlpha=clamp(a*0.95,0,1);
-            c.fillStyle='rgba(10,6,12,.66)';
+            c.fillStyle='rgba(10,6,12,.50)';
             c.beginPath(); c.ellipse(sel.x, sel.y, lensR*1.14, lensR, 0,0,7); c.fill();
             c.strokeStyle=rgbA(col,0.55); c.lineWidth=1.4;
             c.beginPath(); c.ellipse(sel.x, sel.y, lensR*1.14, lensR, 0,0,7); c.stroke();
-            const sphere=(cx2,cy2,rx,ry,base,rim)=>{
-              const rg=c.createRadialGradient(cx2-rx*0.34,cy2-ry*0.36,rx*0.10, cx2,cy2,rx*1.08);
-              rg.addColorStop(0, lit2(base,1.55)); rg.addColorStop(0.50, base); rg.addColorStop(1, shade2(base));
-              c.fillStyle=rg; c.beginPath(); c.ellipse(cx2,cy2,rx,ry,0,0,7); c.fill();
-              c.strokeStyle=rgbA(rim,0.85); c.lineWidth=1.4;
-              c.beginPath(); c.ellipse(cx2,cy2,rx,ry,0,0,7); c.stroke();
-              // a hard little glint, so it reads as taut skin and not a sticker
-              c.fillStyle='rgba(255,255,255,.55)';
-              c.beginPath(); c.ellipse(cx2-rx*0.36,cy2-ry*0.40,rx*0.16,ry*0.12,0,0,7); c.fill();
+            /* the outline of one cheek. flip is the direction of its CROWN
+               (-1 for the upper one, +1 for the lower): full and round that
+               way, and tapering back the other way into the crease. */
+            const cheekPath=(cy2, flip, rx, ry)=>{
+              c.beginPath();
+              c.moveTo(sel.x-rx, cy2 - flip*ry*0.06);
+              c.bezierCurveTo(sel.x-rx*1.03, cy2 + flip*ry*0.70,
+                              sel.x-rx*0.56, cy2 + flip*ry*1.08,
+                              sel.x,         cy2 + flip*ry*1.08);
+              c.bezierCurveTo(sel.x+rx*0.56, cy2 + flip*ry*1.08,
+                              sel.x+rx*1.03, cy2 + flip*ry*0.70,
+                              sel.x+rx,      cy2 - flip*ry*0.06);
+              /* the inner face, which curves BACK toward the crease rather
+                 than running straight across — that curve is the whole
+                 difference between a cheek and a half-oval */
+              c.bezierCurveTo(sel.x+rx*0.60, cy2 - flip*ry*0.60,
+                              sel.x-rx*0.60, cy2 - flip*ry*0.60,
+                              sel.x-rx,      cy2 - flip*ry*0.06);
+              c.closePath();
+            };
+            const cheek=(cy2, flip, rx, ry, base, rim)=>{
+              /* ================================================
+                 ONE LAMP, ABOVE AND LEFT — AND IT DOES NOT FLIP
+                 ------------------------------------------------
+                 The pass before this mirrored every light on the
+                 lower cheek along with its shape, so it was lit
+                 from BELOW while the upper one was lit from
+                 above. Two masses lit from opposite sides read as
+                 two dishes, which is exactly what they looked
+                 like: a bright rim round a dark middle is the
+                 signature of something concave.
+                 The lamp is over the chart, once, for both of
+                 them: bright on the top of each mass, rolling off
+                 to the bottom of each mass, whichever way round
+                 the mass itself is. Only the AMBIENT OCCLUSION in
+                 the crease is mirrored, because that genuinely
+                 does belong to whichever face is looking at the
+                 other cheek.
+                 ================================================ */
+              cheekPath(cy2, flip, rx, ry);
+              /* the lit pole sits INSIDE the mass, up and to the left of its
+                 centre — not out on the crown, which is what made it a rim */
+              const rg=c.createRadialGradient(sel.x-rx*0.30, cy2-ry*0.34, rx*0.03,
+                                              sel.x-rx*0.06, cy2+ry*0.10, rx*1.02);
+              rg.addColorStop(0.00, lit2(base,1.66));
+              rg.addColorStop(0.30, lit2(base,1.30));
+              rg.addColorStop(0.62, lit2(base,1.04));
+              rg.addColorStop(0.88, shade2(base));
+              rg.addColorStop(1.00, mixHex(shade2(base),'#2a0e16',0.34));
+              c.fillStyle=rg; c.fill();
+              c.save(); cheekPath(cy2, flip, rx, ry); c.clip();
+              /* SUBSURFACE, along the underside — skin is not opaque, and the
+                 shadowed edge of a soft mass goes WARM rather than simply
+                 dark. Leaving this out is most of what reads as plastic. */
+              const sg=c.createLinearGradient(0, cy2+ry*0.30, 0, cy2+ry*1.15);
+              sg.addColorStop(0, rgbA(base, 0));
+              sg.addColorStop(1, rgbA(mixHex(base,'#ff8a62',0.60), 0.30));
+              c.fillStyle=sg;
+              c.fillRect(sel.x-rx*1.15, cy2-ry*1.35, rx*2.3, ry*2.7);
+              /* AMBIENT OCCLUSION — and THIS one is mirrored, because it is
+                 the face looking at the other cheek that loses its sky */
+              const og=c.createLinearGradient(0, cy2 - flip*ry*0.52, 0, cy2 - flip*ry*1.06);
+              og.addColorStop(0, 'rgba(0,0,0,0)');
+              og.addColorStop(1, 'rgba(26,9,16,'+(0.30+tin*0.18).toFixed(2)+')');
+              c.fillStyle=og;
+              c.fillRect(sel.x-rx*1.15, cy2-ry*1.35, rx*2.3, ry*2.7);
+              /* a bounce rim on the lower right, where the ground throws a
+                 little back up — the one edge that is allowed to be bright
+                 on the dark side, and it keeps the silhouette from dying */
+              c.strokeStyle=rgbA(lit2(base,1.40), 0.34); c.lineWidth=2.0;
+              cheekPath(cy2+1.5, flip, rx*0.98, ry*0.98); c.stroke();
+              c.restore();
+              /* the reading's own colour as the outline, so the tie to the
+                 number on the chart is never lost */
+              c.strokeStyle=rgbA(rim,0.78); c.lineWidth=1.3;
+              cheekPath(cy2, flip, rx, ry); c.stroke();
+              /* the specular — up and left, INSIDE the mass, soft-edged */
+              const hx=sel.x-rx*0.34, hy=cy2-ry*0.40;
+              const hg=c.createRadialGradient(hx, hy, 0, hx, hy, rx*0.30);
+              hg.addColorStop(0,'rgba(255,255,255,.52)');
+              hg.addColorStop(0.55,'rgba(255,255,255,.14)');
+              hg.addColorStop(1,'rgba(255,255,255,0)');
+              c.fillStyle=hg;
+              c.beginPath(); c.ellipse(hx, hy, rx*0.30, ry*0.34, -0.32, 0, 7); c.fill();
             };
             /* a ground shadow first, UNDER everything, so the pair sits ON
                the figure instead of floating flat against it */
@@ -8808,14 +8889,32 @@ function drawPartPicker(c,cnv,w,view,W2,H2,GUT){
             /* LENGTH DECIDES HOW FAR IN IT GETS. They part further for a
                long one because they have to — that is the whole reading. */
             const lenK=clamp((len-3)/7,0,1);
-            const gap=cr*(0.68+tin*(0.13+lenK*0.24));
-            sphere(sel.x, sel.y-gap, cr*1.10, cr*0.58, cushBase, col);
-            sphere(sel.x, sel.y+gap, cr*1.10, cr*0.58, cushBase, col);
-            /* where they meet: a real crease, darker as the press deepens */
-            c.strokeStyle='rgba(14,6,8,'+(0.38+tin*0.34).toFixed(2)+')'; c.lineWidth=2.0;
-            c.beginPath(); c.moveTo(sel.x-cr*0.86, sel.y); c.lineTo(sel.x+cr*0.86, sel.y); c.stroke();
-            c.strokeStyle='rgba(255,255,255,.10)'; c.lineWidth=0.8;
-            c.beginPath(); c.moveTo(sel.x-cr*0.80, sel.y+2); c.lineTo(sel.x+cr*0.80, sel.y+2); c.stroke();
+            /* SQUASH AND STRETCH. Soft things do not keep their outline when
+               something is driven between them: they spread wide and lose a
+               little height. Without this the pair just slid apart while
+               staying exactly as round as they started, which is the tell
+               that nothing is actually being pressed. */
+            const rxC=cr*(1.00 + tin*0.11), ryC=cr*(0.70 - tin*0.05);
+            /* the rod's own half-thickness, hoisted up here because the gap
+               between the two of them is measured off it — a bigger one has
+               to shove them further apart, and that IS the length reading */
+            const thBase=Math.max(3.4, 2.6+len*0.40), thTip=thBase*0.80;
+            /* cheekPath puts each inner face at 0.60 of its own ry, so this
+               starts them nearly shut and opens them by about the width of
+               what is going between them */
+            const gap=ryC*0.60 + thBase*(0.30 + tin*0.52);
+            /* the crease they both sit into, laid down FIRST so both of them
+               bed into it rather than floating over it */
+            { const cg=c.createLinearGradient(0, sel.y-gap*0.9, 0, sel.y+gap*0.9);
+              cg.addColorStop(0.00,'rgba(0,0,0,0)');
+              cg.addColorStop(0.50,'rgba(16,6,10,'+(0.34+tin*0.16).toFixed(2)+')');
+              cg.addColorStop(1.00,'rgba(0,0,0,0)');
+              c.fillStyle=cg;
+              c.fillRect(sel.x-rxC*1.08, sel.y-gap*0.9, rxC*2.16, gap*1.8); }
+            /* the lower one is a shade larger — a real pair is not a mirror,
+               and stamping the same oval twice is what made it look printed */
+            cheek(sel.y-gap, -1, rxC,        ryC,        cushBase, col);
+            cheek(sel.y+gap, +1, rxC*1.045,  ryC*1.06,   cushBase, col);
             /* ---- THE ROD. Thicker, to match the cushions it is pressing
                into rather than reading as a pin — it slides in from off
                to the side and stops AGAINST the crease rather than
@@ -8823,7 +8922,6 @@ function drawPartPicker(c,cnv,w,view,W2,H2,GUT){
             const sk=mixHex((G&&G.skin)||'#caa06a','#c07a68',0.26);
             const HI2=shade(sk,50), LO2=shade(sk,-42), MD=shade(sk,-6);
             const L=11+len*3.3;
-            const thBase=Math.max(3.4, 2.6+len*0.40), thTip=thBase*0.80;
             const startX=sel.x + side*(sel.r + L + 8);            // fully retracted
             /* a 3 stops on the near edge of the crease; a 10 is through it
                and out the far side, which is what "you can feel more of it"
@@ -8859,6 +8957,34 @@ function drawPartPicker(c,cnv,w,view,W2,H2,GUT){
               c.beginPath(); c.ellipse(fx, sel.y-gap*0.58, cr*0.34, cr*0.24, 0,0,7); c.fill();
               c.beginPath(); c.ellipse(fx, sel.y+gap*0.58, cr*0.34, cr*0.24, 0,0,7); c.fill(); }
             c.globalAlpha=1;
+            /* ---- THE CHEEKS CLOSE OVER IT ---- */
+            if(tin>0.10){
+              for(const sg of [-1,1]){
+                const cyy=sel.y + sg*gap;
+                const rxx=(sg<0? rxC : rxC*1.045), ryy=(sg<0? ryC : ryC*1.06);
+                c.save(); cheekPath(cyy, sg, rxx, ryy); c.clip();
+                /* the rod's own shadow thrown up onto the lip above it and
+                   down onto the one below — they are touching it, so they
+                   are darkened by it */
+                const shg=c.createLinearGradient(0, sel.y + sg*thBase*0.55,
+                                                 0, sel.y + sg*(thBase+ryy*0.70));
+                shg.addColorStop(0,'rgba(18,6,10,'+(0.34*tin).toFixed(2)+')');
+                shg.addColorStop(1,'rgba(18,6,10,0)');
+                c.fillStyle=shg;
+                c.fillRect(Math.min(tipX,tailX)-2, cyy-ryy*1.4,
+                           Math.abs(tailX-tipX)+4, ryy*2.8);
+                /* and the lip itself, opaque only in the last stretch nearest
+                   the crease so it reads as the edge of her closing rather
+                   than as a slab painted over him */
+                const lg=c.createLinearGradient(0, cyy - sg*ryy*0.16, 0, cyy - sg*ryy*0.60);
+                lg.addColorStop(0.00, rgbA(cushBase, 0));
+                lg.addColorStop(0.55, rgbA(shade2(cushBase), 0.86));
+                lg.addColorStop(1.00, rgbA(mixHex(shade2(cushBase),'#2a0e16',0.38), 1));
+                c.fillStyle=lg;
+                c.fillRect(sel.x-rxx*1.2, cyy-ryy*1.4, rxx*2.4, ryy*2.8);
+                c.restore();
+              }
+            }
             /* a calliper across what actually went in */
             if(tin>0.9){
               c.strokeStyle='rgba(240,220,250,.55)'; c.lineWidth=1;
