@@ -7038,6 +7038,13 @@ const WIFE_TRAITS=[
   {id:'shrewd',   name:'Shrewd',     icon:'⚖', min:6, desc:'She reads a contract the way a haruspex reads a liver, and finds the rot.'},
   {id:'tempting', name:'Tempting',   icon:'🍑', min:5, female:true,
    desc:'There is always something on the LOW shelf, and she never once hurries.'},
+  /* ---- THE VAKRAN. The coast's own word for a seat that does not merely
+     take a thing: it closes on it and keeps it there until she is finished.
+     Like Curious it belongs to this coast and nowhere else, and like
+     Curious it is not a performance — it is a decision she makes and then
+     carries out without discussing it with you first. ---- */
+  {id:'vakran',   name:'Vakran',     icon:'🐚', min:5, female:true, eth:'rkrai',
+   desc:'A vakran does not take hold of a thing, she CLOSES on it. She will call you over about it, she will not explain first, and she decides when it is over.'},
   /* ---- AND THE RKRAI ANSWER TO IT, which is not a performance at all ---- */
   {id:'curious',  name:'Curious',    icon:'🔎', min:4, female:true, eth:'rkrai',
    desc:'Something has caught her eye and the rest of the room has stopped existing. She is not doing it AT you. That is the whole difference.'},
@@ -23740,7 +23747,7 @@ function updateCurio(dt){
 const RK_CLAM={
   name:'THE CLAM',
   what:'She calls you over, she does not explain, and then she clenches — and what you brought with you is not going anywhere until she has finished with it. How long that lasts is decided by her seat, by what the two of you are worth to each other, and by how much of you she has hold of.',
-  rule:'Only a seat past the ninth mark can do it. Whether it is love or a grievance is settled the moment she calls, and you do not get told which.',
+  rule:'Only a vakran does it — it is her trait, not a score, and no other wife on this coast will ever call you over like this. Her seat decides how LONG it runs. Whether it is love or a grievance is settled the moment she calls, and you do not get told which.',
   callLove:[ '“Honey. Come here.”',
              '“Come here. Now, and not in a moment.”',
              '“Put that down and come here.”',
@@ -23764,11 +23771,12 @@ function clamReady(){
     if(!rkHere() || !ADULT) return false;
     if(!(G && G.married && G.wife && !G.wife.male)) return false;
     if(G.isFemale) return false;
-    /* THE BOOTY MASTER AND NOBODY ELSE. This is a thing a seat does, and
-       a seat that does not carry the ninth mark cannot do it — the same
-       gate the ulvik and the bend beat both answer to, on purpose, so the
-       three of them can never disagree about who she is. */
-    if(((G.wife.body&&G.wife.body.booty)|0) < RK_BEND_NEED) return false;
+    /* THE VAKRAN AND NOBODY ELSE. Gating this on the seat alone made it a
+       property of a number — every wife past the ninth mark did it, which
+       is the opposite of the thing being particular to her. It is her
+       TRAIT now, exactly as the curious one is, and the seat has kept the
+       job it is actually good for: deciding how long it runs. */
+    if(!(G.wife.traits && G.wife.traits.indexOf('vakran')>=0)) return false;
     return true;
   }catch(e){ return false; }
 }
@@ -24043,27 +24051,63 @@ function drawClam(){
     for(let q=-th;q<=th;q++){ const u=(q+th)/Math.max(1,th*2);
       px(x0, cy+q, out+1, 1, (u<0.26)? MH2 : (u<0.70)? M2 : MS2); }
     px(x0, cy-th, out+1, 1, MS2); px(x0, cy+th, out+1, 1, MS2);
+    /* a specular run along the top so it is a cylinder and not a strip */
+    ctx.globalAlpha=clamp(pressK*1.2,0,1)*0.75;
+    px(x0+1, cy-th+1, Math.max(1,out-1), 1, MH2);
     ctx.globalAlpha=1;
-    /* THE CLAMP. Two brackets closing on the contact in the band she holds
-       her office in, because on this coast that is what is doing the
-       holding. Drawn as pixel bars rather than arcs — this canvas is not
-       anti-aliased and a smooth curve reads as a bug on it. */
+    /* =====================================================
+       THE CLAMP — DRAWN ON THE RIGHT AXIS THIS TIME
+       -----------------------------------------------------
+       The first cut drew it as two horizontal bars, one above
+       the contact and one below, closing vertically. That is
+       the wrong axis for this body: drawRkBack builds her from
+       BEHIND, so her two cheeks sit either side of a VERTICAL
+       crease down the centre line, and anything closing on
+       something between them closes SIDEWAYS. Bars across her
+       therefore read as a bracket laid on top of her rather
+       than as her doing anything, which is exactly how it
+       looked.
+       So: the two masses roll in toward the centre, the crease
+       between them deepens as they do, and the only bright
+       mark left is a pair of short ticks flanking the join —
+       enough to keep the beat legible without painting a piece
+       of machinery onto a woman.
+       ===================================================== */
     if(sq>0.04){
       const band=(typeof rkOfficeBand==='function')? rkOfficeBand(w) : '#8a6a3a';
       const cl =mad? mixHex(band,'#ff6a72',0.50) : mixHex(band,'#ffb6d6',0.42);
-      const cl2=shade(cl,-34);
-      const sp=Math.max(1, Math.round((3.6+be2*0.26)*(1-sq*0.42)));
-      ctx.globalAlpha=clamp((0.32+sq*0.62),0,1);
+      /* her seat's own bones, off the same numbers drawRkBack used, so the
+         closure lands on the cheeks she actually has rather than near them */
+      const bnd=(X.bend||0);
+      const hike=bnd*(2.6+be2*0.26);
+      const sY=AK.seatY-hike, sH=AK.seatH;
+      const seatW=(4.6+be2*0.48)*(1+bnd*0.16);
+      const cyS=sY+sH*0.52, rhS=sH*0.92;
+      const skH=sk2, hiH=shade(skH,20), shH=shade(skH,-30), deepH=shade(skH,-50);
+      /* how far in each mass has travelled */
+      const close=sq*(1.5+be2*0.11);
       for(const sg of [-1,1]){
-        const yy=cy+sg*sp, wd=Math.round(6+be2*0.30);
-        px(PX-wd/2, yy, wd, 1, cl);
-        px(PX-wd/2-1, yy+sg, 2, 1, cl2);
-        px(PX+wd/2-1, yy+sg, 2, 1, cl2);
+        /* the inner shoulder of the cheek, bunching as it rolls in: a lit
+           edge on the way down into the crease and its own shadow under it */
+        const xi=PX + sg*Math.max(1.2, seatW*0.34 - close);
+        ctx.globalAlpha=clamp(sq*0.60,0,1);
+        px(xi-(sg<0?1.6:0), cyS-rhS*0.40, 1.6, rhS*0.80, hiH);
+        ctx.globalAlpha=clamp(sq*0.52,0,1);
+        px(PX+sg*1.4, cyS-rhS*0.46, 1.4, rhS*0.92, shH);
       }
-      /* one soft shadow UNDER the jaws rather than a second pair of bars —
-         it says "gripping" without adding another horizontal line to read */
-      ctx.globalAlpha=clamp(sq*0.34,0,1);
-      px(PX-2, cy-sp+1, 4, (sp*2)-1, 'rgba(24,8,14,.55)');
+      /* THE CREASE, which is the whole read: it darkens and it lengthens
+         as the two of them shut on him */
+      ctx.globalAlpha=clamp(0.40+sq*0.55,0,1);
+      px(PX-0.7, sY-sq*1.2, 1.4, sH+1+sq*2.4, mixHex(deepH,'#180a0e',0.55));
+      /* and a shadow pooling at the join, so he is INSIDE it and not
+         standing in front of it */
+      ctx.globalAlpha=clamp(sq*0.46,0,1);
+      px(PX-3, cy-2, 6, 5, 'rgba(20,7,12,.62)');
+      /* the two ticks that keep the beat readable — flanking the join on
+         the axis it actually closes on, and they come TOGETHER */
+      const tk=Math.max(1.4, (3.4 - sq*1.7));
+      ctx.globalAlpha=clamp(0.34+sq*0.60,0,1);
+      for(const sg of [-1,1]) px(PX+sg*tk-(sg<0?1:0), cy-2, 1, 5, cl);
       ctx.globalAlpha=1;
     }
     /* the hit flash, so a ridden pulse is unmistakable */
@@ -31802,6 +31846,7 @@ function openTheTen(tab){
         +'</div>', has? 'var(--gold)' : '#7ad08a'); }
     /* ---- 🐚 THE CLAM, which is a thing a seat does ---- */
     { const be=(w&&w.body&&w.body.booty)|0;
+      const has=!!(w && w.traits && w.traits.indexOf('vakran')>=0);
       const can=(typeof clamReady==='function') && clamReady();
       card('<div style="color:#ff8ad0;letter-spacing:1px"><b>🐚 '+RK_CLAM.name+'</b>'
         +' <span class="small muted">— she starts it, and she finishes it</span></div>'
@@ -31812,11 +31857,12 @@ function openTheTen(tab){
         +'where the middle of it is not yours: she calls, she closes, and you either meet each one as it comes or you do not.'
         +'</div>'
         +'<div class="small" style="margin-top:5px;line-height:1.7">'
-        +'<span style="color:'+(can?'var(--gold)':'#7a6a58')+'">'+(can?'◈':'·')+' '
-        +(can? ((w.name||'She').split(' ')[0]+' carries the mark — booty <b>'+be+'</b>, and past the ninth she can do this.')
-             : (w? ('Booty '+be+' — under the ninth mark, so no. This is a thing a SEAT does.')
+        +'<span style="color:'+(has?'var(--gold)':'#7a6a58')+'">'+(has?'◈':'·')+' '
+        +(has? ((w.name||'She').split(' ')[0]+' is a vakran. Her seat is <b>'+be+'</b>, which is not what decides '
+                +'whether this happens — it is what decides how long it runs once it does.')
+             : (w? 'She is not a vakran, so this will never happen in this house. It is a trait of this coast, like Curious — you either married one or you did not.'
                  : 'Nobody in this house can do it.'))+'</span>'
-        +(can? '<br><span class="muted">She comes to you in the hall. <b style="color:#e8c34a">SPACE</b> goes over, '
+        +(has? '<br><span class="muted">She comes to you in the hall. <b style="color:#e8c34a">SPACE</b> goes over, '
               +'<b style="color:#e8c34a">X</b> does not — and standing there saying nothing is its own answer. '
               +'Once she has you, meet each clench with <b style="color:#e8c34a">SPACE</b> inside the window; '
               +'<b style="color:#e8c34a">X</b> pulls out early. It runs to <b style="color:#ff8ad0">'
