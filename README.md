@@ -49,7 +49,7 @@ publicly, leaving it off keeps the game safe for a general audience.
 ---
 
 ## Feature highlights
-- **Fighter cards** — choose a champion (Roman Legionary, Celtic Warrior, Persian Immortal,
+- **Fighter cards** — choose a champion (Roman Legionary, Celtic Warrior, Parthian Cataphract,
   Pit Brawler, Blood Fanatic, Net-Fighter), each a real gladiator class with a drawn portrait
   and stat bars. No default — you must pick.
 - **Physics-hopper combat** — every step is a real hop with momentum and gravity; stance
@@ -75,6 +75,312 @@ publicly, leaving it off keeps the game safe for a general audience.
   **intrigue** against rival elites, and — at the summit — become **Emperor** and rule.
 - **Succession** — when your gladiator's day is done, **play on as your son or daughter**,
   inheriting the family's standing.
+- **Choose your sex, and roll for your blood** — pick ♂ or ♀ at the enrolment table (the champion
+  cards are drawn for both), then **roll your own body and traits** as many times as you like. The
+  ⛧ IMPOSSIBLE can land for anyone, but the odds climb steeply with rank: a gladiator's odds are a
+  rounding error, a patrician's are real, and the **Emperor's Kin** roll it more often than not
+  everyone else combined.
+- **The wardrobe of rank** — an elite house or the imperial line starts with a **crown and an
+  expensive robe already on them**, no purchase required (toggle it on or off from the villa).
+  It is painted onto **every portrait of you and your house**. Everyone else sees exactly what it
+  would take to earn one.
+- **A family portrait gallery** — every name in your house gets a drawn face: parents, siblings,
+  spouse, children and you. Rank is written on it (a patrician circlet, the imperial diadem, an
+  Emperor's laurel), and the dead are painted with *D · M* the way every Roman tomb was.
+- **The imperial court** — for those born to the purple: the **Praetorian Prefect** who really
+  decides whether you keep breathing, three court figures with their own opinions of you, and a
+  live **RISK TO THE PURPLE** reading fed by unrest, unanswered petitions and a brother with a
+  better claim.
+- **The poor do not buy a marriage — they have to talk** — a matchmaker is a service
+  bought by families with something to trade. Below the citizen line there is no
+  shortlist and no roll buttons at all: the matchmaker card is **locked, and says
+  why**. What you get instead is **a conversation**. Four doors — someone of your own
+  station, a rich merchant's child, a patrician's child, one of the imperial house —
+  and the shut ones stay **visible and locked with the exact requirement on them**
+  (a slave cannot contract a legal marriage into the senatorial class no matter how
+  much coin he is sitting on, which is real Roman law, not a balance decision).
+- **Courtship is a talking game** — a progress bar to 100, a hard mistake limit (four
+  at your own station, three for the rich, two for a patrician, **one** for the
+  purple), and a fresh exchange every turn with four ways to answer. Every line is
+  tagged — 💗 sweet · 🫱 honest · 🎭 wit · 💪 body · 🔥 bold — and the card tells you
+  how *this particular person* takes that sort of thing, because taste inverts by
+  station: **a woman of your own class warms to sweetness and honesty; a rich one has
+  been flattered by professionals and wants to know what you actually ARE.** Every
+  answer gets a real reply, colour-coded, and a reaction — flattered, amused,
+  unmoved, put off, offended.
+- **🂠 HIDDEN POTENTIAL — the gutter roll** — a roll offered at the enrolment table
+  to the **bottom of the ladder and nobody else**. Every visible part of you comes back
+  resolutely ordinary (average 4.8, never above 6 — you will not turn a head in the
+  street), except the one thing nobody can see, which comes back **immense, every
+  time**. A patrician has no use for it; he can buy a match on his name. A gladiator
+  cannot buy anything and has to talk — and this is the hand that makes the secret
+  boast **true**, where an ordinary poor roll backs it only about 13% of the time.
+- **The courtship has a scene** — it was a wall of text with a stamp-sized portrait.
+  It now draws **the two of you where you actually are**: a torchlit street fountain,
+  a colonnaded garden with the wine out, a marble hall, or the palace with the guards'
+  spears at the edge. Their posture answers to how it is going — half turned away
+  while they are unconvinced, square on once you have them — you **close the distance**
+  as the bar fills, hearts rise between you past two-thirds, and a mood glyph sits over
+  their head. Plus a proper inset progress bar with quarter-marks, mistake pips that
+  look like pips, and every answer colour-coded down its edge by type.
+- **A boast is a claim, and a claim can be false** — once the conversation is going
+  well enough, lines unlock that name a thing about your body and put a number behind
+  it. Say it when it's **true** and it lands harder than any sweet line. Say it when
+  it isn't and they simply **do not believe you** — and then you decide: let it go and
+  eat the mistake, or **SHOW THEM**. If the claim was true, that settles it completely.
+  If it wasn't, it is a disaster you do not recover from. And in front of a patrician
+  or the imperial house, offering at all ends the evening on the spot.
+- **The tonsor and the clothier** — you had eight cuts, five beards, seven outfits and
+  a hair palette, and no way on earth to choose any of them. The villa now keeps a
+  barber and a wardrobe: pick your cut, your beard, your colour (henna, walnut hulls,
+  Germanic soap-lye — Rome dyed its hair constantly) and your cloth, with a live
+  preview of yourself, and **Rome's rules about who may wear what**: the toga needs an
+  office or a seat, the cuirass needs a command. What you choose is what you wear in
+  the halls, in the family portrait and on every plate you appear on.
+- **Scars, and the arena's price** — a wound that closes is placed **once** on the
+  body — face, arm, torso or leg, chosen from what the wound actually was — and then
+  drawn there for the rest of your life: on the body map, in the villa, on your
+  portrait and in the bath, where there is nothing to hide it. A light wound is one
+  stroke, a serious one two, a grave one a ruin. The chart lists them by name.
+- **500 denarii buys you a hearing** — station opens the matchmaker's door by
+  default, but so does money, because it always did. A gladiator with **500d in hand**
+  gets the same shortlists as anyone; below that the locked card tells you exactly how
+  much you are short. Courting stays available at every station either way — it is a
+  second road, not a punishment.
+- **The wardrobe scene was running blind** — twelve seconds of two dark-brown
+  silhouettes drawn at 0.3 alpha onto dark-brown cedar, which is to say twelve seconds
+  of nothing. The same failure the pool had. **The lamp is inside now**: the panels
+  glow, light bleeds through the seam and spills on the floor, and the pair read as
+  near-black shadows against it — which is the entire point of putting them behind a
+  door.
+- **The steam got out of the way** — the pool's censoring was two near-opaque slabs at
+  0.85 alpha covering the figure from shoulders to thigh, which read as a white bar
+  rather than as steam. It is now a pair of **narrow bands that drift, breathe and
+  taper off at both ends**, with loose curls rising off the water — shoulders, arms,
+  waist and legs all read through it, and it still covers what it has to.
+- **Three pool bugs, fixed** — pressing SPACE or W near the pool used to be able to
+  glitch: both keys were checked unconditionally in the same tick, so a fast
+  double-press (or a touch player's thumb clipping two adjacent pads) could start
+  the solo bath and have it silently replaced by the invite scene, or vice versa,
+  before either ever drew a frame. Only one action starts per tick now. Separately,
+  the **W/INVITE touch button was hidden outright in the villa** — the on-screen
+  prompt said "W: INVITE" but touch players had no control that sent it; it now
+  shows in the villa too, relabelled 💞 so it isn't confused with the race's WHIP
+  button. And the five pool positions were assigning roles to **"the player" and
+  "the spouse"** rather than to whichever figure is actually male — so a woman
+  playing opposite a male spouse was drawn behind him doing the pressing in
+  "against the marble lip," and lifting him in "lifted." Roles now follow **which
+  figure is actually male**, so the pairing plays the same way regardless of which
+  side of it is you.
+- **The bedchamber is a theatre** — the shadow-play used to run at two-thirds size
+  against its own flat backdrop. It now gets what made the pool work: the room dims to
+  nothing, a **wall of lamplit warmth** appears behind the pair so the silhouettes are
+  shadows *on* something, two lamps carry the light with a real flicker, the **camera
+  comes in**, and a vignette holds the eye. All seven positions — the embrace, the
+  kiss, from behind, the ride, the lift, the sundial, the tangle — read as clean black
+  figures against warm light, and each is **named on the plate** as it settles.
+- **The max face is three faces** — a man of twenty-four, forty and sixty-five are not
+  handsome in the same way. The top tier now draws a **young**, a **middle-aged** and
+  an **old** cut of the same head: the same bones, but the brow thickens and goes
+  unruly, the eye-lines deepen, the jaw corner grows heavy, and the years arrive on
+  top. It is also **drawn simple on purpose**: the previous version stacked thirty-odd
+  marks on a thirteen-pixel head — brow rows, lash lines, sockets, hollows, four rows
+  of mouth — and all that detail turned to mud at sprite size. It is a dozen marks
+  now: clean skin, two bright eyes with a glint apiece, one light arched brow, the
+  smallest nose that reads, and a **cheeky lopsided grin with a dimple**. And the scar
+  that used to be painted on **every man in the game whether he had earned one or
+  not** is gone; you get scars by being cut.
+- **The matchmaker matches on age** — pay her and she does what you are paying her
+  for. An ordinary viewing is off by sixteen years on average; **SEND FOR FINER
+  FAMILIES** lands within six, and **THE MATCHMAKER'S FINEST** within three.
+- **Five positions in the pool** — face to face, lifted clean out of the water,
+  against the marble lip, astride on the step, and adrift in no hurry at all. Each has
+  its own placement and its own motion, they cycle through the scene, and **each one
+  is named on the plate** so you can tell what you are looking at. The bedchamber's
+  seven positions are named now too.
+- **The pool, rebuilt** — the bathing scene was four bugs stacked on each other: the
+  player's head-in-the-water was drawn every frame, so a spare head sat beside the
+  couple for the whole scene; the spouse walked over with **no subject passed**, so
+  they arrived wearing *your* body; the undressed figure on the rim was two fixed sets
+  of rectangles, identical for a flat spouse and a maxed one; and the two silhouettes
+  in the shallows merged into one lump that tilted a pixel and a half and did nothing
+  else. Both figures are now built from **their own scores**, the roles follow who is
+  actually who, and once they close there is a **beat** — they rise and settle on it,
+  arms shift, the surface heaves and breaks, and rings pulse out in time. The camera
+  also **comes in**: this played out at sixty pixels wide in the corner of a
+  four-hundred-and-eighty-pixel hall, lit from behind by a wall of lamplit steam so
+  the shadows are shadows *on* something.
+- **Eight haircuts and five beards for men** — the game used to draw every man
+  alive with the same head of hair. Now there is **the Roman crop** (combed forward,
+  cut straight across the brow), **swept back** (tight sides, height at the front),
+  **tousled**, **tight curls** (the Hadrianic fashion), **Germanic long**, the real
+  **Suebian knot** tied above one ear, the **steppe queue** (shaved sides, one long
+  tail), and **cropped to the scalp** — plus clean-shaven, stubble, a full beard, a
+  forked beard and a drooping Celtic moustache, and a hair palette that runs from
+  blue-black through chestnut and auburn to Germanic blond.
+- **Seven outfits** — a white wool tunic, a soldier's **muscled cuirass** with
+  pteruges and a general's cloak, the **toga** with its purple border sweeping hip to
+  shoulder, an **embroidered eastern robe** over trousers, a **fur-trimmed Germanic
+  cloak** with a great round brooch and cross-gartered legs, a **rider's kaftan**
+  crossed over a fitted belt, and a **Greek himation** worn off one bare shoulder.
+  Each people wears its own, and the marriage card tells you which.
+- **The villa is the portrait** — this was the bug: the painted plate gave a woman a
+  krobylos knot, an Egyptian wig or a Celtic braid, and the villa gave *everyone* the
+  same generic cap of hair. Both now call **one hair routine**, so the woman walking
+  your halls has the arrangement, the gown, the gold and the diadem she was painted
+  with — and the same is true of your husband's cut, beard and clothes, and of you.
+- **The years, written on every face** — one age drives grey at the temples, crow's
+  feet, a furrowed brow, a jaw that softens and then goes, clouded eyes past seventy,
+  a receding hairline on a man and a covered head on a matron — and youth gets its own
+  bloom, so twenty does not look like thirty-five. It runs in the family gallery, the
+  court, the marriage portraits, the husband sprite and the villa alike. Your house
+  ages exactly as fast as you do, because everyone's age is an offset from yours.
+- **Five drawn bust tiers to match the rear** — FLAT (one unbroken panel, nothing to
+  part), RAISED (a modest swell), GOOD (two clear cups and a short V), BIG (parted
+  cups with real depth and a forward thrust), HUGE (it crests above the neckline,
+  spills past the ribs and the lacing is visibly losing). Drawn in the marriage
+  portrait, the villa sprite and the body map's front and side views — noble silk and
+  peasant homespun each get their own treatment at every rung.
+- **The whole house has real faces** — every parent, sibling, Praetorian Prefect and
+  court figure is drawn on the same 1-10 ladder as your spouse: five male face tiers,
+  five female, a build that shows in the shoulders and the bodice, and hair from thin
+  to piled-high Flavian. Fixed for life, seeded from the name.
+- **Blood shows** — a child's face, hair and build are rolled from *both* parents
+  rather than from nothing, so a house of plain people does not produce five stunning
+  children. Grown children stand in the family portrait as adults, drawn on the face
+  they inherited, instead of staying round-cheeked toddlers forever.
+- **The court are people now** — each of the three court figures has a name, an age,
+  a sex and a drawn face beside their lever, not just an emoji.
+- **The body map is modelled** — every mass on the chart now carries a light from the
+  upper left and a shadow opposite, so a figure reads as a body rather than as a set
+  of flat stickers. Plus a surveyor's grid with major lines and numerals, and a vignette.
+- **The other ledger, rebuilt** — the studies are drawn with real gradients and a cast
+  shadow; the rule has numerals and a **ROME · AVERAGE** pin so the number means
+  something ("+3 over Rome's common run"); the girth view has calliper jaws that
+  actually close on the section; and when roused, the **at-rest state is ghosted over
+  the top** so the difference is the thing you can see.
+- **Five drawn booty tiers, in the portrait too** — FLAT, RAISED, ELEVATED, FAT and COLOSSAL are
+  five genuinely different silhouettes on the body map, in the villa sprite **and in the painted
+  marriage portrait you actually look at**, not one shape scaled up. FLAT lets the cloth fall
+  straight from girdle to thigh; RAISED is one shallow swell; ELEVATED sits round and high on a
+  shelf; FAT rises above the girdle with a real underfold; COLOSSAL overhangs the thigh with a
+  double fold and light rolls around the hip. The girdle line bends to follow whichever it is.
+  The readout puts the tier first, the way a person would say it: **FAT Booty**, **TINY Waist**.
+- **Five drawn male faces, in the portrait too** — Plain (round, soft, heavy-nosed) → Rough (a
+  broken nose and a crooked mouth) → Handsome → Striking (a straight nose and a jaw that juts) →
+  Godlike (deep-set eyes, hollows under the cheekbones, a chin with a corner on it). The head
+  shape changes too, so it reads at sprite size.
+- **Suitors are drawn as themselves** — the husband's marriage portrait used to render *your*
+  body with a default face on every candidate. He now gets his own painted alcove — a marble
+  column and hung curtain for a noble, a plastered wall and a shuttered window for a peasant, a
+  planted spear if he is a warrior — and his own face tier, build, length, skin, tunic and rank
+  clavus. Ten suitors are ten different men.
+- **White wool and Tyrian purple** — the brown is gone. Roman tunics were undyed white with a
+  **purple clavus**, and its width was the rank: broad for a senator, narrow for everyone else.
+  Noblewomen wear real purple, which cost more than its weight in silver and was the whole point.
+- **The villa sprites are the portraits** — your spouse in the halls now carries the same gown
+  colour, hair, gold hem, diadem, necklace and earrings as the painted plate she came from.
+- **Every body is its own body** — the villa walk, the bride portraits and every intimate scene
+  are drawn from the *actual* rolled scores of you and your spouse. A flat figure reads flat
+  (no invented cleavage, no invented behind), a maxed one is unmistakable, and the shadow-play
+  is measured rather than assumed.
+- **Seven staged shadows** — the shadow-play reads the same ladder the body map does, and each
+  tier throws its own shadow with its own light, heat and **its own nameplate treatment**:
+  **NO LOOKS** (a chipped grey slab) → **GOOD LOOKS** (plain bronze) → **CURVY** (breathing amber)
+  → **GOOD LOOKING** (rose, sparks at the corners) → **ABSOLUTE FIRE** (the plate is on fire and
+  the wall is burning through) → **SPICY (MAX)** (**no wall left at all**, radiating beams, a
+  shine sweeping the title) → **⛧ IMPOSSIBLE** (a rippling plate, orbiting motes and a ghosted
+  title). A husband is rated on **his own parts and his own length**, not hers.
+- **Your own rung** — the mirror names your stage on the same ladder, and it drives how often
+  Rome shouts about you and how often unasked gifts turn up.
+- **The Titles of Rome** — 22 honours from **AVGVSTVS** down to **TIRO**, each with a drawn
+  emblem (the laurel, the fasces, the aquila, the curule chair, the scales, and the *rudis* —
+  the wooden sword that bought a gladiator's freedom), ranked best to worst, with the real
+  history behind each one. You wear **1 to 4 at once** (office, the Senate and the purple each
+  open a slot), and they print under your name.
+  **Women take the masculine form where history did**: Irene of Athens ruled and signed herself
+  *Basileus*, not Basilissa, so **AVGVSTVS**, **CONSVL**, **LEGATVS LEGIONIS** and the rest are
+  hers in the man's form and marked *♂ IN THE MASCULINE*. Where Rome insisted on a feminine
+  title she gets that instead — **CLARISSIMA FEMINA** was a real legal rank — and
+  **MATER CASTRORVM**, voted to Faustina and Julia Domna, was only ever hers.
+- **Born to something** — a patrician starts as **PATRICIVS**, the imperial line as
+  **NOBILISSIMVS CAESAR**, and everyone else as **TIRO** (which is quietly replaced the moment
+  you earn better).
+- **Titles pay** — every worn honour carries a real effect: *AVGVSTVS* +18 tolerance,
+  *MAGISTER MILITVM* +3 to the provinces you can carry, *PATER PATRIAE* quiets unrest across the
+  whole empire, *RVDIARIVS* lets you refuse a bout without disgrace.
+- **The conferring** — a rank-7 honour is not a silent unlock. The Guard brings the purple on a
+  spear-shaft; the Senate votes *Pater Patriae* standing; the legions shout one word at the
+  rampart until the officers give up stopping them.
+- **The inscription** — every honour you ever earned is cut into your stone (*D · M … VIXIT
+  ANNIS …  STTL*), and your heir inherits a share of what those honours bought in renown, honour
+  and tolerance.
+- **A political map, painted** — hold a province and **the whole territory takes your colour**,
+  gold-hatched, not just the label. Dotted seams mark the internal borders, Parthia is steel,
+  barbaricum cream, and the **Gepids** hold the Carpathian rim.
+- **Exhaustion and over-extension** — every province is a garrison, a road and a grain convoy.
+  Take more than you can carry and upkeep climbs, unrest spreads and men desert in the night.
+  Taking a **core** province (Italia, Aegyptus, Asia Minor, Syria, Africa, Gallia) is a civil
+  war, not a conquest: triple the exhaustion, −honour, −approval, and every other province you
+  hold turns uneasy.
+- **The Herbarius** — a real Roman apothecary, ten plants a physician of 200 A.D. actually
+  carried, each with its own drawn icon: garlic & honey, willow bark (*"seventeen centuries later
+  they will call it aspirin"*), wormwood, betony, opium poppy, mandrake root, and **Theriac of
+  Galen** — sixty-four ingredients, compounded for the Emperor himself. They close wounds, lift
+  fatigue and hold the years back.
+  **Rue** for the eyes (Pliny says engravers ate it daily), **pennyroyal** for the chest and the
+  gut, and **silphium of Cyrene** — the panacea Rome stamped on its coinage and then harvested to
+  extinction. Every herb has a drawn icon and its own sound at the pestle.
+- **Illness in the house** — five period ailments (marsh fever, a griping flux, a winter cough,
+  streaming eyes, a wound gone bad) land on you, your spouse or a named child. The right plant
+  clears it in an evening; the wrong one does nothing; left alone it runs its course and
+  occasionally takes something with it.
+- **Childbirth is preparation, not luck** — a retained midwife, the right two plants, a clean
+  house and coin in the box take the risk from **14.5% → 0.6%** in five clear steps. The herbs
+  are actually spent at the delivery.
+- **The children live in the villa** — up to four of them underfoot in the halls, drawn at their
+  real age (infant in arms → child → half-grown), wandering, pausing and turning on their own.
+- **The husband is built from his own scores too** — his silhouette is a taper: a chiselled man
+  is a V, a soft one widens toward the hem, and a great chest moves when he walks. Both spouses
+  and you now **walk, run and turn** in the villa halls.
+- **Sibling politics** — send a gift, marry a sister off for an alliance, give a brother a command
+  (grateful, and now armed), or have a rival prince quietly removed — which works, and which
+  people sometimes find out about.
+- **Court favour is a currency** — each figure at your court holds one lever: **DOORS** (petitions
+  never reach you), **THE LAW** (+tolerance), **THE YEARS** (slower ageing), **WARNING** (−risk to
+  the purple), **BREAD** (−unrest everywhere), **RENOWN**, **HORSE** (+loyalty). Cultivate them
+  with coin, or spend the favour all at once and have them cooler afterwards.
+- **The other ledger has a different seller for every class** — a poor man buys it from a stranger
+  in a cloak because his dealings must stay hidden; everyone above him already has someone
+  discreet in their own circle for it (a neighbour, a senator's wife, your own advocate, a lady of
+  the palace) — and pays less for the convenience.
+- **The house you were born into** — a father, a mother and siblings with real occupations and
+  real opinions of you. A **prince** sees whether his sister has been married off yet; a
+  **daughter of the purple** sees whether her brother is the heir — and whether *she* could
+  take the throne instead (rare, but it happened: Irene of Athens signed herself *Basileus*).
+- **Provincial management** — every title is a job. Set the **tax rate**, pay for a **garrison**
+  and a **grain dole**, replace a governor who is stealing from you, hold **games** to buy back a
+  province's temper, and answer the **petitions and complaints** that come up from the provinces:
+  hear them out, refuse them, buy them off, make an example — or go and stand in front of them
+  yourself, which works far better than it should if you are good-looking enough.
+- **Looks are politics** — for a prince, a princess or an Augusta, a fine face is worth **public
+  opinion**, **political tolerance** and **gifts that arrive unasked**.
+- **The tier pays for itself** — a *SPICY* or *⛧ IMPOSSIBLE* match doesn't just look different, it
+  burns hotter (up to ×1.85 on ♥ and 🔥), conceives easier, and Rome talks about it (+pop).
+- **The years tell** — every body drifts. Under thirty the scores climb; after thirty they slide,
+  and the slide is slower for a house that keeps its baths hot, its lagoon full and coin in the
+  box. The waist goes first. An ⛧ IMPOSSIBLE body never ages at all.
+- **The night they come for the purple** — when RISK TO THE PURPLE runs hot the Praetorians stop
+  doing arithmetic and start moving. Pay the donative, call out your own people, walk out and face
+  them in the doorway, or abdicate and keep your head. This is the century that auctioned the
+  empire off the rampart; the guard is the only vote that ever really counted.
+- **Call-outs** — Rome says what it thinks of you, out loud, in the street. Satisfy the crowd,
+  stoke your spouse's jealousy, balance it out — or, if your house is loyal enough, say nothing
+  at all while your own people close on the man who spoke.
+- **The body map, animated** — front, side, back and a walking figure for both sexes, with a
+  **PUBLIC EYES** mode that counts where every eye in the colonnade actually went, and a
+  **SPOUSE'S EYES** mode that shows only what the person you married looks at, ranked. Marriage
+  doesn't close the chart — it adds a column: you can read it on **yourself and on your spouse**.
 - **Honor & shady play** — fight fair to build public reputation, or *hire a champion*,
   *ambush* a foe, or *rig* a bout — each trades honour for an edge.
 - All art is **drawn live on canvas** — no image assets ship with the game.
@@ -190,8 +496,8 @@ Popularity rises (battle escalation). **All 21 regions, exactly as specified:**
 
 Gallia · Africa Proconsularis · Italia · Aegyptus · Syria Palaestina · Asia Minor · Achaea ·
 Illyricum · Dalmatia · Bosporan Kingdom · Germania Magna · Hispania Baetica ·
-Insulae Baleares &amp; Sicilia · Creta · Cyprus · Arabia Petraea · Asōristān · Mesopotamia ·
-Ērānshahr · Sogdiana · Britannia
+Insulae Baleares &amp; Sicilia · Creta · Cyprus · Arabia Petraea · Babylonia · Mesopotamia ·
+Persis · Sogdiana · Britannia
 
 ![World map](screenshots/04_map.png)
 
@@ -214,8 +520,12 @@ Insulae Baleares &amp; Sicilia · Creta · Cyprus · Arabia Petraea · Asōrist�
   Emperor in the imperial finale.
 - Arena cities are real: **Thysdrus** (El Djem, in modern Tunisia), **Alexandria**,
   **Caesarea** in Judaea, **Capua** (home of the most famous ludus), **Corduba**, **Ephesus**,
-  **Petra**, **Ctesiphon** on the Sasanian frontier, and so on.
+  **Petra**, **Ctesiphon** on the Parthian frontier, and so on.
 - Latin arena calls (*Missus!*, *Pollice verso*) and equipment names are used as they were.
+- **The East is Parthian, not Sasanian.** In 200 A.D. Rome's great eastern rival was the
+  **Parthian (Arsacid) Empire** — the Sasanians did not rise until Ardashir I (~224 A.D.).
+  So the eastern regions (**Babylonia**, **Persis**), titles (*Satrap*, *Great King*, *King of
+  Kings*), the frontier power, and the **Parthian Cataphract** fighter are all era-correct.
 
 This is an original work and does not reference, reuse, or depict any existing game.
 
