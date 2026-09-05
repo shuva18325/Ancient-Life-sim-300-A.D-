@@ -8742,50 +8742,121 @@ function drawPartPicker(c,cnv,w,view,W2,H2,GUT){
               c.globalAlpha=1;
             }
           } else if(bmFlash.kind==='against'){
-            /* IT COMES IN, IT MEETS THE PART, AND IT PRESSES. Drawn to the
-               same scale as everything else on this chart — the length is
-               the length, so a 3 barely reaches and a 10 arrives early and
-               goes in deep, which is the reading you came for. */
+            /* =====================================================
+               TWO CUSHIONS, LARGER THAN THE PART ITSELF, AND A ROD
+               ---------------------------------------------------
+               The first cut coloured the cushions in the part's OWN
+               heat tone — which is also the tone the entire diagram
+               figure is already painted in, so on a purple chart the
+               two "cushions" were purple on purple and vanished. They
+               are drawn in HER SKIN now, oversized so they visibly
+               bulge past the hotspot ring rather than living inside
+               it, with a bright rim in the reading's own colour so
+               the tie to the number is never lost, and a real ground
+               shadow so the pair lifts off the flat diagram.
+               ===================================================== */
             const side=bmFlash.side||-1;
             const len=bmFlash.len||5;
-            const L=6+len*2.6, TH=Math.max(3, 2+len*0.42);
-            /* travel: in over the first third, held for the rest */
-            const tin=clamp(k/0.34,0,1);
-            const into=(1.4+len*0.30)*tin;
-            const bx=sel.x + side*(sel.r + L*(1-tin) + 2) - side*into;
-            const sk=mixHex((G&&G.skin)||'#caa06a','#c07a68',0.30);
-            const HI2=shade(sk,42), LO2=shade(sk,-40), MD=shade(sk,-8);
-            c.globalAlpha=clamp(a*1.25,0,1);
-            /* the part gives where it lands */
-            if(tin>0.6){ c.fillStyle='rgba(140,60,70,.28)';
-              c.beginPath(); c.ellipse(sel.x - side*(sel.r*0.30), sel.y,
-                sel.r*0.52, sel.r*0.42, 0,0,7); c.fill(); }
-            /* the shaft, moulded across so it is a cylinder not a stripe */
-            const x0=Math.min(bx, bx+side*L), wdt=L;
-            for(let q=-TH;q<=TH;q++){
-              const u=(q+TH)/Math.max(1,TH*2);
-              c.fillStyle=(u<0.24)? HI2 : (u<0.62)? MD : (u<0.88)? sk : LO2;
-              c.fillRect(x0, sel.y+q, wdt, 1);
+            const tin=clamp(k/0.34,0,1);              // in over the first third, held after
+            const herSkin=(w&&w.skin)||'#e6bd94';
+            const cushBase=mixHex(herSkin, col, 0.30);
+            const cr=sel.r*1.28;
+            /* ---- THE LENS. A skin-toned cushion drawn straight over the
+               figure blended into it no matter what tone we mixed —
+               DIAGRAM mode paints the whole body the part's own heat
+               colour, so anything close to that hue vanished into it on
+               contact. A dark neutral backing patch first, like a
+               magnifying glass laid over the spot, guarantees the
+               contrast holds in diagram mode AND in the real sprite. ---- */
+            const lensR=cr*1.62;
+            c.globalAlpha=clamp(a*0.95,0,1);
+            c.fillStyle='rgba(10,6,12,.66)';
+            c.beginPath(); c.ellipse(sel.x, sel.y, lensR*1.14, lensR, 0,0,7); c.fill();
+            c.strokeStyle=rgbA(col,0.55); c.lineWidth=1.4;
+            c.beginPath(); c.ellipse(sel.x, sel.y, lensR*1.14, lensR, 0,0,7); c.stroke();
+            const sphere=(cx2,cy2,rx,ry,base,rim)=>{
+              const rg=c.createRadialGradient(cx2-rx*0.34,cy2-ry*0.36,rx*0.10, cx2,cy2,rx*1.08);
+              rg.addColorStop(0, lit2(base,1.55)); rg.addColorStop(0.50, base); rg.addColorStop(1, shade2(base));
+              c.fillStyle=rg; c.beginPath(); c.ellipse(cx2,cy2,rx,ry,0,0,7); c.fill();
+              c.strokeStyle=rgbA(rim,0.85); c.lineWidth=1.4;
+              c.beginPath(); c.ellipse(cx2,cy2,rx,ry,0,0,7); c.stroke();
+              // a hard little glint, so it reads as taut skin and not a sticker
+              c.fillStyle='rgba(255,255,255,.55)';
+              c.beginPath(); c.ellipse(cx2-rx*0.36,cy2-ry*0.40,rx*0.16,ry*0.12,0,0,7); c.fill();
+            };
+            /* a ground shadow first, UNDER everything, so the pair sits ON
+               the figure instead of floating flat against it */
+            c.globalAlpha=clamp(a*0.9,0,1);
+            c.fillStyle='rgba(0,0,0,.34)';
+            c.beginPath(); c.ellipse(sel.x, sel.y+sel.r*1.05, sel.r*1.5, sel.r*0.55, 0,0,7); c.fill();
+            c.globalAlpha=clamp(a*1.30,0,1);
+            /* ---- THE TWO CUSHIONS. Bigger than the hotspot ring itself —
+               oversized on purpose, because the whole complaint was that
+               they used to hide inside it — and they part a little further
+               as the pressure builds. ---- */
+            /* the vertical radius has to stay SMALLER than the gap between
+               centres, or the two "cushions" overlap into one blob — which
+               is exactly what the previous pass did and is why it read as
+               a single mass with a rod poking into it rather than two. */
+            const gap=cr*(0.70+tin*0.16);
+            sphere(sel.x, sel.y-gap, cr*1.10, cr*0.58, cushBase, col);
+            sphere(sel.x, sel.y+gap, cr*1.10, cr*0.58, cushBase, col);
+            /* where they meet: a real crease, darker as the press deepens */
+            c.strokeStyle='rgba(14,6,8,'+(0.38+tin*0.34).toFixed(2)+')'; c.lineWidth=2.0;
+            c.beginPath(); c.moveTo(sel.x-cr*0.86, sel.y); c.lineTo(sel.x+cr*0.86, sel.y); c.stroke();
+            c.strokeStyle='rgba(255,255,255,.10)'; c.lineWidth=0.8;
+            c.beginPath(); c.moveTo(sel.x-cr*0.80, sel.y+2); c.lineTo(sel.x+cr*0.80, sel.y+2); c.stroke();
+            /* ---- THE ROD. Thicker, to match the cushions it is pressing
+               into rather than reading as a pin — it slides in from off
+               to the side and stops AGAINST the crease rather than
+               through it, tapering to a rounded tip like a real limb. ---- */
+            const sk=mixHex((G&&G.skin)||'#caa06a','#c07a68',0.26);
+            const HI2=shade(sk,50), LO2=shade(sk,-42), MD=shade(sk,-6);
+            const L=11+len*3.3;
+            const thBase=Math.max(3.4, 2.6+len*0.40), thTip=thBase*0.80;
+            const startX=sel.x + side*(sel.r + L + 8);            // fully retracted
+            const endX  =sel.x + side*(cr*0.20);                  // pressed in, short of dead-centre
+            const tipX  =startX + (endX-startX)*tin;
+            const tailX =tipX + side*L;
+            const steps=Math.max(8, Math.round(L));
+            for(let i=0;i<=steps;i++){
+              const t2=i/steps;                                   // 0 at the tip, 1 at the tail
+              const xx=Math.round(tipX + side*L*t2);
+              const rr=thTip + (thBase-thTip)*t2;
+              for(let q=-rr;q<=rr;q++){
+                const u=(q+rr)/Math.max(1,rr*2);
+                c.fillStyle=(u<0.22)? HI2 : (u<0.58)? MD : (u<0.86)? sk : LO2;
+                c.fillRect(xx, Math.round(sel.y+q), 1, 1);
+              }
             }
-            c.strokeStyle='rgba(20,10,8,.5)'; c.lineWidth=1;
-            c.strokeRect(x0+0.5, sel.y-TH+0.5, wdt-1, TH*2);
-            /* the tip, which is what the eye tracks */
-            c.fillStyle=mixHex(sk,'#c07a68',0.45);
-            c.beginPath(); c.ellipse(bx - side*0, sel.y, TH*0.7, TH*1.0, 0,0,7); c.fill();
-            c.fillStyle=HI2;
-            c.fillRect(x0, sel.y-TH, wdt, 1);
+            /* the rounded tip, lit like a real curved surface */
+            c.fillStyle=mixHex(sk,'#c07a68',0.44);
+            c.beginPath(); c.ellipse(tipX, sel.y, thTip*1.02, thTip*1.12, 0,0,7); c.fill();
+            c.strokeStyle='rgba(20,8,8,.46)'; c.lineWidth=0.9;
+            c.beginPath(); c.ellipse(tipX, sel.y, thTip*1.02, thTip*1.12, 0,0,7); c.stroke();
+            c.fillStyle='rgba(255,255,255,.30)';
+            c.beginPath(); c.ellipse(tipX-side*thTip*0.20, sel.y-thTip*0.32, thTip*0.30, thTip*0.24, 0,0,7); c.fill();
+            /* a bright specular ridge down the top of the shaft */
+            c.fillStyle=HI2; c.globalAlpha=clamp(a*1.30,0,1)*0.85;
+            c.beginPath(); c.ellipse((tipX+tailX)/2, sel.y-thBase*0.44, Math.abs(tailX-tipX)*0.44, thBase*0.16, 0,0,7); c.fill();
+            c.globalAlpha=clamp(a*1.30,0,1);
+            /* the near cushion flattens a shade where it actually meets it */
+            if(tin>0.50){ const fx=sel.x+side*cr*0.32;
+              c.fillStyle='rgba(0,0,0,.20)';
+              c.beginPath(); c.ellipse(fx, sel.y-gap*0.58, cr*0.34, cr*0.24, 0,0,7); c.fill();
+              c.beginPath(); c.ellipse(fx, sel.y+gap*0.58, cr*0.34, cr*0.24, 0,0,7); c.fill(); }
             c.globalAlpha=1;
             /* a calliper across what actually went in */
             if(tin>0.9){
-              c.strokeStyle='rgba(240,220,250,.46)'; c.lineWidth=1;
-              const cy2=sel.y+TH+7;
-              const a1=sel.x - side*(sel.r*0.9), a2=bx;
+              c.strokeStyle='rgba(240,220,250,.55)'; c.lineWidth=1;
+              const cy2=sel.y+gap+thBase+11;
+              const a1=startX, a2=tipX;
               c.beginPath();
               c.moveTo(a1, cy2-3); c.lineTo(a1, cy2+3);
               c.moveTo(a2, cy2-3); c.lineTo(a2, cy2+3);
               c.moveTo(a1, cy2);   c.lineTo(a2, cy2); c.stroke();
               c.font='bold 7px Georgia,serif'; c.textAlign='center';
-              c.fillStyle='rgba(240,220,250,.80)';
+              c.fillStyle='rgba(240,220,250,.85)';
               c.fillText('LENGTH '+len, (a1+a2)/2, cy2+9);
             }
           } else if(bmFlash.kind==='ledger'){
@@ -8813,10 +8884,16 @@ function drawPartPicker(c,cnv,w,view,W2,H2,GUT){
         }
       }
       /* ON ITS OWN GROUND. Printed straight onto the figure it was the
-         one label on this chart you could not read. */
+         one label on this chart you could not read. AND CLEAR OF THE
+         LENS — the "against" close-up draws a magnified pair right where
+         this tag used to sit, and the tag was cutting straight through
+         the top cushion. */
       { c.font='bold 9px Georgia,serif'; c.textAlign='center';
         const lab=String(sel.name).toUpperCase()+' '+(v>=IMPOSSIBLE_V?'⛧':v);
-        const lx2=clamp(sel.x, 30, (W2-GUT)-30), ly2=Math.max(12, sel.y-sel.r-4);
+        const againstLive = bmFlash && bmFlash.part===sel.id && bmFlash.kind==='against'
+                           && (Date.now()-bmFlash.t)/1000 < 1.7;
+        const lx2=clamp(sel.x, 30, (W2-GUT)-30);
+        const ly2=Math.max(12, sel.y - sel.r*(againstLive?2.9:1) - 4);
         const lw2=c.measureText(lab).width+8;
         c.fillStyle='rgba(14,8,20,.78)'; c.fillRect(lx2-lw2/2, ly2-9, lw2, 12);
         c.strokeStyle=rgbA(col,0.5); c.lineWidth=1;
@@ -9232,13 +9309,15 @@ function bmDoAction(w, pid, id, rebuild, redraw){
 /* WHAT YOU LEARN BY TOUCHING IT. Three bands to a part, the score picks
    the band, and once taken it is on the chart for good. */
 const BM_FEEL={
-  booty:{ hi:[ 'Heavier than it looks, and it gives and comes back. It is doing the work of a cushion and it does not know it.',
-               'Soft the whole way and then firm underneath, which is the thing nobody warns you about.',
-               'It closes round and holds. You could rest there and the coast would say you had earned it.' ],
-          mid:['Warm, even, and it gives about as far as you would expect.',
-               'Comfortable. Nothing about it is a surprise and nothing about it is a disappointment.' ],
-          lo:[ 'Not much give. You are mostly finding the bone under it.',
-               'It is warm and it is flat and that is the whole reading.' ]},
+  booty:{ hi:[ 'Soft — like two cushions of booty pressing against a rod, and they do not stop giving.',
+               'Heavier than it looks, and the booty gives and comes back. It is doing the work of a cushion and it does not know it.',
+               'Soft the whole way through and then firm underneath, which is the thing nobody warns you about with a butt this size.',
+               'The whole seat closes round it and holds. You could rest there and the coast would say you had earned it.',
+               'Two full cheeks, and pressed together they take the whole length of it without complaint.' ],
+          mid:['Warm booty, even, and it gives about as far as you would expect.',
+               'A good handful of butt. Comfortable. Nothing about it is a surprise.' ],
+          lo:[ 'Not much booty to speak of. You are mostly finding the bone under it.',
+               'A small, flat backside — warm, but there is no cushion in it at all.' ]},
   bust:{ hi:[ 'Soft to a degree that stops being funny and becomes a fact about the afternoon.',
                'It spreads under any pressure at all and comes straight back. Ulva was generous.' ],
          mid:['Warm and yielding, and holds its shape.' ],
@@ -15914,6 +15993,7 @@ window.addEventListener('keydown',e=>{
   else if(k==='f'){ setEdge('f'); }                 // and bend for something that is not there
   else if(k==='l'){ setEdge('l'); }                 // 🏛 the ardor
   else if(k==='k'){ setEdge('k'); }                 // ◆ and the standing, which is its own act here
+  else if(k==='x'){ setEdge('x'); }                 // 🍑 the quick decline — skip the bend outright
   else if(k==='j'){ setEdge('j');                   // ◆ and the press, which is how a standing is answered
     /* A KEY THAT DOES NOTHING OUTSIDE ONE SCREEN IS A KEY THE PLAYER
        DECIDES IS BROKEN. J is only meaningful in the hall, so pressed
@@ -23442,9 +23522,10 @@ function curioDue(){
   const D=DM; if(!D) return false;
   if(!curioReady()) return false;
   if(D.scene||D.slap||D.rslap||D.tempt||D.husb||D.drop||D.rise||D.ardor||D.press||D.curio) return false;
-  if((G.day|0)===(G.curioDay|0) && (G.curioToday||0)>=1) return false;
-  if(D.t < (D.curioNext||360)) return false;
-  return Math.random() < 0.020;
+  /* NO MORE ONCE-A-DAY. The tick cooldown below is the only limiter, so a
+     long visit gets more than one chance rather than exactly one. */
+  if(D.t < (D.curioNext||160)) return false;
+  return Math.random() < 0.045;
 }
 function startCurio(){
   const D=DM; if(!D || !curioReady()) return false;
@@ -23452,7 +23533,7 @@ function startCurio(){
             find:pick(RK_CURIO.finds), look:pick(RK_CURIO.look),
             bond:0, phys:0, locks:true, rub:0 };
   D.wifePause=99999;
-  D.curioNext = D.t + 900;
+  D.curioNext = D.t + 520;
   try{ sfx('ui'); }catch(e){}
   return true;
 }
@@ -24773,6 +24854,15 @@ function startTempt(){
 function updateTempt(dt){
   const D=DM, X=D.tempt; X.t+=dt;
   shimmyTick(dt);
+  /* ---- THE QUICK DECLINE. Holding out used to mean winning the resist
+     bar and then three rounds of eye-tracking — which is a lot of skill
+     check for "no thank you". X says it outright, from anywhere before
+     the answer is decided, and resolves exactly the way winning does. ---- */
+  if((X.ph==='bend'||X.ph==='approach'||X.ph==='resist'||X.ph==='look') && consume('x')){
+    X.ph='held'; X.t=0; X.declined=true;
+    try{ sfx('ui'); }catch(e){}
+    return;
+  }
   if(X.ph==='bend'){                        // five stages, and she does not hurry
     X.k=clamp(X.t/150,0,1);
     /* AND THEN SHE MOVES. The scene used to hold the bend for sixty ticks and
@@ -24846,12 +24936,17 @@ function updateTempt(dt){
       /* THE SAME ACT, SCORED BY THE COUNTRY YOU ARE STANDING IN. In Rome
          it is discretion and it is worth a point of honour. On a coast
          where her office is to be seen it is a review of her office. */
-      const RV=(typeof rkHeldVerdict==='function')? rkHeldVerdict() : {coast:false};
+      const RV=(typeof rkHeldVerdict==='function')? rkHeldVerdict(!!X.beat) : {coast:false};
       if(RV.coast){
         G.wifeRel=clamp((G.wifeRel||0)+RV.rel,0,bondCeiling());
         G.wifePhys=clamp((G.wifePhys||45)+RV.phys,0,100);
         G.rkSnubs=(G.rkSnubs||0)+1;
         saveQuiet(); toast(pick(RV.lines),4800);
+      } else if(typeof rkHere==='function' && rkHere()){
+        /* on this coast but NOT a seat reading — an ordinary reach, and
+           holding out costs nothing because nothing was being read */
+        G.honor=clamp((G.honor||50)+1,0,100);
+        saveQuiet(); toast('🧊 You looked away. Nobody here was reading anything into it. (+1 honor)',4200);
       } else {
         G.honor=clamp((G.honor||50)+1,0,100);
         saveQuiet(); toast('🧊 You look at the frieze. You comment on the frieze. (+1 honor — she noticed that too.)',4200);
@@ -26739,6 +26834,8 @@ function drawTempt(){
   } else drawWifeFig(ctx, X.x, FY, w, 1, 'bend');
   if(X.ph==='bend' && X.k>0.45 && !X.shook){ ctx.textAlign='center';
     pixelText('…', X.x, FY-46, 'rgba(255,214,190,.7)', 1); ctx.textAlign='left'; }
+  if(X.ph==='bend'||X.ph==='approach'){ ctx.textAlign='center';
+    pixelText('X — look away', W/2, 15, 'rgba(200,180,200,.52)', 0.58); ctx.textAlign='left'; }
   /* ---- THE SIGN. Not decoration and not a hint: on this coast a display
      is an office being exercised, so the game says so in the same plain
      words the appointment uses, and then it is on you. ---- */
@@ -26813,6 +26910,7 @@ function drawTempt(){
     ctx.textAlign='center';
     pixelText((typeof rkHere==='function' && rkHere())? RK_READ.bar : 'DO NOT DO IT — MASH  SPACE',
       W/2, 26, '#ffd0da', 1.05);
+    pixelText('or X to look away now', W/2, 15, 'rgba(200,180,200,.60)', 0.62);
     // the same five stages her husband gets, so both sides read the same way
     { const st5=Math.min(4,Math.floor((1-clamp(X.hold/100,0,1))*5)), bx5=W/2-24;
       for(let i=0;i<5;i++) px(bx5+i*10, 40, 7, 3, i<=st5? (i>=3?'#e0705b':'#e8c34a') : '#4a3826'); }
@@ -26845,13 +26943,16 @@ function drawTempt(){
     for(let i=0;i<3;i++) px(bx+bw/2-10+i*8, by-9, 5, 3, i<X.round? '#7ad48a':'#4a3826');
     ctx.textAlign='center';
     pixelText('LOOK AWAY — SPACE IN THE GREEN', W/2, 26, '#9ad4ff', 1.05);
+    pixelText('or X to stop here', W/2, 15, 'rgba(200,180,200,.60)', 0.60);
     pixelText(['“…fine frieze, that.”','“Mm. The frieze.”','“STILL looking at the frieze.”'][X.round]||'',
       W/2, by-16, 'rgba(190,214,255,.85)', 1);
     if(X.t>240) pixelText('— decide —', W/2, by+24, 'rgba(255,190,170,.9)', 1);
     ctx.textAlign='left';
   }
   if(X.ph==='held'){ ctx.textAlign='center';
-    pixelText('“…fine frieze, that.”', W/2, 40, '#9ad4ff', 1.05); ctx.textAlign='left'; }
+    pixelText((typeof rkHere==='function' && rkHere())? '“I looked away. That is the whole of it.”'
+                                                       : '“…fine frieze, that.”', W/2, 40, '#9ad4ff', 1.05);
+    ctx.textAlign='left'; }
 }
 /* And then you have to say something. The same three-answer shape the rest of
    the house uses: own it, deny it, or explain — and EXPLAIN only works if you
@@ -41486,9 +41587,16 @@ function rkReadOn(){
   }catch(e){ return null; }
 }
 /* what holding out is actually worth, which is not the same number here */
-function rkHeldVerdict(){
+function rkHeldVerdict(seated){
   try{
     if(!rkHere()) return {coast:false};
+    /* ONLY WHEN SHE IS ACTUALLY THE BOOTY-MASTER. rkBendBeat() already
+       gates the shake/invite flavour on her seat clearing the mark — an
+       ordinary Rkrai wife with a flat booty, reaching for an ordinary
+       crate, has exactly the same alibi anywhere else on this map, and
+       treating every hold-out on the coast as a review of an office she
+       does not hold was the bug. */
+    if(!seated) return {coast:false};
     return {coast:true, rel:-4, phys:-5, honor:0, lines:RK_READ.held};
   }catch(e){ return {coast:false}; }
 }
