@@ -101,6 +101,18 @@ const ok=(name,cond,detail)=>{
       }catch(e){ thrown.push(name+': '+e.message); }
     };
     run('curio', ()=>S.startCurio(), t=>S.updateCurio(t), ()=>S.drawCurio(), 900);
+    /* every clam phase drawn, including the ones only reachable by input */
+    try{
+      S.openDomus(); S.startClam(); const D=S.DM;
+      const phs=[['call',{}],['come',{}],['clench',{}],['hold',{pt:20}],
+                 ['grab',{gp:0.5}],['drive',{driveLeft:200,nextThrust:4,thrust:3}],
+                 ['bend',{slaps:1,slapFlash:10}]];
+      for(const [ph,extra] of phs){
+        Object.assign(D.clam, {ph, t:40, bend:0.5, stood:true, blush:0.8,
+                               miss:1, strikeFlash:10}, extra);
+        for(let t=0;t<40;t++){ D.clam.t=t; S.drawClam(); }
+      }
+    }catch(e){ thrown.push('clam phases: '+e.message); }
     run('clam',  ()=>S.startClam(),  t=>S.updateClam(t),  ()=>S.drawClam(),  900);
     run('tempt', ()=>S.startTempt&&(S.startTempt(),true), t=>S.updateTempt(t), ()=>S.drawTempt(), 700);
     /* and the curious one through EVERY rung, which is where the new
@@ -117,6 +129,77 @@ const ok=(name,cond,detail)=>{
     return thrown;
   });
   ok('no scene threw', sweep.length===0, sweep.join(' | '));
+
+  console.log('\n--- THE CLAM: PACE, STRIKES, AND THE WAYS OUT ---');
+  const clam2=await pg.evaluate(()=>{
+    const S=window.__SS, G=S.G, out={};
+    G.wife.traits=['curious','vakran']; G.wife.body.booty=10; G.wifeRel=85;
+    S.openDomus(); S.startClam(); const D=S.DM;
+    out.cyc=D.clam.cyc;
+    out.windowTicks=Math.round(D.clam.cyc*0.34);
+
+    // three strikes, not one
+    S.openDomus(); S.startClam(); let X=S.DM.clam;
+    X.ph='hold'; X.t=0; X.pt=0; X.rode=0; X.need=8; X.miss=0;
+    let guard=0;
+    while(S.DM.clam && S.DM.clam.ph==='hold' && guard++<20000) S.updateClam(1);
+    out.missEnded=S.DM.clam? S.DM.clam.ph : 'gone';
+    out.misses=S.DM.clam? S.DM.clam.miss : -1;
+
+    // ✊ take it off her: mash through the contest
+    S.openDomus(); S.startClam(); X=S.DM.clam;
+    X.ph='hold'; X.t=0; X.pt=0; X.need=8;
+    S.setEdge('w'); S.updateClam(1);
+    out.grabbed=(S.DM.clam.ph==='grab');
+    guard=0;
+    while(S.DM.clam && S.DM.clam.ph==='grab' && guard++<4000){
+      S.setEdge('space'); S.updateClam(1); }
+    out.drove=(S.DM.clam.ph==='drive');
+    // thrust a few, then let the clock run out
+    for(let i=0;i<8;i++){ S.setEdge('space'); S.updateClam(1);
+      for(let j=0;j<12;j++) S.updateClam(1); }
+    out.thrusts=S.DM.clam.thrust;
+    guard=0;
+    while(S.DM.clam && S.DM.clam.ph==='drive' && guard++<4000) S.updateClam(1);
+    out.afterDrive=S.DM.clam? S.DM.clam.ph : 'gone';
+
+    // 🍑 the two she bends for
+    if(S.DM.clam && S.DM.clam.ph==='bend'){
+      for(let i=0;i<60;i++) S.updateClam(1);
+      S.setEdge('space'); S.updateClam(1);
+      for(let i=0;i<30;i++) S.updateClam(1);
+      S.setEdge('space'); S.updateClam(1);
+      out.slaps=S.DM.clam? S.DM.clam.slaps : -1;
+      guard=0;
+      while(S.DM.clam && S.DM.clam.ph==='bend' && guard++<2000) S.updateClam(1);
+      out.afterBend=S.DM.clam? S.DM.clam.ph : 'gone';
+      out.kind=S.DM.clam&&S.DM.clam.result? S.DM.clam.result.kind : null;
+      out.phys=S.DM.clam&&S.DM.clam.result? S.DM.clam.result.phys : null;
+    }
+
+    // ◆ stand it while she has hold
+    S.openDomus(); S.startClam(); X=S.DM.clam;
+    X.ph='hold'; X.t=0; X.pt=0; X.need=8;
+    S.setEdge('k'); S.updateClam(1);
+    out.stood=!!S.DM.clam.stood;
+    out.blush=S.DM.clam.blush>0;
+    S.setEdge('k'); S.updateClam(1);
+    out.standOnce=(S.DM.clam.blush<=1);
+    return out;
+  });
+  ok('the clench is a rhythm, not a reflex test', clam2.cyc>=46,
+     'cycle '+clam2.cyc+' ticks, window ~'+clam2.windowTicks);
+  ok('three strikes before she lets go', clam2.misses===3 || clam2.missEnded==='done',
+     'misses '+clam2.misses);
+  ok('W starts the contest',      clam2.grabbed===true);
+  ok('winning it hands you the rhythm', clam2.drove===true);
+  ok('and you can actually thrust', clam2.thrusts>0, 'thrusts '+clam2.thrusts);
+  ok('the drive ends in the bend', clam2.afterDrive==='bend', clam2.afterDrive);
+  ok('two slaps land',            clam2.slaps===2, 'slaps '+clam2.slaps);
+  ok('and then it resolves',      clam2.afterBend==='done' || clam2.kind, clam2.kind||'');
+  ok('taking it is paid as took', clam2.kind==='took', clam2.kind||'');
+  ok('K stands it while she holds', clam2.stood===true);
+  ok('and she colours for it',      clam2.blush===true);
 
   console.log('\n--- THE BODY MAP DRAWS THE PRESS ---');
   const bm=await pg.evaluate(async()=>{

@@ -23873,6 +23873,8 @@ function updateCurio(dt){
    same act with a point being made inside it. Riding that one out is
    how the point gets taken.
    ===================================================================== */
+const CLAM_STRIKES = 3;                 // she lets go on the third missed swell
+const CLAM_SLAPS    = 2;                 // and what she bends for at the end
 const RK_CLAM={
   name:'THE CLAM',
   what:'She calls you over, she does not explain, and then she clenches — and what you brought with you is not going anywhere until she has finished with it. How long that lasts is decided by her seat, by what the two of you are worth to each other, and by how much of you she has hold of.',
@@ -23954,7 +23956,8 @@ function startClam(){
   D.clam={ ph:'call', t:0, pt:0, bend:0, locks:true, mood,
            grip: clamp((be-5)/6, 0, 1.15),
            need: clamPulses(mad), rode:0, flash:0, early:0,
-           cyc:  clamp(Math.round(38 - be*1.1 - (mad?5:0)), 19, 40),
+           cyc:  clamp(Math.round(84 - be*1.7 - (mad?9:0)), 46, 90),
+           miss:0, stood:false, blush:0, slaps:0, thrust:0, kind:null,
            call: pick(mad? RK_CLAM.callMad : RK_CLAM.callLove),
            see:  pick(mad? RK_CLAM.seeMad  : RK_CLAM.seeLove) };
   D.wifePause=99999;
@@ -23974,7 +23977,18 @@ function clamResolve(kind){
   const need=Math.max(1, X.need||1), rode=X.rode||0;
   const rf=clamp(rode/need,0,1);
   let bond=0, phys=0, line='';
-  if(kind==='rode'){
+  if(kind==='took'){
+    const th=(X.thrust||0);
+    bond = mad? -4 : Math.round(1 + bw*2);
+    phys = Math.round(6 + bw*7 + pw*7 + Math.min(14, th*0.9));
+    G.woohooAll=(G.woohooAll||0)+1; G.lastLoveDay=G.day;
+    try{ spendLove('quick'); }catch(e){}
+    G.clamTook=(G.clamTook||0)+1;
+    line = mad
+      ? '🐚✊ You took it off her at the '+(X.rode||0)+'th and finished it your way. She lets you — and she has not forgotten what she called you over for.'
+      : '🐚✊ You got a hand in her hair and the rhythm went with it. '+th+' of them, on your count, and she stopped counting.';
+  }
+  else if(kind==='rode'){
     bond = Math.round(3 + bw*4 + (mad? 5 : 1));
     phys = Math.round(7 + bw*10 + pw*8);
     G.woohooAll=(G.woohooAll||0)+1; G.lastLoveDay=G.day;
@@ -23982,7 +23996,8 @@ function clamResolve(kind){
     G.clamRode=(G.clamRode||0)+1;
     if(mad){ G.rkSnubs=Math.max(0,(G.rkSnubs||0)-1);
       line='🐚💢 All '+need+' of them, and she let go on her own terms. Whatever it was about is settled — and it is settled her way.'; }
-    else line='🐚❦ All '+need+'. She let go last, and on this coast that is the whole sentence.';
+    else line='🐚❦ All '+need+'. She let go last, and on this coast that is the whole sentence.'
+              +((X.slaps|0)>=2? ' Then she bent, and you did not leave her waiting.' : '');
   } else if(kind==='pulled'){
     phys = Math.round(2 + rf*(5 + bw*6 + pw*4));
     bond = mad? -3 : 0;
@@ -23991,8 +24006,8 @@ function clamResolve(kind){
   } else if(kind==='missed'){
     phys = Math.round(1 + rf*(4 + bw*5));
     bond = 0;
-    line = rode>0 ? '🐚 She loses the rhythm of it at '+rode+' and lets go. Neither of you says anything about that.'
-                  : '🐚 She holds, waits for you to meet it, and does not get met. She lets go.';
+    line = rode>0 ? '🐚 Three of them go by unmet. She loses the rhythm of it at '+rode+' and lets go, and neither of you says anything about that.'
+                  : '🐚 She holds, and waits, and holds — three times — and is not met once. She lets go.';
   } else { /* declined — you did not come, or you would not */
     bond = mad? -5 : -2;
     G.rkSnubs=(G.rkSnubs||0)+1;
@@ -24000,9 +24015,15 @@ function clamResolve(kind){
          : (mad? '❄ You do not go over. She had something to settle and you have just told her how it gets settled instead.'
                : '❄ You do not go over. She takes her hand back in and the room is very quiet for a while.');
   }
+  /* ◆ AND WHETHER YOU STOOD IT WHILE SHE HAD HOLD. She is holding the one
+     thing it would happen to, so she is the first to know — and there is
+     no arguing with having gone red. */
+  if(X.stood){ bond += (mad? 2 : 1); phys += 4; }
+  /* 🍑 and the two she bent for, paid one at a time */
+  if(X.slaps){ phys += (X.slaps|0)*3; bond += (X.slaps>=2? 1 : 0); }
   /* the standing, if one got raised for this, is discharged by going */
   let kept=null;
-  if(kind==='rode'||kind==='pulled'||kind==='missed'){
+  if(kind==='rode'||kind==='took'||kind==='pulled'||kind==='missed'){
     try{ kept=rkTaqrunKeep(); }catch(e){}
     if(!kept){ try{ G.rkStand=null; }catch(e){} }
   }
@@ -24011,7 +24032,8 @@ function clamResolve(kind){
   G.clamSeen=(G.clamSeen||0)+1;
   if(mad) G.clamMad=(G.clamMad||0)+1;
   try{ refreshStatbar(); saveQuiet(); }catch(e){}
-  return {bond, phys, line, kept, kind, need, rode, mood:X.mood};
+  return {bond, phys, line, kept, kind, need, rode, mood:X.mood,
+          stood:!!X.stood, slaps:(X.slaps|0), thrust:(X.thrust|0), miss:(X.miss|0)};
 }
 /* the swell inside one pulse: she closes, HOLDS through the window, and
    eases off after it — so the plateau you have to meet is the plateau
@@ -24020,11 +24042,42 @@ function clamSwell(k){
   const ease=t=>0.5-0.5*Math.cos(clamp(t,0,1)*Math.PI);
   return k<0.52? ease(k/0.52) : (k<=0.86? 1 : ease(1-(k-0.86)/0.14));
 }
+/* ◆ STAND IT WHILE SHE HAS YOU. She is holding the one thing this would
+   happen to, so she is the first to know it happened — and on a coast with
+   no vocabulary for being embarrassed, going red is the one thing she
+   cannot argue with. Once per clam, from any phase where she has hold. */
+function clamStandIt(X){
+  try{
+    if(X.stood) return false;
+    if(!consume('k')) return false;
+    X.stood=true; X.blush=1; X.blushT=0;
+    try{ if(typeof rkStandOn==='function' && !rkStandOn()) rkStand(); }catch(e){}
+    try{ sfx('hmm'); }catch(e){}
+    try{ shimmyStart(G.wife, 0.55); }catch(e){}
+    try{ kickShake(1.2,14); }catch(e){}
+    /* she is not going to say anything, so the room says it */
+    toast(X.mood==='mad'
+      ? '◆ You stand it, with her holding it. She goes red to the ears and does NOT let go — but she has lost the thread of whatever she was proving.'
+      : '◆ You stand it, with her holding it. She feels the whole of it arrive and goes red to the ears.', 5200);
+    return false;                       // it does not end the beat, it colours it
+  }catch(e){ return false; }
+}
+/* the finish is not the end: she bends, and there are two of yours owed */
+function clamToBend(X, kind){
+  X.kind=kind; X.ph='bend'; X.t=0; X.slaps=0; X.slapFlash=0;
+  try{ sfx('cloth'); }catch(e){}
+  try{ shimmyStart(G.wife, 0.7); }catch(e){}
+}
 function updateClam(dt){
   const D=DM, X=D.clam; if(!X) return;
   X.t+=dt;
   shimmyTick(dt);
   const mad=(X.mood==='mad');
+  /* the colour fades off the peak but it does not leave — she stays flushed
+     for the rest of it, which is the whole point of having done it */
+  if(X.stood){ X.blushT=(X.blushT||0)+dt;
+    X.blush=Math.max(0.42, 1-(X.blushT/90)); }
+  if(X.strikeFlash>0) X.strikeFlash-=dt;
   if(X.ph==='call'){
     X.locks=true;
     X.bend=clamp(X.t/80,0,1)*0.30;
@@ -24046,6 +24099,7 @@ function updateClam(dt){
   }
   else if(X.ph==='clench'){
     X.locks=true; X.bend=0.42;
+    if(clamStandIt(X)) return;
     if(!X.snap && X.t>34){ X.snap=true;
       try{ sfx(mad? 'slapBig' : 'kiss'); }catch(e){}
       try{ kickShake(mad? 1.9 : 1.2, 20); }catch(e){}
@@ -24056,8 +24110,19 @@ function updateClam(dt){
     X.locks=true; X.bend=0.42;
     X.pt=(X.pt||0)+dt;
     if(X.flash>0) X.flash-=dt;
+    if(clamStandIt(X)) return;                     // ◆ K — while she has you
     const k=(X.pt/Math.max(1,X.cyc)), win=(k>=0.52 && k<=0.86);
     if(consume('x')){ X.ph='done'; X.t=0; X.result=clamResolve('pulled'); return; }
+    /* ---- W — TAKE IT OFF HER. The whole scene is hers by design, and a
+       scene that is only ever done TO you wants a door out of it that is
+       not just leaving. This is the door: a hand in her hair and a
+       straight contest of grip. Win and the rhythm is yours. ---- */
+    if(consume('w')){
+      X.ph='grab'; X.t=0; X.gp=0.34;
+      try{ sfx('cloth'); }catch(e){}
+      try{ kickShake(1.5,16); }catch(e){}
+      return;
+    }
     if(consume('space')||consume('attack')){
       if(win){
         X.rode=(X.rode||0)+1; X.pt=0; X.flash=12;
@@ -24066,14 +24131,83 @@ function updateClam(dt){
         try{ slapKick(0.28+X.grip*0.22); }catch(e){}
         D.hearts.push({x:D.wifeX+rnd(-7,7), y:214-48, vy:0.30+Math.random()*0.22,
                        life:60, c: mad? '#ff7a8a' : '#ff9ad8'});
-        if(X.rode>=X.need){ X.ph='done'; X.t=0; X.result=clamResolve('rode'); return; }
-        /* SHE SPEEDS UP. Each one comes round on you faster than the last,
-           so a long hold is a hold that gets harder rather than a hold
-           that gets longer. */
-        X.cyc=Math.max(16, X.cyc-1.5);
+        if(X.rode>=X.need){ clamToBend(X,'rode'); return; }
+        /* she still winds up as it goes — from a cycle you can hear */
+        X.cyc=Math.max(34, X.cyc-1.0);
       } else { X.early=(X.early||0)+1; try{ sfx('ui'); }catch(e){} }
     }
-    if(k>1){ X.ph='done'; X.t=0; X.result=clamResolve('missed'); return; }
+    /* ---- A MISSED SWELL IS A STRIKE, NOT THE END ---- */
+    if(k>1){
+      X.pt=0; X.miss=(X.miss||0)+1; X.strikeFlash=22;
+      try{ sfx('deny'); }catch(e){}
+      if(X.miss>=CLAM_STRIKES){ X.ph='done'; X.t=0; X.result=clamResolve('missed'); return; }
+    }
+  }
+  /* ---- ✊ THE CONTEST. Mash to close your grip; she pulls the other way,
+     and how hard is her seat and her temper. ---- */
+  else if(X.ph==='grab'){
+    X.locks=true; X.bend=0.42;
+    if(clamStandIt(X)) return;
+    const pull=0.0042 + X.grip*0.0030 + (mad? 0.0022 : 0);
+    X.gp=(X.gp||0) - pull*dt;
+    if(consume('space')||consume('attack')){
+      X.gp+=0.075; X.flash=8;
+      try{ sfx((X.thrust%2)? 'kiss' : 'hmm'); }catch(e){}
+      try{ shimmyStart(G.wife, 0.30); }catch(e){}
+    }
+    if(consume('x')){ X.ph='done'; X.t=0; X.result=clamResolve('pulled'); return; }
+    if(X.gp>=1){                                   // it is yours
+      X.ph='drive'; X.t=0; X.driveLeft=300; X.nextThrust=0;
+      try{ sfx('slapBig'); }catch(e){} try{ kickShake(2.2,26); }catch(e){}
+      return;
+    }
+    if(X.gp<=0 || X.t>230){                        // she keeps it
+      X.ph='hold'; X.t=0; X.pt=0;
+      X.miss=(X.miss||0)+1; X.strikeFlash=22;
+      X.cyc=Math.max(30, X.cyc-6);                 // and she tightens for it
+      try{ sfx('deny'); }catch(e){}
+      if(X.miss>=CLAM_STRIKES){ X.ph='done'; X.t=0; X.result=clamResolve('missed'); }
+      return;
+    }
+  }
+  /* ---- ◆ AND THEN IT IS YOUR RHYTHM. No window to find: you set the
+     beat, she takes it, and the clock is the only thing stopping you. ---- */
+  else if(X.ph==='drive'){
+    X.locks=true; X.bend=0.42+clamp(X.t/60,0,1)*0.16;
+    if(clamStandIt(X)) return;
+    X.driveLeft-=dt;
+    if(X.nextThrust>0) X.nextThrust-=dt;
+    if((consume('space')||consume('attack')) && X.nextThrust<=0){
+      X.thrust=(X.thrust||0)+1; X.nextThrust=11; X.flash=12;
+      try{ sfx((X.thrust%2)? 'slapBig' : 'moan'); }catch(e){}
+      try{ shimmyStart(G.wife, 0.62); }catch(e){}
+      try{ slapKick(0.42+X.grip*0.26); }catch(e){}
+      if((X.thrust%4)===0){ try{ kickShake(1.6,18); }catch(e){} }
+      D.hearts.push({x:D.wifeX+rnd(-9,9), y:214-50, vy:0.34+Math.random()*0.26,
+                     life:66, c:'#ff9ad8'});
+    }
+    if(consume('x')){ clamToBend(X,'took'); return; }
+    if(X.driveLeft<=0){ clamToBend(X,'took'); return; }
+  }
+  /* ---- 🍑 AND WHAT SHE DOES AFTERWARDS. She lets go, turns, and bends —
+     and that is not a cutscene, it is two of yours to land. ---- */
+  else if(X.ph==='bend'){
+    X.locks=true;
+    X.bend=0.42+clamp(X.t/46,0,1)*0.56;            // right down over it
+    if(X.slapFlash>0) X.slapFlash-=dt;
+    if(X.t>46 && (X.slaps||0)<CLAM_SLAPS && (consume('space')||consume('attack'))){
+      X.slaps=(X.slaps||0)+1; X.slapFlash=20; X.slapSide=(Math.random()<0.5?-1:1);
+      try{ sfx('slapBig'); }catch(e){}
+      try{ slapKick(1.15+X.grip*0.42); }catch(e){}
+      try{ shimmyStart(G.wife, 1.0); }catch(e){}
+      try{ kickShake(2.0,22); }catch(e){}
+      D.hearts.push({x:D.wifeX+rnd(-10,10), y:214-44, vy:0.32+Math.random()*0.26,
+                     life:70, c:'#ffb0d0'});
+    }
+    /* two of them, or she straightens up on her own if you stand there */
+    if((X.slaps||0)>=CLAM_SLAPS && X.t>60 && X.slapFlash<=0){
+      X.ph='done'; X.t=0; X.result=clamResolve(X.kind||'rode'); return; }
+    if(X.t>340){ X.ph='done'; X.t=0; X.result=clamResolve(X.kind||'rode'); return; }
   }
   else if(X.ph==='done'){
     X.locks=false;
@@ -24091,10 +24225,16 @@ function drawClam(){
   const D=DM, X=D.clam; if(!X) return;
   const FY=214, T=X.t, w=G.wife, PX=D.wifeX;
   const mad=(X.mood==='mad');
-  const inHold=(X.ph==='hold'), held=(X.ph==='clench'||inHold);
-  /* how hard she is closed at this instant: the clench ramps in once and
-     then the pulses take it over */
+  const inHold=(X.ph==='hold'), inGrab=(X.ph==='grab'), inDrive=(X.ph==='drive');
+  const inBend=(X.ph==='bend');
+  const held=(X.ph==='clench'||inHold||inGrab||inDrive);
+  /* how hard she is closed at this instant. Through her rhythm it is the
+     swell; through the contest it is her grip, which is exactly what you
+     are fighting; and once you have taken it, it is YOUR stroke. */
+  const drv = inDrive? Math.max(0, 1-(X.nextThrust||0)/11) : 0;
   const sq = inHold? clamSwell((X.pt||0)/Math.max(1,X.cyc))
+           : inGrab? clamp(0.55+(1-clamp(X.gp||0,0,1))*0.45, 0, 1)
+           : inDrive? (0.34+0.62*Math.sin(drv*Math.PI))
            : (X.ph==='clench'? clamp((T-20)/54,0,1) : 0);
   /* ---- THE ROOM DIMS AND THE LAMP FINDS THE TWO OF THEM ---- */
   const dark = X.ph==='call'? clamp(T/90,0,1)*0.24 : (held? 0.42 : 0.32);
@@ -24106,14 +24246,18 @@ function drawClam(){
     g.addColorStop(1,'rgba(0,0,0,0)'); ctx.fillStyle=g; ctx.fillRect(0,60,W,H-60); }
   /* ---- HIM. Away while she is calling; behind her from the moment you
      answer, and drawn IN as she takes him. ---- */
-  const goPh=(X.ph==='come'||held);
-  const comeK = X.ph==='come'? clamp(T/54,0,1) : (held? 1 : 0);
-  const pressK= held? 1 : comeK;
+  const goPh=(X.ph==='come'||held||inBend);
+  const comeK = X.ph==='come'? clamp(T/54,0,1) : (goPh? 1 : 0);
+  const pressK= (held||inBend)? 1 : comeK;
   const AK=rkBackBones(FY, (w&&w.body&&w.body.legs)||5, (w&&w.body&&w.body.booty)||5,
                            (w&&w.body&&w.body.waist)||5, false);
   const aimY=AK.seatY+Math.round(AK.seatH*0.42)-Math.round((X.bend||0)*((2.4+((w&&w.body&&w.body.booty)||5)*0.22)));
   /* she pulls him IN as she closes — the gap is the squeeze, drawn */
-  const gap = goPh? (9.4 - comeK*1.4 - sq*2.6) : 30;
+  /* HIS OWN TRAVEL. Riding her rhythm he barely moves; driving it he does
+     the moving, so the gap opens and shuts on HIS stroke. */
+  const gap = inBend? (13 - clamp(T/46,0,1)*3)
+            : goPh? (9.4 - comeK*1.4 - sq*2.6 - (inDrive? (1-drv)*3.4 : 0))
+            : 30;
   const hx  = PX + side*(goPh? gap : 30);
   let HM=null;
   try{ HM=drawRkBehindHim(hx, FY, {
@@ -24246,6 +24390,146 @@ function drawClam(){
       ctx.globalAlpha=1;
     }
   }
+  /* ================================================================
+     ❦ SHE HAS GONE RED. A back view has no face to blush with, so it
+     goes where it would actually show from behind: the ear, the back
+     of the neck, and the tops of the shoulders. It arrives hot and
+     settles, it does not leave.
+     ================================================================ */
+  if(X.stood && (X.blush||0)>0){
+    const bl=clamp(X.blush,0,1);
+    const nk=AK.shY-2, hw=Math.max(3, Math.round(AK.waistW+1.4));
+    ctx.globalAlpha=clamp(bl*0.86,0,1);
+    /* the neck and the tops of the shoulders — this is the one thing in the
+       scene she cannot argue with, so it is not drawn faintly */
+    px(PX-hw*0.62, nk-1, hw*1.24, 4, 'rgba(236,88,116,.90)');
+    px(PX-hw*0.95, nk+3, hw*1.9, 3, 'rgba(228,80,110,.62)');
+    px(PX-hw*1.05, nk+6, hw*2.1, 2, 'rgba(224,76,106,.34)');
+    /* and both ears, because that is where it always goes first */
+    px(PX - side*(hw*0.66), nk-5, 2, 4, 'rgba(255,116,138,.95)');
+    px(PX + side*(hw*0.66), nk-5, 2, 4, 'rgba(255,116,138,.70)');
+    ctx.globalAlpha=1;
+    /* the heat coming off it, only while it is fresh */
+    if(bl>0.6){
+      ctx.globalAlpha=(bl-0.6)/0.4*0.55;
+      for(let i=0;i<3;i++){
+        const yy=nk-8-((T*0.5+i*7)%16);
+        px(PX-4+i*4+Math.round(Math.sin((T+i*20)*0.11)*1.6), yy, 1, 3, 'rgba(255,170,180,.8)');
+      }
+      ctx.globalAlpha=1;
+    }
+  }
+  /* ================================================================
+     ✊ THE CONTEST. A fist closed in her hair, her head pulled back
+     off the line it was on, and a bar between the two of you that is
+     genuinely a tug — his end and hers, meeting where the grip is.
+     ================================================================ */
+  if(inGrab){
+    const gp=clamp(X.gp||0,0,1);
+    const hair=mixHex((w&&w.hair)||'#3a2412','#1a1006',0.30);
+    const hs=mixHex((G&&G.skin)||'#caa06a','#1a0e08',0.06);
+    /* her head comes back as he wins it */
+    const hyy=AK.headY+2-Math.round(gp*4);
+    const hxx=PX - side*Math.round(1+gp*2);
+    /* the hank of hair in his fist, stretched between them */
+    ctx.globalAlpha=0.92;
+    { const gx=hx + (-side)*2, gy=AK.shY-6-Math.round(gp*3);
+      const n=8;
+      for(let i=0;i<=n;i++){ const t2=i/n;
+        const xx=hxx+(gx-hxx)*t2, yy=hyy+(gy-hyy)*t2 - Math.sin(t2*Math.PI)*2.2*(1-gp);
+        px(xx-1, yy-1, 2, 2, i<n*0.5? hair : shade(hair,-14)); }
+      /* the fist itself */
+      px(gx-2, gy-2, 5, 5, hs);
+      px(gx-2, gy-2, 5, 1, shade(hs,22));
+      px(gx-2, gy+2, 5, 1, shade(hs,-30));
+      /* knuckles */
+      for(let i=0;i<3;i++) px(gx-1+i*1.6, gy-1, 1, 1, shade(hs,30)); }
+    ctx.globalAlpha=1;
+    /* THE TUG. Two colours meeting at the grip: his gain from the left,
+       her hold from the right, and the seam is the state of it. */
+    const bw2=92, bx=Math.round(W/2-bw2/2), by=48;
+    px(bx-1, by-1, bw2+2, 9, 'rgba(10,5,9,.88)');
+    const mid=Math.round(bw2*gp);
+    px(bx, by, mid, 7, '#7ad08a');
+    px(bx+mid, by, bw2-mid, 7, mad? '#a8324a' : '#8a3a58');
+    px(bx+mid-1, by-2, 2, 11, '#fff2c8');
+    ctx.textAlign='center';
+    pixelText('✊ MASH  SPACE — TAKE IT', W/2, by+18, 'rgba(255,236,190,.95)', 0.74);
+    pixelText('X — let go of it', W/2, by+27, 'rgba(200,180,200,.45)', 0.52);
+    ctx.textAlign='left';
+  }
+  /* ================================================================
+     ◆ YOUR RHYTHM NOW. No window, no bar to meet — a stroke meter that
+     empties as the beat runs out and a count of what you have put in.
+     ================================================================ */
+  if(inDrive){
+    const bw2=92, bx=Math.round(W/2-bw2/2), by=50;
+    const lf=clamp((X.driveLeft||0)/300,0,1);
+    px(bx-1, by-1, bw2+2, 6, 'rgba(10,5,9,.86)');
+    px(bx, by, Math.round(bw2*lf), 4, lf>0.28? '#ff9ad8' : '#e0705b');
+    /* the stroke itself, as a pip that fills between thrusts */
+    const pw2=Math.round(20*drv);
+    px(Math.round(W/2-10), by+7, 20, 2, 'rgba(120,90,110,.40)');
+    px(Math.round(W/2-10), by+7, pw2, 2, '#fff2c8');
+    ctx.textAlign='center';
+    pixelText('◆ '+(X.thrust||0)+'   —   SPACE', W/2, by+18,
+      'rgba(255,200,230,.95)', 0.76);
+    ctx.textAlign='left';
+  }
+  /* ================================================================
+     🍑 AND THE TWO SHE BENT FOR. The hand comes off his near shoulder,
+     arcs, and lands — and the two pips underneath say plainly that
+     there are two of them and walking away leaves them behind.
+     ================================================================ */
+  if(inBend){
+    const seatY2=AK.seatY-(X.bend||0)*(2.6+((w&&w.body&&w.body.booty)||5)*0.26);
+    const cy3=seatY2+AK.seatH*0.52;
+    const seatW2=(4.6+((w&&w.body&&w.body.booty)||5)*0.48)*(1+(X.bend||0)*0.16);
+    const HS=mixHex((G&&G.skin)||'#caa06a','#e8c39a',0.28);
+    const HKb=rkBackBones(FY, (G.body&&G.body.legs)||5, 4, (G.body&&G.body.waist)||5, true);
+    const ready=(X.slaps||0)<CLAM_SLAPS && T>46;
+    const sf=clamp((X.slapFlash||0)/20,0,1);
+    /* the arm: cocked while it waits, swung through while it lands */
+    const land=1-sf;
+    const sx2=hx - side*(HKb.waistW+3.5), sy2=HKb.shY+2;
+    const tx2=PX + side*seatW2*0.72, ty2=cy3;
+    if(X.slapFlash>0 || ready){
+      const arc=Math.sin(land*Math.PI)*8;
+      const ex=sx2+(tx2-sx2)*land, ey=sy2+(ty2-sy2)*land-arc;
+      ctx.globalAlpha=0.95;
+      const N=11;
+      for(let i2=0;i2<=N;i2++){ const t2=i2/N;
+        const xx=sx2+(ex-sx2)*t2, yy=sy2+(ey-sy2)*t2-Math.sin(t2*Math.PI)*arc*0.3;
+        const th=Math.max(2, 3.4-t2*1.2);
+        px(xx-th/2, yy-th/2, th, th, t2<0.45? shade(HS,-16) : shade(HS,-4));
+        px(xx-th/2, yy-th/2, th, 1, shade(HS,16)); }
+      px(ex-2.5, ey-3, 5, 6, HS);
+      px(ex-2.5, ey-3, 5, 1, shade(HS,26));
+      px(ex-2.5, ey+2, 5, 1, shade(HS,-30));
+      ctx.globalAlpha=1;
+    }
+    /* what landing looks like */
+    if(sf>0){
+      const r0=1-sf;
+      ctx.globalAlpha=sf*0.85;
+      ctx.strokeStyle='rgba(255,190,210,.95)'; ctx.lineWidth=1.3;
+      for(const m of [0.5,1.0]){
+        ctx.beginPath(); ctx.arc(tx2, ty2, 3+r0*16*m, 0, 7); ctx.stroke(); }
+      ctx.globalAlpha=sf*0.55;
+      px(tx2-5, ty2-4, 10, 8, 'rgba(255,225,235,.6)');
+      ctx.globalAlpha=1;
+    }
+    /* the two owed */
+    const px0=Math.round(W/2-13);
+    for(let i=0;i<CLAM_SLAPS;i++){
+      const on=i<(X.slaps||0);
+      px(px0+i*14, 52, 11, 4, on? '#ff9ad8' : 'rgba(120,90,110,.45)');
+    }
+    ctx.textAlign='center';
+    pixelText(ready? '🍑 SPACE — LAND IT' : ((X.slaps||0)>=CLAM_SLAPS? '🍑 BOTH' : '🍑 …'),
+      W/2, 44, ready? 'rgba(255,180,220,.95)' : 'rgba(230,200,220,.60)', 0.76);
+    ctx.textAlign='left';
+  }
   /* ---- THE COUNT AND THE WINDOW. Without these it is a scene that
      wants a keypress and never says when. ---- */
   if(inHold){
@@ -24265,10 +24549,21 @@ function drawClam(){
       const on=i<(X.rode||0);
       px(px0+i*(pw2+2), by+9, pw2, 3, on? (mad? '#ff8a94' : '#ff9ad8') : 'rgba(120,90,110,.45)');
     }
+    /* THREE STRIKES, ON SCREEN. A limit the player cannot see is not a
+       limit, it is a surprise. */
+    { const sx3=Math.round(W/2+bw2/2+5);
+      for(let i=0;i<CLAM_STRIKES;i++){
+        const gone=i<(X.miss||0);
+        const fresh=gone && i===(X.miss-1) && (X.strikeFlash||0)>0;
+        ctx.globalAlpha=fresh? (0.5+0.5*Math.sin(T*0.7)) : 1;
+        px(sx3+i*5, by, 3, 5, gone? '#e0705b' : 'rgba(120,90,110,.42)');
+        ctx.globalAlpha=1; } }
     ctx.textAlign='center';
     pixelText(win? 'SPACE — MEET IT' : 'WAIT FOR THE CLENCH', W/2, by+20,
       win? 'rgba(159,232,168,.95)' : 'rgba(210,190,210,.60)', win? 0.72 : 0.58);
-    pixelText('X — pull out', W/2, by+29, 'rgba(200,180,200,.42)', 0.52);
+    pixelText('W — take it off her'+(X.stood? '' : '    ◆ K — stand it'),
+      W/2, by+29, 'rgba(232,195,74,.55)', 0.54);
+    pixelText('X — pull out', W/2, by+37, 'rgba(200,180,200,.38)', 0.50);
     ctx.textAlign='left';
   }
   /* ---- WORDS ---- */
@@ -24296,8 +24591,16 @@ function drawClam(){
                           : 'It stops being a suggestion. You are held exactly where she put you.',
       W/2, 37, 'rgba(232,220,240,'+clamp((T-36)/30,0,0.78)+')', 0.56);
   } else if(inHold){
-    pixelText('🐚 '+(X.rode||0)+' / '+X.need+(mad? '   — SHE IS MAKING A POINT' : ''),
+    pixelText('🐚 '+(X.rode||0)+' / '+X.need+(mad? '   — SHE IS MAKING A POINT' : '')
+      +(X.stood? '   ◆ AND SHE KNOWS' : ''),
       W/2, 26, mad? 'rgba(255,150,160,.88)' : 'rgba(255,180,220,.88)', 0.76);
+  } else if(inGrab){
+    pixelText('✊ A HAND IN HER HAIR', W/2, 26, 'rgba(255,214,150,.92)', 0.80);
+  } else if(inDrive){
+    pixelText('◆ YOUR COUNT NOW', W/2, 26, 'rgba(255,190,225,.92)', 0.80);
+  } else if(inBend){
+    pixelText((X.slaps||0)>=CLAM_SLAPS? '🍑 SHE STRAIGHTENS UP' : '🍑 SHE BENDS. TWO OF THEM.',
+      W/2, 26, 'rgba(255,180,220,.92)', 0.80);
   }
   ctx.textAlign='left';
 }
