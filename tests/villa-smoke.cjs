@@ -201,6 +201,101 @@ const ok=(name,cond,detail)=>{
   ok('K stands it while she holds', clam2.stood===true);
   ok('and she colours for it',      clam2.blush===true);
 
+  console.log('\n--- THE CLENCH IS COMMON, NOT CONSTANT ---');
+  const cf=await pg.evaluate(()=>{
+    const S=window.__SS; let fires=0;
+    S.openDomus(); const D=S.DM;
+    for(let i=0;i<12000;i++){ D.t+=1;
+      if(!D.clam && S.clamDue()){ S.startClam(); fires++; D.clam=null; } }
+    return {fires, cap:(D.clamFired|0)};
+  });
+  ok('capped per visit', cf.fires<=4, 'fired '+cf.fires+' in 12000 ticks');
+  ok('still the common one on the coast', cf.fires>=2,
+     'one per ~'+(cf.fires? Math.round(12000/cf.fires):'-')+' ticks');
+
+  console.log('\n--- THE COAST HAS ITS OWN MAP PINS ---');
+  const map=await pg.evaluate(()=>{
+    const S=window.__SS;
+    S.openMap && S.openMap();
+    S.buildRegions();
+    const layer=document.getElementById('region-layer');
+    const names=[...layer.querySelectorAll('.region')].map(d=>d.textContent.trim());
+    return {n:names.length, has:names.indexOf('Leokanis')>=0,
+            roman:names.indexOf('Italia')>=0, sample:names.slice(0,4)};
+  });
+  ok('the coast pins its own places', map.has, map.sample.join(', '));
+  ok('and not the Roman provinces', !map.roman);
+
+  console.log('\n--- SHE HAS AN OPINION ABOUT YOU ---');
+  const pr=await pg.evaluate(()=>{
+    const S=window.__SS, G=S.G, out={};
+    G.body.secret=10;
+    out.ready=S.praiseReady();
+    out.pool=S.praisePool().length;
+    S.openDomus();
+    out.started=S.startPraise();
+    const P=S.DM.praise;
+    out.replies=S.praiseReplies().length;
+    for(let i=0;i<90;i++) S.updatePraise(1);
+    out.asks=(P.ph==='ask');
+    const r0=G.wifeRel;
+    S.praiseTake(0);
+    out.paid=(G.wifeRel>r0);
+    // and it draws in every phase
+    let threw=null;
+    try{ for(const ph of ['say','ask','answer']){ P.ph=ph;
+      for(let t=0;t<30;t++){ P.t=t; S.drawPraise(); } } }catch(e){ threw=e.message; }
+    out.threw=threw;
+    return out;
+  });
+  ok('she has grounds to say something', pr.ready===true && pr.pool>0, 'pool '+pr.pool);
+  ok('the beat starts',      pr.started===true);
+  ok('and you get answers',  pr.replies===3, 'replies '+pr.replies);
+  ok('choosing one pays',    pr.paid===true);
+  ok('and it draws clean',   !pr.threw, pr.threw||'');
+
+  console.log('\n--- THE ACTION TABLET ---');
+  const tb=await pg.evaluate(()=>{
+    const S=window.__SS, out={};
+    S.openDomus();
+    S.openTablet();
+    out.open=!!S.DM.tablet;
+    const M=S.tabletMenu();
+    out.rows=M.length;
+    out.clamRow=!!M.find(m=>m.id==='clam' && m.ok);
+    out.hasWhy=M.every(m=>m.ok || (m.why && m.why.length>0));
+    let threw=null;
+    try{ for(let t=0;t<40;t++){ S.DM.tablet.t=t; S.drawTablet(); } }catch(e){ threw=e.message; }
+    out.threw=threw;
+    // and it can actually fire one
+    S.DM.tablet.sel=M.findIndex(m=>m.id==='clam');
+    S.setEdge('space'); S.updateTablet(1);
+    out.fired=!!S.DM.clam; out.closed=!S.DM.tablet;
+    return out;
+  });
+  ok('T opens it',                  tb.open===true);
+  ok('it lists the hall\'s beats',  tb.rows>=5, 'rows '+tb.rows);
+  ok('a blocked row says why',      tb.hasWhy===true);
+  ok('it draws clean',              !tb.threw, tb.threw||'');
+  ok('and it actually fires one',   tb.fired===true && tb.closed===true);
+
+  console.log('\n--- THE ACTION BAR NAMES WHAT YOU MAY PRESS ---');
+  const bar=await pg.evaluate(()=>{
+    const S=window.__SS, out={};
+    S.openDomus(); S.startClam(); const X=S.DM.clam;
+    const grab=()=>{ S.syncSceneActs();
+      return [...document.querySelectorAll('#sceneacts .sact')].map(b=>b.textContent); };
+    X.ph='call';  out.call=grab();
+    X.ph='hold'; X.pt=X.cyc*0.7; X.stood=false; out.hold=grab();
+    X.ph='grab'; out.grab=grab();
+    X.ph='bend'; X.slaps=0; out.bend=grab();
+    return out;
+  });
+  ok('the call offers going or not', bar.call.length===2, bar.call.join(' / '));
+  ok('the hold names all four',      bar.hold.length===4, bar.hold.join(' / '));
+  ok('the contest names its two',    bar.grab.length===2, bar.grab.join(' / '));
+  ok('and the bend counts them down',bar.bend.length===1, bar.bend.join(' / '));
+
   console.log('\n--- THE BODY MAP DRAWS THE PRESS ---');
   const bm=await pg.evaluate(async()=>{
     const S=window.__SS, G=S.G;

@@ -147,6 +147,22 @@
   .blink{animation:bl 1s steps(2) infinite;}
   @keyframes bl{50%{opacity:.25;}}
   .hide{display:none!important;}
+  /* the scene action chips: a key cap, a label, and a lit state for the
+     beat that is actually live right now */
+  .sact{pointer-events:auto;cursor:pointer;user-select:none;-webkit-user-select:none;
+    touch-action:manipulation;display:flex;align-items:center;gap:5px;
+    background:linear-gradient(#241811ee,#150d07ee);border:2px solid #6b4e2a;
+    color:var(--bone);padding:4px 9px;font-family:inherit;font-weight:bold;
+    font-size:clamp(9px,1.7vw,13px);letter-spacing:1px;border-radius:3px;
+    box-shadow:0 2px 6px rgba(0,0,0,.55);transition:filter .08s,transform .05s;}
+  .sact:hover{filter:brightness(1.25);}
+  .sact:active{transform:translateY(1px);}
+  .sact .cap{background:#000;border:1px solid var(--gold);color:var(--gold);
+    padding:0 4px;border-radius:2px;font-size:.86em;min-width:14px;text-align:center;}
+  .sact.hot{border-color:#9fe8a8;box-shadow:0 0 0 1px #9fe8a8,0 2px 10px rgba(120,232,150,.35);}
+  .sact.hot .cap{border-color:#9fe8a8;color:#9fe8a8;}
+  .sact.warn{border-color:#c85a6a;} .sact.warn .cap{border-color:#c85a6a;color:#e08a96;}
+  .sact.dim{opacity:.5;}
 </style>
 </head>
 <body>
@@ -682,6 +698,11 @@
       <button class="btn t2 blood" data-k2="space" style="width:56px;height:56px">ACT</button>
     </div>
   </div>
+
+  <!-- ===== SCENE ACTIONS — labelled, pressable, and always on ===== -->
+  <div id="sceneacts" class="hide" style="position:absolute;left:0;right:0;bottom:6px;
+       z-index:10;display:flex;gap:6px;justify-content:center;flex-wrap:wrap;
+       padding:0 8px;pointer-events:none;"></div>
 
   <!-- on-screen touch controls (mobile) -->
   <div id="touch" class="hide" style="position:absolute;inset:0;z-index:8;pointer-events:none;">
@@ -16051,15 +16072,24 @@ function sfx(kind, sfxArg){
 
     /* ---------- THE SLAPS ---------- */
     case 'slap':           // an open palm on skin — sharper and wetter than 'hit'
-      hiss({d:0.030, v:0.22, f:3200, to:1100, band:true, q:0.8, a:0.0006});
-      hiss({d:0.10,  v:0.14, f:1200, to:300,  a:0.0015, rev:true});
-      blip({f:180, to:70, d:0.13, type:'sine', v:0.11, a:0.002});
+      hiss({d:0.030, v:0.24, f:3200, to:1100, band:true, q:0.8, a:0.0006});
+      hiss({d:0.12,  v:0.16, f:1000, to:240,  a:0.0015, rev:true});
+      /* THE BODY OF IT. One thin sine at 0.11 was the whole low end, which
+         is why it read as a hand on a table rather than on a person. */
+      blip({f:150, to:52, d:0.22, type:'sine', v:0.26, a:0.002, rev:true});
+      blip({f:78,  to:38, d:0.26, type:'sine', v:0.20, a:0.003, rev:true});
       break;
     case 'slapBig':        // the committed one, with the whole arm behind it
-      hiss({d:0.040, v:0.26, f:3800, to:900, band:true, q:0.7, a:0.0005});
-      hiss({d:0.20,  v:0.17, f:1400, to:220, a:0.0015, rev:true});
-      blip({f:150, to:46, d:0.26, type:'sine',     v:0.15, a:0.002, rev:true});
-      blip({f:300, to:110, d:0.10, type:'triangle', v:0.05, a:0.002});
+      hiss({d:0.045, v:0.30, f:3800, to:900, band:true, q:0.7, a:0.0005});
+      hiss({d:0.22,  v:0.19, f:1300, to:200, a:0.0015, rev:true});
+      /* the crack, the thump, and the sub under the thump */
+      blip({f:132, to:40, d:0.34, type:'sine',     v:0.34, a:0.002, rev:true});
+      blip({f:66,  to:29, d:0.42, type:'sine',     v:0.27, a:0.003, rev:true});
+      blip({f:300, to:110, d:0.10, type:'triangle', v:0.07, a:0.002});
+      /* AND IT KEEPS MOVING. A big soft mass does not stop when the hand
+         does — a slow second swell under the tail is the part of the sound
+         that was missing entirely and the reason it felt shallow. */
+      blip({f:52, to:34, d:0.30, type:'sine', v:0.15, a:0.004, at:0.09, rev:true});
       break;
 
     /* ---------- COIN, COURT, HERBS ---------- */
@@ -16191,6 +16221,7 @@ window.addEventListener('keydown',e=>{
   else if(k==='l'){ setEdge('l'); }                 // 🏛 the ardor
   else if(k==='k'){ setEdge('k'); }                 // ◆ and the standing, which is its own act here
   else if(k==='x'){ setEdge('x'); }                 // 🍑 the quick decline — skip the bend outright
+  else if(k==='t'){ setEdge('t'); }                 // ⌘ the action tablet, in the hall
   else if(k==='j'){ setEdge('j');                   // ◆ and the press, which is how a standing is answered
     /* A KEY THAT DOES NOTHING OUTSIDE ONE SCREEN IS A KEY THE PLAYER
        DECIDES IS BROKEN. J is only meaningful in the hall, so pressed
@@ -16240,6 +16271,89 @@ document.addEventListener('mousedown',e=>{ if(e.button===0 && state==='fight'){ 
     btn.addEventListener('mousedown',down); btn.addEventListener('mouseup',up); btn.addEventListener('mouseleave',up);
   });
 })();
+/* WHAT YOU MAY PRESS RIGHT NOW. Read off the live scene rather than kept
+   in a table beside it, so a phase that changes its controls can never
+   leave the bar describing the previous one. */
+function sceneActions(){
+  const D=DM; if(!D || state!=='domus') return [];
+  const A=[];
+  const X=D.clam;
+  if(X){
+    if(X.ph==='call'){
+      A.push({k:'space', c:'␣', t:'GO TO HER', hot:true});
+      A.push({k:'x', c:'X', t:'NOT NOW', warn:true});
+    } else if(X.ph==='hold'){
+      const kk=(X.pt||0)/Math.max(1,X.cyc||1), win=(kk>=0.52&&kk<=0.86);
+      A.push({k:'space', c:'␣', t:win?'MEET IT':'WAIT…', hot:win, dim:!win});
+      A.push({k:'w', c:'W', t:'TAKE IT'});
+      if(!X.stood) A.push({k:'k', c:'K', t:'STAND IT'});
+      A.push({k:'x', c:'X', t:'PULL OUT', warn:true});
+    } else if(X.ph==='grab'){
+      A.push({k:'space', c:'␣', t:'MASH — TAKE IT', hot:true});
+      A.push({k:'x', c:'X', t:'LET GO', warn:true});
+    } else if(X.ph==='drive'){
+      A.push({k:'space', c:'␣', t:'THRUST', hot:(X.nextThrust||0)<=0, dim:(X.nextThrust||0)>0});
+      if(!X.stood) A.push({k:'k', c:'K', t:'STAND IT'});
+      A.push({k:'x', c:'X', t:'FINISH'});
+    } else if(X.ph==='bend'){
+      const left=2-(X.slaps||0);
+      A.push({k:'space', c:'␣', t: left>0? ('LAND IT  ('+left+')') : 'DONE', hot:left>0, dim:left<=0});
+    }
+    return A;
+  }
+  const C=D.curio;
+  if(C){
+    if(C.ph==='choose'){
+      const M=(typeof curioMenu==='function')? curioMenu() : [];
+      const cur=M[clamp(C.sel|0,0,Math.max(0,M.length-1))];
+      A.push({k:'a', c:'◀', t:''});
+      A.push({k:'space', c:'␣', t: cur? cur.name : 'TAKE', hot:true});
+      A.push({k:'d', c:'▶', t:''});
+      A.push({k:'j', c:'J', t:'LEAVE HER TO IT', warn:true});
+    }
+    return A;
+  }
+  const P=D.praise;
+  if(P && P.ph==='ask'){
+    const R=(typeof praiseReplies==='function')? praiseReplies() : [];
+    const cur=R[clamp(P.sel|0,0,Math.max(0,R.length-1))];
+    A.push({k:'a', c:'◀', t:''});
+    A.push({k:'space', c:'␣', t: cur? cur.name : 'SAY IT', hot:true});
+    A.push({k:'d', c:'▶', t:''});
+    return A;
+  }
+  const Tp=D.tempt;
+  if(Tp){
+    if(Tp.ph==='resist'){ A.push({k:'space', c:'␣', t:'MASH — DO NOT', hot:true});
+      A.push({k:'x', c:'X', t:'LOOK AWAY'}); return A; }
+    if(Tp.ph==='look'){ A.push({k:'space', c:'␣', t:'IN THE GREEN', hot:true});
+      A.push({k:'x', c:'X', t:'STOP HERE'}); return A; }
+    if(Tp.ph==='bend'||Tp.ph==='approach'){ A.push({k:'x', c:'X', t:'LOOK AWAY'}); return A; }
+  }
+  if(D.tablet) return [];              // the tablet draws its own
+  return A;
+}
+let _sactSig='';
+function syncSceneActs(){
+  const el=$('sceneacts'); if(!el) return;
+  const A=sceneActions();
+  if(!A.length){ if(_sactSig!==''){ el.innerHTML=''; _sactSig=''; }
+    el.classList.add('hide'); return; }
+  el.classList.remove('hide');
+  const sig=A.map(a=>a.k+a.t+(a.hot?'1':'')+(a.dim?'d':'')).join('|');
+  if(sig===_sactSig) return;           // do not thrash the DOM every frame
+  _sactSig=sig; el.innerHTML='';
+  A.forEach(a=>{
+    const b=document.createElement('div');
+    b.className='sact'+(a.hot?' hot':'')+(a.warn?' warn':'')+(a.dim?' dim':'');
+    b.innerHTML='<span class="cap">'+a.c+'</span>'+(a.t? '<span>'+a.t+'</span>' : '');
+    const fire=e=>{ e.preventDefault(); e.stopPropagation();
+      setEdge(a.k); try{ sfx('ui'); }catch(e2){} };
+    b.addEventListener('mousedown',fire);
+    b.addEventListener('touchstart',fire,{passive:false});
+    el.appendChild(b);
+  });
+}
 // show the right pad for the screen we're on
 function syncTouchPads(){
   const on = isTouchOn();
@@ -22509,6 +22623,12 @@ function updateDomus(dt){
   /* 🐚 AND THE CLAM, which she starts and she finishes */
   if(D.clam){ updateClam(dt); if(D.clam && D.clam.locks) return; }
   else if(clamDue()) startClam();
+  /* 💬 her turn to have an opinion about you */
+  if(D.praise){ updatePraise(dt); if(D.praise && D.praise.locks) return; }
+  else if(praiseDue()) startPraise();
+  /* ⌘ and the tablet, which locks hardest of all because it is a menu */
+  if(D.tablet){ updateTablet(dt); if(D.tablet && D.tablet.locks) return; }
+  else if(consume('t')) openTablet();
   if(D.husb){ updateHusbandMove(dt); return; }        // he is already crossing; nothing interrupts that
   if(D.bendAsk){ updateBendAsk(dt); return; }        // he has asked; the room waits on your answer
   if(D.drop){ updateDrop(dt); if(D.drop && D.drop.locks) return; }
@@ -23873,6 +23993,307 @@ function updateCurio(dt){
    same act with a point being made inside it. Riding that one out is
    how the point gets taken.
    ===================================================================== */
+/* =====================================================================
+   💬 SHE SAYS SOMETHING ABOUT YOU
+   ---------------------------------------------------------------------
+   The whole compliment system in this game runs one way: you look at her,
+   you read her, you say the plain word for what you found. She never once
+   said anything back about YOU, which on a coast where being looked at is
+   an office is a strange thing to leave out — a woman who holds a seat by
+   the evidence of her body is not going to be shy about the evidence of
+   yours. So she says it, and it is your turn to have an answer.
+
+   Three answers to each, and they are not better and worse: taking it,
+   returning it, and being modest about it all move the bond, they just
+   move it differently, and the coast reads all three.
+   ===================================================================== */
+const RK_PRAISE=[
+  {id:'rod', need:{len:8},
+   line:'“That is a big rod on you and I am not going to pretend I have not noticed.”',
+   replies:[
+     {name:'I KNOW',        line:'“I know.” She snorts. “Of course you do.”',            bond:2, phys:3},
+     {name:'YOU MEASURED?', line:'“Did you measure it?” “I did. Twice. It did not change.”', bond:3, phys:2},
+     {name:'SAY IT AGAIN',  line:'“Say that again at the equinox, in front of the Ten.” She says she will.', bond:4, phys:1} ]},
+  {id:'rod2', need:{len:9},
+   line:'“The ledger said the number out loud and the whole district heard it.”',
+   replies:[
+     {name:'LET THEM',   line:'“Let them.” She looks at you for a moment too long and says nothing.', bond:3, phys:2},
+     {name:'AND YOU?',   line:'“And what did you think of it?” “I am still thinking.”',   bond:4, phys:2},
+     {name:'IT IS ONLY A NUMBER', line:'“It is only a number.” “It is not, and you know it is not.”', bond:2, phys:1} ]},
+  {id:'stand',need:{stand:true},
+   line:'“That is standing, and the kilt is not hiding it, and I am not going to help you.”',
+   replies:[
+     {name:'I DID NOT ASK', line:'“I did not ask for help.” “No,” she says. “You did not.”', bond:2, phys:4},
+     {name:'COME HERE',     line:'“Then come here.” She takes her time about it, and she comes.', bond:3, phys:4},
+     {name:'IT IS THE COLD', line:'“It is the cold.” She looks at the fire. She looks back at you.', bond:1, phys:2} ]},
+  {id:'work',
+   line:'“You carried the whole of that load and did not once put it down. I watched.”',
+   replies:[
+     {name:'YOU WATCHED?', line:'“You watched?” “I watch a great deal. You are not subtle.”', bond:4, phys:1},
+     {name:'IT WAS LIGHT', line:'“It was not heavy.” It was. She was there when it was weighed.', bond:2, phys:1},
+     {name:'GOOD',         line:'“Good.” She goes back to the rack, pleased about something.', bond:3, phys:0} ]},
+  {id:'arms',
+   line:'“There is more of you through the shoulders than there was at the thaw.”',
+   replies:[
+     {name:'THE OAR',   line:'“The oar.” “Mm. Keep at the oar.”',                       bond:3, phys:1},
+     {name:'FOR YOU',   line:'“For you.” She says nothing at all, which here is the whole sentence.', bond:4, phys:2},
+     {name:'HAVE THERE?',line:'“Is there?” She puts a hand on it to check. There is.',  bond:3, phys:3} ]},
+  {id:'stay',
+   line:'“Nobody on this coast married better than I did and I have said so out loud.”',
+   replies:[
+     {name:'TO WHO',  line:'“To who?” “To the Ten. At the equinox. You were not there.”', bond:5, phys:1},
+     {name:'NOR DID I',line:'“Nor did I.” She lets that sit, and does not correct it.',    bond:4, phys:1},
+     {name:'MM',      line:'“Mm.” It is her own word and she notices you using it.',       bond:2, phys:0} ]},
+];
+function praiseReady(){
+  try{
+    if(!rkHere() || !ADULT) return false;
+    if(!(G && G.married && G.wife && !G.wife.male)) return false;
+    if(G.isFemale) return false;
+    return true;
+  }catch(e){ return false; }
+}
+/* which of them she has grounds to say right now */
+function praisePool(){
+  const len=(typeof ardorLen==='function')? ardorLen() : 5;
+  const up =(typeof rkStandOn==='function') && rkStandOn();
+  return RK_PRAISE.filter(p=>{
+    const n=p.need||{};
+    if(n.len && len < n.len) return false;
+    if(n.stand && !up) return false;
+    return true;
+  });
+}
+function praiseDue(){
+  const D=DM; if(!D) return false;
+  if(!praiseReady()) return false;
+  if(D.scene||D.slap||D.rslap||D.tempt||D.husb||D.drop||D.rise||D.ardor
+     ||D.press||D.curio||D.clam||D.praise||D.tablet) return false;
+  if((D.praiseFired|0) >= 3) return false;
+  if(D.t < (D.praiseNext||500)) return false;
+  return Math.random() < 0.010;
+}
+function startPraise(){
+  const D=DM; if(!D || !praiseReady()) return false;
+  const pool=praisePool(); if(!pool.length) return false;
+  D.praise={ ph:'say', t:0, sel:0, locks:true, p:pick(pool) };
+  D.wifePause=99999;
+  D.praiseFired=(D.praiseFired|0)+1;
+  D.praiseNext=D.t+1400;
+  try{ sfx('ui'); }catch(e){}
+  return true;
+}
+function praiseReplies(){
+  const P=DM&&DM.praise; if(!P||!P.p) return [];
+  return P.p.replies||[];
+}
+function praiseTake(i){
+  const D=DM, P=D&&D.praise; if(!P) return null;
+  const R=praiseReplies()[i]; if(!R) return null;
+  P.ph='answer'; P.t=0; P.chose=R;
+  const ceil=(typeof bondCeiling==='function')? bondCeiling() : 100;
+  G.wifeRel =clamp((G.wifeRel||50)+(R.bond|0), 0, ceil);
+  G.wifePhys=clamp((G.wifePhys===undefined?45:G.wifePhys)+(R.phys|0), 0, 100);
+  G.praiseHeard=(G.praiseHeard||0)+1;
+  try{ sfx('ahh'); }catch(e){} try{ refreshStatbar(); saveQuiet(); }catch(e){}
+  return R;
+}
+function updatePraise(dt){
+  const D=DM, P=D.praise; if(!P) return;
+  P.t+=dt;
+  if(P.ph==='say'){
+    P.locks=true;
+    if(P.t>84){ P.ph='ask'; P.t=0; P.sel=0; }
+  } else if(P.ph==='ask'){
+    P.locks=true;
+    const R=praiseReplies();
+    if(consume('a')){ P.sel=(P.sel+R.length-1)%R.length; try{ sfx('ui'); }catch(e){} }
+    if(consume('d')){ P.sel=(P.sel+1)%R.length;          try{ sfx('ui'); }catch(e){} }
+    if(consume('space')||consume('attack')) praiseTake(clamp(P.sel,0,R.length-1));
+  } else if(P.ph==='answer'){
+    P.locks=true;
+    if(P.t>140){ P.ph='done'; P.t=0; }
+  } else {
+    P.locks=false;
+    const R=P.chose;
+    D.praise=null; D.wifePause=0;
+    if(R) toast('💬 '+R.line+'   ('+(R.bond>=0?'+':'')+(R.bond|0)+' 💞'
+      +(R.phys? ', +'+(R.phys|0)+' 🔥' : '')+')', 6000);
+  }
+}
+function drawPraise(){
+  const D=DM, P=D.praise; if(!P) return;
+  const FY=214, T=P.t, w=G.wife, PX=D.wifeX;
+  /* the room drops back and the lamp comes up on her, the same way every
+     other beat in this hall marks itself */
+  ctx.globalAlpha=0.10+0.22; px(-4,-4,W+8,H+8,'#180b12'); ctx.globalAlpha=1;
+  { const g=ctx.createRadialGradient(PX,FY-40,6,PX,FY-40,80);
+    g.addColorStop(0,'rgba(255,200,180,.22)'); g.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.fillStyle=g; ctx.fillRect(0,60,W,H-60); }
+  ctx.textAlign='center';
+  /* ---- HER LINE, in a box with a tail that points at her ---- */
+  { const a=clamp(T/26,0,1);
+    const words=String(P.p.line).split(' '); let ln='', out=[];
+    words.forEach(wd=>{ const t2=ln?ln+' '+wd:wd;
+      if(t2.length>44 && ln){ out.push(ln); ln=wd; } else ln=t2; });
+    if(ln) out.push(ln);
+    out=out.slice(0,3);
+    const bh=out.length*9+9, by=24;
+    ctx.globalAlpha=a;
+    px(W/2-118, by-7, 236, bh, 'rgba(18,9,15,.88)');
+    px(W/2-118, by-7, 236, 1, 'rgba(255,190,220,.40)');
+    px(W/2-118, by-8+bh, 236, 1, 'rgba(255,190,220,.16)');
+    /* the tail, aimed at whoever is speaking */
+    { const tx=clamp(PX, W/2-90, W/2+90);
+      px(tx-3, by-8+bh, 6, 2, 'rgba(18,9,15,.88)');
+      px(tx-1, by-6+bh, 3, 2, 'rgba(18,9,15,.88)'); }
+    out.forEach((L,i)=>pixelText(L, W/2, by+i*9, 'rgba(255,226,236,'+(a*0.95).toFixed(2)+')', 0.62));
+    ctx.globalAlpha=1; }
+  /* ---- AND YOUR THREE ANSWERS ---- */
+  if(P.ph==='ask'){
+    const R=praiseReplies();
+    const y0=FY-104;
+    R.forEach((r,i)=>{
+      const on=(i===(P.sel|0));
+      const yy=y0+i*13;
+      ctx.globalAlpha=on?1:0.55;
+      px(W/2-96, yy-6, 192, 12, on? 'rgba(58,26,44,.95)' : 'rgba(24,12,20,.80)');
+      if(on){ px(W/2-96, yy-6, 192, 1, 'rgba(255,190,220,.70)');
+              px(W/2-96, yy+5, 192, 1, 'rgba(255,190,220,.28)');
+              px(W/2-101, yy-3, 3, 6, '#ffd27a'); }
+      pixelText(r.name, W/2, yy-1, on? 'rgba(255,236,214,.98)' : 'rgba(220,200,215,.70)', 0.62);
+      ctx.globalAlpha=1;
+    });
+    if(T>20) pixelText('◀ ▶  to choose      SPACE  to say it', W/2, y0+R.length*13+6,
+      'rgba(232,195,74,.55)', 0.54);
+  }
+  /* ---- WHAT SHE MADE OF THE ANSWER ---- */
+  else if(P.ph==='answer' && P.chose){
+    const a=clamp(T/22,0,1);
+    const words=String(P.chose.line).split(' '); let ln='', out=[];
+    words.forEach(wd=>{ const t2=ln?ln+' '+wd:wd;
+      if(t2.length>46 && ln){ out.push(ln); ln=wd; } else ln=t2; });
+    if(ln) out.push(ln);
+    out.slice(0,3).forEach((L,i)=>pixelText(L, W/2, FY-100+i*10,
+      'rgba(255,214,190,'+(a*0.92).toFixed(2)+')', 0.60));
+    if(T>40){
+      const g2=(P.chose.bond|0)>=4? 'rgba(159,232,168,.9)' : 'rgba(255,180,220,.85)';
+      pixelText('+'+(P.chose.bond|0)+' 💞'+((P.chose.phys|0)? '   +'+(P.chose.phys|0)+' 🔥':''),
+        W/2, FY-64, g2, 0.66);
+    }
+    /* she is pleased and would rather you did not see it */
+    if(((T|0)%22)<12) pixelText('❦', PX, FY-96, 'rgba(255,180,220,.5)', 0.7);
+  }
+  ctx.textAlign='left';
+}
+/* =====================================================================
+   ⌘ THE ACTION TABLET — the villa's own console
+   ---------------------------------------------------------------------
+   Not hacks: a way to SEE the things this hall does without standing in
+   it waiting for a die roll to come up. Every beat on this coast fires on
+   a cooldown and a probability, which is right for playing and useless
+   for looking at what you built. T opens it, it lists what this house can
+   currently do, it says plainly when something is not available and why,
+   and it fires the rest on the spot.
+   ===================================================================== */
+function tabletMenu(){
+  const D=DM; if(!D) return [];
+  const out=[];
+  const add=(id,name,note,ok,why)=>out.push({id,name,note,ok:!!ok,why:why||''});
+  add('tempt','🍑 THE BEND','She reaches for the low shelf and the whole game is whether you look.',
+      true);
+  add('look','◎ THE LOOK','Somebody is behind a door, and the door is not locked.',
+      (typeof nearStairs==='function'), 'There is nowhere in this hall to look into.');
+  add('curio','🔎 THE CURIOUS ONE','Something has caught her eye and the room has stopped existing.',
+      (typeof curioReady==='function') && curioReady(),
+      'She has not got the Curious trait — it is hers or it is nobody’s.');
+  add('clam','🐚 THE CLENCH','She calls you over, and then she closes.',
+      (typeof clamReady==='function') && clamReady(),
+      'She is not a vakran. The clam is that trait and no other.');
+  add('praise','💬 SHE SAYS SOMETHING','Her turn to have an opinion about you.',
+      (typeof praiseReady==='function') && praiseReady() && praisePool().length>0,
+      'Nothing she has grounds to say right now.');
+  add('press','◆ THE PRESS','The crossing, the contact, and the hold.',
+      (typeof rkPressOk==='function') && rkPressOk().ok,
+      (typeof rkPressOk==='function')? (rkPressOk().why||'Not here.') : 'Not here.');
+  return out;
+}
+function tabletFire(id){
+  const D=DM; if(!D) return;
+  D.tablet=null;
+  try{
+    if(id==='tempt'){ if(typeof startTempt==='function') startTempt(); return; }
+    if(id==='curio'){ if(typeof startCurio==='function') startCurio(); return; }
+    if(id==='clam'){  if(typeof startClam==='function')  startClam();  return; }
+    if(id==='praise'){if(typeof startPraise==='function')startPraise();return; }
+    if(id==='press'){ if(typeof tryRkPress==='function') tryRkPress(); return; }
+    if(id==='look'){
+      const rooms=(typeof roomsOccupiedToday==='function')? roomsOccupiedToday() : {};
+      const k=Object.keys(rooms)[0];
+      if(k && typeof startPeek==='function') startPeek(k, rooms[k]);
+      else toast('Nobody is behind a door just now.',2600);
+      return;
+    }
+  }catch(e){ toast('That one would not start.',2400); }
+}
+function openTablet(){
+  const D=DM; if(!D) return;
+  if(D.scene||D.slap||D.rslap||D.tempt||D.husb||D.drop||D.rise||D.ardor
+     ||D.press||D.curio||D.clam||D.praise){
+    toast('Something is already happening in this hall.',2400); return; }
+  D.tablet={ t:0, sel:0, locks:true };
+  try{ sfx('ui'); }catch(e){}
+}
+function updateTablet(dt){
+  const D=DM, X=D.tablet; if(!X) return;
+  X.t+=dt; X.locks=true;
+  const M=tabletMenu();
+  if(consume('a')){ X.sel=(X.sel+M.length-1)%M.length; try{ sfx('ui'); }catch(e){} }
+  if(consume('d')){ X.sel=(X.sel+1)%M.length;          try{ sfx('ui'); }catch(e){} }
+  if(consume('x')||consume('t')){ D.tablet=null; return; }
+  if(consume('space')||consume('attack')){
+    const c=M[clamp(X.sel,0,M.length-1)];
+    if(!c) return;
+    if(!c.ok){ toast('✗ '+c.why, 3600); try{ sfx('deny'); }catch(e){} return; }
+    tabletFire(c.id);
+  }
+}
+function drawTablet(){
+  const D=DM, X=D.tablet; if(!X) return;
+  const M=tabletMenu(), a=clamp(X.t/14,0,1);
+  ctx.globalAlpha=0.62*a; px(-4,-4,W+8,H+8,'#0a0610'); ctx.globalAlpha=1;
+  const bw=286, bx=Math.round(W/2-bw/2), by=30, rowH=17;
+  const bh=34+M.length*rowH+22;
+  ctx.globalAlpha=a;
+  px(bx-2, by-2, bw+4, bh+4, 'rgba(232,195,74,.30)');
+  px(bx, by, bw, bh, 'rgba(14,9,18,.96)');
+  px(bx, by, bw, 1, 'rgba(232,195,74,.55)');
+  ctx.textAlign='center';
+  pixelText('⌘  THE ACTION TABLET', W/2, by+11, 'rgba(255,226,150,.95)', 0.76);
+  pixelText('nothing here is earned — it is here so you can look at it',
+    W/2, by+21, 'rgba(200,180,200,.52)', 0.50);
+  M.forEach((m,i)=>{
+    const on=(i===(X.sel|0)), yy=by+34+i*rowH;
+    if(on){ px(bx+4, yy-6, bw-8, rowH-2, 'rgba(58,30,50,.95)');
+            px(bx+4, yy-6, bw-8, 1, 'rgba(255,200,230,.6)');
+            px(bx+1, yy-4, 3, rowH-6, '#ffd27a'); }
+    ctx.textAlign='left';
+    pixelText(m.name, bx+12, yy+1,
+      m.ok? (on? 'rgba(255,238,220,.98)' : 'rgba(226,208,222,.80)')
+          : 'rgba(150,120,140,.62)', 0.62);
+    ctx.textAlign='right';
+    pixelText(m.ok? '▶' : '✗', bx+bw-10, yy+1,
+      m.ok? 'rgba(159,232,168,.85)' : 'rgba(224,112,91,.85)', 0.60);
+  });
+  ctx.textAlign='center';
+  { const cur=M[clamp(X.sel,0,M.length-1)];
+    if(cur) pixelText(cur.ok? cur.note : ('✗ '+cur.why), W/2, by+bh-9,
+      cur.ok? 'rgba(210,196,214,.70)' : 'rgba(224,140,120,.80)', 0.52); }
+  pixelText('◀ ▶  ·  SPACE fires it  ·  T or X closes', W/2, by+bh+11,
+    'rgba(232,195,74,.55)', 0.52);
+  ctx.textAlign='left';
+  ctx.globalAlpha=1;
+}
 const CLAM_STRIKES = 3;                 // she lets go on the third missed swell
 const CLAM_SLAPS    = 2;                 // and what she bends for at the end
 const RK_CLAM={
@@ -23946,8 +24367,9 @@ function clamDue(){
   const D=DM; if(!D) return false;
   if(!clamReady()) return false;
   if(D.scene||D.slap||D.rslap||D.tempt||D.husb||D.drop||D.rise||D.ardor||D.press||D.curio||D.clam) return false;
-  if(D.t < (D.clamNext||200)) return false;
-  return Math.random() < 0.038;
+  if((D.clamFired|0) >= 4) return false;
+  if(D.t < (D.clamNext||300)) return false;
+  return Math.random() < 0.012;
 }
 function startClam(){
   const D=DM; if(!D || !clamReady()) return false;
@@ -23961,7 +24383,8 @@ function startClam(){
            call: pick(mad? RK_CLAM.callMad : RK_CLAM.callLove),
            see:  pick(mad? RK_CLAM.seeMad  : RK_CLAM.seeLove) };
   D.wifePause=99999;
-  D.clamNext=D.t+600;
+  D.clamFired=(D.clamFired|0)+1;
+  D.clamNext=D.t+1500;
   try{ sfx(mad? 'hmm' : 'ui'); }catch(e){}
   return true;
 }
@@ -24561,9 +24984,9 @@ function drawClam(){
     ctx.textAlign='center';
     pixelText(win? 'SPACE — MEET IT' : 'WAIT FOR THE CLENCH', W/2, by+20,
       win? 'rgba(159,232,168,.95)' : 'rgba(210,190,210,.60)', win? 0.72 : 0.58);
-    pixelText('W — take it off her'+(X.stood? '' : '    ◆ K — stand it'),
-      W/2, by+29, 'rgba(232,195,74,.55)', 0.54);
-    pixelText('X — pull out', W/2, by+37, 'rgba(200,180,200,.38)', 0.50);
+    /* the other three used to be printed here as captions. They are real
+       buttons along the bottom of the stage now, so repeating them over the
+       track is just two more lines between the player and the beat. */
     ctx.textAlign='left';
   }
   /* ---- WORDS ---- */
@@ -28641,6 +29064,10 @@ function drawPillaredShell(FY, T, UPPER){
   px(0,FY-2,W,2,'#5a5040');
 }
 function drawDomus(){
+  /* the action bar reads the live phase, so it is refreshed with the
+     frame that draws that phase rather than when the screen changed */
+  try{ syncSceneActs(); }catch(e){}
+
   const D=DM, T=D.t, FY=214;
   /* =====================================================================
      THE HOUSE
@@ -29037,6 +29464,7 @@ function drawDomus(){
     }
     if(D.curio) drawCurio();                            // 🔎 she is looking at something
     if(D.clam)  drawClam();                             // 🐚 she called you over, and then she closed
+    if(D.praise) drawPraise();                          // 💬 and she has an opinion about you
     if(D.press) drawRkPress();                          // ◆ the crossing, the contact and the hold
     if(D.ardor) drawArdor();                            // 🏛 and it is your own fault this time
     if(D.kidWalk) drawKidWalk();                        // and so is somebody else's husband
@@ -29278,6 +29706,12 @@ function drawDomus(){
     px(st.x-3,st.y-7,6,6,'#e8e2da'); px(st.x-1,st.y-12,3,5,'#f2eee8'); ctx.globalAlpha=1; }
   ctx.textAlign='center';
   for(const h of D.hearts) pixelText('♥',h.x,h.y,'#e26a8a',1);
+  /* ⌘ THE TABLET IS AN OVERLAY, and therefore LAST — after the hall, after
+     everyone standing in it, after the steam. Put in with the scene draws
+     it went under the player's own sprite, so he stood in the middle of the
+     panel he is supposed to be holding up. */
+  if(D.tablet) drawTablet();
+  ctx.textAlign='left';
 }
 
 /* =====================================================================
@@ -33346,7 +33780,8 @@ function buildRegions(){
      career got twenty-two Roman provinces laid over a map of Han China. */
   const _pw=playerWorld();
   const _RS = (_pw==='wa'   && typeof REGIONS_WA!=='undefined')?   REGIONS_WA
-            : (_pw==='east' && typeof REGIONS_EAST!=='undefined')? REGIONS_EAST : REGIONS;
+            : (_pw==='east' && typeof REGIONS_EAST!=='undefined')? REGIONS_EAST
+            : (_pw==='rk'   && typeof REGIONS_RK!=='undefined')?   REGIONS_RK : REGIONS;
   /* THE JAPANESE SHEET LAYS ITS LABELS OUT rather than stacking them on
      top of each other in the Kansai. */
   const _wa = (_pw==='wa');
@@ -47165,6 +47600,10 @@ window.__SS = {
   rkBackBones, drawRkBack, drawRkBehindHim,
   RK_CURIO, curioOn, curioReady, curioDue, startCurio, curioMenu, curioTake,
   curioResolve, updateCurio, drawCurio,
+  RK_PRAISE, praiseReady, praisePool, praiseDue, startPraise, praiseReplies,
+  praiseTake, updatePraise, drawPraise,
+  tabletMenu, tabletFire, openTablet, updateTablet, drawTablet,
+  sceneActions, syncSceneActs,
   RK_CLAM, clamOn, clamReady, clamMood, clamPulses, clamDue, startClam,
   clamResolve, clamSwell, updateClam, drawClam, setEdge,
   bmHotspots, bmPartAt, bmActions, bmSayIt, bmDoAction, bmMineLen, drawPartPicker,
