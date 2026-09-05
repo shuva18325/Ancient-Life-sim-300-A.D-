@@ -23722,10 +23722,12 @@ function curioDue(){
   const D=DM; if(!D) return false;
   if(!curioReady()) return false;
   if(D.scene||D.slap||D.rslap||D.tempt||D.husb||D.drop||D.rise||D.ardor||D.press||D.curio||D.clam) return false;
-  /* NO MORE ONCE-A-DAY. The tick cooldown below is the only limiter, so a
-     long visit gets more than one chance rather than exactly one. */
-  if(D.t < (D.curioNext||160)) return false;
-  return Math.random() < 0.045;
+  /* THREE TO A VISIT, and DM is rebuilt on every openDomus, so this is a
+     ceiling on one stay in the hall rather than the once-per-save gate
+     that used to stop it happening at all. */
+  if((D.curioFired|0) >= 3) return false;
+  if(D.t < (D.curioNext||420)) return false;
+  return Math.random() < 0.005;
 }
 function startCurio(){
   const D=DM; if(!D || !curioReady()) return false;
@@ -23733,7 +23735,8 @@ function startCurio(){
             find:pick(RK_CURIO.finds), look:pick(RK_CURIO.look),
             bond:0, phys:0, locks:true, rub:0 };
   D.wifePause=99999;
-  D.curioNext = D.t + 520;
+  D.curioFired=(D.curioFired|0)+1;
+  D.curioNext = D.t + 2600;
   try{ sfx('ui'); }catch(e){}
   return true;
 }
@@ -24712,8 +24715,14 @@ function drawCurio(){
   const goPh=(X.ph==='rub'||X.ph==='woohoo');
   const pressK = goPh? clamp(T/34,0,1) : 0;
   const rub = goPh? (X.rub||0) : 0;
-  const gap = goPh? (7 - pressK*1.4) : 30;
-  const hx  = goPh? (PX + side*gap) : (PX + side*30);
+  /* how close the rung wants him. STAND IT keeps its distance on purpose —
+     the whole content of that one is that it is legible from the door. */
+  const actId = (X.ph==='act' && X.act)? X.act.id : null;
+  const actK  = actId? clamp(T/38,0,1) : 0;
+  const ACT_GAP = {look:19, say:25, slap:15, bare:16, hard:30};
+  const standGap = actId? (30 - (30-(ACT_GAP[actId]===undefined?30:ACT_GAP[actId]))*actK) : 30;
+  const gap = goPh? (7 - pressK*1.4) : standGap;
+  const hx  = PX + side*gap;
   let HM=null;
   const AK=rkBackBones(FY, (w&&w.body&&w.body.legs)||5, (w&&w.body&&w.body.booty)||5,
                            (w&&w.body&&w.body.waist)||5, false);
@@ -24770,6 +24779,181 @@ function drawCurio(){
       px(x0, cy+q, into+1, 1, (u<0.26)? MH2 : (u<0.70)? M2 : MS2); }
     px(x0, cy-th-1, into+1, 1, MS2); px(x0, cy+th+1, into+1, 1, MS2);
     ctx.globalAlpha=1;
+  }
+  /* ================================================================
+     WHAT THE RUNG LOOKS LIKE. Each one lands over the first stretch of
+     the beat and then holds, so it reads as a thing that HAPPENED
+     rather than a caption that appeared.
+     ================================================================ */
+  if(X.ph==='act' && X.act){
+    const ak=clamp(T/38,0,1), id=X.act.id;
+    const HK=rkBackBones(FY, (G.body&&G.body.legs)||5, 4,
+                             (G.body&&G.body.waist)||5, true);
+    const hHeadY=HK.headY+HK.headH*0.5;
+    const dotLine=(x1,y1,x2,y2,c2,skip)=>{
+      const n=Math.max(3, Math.round(Math.hypot(x2-x1,y2-y1)/4));
+      for(let i=0;i<=n;i++){ if((i+(skip|0))%2) continue;
+        px(x1+(x2-x1)*i/n, y1+(y2-y1)*i/n, 1, 1, c2); }
+    };
+    /* ---- ◎ LOOK AT IT TOO. The point of the rung is that the two of
+       you are aimed at the same object, so that is what gets drawn:
+       both sight-lines, landing on the thing, and nothing on her. ---- */
+    if(id==='look'){
+      /* the lines were a dot every four pixels at a third alpha, which on a
+         lit hall is nothing at all. Solid, bright, and they CONVERGE. */
+      const p=0.5+0.5*Math.sin(T*0.16);
+      const aL=clamp(ak,0,1)*(0.55+p*0.30);
+      ctx.globalAlpha=aL;
+      ctx.strokeStyle='rgba(255,222,150,.85)'; ctx.lineWidth=1;
+      ctx.setLineDash([3,3]); ctx.lineDashOffset=-(T*0.5);
+      for(const p0 of [[PX-side*4, AK.shY+1],[hx-side*2, hHeadY]]){
+        ctx.beginPath(); ctx.moveTo(p0[0], p0[1]); ctx.lineTo(TX, TY-5); ctx.stroke(); }
+      ctx.setLineDash([]); ctx.lineDashOffset=0;
+      /* and the thing itself lights up, because that is what they are on */
+      const gl=ctx.createRadialGradient(TX,TY-4,1, TX,TY-4,15);
+      gl.addColorStop(0,'rgba(255,214,122,'+(0.34+p*0.26).toFixed(2)+')');
+      gl.addColorStop(1,'rgba(0,0,0,0)');
+      ctx.fillStyle=gl; ctx.fillRect(TX-16, TY-20, 32, 32);
+      ctx.globalAlpha=1;
+      ctx.textAlign='center';
+      pixelText('◎', TX, TY-17, 'rgba(255,226,150,'+(0.6+p*0.35).toFixed(2)+')', 0.86);
+      ctx.textAlign='left';
+    }
+    /* ---- 💬 SAY IT. The joke in the line is that she answers the
+       TALLY-STICK, so the answer is drawn on the tally-stick — a little
+       tail off the object, not off her head. ---- */
+    else if(id==='say'){
+      ctx.textAlign='center';
+      /* his half, out of his mouth */
+      if(ak>0.05){
+        ctx.globalAlpha=clamp(ak*1.4,0,1);
+        px(hx-side*2, hHeadY-1, 2, 1, 'rgba(255,220,235,.55)');
+        px(hx-side*5, hHeadY-3, 2, 1, 'rgba(255,220,235,.40)');
+        ctx.globalAlpha=1;
+      }
+      /* and hers, landing on the object */
+      if(ak>0.55){
+        const b=clamp((ak-0.55)/0.45,0,1);
+        const by=TY-22+Math.round((1-b)*4);
+        ctx.globalAlpha=b;
+        px(TX-11, by-6, 22, 10, 'rgba(20,10,16,.80)');
+        px(TX-11, by-6, 22, 1, 'rgba(255,200,220,.30)');
+        px(TX-2, by+4, 4, 2, 'rgba(20,10,16,.80)');
+        px(TX-1, by+6, 2, 2, 'rgba(20,10,16,.80)');
+        pixelText('“mm”', TX, by+1, 'rgba(255,214,190,.95)', 0.70);
+        ctx.globalAlpha=1;
+      }
+      ctx.textAlign='left';
+    }
+    /* ---- 👋 A HAND ON IT. It comes in from his side, it lands, and it
+       STAYS — a slap that is only a sound effect is not a slap. ---- */
+    else if(id==='slap'){
+      /* THE ARM HAS TO COME OFF HIM. The first cut drew a free-floating
+         forearm at her hip — and drew it pointing the wrong way, running
+         INTO her instead of back toward the man it belongs to, because the
+         side test was inverted. It is a limb now: shoulder, taper, hand,
+         swung from where he is actually standing. */
+      const seatY=AK.seatY-(X.bend||0)*(2.6+((w&&w.body&&w.body.booty)||5)*0.26);
+      const cy2=seatY+AK.seatH*0.52;
+      const seatW=(4.6+((w&&w.body&&w.body.booty)||5)*0.48)*(1+(X.bend||0)*0.16);
+      const HS=mixHex((G&&G.skin)||'#caa06a','#e8c39a',0.30);
+      const land=clamp(ak/0.45,0,1);
+      /* off his NEAR shoulder, not his centre line — starting it at hx drew
+         the arm straight across his own chest before it ever left him */
+      const sx2=hx - side*(HK.waistW+3.5), sy2=HK.shY+2;
+      const tx2=PX + side*seatW*0.72, ty2=cy2;
+      /* the swing arcs rather than sliding — it comes up and then down */
+      const arc=Math.sin(land*Math.PI)*7;
+      const ex=sx2+(tx2-sx2)*land, ey=sy2+(ty2-sy2)*land-arc;
+      ctx.globalAlpha=clamp(0.55+land*0.45,0,1);
+      const N=11;
+      for(let i2=0;i2<=N;i2++){
+        const t2=i2/N;
+        const xx=sx2+(ex-sx2)*t2, yy=sy2+(ey-sy2)*t2 - Math.sin(t2*Math.PI)*arc*0.30;
+        const th=Math.max(2, 3.4-t2*1.2);
+        px(xx-th/2, yy-th/2, th, th, t2<0.45? shade(HS,-16) : shade(HS,-4));
+        px(xx-th/2, yy-th/2, th, 1, shade(HS,16));
+      }
+      /* the hand, flat on and side-on to her */
+      px(ex-2.5, ey-3, 5, 6, HS);
+      px(ex-2.5, ey-3, 5, 1, shade(HS,26));
+      px(ex-2.5, ey+2, 5, 1, shade(HS,-30));
+      ctx.globalAlpha=1;
+      /* and what landing looks like */
+      if(land>=1){
+        const r0=clamp((ak-0.45)/0.55,0,1);
+        ctx.globalAlpha=clamp(1-r0,0,1)*0.75;
+        ctx.strokeStyle='rgba(255,190,210,.95)'; ctx.lineWidth=1.2;
+        for(const m of [0.55,1.0]){
+          ctx.beginPath(); ctx.arc(tx2, ty2, 3+r0*14*m, 0, 7); ctx.stroke(); }
+        ctx.globalAlpha=clamp(1-r0*1.6,0,1)*0.5;
+        px(tx2-4, ty2-3, 8, 6, 'rgba(255,220,230,.55)');
+        ctx.globalAlpha=1;
+      }
+    }
+    /* ---- ❦ TAKE THE UPPER OFF. The garment actually leaves: it lifts
+       over the belt, clears her, and goes. Her arm goes up for it and
+       never once stops her looking at the thing. ---- */
+    else if(id==='bare'){
+      /* IT HAS TO BE A GARMENT, NOT A SMUDGE. The first cut lifted a
+         four-pixel bar straight up through her own head, in a dress colour
+         that on a pale ulvik is nearly the wall. It comes up off the belt,
+         swings out to HIS side so it clears her entirely, and it keeps the
+         office band on it the whole way so you can see what left. */
+      const dress=mixHex((w&&w.dress)||'#8a2f4a','#ffffff',0.10);
+      const band2=(typeof rkOfficeBand==='function')? rkOfficeBand(w) : '#8a6a3a';
+      const lift=ak*ak;
+      const topY=AK.waistY-2-Math.round(lift*26);
+      const hgt=Math.max(3, Math.round(11-lift*5));
+      const wid=Math.max(4, Math.round((AK.waistW+3.5)*2*(1-lift*0.22)));
+      const offX=Math.round(side*lift*15);               // out of her way
+      const tilt=Math.round(Math.sin(T*0.20)*1.8*lift);
+      const gx=Math.round(PX+offX-wid/2);
+      ctx.globalAlpha=clamp(1-lift*0.70,0,1);
+      px(gx, topY+tilt, wid, hgt, dress);
+      px(gx, topY+tilt, wid, 1, shade(dress,30));
+      px(gx, topY+hgt-1+tilt, wid, 1, shade(dress,-38));
+      px(gx, topY+Math.round(hgt*0.55)+tilt, wid, 1, band2);   // the office band
+      /* the two hems, hanging and swinging as it comes clear */
+      { const f=Math.round(Math.sin(T*0.26)*2.2*lift);
+        px(gx-1, topY+hgt-2+f+tilt, 2, 3, shade(dress,-22));
+        px(gx+wid-1, topY+hgt-2-f+tilt, 2, 3, shade(dress,-22)); }
+      ctx.globalAlpha=1;
+      /* her far arm, up for it and coming back down */
+      { const sk3=(w&&w.skin)||'#e6bd94';
+        const armUp=Math.sin(clamp(ak,0,1)*Math.PI);
+        const ay=AK.shY - Math.round(armUp*9);
+        ctx.globalAlpha=clamp(0.5+armUp*0.5,0,1);
+        px(PX - side*(AK.waistW+3), ay, 2, Math.max(2,Math.round(7+armUp*4)), shade(sk3,-12));
+        ctx.globalAlpha=1; }
+      if(ak>0.8){ ctx.textAlign='center';
+        pixelText('❦', PX, AK.shY-16, 'rgba(255,180,220,'+((ak-0.8)/0.2*0.7).toFixed(2)+')', 0.80);
+        ctx.textAlign='left'; }
+    }
+    /* ---- ◆ STAND IT. The whole content of the rung is that this is
+       LEGIBLE FROM THE DOOR, so the drawing says so: it lights up, and
+       a line runs from it to the doorway. ---- */
+    else if(id==='hard'){
+      const kiltY=HK.hipY-3;
+      const p=0.5+0.5*Math.sin(T*0.20);
+      ctx.globalAlpha=clamp(ak,0,1)*(0.34+p*0.40);
+      /* a glow at the cut, in the office's own colour */
+      const band=(typeof rkOfficeBand==='function')? rkOfficeBand(w) : '#8a6a3a';
+      const gl=ctx.createRadialGradient(hx,kiltY,1, hx,kiltY,14);
+      gl.addColorStop(0, rgbA0(band,0.55));
+      gl.addColorStop(1,'rgba(0,0,0,0)');
+      ctx.fillStyle=gl; ctx.fillRect(hx-16, kiltY-14, 32, 28);
+      ctx.globalAlpha=1;
+      /* and the sight-line to the door, which is the point of it */
+      if(ak>0.45){
+        const doorX = side<0? W-26 : 26;
+        dotLine(hx, kiltY, doorX, kiltY-6,
+          'rgba(255,214,122,'+(0.18+p*0.26).toFixed(2)+')', (T*0.10)|0);
+        ctx.textAlign='center';
+        pixelText('◆', hx, kiltY-18, 'rgba(255,214,122,'+(0.45+p*0.45).toFixed(2)+')', 0.76);
+        ctx.textAlign='left';
+      }
+    }
   }
   /* ---- WORDS ---- */
   ctx.textAlign='center';
