@@ -16305,10 +16305,11 @@ function sceneActions(){
   if(C){
     if(C.ph==='choose'){
       const M=(typeof curioMenu==='function')? curioMenu() : [];
-      const cur=M[clamp(C.sel|0,0,Math.max(0,M.length-1))];
-      A.push({k:'a', c:'◀', t:''});
-      A.push({k:'space', c:'␣', t: cur? cur.name : 'TAKE', hot:true});
-      A.push({k:'d', c:'▶', t:''});
+      const n=M.length||1, i=clamp(C.sel|0,0,n-1);
+      const cur=M[i];
+      A.push({k:'a', c:'◀', t:'PREV'});
+      A.push({k:'space', c:'␣', t: (cur? cur.name : 'TAKE')+'   ('+(i+1)+'/'+n+')', hot:true});
+      A.push({k:'d', c:'▶', t:'NEXT'});
       A.push({k:'j', c:'J', t:'LEAVE HER TO IT', warn:true});
     }
     return A;
@@ -16316,10 +16317,14 @@ function sceneActions(){
   const P=D.praise;
   if(P && P.ph==='ask'){
     const R=(typeof praiseReplies==='function')? praiseReplies() : [];
-    const cur=R[clamp(P.sel|0,0,Math.max(0,R.length-1))];
-    A.push({k:'a', c:'◀', t:''});
-    A.push({k:'space', c:'␣', t: cur? cur.name : 'SAY IT', hot:true});
-    A.push({k:'d', c:'▶', t:''});
+    const n=R.length||1, i=clamp(P.sel|0,0,n-1);
+    const cur=R[i];
+    /* a bare arrow does not say it CYCLES anything — it now carries the
+       count, so the bar states plainly that there is a list and where in
+       it you are */
+    A.push({k:'a', c:'◀', t:'PREV'});
+    A.push({k:'space', c:'␣', t: (cur? cur.name : 'SAY IT')+'   ('+(i+1)+'/'+n+')', hot:true});
+    A.push({k:'d', c:'▶', t:'NEXT'});
     return A;
   }
   const Tp=D.tempt;
@@ -21482,6 +21487,94 @@ function litWife(c,x,y,w,ph,mode,preg,opt){
 function litHusband(c,x,y,bond,sk,tn,w,ph,mode,opt){
   litFigure(c,x,y,(bc,bx,by)=>drawHusbandFig(bc,bx,by,bond,sk,tn,w,ph,mode),opt); }
 /* =====================================================================
+   WHAT IS ON HER FACE
+   ---------------------------------------------------------------------
+   Three pixels — a brow, an eye and a mouth — and until now all three
+   sat at fixed offsets, so the same face was worn through every beat in
+   the hall. These are the states the game can already tell it is in, so
+   they are the states her face has: it reads the live scene first and
+   falls back on the standing of the house.
+   ===================================================================== */
+function wifeExpr(w){
+  try{
+    if(!w || w!==(G&&G.wife)) return 'flat';
+    const D=(typeof DM!=='undefined')? DM : null;
+    if(D){
+      const C=D.clam;
+      if(C){
+        if(C.stood && (C.blush||0)>0.5) return 'flush';
+        if(C.mood==='mad' && C.ph!=='bend') return 'cross';
+        if(C.ph==='drive'||C.ph==='bend') return 'flush';
+        if(C.ph==='grab') return 'bite';
+        if(C.ph==='hold'||C.ph==='clench') return 'brace';
+        return 'smug';                       // the call: she has decided something
+      }
+      if(D.curio) return 'absorbed';
+      if(D.praise){
+        if(D.praise.ph==='answer'){
+          const b=(D.praise.chose&&D.praise.chose.bond)|0;
+          return b>=4? 'pleased' : b>=2? 'smug' : 'flat';
+        }
+        return 'smug';
+      }
+      if(D.tempt) return 'smug';
+      if(D.slap||D.rslap) return 'flush';
+    }
+    const rel=(G&&G.wifeRel)|0, phys=(G&&G.wifePhys===undefined?45:G.wifePhys)|0;
+    if(rel<30) return 'cross';
+    if(phys>=80) return 'flush';
+    if(rel>=85) return 'pleased';
+    return 'flat';
+  }catch(e){ return 'flat'; }
+}
+/* the three pixels, arranged. P is figure-local, (hx,hy) the eye's home. */
+function drawWifeFace(P, hx, hy, skin, expr){
+  const DK='#2a1a10', BR=shade(skin,-18), MO=mixHex(skin,'#a04a4a',0.55);
+  const HOT=mixHex(skin,'#e06a7a',0.55);
+  switch(expr){
+    case 'pleased':                        // the eye softens and the mouth turns up
+      P(hx, hy, 1, 1, DK);
+      P(hx-1, hy-1, 2, 1, BR);
+      P(hx, hy+3, 2, 1, MO); P(hx+2, hy+2, 1, 1, MO);
+      break;
+    case 'smug':                           // narrowed, and one corner only
+      P(hx, hy, 2, 1, DK);
+      P(hx-1, hy-2, 3, 1, BR);
+      P(hx, hy+3, 2, 1, MO); P(hx+2, hy+2, 1, 1, shade(MO,-20));
+      break;
+    case 'cross':                          // the brow comes down and in
+      P(hx, hy, 1, 1, DK);
+      P(hx-1, hy-1, 1, 1, shade(BR,-24)); P(hx, hy-2, 2, 1, shade(BR,-24));
+      P(hx, hy+3, 3, 1, shade(MO,-26));
+      break;
+    case 'absorbed':                       // wide, and the mouth forgets to close
+      P(hx, hy-1, 1, 2, DK);
+      P(hx-1, hy-3, 3, 1, BR);
+      P(hx+1, hy+3, 1, 1, MO);
+      break;
+    case 'flush':                          // half-lidded, open, and the cheek goes
+      P(hx, hy, 2, 1, DK);
+      P(hx-1, hy-2, 3, 1, BR);
+      P(hx, hy+3, 2, 2, HOT);
+      P(hx-2, hy+1, 2, 2, mixHex(skin,'#e0708a',0.42));
+      break;
+    case 'bite':                           // holding on to something
+      P(hx, hy, 1, 1, DK);
+      P(hx-1, hy-2, 3, 1, shade(BR,-16));
+      P(hx, hy+3, 2, 1, shade(MO,-10)); P(hx, hy+2, 1, 1, mixHex(skin,'#ffffff',0.55));
+      break;
+    case 'brace':                          // shut, and set
+      P(hx, hy, 2, 1, shade(BR,-30));
+      P(hx-1, hy-2, 3, 1, BR);
+      P(hx, hy+3, 3, 1, shade(MO,-14));
+      break;
+    default:                               // flat: the one it has always had
+      P(hx, hy, 1, 1, DK);
+      P(hx-1, hy-1, 2, 1, BR);
+      P(hx, hy+3, 2, 1, MO);
+  }
+}
+/* =====================================================================
    THE SEAT PROFILE — A CURVE, NOT A STAIRCASE
    ---------------------------------------------------------------------
    This was four axis-aligned bands, each one width, stacked. Two things
@@ -21758,9 +21851,9 @@ function drawWifeFig(c,x,y,w,ph,mode,preg){
     P(shX-2, shY-3, 5, 4, skin); P(shX-2, shY-3, 5, 1, shade(skin,16));   // neck
     P(shX-4, shY-11, 8, 8, skin); P(shX-4, shY-11, 8, 1, shade(skin,22));
     P(shX+3, shY-10, 1, 8, sSh);                               // the shaded side of the face
-    P(shX+2, shY-7, 1, 1, '#2a1a10');                          // one eye, on whatever she is after
-    P(shX+1, shY-8, 2, 1, shade(skin,-18));                    // a brow over it
-    P(shX+2, shY-4, 2, 1, mixHex(skin,'#a04a4a',0.55));        // and a mouth
+    /* the eye, the brow and the mouth — arranged by what is actually
+       going on rather than nailed down at one offset each */
+    drawWifeFace(P, shX+2, shY-7, skin, wifeExpr(w));
     P(shX+4, shY-8, 1, 3, skin);                               // the ear
     /* HER ACTUAL CUT. This drew one generic cap for everybody, so ten brides
        rolling four different hairstyles all bent over with identical hair. */
@@ -22383,6 +22476,13 @@ function drawWifeFig(c,x,y,w,ph,mode,preg){
   drawHairF((a,b2,ww,h,col)=>P(a+lean*0.6,b2,ww,h,col),
             {hair, hHi:hairHi, hSh:hairSh, gold:'#e8c34a', goldHi:'#fff0b0', dress, dHi, dSh},
             (w.hairStyle||hairStyleFallback(w)), -4, top-38, 9, {noble, fall:0.42, run:running});
+  /* ---- AND A FACE ON IT. This head was a nine-by-ten rectangle of skin
+     with hair on top and nothing else: no eye, no brow, no mouth, in every
+     upright pose she has. She only ever had features while BENT OVER, which
+     is the one pose you cannot read a face in. Drawn after the hair so a
+     fringe cannot bury it, and before the diadem so rank still sits on top. */
+  drawWifeFace((a,b2,ww,h,c2)=>P(a+lean*0.6, b2, ww, h, c2),
+               0, top-33, skin, wifeExpr(w));
   if(noble){ P(-5+lean*0.6, top-42, 11, 2, '#e8c34a'); P(-5+lean*0.6, top-42, 11, 1, '#fff0b0'); }  // her diadem
   /* AND THE TWO BRIEFS THAT ARE ABOUT HER HEAD go on after the hair, for
      the reason every other layering bug in this function had: the hair is
@@ -24152,20 +24252,32 @@ function drawPraise(){
   /* ---- AND YOUR THREE ANSWERS ---- */
   if(P.ph==='ask'){
     const R=praiseReplies();
-    const y0=FY-104;
+    const rowH=15, pw=214, ph2=24+R.length*rowH+13;
+    /* under her line, not down among the furniture — at mid-height the
+       player's own sprite stood in the middle of the list */
+    const bx=Math.round(W/2-pw/2), by=62;
+    /* the panel, so it reads as a list of answers rather than as three
+       captions that happen to be stacked */
+    px(bx-2, by-2, pw+4, ph2+4, 'rgba(232,195,74,.26)');
+    px(bx, by, pw, ph2, 'rgba(12,7,14,.94)');
+    px(bx, by, pw, 1, 'rgba(255,190,220,.55)');
+    pixelText('YOUR ANSWER', W/2, by+10, 'rgba(255,214,190,.85)', 0.60);
     R.forEach((r,i)=>{
       const on=(i===(P.sel|0));
-      const yy=y0+i*13;
-      ctx.globalAlpha=on?1:0.55;
-      px(W/2-96, yy-6, 192, 12, on? 'rgba(58,26,44,.95)' : 'rgba(24,12,20,.80)');
-      if(on){ px(W/2-96, yy-6, 192, 1, 'rgba(255,190,220,.70)');
-              px(W/2-96, yy+5, 192, 1, 'rgba(255,190,220,.28)');
-              px(W/2-101, yy-3, 3, 6, '#ffd27a'); }
-      pixelText(r.name, W/2, yy-1, on? 'rgba(255,236,214,.98)' : 'rgba(220,200,215,.70)', 0.62);
-      ctx.globalAlpha=1;
+      const yy=by+24+i*rowH;
+      if(on){ px(bx+3, yy-6, pw-6, rowH-2, 'rgba(72,32,56,.98)');
+              px(bx+3, yy-6, pw-6, 1, 'rgba(255,200,230,.72)');
+              px(bx+3, yy+rowH-9, pw-6, 1, 'rgba(255,200,230,.30)');
+              px(bx, yy-4, 3, rowH-6, '#ffd27a'); }
+      ctx.textAlign='left';
+      pixelText((i+1)+'.', bx+9, yy+2,
+        on? 'rgba(255,214,122,.95)' : 'rgba(150,130,150,.70)', 0.56);
+      pixelText(r.name, bx+21, yy+2,
+        on? 'rgba(255,240,222,1)' : 'rgba(206,190,206,.88)', 0.62);
+      ctx.textAlign='center';
     });
-    if(T>20) pixelText('◀ ▶  to choose      SPACE  to say it', W/2, y0+R.length*13+6,
-      'rgba(232,195,74,.55)', 0.54);
+    pixelText('◀ ▶  choose   ·   SPACE  say it', W/2, by+ph2-4,
+      'rgba(232,195,74,.70)', 0.54);
   }
   /* ---- WHAT SHE MADE OF THE ANSWER ---- */
   else if(P.ph==='answer' && P.chose){
@@ -26411,7 +26523,11 @@ function startTempt(){
   D.wifePause=99999;                        // she is busy
 }
 function updateTempt(dt){
-  const D=DM, X=D.tempt; X.t+=dt;
+  /* THE GUARD ITS SIBLINGS ALL HAVE. updateCurio and updateClam both bail
+     on a missing scene object; this one dereferenced it blind, so any
+     caller that ticked one frame past the resolve threw. */
+  const D=DM, X=D&&D.tempt; if(!X) return;
+  X.t+=dt;
   shimmyTick(dt);
   /* ---- THE QUICK DECLINE. Holding out used to mean winning the resist
      bar and then three rounds of eye-tracking — which is a lot of skill
@@ -29373,7 +29489,7 @@ function drawDomus(){
   const HALLNAME=(hallStyle()==='forest')
     ? (playerCulture().id==='celt'? 'THE ROUNDHOUSE' : 'THE LONGHOUSE')+' — your hall'
     : 'VILLA RUSTICA — your halls';
-  px(-4,-4,W+8,16,'#0a0705'); ctx.textAlign='center'; pixelText(HALLNAME+' · A/D walk · S run · SPACE act'
+  px(-4,-4,W+8,16,'#0a0705'); ctx.textAlign='center'; pixelText(HALLNAME+' · A/D walk · S run · SPACE act · ⌘ T: TABLET'
     +((typeof ardorReady==='function' && ardorReady())? ' · L: GET HARD':'')
     /* AND THE COAST'S OWN TWO. They only exist here, so they are only
        offered here, and the second only once there is something to answer. */
@@ -47603,7 +47719,7 @@ window.__SS = {
   RK_PRAISE, praiseReady, praisePool, praiseDue, startPraise, praiseReplies,
   praiseTake, updatePraise, drawPraise,
   tabletMenu, tabletFire, openTablet, updateTablet, drawTablet,
-  sceneActions, syncSceneActs,
+  sceneActions, syncSceneActs, wifeExpr, drawWifeFace,
   RK_CLAM, clamOn, clamReady, clamMood, clamPulses, clamDue, startClam,
   clamResolve, clamSwell, updateClam, drawClam, setEdge,
   bmHotspots, bmPartAt, bmActions, bmSayIt, bmDoAction, bmMineLen, drawPartPicker,

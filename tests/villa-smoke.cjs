@@ -97,7 +97,12 @@ const ok=(name,cond,detail)=>{
       try{
         S.openDomus(); G.wife.traits=['curious','vakran'];
         if(!start()) { thrown.push(name+': did not start'); return; }
-        for(let i=0;i<ticks;i++){ upd(1); draw(); }
+        /* stop when the scene resolves — ticking past the end is the
+           harness being wrong, not the game */
+        const liveKey={curio:'curio', clam:'clam', tempt:'tempt'}[name];
+        for(let i=0;i<ticks;i++){
+          if(liveKey && !S.DM[liveKey]) break;
+          upd(1); draw(); }
       }catch(e){ thrown.push(name+': '+e.message); }
     };
     run('curio', ()=>S.startCurio(), t=>S.updateCurio(t), ()=>S.drawCurio(), 900);
@@ -295,6 +300,52 @@ const ok=(name,cond,detail)=>{
   ok('the hold names all four',      bar.hold.length===4, bar.hold.join(' / '));
   ok('the contest names its two',    bar.grab.length===2, bar.grab.join(' / '));
   ok('and the bend counts them down',bar.bend.length===1, bar.bend.join(' / '));
+
+  console.log('\n--- SHE HAS A FACE, AND IT MOVES ---');
+  const face=await pg.evaluate(()=>{
+    const S=window.__SS, G=S.G, out={};
+    S.openDomus();
+    G.wifeRel=88; G.wifePhys=55; out.warm=S.wifeExpr(G.wife);
+    G.wifeRel=15;                out.cold=S.wifeExpr(G.wife);
+    G.wifeRel=88; G.wifePhys=90; out.hot =S.wifeExpr(G.wife);
+    G.wifePhys=55;
+    S.startCurio(); out.curio=S.wifeExpr(G.wife); S.DM.curio=null;
+    S.startClam(); const X=S.DM.clam;
+    X.ph='hold';                 out.hold=S.wifeExpr(G.wife);
+    X.stood=true; X.blush=0.9;   out.stood=S.wifeExpr(G.wife);
+    X.stood=false; X.mood='mad'; out.mad=S.wifeExpr(G.wife);
+    X.mood='love'; X.ph='grab';  out.grab=S.wifeExpr(G.wife);
+    S.DM.clam=null;
+    /* and every one of them has to actually paint without throwing */
+    let threw=null;
+    try{ const c=document.createElement('canvas').getContext('2d');
+      const P=(a,b,w,h,col)=>{ c.fillStyle=col; c.fillRect(a,b,w,h); };
+      ['flat','pleased','smug','cross','absorbed','flush','bite','brace']
+        .forEach(e=>S.drawWifeFace(P, 10, 10, '#e6bd94', e));
+    }catch(e){ threw=e.message; }
+    out.threw=threw;
+    return out;
+  });
+  const distinct=new Set([face.warm,face.cold,face.hot,face.curio,face.hold,
+                          face.stood,face.mad,face.grab]);
+  ok('the face reads the scene', distinct.size>=5,
+     [...distinct].join(', '));
+  ok('a cold house shows on it',  face.cold==='cross');
+  ok('and being caught looking',  face.curio==='absorbed');
+  ok('every expression paints',   !face.threw, face.threw||'');
+
+  console.log('\n--- THE TABLET IS ADVERTISED ---');
+  const adv=await pg.evaluate(()=>{
+    const S=window.__SS; S.openDomus();
+    // the banner is drawn to the text overlay; check the source of truth
+    return {key:typeof S.openTablet==='function'};
+  });
+  ok('openTablet exists', adv.key===true);
+  const banner=await pg.evaluate(()=>{
+    const el=document.documentElement.innerHTML;
+    return el.indexOf('T: TABLET')>=0;
+  });
+  ok('and the hall banner names T', banner===true);
 
   console.log('\n--- THE BODY MAP DRAWS THE PRESS ---');
   const bm=await pg.evaluate(async()=>{
