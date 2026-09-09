@@ -343,6 +343,7 @@
       <button class="btn" id="btn-herbs">🌿 HERBARIUS</button>
       <button class="btn" id="btn-titles">⚜ TITLES</button>
       <button class="btn" id="btn-raunskar" style="display:none">✇ THE RAUNSKAR</button>
+      <button class="btn" id="btn-skarvek" style="display:none">⚔ THE SKARVEK</button>
       <button class="btn" id="btn-trophies">🏆 TROPHIES</button>
       <button class="btn" id="btn-regalia">⚜ REGALIA</button>
       <button class="btn" id="btn-circus">🏇 CIRCUS</button>
@@ -14136,6 +14137,24 @@ function endFight(won){
 }
 function finishFight(won){
   G.hygiene=clamp((G.hygiene===undefined?70:G.hygiene)-8,0,100);   // sand, sweat and other men's blood
+  /* ⚔ THE PIT OUTSIDE THE HARBOUR settles on its own ladder, and it counts
+     every man you put down whether or not you walked off the field. */
+  if(G.__rkPit){
+    try{
+      const gt=FT.gauntlet;
+      const cleared = won? (G.__rkPit.n|0)
+                         : (gt? clamp((gt.wave|0)-1, 0, G.__rkPit.n|0) : 0);
+      const R=rkWarSettle(won, cleared);
+      if(R){
+        setTimeout(()=>{ try{
+          toast('⚔ '+(R.won? 'You walk off the field.' : 'They carry you off it.')
+            +'  '+R.cleared+' of '+R.of+' down · +'+R.gain+' notches · 🪙 '+R.purse, 6200);
+          if(R.rose) setTimeout(()=>toast('⚔ THE POST IS CUT AGAIN — you are '+R.rose.name+'. '
+            +R.rose.note, 7200), 3000);
+        }catch(e){} }, 300);
+      }
+    }catch(e){}
+  }
   // ---- Elite Siege outcome ----
   if(FT.siege){
     const el=FT.siege;
@@ -31315,7 +31334,39 @@ function drawBridePortrait(cnv,b,bare,preg){
   // ================= BACK ARM (her left, hanging behind) =================
   P(-8,-50,3,9,sSh); P(-8,-41,3,7,sSh); P(-8,-34,3,3,shade(skin,-44));
   // ================= LEGS / SKIRT =================
-  if(noble){
+  const SKINMODE = !!b._skinBody;
+  if(SKINMODE){
+    /* ---- NO GARMENT BELOW THE WAIST. Two legs, taking their width from
+       the same thigh metric the clothed branches use, so she is the same
+       woman with the cloth off rather than a different figure. ---- */
+    const tw=Math.max(4, thigh), inner=1;
+    for(const sg of [-1,1]){
+      const lx = sg<0? -inner-tw : inner;
+      /* thigh — fullest at the hip, tapering to the knee */
+      for(let y=0;y<10;y++){
+        const w0=Math.round(tw*(1-y*0.030));
+        const xx= sg<0? (lx+ (tw-w0)) : lx;
+        P(xx, hipBot+y, w0, 1, sg<0? sSh : skin);
+      }
+      /* knee, calf, ankle */
+      P(lx+(sg<0?1:0), -14, tw-1, 5, sg<0? sSh : skin);
+      for(let y=0;y<7;y++){
+        const w0=Math.max(2, Math.round((tw-1)*(1-y*0.055)));
+        const xx= sg<0? (lx+1+((tw-1)-w0)) : lx;
+        P(xx, -9+y, w0, 1, sg<0? sSh : skin);
+      }
+      /* the lit edge down the near leg, and the shade down the far one */
+      if(sg>0){ P(lx, hipBot, 1, 10, sHi); P(lx, -9, 1, 7, sHi); }
+      else    { P(lx, hipBot, 1, 10, shade(skin,-46)); }
+      /* the foot */
+      P(lx-(sg<0?0:1), -2, tw, 2, shade(skin,-18));
+      P(lx-(sg<0?0:1), -2, tw, 1, sSh);
+    }
+    /* the gap between them, which is what says there are two */
+    P(-inner, hipBot, inner*2, 12, shade(skin,-52));
+    P(-inner, -12, inner*2, 10, shade(skin,-48));
+  }
+  else if(noble){
     // floor-length clingy gown with a high slit baring the front leg
     P(-7-rear+2,hipBot,10+rear,20,dress);                                   // skirt column (back/left mass)
     P(-7-rear+2,hipBot,2,20,dSh); for(let fx=-4;fx<2;fx+=3)P(fx,hipBot,1,19,dMid); // folds
@@ -31522,7 +31573,7 @@ function drawBridePortrait(cnv,b,bare,preg){
      woman in a working tunica is barer than a senator's wife, every time.
      coverageOf() is one number (0..1) shared with the villa sprite, so the
      plate and the woman in your halls are wearing the same thing. ---- */
-  { const CU=personCulture(b), cov=(b._cov===undefined? coverageOf(b) : b._cov);
+  { const CU=personCulture(b), cov=b._skinBody? 0 : (b._cov===undefined? coverageOf(b) : b._cov);
     const clothC = (dressModeOf(b)==='roman')? dress : (CU.cloth? CU.cloth[0] : dress);
     const cSh=shade(clothC,-32), cHi=shade(clothC,28);
     /* 1 · THE NECKLINE CLOSES. The V of bare skin the bust tiers opened is
@@ -32775,6 +32826,153 @@ function standardsHere(){
    without ever finding out what any of it was called.
    ===================================================================== */
 /* =====================================================================
+   ⚔ THE SKARVEK — the coast's other ladder
+   ---------------------------------------------------------------------
+   Everything else on this coast is seated: the Ten seat the Rkraun, the
+   provinces seat their holders, six of the Masteries are seated on the
+   evidence of a body. Seating takes a lifetime and it takes relatives.
+
+   The SKARVEK is the door for men who have neither. It is not an office
+   and the Ten do not confirm it — it is a running tally of men you have
+   put down in the pit outside the harbour, kept by the people who bet on
+   it, and it is the only thing on this coast that will take a man with
+   no name and no herd and make him rich inside a winter. The province
+   holders detest it. They also attend.
+
+   Eight notches. Each one is a real change in what you are: what you may
+   legally carry, what the harbour charges you, what the district expects
+   of you, and — because this is that coast — what it expects to be able
+   to READ off you.
+   ===================================================================== */
+const RK_WAR_RANKS = [
+  {id:0, name:'UNCUT',          need:0,    purse:0,   coin:0,
+   note:'No notches. You are a man who has not been in the pit, which on this side of the harbour is a description rather than an insult.'},
+  {id:1, name:'ONE-NOTCH',      need:3,    purse:1.0, coin:14,
+   note:'One cut in the post. The bettors know your face and have not yet decided anything about it.'},
+  {id:2, name:'KAUN-SKARVEK',   need:9,    purse:1.25,coin:40,
+   note:'The pit-fighter proper. You are on the board, you are worth backing, and men who owe money know your name.'},
+  {id:3, name:'HARD-HAND',      need:20,   purse:1.55,coin:95,
+   note:'Nobody takes you for a first bout any more. The harbour stops charging you the stranger’s rate.'},
+  {id:4, name:'RUUN-SKARVEK',   need:38,   purse:1.95,coin:190,
+   note:'A name on the plateau as well as the shore. Houses that would not have seated you start finding reasons to.'},
+  {id:5, name:'THE STANDING',   need:64,   purse:2.45,coin:340,
+   note:'You stand where the province men stand and none of them enjoys it. The Ten have begun mentioning you without being asked.'},
+  {id:6, name:'PIT-MASTER',     need:100,  purse:3.10,coin:560,
+   note:'You are not fighting for the purse now, you are the reason there is a purse. The bettors take your side of the post as read.'},
+  {id:7, name:'SKARVEK-HARRA',  need:150,  purse:3.90,coin:900,
+   note:'A seat won the wrong way round. The council has no procedure for a man who arrived like this and has stopped pretending it does.'},
+];
+function rkWarScore(){ try{ return (G&&G.rkWar)|0; }catch(e){ return 0; } }
+function rkWarRank(){
+  const w=rkWarScore(); let r=RK_WAR_RANKS[0];
+  for(const q of RK_WAR_RANKS) if(w>=q.need) r=q;
+  return r;
+}
+function rkWarNext(){
+  const w=rkWarScore();
+  return RK_WAR_RANKS.find(q=>q.need>w) || null;
+}
+function rkWarOn(){ try{ return rkHere() && !(G&&G.isFemale); }catch(e){ return false; } }
+/* ---- WHAT THE DISTRICT EXPECTS OF YOU ----
+   The coast reads bodies for office and it does not stop doing that just
+   because the man in front of it arrived with an axe. A pit reputation
+   raises the bar it holds you to — win enough and "big enough for the
+   post" stops being a compliment and becomes the minimum. */
+function rkExpectLen(){
+  const r=rkWarRank().id;
+  return clamp(4 + r*0.75, 4, 10);
+}
+function rkExpectGap(){
+  const have=(typeof ardorLen==='function')? ardorLen() : 5;
+  return Math.round((have - rkExpectLen())*10)/10;
+}
+function rkExpectLine(){
+  const g=rkExpectGap(), r=rkWarRank();
+  if(r.id<=1) return 'Nobody is holding you to anything yet.';
+  if(g>=2)  return 'The district expects a '+rkExpectLen().toFixed(1)+' off a '+r.name+'. You are over it, and it has been mentioned at the post.';
+  if(g>=0)  return 'The district expects a '+rkExpectLen().toFixed(1)+' off a '+r.name+', and you clear it. Nobody is going to raise it.';
+  if(g>=-2) return 'The district expects a '+rkExpectLen().toFixed(1)+' off a '+r.name+'. You are under it, and the ones who bet against you know.';
+  return 'The district expects a '+rkExpectLen().toFixed(1)+' off a '+r.name+' and you are a long way under it. That is a joke somebody is telling.';
+}
+/* ---- THE ARMS LAW ----
+   Every notch legalises what the one below it could only carry with the
+   harbour looking the other way. Carrying above your notch is not a crime
+   against a person, it is a customs offence, and the coast fines it. */
+const RK_ARMS = [
+  {id:'club',    name:'A cut club',        rank:0, note:'Not a weapon, a piece of the rack. Nobody has ever been fined for one.'},
+  {id:'knife',   name:'The belt knife',    rank:0, note:'Every man on the shore has one and it is not on any list.'},
+  {id:'hatchet', name:'A hull hatchet',    rank:1, note:'A tool the harbour recognises. Above one notch it stops needing an excuse.'},
+  {id:'spear',   name:'The seal spear',    rank:2, note:'The honest weapon of the coast. A Kaun-Skarvek carries one openly.'},
+  {id:'longaxe', name:'The long axe',      rank:4, note:'Two hands and a reach. Below the fourth notch the harbour takes it off you at the gate.'},
+  {id:'harpoon', name:'The bone harpoon',  rank:5, note:'It is a whaling tool and everyone knows what it is actually for. The Standing may carry it.'},
+  {id:'ulvblade',name:'The ulv-blade',     rank:7, note:'Cut for one man at a time and never for a man without a seat. A Skarvek-Harra is the exception the law did not want.'},
+];
+function rkArmsLegal(a){ return rkWarRank().id >= (a.rank|0); }
+function rkArmsList(){
+  return RK_ARMS.map(a=>Object.assign({}, a, {legal:rkArmsLegal(a),
+    fine: rkArmsLegal(a)? 0 : Math.round(120 + (a.rank-rkWarRank().id)*260)}));
+}
+/* ---- THE PIT ITSELF ----
+   Five cards, and the fifth is the one the whole thing exists for. Each
+   is a real 1-vs-N on the field outside the walls; the engine already
+   runs waves, so what this adds is the coast's own stakes on top. */
+const RK_PIT = [
+  {id:'one',   name:'A SINGLE MAN',   n:1, need:0, fee:0,   war:2,
+   note:'One man, one bout. It is how everybody starts and nobody remembers it.'},
+  {id:'two',   name:'TWO IN A ROW',   n:2, need:1, fee:20,  war:5,
+   note:'The second steps over the first. This is where most men find out what they are.'},
+  {id:'three', name:'THREE',          n:3, need:2, fee:60,  war:10,
+   note:'A card the bettors turn up for. Three is the number that separates a hard hand from a man with one good afternoon.'},
+  {id:'four',  name:'FOUR',           n:4, need:3, fee:150, war:18,
+   note:'By the fourth your arms are gone and the crowd knows it. So does he.'},
+  {id:'five',  name:'THE FIVE',       n:5, need:4, fee:400, war:32,
+   note:'One against five, taken in order, on the field outside the harbour. Men are named for the rest of their lives off this card and most of the names are posthumous.'},
+];
+function rkPitOpen(c){ return rkWarRank().id >= (c.need|0) && (G.coin|0) >= (c.fee|0); }
+function rkPitWhy(c){
+  if(rkWarRank().id < (c.need|0)){
+    const need=RK_WAR_RANKS.find(r=>r.id===c.need);
+    return 'The post will not card you for this under '+(need? need.name : 'a higher notch')+'.';
+  }
+  if((G.coin|0) < (c.fee|0)) return 'The stake is '+c.fee+' and you have '+(G.coin|0)+'.';
+  return '';
+}
+/* THE PURSE. Waves cleared, the rank's own multiplier, and the card. */
+function rkPitPurse(cardId, waves){
+  const c=RK_PIT.find(x=>x.id===cardId)||RK_PIT[0];
+  const R=rkWarRank();
+  const base=90 + (waves|0)*140 + c.n*70;
+  return Math.round(base*(0.7+R.purse*0.45));
+}
+/* AND WHAT IT DOES TO THE LADDER. Called once when a card resolves. */
+function rkWarSettle(won, waves){
+  try{
+    const P=G.__rkPit; if(!P) return null;
+    G.__rkPit=null;
+    const c=RK_PIT.find(x=>x.id===P.card)||RK_PIT[0];
+    const before=rkWarRank();
+    const cleared=clamp(waves|0, 0, c.n);
+    /* every man you put down counts, whether or not you walked off the field */
+    const gain = won? c.war : Math.round(c.war*0.35*(cleared/Math.max(1,c.n)));
+    G.rkWar=(G.rkWar|0)+gain;
+    G.rkPitRuns=(G.rkPitRuns||0)+1;
+    if(won) G.rkPitWins=(G.rkPitWins||0)+1;
+    G.rkPitBest=Math.max(G.rkPitBest||0, cleared);
+    const purse= won? rkPitPurse(P.card, cleared) : Math.round(rkPitPurse(P.card, cleared)*0.25);
+    G.coin=(G.coin|0)+purse;
+    const after=rkWarRank();
+    const rose=(after.id>before.id)? after : null;
+    if(rose){
+      G.honor=clamp((G.honor||50)+3,0,100);
+      G.rkWarRankSeen=after.id;
+    }
+    try{ refreshStatbar(); saveQuiet(); }catch(e){}
+    return {gain, purse, cleared, of:c.n, won:!!won, rose, rank:after};
+  }catch(e){ return null; }
+}
+/* the standing income a notch is worth, paid the way the villa pays */
+function rkWarIncome(){ try{ return rkWarOn()? (rkWarRank().coin|0) : 0; }catch(e){ return 0; } }
+/* =====================================================================
    ✇ THE RAUNSKAR — the coast's likeness trade
    ---------------------------------------------------------------------
    A country that seats six of its ten Masteries on the evidence of a body
@@ -33077,7 +33275,7 @@ function raunskarRender(cv, p){
        then lays her people's cloth back over the top; a garment that is
        meant to show her has to undo both, or the leaves end up pinned to a
        gown — which is exactly what the first cut of the sivrak did. */
-    if(R.skin){ w._cov=0; w.dress=w.skin||'#e6bd94'; }
+    if(R.skin){ w._cov=0; w.dress=w.skin||'#e6bd94'; w._skinBody=true; }
     /* RENDER BIG, THEN FRAME. drawBridePortrait paints a whole standing
        woman at whatever size the canvas is; cropping to the measure the
        piece is ABOUT is the entire difference between a commission and a
@@ -33102,6 +33300,7 @@ function raunskarRender(cv, p){
       if(ex===undefined) delete w._expr; else w._expr=ex;
       if(cf===undefined) delete w._cutForce; else w._cutForce=cf;
       if(cv0===undefined) delete w._cov; else w._cov=cv0;
+      delete w._skinBody;
       w.dress=dr0;
     }
     return true;
@@ -33112,6 +33311,199 @@ function raunskarRender(cv, p){
    bench half-cut, and what the house is already holding.
    --------------------------------------------------------------------- */
 let rsPick={hand:'plank', form:'plank', pose:'seated', subj:'booty', dress:'parka', expr:''};
+/* ---------------------------------------------------------------------
+   THE POST. Where the notches are cut and the cards are taken.
+   --------------------------------------------------------------------- */
+function openSkarvek(){
+  if(!rkWarOn()){
+    try{ toast('There is no pit here.',2200); }catch(e){}
+    try{ enterMap(); }catch(e){} return;
+  }
+  state='villa'; show('scr-villa'); $('statbar').classList.remove('hide'); refreshStatbar();
+  const R=rkWarRank(), N=rkWarNext();
+  villaHead('⚔ THE SKARVEK — THE POST OUTSIDE THE HARBOUR',
+    'Not an office and the Ten do not confirm it. A running tally of men you have put down in the pit, kept by the people who bet on it — and the only ladder on this coast that will take a man with no name and make him rich inside a winter.',
+    '#e0705b');
+  const b=$('villa-body'); b.innerHTML='';
+  const card=(html,col)=>{ const d=document.createElement('div'); d.className='panel';
+    d.style.cssText='padding:9px;border-color:'+(col||'#6b4e2a'); d.innerHTML=html;
+    b.appendChild(d); return d; };
+
+  /* ---- THE POST ITSELF, drawn: eight notches and where you are on it ---- */
+  { const d=card('<div style="color:#e0705b;letter-spacing:1px"><b>✇ THE POST</b>'
+      +' <span class="small muted">— '+rkWarScore()+' notches</span></div>', '#e0705b');
+    const cv=document.createElement('canvas'); cv.width=560; cv.height=96;
+    cv.style.cssText='position:static;width:100%;height:auto;image-rendering:pixelated;'
+      +'margin-top:6px;border:2px solid #4a2a26;border-radius:3px';
+    drawSkarvekPost(cv);
+    d.appendChild(cv);
+    const now=document.createElement('div'); now.className='small';
+    now.style.cssText='margin-top:6px;line-height:1.6';
+    now.innerHTML='<b style="color:#e8c34a;letter-spacing:1px">'+R.name+'</b>'
+      +' <span class="muted">'+R.note+'</span>'
+      +(N? '<br><span class="small muted">Next cut: <b style="color:#e0705b">'+N.name+'</b> at '
+           +N.need+' notches — '+(N.need-rkWarScore())+' to go.</span>'
+         : '<br><span class="small" style="color:#e8c34a">There is no notch above this one.</span>')
+      +'<br><span class="small muted">The post pays <b style="color:#e8c34a">🪙 '+(R.coin|0)
+      +'</b> a bout, win or lose, and multiplies every purse by ×'+R.purse.toFixed(2)+'.</span>';
+    d.appendChild(now);
+  }
+
+  /* ---- WHAT THE DISTRICT NOW EXPECTS OF YOU ---- */
+  { const g=rkExpectGap();
+    const col = g>=0? '#7ad08a' : g>=-2? '#e8c34a' : '#e0705b';
+    card('<div style="color:'+col+';letter-spacing:1px"><b>◆ WHAT IS EXPECTED</b></div>'
+      +'<div class="small muted" style="margin-top:3px;line-height:1.55">'
+      +'This coast reads bodies for office and it does not stop because the man in front of it '
+      +'arrived with an axe. Every notch raises the bar it holds you to.</div>'
+      +'<div class="small" style="margin-top:5px;line-height:1.6">'+rkExpectLine()+'</div>', col);
+  }
+
+  /* ---- THE CARDS ---- */
+  { const d=card('<div style="color:#e8c34a;letter-spacing:1px"><b>⚔ THE CARDS</b>'
+      +' <span class="small muted">— taken in order, on the field outside the walls</span></div>',
+      '#e8c34a');
+    const grid=document.createElement('div');
+    grid.style.cssText='display:grid;gap:7px;margin-top:6px;grid-template-columns:repeat(auto-fill,minmax(210px,1fr))';
+    d.appendChild(grid);
+    RK_PIT.forEach(c=>{
+      const open=rkPitOpen(c), why=rkPitWhy(c);
+      const cell=document.createElement('div'); cell.className='shopcard';
+      if(open) cell.style.borderColor='#e8c34a';
+      cell.innerHTML='<div style="color:'+(open?'#e8c34a':'#8a7a70')+';letter-spacing:1px">'
+        +'<b>1 v '+c.n+' — '+c.name+'</b></div>'
+        +'<div class="small muted" style="line-height:1.5;margin-top:2px">'+c.note+'</div>'
+        +'<div class="small" style="margin-top:4px">Stake <b>🪙 '+c.fee+'</b>'
+        +' · purse about <b style="color:#e8c34a">🪙 '+rkPitPurse(c.id,c.n)+'</b>'
+        +' · <b style="color:#e0705b">+'+c.war+'</b> notches</div>'
+        +(open? '' : '<div class="small" style="margin-top:3px;color:#e0905b">✗ '+why+'</div>');
+      const bt=document.createElement('button');
+      bt.className='btn sm'+(open?' gold':''); bt.style.marginTop='5px';
+      bt.textContent=open? ('⚔ TAKE THE CARD  (1 v '+c.n+')') : '✗ NOT CARDED';
+      if(!open){ bt.disabled=true; bt.style.opacity='.45'; }
+      bt.onclick=()=>rkPitTake(c.id);
+      cell.appendChild(bt);
+      grid.appendChild(cell);
+    });
+  }
+
+  /* ---- THE ARMS LAW ---- */
+  { const d=card('<div style="color:#8fc0cf;letter-spacing:1px"><b>⚖ WHAT YOU MAY CARRY</b>'
+      +' <span class="small muted">— the harbour’s list, not a moral one</span></div>', '#8fc0cf');
+    const nt=document.createElement('div'); nt.className='small muted';
+    nt.style.cssText='margin-top:3px;line-height:1.55';
+    nt.textContent='Carrying above your notch is a customs offence rather than a crime against a '
+      +'person, and the coast fines it accordingly. Every cut in the post legalises one more of these.';
+    d.appendChild(nt);
+    const tbl=document.createElement('div');
+    tbl.style.cssText='display:grid;gap:4px;margin-top:6px';
+    d.appendChild(tbl);
+    rkArmsList().forEach(a=>{
+      const row=document.createElement('div');
+      row.style.cssText='display:flex;gap:8px;align-items:baseline;padding:3px 5px;border-radius:2px;'
+        +'background:'+(a.legal? 'rgba(60,90,60,.22)' : 'rgba(90,40,40,.22)');
+      row.innerHTML='<span style="color:'+(a.legal?'#7ad08a':'#e0705b')+';width:14px">'
+        +(a.legal?'✓':'✗')+'</span>'
+        +'<span class="small" style="flex:0 0 130px;color:'+(a.legal?'#e8dcc8':'#a08a86')+'"><b>'
+        +a.name+'</b></span>'
+        +'<span class="small muted" style="flex:1 1 160px;line-height:1.45">'+a.note+'</span>'
+        +'<span class="small" style="color:'+(a.legal?'#7ad08a':'#e0705b')+'">'
+        +(a.legal? 'LEGAL' : 'ILLEGAL · fine 🪙'+a.fine)+'</span>';
+      tbl.appendChild(row);
+    });
+  }
+
+  /* ---- THE RECORD ---- */
+  card('<div style="color:#c9a4ef;letter-spacing:1px"><b>▦ THE RECORD</b></div>'
+    +'<div class="small" style="margin-top:4px;line-height:1.7">'
+    +'Cards taken: <b>'+(G.rkPitRuns|0)+'</b> · walked off: <b style="color:#7ad08a">'
+    +(G.rkPitWins|0)+'</b> · longest run: <b style="color:#e8c34a">'+(G.rkPitBest|0)+'</b> men'
+    +'<br>Notches on the post: <b style="color:#e0705b">'+rkWarScore()+'</b>'
+    +'</div>', '#c9a4ef');
+}
+/* THE POST, and it is a TALLY POST — cut in fives, the way anything is
+   counted by people standing round it in the cold. The first cut of this
+   scattered the marks on a diagonal because it took the index modulo the
+   height, which is a stripe pattern, not a count. */
+function drawSkarvekPost(cv){
+  const c=cv.getContext('2d'); c.imageSmoothingEnabled=false;
+  const W2=cv.width, H2=cv.height;
+  c.fillStyle='#140d0b'; c.fillRect(0,0,W2,H2);
+  const R=rkWarRank(), score=rkWarScore(), TOP=RK_WAR_RANKS[RK_WAR_RANKS.length-1];
+
+  /* ---- THE TIMBER, top third: split cedar with its lashings ---- */
+  const bx=14, bw=W2-28, by=10, bh=26;
+  c.fillStyle='#4e4030'; c.fillRect(bx,by,bw,bh);
+  c.fillStyle='#6a5842'; c.fillRect(bx,by,bw,3);
+  c.fillStyle='#2e2418'; c.fillRect(bx,by+bh-3,bw,3);
+  for(let g=bx+9; g<bx+bw; g+=27){ c.fillStyle='rgba(28,20,13,.42)'; c.fillRect(g,by+3,1,bh-6); }
+
+  /* how far along the timber each notch-name sits, and how far YOU are */
+  const t=clamp(score/Math.max(1,TOP.need),0,1);
+  const runX=x=>Math.round(bx+6+(bw-12)*x);
+
+  /* the ground you have covered, burnt into the timber */
+  c.fillStyle='rgba(224,112,91,.30)'; c.fillRect(bx+6, by+4, runX(t)-(bx+6), bh-8);
+  c.fillStyle='rgba(255,242,200,.85)'; c.fillRect(runX(t)-1, by-3, 2, bh+6);
+
+  /* the eight names along it */
+  RK_WAR_RANKS.forEach(q=>{
+    const x=runX(q.need/Math.max(1,TOP.need)), got=score>=q.need, here=(q.id===R.id);
+    c.fillStyle = here? '#fff2c8' : got? '#e0705b' : 'rgba(120,100,92,.55)';
+    c.fillRect(x-1, by-2, here?3:2, bh+4);
+    c.font='bold 7px Georgia,serif'; c.textAlign='center';
+    c.fillStyle = here? '#fff2c8' : got? 'rgba(232,195,74,.80)' : 'rgba(150,130,124,.50)';
+    c.fillText(String(q.id), x, by-4);
+  });
+
+  /* ---- THE TALLY, below: five-bar gates, which is how a count that men
+     stand round in the cold actually gets kept ---- */
+  const ty=by+bh+13, gate=5;
+  const gw=13, gh=13, gap=6;
+  const perRow=Math.max(6, Math.floor((W2-24)/(gw+gap)));
+  const gates=Math.ceil(score/gate);
+  const shown=Math.min(gates, perRow*2);
+  c.font='bold 7px Georgia,serif'; c.textAlign='left';
+  c.fillStyle='rgba(200,178,168,.55)';
+  c.fillText('CUT IN FIVES', 14, ty-3);
+  for(let g=0; g<shown; g++){
+    const col=g%perRow, row=(g/perRow)|0;
+    const gx=14+col*(gw+gap), gy=ty+row*(gh+7);
+    const inThis=Math.min(gate, score-g*gate);
+    for(let k=0;k<Math.min(4,inThis);k++){
+      c.fillStyle='#e8c34a'; c.fillRect(gx+k*3, gy, 1, gh);
+      c.fillStyle='rgba(20,12,8,.55)'; c.fillRect(gx+k*3+1, gy, 1, gh);
+    }
+    if(inThis>=gate){                              // the fifth goes across
+      c.strokeStyle='#e8c34a'; c.lineWidth=1.4;
+      c.beginPath(); c.moveTo(gx-1, gy+gh-2); c.lineTo(gx+11, gy+2); c.stroke();
+    }
+  }
+  if(gates>shown){
+    c.fillStyle='rgba(232,195,74,.75)'; c.font='bold 8px Georgia,serif';
+    c.fillText('+'+((gates-shown)*gate)+' more', 14+ (perRow*(gw+gap)) - 46, ty+gh+7+gh);
+  }
+  /* and the name of what you are, under the lot */
+  c.textAlign='center'; c.font='bold 9px Georgia,serif';
+  c.fillStyle='#fff2c8'; c.fillText(R.name, W2/2, H2-4);
+  c.font='bold 7px Georgia,serif'; c.fillStyle='rgba(224,112,91,.85)';
+  c.textAlign='right'; c.fillText(score+' NOTCHES', W2-14, H2-4);
+}
+/* TAKE THE CARD. The engine already runs waves; this puts the coast's own
+   stake on it and remembers what was taken so the ladder can settle it. */
+function rkPitTake(cardId){
+  const c=RK_PIT.find(x=>x.id===cardId); if(!c) return;
+  if(!rkPitOpen(c)){ toast('✗ '+rkPitWhy(c), 3600); return; }
+  const reg=(typeof regionAny==='function')? regionAny(G.current) : null;
+  if(!reg){ toast('There is nowhere to hold it.',2600); return; }
+  G.coin=(G.coin|0)-(c.fee|0);
+  G.__rkPit={card:c.id, n:c.n};
+  try{ refreshStatbar(); saveQuiet(); }catch(e){}
+  toast('⚔ 1 v '+c.n+' — they come in order. Put them down.', 3400);
+  try{
+    startFight(reg, {gauntlet:c.n, pit:true, rkPit:true});
+  }catch(e){ G.__rkPit=null; toast('The field would not open.',2600); }
+}
 function openRaunskar(){
   if(!raunskarOn()){
     try{ toast('No such trade here.',2200); }catch(e){}
@@ -34391,7 +34783,7 @@ const HUB_WEST_LABEL={
    country that counts everything on a split stick. */
 const HUB_RK = {
   hide:['btn-circus','btn-forum','btn-legion','btn-silk'],
-  show:['btn-raunskar'],
+  show:['btn-raunskar','btn-skarvek'],
   label:{
     'btn-fightcur':null,                                  // set from the venue itself
     'btn-shop':'⚔ THE RACK',
@@ -34408,7 +34800,8 @@ const HUB_RK = {
 function applyHub(){
   /* the likeness trade is one country's institution — off by default, and
      only the Rkrai branch below turns it on */
-  { const rsb=$('btn-raunskar'); if(rsb) rsb.style.display='none'; }
+  { const rsb=$('btn-raunskar'); if(rsb) rsb.style.display='none';
+    const skb=$('btn-skarvek');  if(skb) skb.style.display='none'; }
   const _w  = playerWorld();
   const east = _w==='east';
   const wa   = _w==='wa';
@@ -41845,6 +42238,7 @@ $('btn-provinces').onclick=()=>openProvinces();
 $('btn-herbs').onclick=()=>openHerbs('map');
 $('btn-titles').onclick=()=>openTitles();
 { const rsb=$('btn-raunskar'); if(rsb) rsb.onclick=()=>openRaunskar(); }
+{ const skb=$('btn-skarvek');  if(skb) skb.onclick=()=>openSkarvek(); }
 $('btn-titles-back').onclick=()=>enterMap();
 $('btn-herb-back').onclick=()=>{ if(herbBack==='villa') openVilla(); else enterMap(); };
 $('btn-prov-back').onclick=()=>enterMap();
@@ -48412,6 +48806,11 @@ window.__SS = {
   praiseTake, updatePraise, drawPraise,
   tabletMenu, tabletFire, openTablet, updateTablet, drawTablet,
   sceneActions, syncSceneActs, wifeExpr, drawWifeFace,
+  RK_WAR_RANKS, rkWarScore, rkWarRank, rkWarNext, rkWarOn, rkExpectLen,
+  rkExpectGap, rkExpectLine, RK_ARMS, rkArmsLegal, rkArmsList,
+  RK_PIT, rkPitOpen, rkPitWhy, rkPitPurse, rkWarSettle, rkWarIncome,
+  openSkarvek, rkPitTake, drawSkarvekPost,
+  get FT(){ return FT; },
   RK_RAUNSKAR, RK_ART_HANDS, RK_ART_FORMS, RK_ART_POSES, RK_ART_DRESS,
   RK_ART_FRAME, RK_ART_FACE, raunskarFrame, raunskarOn,
   raunskarSubjects, raunskarErr, raunskarWorth, raunskarCost, raunskarCommission,
