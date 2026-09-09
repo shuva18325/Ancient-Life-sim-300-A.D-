@@ -491,6 +491,19 @@ const ok=(name,cond,detail)=>{
     const worthOf=(d)=>{ const p={hand:'ten',form:'token',pose:'back',subj:'booty',read:10,dress:d};
       return S.raunskarWorth(p); };
     out.wCoat=worthOf('parka'); out.wLeaf=worthOf('sivrak');
+    out.skinOnes=S.RK_ART_DRESS.filter(d=>d.skin).map(d=>d.id);
+    const d0=G.wife.dress;
+    { const cv=document.createElement('canvas'); cv.width=cv.height=120;
+      S.raunskarRender(cv, {hand:'ten',form:'bone',pose:'back',subj:'booty',
+                            dress:'sivrak',expr:'smoulder',truth:8,read:8}); }
+    out.dressRestored=(G.wife.dress===d0);
+    /* every face the hand will cut, painted */
+    out.faces=S.RK_ART_FACE.length; out.faceThrew=null;
+    try{ for(const f of S.RK_ART_FACE){
+      const cv=document.createElement('canvas'); cv.width=cv.height=120;
+      S.raunskarRender(cv, {hand:'ten',form:'bone',pose:'seated',subj:'face',
+                            dress:'parka',expr:f.id,truth:8,read:8}); }
+    }catch(e){ out.faceThrew=e.message; }
     return out;
   });
   ok('the coast has its own house garment', dr.hasUlvik===true);
@@ -505,9 +518,11 @@ const ok=(name,cond,detail)=>{
   ok('and nothing threw',                   !dr.threw, dr.threw||'');
   ok('her garment override is cleaned up',  dr.restored===true);
   ok('the leaf is worth more than the coat', dr.wLeaf>dr.wCoat, dr.wCoat+' -> '+dr.wLeaf);
-  ok('and no garment claims to be one it is not',
-     dr.dresses.indexOf('bare')<0,
-     'the portrait draws the gown unconditionally, so an undressed option would render clothed');
+  ok('the leaf and the bare one show actual skin',
+     dr.skinOnes.length===2, dr.skinOnes.join(', '));
+  ok('and a skin garment restores her dress afterwards', dr.dressRestored===true);
+  ok('the face is a commission axis', dr.faces>=6, dr.faces+' faces');
+  ok('and every one of them paints',  dr.faceThrew===null, dr.faceThrew||'');
 
   console.log('\n--- PAGE ERRORS ---');
   ok('none', errs.length===0, errs.slice(0,4).join(' | '));
