@@ -451,6 +451,64 @@ const ok=(name,cond,detail)=>{
   ok('and her real body is restored',rs.restored===true);
   ok('a house-post does not come down', rs.postStays===true);
 
+  console.log('\n--- ✇ WHAT SHE IS WEARING, AND WHAT IT IS OF ---');
+  const dr=await pg.evaluate(()=>{
+    const S=window.__SS, G=S.G, out={};
+    G.coin=999999; G.rkArt=[]; G.rkArtRefused={}; G.rkArtPending=null;
+    out.dresses=S.RK_ART_DRESS.map(d=>d.id);
+    out.hasLeaf=out.dresses.indexOf('sivrak')>=0;
+    out.hasUlvik=out.dresses.indexOf('ulvik')>=0;
+    /* the frame actually moves with the subject — a seat piece and a face
+       piece must not be the same crop */
+    const fb=S.raunskarFrame('booty','back'), ff=S.raunskarFrame('face','back');
+    out.framesDiffer=Math.abs(fb.y-ff.y)>0.15;
+    out.fb=fb; out.ff=ff;
+    /* and the pose pulls the hand back */
+    const tight=S.raunskarFrame('booty','back'), wide=S.raunskarFrame('booty','stand');
+    out.poseZooms=wide.h>tight.h;
+    /* every frame stays on the canvas */
+    out.inBounds=['face','hairq','bust','waist','booty','legs'].every(k=>
+      ['seated','stand','back','rack'].every(po=>{
+        const f=S.raunskarFrame(k,po);
+        return f.x>=0 && f.y>=0 && f.x+f.w<=1.0001 && f.y+f.h<=1.0001 && f.w>0 && f.h>0; }));
+    /* a leaf sitting costs more than a coat sitting */
+    out.coat=S.raunskarCost('post','bone','seated','parka');
+    out.leaf=S.raunskarCost('post','bone','seated','sivrak');
+    /* commission in each garment and make sure every one renders */
+    let threw=null; const drew={};
+    try{
+      for(const d of out.dresses){
+        const c=S.raunskarCommission('post','bone','back','booty',d);
+        if(!c.ok){ drew[d]='refused: '+c.why; continue; }
+        const cv=document.createElement('canvas'); cv.width=cv.height=148;
+        drew[d]=S.raunskarRender(cv, G.rkArtPending)? 'ok' : 'no';
+        S.raunskarRespond('accept');
+      }
+    }catch(e){ threw=e.message; }
+    out.drew=drew; out.threw=threw;
+    out.restored=(G.wife._cutForce===undefined);
+    /* the leaf and the bare one are worth more than the coat */
+    const worthOf=(d)=>{ const p={hand:'ten',form:'token',pose:'back',subj:'booty',read:10,dress:d};
+      return S.raunskarWorth(p); };
+    out.wCoat=worthOf('parka'); out.wLeaf=worthOf('sivrak');
+    return out;
+  });
+  ok('the coast has its own house garment', dr.hasUlvik===true);
+  ok('and the leaf is on the list',         dr.hasLeaf===true, dr.dresses.join(', '));
+  ok('a seat piece is not a face piece',    dr.framesDiffer===true,
+     'booty y='+dr.fb.y.toFixed(2)+' vs face y='+dr.ff.y.toFixed(2));
+  ok('the pose changes how far back it stands', dr.poseZooms===true);
+  ok('every frame lands on the plate',      dr.inBounds===true);
+  ok('a leaf sitting costs more than a coat', dr.leaf>dr.coat, dr.coat+' -> '+dr.leaf);
+  ok('every garment renders',               Object.values(dr.drew).every(v=>v==='ok'),
+     JSON.stringify(dr.drew));
+  ok('and nothing threw',                   !dr.threw, dr.threw||'');
+  ok('her garment override is cleaned up',  dr.restored===true);
+  ok('the leaf is worth more than the coat', dr.wLeaf>dr.wCoat, dr.wCoat+' -> '+dr.wLeaf);
+  ok('and no garment claims to be one it is not',
+     dr.dresses.indexOf('bare')<0,
+     'the portrait draws the gown unconditionally, so an undressed option would render clothed');
+
   console.log('\n--- PAGE ERRORS ---');
   ok('none', errs.length===0, errs.slice(0,4).join(' | '));
 
