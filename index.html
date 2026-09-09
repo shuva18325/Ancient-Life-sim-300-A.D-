@@ -342,6 +342,7 @@
       <button class="btn" id="btn-provinces">🏛 PROVINCES</button>
       <button class="btn" id="btn-herbs">🌿 HERBARIUS</button>
       <button class="btn" id="btn-titles">⚜ TITLES</button>
+      <button class="btn" id="btn-raunskar" style="display:none">✇ THE RAUNSKAR</button>
       <button class="btn" id="btn-trophies">🏆 TROPHIES</button>
       <button class="btn" id="btn-regalia">⚜ REGALIA</button>
       <button class="btn" id="btn-circus">🏇 CIRCUS</button>
@@ -32635,6 +32636,461 @@ function standardsHere(){
    on a screen, which meant a player could finish a whole Rkrai life
    without ever finding out what any of it was called.
    ===================================================================== */
+/* =====================================================================
+   ✇ THE RAUNSKAR — the coast's likeness trade
+   ---------------------------------------------------------------------
+   A country that seats six of its ten Masteries on the evidence of a body
+   has an obvious problem: bodies are not archives. The coast solved it the
+   way it solves everything, by CUTTING A RECORD — a raunskar is a likeness
+   cut and kept, and it is not decoration. It is what the district consults
+   when the woman herself is not in the room, and past a certain grade it
+   is struck as a token and CIRCULATES, which means a flattering one is
+   quietly a forgery of a public document that everybody is too polite to
+   call a forgery.
+
+   So the whole trade runs on one tension. A hand cuts what it sees; what
+   it sees is never exactly the number; and you are standing there with the
+   ledger in your head and a purse in your hand. You may take the honest
+   one. You may argue it back. You may fine the hand for it. Or you may pay
+   the difference and hang a better woman than the one you married on your
+   own house-post, and live with the district reading it.
+   ===================================================================== */
+const RK_RAUNSKAR = {
+  name:'THE RAUNSKAR',
+  gloss:'the cut likeness — a record of a body, kept where the body cannot be',
+  what:'Six of the ten Masteries are seated on the evidence of a body, and a body is not an archive. So the coast cuts one. A raunskar is consulted when the woman is not in the room; struck as a token it circulates, and then it is doing the work of a document.',
+  rule:'The hand cuts what it sees. What it sees is never exactly the number. What you do about that is the whole of the trade.',
+};
+/* ---- THE HANDS. Cheap and quick, or dear and close to true. ---- */
+const RK_ART_HANDS = [
+  {id:'plank', name:'Kaiq Plank-Hand', where:'Leokanis', fee:140, skill:2,
+   note:'Cuts hull-marks for the harbour six days a week and faces on the seventh. Fast, cheap, and he will get something wrong.'},
+  {id:'post',  name:'Uvrak Post-Carver', where:'Uvrak Plateau', fee:520, skill:5,
+   note:'Cuts the house-posts on the plateau. Knows how a body sits because he has cut four hundred of them into standing timber.'},
+  {id:'river', name:'Nalvi of the River', where:'Nalkut River', fee:1700, skill:8,
+   note:'Scrimshaws on bone by the winter lamp. Slow, dear, and very nearly right — which on this coast is a professional reputation.'},
+  {id:'ten',   name:'The Ten’s Own Hand', where:'Leokanis', fee:5400, skill:10,
+   note:'Cuts the seating records themselves. What this hand cuts IS the number, as far as the district is concerned, and it is priced accordingly.'},
+];
+/* ---- WHAT IT IS CUT INTO. The last of them is money. ---- */
+const RK_ART_FORMS = [
+  {id:'plank', name:'A cut plank',        mul:1.0,
+   note:'A board off the rack. It hangs in the house and it is nobody else’s business.'},
+  {id:'post',  name:'A house-post face',  mul:1.9,
+   note:'Cut into the post itself. It is not coming down without the roof, and everyone who comes to the door reads it.'},
+  {id:'bone',  name:'Scrimshaw on bone',  mul:2.9,
+   note:'Small enough to carry, fine enough to be argued over. The thing a province-holder puts on the table in front of the Ten.'},
+  {id:'token', name:'A struck token', mul:4.6, money:true,
+   note:'It CIRCULATES. The harbour weighs it, the district passes it, and whatever it says about her is being said in other people’s hands.'},
+];
+/* ---- AND HOW IT IS CUT. The pose is half the reading. ---- */
+const RK_ART_POSES = [
+  {id:'seated', name:'SEATED, IN THE ULVIK', mul:1.00,
+   note:'The office pose. It is what the seating record looks like and it flatters nobody.'},
+  {id:'stand',  name:'STANDING, FULL',       mul:1.15,
+   note:'The whole of her, head to sole. More work, more to get wrong.'},
+  {id:'back',   name:'FROM BEHIND',          mul:1.30,
+   note:'The pose the seat Masteries are actually seated on. On any other coast this would need explaining.'},
+  {id:'rack',   name:'AT THE RACK, WORKING', mul:1.10,
+   note:'Doing something, not being looked at. The district reads this as modesty and prices it as taste.'},
+];
+function raunskarOn(){ try{ return rkHere(); }catch(e){ return false; } }
+function raunskarSubjects(w){
+  try{
+    const P=(typeof partsFor==='function')? partsFor(w) : [];
+    return P.filter(p=>['face','hairq','bust','waist','booty','legs'].indexOf(p.id)>=0);
+  }catch(e){ return []; }
+}
+/* HOW FAR OFF THE HAND IS. Skill narrows it; a struck token is cut with
+   more care than a plank because it is going to be handled. */
+function raunskarErr(hand, form){
+  const sp=(11-(hand.skill||1))*0.42 - ((form&&form.money)? 0.5 : 0);
+  const raw=(Math.random()+Math.random()+Math.random()-1.5)*Math.max(0.25, sp);
+  let e=Math.round(raw);
+  if(e===0 && Math.random()<0.30) e=(Math.random()<0.5?-1:1);   // hands slip
+  return clamp(e, -4, 4);
+}
+function raunskarWorth(p){
+  try{
+    const H=RK_ART_HANDS.find(h=>h.id===p.hand)||RK_ART_HANDS[0];
+    const F=RK_ART_FORMS.find(f=>f.id===p.form)||RK_ART_FORMS[0];
+    const O=RK_ART_POSES.find(o=>o.id===p.pose)||RK_ART_POSES[0];
+    const base=60+H.skill*46;
+    return Math.round(base*F.mul*O.mul*(1+(p.read|0)*0.07));
+  }catch(e){ return 0; }
+}
+function raunskarCost(handId, formId, poseId){
+  const H=RK_ART_HANDS.find(h=>h.id===handId)||RK_ART_HANDS[0];
+  const F=RK_ART_FORMS.find(f=>f.id===formId)||RK_ART_FORMS[0];
+  const O=RK_ART_POSES.find(o=>o.id===poseId)||RK_ART_POSES[0];
+  return Math.round(H.fee*F.mul*O.mul);
+}
+/* THE COMMISSION. Money leaves, a piece exists, and what it says about her
+   is decided here and not by you. */
+function raunskarCommission(handId, formId, poseId, subjId){
+  try{
+    const w=G&&G.wife; if(!w) return {ok:false, why:'There is nobody in this house to cut.'};
+    if(!raunskarOn()) return {ok:false, why:'No such trade here.'};
+    const H=RK_ART_HANDS.find(h=>h.id===handId);
+    const F=RK_ART_FORMS.find(f=>f.id===formId);
+    const O=RK_ART_POSES.find(o=>o.id===poseId);
+    if(!H||!F||!O) return {ok:false, why:'Pick a hand, a form and a pose.'};
+    if((G.rkArtRefused||{})[H.id]) return {ok:false, why:H.name+' will not take your work again.'};
+    const cost=raunskarCost(handId, formId, poseId);
+    if((G.coin|0) < cost) return {ok:false, why:'That is '+cost+' and you have '+(G.coin|0)+'.'};
+    const b=(w.body)||{}, sub=subjId||'booty';
+    const truth=(b[sub]===undefined? 5 : b[sub])|0;
+    const err=raunskarErr(H,F);
+    const read=clamp(truth+err, 1, (typeof IMPOSSIBLE_V!=='undefined'? IMPOSSIBLE_V : 11));
+    G.coin=(G.coin|0)-cost;
+    const p={ id:'rs'+Date.now()+Math.floor(Math.random()*999),
+              hand:H.id, form:F.id, pose:O.id, subj:sub,
+              truth, read, paid:cost, day:(G.day|0), settled:false,
+              tweaked:false, argued:false };
+    G.rkArtPending=p;
+    try{ refreshStatbar(); saveQuiet(); }catch(e){}
+    return {ok:true, piece:p};
+  }catch(e){ return {ok:false, why:'It would not cut.'}; }
+}
+function raunskarVerdict(p){
+  if(!p) return 'true';
+  const d=(p.read|0)-(p.truth|0);
+  return d>0? 'over' : d<0? 'under' : 'true';
+}
+/* WHAT YOU MAY DO ABOUT IT. Every one of these is a real position and the
+   coast has an opinion about all four. */
+function raunskarOptions(p){
+  if(!p) return [];
+  const v=raunskarVerdict(p), out=[];
+  const H=RK_ART_HANDS.find(h=>h.id===p.hand)||RK_ART_HANDS[0];
+  const surcharge=Math.round(H.fee*0.55);
+  if(v==='true'){
+    out.push({id:'keep', name:'✔ TAKE IT AS CUT', cost:0,
+      note:'It is the number. Hang it and let the district read it.'});
+    if(!p.tweaked){
+      out.push({id:'bigger', name:'▲ ASK FOR MORE OF IT', cost:surcharge,
+        note:'He can cut it a mark over. It is your post and his chisel, and it is '+surcharge+'.'});
+      out.push({id:'smaller', name:'▼ ASK FOR LESS OF IT', cost:surcharge,
+        note:'Some houses would rather not be read that closely. Also '+surcharge+'.'});
+    }
+  } else {
+    out.push({id:'accept', name:'✔ ACCEPT IT', cost:0,
+      note: v==='over'
+        ? 'Let it stand at more than she is. Nobody is going to measure it against her in the street — probably.'
+        : 'Let it stand at less than she is. She will see it before the district does.'});
+    if(!p.argued) out.push({id:'argue', name:'💬 ARGUE IT', cost:0,
+      note:'Take it back to the bench with the ledger in your hand. He will cut it closer and he will not enjoy it.'});
+    out.push({id:'fine', name:'⚖ FINE THE HAND', cost:0,
+      note:'Half your money back and he never works for this house again. The coast will hear which of you was right.'});
+  }
+  return out;
+}
+function raunskarRespond(how){
+  const p=G&&G.rkArtPending; if(!p) return null;
+  const H=RK_ART_HANDS.find(h=>h.id===p.hand)||RK_ART_HANDS[0];
+  const F=RK_ART_FORMS.find(f=>f.id===p.form)||RK_ART_FORMS[0];
+  const v=raunskarVerdict(p);
+  const ceil=(typeof bondCeiling==='function')? bondCeiling() : 100;
+  let bond=0, honor=0, line='', kept=true;
+  if(how==='argue'){
+    p.argued=true;
+    const d=(p.read|0)-(p.truth|0);
+    p.read=clamp(p.truth + (d>0? Math.max(0,d-2) : Math.min(0,d+2)), 1, 11);
+    honor=1;
+    line='💬 You put the ledger on his bench. He cuts it closer, says nothing you would repeat, and it is nearer the mark now.';
+    try{ saveQuiet(); }catch(e){}
+    return {done:false, line, bond, honor};
+  }
+  if(how==='fine'){
+    const back=Math.round(p.paid*0.5);
+    G.coin=(G.coin|0)+back;
+    G.rkArtRefused=G.rkArtRefused||{}; G.rkArtRefused[H.id]=true;
+    honor=(v==='over')? 2 : 1;
+    line='⚖ You fine him '+back+' back and he puts his chisel down. '+H.name+' will not take your work again — and the district now knows you count.';
+    kept=false;
+  }
+  else if(how==='bigger' || how==='smaller'){
+    const sur=Math.round(H.fee*0.55);
+    if((G.coin|0)<sur) return {done:false, line:'That is '+sur+' and you have not got it.'};
+    G.coin=(G.coin|0)-sur;
+    p.read=clamp(p.read + (how==='bigger'? 1 : -1), 1, 11);
+    p.tweaked=true; p.paid+=sur;
+    honor=-1;
+    bond=(how==='bigger')? 1 : -2;
+    line=(how==='bigger')
+      ? '▲ He cuts it a mark over and does not ask why. It is a better woman than the one who lives here, by exactly one notch.'
+      : '▼ He cuts it a mark under. She will notice. She notices the tally-stick.';
+    try{ saveQuiet(); }catch(e){}
+    return {done:false, line, bond, honor, tweak:true};
+  }
+  else {                                   // keep / accept
+    if(v==='over'){
+      bond=1; honor=F.money? -3 : -1;
+      line='✔ You hang it as cut. It says more of her than the ledger does'
+        +(F.money? ', and it is a TOKEN — it is going to be in other people’s hands saying it.' : '.');
+    } else if(v==='under'){
+      bond=-3; honor=1;
+      line='✔ You hang it as cut. It says less of her than the ledger does, and she is the one who has to walk past it.';
+    } else {
+      bond=2; honor=2;
+      line='✔ You hang it as cut, at the number. On this coast that is the whole compliment.';
+    }
+  }
+  /* it goes into the house either way, unless you fined him out of it */
+  if(kept){
+    G.rkArt=G.rkArt||[];
+    p.settled=true; p.worth=raunskarWorth(p);
+    G.rkArt.push(p);
+    G.rkArtCut=(G.rkArtCut||0)+1;
+  }
+  G.rkArtPending=null;
+  G.wifeRel=clamp((G.wifeRel||50)+bond, 0, ceil);
+  G.honor=clamp((G.honor||50)+honor, 0, 100);
+  try{ refreshStatbar(); saveQuiet(); }catch(e){}
+  return {done:true, line, bond, honor, kept};
+}
+/* what the house is holding, in coin */
+function raunskarHoldings(){
+  try{ return (G.rkArt||[]).reduce((a,p)=>a+(p.worth|0),0); }catch(e){ return 0; }
+}
+/* SELL ONE. A token is money; a post is not coming off the house. */
+function raunskarSell(id){
+  try{
+    const arr=G.rkArt||[], i=arr.findIndex(p=>p.id===id);
+    if(i<0) return {ok:false, why:'Not in the house.'};
+    const p=arr[i];
+    const F=RK_ART_FORMS.find(f=>f.id===p.form)||RK_ART_FORMS[0];
+    if(p.form==='post') return {ok:false, why:'It is cut into the post. It is not coming down without the roof.'};
+    const take=Math.round((p.worth|0)*(F.money? 1.0 : 0.6));
+    G.coin=(G.coin|0)+take; arr.splice(i,1);
+    try{ refreshStatbar(); saveQuiet(); }catch(e){}
+    return {ok:true, take};
+  }catch(e){ return {ok:false, why:'No.'}; }
+}
+/* ---- and the picture itself: her portrait, cut to what the HAND saw
+   rather than to what the ledger says, which is the entire point ---- */
+function raunskarRender(cv, p){
+  try{
+    const w=G&&G.wife; if(!cv||!w||!p) return false;
+    const b=w.body||{}, keep=b[p.subj];
+    b[p.subj]=p.read;                       // the piece shows the READ, not the truth
+    const ex=w._expr; w._expr=(p.pose==='rack')? 'absorbed' : 'flat';
+    try{ drawBridePortrait(cv, w); } finally {
+      if(keep===undefined) delete b[p.subj]; else b[p.subj]=keep;
+      if(ex===undefined) delete w._expr; else w._expr=ex;
+    }
+    return true;
+  }catch(e){ return false; }
+}
+/* ---------------------------------------------------------------------
+   THE BENCH. One screen, three states: what is on offer, what is on the
+   bench half-cut, and what the house is already holding.
+   --------------------------------------------------------------------- */
+let rsPick={hand:'plank', form:'plank', pose:'seated', subj:'booty'};
+function openRaunskar(){
+  if(!raunskarOn()){
+    try{ toast('No such trade here.',2200); }catch(e){}
+    try{ enterMap(); }catch(e){} return;
+  }
+  state='villa'; show('scr-villa'); $('statbar').classList.remove('hide'); refreshStatbar();
+  villaHead('✇ '+RK_RAUNSKAR.name+' — THE CUT LIKENESS', RK_RAUNSKAR.what, '#c9a4ef');
+  const b=$('villa-body'); b.innerHTML='';
+  const card=(html,col)=>{ const d=document.createElement('div'); d.className='panel';
+    d.style.cssText='padding:9px;border-color:'+(col||'#6b4e2a');
+    d.innerHTML=html; b.appendChild(d); return d; };
+  const w=G.wife;
+  if(!w || w.male){
+    card('<div class="small">There is nobody in this house whose likeness the district wants cut.</div>','#8a6a58');
+    const back=document.createElement('button'); back.className='btn gold';
+    back.textContent='◀ BACK'; back.onclick=()=>enterMap(); b.appendChild(back); return;
+  }
+  card('<div class="small muted" style="line-height:1.55"><b style="color:#e8c34a">The rule:</b> '
+    +RK_RAUNSKAR.rule+'</div>'
+    +'<div class="small muted" style="margin-top:4px">'+RK_RAUNSKAR.gloss+'</div>'
+    +'<div class="small" style="margin-top:5px">In the house: <b style="color:#c9a4ef">'
+    +((G.rkArt||[]).length)+'</b> cut · worth <b style="color:#e8c34a">'+raunskarHoldings()
+    +'</b> · 🪙 <b>'+(G.coin|0)+'</b></div>','#c9a4ef');
+
+  const P=G.rkArtPending;
+  if(P){ raunskarBench(card, P); }
+  else  { raunskarOffers(card, w); }
+  raunskarHouse(card);
+
+  /* the scr-villa shell carries its own BACK at the foot of the panel —
+     adding a second one put two of them under the gallery */
+}
+/* ---- WHAT IS ON OFFER, and what each of it costs ---- */
+function raunskarOffers(card, w){
+  const refused=G.rkArtRefused||{};
+  const row=(label, items, key, cur)=>{
+    let h='<div class="small" style="color:#e8c34a;letter-spacing:1px;margin-top:2px">'+label+'</div>'
+         +'<div class="row gap6" style="flex-wrap:wrap;margin-top:3px">';
+    h+='</div>'; return h;
+  };
+  const d=card('<div style="color:#c9a4ef;letter-spacing:1px"><b>✇ PUT IT ON THE BENCH</b></div>'
+    +'<div class="small muted" style="margin-top:2px">A hand, a thing to cut it into, a pose, and the one measure the piece is built around.</div>',
+    '#c9a4ef');
+  const mk=(title, list, key, fmt)=>{
+    const t=document.createElement('div'); t.className='small';
+    t.style.cssText='color:#e8c34a;letter-spacing:1px;margin-top:7px'; t.textContent=title;
+    d.appendChild(t);
+    const r=document.createElement('div'); r.className='row gap6';
+    r.style.cssText='flex-wrap:wrap;margin-top:3px'; d.appendChild(r);
+    list.forEach(o=>{
+      const bt=document.createElement('button');
+      const off=!!(key==='hand' && refused[o.id]);
+      bt.className='btn sm'+(rsPick[key]===o.id?' gold':'');
+      bt.textContent=fmt(o);
+      bt.title=o.note||'';
+      if(off){ bt.disabled=true; bt.style.opacity='.4'; bt.title='Will not take your work again.'; }
+      bt.onclick=()=>{ rsPick[key]=o.id; openRaunskar(); };
+      r.appendChild(bt);
+    });
+    const nt=document.createElement('div'); nt.className='small muted';
+    nt.style.cssText='margin-top:3px;line-height:1.5';
+    const cur=list.find(o=>o.id===rsPick[key]);
+    nt.textContent=cur? (cur.note||'') : '';
+    d.appendChild(nt);
+  };
+  mk('THE HAND',  RK_ART_HANDS, 'hand',  o=>o.name+'  ('+o.where+')  🪙'+o.fee);
+  mk('CUT INTO',  RK_ART_FORMS, 'form',  o=>o.name+(o.money?'  ◆ MONEY':''));
+  mk('THE POSE',  RK_ART_POSES, 'pose',  o=>o.name);
+  const subs=raunskarSubjects(G.wife);
+  { const t=document.createElement('div'); t.className='small';
+    t.style.cssText='color:#e8c34a;letter-spacing:1px;margin-top:7px';
+    t.textContent='BUILT AROUND'; d.appendChild(t);
+    const r=document.createElement('div'); r.className='row gap6';
+    r.style.cssText='flex-wrap:wrap;margin-top:3px'; d.appendChild(r);
+    subs.forEach(p=>{
+      const bt=document.createElement('button');
+      bt.className='btn sm'+(rsPick.subj===p.id?' gold':'');
+      const v=((G.wife.body||{})[p.id]);
+      bt.textContent=p.name.toUpperCase()+'  '+(v===undefined?5:v);
+      bt.onclick=()=>{ rsPick.subj=p.id; openRaunskar(); };
+      r.appendChild(bt);
+    });
+    const nt=document.createElement('div'); nt.className='small muted';
+    nt.style.cssText='margin-top:3px;line-height:1.5';
+    nt.textContent='This is the measure the hand is working to. It is the one he can get wrong.';
+    d.appendChild(nt);
+  }
+  const cost=raunskarCost(rsPick.hand, rsPick.form, rsPick.pose);
+  const afford=(G.coin|0)>=cost && !refused[rsPick.hand];
+  const go=document.createElement('button');
+  go.className='btn'+(afford?' gold':''); go.style.marginTop='8px';
+  go.textContent='✇ COMMISSION IT  —  🪙 '+cost;
+  if(!afford){ go.disabled=true; go.style.opacity='.5'; }
+  go.onclick=()=>{
+    const r=raunskarCommission(rsPick.hand, rsPick.form, rsPick.pose, rsPick.subj);
+    if(!r.ok){ toast('✗ '+r.why, 3400); return; }
+    try{ sfx('coin'); }catch(e){}
+    openRaunskar();
+  };
+  d.appendChild(go);
+}
+/* ---- WHAT IS ON THE BENCH, and the argument about it ---- */
+function raunskarBench(card, P){
+  const H=RK_ART_HANDS.find(h=>h.id===P.hand)||RK_ART_HANDS[0];
+  const F=RK_ART_FORMS.find(f=>f.id===P.form)||RK_ART_FORMS[0];
+  const O=RK_ART_POSES.find(o=>o.id===P.pose)||RK_ART_POSES[0];
+  const v=raunskarVerdict(P);
+  const nm=(typeof partsFor==='function')
+    ? ((partsFor(G.wife).find(p=>p.id===P.subj)||{name:P.subj}).name) : P.subj;
+  const col = v==='true'? '#7ad08a' : v==='over'? '#e8c34a' : '#e0705b';
+  const d=card('<div style="color:'+col+';letter-spacing:1px"><b>✇ ON THE BENCH</b>'
+    +' <span class="small muted">— '+H.name+' · '+F.name+' · '+O.name+'</span></div>', col);
+  /* the piece itself, drawn as the hand cut it */
+  const wrap=document.createElement('div');
+  wrap.className='row gap'; wrap.style.cssText='align-items:flex-start;margin-top:6px;flex-wrap:wrap';
+  const cv=document.createElement('canvas'); cv.width=cv.height=148;
+  cv.style.cssText='position:static;flex:0 0 auto;width:148px;height:148px;'
+    +'image-rendering:pixelated;border:2px solid '+col+';border-radius:3px';
+  raunskarRender(cv, P);
+  wrap.appendChild(cv);
+  const txt=document.createElement('div'); txt.style.cssText='flex:1 1 260px;min-width:220px';
+  txt.innerHTML='<div class="small" style="line-height:1.6">'
+    +'He has cut <b style="color:'+col+'">'+String(nm).toUpperCase()+'</b> at '
+    +'<b style="color:'+col+'">'+P.read+'</b>. The ledger says <b>'+P.truth+'</b>.'
+    +'</div><div class="small muted" style="margin-top:4px;line-height:1.55">'
+    +(v==='true'
+       ? 'It is the number. He looked at her and he got it, which is rarer than the fee suggests.'
+       : v==='over'
+         ? 'He has cut her <b style="color:#e8c34a">'+(P.read-P.truth)+' over</b>. Flattering, and a flattering record is still a record.'
+         : 'He has cut her <b style="color:#e0705b">'+(P.truth-P.read)+' under</b>. She will see it before the district does.')
+    +'</div>'
+    +(F.money? '<div class="small" style="margin-top:4px;color:#e8c34a">◆ This one is going to CIRCULATE.</div>' : '');
+  wrap.appendChild(txt);
+  d.appendChild(wrap);
+  const opts=raunskarOptions(P);
+  const r=document.createElement('div'); r.className='row gap6';
+  r.style.cssText='flex-wrap:wrap;margin-top:8px'; d.appendChild(r);
+  opts.forEach(o=>{
+    const bt=document.createElement('button');
+    bt.className='btn sm'+(o.id==='keep'||o.id==='accept'?' gold':'');
+    bt.textContent=o.name+(o.cost? '  🪙'+o.cost : '');
+    bt.title=o.note||'';
+    bt.onclick=()=>{
+      const res=raunskarRespond(o.id);
+      if(!res) return;
+      toast(res.line+((res.bond||res.honor)? '   ('+(res.bond>=0?'+':'')+(res.bond|0)+' 💞, '
+        +(res.honor>=0?'+':'')+(res.honor|0)+' ⚖)' : ''), 6400);
+      try{ sfx(o.id==='fine'? 'deny' : 'ui'); }catch(e){}
+      openRaunskar();
+    };
+    r.appendChild(bt);
+  });
+  const nt=document.createElement('div'); nt.className='small muted';
+  nt.style.cssText='margin-top:5px;line-height:1.55';
+  nt.textContent=(opts[0]&&opts[0].note)||'';
+  d.appendChild(nt);
+}
+/* ---- WHAT THE HOUSE IS HOLDING ---- */
+function raunskarHouse(card){
+  const arr=G.rkArt||[];
+  const d=card('<div style="color:#8fc0cf;letter-spacing:1px"><b>▦ WHAT THE HOUSE HOLDS</b>'
+    +' <span class="small muted">— '+arr.length+' cut, worth '+raunskarHoldings()+'</span></div>', '#8fc0cf');
+  if(!arr.length){
+    const n=document.createElement('div'); n.className='small muted';
+    n.style.marginTop='4px';
+    n.textContent='Nothing yet. A house with no raunskar in it is a house the district has to take your word about.';
+    d.appendChild(n); return;
+  }
+  const grid=document.createElement('div');
+  grid.style.cssText='display:grid;gap:8px;margin-top:6px;grid-template-columns:repeat(auto-fill,minmax(146px,1fr))';
+  d.appendChild(grid);
+  arr.slice().reverse().forEach(p=>{
+    const H=RK_ART_HANDS.find(h=>h.id===p.hand)||RK_ART_HANDS[0];
+    const F=RK_ART_FORMS.find(f=>f.id===p.form)||RK_ART_FORMS[0];
+    const cell=document.createElement('div'); cell.className='shopcard';
+    const cv=document.createElement('canvas'); cv.width=cv.height=132;
+    cv.style.cssText='position:static;width:100%;height:auto;image-rendering:pixelated;border-radius:2px';
+    raunskarRender(cv, p);
+    cell.appendChild(cv);
+    const lab=document.createElement('div'); lab.className='small';
+    lab.style.lineHeight='1.45';
+    const off=(p.read|0)-(p.truth|0);
+    lab.innerHTML='<b style="color:#c9a4ef">'+F.name+'</b>'
+      +'<br><span class="muted">'+H.name+'</span>'
+      +'<br>'+String(p.subj).toUpperCase()+' <b>'+p.read+'</b>'
+      +(off? ' <span style="color:'+(off>0?'#e8c34a':'#e0705b')+'">('+(off>0?'+':'')+off+')</span>'
+           : ' <span style="color:#7ad08a">(true)</span>')
+      +'<br>🪙 <b>'+(p.worth|0)+'</b>';
+    cell.appendChild(lab);
+    if(p.form!=='post'){
+      const sb=document.createElement('button'); sb.className='btn sm';
+      sb.style.marginTop='4px'; sb.textContent='SELL';
+      sb.onclick=()=>{ const r=raunskarSell(p.id);
+        toast(r.ok? ('🪙 Sold for '+r.take+'.') : ('✗ '+r.why), 3200);
+        if(r.ok){ try{ sfx('coin'); }catch(e){} } openRaunskar(); };
+      cell.appendChild(sb);
+    } else {
+      const n=document.createElement('div'); n.className='small muted';
+      n.style.marginTop='4px'; n.textContent='Cut into the post. It stays.';
+      cell.appendChild(n);
+    }
+    grid.appendChild(cell);
+  });
+}
 function openTheTen(tab){
   /* ONE COUNTRY'S INSTITUTION, IN ONE COUNTRY. The hub button is hidden
      outside the Rkrai world, but the function had no guard of its own —
@@ -33705,6 +34161,7 @@ const HUB_WEST_LABEL={
    country that counts everything on a split stick. */
 const HUB_RK = {
   hide:['btn-circus','btn-forum','btn-legion','btn-silk'],
+  show:['btn-raunskar'],
   label:{
     'btn-fightcur':null,                                  // set from the venue itself
     'btn-shop':'⚔ THE RACK',
@@ -33719,6 +34176,9 @@ const HUB_RK = {
   },
 };
 function applyHub(){
+  /* the likeness trade is one country's institution — off by default, and
+     only the Rkrai branch below turns it on */
+  { const rsb=$('btn-raunskar'); if(rsb) rsb.style.display='none'; }
   const _w  = playerWorld();
   const east = _w==='east';
   const wa   = _w==='wa';
@@ -33737,6 +34197,7 @@ function applyHub(){
       if(el) el.textContent = (V.kind==='rite'? '⚔ ' : '⚔ ')+V.name; }
   } else if(rk){
     HUB_RK.hide.forEach(id=>vis(id,false));
+    (HUB_RK.show||[]).forEach(id=>vis(id,true));
     for(const k in HUB_RK.label) set(k, HUB_RK.label[k]);
     { const V=venueHere(), el=$('btn-fightcur'); if(el) el.textContent='⚔ '+V.name; }
   } else {
@@ -41153,6 +41614,7 @@ $('btn-mirror').onclick=()=>openMirror();
 $('btn-provinces').onclick=()=>openProvinces();
 $('btn-herbs').onclick=()=>openHerbs('map');
 $('btn-titles').onclick=()=>openTitles();
+{ const rsb=$('btn-raunskar'); if(rsb) rsb.onclick=()=>openRaunskar(); }
 $('btn-titles-back').onclick=()=>enterMap();
 $('btn-herb-back').onclick=()=>{ if(herbBack==='villa') openVilla(); else enterMap(); };
 $('btn-prov-back').onclick=()=>enterMap();
@@ -47720,6 +48182,10 @@ window.__SS = {
   praiseTake, updatePraise, drawPraise,
   tabletMenu, tabletFire, openTablet, updateTablet, drawTablet,
   sceneActions, syncSceneActs, wifeExpr, drawWifeFace,
+  RK_RAUNSKAR, RK_ART_HANDS, RK_ART_FORMS, RK_ART_POSES, raunskarOn,
+  raunskarSubjects, raunskarErr, raunskarWorth, raunskarCost, raunskarCommission,
+  raunskarVerdict, raunskarOptions, raunskarRespond, raunskarHoldings,
+  raunskarSell, raunskarRender, openRaunskar,
   RK_CLAM, clamOn, clamReady, clamMood, clamPulses, clamDue, startClam,
   clamResolve, clamSwell, updateClam, drawClam, setEdge,
   bmHotspots, bmPartAt, bmActions, bmSayIt, bmDoAction, bmMineLen, drawPartPicker,

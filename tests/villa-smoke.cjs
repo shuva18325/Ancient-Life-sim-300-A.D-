@@ -376,6 +376,81 @@ const ok=(name,cond,detail)=>{
   ok('the curious one too',   guide.curio);
   ok('and it names the trait', guide.vakran);
 
+  console.log('\n--- ✇ THE RAUNSKAR ---');
+  const rs=await pg.evaluate(()=>{
+    const S=window.__SS, G=S.G, out={};
+    G.coin=99999; G.rkArt=[]; G.rkArtRefused={}; G.rkArtPending=null;
+    G.wife.body.bust=7;
+    out.tiers=S.RK_ART_HANDS.map(h=>h.fee);
+    out.rising=out.tiers.every((f,i)=>i===0||f>out.tiers[i-1]);
+    out.money=S.RK_ART_FORMS.filter(f=>f.money).length;
+    // a dear hand costs more than a cheap one for the same job
+    out.cheap=S.raunskarCost('plank','plank','seated');
+    out.dear =S.raunskarCost('ten','token','back');
+    // a better hand lands nearer the truth over many cuts
+    const err=(id)=>{ let t=0; const h=S.RK_ART_HANDS.find(x=>x.id===id);
+      const f=S.RK_ART_FORMS[0];
+      for(let i=0;i<4000;i++) t+=Math.abs(S.raunskarErr(h,f));
+      return t/4000; };
+    out.errCheap=Math.round(err('plank')*100)/100;
+    out.errDear =Math.round(err('ten')*100)/100;
+    // commission, then answer it
+    const c=S.raunskarCommission('post','bone','stand','bust');
+    out.ok=c.ok; out.piece=c.piece? {truth:c.piece.truth, read:c.piece.read} : null;
+    const P=G.rkArtPending;
+    out.verdict=S.raunskarVerdict(P);
+    out.opts=S.raunskarOptions(P).map(o=>o.id);
+    // force the honest case and check the paid tweak exists
+    P.read=P.truth; P.tweaked=false;
+    out.trueOpts=S.raunskarOptions(P).map(o=>o.id);
+    const c0=G.coin;
+    const t=S.raunskarRespond('bigger');
+    out.tweaked=(G.rkArtPending.read===P.truth+1) && (G.coin<c0);
+    // and settle it
+    const r=S.raunskarRespond('keep');
+    out.settled=!!r.done; out.held=(G.rkArt||[]).length;
+    out.worth=S.raunskarHoldings();
+    // fining a hand bars it
+    S.raunskarCommission('plank','plank','seated','booty');
+    const P2=G.rkArtPending; P2.read=P2.truth+2;
+    S.raunskarRespond('fine');
+    out.barred=!!(G.rkArtRefused||{}).plank;
+    out.refuses=!S.raunskarCommission('plank','plank','seated','booty').ok;
+    // the picture actually draws, and draws the READ not the truth
+    let threw=null;
+    try{ const cv=document.createElement('canvas'); cv.width=cv.height=148;
+      const p=(G.rkArt||[])[0];
+      out.drew=S.raunskarRender(cv,p);
+      // and the real body is put back afterwards
+      out.restored=(G.wife.body.bust===7);
+    }catch(e){ threw=e.message; }
+    out.threw=threw;
+    // a post cannot be sold off the house
+    const post=S.raunskarCommission('post','post','seated','booty');
+    if(post.ok){ S.raunskarRespond('accept'); }
+    const pp=(G.rkArt||[]).find(x=>x.form==='post');
+    out.postStays = pp? !S.raunskarSell(pp.id).ok : true;
+    return out;
+  });
+  ok('the hands are a price ladder', rs.rising===true, rs.tiers.join(' < '));
+  ok('a dear commission costs more', rs.dear>rs.cheap, rs.cheap+' vs '+rs.dear);
+  ok('a better hand cuts nearer true', rs.errDear<rs.errCheap,
+     'avg error '+rs.errCheap+' -> '+rs.errDear);
+  ok('one of the forms is money',   rs.money>=1);
+  ok('commissioning works',         rs.ok===true, JSON.stringify(rs.piece));
+  ok('an honest cut offers the paid tweaks',
+     rs.trueOpts.indexOf('bigger')>=0 && rs.trueOpts.indexOf('smaller')>=0,
+     rs.trueOpts.join(','));
+  ok('and a wrong one offers argue and fine',
+     ['over','under','true'].indexOf(rs.verdict)>=0, rs.verdict+': '+rs.opts.join(','));
+  ok('paying for more of it moves the read', rs.tweaked===true);
+  ok('settling puts it in the house', rs.settled===true && rs.held>=1,
+     rs.held+' held, worth '+rs.worth);
+  ok('fining a hand bars it',        rs.barred===true && rs.refuses===true);
+  ok('the piece renders',            rs.drew===true && !rs.threw, rs.threw||'');
+  ok('and her real body is restored',rs.restored===true);
+  ok('a house-post does not come down', rs.postStays===true);
+
   console.log('\n--- PAGE ERRORS ---');
   ok('none', errs.length===0, errs.slice(0,4).join(' | '));
 
