@@ -31307,8 +31307,9 @@ function drawBridePortrait(cnv,b,bare,preg){
   /* ---- THE YEARS. A woman of forty is not drawn as a woman of eighteen: the
      hair greys, the jaw softens, and the lines come in around the eyes. ---- */
   const BAGE = (b.age===undefined? 22 : b.age), BM = ageMarks(BAGE);
+  const SKINMODE = !!b._skinBody;                                  // nothing on her below the neck
   const skin=agedSkin(b.skin,BAGE), sSh=shade(skin,-36), sHi=shade(skin,28), sGlow=shade(skin,12);
-  const dress=b.dress, dSh=shade(dress,-38), dHi=shade(dress,30), dMid=shade(dress,-16);
+  const dress=SKINMODE? skin : b.dress, dSh=shade(dress,-38), dHi=shade(dress,30), dMid=shade(dress,-16);
   const hair=greyHair(b.hair,BAGE), hSh=shade(hair,-30), hHi=shade(hair,32), gold='#e8c34a', goldHi='#fff0b0';
   // ---- figure metrics: bust depth & protrusion, hips & rear, waist pinch ----
   // ---- THE FIGURE IS HER SCORES. A FLAT 1 draws flat; an IMPOSSIBLE 11 draws absurd. ----
@@ -31330,11 +31331,13 @@ function drawBridePortrait(cnv,b,bare,preg){
   // 3-4 is RAISED — a slight swell, NOT a canyon; 5 and up earns the full
   // treatment. The old art jumped straight from flat to deep cleavage.
   const warrior=b.rank==='warrior';
-  const noble=b.rank==='noble'||warrior;   // both wear an elevated gown (warrior's is martial in colour)
+  /* the gilt trim and the elevated gown are GARMENT, so they are off when
+     there is no garment — a gold seam running down a bare rib was the loudest
+     thing wrong with the first cut of this */
+  const noble=!SKINMODE && (b.rank==='noble'||warrior);
   // ================= BACK ARM (her left, hanging behind) =================
   P(-8,-50,3,9,sSh); P(-8,-41,3,7,sSh); P(-8,-34,3,3,shade(skin,-44));
   // ================= LEGS / SKIRT =================
-  const SKINMODE = !!b._skinBody;
   if(SKINMODE){
     /* ---- NO GARMENT BELOW THE WAIST. Two legs, taking their width from
        the same thigh metric the clothed branches use, so she is the same
@@ -31394,13 +31397,73 @@ function drawBridePortrait(cnv,b,bare,preg){
   // ============ HIPS & REAR — FIVE DRAWN TIERS, NOT ONE SHAPE SCALED ============
   // FLAT · RAISED · ELEVATED · FAT · COLOSSAL. Each is its own silhouette in
   // the painted plate, exactly as it is on the body map and the villa sprite.
-  P(-6,hipTop,hips-2,hipBot-hipTop,dress);
+  if(!SKINMODE) P(-6,hipTop,hips-2,hipBot-hipTop,dress);                        // the skirt panel the tiers sit on
   const bT = booV>=9?4 : booV>=7?3 : booV>=5?2 : booV>=3?1 : 0;
   const bw2 = [3, rear+2, rear+4, rear+6, rear+8][bT];                          // how far it projects
   const bh2 = [7, 8, 9, 11, 13][bT];                                            // and how deep it hangs
   const bx0 = -6-bw2;
   const cleftX = bx0+((bw2/2)|0);
-  if(bT===0){
+  if(SKINMODE){
+    /* ---- DRAWN AS A BODY. Three curves and the light: the back of her,
+       which leaves the waist late and crowns high; the front of her, which
+       swells to the hip and drops into the thigh; and the fold underneath,
+       which is the only place the whole thing reads as weight. ---- */
+    const hang  = [1,2,3,5,7][bT];
+    const yTop  = hipTop - (bT>=3?2:bT>=2?1:0);
+    const yBot  = hipBot + hang;
+    const span  = Math.max(1, yBot-yTop);
+    const wx0   = -(waistW/2)|0, wBack=wx0, wFront=wx0+waistW;   // exactly where the waist column ends
+    const fHip  = Math.max(wFront+1, hips-8);
+    const tw2   = Math.max(4, thigh);
+    const fThigh= tw2+1;
+    const backAt=(t)=>{
+      /* it does not start at the waist and it does not end at the thigh —
+         it leaves late, peaks around two fifths down, and curls back under */
+      const q=clamp((t-0.05)/0.95,0,1);
+      return wBack - Math.pow(Math.sin(Math.PI*Math.pow(q,0.78)),0.72)*bw2;
+    };
+    const frontAt=(t)=> (t<0.55)
+      ? (wFront + (fHip-wFront)*Math.sin(t/0.55*Math.PI*0.5))
+      : (fHip + (fThigh-fHip)*((t-0.55)/0.45));
+    let crownX=0, crownY=yTop;
+    for(let y=yTop; y<=yBot; y++){
+      const t=(y-yTop)/span;
+      const bxr=Math.round(backAt(t));
+      const stop=(y>hipBot)? -1 : Math.round(frontAt(t));   // below the hip the thigh owns the front
+      const wRow=stop-bxr; if(wRow<1) continue;
+      P(bxr, y, wRow, 1, skin);
+      if(wRow>3) P(bxr, y, Math.max(1,Math.round(wRow*0.32)), 1, sSh);   // turning away from the light
+      if(wRow>5) P(stop-2, y, 2, 1, sGlow);                              // and catching it at the front
+      P(bxr, y, 1, 1, shade(skin,-52));                                  // the contour itself
+      if(bxr<crownX){ crownX=bxr; crownY=y; }
+    }
+    /* the rim along the upper outer quarter — the one edge of a rear that
+       is ever actually bright, and the thing that says round */
+    if(bT>=1){
+      const r0=yTop+Math.max(1,Math.round(span*0.12)), r1=yTop+Math.round(span*0.46);
+      for(let y=r0; y<=r1; y++){
+        const t=(y-yTop)/span, bxr=Math.round(backAt(t));
+        P(bxr+1, y, Math.max(1,Math.round(bw2*0.20)), 1, sHi);
+      }
+      c.fillStyle='rgba(255,255,255,.09)';
+      c.fillRect(crownX+1, crownY-Math.round(span*0.34), Math.max(2,Math.round(bw2*0.42)), Math.max(2,Math.round(span*0.34)));
+    }
+    /* the crease at the small of her back, where the mass parts from her */
+    if(bT>=2){ P(wBack-1, yTop+1, 1, 2, shade(skin,-44)); P(wBack-2, yTop+2, 1, 1, shade(skin,-34)); }
+    /* THE FOLD. Two rows of it at the bottom of the curve for a heavy one,
+       one for a light one, and it is what separates rear from thigh. */
+    { const fy=yBot, fw=Math.max(2, (-2)-crownX);
+      P(crownX+1, fy,   fw, 1, shade(skin,-46));
+      if(bT>=2) P(crownX+2, fy-1, Math.max(1,fw-2), 1, shade(skin,-30));
+      if(bT>=3) P(crownX+2, fy+1, Math.max(1,fw-2), 1, shade(skin,-56));
+      /* and the shadow it throws down the back of the thigh */
+      if(bT>=2) P(-1-tw2, fy+1, tw2, 1, shade(skin,-42));
+      if(bT>=4) P(-1-tw2, fy+2, tw2, 1, shade(skin,-34));
+    }
+    /* the hip point, lit, on the near side */
+    P(Math.max(1,fHip-3), hipTop+2, 2, 2, sHi);
+  }
+  else if(bT===0){
     // FLAT — the cloth simply falls from the girdle to the thigh. Nothing to see.
     P(bx0+2,hipTop+1,bw2,bh2,dress); P(bx0+2,hipTop+1,1,bh2,dSh);
     P(bx0+3,hipTop+bh2,bw2-1,1,shade(dress,-30));
@@ -31445,10 +31508,12 @@ function drawBridePortrait(cnv,b,bare,preg){
     P(bx0+2,hipTop+bh2+3,bw2-3,1,shade(dress,-60));
     c.fillStyle='rgba(255,255,255,.10)'; c.fillRect(bx0,hipTop+1,2,bh2);        // light rolls right round it
   }
-  P(-5,hipTop+1,2,2,dHi);                                                      // hip sheen
-  P(hips-8,hipTop,2,hipBot-hipTop,dSh);                                        // front hip shadow
-  // girdle low on the hips
-  P(bx0+1,hipTop,hips+bw2-2,2,noble?gold:shade(dress,-52)); if(noble)P(0,hipTop,2,2,goldHi);
+  if(!SKINMODE){
+    P(-5,hipTop+1,2,2,dHi);                                                    // hip sheen
+    P(hips-8,hipTop,2,hipBot-hipTop,dSh);                                      // front hip shadow
+    // girdle low on the hips
+    P(bx0+1,hipTop,hips+bw2-2,2,noble?gold:shade(dress,-52)); if(noble)P(0,hipTop,2,2,goldHi);
+  }
   // ================= WAIST — or the belly, if she is carrying =================
   const wx=-(waistW/2)|0;
   if(preg>0){
@@ -31468,6 +31533,25 @@ function drawBridePortrait(cnv,b,bare,preg){
     P(Math.round(maxw*0.40),by1+Math.round(bh4*0.32),1,Math.round(bh4*0.42),dSh);   // shaded far flank
     P(wx-1,bustBot,waistW+2+Math.round(maxw*0.7),2,noble?gold:shade(dress,-52));
     if(noble)P(0,bustBot,2,2,goldHi);
+  } else if(SKINMODE){
+    /* ---- RIBS, WAIST, NAVEL. Widest under the bust where the ribcage is,
+       pinched two thirds down, and back out to exactly the width the hip
+       curve below starts at, so the two meet without a step. ---- */
+    const wSpan=Math.max(1, hipTop-bustBot-1), cx0=wx+waistW/2;
+    for(let y=bustBot+1; y<hipTop; y++){
+      const t=(y-(bustBot+1))/wSpan;
+      const w0=Math.max(2, waistW + Math.round(3*Math.pow(1-t,1.7)));
+      const x0=Math.round(cx0-w0/2);
+      P(x0, y, w0, 1, skin);
+      P(x0, y, 1, 1, sSh);                                       // the back of her, turned away
+      P(x0+w0-1, y, 1, 1, sGlow);                                // and the front, lit
+      if(t<0.34) P(x0+1, y, Math.max(1,w0-2), 1, shade(skin, -8-Math.round(t*24)));  // under-bust shade
+    }
+    /* the floating ribs, faintly, on a lean one only */
+    if(waiV>=6){ for(let rr=0;rr<2;rr++) P(wx+1, bustBot+2+rr*2, Math.max(1,waistW-2), 1, shade(skin,-14)); }
+    P(0, hipTop-Math.max(2,Math.round(wSpan*0.34)), 1, 2, shade(skin,-34));   // navel
+    P(0, hipTop-Math.max(2,Math.round(wSpan*0.34))-1, 1, 1, sHi);
+    P(wx-1,bustBot,waistW+2,1,shade(skin,-24));                  // the crease under the bust, not a sash
   } else {
     P(wx,bustBot+1,waistW,hipTop-bustBot-1,dress);
     P(wx,bustBot+1,1,hipTop-bustBot-1,dSh); P(wx+waistW-1,bustBot+1,1,hipTop-bustBot-1,dSh);
@@ -31481,13 +31565,62 @@ function drawBridePortrait(cnv,b,bare,preg){
      V to plunge, and a huge one overflows the neckline and strains the cloth. */
   const busT = busV>=9?4 : busV>=7?3 : busV>=5?2 : busV>=3?1 : 0;
   P(-4,-52,10,3,skin); P(-4,-52,10,1,sHi);                                     // collar & upper chest, always
-  if(busT===0){
+  if(SKINMODE){
+    /* ---- NOTHING OVER IT, SO IT IS NOT CUPS. Two masses, each drawn as a
+       mass: the far one turned away and partly behind, the near one fuller
+       and projecting, both with a lit upper slope, a real underside and the
+       bounce of light that comes back up off the ribs beneath them. ---- */
+    const bdp=Math.max(3, bd);
+    P(-4, bustTop-1, 11, bdp+1, skin);                            // the ribcage they sit on
+    P(-4, bustTop-1, 1, bdp+1, sSh); P(6, bustTop-1, 1, bdp+1, sGlow);
+    const mound=(cx, cy, rx, ry, far)=>{
+      for(let dy=-ry; dy<=ry; dy++){
+        const q=1-(dy*dy)/(ry*ry); if(q<=0) continue;
+        const w0=Math.max(1, Math.round(rx*Math.pow(q,0.42)));     // fuller than an ellipse — it hangs
+        const y=Math.round(cy+dy), x0=Math.round(cx-w0);
+        P(x0, y, w0*2, 1, far? sSh : skin);
+        if(dy < -ry*0.20)                                          // the lit upper slope
+          P(x0+Math.round(w0*0.6), y, Math.max(1,Math.round(w0*0.8)), 1, far? skin : sHi);
+        if(dy >  ry*0.34)                                          // and the weight underneath
+          P(x0+1, y, Math.max(1,w0*2-2), 1, shade(skin, far? -50 : -32));
+        if(dy >  ry*0.78)                                          // bounce off the ribs
+          P(x0+Math.round(w0*0.55), y, Math.max(1,Math.round(w0*0.85)), 1, shade(skin,-14));
+      }
+    };
+    if(busT===0){
+      /* FLAT. There is no mass to draw — a chest, a shadow under each pec,
+         and that is the whole truth of it. */
+      P(-3,bustTop+2,4,1,shade(skin,-20)); P(2,bustTop+2,4,1,shade(skin,-24));
+      P(-3,bustTop,4,1,sHi);
+    } else {
+      const rxN=2+Math.round(busV*0.34), ryN=Math.max(2, Math.round(bdp*0.46));
+      const cxN=2+Math.round(bp*0.38), cxF=cxN-(rxN+1), cyN=bustTop+ryN;
+      mound(cxF, cyN-1, Math.round(rxN*0.94), Math.round(ryN*0.94), true);   // her left, behind
+      mound(cxN, cyN,   rxN,                  ryN,                  false);  // her right, toward us
+      /* the shadow the near one throws into the valley between them */
+      P(cxF+Math.round(rxN*0.80), cyN-Math.round(ryN*0.5), 1, Math.max(2,ryN), shade(skin,-44));
+    }
+    /* AND WHAT MAKES IT HERS. rgba over whatever skin she has, so it works
+       on every complexion the coast keeps. */
+    const nY  = bustTop + Math.max(1, Math.round(bdp*[0.34,0.44,0.48,0.50,0.50][busT]));
+    const nRx = 2+Math.round(busV*0.34);
+    const nR  = busT===0? 3 : (2+Math.round(bp*0.38))+Math.round(nRx*0.42);
+    const nL  = busT===0? -3 : (2+Math.round(bp*0.38))-(nRx+1)+Math.round(nRx*0.30);
+    const rad = busT>=3? 3 : 2;
+    c.fillStyle='rgba(170,88,80,.50)';
+    c.fillRect(nL,nY,rad-(busT>=3?1:0),rad); c.fillRect(nR,nY,rad,rad);
+    c.fillStyle='rgba(138,58,56,.60)';
+    c.fillRect(nR+(rad>2?1:0),nY+(rad>2?1:0),1,1); c.fillRect(nL,nY+(rad>2?1:0),1,1);
+    c.fillStyle='rgba(255,246,236,.18)';
+    c.fillRect(nL,nY-1,rad-(busT>=3?1:0),1); c.fillRect(nR,nY-1,rad,1);
+  }
+  else if(busT===0){
     // FLAT — one unbroken panel of cloth. There is nothing under it to draw.
     P(-4,bustTop-1,11,2,skin);
     P(-4,bustTop,11,bd,dress); P(-4,bustTop,11,1,dHi);
     P(-4,bustBot,11,1,dSh);                                                    // where the cloth simply ends
     if(noble){ P(-4,bustTop-2,1,bd+2,gold); P(6,bustTop-2,1,bd+2,gold); }      // the trim still runs, on nothing
-    else { P(1,bustTop+2,1,bd-3,shade(dress,-30)); }                           // a slack lace, hanging loose
+    else if(!SKINMODE){ P(1,bustTop+2,1,bd-3,shade(dress,-30)); }             // a slack lace, hanging loose
   } else if(busT===1){
     // RAISED — a modest swell under the cloth. A shallow shadow between, and
     // that is all: no plunging V, no parted cups, nothing to spill.
@@ -31512,7 +31645,7 @@ function drawBridePortrait(cnv,b,bare,preg){
     c.fillStyle='rgba(220,110,110,.14)'; c.fillRect(-1,bustTop,1,2); c.fillRect(3,bustTop,1,2);
     if(noble){ P(-4,bustTop-2,1,bd+2,gold); P(7,bustTop,1,bd,gold);
       c.fillStyle='rgba(255,255,255,.28)'; c.fillRect(-3,bustTop+1,2,1); c.fillRect(4,bustTop+1,2,1); }
-    else { for(let ly=bustTop+3;ly<bustBot;ly+=3) P(1,ly,1,1,shade(dress,-42)); }  // laced, and holding
+    else if(!SKINMODE){ for(let ly=bustTop+3;ly<bustBot;ly+=3) P(1,ly,1,1,shade(dress,-42)); }  // laced, and holding
   } else if(busT===3){
     // BIG — parted cups, a real V with depth, and a forward thrust the
     // silhouette cannot hide.
@@ -31535,7 +31668,7 @@ function drawBridePortrait(cnv,b,bare,preg){
     if(noble){ P(-4,bustTop-3,1,bd+3,gold); P(6+bp,bustTop,1,bd,gold);           // gilt neckline trim
       c.fillStyle='rgba(255,255,255,.35)'; c.fillRect(-3,bustTop+1,2,1); c.fillRect(4,bustTop+2,2,1);
       c.fillStyle='rgba(255,255,255,.18)'; c.fillRect(-2,bustTop+3,1,1); c.fillRect(5,bustTop+4,1,1); }
-    else { for(let ly=bustTop+2;ly<bustBot;ly+=2) P(1,ly,2,1,shade(dress,-46)); } // straining laces
+    else if(!SKINMODE){ for(let ly=bustTop+2;ly<bustBot;ly+=2) P(1,ly,2,1,shade(dress,-46)); } // straining laces
   } else {
     // HUGE — it does not fit the cloth. The swell rises clear of the neckline,
     // spills past the ribs on both sides, and the seam is visibly losing.
@@ -31562,9 +31695,10 @@ function drawBridePortrait(cnv,b,bare,preg){
     if(noble){ P(-6,bustTop-1,1,bd+1,gold); P(8+bp,bustTop-1,1,bd+1,gold);
       c.fillStyle='rgba(255,255,255,.38)'; c.fillRect(-4,bustTop,3,1); c.fillRect(5,bustTop+2,3,1);
       c.fillStyle='rgba(255,255,255,.20)'; c.fillRect(-3,bustTop+3,2,1); c.fillRect(6,bustTop+5,2,1); }
-    else { for(let ly=bustTop+1;ly<bustBot;ly+=2){ P(0,ly,3,1,shade(dress,-50)); }  // the lacing, losing
+    else if(!SKINMODE){ for(let ly=bustTop+1;ly<bustBot;ly+=2){ P(0,ly,3,1,shade(dress,-50)); }  // the lacing, losing
       P(-1,bustTop+2,1,1,skin); P(3,bustTop+5,1,1,skin); }                          // and gaping between
   }
+
   /* ============ AND THEN HER PEOPLE PUT THEIR CLOTH BACK OVER IT ============
      Everything above draws the FIGURE. This draws what her culture and her
      class actually let a stranger see of it, and in Rome that runs the
