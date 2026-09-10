@@ -33232,49 +33232,124 @@ function selvskarMarks(c, W2, H2, n, alpha){
   for(let i=0;i<n*4;i++){
     const sx=W2*(0.28+hash(i*2+1)*0.44);
     const sy=H2*(0.18+hash(i*2+2)*0.44);
-    const r =6+hash(i+91)*6;
-    const run=22+hash(i+57)*48;
+    const r =5.5+hash(i+91)*5;
+    const run=14+hash(i+57)*46;
+    selvskarTrail(c, sx, sy, run, r);
     selvskarBlob(c, sx, sy, r, run);
   }
   c.restore();
 }
-/* ONE FAT CARTOON BLOB WITH A DRIP UNDER IT. Rounded tip, a highlight on
-   the shoulder, and a soft edge — it has to read as comedy at a glance,
-   which is the whole brief. */
-function selvskarBlob(c, x, y, r, run){
+/* =====================================================================
+   A REAL ONE, NOT A CARTOON ONE
+   ---------------------------------------------------------------------
+   The first cut of this was deliberately comic: one flat opaque blob with
+   a tapered tail and a white dot on it. Fluid does not look like that.
+   Four things separate the two and all four are cheap:
+
+     · IT IS NOT OPAQUE. It is translucent and it TINTS what is under it
+       rather than replacing it, so the hide and the drawing show through
+       and it reads as something lying on the surface. That is done with a
+       multiply-ish tint plus a screen-ish sheen rather than a fill.
+     · IT HAS A MENISCUS. The bright line is not a dot on top, it is a
+       rim where the surface curves away — brightest along the upper-left
+       arc, with a dark contact line where it meets the hide.
+     · IT REFRACTS. What is under the bead is very slightly displaced and
+       lightened, which is the single strongest cue that a lens is sitting
+       on a surface.
+     · IT DOES NOT TAPER EVENLY. A real run is a thin thread with the mass
+       collected in a heavier bead at the bottom, because gravity drags the
+       volume down the thread — the tail is wider than the middle.
+   ===================================================================== */
+/* ONE DROP LYING ON A SURFACE. Everything that makes fluid read as fluid
+   at this size is in here and none of it is the silhouette:
+     · it is TRANSLUCENT and tints what is under it instead of covering it
+     · it REFRACTS — the ground under it is lifted, which is the single
+       strongest cue that a lens is sitting on a surface
+     · it has a MENISCUS: bright where the surface turns away from the
+       light, and a thin dark contact line where it meets the hide
+     · and exactly one hard specular, where the light actually is */
+function selvskarDome(c, x, y, rx, ry){
+  const shape=()=>{ c.beginPath(); c.ellipse(x, y-ry*0.20, rx, ry, 0, 0, 7); c.closePath(); };
   c.save();
-  c.fillStyle='rgba(252,250,246,.94)';
-  c.beginPath();
-  c.moveTo(x-r, y);
-  c.bezierCurveTo(x-r, y-r*1.25, x+r, y-r*1.25, x+r, y);
-  /* the run: two long curves down to a rounded tip */
-  const tw=Math.max(1.6, r*0.42);
-  c.bezierCurveTo(x+r*0.9, y+run*0.55, x+tw*1.25, y+run*0.72, x+tw, y+run);
-  c.bezierCurveTo(x+tw*0.5, y+run+tw*1.4, x-tw*0.5, y+run+tw*1.4, x-tw, y+run);
-  c.bezierCurveTo(x-tw*1.25, y+run*0.72, x-r*0.9, y+run*0.55, x-r, y);
-  c.closePath();
-  c.fill();
-  c.fillStyle='rgba(226,236,244,.55)';          // the shaded underside of the bead
-  c.beginPath(); c.ellipse(x+r*0.18, y+r*0.30, r*0.52, r*0.30, 0,0,7); c.fill();
-  c.fillStyle='rgba(255,255,255,.98)';          // and the highlight on its shoulder
-  c.beginPath(); c.ellipse(x-r*0.30, y-r*0.42, r*0.34, r*0.24, -0.4,0,7); c.fill();
+  /* what is underneath, lifted */
+  shape(); c.save(); c.clip();
+  c.globalCompositeOperation='lighter';
+  c.fillStyle='rgba(152,148,140,.19)';
+  c.fillRect(x-rx*1.6, y-ry*2.4, rx*3.2, ry*4);
+  c.restore();
+  /* the body */
+  shape();
+  { const g=c.createRadialGradient(x-rx*0.34, y-ry*0.72, rx*0.10, x, y-ry*0.18, rx*1.22);
+    g.addColorStop(0.00,'rgba(255,255,255,.80)');
+    g.addColorStop(0.44,'rgba(240,243,242,.48)');
+    g.addColorStop(0.84,'rgba(224,231,232,.40)');
+    g.addColorStop(1.00,'rgba(248,251,250,.62)');
+    c.fillStyle=g; c.fill(); }
+  /* the meniscus, and the contact line under it */
+  c.save(); shape(); c.clip();
+  c.strokeStyle='rgba(255,255,255,.74)'; c.lineWidth=Math.max(0.5, rx*0.15);
+  c.beginPath(); c.ellipse(x, y-ry*0.20, rx*0.84, ry*0.84, 0, Math.PI*1.06, Math.PI*1.90); c.stroke();
+  c.fillStyle='rgba(96,84,64,.24)';
+  c.beginPath(); c.ellipse(x+rx*0.10, y+ry*0.56, rx*0.84, ry*0.22, 0,0,7); c.fill();
+  c.restore();
+  /* the specular, and the bounce off the hide */
+  c.fillStyle='rgba(255,255,255,.92)';
+  c.beginPath(); c.ellipse(x-rx*0.32, y-ry*0.72, rx*0.22, ry*0.24, -0.42, 0,7); c.fill();
+  c.fillStyle='rgba(255,255,255,.20)';
+  c.beginPath(); c.ellipse(x+rx*0.18, y+ry*0.10, rx*0.34, ry*0.18, 0.24, 0,7); c.fill();
+  shape(); c.strokeStyle='rgba(212,222,224,.50)';
+  c.lineWidth=Math.max(0.3, rx*0.07); c.stroke();
   c.restore();
 }
-/* =====================================================================
-   ✽ SPLAISH
-   ---------------------------------------------------------------------
-   The instruction that came with it, animated, and deliberately funny:
-   fat cartoon drops arc in from off-plate, land with a crown and a ring
-   of flecks, and then hang there and DRIP. The word lands with them.
-   ===================================================================== */
+/* AND A RUN IS NOT A TAPER. Drawing one as a wide top narrowing to a point
+   with a bulb under it produces a wine glass, which is what the first two
+   cuts of this looked like. A real one is a bead where it landed, a bead at
+   the leading edge, and a THREAD of near-constant width between them —
+   surface tension holds the thread thin and gravity collects the volume at
+   the bottom of it. */
+function selvskarBlob(c, x, y, r, run){
+  const by=y+run;
+  const bw=Math.max(1.2, r*0.60);         // the leading bead: smaller than the head
+  if(run>2.5){
+    const tw=Math.max(0.55, r*0.135);     // the thread, and it barely narrows
+    c.save();
+    c.beginPath();
+    c.moveTo(x-tw, y); c.lineTo(x+tw, y);
+    c.lineTo(x+tw*0.88, by); c.lineTo(x-tw*0.88, by);
+    c.closePath();
+    { const g=c.createLinearGradient(x-tw, 0, x+tw, 0);
+      g.addColorStop(0.00,'rgba(226,234,234,.26)');
+      g.addColorStop(0.36,'rgba(253,253,251,.62)');
+      g.addColorStop(1.00,'rgba(218,228,230,.28)');
+      c.fillStyle=g; c.fill(); }
+    c.restore();
+  }
+  selvskarDome(c, x, y, r, r*0.60);                    // where it landed
+  if(run>2.5) selvskarDome(c, x, by, bw, bw*0.80);     // and where it has got to
+}
+/* the wet track a run leaves behind it — the thread does not arrive dry */
+function selvskarTrail(c, x, y, run, r){
+  if(run<3) return;
+  c.save();
+  const w=Math.max(0.8, r*0.30);
+  const g=c.createLinearGradient(x, y, x, y+run);
+  g.addColorStop(0,'rgba(236,240,240,.34)');
+  g.addColorStop(1,'rgba(236,240,240,.10)');
+  c.fillStyle=g;
+  c.beginPath();
+  c.moveTo(x-w, y); c.lineTo(x+w, y);
+  c.lineTo(x+w*0.55, y+run); c.lineTo(x-w*0.55, y+run);
+  c.closePath(); c.fill();
+  c.restore();
+}
 function selvskarSplashStart(){
   const drops=[];
   const n=8;
   for(let i=0;i<n;i++){
     drops.push({
       x:0.28+Math.random()*0.46, y:-0.12-Math.random()*0.50,
-      vy:0.80+Math.random()*0.50, r:8+Math.random()*6,
-      land:0.20+Math.random()*0.44, hit:0, run:0, runMax:34+Math.random()*58,
+      vy:0.80+Math.random()*0.50, r:6.5+Math.random()*5,
+      land:0.20+Math.random()*0.44, hit:0, run:0, runMax:20+Math.random()*54,
       d:i*0.07,
     });
   }
@@ -33291,57 +33366,95 @@ function selvskarSplash(c, W2, H2, now){
       const y=d.y+d.vy*lt*1.9;
       if(y>=d.land){ d.hit=lt; }
       else {
-        /* in the air: a stretched bead with a tail, because a falling drop
-           is not a circle */
+        /* IN THE AIR. Surface tension pulls a falling drop into a sphere;
+           speed flattens it a little and drags a short tail off the top.
+           The long pointed teardrop is a drawing convention, not a photo. */
         const X=W2*d.x, Y=H2*y;
-        c.fillStyle='rgba(252,250,246,.92)';
-        c.beginPath(); c.ellipse(X, Y, d.r*0.72, d.r*1.55, 0,0,7); c.fill();
-        c.beginPath(); c.moveTo(X-d.r*0.5,Y-d.r*1.2);
-        c.quadraticCurveTo(X, Y-d.r*4.4, X+d.r*0.5, Y-d.r*1.2); c.closePath(); c.fill();
+        const sp=Math.min(1, d.vy*lt*1.4);
+        const rx=d.r*(0.80+sp*0.06), ry=d.r*(0.86+sp*0.34);
+        c.save();
+        /* the tail: short, soft, and gone by the time it lands */
+        if(sp>0.25){
+          const g=c.createLinearGradient(X, Y-ry*3.2, X, Y);
+          g.addColorStop(0,'rgba(240,244,244,0)'); g.addColorStop(1,'rgba(240,244,244,.42)');
+          c.fillStyle=g;
+          c.beginPath(); c.moveTo(X-rx*0.42, Y);
+          c.quadraticCurveTo(X, Y-ry*(1.6+sp*1.6), X+rx*0.42, Y);
+          c.closePath(); c.fill();
+        }
+        /* the body — translucent, with the ground showing through it */
+        c.beginPath(); c.ellipse(X, Y, rx, ry, 0,0,7);
+        { const g=c.createRadialGradient(X-rx*0.34, Y-ry*0.40, rx*0.12, X, Y, rx*1.25);
+          g.addColorStop(0.00,'rgba(255,255,255,.90)');
+          g.addColorStop(0.42,'rgba(238,242,242,.52)');
+          g.addColorStop(0.86,'rgba(224,230,232,.40)');
+          g.addColorStop(1.00,'rgba(246,250,250,.66)');
+          c.fillStyle=g; c.fill(); }
+        /* the rim where it turns away, and one hard specular */
+        c.strokeStyle='rgba(255,255,255,.62)'; c.lineWidth=Math.max(0.5,d.r*0.14);
+        c.beginPath(); c.arc(X, Y, rx*0.88, Math.PI*1.08, Math.PI*1.84); c.stroke();
         c.fillStyle='rgba(255,255,255,.95)';
-        c.beginPath(); c.ellipse(X-d.r*0.22, Y-d.r*0.5, d.r*0.24, d.r*0.5, 0,0,7); c.fill();
+        c.beginPath(); c.ellipse(X-rx*0.32, Y-ry*0.38, rx*0.24, ry*0.16, -0.42,0,7); c.fill();
+        c.restore();
         return;
       }
     }
     /* landed: the crown, the flecks, then the run growing to its length */
     const age=lt-d.hit;
     const X=W2*d.x, Y=H2*d.land;
-    if(age<0.30){
-      const k=age/0.30;
-      c.strokeStyle='rgba(252,250,246,'+(0.85*(1-k))+')'; c.lineWidth=2.4;
-      c.beginPath(); c.arc(X, Y, d.r*(1.1+k*2.6), Math.PI*1.05, Math.PI*1.95); c.stroke();
-      for(let f=0;f<6;f++){
-        const a=Math.PI*(1.06+f*0.155), rr=d.r*(1.2+k*3.4);
-        c.fillStyle='rgba(252,250,246,'+(0.9*(1-k))+')';
-        c.beginPath(); c.arc(X+Math.cos(a)*rr, Y+Math.sin(a)*rr*0.8, Math.max(0.8,1.9*(1-k*0.6)), 0,7); c.fill();
+    if(age<0.42){
+      const k=age/0.42;
+      /* THE CORONA. A thin sheet thrown up and outward, thinning as it
+         goes — a stroke that fades and widens, not a hard ring. */
+      c.save();
+      c.strokeStyle='rgba(248,250,250,'+(0.55*(1-k)*(1-k))+')';
+      c.lineWidth=Math.max(0.5, d.r*0.42*(1-k*0.7));
+      c.beginPath(); c.ellipse(X, Y, d.r*(0.9+k*2.4), d.r*(0.34+k*0.9),
+                               0, Math.PI*1.02, Math.PI*1.98); c.stroke();
+      /* SATELLITES. Real spatter throws a few small drops off the crown on
+         their own little arcs, and they land. */
+      for(let f=0;f<5;f++){
+        const a=Math.PI*(1.10+f*0.19), sp=d.r*(1.0+f*0.22);
+        const ex=X+Math.cos(a)*sp*(0.9+k*2.6);
+        const ey=Y+Math.sin(a)*sp*(0.7+k*1.3) + k*k*d.r*2.6;   // gravity takes them back
+        const sr=Math.max(0.7, d.r*0.20*(1-k*0.35));
+        c.beginPath(); c.arc(ex, ey, sr, 0, 7);
+        c.fillStyle='rgba(246,250,250,'+(0.72*(1-k*0.55))+')'; c.fill();
+        c.fillStyle='rgba(255,255,255,'+(0.60*(1-k*0.55))+')';
+        c.beginPath(); c.arc(ex-sr*0.3, ey-sr*0.3, sr*0.38, 0, 7); c.fill();
       }
+      c.restore();
     }
     /* it runs fast at first and then keeps going, the way a heavy drop does */
     d.run=d.runMax*(1-Math.pow(1-Math.min(1, age/1.7), 2.2));
-    selvskarBlob(c, X, Y, d.r*1.2, d.run);
+    selvskarTrail(c, X, Y, d.run, d.r*1.15);
+    selvskarBlob(c, X, Y, d.r*1.15, d.run);
   });
   /* THE WORD. It arrives with the first landing, overshoots, and settles. */
   const first=A.drops[0];
   if(first && first.hit){
     const wt=t-(first.d+first.hit);
-    if(wt>=0 && wt<1.9){
-      const k=Math.min(1, wt/0.22);
-      const pop=1+ (wt<0.34? Math.sin(wt/0.34*Math.PI)*0.36 : 0);
-      const fade=wt>1.35? 1-(wt-1.35)/0.55 : 1;
+    if(wt>=0 && wt<1.6){
+      /* THE WORD STAYS, BUT QUIETER. It was a comic-book blast, which
+         fought the fluid the moment the fluid started looking real — so it
+         is smaller, it barely overshoots, and it clears off sooner. */
+      const k=Math.min(1, wt/0.20);
+      const pop=1+ (wt<0.30? Math.sin(wt/0.30*Math.PI)*0.13 : 0);
+      const fade=wt>1.05? Math.max(0,1-(wt-1.05)/0.50) : 1;
       c.save();
-      c.translate(W2*0.5, H2*0.30);
-      c.rotate(-0.10+Math.sin(wt*9)*0.016);
+      c.translate(W2*0.5, H2*0.245);
+      c.rotate(-0.055);
       c.scale(pop*k, pop*k);
-      c.font='bold 40px Georgia,serif'; c.textAlign='center';
-      c.lineWidth=7; c.strokeStyle='rgba(30,20,12,'+(0.86*fade)+')';
+      c.font='bold 27px Georgia,serif'; c.textAlign='center';
+      c.lineWidth=5; c.strokeStyle='rgba(26,18,10,'+(0.62*fade)+')';
       c.strokeText('SPLAISH', 0, 0);
-      c.lineWidth=3; c.strokeStyle='rgba(214,236,248,'+(0.9*fade)+')';
-      c.strokeText('SPLAISH', 0, 0);
-      c.fillStyle='rgba(255,255,255,'+(0.97*fade)+')';
+      c.fillStyle='rgba(252,252,250,'+(0.90*fade)+')';
       c.fillText('SPLAISH', 0, 0);
-      c.font='bold 12px Georgia,serif';
-      c.fillStyle='rgba(255,240,200,'+(0.8*fade)+')';
-      c.fillText('· as instructed ·', 0, 20);
+      c.font='italic 9.5px Georgia,serif';
+      c.lineWidth=3; c.strokeStyle='rgba(26,18,10,'+(0.55*fade)+')';
+      c.strokeText('· as instructed ·', 0, 14);
+      c.fillStyle='rgba(255,242,208,'+(0.72*fade)+')';
+      c.fillText('· as instructed ·', 0, 14);
       c.restore();
     }
   }
@@ -33547,7 +33660,7 @@ function rkCrossNextSeason(){
    is the thing you are supposed to read before you decide.
    ===================================================================== */
 const RK_HOLDS = [
-  {id:'naukan', name:'THE NAUKAN STAIRS', x:0.392, y:0.322, need:0, power:5, waves:2,
+  {id:'naukan', name:'THE NAUKAN STAIRS', x:0.392, y:0.322, ll:[-169.75,66.02], need:0, power:5, waves:2,
    reach:'boat', coin:180, war:6, pull:1,
    place:'A cliff village cut in steps at the very nose of the far shore — the closest '
         +'thing on it to a door, and the only landing a launching can make in one tide.',
@@ -33557,7 +33670,7 @@ const RK_HOLDS = [
         {lab:'THE GROUND', n:'A staircase, and you are at the foot', p:0.7, w:'the whole reason it is a hold'}],
    read:'Not many and not well armed, but they are standing on a staircase and you are at the bottom of it.',
    prize:'THE DOOR. Nothing else on the far shore can be reached until this is yours.'},
-  {id:'uelen',  name:'THE UELEN SPIT',    x:0.345, y:0.262, need:1, power:6, waves:2,
+  {id:'uelen',  name:'THE UELEN SPIT',    x:0.345, y:0.262, ll:[-170.60,66.25], need:1, power:6, waves:2,
    reach:'boat', coin:240, war:8, pull:2,
    place:'A shingle spit on the north side with a lagoon behind it. Every launching that '
         +'goes further west shelters here or does not go further west.',
@@ -33566,7 +33679,7 @@ const RK_HOLDS = [
         {lab:'TOGETHER',   n:'A drum — it moves them as one',       p:1.0, w:'not a joke, a formation'},
         {lab:'THE GROUND', n:'Shingle, and they know which of it holds', p:1.1, w:'you will not'}],
    read:'Better men than the stairs and they know the ground. Even fight if your kit is honest.'},
-  {id:'imaqliq',name:'THE IMAQLIQ ROCK',  x:0.468, y:0.300, need:1, power:7, waves:3,
+  {id:'imaqliq',name:'THE IMAQLIQ ROCK',  x:0.468, y:0.300, ll:[-169.00,65.78], need:1, power:7, waves:3,
    reach:'ice',  coin:300, war:12, pull:1,
    place:'The high island in the middle of the strait. Two miles of cliff and a village on '
         +'top of it, and from that top you can see both shores at once — which is why it is '
@@ -33577,7 +33690,7 @@ const RK_HOLDS = [
         {lab:'THE GROUND', n:'Two miles of cliff',                  p:1.3, w:'and one way up it'}],
    read:'The hardest small thing in the strait. Whoever holds this rock holds the crossing itself.',
    prize:'THE PIVOT. Every hold taken after this one pays a third again.'},
-  {id:'enurmin',name:'THE ENURMIN BAR',   x:0.288, y:0.170, need:2, power:6, waves:3,
+  {id:'enurmin',name:'THE ENURMIN BAR',   x:0.288, y:0.170, ll:[-173.50,67.05], need:2, power:6, waves:3,
    reach:'ice',  coin:280, war:10, pull:2,
    place:'A sand bar a long day north-west along the coast, walkable when the strait is '
         +'shut and unreachable when it is not. There is a herd behind it.',
@@ -33586,7 +33699,7 @@ const RK_HOLDS = [
         {lab:'WITH THEM',  n:'Dogs, and they are used properly',    p:1.0, w:'they break the line before you reach it'},
         {lab:'THE GROUND', n:'A bar with a herd behind it',          p:1.1, w:'and they are defending the herd'}],
    read:'They fight like men who expect to be walked at, because every winter somebody does.'},
-  {id:'lorino', name:'THE LORINO SHELF',  x:0.300, y:0.382, need:2, power:7, waves:3,
+  {id:'lorino', name:'THE LORINO SHELF',  x:0.300, y:0.382, ll:[-171.70,65.50], need:2, power:7, waves:3,
    reach:'boat', coin:340, war:12, pull:3,
    place:'The whaling shelf on the south side. Deep water close in, and the racks along it '
         +'are the reason anybody on either shore eats in March.',
@@ -33596,7 +33709,7 @@ const RK_HOLDS = [
         {lab:'THE GROUND', n:'Deep water close in',                 p:1.2, w:'no shallows to land dry in'}],
    read:'The richest thing short of the river and defended by men whose tools are already weapons.',
    prize:'THE RACKS. The far shore starts paying a standing income.'},
-  {id:'kolyuchin',name:'THE KOLYUCHIN SHOAL', x:0.222, y:0.082, need:4, power:8, waves:4,
+  {id:'kolyuchin',name:'THE KOLYUCHIN SHOAL', x:0.222, y:0.082, ll:[-176.50,67.40], need:4, power:8, waves:4,
    reach:'ice',  coin:420, war:16, pull:2,
    place:'The far northern shoal, behind the ice for most of the year and behind nothing at '
         +'all for the rest. The last thing on this coast anybody has counted.',
@@ -33605,7 +33718,7 @@ const RK_HOLDS = [
         {lab:'THE WORKS',  n:'A wall, and it is a real one',         p:1.6, w:'with a gate in it'},
         {lab:'THE GROUND', n:'Behind the ice, and used to it',      p:1.4, w:'they have done this before'}],
    read:'They have iron and you should want to know where from. This is the fight that tells you the far shore has friends.'},
-  {id:'anadyr', name:'THE ANADYR MOUTH',  x:0.150, y:0.548, need:5, power:9, waves:5,
+  {id:'anadyr', name:'THE ANADYR MOUTH',  x:0.150, y:0.548, ll:[177.50,64.73], need:5, power:9, waves:5,
    reach:'boat', coin:700, war:26, pull:5,
    place:'The river mouth, and the river behind it goes further inland than anybody on the '
         +'Rkrai shore has ever gone. Take this and the far shore is not a frontier any more, '
@@ -36681,7 +36794,11 @@ function applyHub(){
        treatment: a pale strip with ink on it. */
     if(cap){ cap.style.cssText='position:absolute;right:6px;bottom:4px;font-size:10px;'
       +'background:rgba(250,243,224,0.95);color:#3a2810;padding:1px 6px;border-radius:2px;'
-      +'border:1px solid rgba(120,92,50,.55);font-family:Georgia,serif;letter-spacing:.02em;'; }
+      +'border:1px solid rgba(120,92,50,.55);font-family:Georgia,serif;letter-spacing:.02em;'
+      /* .screen puts a 2px hard black text-shadow on everything, which on
+         dark ink over a cream plate renders as a second offset copy of the
+         whole legend — it reads as the line being drawn twice */
+      +'text-shadow:none;'; }
     if(cap && cap.textContent.indexOf('current')>=0)
       cap.textContent = wa
         ? '戦国 · THE COUNTRY AT WAR · ' + (G&&G.waEra? G.waEra+' ' : '')
@@ -45024,58 +45141,128 @@ const REGION_EAST_BY_ID={}; REGIONS_EAST.forEach(r=>REGION_EAST_BY_ID[r.id]=r);
    coast. Everything outside that run is the inland border and is drawn as
    one — a political line, not a shore.
    ===================================================================== */
-const RK_COAST=[
-  [54.6,18.2],[59.0,19.5],[63.5,20.5],[64.5,23.5],[68.2,24.0],[70.5,26.0],
-  [75.5,26.5],[78.5,29.5],[83.0,31.5],[82.8,36.0],[80.5,41.0],[80.0,47.0],
-  [82.0,52.5],[85.5,56.5],[87.0,63.0],[84.0,68.5],[80.0,72.0],[75.5,75.0],
-  [71.5,76.5],[67.0,79.0],[62.5,80.5],[59.0,78.5],[56.5,74.5],[53.0,71.0],
-  [49.5,74.5],[46.5,79.0],[42.0,82.0],[38.0,84.5],[33.0,86.0],[28.5,88.5],
-  [24.0,90.5],[20.5,88.0],[17.5,84.0],[14.0,80.0],[10.5,75.0],[8.0,70.0],
-  [6.5,65.0],[7.2,60.0],[9.5,56.0],[7.5,52.0],[7.2,47.5],[9.0,44.5],
-  [13.5,42.0],[17.5,44.5],[20.5,47.0],[22.5,44.0],[23.5,39.0],[26.0,35.0],
-  [29.5,31.5],[34.0,28.5],[38.5,26.0],[43.0,23.5],[47.0,21.5],[50.5,19.5],
+/* ---------------------------------------------------------------------
+   THE PROJECTION. Chukotka and Alaska straddle the antimeridian, so
+   longitude is carried east-positive on a 0..360 axis — 177.5 is the
+   Anadyr, 190.35 is Cape Dezhnev, 191.91 is Cape Prince of Wales. The
+   strait between those last two is 1.56 degrees, which is why it is
+   eighty kilometres of water and why it needs to be labelled to be read.
+   --------------------------------------------------------------------- */
+const MAP_RK_PROJ={lonW:164, lonE:226, latN:71.6, latS:59.9};
+function rkLonX(lon){ return lon<0? lon+360 : lon; }
+/* real lon/lat -> percent of the map box, which is the same space the DOM
+   region labels are positioned in, so the pins and the paint cannot drift */
+function rkLL(lon,lat){
+  const P=MAP_RK_PROJ, x=rkLonX(lon);
+  return { x:+(((x-P.lonW)/(P.lonE-P.lonW))*100).toFixed(2),
+           y:+(((P.latN-lat)/(P.latN-P.latS))*100).toFixed(2),
+           real:[lon,lat] };
+}
+function rkXY(u,v){ return {x:+(u.toFixed(1)), y:+(v.toFixed(1))}; }   // kept for old saves
+/* ---- CHUKOTKA. The Chukchi peninsula, Cape Dezhnev at its nose, and the
+   Gulf of Anadyr biting in underneath it. Runs off the western edge,
+   because it does. ---- */
+const RK_LAND_CHUK=[
+  /* the East Siberian and Chukchi coast, west to east */
+  [166,69.70],[168.5,69.95],[170.50,70.10],[172.5,69.90],[174.5,69.70],
+  [176.60,69.90],[178.5,69.40],[180.60,68.90],[181.5,67.95],[184.17,67.83],
+  [185.50,67.00],[187.05,67.03],[188.25,66.93],[189.40,66.50],[190.35,66.08],
+  /* round the nose and down the peninsula's south side */
+  [190.20,65.85],[189.00,65.58],[188.30,65.50],[188.05,64.95],[187.80,64.40],
+  [187.20,64.26],[186.60,64.48],[185.40,64.38],
+  /* west along the Gulf of Anadyr, up into Kresta Bay, out and on to the estuary */
+  [184.00,64.55],[182.20,64.85],[180.80,65.25],[179.90,65.90],[179.12,66.32],
+  [178.85,65.85],[178.50,65.00],[177.50,64.73],
+  /* the gulf's southern shore out to Cape Navarin, then the Koryak coast */
+  [178.10,64.20],[179.00,63.50],[179.80,62.90],[179.10,62.30],
+  [176.5,61.50],[173.5,60.80],[170.5,60.20],[166,59.30],
 ];
-/* the eastern frontier: the stretch of the outline where land continues on
-   the far side rather than water */
-const RK_INLAND_FROM=8, RK_INLAND_TO=14;
+/* ---- ALASKA. Point Hope and Cape Lisburne in the north-west, the north
+   slope along the top, the Seward peninsula reaching for Chukotka, Norton
+   Sound under it, the Yukon delta, and the south-west coast. Runs off the
+   eastern edge into the rest of the continent. ---- */
+const RK_LAND_AK=[
+  /* Point Hope's hook, then the north-west and north slope east to Barrow */
+  [193.20,68.40],[193.80,68.88],[195.40,69.30],[197.00,69.74],[199.97,70.64],
+  [203.21,71.29],[207.80,70.80],[211.00,70.40],[215.00,70.30],[219.00,69.95],
+  [222.00,69.65],[226,69.60],
+  /* off the eastern edge, then west along the Gulf of Alaska, with Cook
+     Inlet cut up into it */
+  [226,59.60],[221.00,59.85],[216.50,59.60],[213.50,59.50],
+  [211.60,60.40],[210.30,61.35],[209.40,60.40],[208.20,59.60],
+  /* Bristol Bay and the Kuskokwim, both leaving the frame at the bottom */
+  [204.00,58.90],[200.50,58.40],[199.60,58.30],[197.90,58.65],
+  [198.40,59.50],[198.90,60.05],[196.80,60.40],[194.90,60.60],[193.90,61.82],
+  /* the Yukon delta, then round Norton Sound — south shore, head, north shore */
+  [194.50,62.50],[194.60,62.90],[195.80,63.05],[197.00,63.20],[199.20,63.87],
+  [200.90,64.35],[199.50,64.90],[198.00,64.60],[196.40,64.55],[194.60,64.50],
+  [193.20,64.70],
+  /* the Seward peninsula's tip, reaching for the other side */
+  [191.91,65.60],
+  /* and back east into Kotzebue Sound, then north-west to Point Hope */
+  [192.30,66.05],[193.60,66.30],[195.20,66.25],[196.40,66.55],[197.80,66.60],
+  [197.40,66.90],[196.60,67.10],[195.20,67.30],[194.20,67.70],[193.60,68.05],
+  [193.00,68.28],
+];
+/* and the islands, including the two in the gap that the whole crossing
+   is routed over */
+const RK_ISLES=[
+  {n:'ST LAWRENCE I.', lab:[190.1,63.95], ring:[[188.9,63.35],[190.1,63.78],[191.35,63.6],[191.0,63.15],[189.6,62.98]]},
+  {n:'NUNIVAK I.',     lab:[194.1,60.55], ring:[[193.2,60.0],[194.3,60.3],[195.0,60.1],[194.4,59.75],[193.4,59.8]]},
+  {n:'',               lab:null,          ring:[[190.86,65.84],[191.02,65.87],[191.06,65.71],[190.88,65.69]]},   // Big Diomede
+  {n:'',               lab:null,          ring:[[191.14,65.81],[191.24,65.81],[191.24,65.72],[191.14,65.72]]},   // Little Diomede
+];
+/* THE FOUR PROVINCES, laid over the country rather than over a diagram */
+const RK_PROV_SHAPES=[
+  {id:'Uvrak Plateau', c:'#cfd8c2', lab:[198.3,65.85], name:'UVRAK PLATEAU',
+   ring:[[191.91,65.6],[193.2,64.70],[196.4,64.55],[198.0,64.60],[200.2,65.6],
+         [199.0,66.8],[197.4,66.9],[196.4,66.55],[193.6,66.30],[192.3,66.05]]},
+  {id:'Nalkut River',  c:'#d8d2bc', lab:[202.6,63.55], name:'NALKUT RIVER',
+   ring:[[194.9,63.2],[196.6,63.3],[199.2,63.85],[200.9,64.35],[200.2,65.6],
+         [206.0,65.4],[208.0,63.8],[203.0,62.6],[196.5,62.6],[195.4,62.7]]},
+  {id:'Sivra Forest',  c:'#c2d0bc', lab:[208.4,66.30], name:'SIVRA FOREST',
+   ring:[[200.2,65.6],[206.0,65.4],[208.0,63.8],[214.0,64.4],[216.0,67.0],
+         [210.0,68.6],[202.0,67.8],[199.0,66.8]]},
+  {id:'Taqruna',       c:'#dcd6c4', lab:[202.4,60.90], name:'TAQRUNA',
+   ring:[[193.9,61.82],[194.9,60.6],[196.8,60.4],[198.9,60.05],[199.6,58.4],
+         [204.0,59.4],[208.2,60.6],[209.0,62.2],[203.0,62.6],[196.5,62.6],
+         [195.4,62.7],[194.9,63.2]]},
+];
+/* the two rivers everything on this coast is actually organised around */
+const RK_RIVERS=[
+  {n:'THE YUKON',     pts:[[214.0,65.4],[210.5,65.0],[207.0,64.8],[204.0,64.6],[201.5,64.2],
+                            [199.0,63.6],[197.0,63.1],[195.6,62.85]]},
+  {n:'THE KUSKOKWIM', pts:[[208.0,63.0],[205.0,62.4],[201.5,61.6],[199.4,60.9],[198.7,60.15]]},
+];
+/* ---- kept so nothing that referenced the old outline breaks ---- */
+const RK_COAST=RK_LAND_AK, RK_BEYOND=RK_LAND_CHUK;
+const RK_INLAND_FROM=7, RK_INLAND_TO=8;
 function rkIsCoast(i){ return i<RK_INLAND_FROM || i>RK_INLAND_TO; }
-/* and the land beyond it, running off the eastern edge of the map */
-const RK_BEYOND=[
-  /* It has to run clean OFF the eastern edge of the canvas or it reads as a
-     second island sitting next to the first, which is the exact impression
-     the whole change exists to remove. The far vertices are past the frame
-     on purpose. */
-  [83.0,31.5],[96,26],[112,22],[130,20],[175,20],
-  [175,78],[130,76],[112,73],[98,69],[87.0,63.0],
-  [85.5,56.5],[82.0,52.5],[80.0,47.0],[80.5,41.0],[82.8,36.0],
-];
-/* 0..100 map units → the canvas the atlas is drawn on */
-function rkXY(u,v){ return {x:+(u.toFixed(1)), y:+(v.toFixed(1))}; }
 const REGIONS_RK = [
   /* ---- THE CAPITAL. A port whose business is other people's cargo. ---- */
   Object.assign({id:'Leokanis', world:'rk', tier:5, sea:true, capital:true,
     city:'Leokanis', prov:'the port, and the ledger',
-    note:'The capital, and it grows nothing and catches almost nothing. Leokanis exists to WEIGH things: every load of dried fish, cut plank and hide out of the other three provinces is counted here, taxed here and sold on from here. The harbour-master outranks two of the four province-holders and everybody resents it.'}, rkXY(72,68)),
+    note:'The capital, and it grows nothing and catches almost nothing. Leokanis exists to WEIGH things: every load of dried fish, cut plank and hide out of the other three provinces is counted here, taxed here and sold on from here. The harbour-master outranks two of the four province-holders and everybody resents it.'}, rkLL(-165.40,64.50)),   /* the weighing port, on the north shore of the sound */
   /* ---- THE FOUR PROVINCES ---- */
   Object.assign({id:'Taqruna', world:'rk', tier:4, sea:true,
     city:'Taqrunaq-Port', prov:'the outer coast',
-    note:'The seaward province and the second harbour. Taqruna faces the open water and takes the weather first, which is why its houses are dug down and its people are the ones who go out in the worst of it. It sells what it lands to Leokanis and complains about the price for the rest of the year.'}, rkXY(42,78)),
+    note:'The seaward province and the second harbour. Taqruna faces the open water and takes the weather first, which is why its houses are dug down and its people are the ones who go out in the worst of it. It sells what it lands to Leokanis and complains about the price for the rest of the year.'}, rkLL(-162.00,60.30)),   /* the outer coast, taking the weather first */
   Object.assign({id:'Uvrak Plateau', world:'rk', tier:4,
     city:'Uvrak-Talik', prov:'the high ground and the herds',
-    note:'The plateau, and it OWNS the caribou. Not hunts — owns. The herds are property with marks cut in the ear, they are lent out for a share of the calving, and a plateau house measures its standing in animals it has never eaten. The single richest thing in the country and the one nobody can carry off.'}, rkXY(38,45)),
+    note:'The plateau, and it OWNS the caribou. Not hunts — owns. The herds are property with marks cut in the ear, they are lent out for a share of the calving, and a plateau house measures its standing in animals it has never eaten. The single richest thing in the country and the one nobody can carry off.'}, rkLL(-161.00,66.60)),   /* the high ground behind the peninsula */
   Object.assign({id:'Nalkut River', world:'rk', tier:4,
     city:'Nalkut-Ruun', prov:'the smoke-houses',
-    note:'The river, the run, and the smoke-houses along it — which means Nalkut owns the WINTER. Fish caught anywhere on this coast still has to be dried and smoked somewhere, and it is dried here, for a cut. In a bad year Nalkut decides who eats, and it has never once forgotten that.'}, rkXY(58,38)),
+    note:'The river, the run, and the smoke-houses along it — which means Nalkut owns the WINTER. Fish caught anywhere on this coast still has to be dried and smoked somewhere, and it is dried here, for a cut. In a bad year Nalkut decides who eats, and it has never once forgotten that.'}, rkLL(-158.00,63.90)),   /* the river, and the smoke-houses on it */
   Object.assign({id:'Sivra Forest', world:'rk', tier:3,
     city:'Sivra-Denik', prov:'the timber',
-    note:'The forest, and every plank, post, boat, bowl, mask and house-front in the country came out of it. Sivra is the poorest province by stored food and the one the others cannot do without, which is an argument it has been winning slowly for two hundred years.'}, rkXY(28,58)),
+    note:'The forest, and every plank, post, boat, bowl, mask and house-front in the country came out of it. Sivra is the poorest province by stored food and the one the others cannot do without, which is an argument it has been winning slowly for two hundred years.'}, rkLL(-149.00,65.20)),   /* the timber, inland where the trees are */
   /* ---- AND THE TOWNS UNDER THEM ---- */
   Object.assign({id:'Kraunivik', world:'rk', tier:3, sea:true,
     city:'Kraunivik', prov:'the second city',
-    note:'The inland market where the plateau, the river and the forest actually meet to trade, because none of them will go to Leokanis to be weighed if they can avoid it. Everything here is barter, everything is disputed, and the arbitration court is the busiest building on the coast.'}, rkXY(70,48)),
+    note:'The inland market where the plateau, the river and the forest actually meet to trade, because none of them will go to Leokanis to be weighed if they can avoid it. Everything here is barter, everything is disputed, and the arbitration court is the busiest building on the coast.'}, rkLL(-156.00,65.60)),   /* the inland market, where the three meet */
   Object.assign({id:'Kraiq-Harra', world:'rk', tier:2,
     city:'Kraiq-Harra', prov:'the far village',
-    note:'The furthest village that still pays in, up where the plateau breaks. Four longhouses, a smoke-shed and a rank ladder observed more strictly here than anywhere in the capital, which is how it usually goes with the far edge of a country.'}, rkXY(15,50)),
+    note:'The furthest village that still pays in, up where the plateau breaks. Four longhouses, a smoke-shed and a rank ladder observed more strictly here than anywhere in the capital, which is how it usually goes with the far edge of a country.'}, rkLL(-166.80,68.35)),   /* the far village, on the last cape north */
 ];
 const REGION_RK_BY_ID={}; REGIONS_RK.forEach(r=>REGION_RK_BY_ID[r.id]=r);
 /* =====================================================================
@@ -47878,129 +48065,243 @@ function drawWaLeaders(c){
    entire business is other people's cargo passing through it, and the
    province seats are joined by the routes the trade actually runs on.
    ===================================================================== */
+/* =====================================================================
+   THE RKRAI SHEET — CHUKOTKA, ALASKA, AND THE STRAIT BETWEEN THEM
+   ---------------------------------------------------------------------
+   Drawn from real longitude and latitude, like the western and eastern
+   sheets. The predecessor was an invented headland with a "land frontier"
+   running off the east edge, which meant the one map in the game where
+   Chukotka and Alaska are the entire subject had neither of them on it.
+   ===================================================================== */
 function drawMapCanvasRk(){
   mctx.setTransform(2,0,0,2,0,0);
   const w=480,h=216;
   mctx.imageSmoothingEnabled=true;
-  /* 0..100 map units -> canvas. The shore was drawn on a square, so it is
-     letterboxed into the strip rather than stretched. */
-  /* THE SHORE SPANS u 6..87 and v 18..90, not the full square, so fitting a
-     0..100 box to the strip threw the title off the top and pushed the south
-     coast off the bottom. Fit the LAND, and leave a band above it for the
-     name. */
-  const SC=2.24;
-  const OX=w*0.50 - 46.8*SC;          // the shore's own horizontal centre
-  const OY=34 - 18*SC;                // its northern tip, held below the title
-  const Q=(u,v)=>[OX+u*SC, OY+v*SC];
+  const P=MAP_RK_PROJ;
+  const Q=(lon,lat)=>{ const x=rkLonX(lon);
+    return [ ((x-P.lonW)/(P.lonE-P.lonW))*w, ((P.latN-lat)/(P.latN-P.latS))*h ]; };
   const path=(pts,close)=>{ mctx.beginPath(); const p0=Q(pts[0][0],pts[0][1]); mctx.moveTo(p0[0],p0[1]);
     for(let k=1;k<pts.length;k++){ const p=Q(pts[k][0],pts[k][1]); mctx.lineTo(p[0],p[1]); }
     if(close!==false) mctx.closePath(); };
   const fill=(pts,c)=>{ path(pts); mctx.fillStyle=c; mctx.fill(); };
-  const label=(t,u,v,c,fs,al)=>{ const p=Q(u,v); mctx.fillStyle=c; mctx.font=fs;
-    mctx.textAlign=al||'center'; mctx.fillText(t,p[0],p[1]); };
-  // ---- THE COLD WATER. Banded, because a northern sea reads as bands. ----
-  for(let i=0;i<6;i++){ mctx.fillStyle=['#3d5b66','#3a5763','#37535f','#344f5b','#314b57','#2e4753'][i];
+  const line=(pts,c,lw,dash)=>{ path(pts,false);
+    mctx.lineWidth=lw||1; mctx.strokeStyle=c; mctx.lineJoin='round'; mctx.lineCap='round';
+    if(dash) mctx.setLineDash(dash); mctx.stroke(); mctx.setLineDash([]); };
+  const label=(t,lon,lat,c,fs,al,ls)=>{ const p=Q(lon,lat); mctx.fillStyle=c; mctx.font=fs;
+    mctx.textAlign=al||'center';
+    if(ls){ mctx.save(); mctx.translate(p[0],p[1]); let x=-(t.length-1)*ls/2;
+      for(const ch of t){ mctx.fillText(ch,x,0); x+=ls; } mctx.restore(); }
+    else mctx.fillText(t,p[0],p[1]); };
+
+  /* ================= 1 · THE COLD WATER ================= */
+  for(let i=0;i<6;i++){ mctx.fillStyle=['#41606c','#3e5c68','#3a5864','#37545f','#34505b','#314c56'][i];
     mctx.fillRect(0, i*(h/6), w, h/6+1); }
-  for(let i=0;i<70;i++){ const sx=(i*97)%w, sy=((i*53)%h);
-    mctx.globalAlpha=0.06+0.05*((i%3)/3); mctx.fillStyle='#cfe6ee';
+  for(let i=0;i<80;i++){ const sx=(i*97)%w, sy=(i*53)%h;
+    mctx.globalAlpha=0.05+0.05*((i%3)/3); mctx.fillStyle='#cfe6ee';
     mctx.fillRect(sx, sy, 7, 1); }
   mctx.globalAlpha=1;
-  /* ---- THE LAND BEYOND THE FRONTIER. The country is a headland on a
-     larger mass, so the east side is a BORDER and the land keeps going. It
-     is drawn first, colder and greyer, so the eye reads it as somebody
-     else's. ---- */
-  fill(RK_BEYOND,'#c9c6bb');
-  { const p=Q(96,30), q=Q(96,66);
-    const g=mctx.createLinearGradient(p[0],p[1],q[0],q[1]);
-    g.addColorStop(0,'rgba(150,150,140,.35)'); g.addColorStop(1,'rgba(120,124,118,.30)');
-    path(RK_BEYOND); mctx.fillStyle=g; mctx.fill(); }
-  for(let i=0;i<48;i++){ const p=Q(86+((i*9)%62), 26+((i*13)%46));  // scrub on the far side
-    mctx.fillStyle='rgba(110,116,102,.45)'; mctx.fillRect(p[0],p[1],2,1); }
-  // ---- THE LAND ----
+  /* the latitude rules, because this sheet is high enough that they matter */
+  mctx.strokeStyle='rgba(200,228,238,.10)'; mctx.lineWidth=0.5;
+  for(let la=60; la<=70; la+=5){ const p=Q(P.lonW,la), q=Q(P.lonE,la);
+    mctx.beginPath(); mctx.moveTo(p[0],p[1]); mctx.lineTo(q[0],q[1]); mctx.stroke();
+    mctx.font='3.8px Georgia,serif'; mctx.textAlign='left';
+    mctx.fillStyle='rgba(10,18,24,.55)'; mctx.fillRect(1, p[1]-6, 15, 6);
+    mctx.fillStyle='rgba(200,228,238,.52)'; mctx.fillText(la+'°N', 3, p[1]-1.5); }
+  /* and the line the whole sheet straddles */
+  { const p=Q(180,P.latN), q=Q(180,P.latS);
+    mctx.setLineDash([3,3]); mctx.strokeStyle='rgba(232,195,74,.22)'; mctx.lineWidth=0.7;
+    mctx.beginPath(); mctx.moveTo(p[0],p[1]); mctx.lineTo(q[0],q[1]); mctx.stroke(); mctx.setLineDash([]);
+    mctx.save(); mctx.translate(p[0],h-8); mctx.fillStyle='rgba(232,195,74,.36)';
+    mctx.font='italic 3.8px Georgia,serif'; mctx.textAlign='center';
+    mctx.fillText('180°', 0, 0); mctx.restore(); }
+
+  /* ================= 2 · CHUKOTKA — cold, grey-green, and not yours ================= */
   mctx.save();
-  path(RK_COAST); mctx.clip();
-  fill(RK_COAST,'#e6e0d2');
-  /* the four provinces, tinted for what each of them SELLS */
-  const prov=[
-    {c:'#cfd8c2', pts:[[7,47],[24,38],[34,28],[46,22],[52,44],[40,58],[22,58]]},   // Uvrak: the herds
-    {c:'#d8d2bc', pts:[[52,20],[66,24],[78,29],[83,36],[74,50],[52,44]]},          // Nalkut: the smoke-houses
-    {c:'#c6d2c0', pts:[[7,47],[22,58],[40,58],[38,74],[20,72],[8,62]]},            // Sivra: the timber
-    {c:'#dcd6c4', pts:[[40,58],[74,50],[80,66],[62,80],[45,79],[38,74]]},          // Taqruna: the outer coast
-  ];
-  prov.forEach(P=>{ fill(P.pts,P.c); });
-  /* the province lines, drawn as the routes they actually are */
-  mctx.strokeStyle='rgba(90,78,58,.45)'; mctx.lineWidth=0.7; mctx.setLineDash([3,2]);
-  prov.forEach(P=>{ path(P.pts); mctx.stroke(); });
-  mctx.setLineDash([]);
-  /* the river the smoke-houses stand on, and the forest */
-  mctx.strokeStyle='#7fa8b8'; mctx.lineWidth=1.5; mctx.lineCap='round';
-  mctx.beginPath();
-  { const r=[[70,26],[64,34],[60,42],[58,50],[60,58],[63,63]];
-    const p0=Q(r[0][0],r[0][1]); mctx.moveTo(p0[0],p0[1]);
-    for(let k=1;k<r.length;k++){ const p=Q(r[k][0],r[k][1]); mctx.lineTo(p[0],p[1]); } }
-  mctx.stroke();
-  for(let i=0;i<34;i++){ const u=14+((i*11)%22), v=52+((i*7)%22);   // the Sivra timber
-    const p=Q(u,v); mctx.fillStyle='#5d7a54';
-    mctx.beginPath(); mctx.moveTo(p[0],p[1]-2.6); mctx.lineTo(p[0]-1.5,p[1]+1); mctx.lineTo(p[0]+1.5,p[1]+1);
-    mctx.closePath(); mctx.fill(); }
-  for(let i=0;i<16;i++){ const u=24+((i*9)%26), v=32+((i*5)%14);    // the plateau, hatched
-    const p=Q(u,v); mctx.strokeStyle='rgba(120,124,96,.55)'; mctx.lineWidth=0.6;
-    mctx.beginPath(); mctx.moveTo(p[0]-2,p[1]); mctx.lineTo(p[0]+2,p[1]); mctx.stroke(); }
+  mctx.shadowColor='rgba(0,0,0,.45)'; mctx.shadowBlur=5; mctx.shadowOffsetY=2;
+  fill(RK_LAND_CHUK,'#b9bfb2');
   mctx.restore();
-  /* ---- THE EDGE, AND IT IS TWO DIFFERENT EDGES. Where the water is, a
-     hard dark shore-line with a pale surf under it. Where the land keeps
-     going, a border: dashed, lighter, and marked. ---- */
-  mctx.lineJoin='round'; mctx.lineCap='round';
-  { // the coast
-    mctx.beginPath(); let pen=false;
-    for(let i=0;i<RK_COAST.length;i++){
-      const p=Q(RK_COAST[i][0],RK_COAST[i][1]);
-      if(rkIsCoast(i)){ if(!pen){ mctx.moveTo(p[0],p[1]); pen=true; } else mctx.lineTo(p[0],p[1]); }
-      else pen=false; }
-    const p0=Q(RK_COAST[0][0],RK_COAST[0][1]);
-    mctx.lineTo(p0[0],p0[1]);
-    mctx.strokeStyle='#2b3f49'; mctx.lineWidth=1.5; mctx.stroke();
-    mctx.strokeStyle='rgba(226,240,246,.40)'; mctx.lineWidth=0.5; mctx.stroke(); }
-  { // the land frontier
+  mctx.save(); path(RK_LAND_CHUK); mctx.clip();
+  { const a=Q(166,71.5), b=Q(190,60);
+    const g=mctx.createLinearGradient(a[0],a[1],b[0],b[1]);
+    g.addColorStop(0,'rgba(150,158,146,.45)'); g.addColorStop(1,'rgba(120,130,120,.30)');
+    mctx.fillStyle=g; mctx.fillRect(0,0,w,h); }
+  for(let i=0;i<70;i++){ const p=Q(167+((i*7)%22), 60.5+((i*11)%9));      // tundra stipple
+    mctx.fillStyle='rgba(104,114,100,.40)'; mctx.fillRect(p[0],p[1],2,1); }
+  for(let i=0;i<44;i++){ const p=Q(178+((i*5)%12), 65.5+((i*7)%4));
+    mctx.fillStyle='rgba(104,114,100,.34)'; mctx.fillRect(p[0],p[1],2,1); }
+  mctx.restore();
+  line(RK_LAND_CHUK,'#22343d',1.4);
+  line(RK_LAND_CHUK,'rgba(226,240,246,.32)',0.5);
+
+  /* ================= 3 · ALASKA — the country you actually live in ================= */
+  mctx.save();
+  mctx.shadowColor='rgba(0,0,0,.5)'; mctx.shadowBlur=6; mctx.shadowOffsetY=2;
+  fill(RK_LAND_AK,'#e6e0d2');
+  mctx.restore();
+  mctx.save(); path(RK_LAND_AK); mctx.clip();
+  RK_PROV_SHAPES.forEach(V=>fill(V.ring, V.c));
+  mctx.strokeStyle='rgba(90,78,58,.42)'; mctx.lineWidth=0.7; mctx.setLineDash([3,2]);
+  RK_PROV_SHAPES.forEach(V=>{ path(V.ring); mctx.stroke(); });
+  mctx.setLineDash([]);
+  /* the rivers */
+  RK_RIVERS.forEach(R=>line(R.pts,'#6f9cb0',1.3));
+  /* the timber, on the province that sells it */
+  for(let i=0;i<52;i++){ const p=Q(202.0+((i*13)%12), 64.6+((i*7)%3.6));
+    mctx.fillStyle='#5d7a54';
+    mctx.beginPath(); mctx.moveTo(p[0],p[1]-2.4); mctx.lineTo(p[0]-1.4,p[1]+0.9);
+    mctx.lineTo(p[0]+1.4,p[1]+0.9); mctx.closePath(); mctx.fill(); }
+  /* the range along the top, hatched, because it is why the plateau is a plateau */
+  for(let i=0;i<34;i++){ const p=Q(197.0+i*0.45, 68.2+((i%3)*0.20));
+    mctx.fillStyle='#c9b48c';
+    mctx.beginPath(); mctx.moveTo(p[0]-2.6,p[1]); mctx.lineTo(p[0],p[1]-3.2); mctx.lineTo(p[0]+2.6,p[1]);
+    mctx.closePath(); mctx.fill();
+    mctx.strokeStyle='rgba(100,80,55,.5)'; mctx.lineWidth=0.4; mctx.stroke();
+    mctx.beginPath(); mctx.moveTo(p[0]-0.9,p[1]-1.8); mctx.lineTo(p[0],p[1]-3.2); mctx.lineTo(p[0]+0.9,p[1]-1.8);
+    mctx.closePath(); mctx.fillStyle='#f4efe4'; mctx.fill(); }
+  /* and the range that walls the interior off from the southern coast */
+  for(let i=0;i<20;i++){ const p=Q(205.0+i*0.5, 62.9+((i%3)*0.18));
+    mctx.fillStyle='#c9b48c';
+    mctx.beginPath(); mctx.moveTo(p[0]-2.4,p[1]); mctx.lineTo(p[0],p[1]-3.0); mctx.lineTo(p[0]+2.4,p[1]);
+    mctx.closePath(); mctx.fill();
+    mctx.strokeStyle='rgba(100,80,55,.5)'; mctx.lineWidth=0.4; mctx.stroke();
+    mctx.beginPath(); mctx.moveTo(p[0]-0.8,p[1]-1.7); mctx.lineTo(p[0],p[1]-3.0); mctx.lineTo(p[0]+0.8,p[1]-1.7);
+    mctx.closePath(); mctx.fillStyle='#f4efe4'; mctx.fill(); }
+  /* the herds, on the province that owns them */
+  for(let i=0;i<15;i++){ const p=Q(194.5+((i*11)%7), 65.3+((i*5)%2.4));
+    mctx.strokeStyle='rgba(120,110,80,.6)'; mctx.lineWidth=0.6;
+    mctx.beginPath(); mctx.moveTo(p[0]-1.6,p[1]); mctx.lineTo(p[0]+1.6,p[1]); mctx.stroke(); }
+  mctx.restore();
+  line(RK_LAND_AK,'#2b3f49',1.5);
+  line(RK_LAND_AK,'rgba(226,240,246,.40)',0.5);
+
+  /* ================= 4 · THE ISLANDS, INCLUDING THE TWO IN THE GAP ================= */
+  RK_ISLES.forEach(I=>{
+    mctx.save(); mctx.shadowColor='rgba(0,0,0,.5)'; mctx.shadowBlur=3;
+    fill(I.ring, I.n? '#ded8c8' : '#9aa2a0');
+    mctx.restore();
+    line(I.ring, '#22343d', 0.9);
+    if(I.n) label(I.n, I.lab[0], I.lab[1], 'rgba(232,240,244,.72)','italic 3.8px Georgia,serif');
+  });
+
+  /* ================= 5 · THE STRAIT, LABELLED, BECAUSE IT IS 80 KM WIDE
+     AND WOULD OTHERWISE READ AS A CRACK ================= */
+  { const a=Q(190.35,66.08), b=Q(191.91,65.60);   // Dezhnev -> Wales
+    /* the route men actually take, over the two rocks */
+    mctx.setLineDash([3,2.5]); mctx.strokeStyle='rgba(255,240,190,.80)'; mctx.lineWidth=1.1;
     mctx.beginPath();
-    for(let i=RK_INLAND_FROM;i<=RK_INLAND_TO;i++){
-      const p=Q(RK_COAST[i][0],RK_COAST[i][1]);
-      if(i===RK_INLAND_FROM) mctx.moveTo(p[0],p[1]); else mctx.lineTo(p[0],p[1]); }
-    mctx.setLineDash([4,3]); mctx.strokeStyle='#6a6a5a'; mctx.lineWidth=1.4; mctx.stroke();
-    mctx.setLineDash([]);
-    mctx.strokeStyle='rgba(240,236,224,.35)'; mctx.lineWidth=0.5; mctx.stroke(); }
-  { // and it is labelled, because a frontier that is not marked reads as a coast
-    const p=Q(92,47);
-    mctx.save(); mctx.translate(p[0],p[1]); mctx.rotate(-Math.PI/2);
-    mctx.fillStyle='rgba(90,90,78,.85)'; mctx.font='bold 5px Georgia,serif'; mctx.textAlign='center';
-    mctx.fillText('THE LAND FRONTIER', 0, 0);
-    mctx.fillStyle='rgba(90,90,78,.6)'; mctx.font='italic 4.2px Georgia,serif';
-    mctx.fillText('\u2014 and it keeps going \u2014', 0, 6);
-    mctx.restore(); }
-  // ---- THE NAMES ----
-  label('UVRAK PLATEAU', 30,40,'rgba(70,64,48,.85)','bold 5px Georgia,serif');
-  label('NALKUT RIVER',  66,34,'rgba(70,64,48,.85)','bold 5px Georgia,serif');
-  label('SIVRA FOREST',  22,63,'rgba(70,64,48,.85)','bold 5px Georgia,serif');
-  label('TAQRUNA',       58,68,'rgba(70,64,48,.85)','bold 5px Georgia,serif');
-  label('THE RKRAI SHORE', 46.8,7.0,'rgba(226,238,244,.94)','bold 8px Georgia,serif');
-  label('\u2014 four provinces, one weight \u2014', 46.8,12.0,'rgba(190,214,224,.78)','italic 5px Georgia,serif');
-  // ---- AND THE PLACES, with the capital marked as a port ----
+    [[191.91,65.60],[191.19,65.77],[190.94,65.78],[190.35,66.08]].forEach((pt,k)=>{
+      const p=Q(pt[0],pt[1]); if(k===0) mctx.moveTo(p[0],p[1]); else mctx.lineTo(p[0],p[1]); });
+    mctx.stroke(); mctx.setLineDash([]);
+    /* the two capes, named, because they are the ends of the crossing */
+    const cape=(lon,lat,t,al,dy)=>{ const p=Q(lon,lat);
+      mctx.fillStyle='#ffe9a8'; mctx.beginPath(); mctx.arc(p[0],p[1],1.5,0,7); mctx.fill();
+      mctx.strokeStyle='#20303a'; mctx.lineWidth=0.5; mctx.stroke();
+      mctx.fillStyle='rgba(255,238,190,.90)'; mctx.font='bold 3.9px Georgia,serif'; mctx.textAlign=al;
+      const dx= al==='right'? -3 : al==='center'? 0 : 3;
+      mctx.strokeStyle='rgba(16,24,30,.85)'; mctx.lineWidth=1.6;
+      mctx.strokeText(t, p[0]+dx, p[1]+dy);
+      mctx.fillText(t, p[0]+dx, p[1]+dy); };
+    cape(190.35,66.08,'C. DEZHNEV','right',-5.0);
+    cape(191.91,65.60,'C. PR. OF WALES','center',9.2);
+    /* and the name of the water itself, on a leader out to clear air */
+    const mid=[(a[0]+b[0])/2, (a[1]+b[1])/2];
+    const lx=Q(181.5,69.75);          // clear water, north-west of the gap
+    mctx.strokeStyle='rgba(255,240,190,.45)'; mctx.lineWidth=0.6;
+    mctx.beginPath(); mctx.moveTo(mid[0]-2,mid[1]-3); mctx.lineTo(lx[0]+22,lx[1]+2); mctx.stroke();
+    mctx.textAlign='center';
+    mctx.font='bold 5.4px Georgia,serif';
+    mctx.strokeStyle='rgba(16,24,30,.9)'; mctx.lineWidth=2.2;
+    mctx.strokeText('THE BERING STRAIT', lx[0], lx[1]);
+    mctx.fillStyle='rgba(255,242,200,.95)'; mctx.fillText('THE BERING STRAIT', lx[0], lx[1]);
+    mctx.font='italic 4.2px Georgia,serif';
+    mctx.strokeStyle='rgba(16,24,30,.9)'; mctx.lineWidth=2;
+    mctx.strokeText('51 miles · rowed in summer, walked in winter', lx[0], lx[1]+5.4);
+    mctx.fillStyle='rgba(226,240,246,.80)';
+    mctx.fillText('51 miles · rowed in summer, walked in winter', lx[0], lx[1]+5.4);
+  }
+
+  /* ================= 6 · THE SEAS AND THE BAYS ================= */
+  label('T H E   C H U K C H I   S E A', 191.0,70.9,'rgba(190,214,224,.40)','italic 4.0px Georgia,serif',null,3.0);
+  label('T H E   B E A U F O R T   S E A', 215.5,71.1,'rgba(190,214,224,.40)','italic 4.0px Georgia,serif',null,3.0);
+  label('T H E   B E R I N G   S E A',   188.0,61.5,'rgba(190,214,224,.48)','italic 4.2px Georgia,serif',null,3.2);
+  label('GULF OF ALASKA',   218.0,61.0,'rgba(190,214,224,.48)','italic 4.0px Georgia,serif');
+  label('GULF OF ANADYR',   181.8,62.60,'rgba(190,214,224,.55)','italic 4.0px Georgia,serif');
+  label('NORTON SOUND',     197.0,63.75,'rgba(150,180,194,.80)','italic 4.0px Georgia,serif');
+  label('KOTZEBUE SOUND',   196.7,66.52,'rgba(150,180,194,.72)','italic 3.6px Georgia,serif');
+  label('SEWARD PENINSULA', 194.7,65.72,'rgba(90,84,64,.60)','italic 3.4px Georgia,serif');
+  RK_RIVERS.forEach(R=>{ const m=R.pts[Math.floor(R.pts.length/2)];
+    label(R.n, m[0], m[1]-1.6,'rgba(70,100,116,.85)','italic 3.8px Georgia,serif'); });
+
+  /* ================= 7 · THE TWO COUNTRIES, NAMED ================= */
+  { const p=Q(172.5,66.4);
+    mctx.textAlign='center';
+    mctx.font='bold 9px Georgia,serif';
+    mctx.strokeStyle='rgba(20,26,24,.55)'; mctx.lineWidth=2.4;
+    mctx.strokeText('CHUKOTKA', p[0], p[1]);
+    mctx.fillStyle='rgba(78,84,72,.92)'; mctx.fillText('CHUKOTKA', p[0], p[1]);
+    mctx.font='italic 4.4px Georgia,serif'; mctx.fillStyle='rgba(88,94,82,.80)';
+    mctx.fillText('VAAK-RUUN · THE OVER-SHORE', p[0], p[1]+6.2);
+    mctx.fillStyle='rgba(96,102,90,.62)';
+    mctx.fillText('— its own people, and no interest in being counted —', p[0], p[1]+11.4); }
+  { const p=Q(215.5,64.4);
+    mctx.textAlign='center';
+    mctx.font='bold 9px Georgia,serif';
+    mctx.strokeStyle='rgba(20,26,30,.55)'; mctx.lineWidth=2.4;
+    mctx.strokeText('ALASKA', p[0], p[1]);
+    mctx.fillStyle='rgba(232,195,74,.92)'; mctx.fillText('ALASKA', p[0], p[1]);
+    mctx.font='italic 4.4px Georgia,serif'; mctx.fillStyle='rgba(212,186,120,.86)';
+    mctx.fillText('THE RKRAI SHORE', p[0], p[1]+6.2);
+    mctx.fillStyle='rgba(200,176,116,.66)';
+    mctx.fillText('— four provinces, one weight —', p[0], p[1]+11.4); }
+  RK_PROV_SHAPES.forEach(V=>{
+    const p=Q(V.lab[0],V.lab[1]);
+    mctx.textAlign='center'; mctx.font='bold 4.6px Georgia,serif';
+    mctx.strokeStyle='rgba(250,246,236,.6)'; mctx.lineWidth=1.6;
+    mctx.strokeText(V.name, p[0], p[1]);
+    mctx.fillStyle='rgba(70,64,48,.88)'; mctx.fillText(V.name, p[0], p[1]);
+  });
+
+  /* ================= 8 · THE UVRAAK, ON THE SHEET IT IS ABOUT =================
+     Seven holds on the far shore, in whatever state they are actually in,
+     so the crossing is legible from the base map and not only from its own
+     plate. ============================================================= */
+  if(typeof RK_HOLDS!=='undefined'){
+    RK_HOLDS.forEach(Hd=>{
+      if(!Hd.ll) return;
+      const p=Q(Hd.ll[0], Hd.ll[1]);
+      let mine=false, open=false;
+      try{ mine=rkHoldMine(Hd); open=!mine && rkHoldWhy(Hd).ok; }catch(e){}
+      mctx.beginPath(); mctx.arc(p[0],p[1], mine?2.4:1.9, 0,7);
+      mctx.fillStyle= mine? 'rgba(232,195,74,.95)' : open? 'rgba(122,208,138,.55)' : 'rgba(30,34,32,.75)';
+      mctx.fill();
+      mctx.strokeStyle= mine? '#8a6512' : open? '#7ad08a' : 'rgba(150,158,146,.8)';
+      mctx.lineWidth=0.8; mctx.stroke();
+      if(mine){ mctx.strokeStyle='#3a2a12'; mctx.lineWidth=0.7;
+        mctx.beginPath(); mctx.moveTo(p[0]-1.3,p[1]-1.3); mctx.lineTo(p[0]+1.3,p[1]+1.3);
+        mctx.moveTo(p[0]+1.3,p[1]-1.3); mctx.lineTo(p[0]-1.3,p[1]+1.3); mctx.stroke(); }
+    });
+    { const held=(typeof rkHeldCount==='function')? rkHeldCount() : 0;
+      const p=Q(183.6,63.70);
+      mctx.textAlign='center'; mctx.font='bold 4.2px Georgia,serif';
+      mctx.strokeStyle='rgba(16,24,30,.8)'; mctx.lineWidth=1.8;
+      const t='⛵ THE UVRAAK · '+held+' of '+RK_HOLDS.length+' holds';
+      mctx.strokeText(t, p[0], p[1]);
+      mctx.fillStyle='rgba(255,242,200,.92)'; mctx.fillText(t, p[0], p[1]); }
+  }
+
+  /* ================= 9 · THE PLACES ================= */
   (typeof REGIONS_RK!=='undefined'? REGIONS_RK : []).forEach(R=>{
-    const p=Q(R.x,R.y);
+    const p= R.real? Q(R.real[0],R.real[1]) : [R.x/100*w, R.y/100*h];
     const cap=!!R.capital;
     mctx.fillStyle= cap? '#e8c34a' : R.sea? '#cfe0e8' : '#e8e0d0';
     mctx.strokeStyle='#20303a'; mctx.lineWidth=0.8;
-    if(cap){ mctx.beginPath();                                    // the capital is a diamond
+    if(cap){ mctx.beginPath();
       mctx.moveTo(p[0],p[1]-3.4); mctx.lineTo(p[0]+3.4,p[1]);
       mctx.lineTo(p[0],p[1]+3.4); mctx.lineTo(p[0]-3.4,p[1]);
       mctx.closePath(); mctx.fill(); mctx.stroke(); }
     else { mctx.beginPath(); mctx.arc(p[0],p[1],2.2,0,7); mctx.fill(); mctx.stroke(); }
-    mctx.fillStyle= cap? '#ffe9a8' : 'rgba(240,240,232,.92)';
-    mctx.font= cap? 'bold 5.5px Georgia,serif' : '5px Georgia,serif';
-    mctx.textAlign='center';
-    mctx.strokeStyle='rgba(20,26,30,.8)'; mctx.lineWidth=2;
-    mctx.strokeText(R.city, p[0], p[1]-4.6);
-    mctx.fillText(R.city, p[0], p[1]-4.6);
+    /* and no text at all — the DOM pill sitting on this marker already
+       carries the name, and printing it again just doubled every label */
   });
   mctx.setTransform(1,0,0,1,0,0);
 }
@@ -50578,6 +50879,8 @@ window.__SS = {
   WORLDS, WORLD_IDS, worldOfArch, worldOfRegion, regionsForWorld, regionAny, playerWorld,
   REGIONS_RK, REGION_RK_BY_ID, RK_COAST, RK_MASTERIES, RK_MASTERY_BY_ID,
   RK_BEYOND, RK_INLAND_FROM, RK_INLAND_TO, rkIsCoast,
+  MAP_RK_PROJ, rkLonX, rkLL, RK_LAND_CHUK, RK_LAND_AK, RK_ISLES,
+  RK_PROV_SHAPES, RK_RIVERS,
   RK_RANKS, rkRank, rkRankIdx, RK_VENUES, drawMapCanvasRk, provGovList,
   RK_GOVERN, rkHead, rkHere, SLAP_BUTTON, RK_HOUSE, rkHouseDress, rkOfficeBand, drawKiltLift,
   RK_BEND_NEED, RK_BEND_LINES, rkBendBeat, SEAT_PEAK, seatWidthAt,
@@ -50611,7 +50914,7 @@ window.__SS = {
   /* ✎ THE SELVSKAR */
   RK_SELVSKAR, RK_SELV_WHY, RK_SELV_SUBJ, RK_SELV_BACK, RK_ART_REFUSED,
   selvskarOn, selvskarWaiting, selvskarWhy, selvskarArrive, selvskarPoll,
-  selvskarFigure, drawSelvskar, selvskarBlob, selvskarMarks,
+  selvskarFigure, drawSelvskar, selvskarBlob, selvskarDome, selvskarTrail, selvskarMarks,
   selvskarSplashStart, selvskarSplash, openSelvskar, selvskarDo, selvskarPutAway,
   get SELV_ANIM(){ return SELV_ANIM; }, set SELV_ANIM(v){ SELV_ANIM=v; },
   get rkCrossSel(){ return rkCrossSel; }, set rkCrossSel(v){ rkCrossSel=v; },

@@ -285,6 +285,87 @@ const head=t=>console.log('\n--- '+t+' ---');
     is('and a click on open water finds nothing', r.miss, null);
   }
 
+  head('\ud83d\uddfa THE BASE SHEET HAS CHUKOTKA AND ALASKA ON IT');
+  { const r=await pg.evaluate(()=>{
+      const S=window.__SS, G=S.G;
+      G.rkHolds={naukan:{day:3}};
+      let threw=null;
+      try{ S.drawMapCanvasRk(); }catch(e){ threw=''+e; }
+      const cv=document.getElementById('mapcv');
+      const c=cv.getContext('2d');
+      /* the sea on this sheet is blue-dominant; neither shore ever is */
+      const isLand=(rr,gg,bb)=>(bb<=gg && bb<=rr);
+      const at=(lon,lat)=>{ const P=S.MAP_RK_PROJ, x=S.rkLonX(lon);
+        const px=Math.round(((x-P.lonW)/(P.lonE-P.lonW))*cv.width);
+        const py=Math.round(((P.latN-lat)/(P.latN-P.latS))*cv.height);
+        const N=13, x0=Math.max(0,Math.min(cv.width-N,px-(N>>1)));
+        const y0=Math.max(0,Math.min(cv.height-N,py-(N>>1)));
+        const d=c.getImageData(x0,y0,N,N).data;
+        let L=0, T=0;
+        for(let k=0;k<d.length;k+=4){ T++; if(isLand(d[k],d[k+1],d[k+2])) L++; }
+        return {px,py,land:L, of:T, frac:+(L/T).toFixed(2)};
+      };
+      const land=p=>p.frac>0.60, sea=p=>p.frac<0.40;
+      return {threw,
+        /* deep in Chukotka, deep in Alaska, and the water between them */
+        chukotka: at(172.0, 66.5),
+        alaska:   at(205.0, 65.0),
+        strait:   at(191.10, 65.90),
+        bering:   at(188.0, 62.0),
+        /* the two capes are land, the gap between them is not */
+        /* the two peninsulas that make the strait, sampled well inland of
+           both — at a cape the sample lands on the coast stroke or on one
+           of the Uvraak's own pins */
+        chukPen:  at(187.00, 66.00),
+        seward:   at(194.00, 65.20),
+        landF:land.toString(), seaF:sea.toString(),
+        proj:S.MAP_RK_PROJ,
+        /* it is projected from real degrees, not a 0..100 diagram */
+        pinsReal: S.REGIONS_RK.every(x=>Array.isArray(x.real)),
+        holdsReal: S.RK_HOLDS.every(x=>Array.isArray(x.ll)),
+        capital:  S.REGIONS_RK.find(x=>x.capital).real,
+      };
+    });
+    const land=p=>p.frac>0.60, sea=p=>p.frac<0.40;
+    yes('the sheet draws without throwing', !r.threw, r.threw||'');
+    yes('there is land where Chukotka is', land(r.chukotka), JSON.stringify(r.chukotka));
+    yes('there is land where Alaska is',   land(r.alaska),   JSON.stringify(r.alaska));
+    yes('and cold water between the two capes', sea(r.strait), JSON.stringify(r.strait));
+    yes('the Bering Sea is water too', sea(r.bering));
+    yes('both peninsulas that make the strait are land',
+        land(r.chukPen) && land(r.seward),
+        'Chukchi '+JSON.stringify(r.chukPen)+' · Seward '+JSON.stringify(r.seward));
+    yes('the projection is real degrees',
+        r.proj.lonW===164 && r.proj.lonE===226, JSON.stringify(r.proj));
+    yes('and it is undistorted at this latitude',
+        Math.abs(((r.proj.lonE-r.proj.lonW)*Math.cos(65*Math.PI/180)
+                  /(r.proj.latN-r.proj.latS))/(480/216) - 1) < 0.12,
+        'lon:lat ratio vs the strip');
+    yes('every place is pinned by longitude and latitude', r.pinsReal);
+    yes('and so is every hold on the far shore', r.holdsReal);
+    yes('the capital sits on the north shore of the sound',
+        r.capital[0]<-164 && r.capital[0]>-167 && r.capital[1]>64 && r.capital[1]<65,
+        JSON.stringify(r.capital));
+  }
+  { const r=await pg.evaluate(()=>{
+      const S=window.__SS, G=S.G;
+      /* the far shore's holds have to fall on the far shore, and the
+         country's places on the country */
+      const P=S.MAP_RK_PROJ;
+      const westOf180=S.RK_HOLDS.filter(h=>S.rkLonX(h.ll[0])<191.91).length;
+      const eastOf180=S.REGIONS_RK.filter(x=>S.rkLonX(x.real[0])>191.5).length;
+      const inBox=(ll)=>{ const x=S.rkLonX(ll[0]);
+        return x>=P.lonW && x<=P.lonE && ll[1]<=P.latN && ll[1]>=P.latS; };
+      return {westOf180, eastOf180,
+              holdsIn:S.RK_HOLDS.every(h=>inBox(h.ll)),
+              pinsIn:S.REGIONS_RK.every(x=>inBox(x.real)),
+              n:S.RK_HOLDS.length, m:S.REGIONS_RK.length};
+    });
+    yes('every hold is west of Cape Prince of Wales', r.westOf180===r.n, r.westOf180+' of '+r.n);
+    yes('every Rkrai place is on the Alaskan side', r.eastOf180===r.m, r.eastOf180+' of '+r.m);
+    yes('and all of it is inside the sheet', r.holdsIn && r.pinsIn);
+  }
+
   head('THE PROJECT KNOWS HOW FAR IT HAS GOT');
   { const r=await pg.evaluate(()=>{
       const S=window.__SS, G=S.G;
