@@ -344,6 +344,7 @@
       <button class="btn" id="btn-titles">⚜ TITLES</button>
       <button class="btn" id="btn-raunskar" style="display:none">✇ THE RAUNSKAR</button>
       <button class="btn" id="btn-skarvek" style="display:none">⚔ THE SKARVEK</button>
+      <button class="btn" id="btn-crossing" style="display:none">⛵ THE UVRAAK</button>
       <button class="btn" id="btn-trophies">🏆 TROPHIES</button>
       <button class="btn" id="btn-regalia">⚜ REGALIA</button>
       <button class="btn" id="btn-circus">🏇 CIRCUS</button>
@@ -8363,7 +8364,7 @@ function drawBodyMap(cnv,w,view,tms){
     const SUBS={
       profile:{val:sv,      tiers:SECRET_PART.tiers,                                   label:'LENGTH', ends:['SHORT','IMMENSE']},
       girth:  {val:gvGirth, tiers:['Slight','Slim','Middling','Thick','Immense'],       label:'GIRTH',  ends:['SLIGHT','IMMENSE']},
-      behind: {val:gvSeat,  tiers:['Flat','Plain','Firm','Full','Sculpted'],            label:'SEAT',   ends:['FLAT','SCULPTED']},
+      behind: {val:gvSeat,  tiers:['Flat','Plain','Firm','Heavy','Slab'],               label:'RUMP',   ends:['FLAT','SLAB']},
     };
     const SB=SUBS[secretSub]||SUBS.profile;
     const val=SB.val, impS=val>=IMPOSSIBLE_V;
@@ -8478,7 +8479,7 @@ function drawBodyMap(cnv,w,view,tms){
       c.fillStyle='rgba(230,210,240,.55)'; c.font='bold 8px Georgia,serif';
       c.fillText('◧ HEAD-ON · ACROSS', cx, top+56);
     } else {
-      // BEHIND — the seat, as the chart measures every other rear on it
+      // BEHIND — the rump, as the chart measures every other rear on it
       const eff=val, W3=11+(eff/10)*18, H3=7+(eff/10)*10;
       const bx=cx, by=top+82;
       const roll=anim*Math.sin(ph*2)*H3*0.10;
@@ -9847,7 +9848,7 @@ function openBodyMap(w,back){
       if(!bmPart){
         const d=document.createElement('div'); d.className='small muted';
         d.style.textAlign='center';
-        d.textContent='No part chosen. Click the figure — the face, the chest, the waist, the seat, the legs.';
+        d.textContent='No part chosen. Click the figure — the face, the chest, the waist, the rump, the legs.';
         pr.appendChild(d); return;
       }
       const P=partsFor(w).find(p=>p.id===bmPart);
@@ -9926,7 +9927,7 @@ function openBodyMap(w,back){
         sb.style.borderColor='#8a5cc0'; sb.style.minWidth='96px';
         sb.title = id==='profile'? 'The measure everyone means when they say the measure.'
                  : id==='girth'  ? 'Taken across, not along. The ledger records both.'
-                 : 'The seat, charted the same way the ledger charts everybody else’s. It is only fair.';
+                 : 'CLUNES in the surveyor’s hand, the rump in everybody else’s, and charted the same way the ledger charts every other rear on it. It is only fair.';
         sb.onclick=()=>{ if(secretSub===id) return; secretSub=id; bmResetCache(); buildSub(); redraw(); try{sfx('ui');}catch(e){} };
         sv.appendChild(sb);
       });
@@ -13003,6 +13004,21 @@ function startFight(region, briefData){
     foe.ai.aggr*=0.5+ (1-B.threat)*0.1; foe.ai.react*=1.6+(1-B.threat)*0.8;
     FT.rigThreat=B.threat;
   }
+  /* ⛵ A HOLD ON THE FAR SHORE. The look-over put both sides on the same
+     1-10 scale before you committed, so the gap it showed you is the gap
+     that scales the man in front of you — a 7 against your 5 has to
+     actually be two points harder or the screen was decoration. */
+  if(briefData.rkCross){
+    FT.rkCross=briefData.rkCross;
+    const g=clamp(briefData.rkCross.gap|0, -4, 6);
+    foe.maxHp*=(1+g*0.155); foe.hp=foe.maxHp;
+    foe.dmgMul=(foe.dmgMul||1)*(1+g*0.085);
+    foe.ai.skill=(foe.ai.skill||0)+clamp(Math.round(g*0.6),-2,3);
+    if(g>=3) foe.ai.aggr=Math.min(0.95,(foe.ai.aggr||0.6)*1.15);
+    if(g<=-3) foe.ai.react=(foe.ai.react||0.3)*1.35;
+    const H=briefData.rkCross.hold? rkHoldById(briefData.rkCross.hold) : null;
+    if(H) setTimeout(()=>{ if(FT&&!FT.over) banner(FT.foe.x, FT.foe.y-64, '⛵ '+H.name, '#8fc0cf'); }, 800);
+  }
   if(FT.ambush){ foe.hp=foe.maxHp*0.55; foe.hurt=20; foe.vx=-foe.facing*4; foe.vy=-3; foe.onGround=false; }  // you struck first
   if(FT.hired){ p.maxHp*=2.2; p.hp=p.maxHp; p.dmgMul=2.4; foe.ai.aggr*=0.7; }                                  // a brawny substitute
   if(FT.upperHelp){ FT.crowd=68; foe.maxHp*=0.7; foe.hp=foe.maxHp; foe.ai.aggr*=0.75; foe.ai.react*=1.4; }      // eques: the editor quietly tilts the bout
@@ -14139,6 +14155,28 @@ function finishFight(won){
   G.hygiene=clamp((G.hygiene===undefined?70:G.hygiene)-8,0,100);   // sand, sweat and other men's blood
   /* ⚔ THE PIT OUTSIDE THE HARBOUR settles on its own ladder, and it counts
      every man you put down whether or not you walked off the field. */
+  if(G.__rkCross){
+    try{
+      const gt=FT.gauntlet;
+      const want=(G.__rkCross.waves|0);
+      const cleared = won? want : (gt? clamp((gt.wave|0)-1, 0, want) : 0);
+      const R=rkCrossSettle(won, cleared);
+      if(R){
+        setTimeout(()=>{ try{
+          toast('⛵ '+(R.won? R.hold.name+' IS TAKEN.' : 'They hold '+R.hold.name+'.')
+            +'  '+R.cleared+' of '+R.of+' down · 🪙 '+R.coin+' · +'+R.war+' notches'
+            +(R.pivot? ' · the rock’s third' : '')+(R.closing&&R.won? ' · closing bounty' : ''), 6400);
+          if(R.won && R.vows) R.vows.forEach((v,i)=>{
+            setTimeout(()=>{ try{
+              toast((v.truth===true? '✔ TRUE — ' : v.truth==='half'? '◑ HALF TRUE — ' : '✘ A LIE — ')
+                +v.pitch+(v.paid? '   '+v.paid : ''), 7000);
+            }catch(e){} }, 2600+i*3400);
+          });
+          if(R.peak) setTimeout(()=>toast('⛵ ALL SEVEN. '+rkCrossPhase().line, 9000), 12000);
+        }catch(e){} }, 300);
+      }
+    }catch(e){}
+  }
   if(G.__rkPit){
     try{
       const gt=FT.gauntlet;
@@ -32960,6 +32998,842 @@ function standardsHere(){
    without ever finding out what any of it was called.
    ===================================================================== */
 /* =====================================================================
+   ⛵ THE UVRAAK — THE GOING-OVER
+   ---------------------------------------------------------------------
+   The coast is at 900 and it is not finished. Everything the Rkrai have
+   built — the Ten, the four provinces, the weighing floor, the rank ladder
+   cut into the front of every house — is a machine for moving a surplus
+   around a headland, and the headland is full. There is one direction left
+   and it is west, across fifty-odd miles of the worst water any of them
+   have ever had a reason to look at, onto a shore that has its own people
+   on it and no interest whatsoever in being counted.
+
+   The council's own arithmetic says the same thing every winter: the
+   Rkraun reaches its height in the middle of this century or it does not
+   reach it at all, and the difference is whether CHUKOTKA is theirs. So
+   the Voice advertises. There are criers on the weighing floor, there is a
+   berth on every launching, there is a purse for every hold taken — and
+   there are the things the criers say to men who have not decided, which
+   range from the merely optimistic to the frankly actionable.
+
+   Some of it is true. That is the part nobody expects.
+   ===================================================================== */
+const RK_UVRAAK = {
+  name:'THE UVRAAK',
+  what:'The going-over. Fifty miles of the worst water on the coast, a shore with '
+      +'its own people on it, and a council that has done the arithmetic and needs it '
+      +'anyway. Seven holds between here and the Anadyr, and the crossing is only open '
+      +'when the strait says so.',
+  why:'By the middle of this century the Rkraun is either at its height or it is a '
+      +'headland with a very good filing system. The council knows which of those it '
+      +'is buying.',
+};
+/* ---- THE STRAIT'S OWN CALENDAR, WHICH IS THE ONLY ONE THAT MATTERS ----
+   Four windows, twelve days each, and they decide what can be done at all:
+   a hold you can row to in August is unreachable in October and can be
+   WALKED to in February. This is what the coast means by an important time
+   — not a festival, a window. */
+const RK_CROSS_SEASONS = [
+  {id:'break', name:'THE BREAK-UP', col:'#8fc0cf', boat:false, ice:false,
+   what:'The ice is going out and it is going out in pieces the size of houses. '
+       +'Nothing crosses. The launchings are hauled up and the criers talk about next month.',
+   does:'No hold can be taken. The council pays the standing purse and nothing else.'},
+  {id:'open',  name:'THE OPEN WATER', col:'#7ad08a', boat:true, ice:false,
+   what:'Clear water, the launchings in it, and every man on the floor being offered a '
+       +'berth by somebody. This is the season the whole project actually happens in.',
+   does:'Every water hold is open. The southern shore and the river mouth can be reached.'},
+  {id:'close', name:'THE CLOSING', col:'#e8c34a', boat:true, ice:false,
+   what:'The last launchings, and the Ten in session behind them. Anything not landed '
+       +'by the end of this window winters where it is.',
+   does:'Water holds still open, and the council pays a closing bounty on anything taken now.'},
+  {id:'ice',   name:'THE ICE ROAD', col:'#cfe4f0', boat:false, ice:true,
+   what:'The strait shuts hard and becomes the flattest road on the coast. Men walk it. '
+       +'So does everybody else, which is the part the criers leave out.',
+   does:'The northern holds and the mid-strait rock open — on foot. The water holds do not.'},
+];
+const RK_CROSS_WINDOW = 12;                                  // days per window
+function rkCrossDay(){ try{ return (G.day|0); }catch(e){ return 0; } }
+function rkCrossSeason(){
+  const d=rkCrossDay(), n=RK_CROSS_SEASONS.length, per=RK_CROSS_WINDOW;
+  const i=Math.floor((d%(per*n))/per);
+  const S=RK_CROSS_SEASONS[clamp(i,0,n-1)];
+  return Object.assign({}, S, {left: per - (d%per), i:i});
+}
+function rkCrossNextSeason(){
+  const i=rkCrossSeason().i;
+  return RK_CROSS_SEASONS[(i+1)%RK_CROSS_SEASONS.length];
+}
+/* =====================================================================
+   THE SEVEN HOLDS
+   ---------------------------------------------------------------------
+   x,y are 0..1 on the strait plate, not on Rome's map — this coast gets
+   its own sheet. `power` is what the garrison is worth on the same 1-10
+   scale the look-over puts YOU on; `kit` is what they are carrying, which
+   is the thing you are supposed to read before you decide.
+   ===================================================================== */
+const RK_HOLDS = [
+  {id:'naukan', name:'THE NAUKAN STAIRS', x:0.392, y:0.322, need:0, power:5, waves:2,
+   reach:'boat', coin:180, war:6, pull:1,
+   place:'A cliff village cut in steps at the very nose of the far shore — the closest '
+        +'thing on it to a door, and the only landing a launching can make in one tide.',
+   kit:[{lab:'IN HAND',    n:'Hide-laced spears, one rank of them', p:1.2, w:'and one rank is all of them'},
+        {lab:'ON THE BODY',n:'Bone plate over seal hide',           p:0.9, w:'it will stop a slung stone'},
+        {lab:'AT RANGE',   n:'Slings, and the height to use them',  p:0.8, w:'downhill, which counts'},
+        {lab:'THE GROUND', n:'A staircase, and you are at the foot', p:0.7, w:'the whole reason it is a hold'}],
+   read:'Not many and not well armed, but they are standing on a staircase and you are at the bottom of it.',
+   prize:'THE DOOR. Nothing else on the far shore can be reached until this is yours.'},
+  {id:'uelen',  name:'THE UELEN SPIT',    x:0.345, y:0.262, need:1, power:6, waves:2,
+   reach:'boat', coin:240, war:8, pull:2,
+   place:'A shingle spit on the north side with a lagoon behind it. Every launching that '
+        +'goes further west shelters here or does not go further west.',
+   kit:[{lab:'IN HAND',    n:'Whale-rib shafts, thrown',            p:1.4, w:'heavier than they look'},
+        {lab:'ON THE BODY',n:'Layered hide, doubled at the chest',  p:1.1, w:'and doubled where it matters'},
+        {lab:'TOGETHER',   n:'A drum — it moves them as one',       p:1.0, w:'not a joke, a formation'},
+        {lab:'THE GROUND', n:'Shingle, and they know which of it holds', p:1.1, w:'you will not'}],
+   read:'Better men than the stairs and they know the ground. Even fight if your kit is honest.'},
+  {id:'imaqliq',name:'THE IMAQLIQ ROCK',  x:0.468, y:0.300, need:1, power:7, waves:3,
+   reach:'ice',  coin:300, war:12, pull:1,
+   place:'The high island in the middle of the strait. Two miles of cliff and a village on '
+        +'top of it, and from that top you can see both shores at once — which is why it is '
+        +'worth three of anything else out here.',
+   kit:[{lab:'AT RANGE',   n:'Sinew-backed bows, and the range for them', p:1.8, w:'they start on you at the water'},
+        {lab:'THE WORKS',  n:'Stone breastworks, waist high',       p:1.3, w:'built, not thrown up'},
+        {lab:'IN HAND',    n:'Ivory-headed clubs for the top of the stair', p:1.2, w:'for exactly one purpose'},
+        {lab:'THE GROUND', n:'Two miles of cliff',                  p:1.3, w:'and one way up it'}],
+   read:'The hardest small thing in the strait. Whoever holds this rock holds the crossing itself.',
+   prize:'THE PIVOT. Every hold taken after this one pays a third again.'},
+  {id:'enurmin',name:'THE ENURMIN BAR',   x:0.288, y:0.170, need:2, power:6, waves:3,
+   reach:'ice',  coin:280, war:10, pull:2,
+   place:'A sand bar a long day north-west along the coast, walkable when the strait is '
+        +'shut and unreachable when it is not. There is a herd behind it.',
+   kit:[{lab:'IN HAND',    n:'Long spears, set in a line',          p:1.5, w:'set, which is the difficult part'},
+        {lab:'ON THE BODY',n:'Antler over hide',                    p:1.0, w:'plates of it, sewn'},
+        {lab:'WITH THEM',  n:'Dogs, and they are used properly',    p:1.0, w:'they break the line before you reach it'},
+        {lab:'THE GROUND', n:'A bar with a herd behind it',          p:1.1, w:'and they are defending the herd'}],
+   read:'They fight like men who expect to be walked at, because every winter somebody does.'},
+  {id:'lorino', name:'THE LORINO SHELF',  x:0.300, y:0.382, need:2, power:7, waves:3,
+   reach:'boat', coin:340, war:12, pull:3,
+   place:'The whaling shelf on the south side. Deep water close in, and the racks along it '
+        +'are the reason anybody on either shore eats in March.',
+   kit:[{lab:'IN HAND',    n:'Toggling harpoons — for whales, and not fussy', p:1.8, w:'it opens on the way out'},
+        {lab:'ON THE BODY',n:'Hide soaked and frozen hard',         p:1.2, w:'a cheap plate that works'},
+        {lab:'AFLOAT',     n:'Boats, and they will use them on you',p:1.4, w:'they do not wait on the beach'},
+        {lab:'THE GROUND', n:'Deep water close in',                 p:1.2, w:'no shallows to land dry in'}],
+   read:'The richest thing short of the river and defended by men whose tools are already weapons.',
+   prize:'THE RACKS. The far shore starts paying a standing income.'},
+  {id:'kolyuchin',name:'THE KOLYUCHIN SHOAL', x:0.222, y:0.082, need:4, power:8, waves:4,
+   reach:'ice',  coin:420, war:16, pull:2,
+   place:'The far northern shoal, behind the ice for most of the year and behind nothing at '
+        +'all for the rest. The last thing on this coast anybody has counted.',
+   kit:[{lab:'IN HAND',    n:'Iron. Somebody has been trading with somebody', p:2.0, w:'and you should want to know who'},
+        {lab:'ON THE BODY',n:'Plate over antler over hide',         p:1.6, w:'three layers, all of them thought about'},
+        {lab:'THE WORKS',  n:'A wall, and it is a real one',         p:1.6, w:'with a gate in it'},
+        {lab:'THE GROUND', n:'Behind the ice, and used to it',      p:1.4, w:'they have done this before'}],
+   read:'They have iron and you should want to know where from. This is the fight that tells you the far shore has friends.'},
+  {id:'anadyr', name:'THE ANADYR MOUTH',  x:0.150, y:0.548, need:5, power:9, waves:5,
+   reach:'boat', coin:700, war:26, pull:5,
+   place:'The river mouth, and the river behind it goes further inland than anybody on the '
+        +'Rkrai shore has ever gone. Take this and the far shore is not a frontier any more, '
+        +'it is a province.',
+   kit:[{lab:'IN HAND',    n:'Iron spearheads, in quantity',        p:2.1, w:'quantity is the whole point'},
+        {lab:'ON THE BODY',n:'Mail. Actual mail, from somewhere west', p:2.0, w:'this is a trading power, not a village'},
+        {lab:'AT RANGE',   n:'Massed bows',                         p:1.7, w:'volleys, on a count'},
+        {lab:'THE WORKS',  n:'A stockade, garrisoned, expecting you', p:1.8, w:'they have known you were coming for a year'}],
+   read:'The whole point of the project and the reason the arithmetic works. It is a 1-v-5 with a wall in it.',
+   prize:'THE PEAK. The Rkraun reaches its height, and the record says when.'},
+];
+function rkHoldById(id){ return RK_HOLDS.find(h=>h.id===id)||null; }
+/* =====================================================================
+   🗺 THE STRAIT PLATE — this coast's own sheet
+   ---------------------------------------------------------------------
+   Not Rome's provinces with new labels on them. Two authored coastlines,
+   a strait between them, and a chart that changes with the season because
+   out here the season is the only thing that decides what is reachable.
+   The projection is the plate's own: x runs west-to-east across fifty-two
+   miles of water, y runs north-to-south down about the same again, and
+   nothing on it corresponds to a Roman mile because nobody out here has
+   ever heard of one.
+   ===================================================================== */
+/* Catmull-Rom through authored points — a coastline drawn as a polyline
+   reads as a cut-out, and every one of these shores is a real curve. */
+/* ---------------------------------------------------------------------
+   THE TWO SHORES. Authored coast by coast, north to south, and closed
+   along the plate's own edge rather than through an off-sheet point —
+   splining THROUGH a far corner is what turned both of these into
+   arrowheads the first time. The strait between them is a fifth of the
+   sheet wide, because seven pins and their names have to fit in it.
+   --------------------------------------------------------------------- */
+const RK_COAST_W = [   /* CHUKOTKA — the nose, and the gulf under it */
+  [0.02,-0.06],[0.13,0.00],[0.205,0.055],[0.245,0.115],[0.30,0.155],[0.278,0.215],
+  [0.325,0.252],[0.372,0.276],[0.402,0.305],[0.378,0.345],[0.322,0.362],[0.286,0.402],
+  [0.232,0.392],[0.196,0.438],[0.252,0.492],[0.276,0.552],[0.228,0.600],[0.152,0.578],
+  [0.096,0.626],[0.036,0.672],[-0.02,0.73]
+];
+const RK_COAST_W_END = [[-0.06,0.73],[-0.06,-0.06]];
+const RK_COAST_E = [   /* THE RKRAI SHORE — the near nose, and the sound under it */
+  [0.98,-0.06],[0.885,0.00],[0.812,0.052],[0.742,0.108],[0.685,0.168],[0.640,0.232],
+  [0.605,0.296],[0.632,0.336],[0.690,0.360],[0.745,0.388],[0.792,0.436],[0.722,0.480],
+  [0.688,0.540],[0.742,0.590],[0.812,0.620],[0.872,0.692],[0.938,0.752],[1.00,0.80]
+];
+const RK_COAST_E_END = [[1.06,0.80],[1.06,-0.06]];
+/* where each pin hangs its name, so seven of them in one strait do not stack */
+const RK_PIN_LAB = {
+  kolyuchin:[-12, 16], enurmin:[ 15,-12], uelen:[-13, 17],
+  naukan:   [ 15, 17], lorino: [-13, 18], anadyr:[ 16, 16],
+  imaqliq:  [ 13,-22],
+};
+function drawStraitMap(cv, hover){
+  const c=cv.getContext('2d');
+  const W=cv.width, H=cv.height;
+  c.imageSmoothingEnabled=true;
+  c.clearRect(0,0,W,H);
+  const S=rkCrossSeason();
+  const PAD=6;
+  const X=u=>PAD+u*(W-PAD*2), Y=v=>PAD+v*(H-PAD*2);
+  /* THE SHEET GOES WHITE IN FEBRUARY. Everything written on open water —
+     the scale, the sea names, the pin plates out in the strait — has to
+     flip with it or the whole chart disappears for a quarter of the year. */
+  const ICEY=!!S.ice;
+  const seaInk=a=>ICEY? 'rgba(34,50,62,'+a+')' : 'rgba(226,244,252,'+a+')';
+  const seaSoft=a=>ICEY? 'rgba(58,84,100,'+a+')' : 'rgba(160,200,220,'+a+')';
+  /* Catmull-Rom through the authored points — a coast drawn as a polyline
+     reads as a cut-out, and every one of these shores is a real curve. */
+  const coastPath=(pts, tail)=>{
+    c.beginPath(); c.moveTo(X(pts[0][0]), Y(pts[0][1]));
+    for(let i=0;i<pts.length-1;i++){
+      const p0=pts[i-1]||pts[i], p1=pts[i], p2=pts[i+1], p3=pts[i+2]||p2;
+      c.bezierCurveTo(X(p1[0]+(p2[0]-p0[0])/6), Y(p1[1]+(p2[1]-p0[1])/6),
+                      X(p2[0]-(p3[0]-p1[0])/6), Y(p2[1]-(p3[1]-p1[1])/6),
+                      X(p2[0]), Y(p2[1]));
+    }
+    if(tail){ tail.forEach(p=>c.lineTo(X(p[0]),Y(p[1]))); c.closePath(); }
+  };
+
+  /* ================= 1 · THE WATER ================= */
+  { const g=c.createLinearGradient(0,0,0,H);
+    g.addColorStop(0,'#16303e'); g.addColorStop(0.55,'#0f2431'); g.addColorStop(1,'#0a1620');
+    c.fillStyle=g; c.fillRect(0,0,W,H); }
+  c.strokeStyle='rgba(140,190,214,.05)'; c.lineWidth=1;
+  for(let gx=0; gx<=8; gx++){ const x=X(gx/8); c.beginPath(); c.moveTo(x,0); c.lineTo(x,H); c.stroke(); }
+  for(let gy=0; gy<=5; gy++){ const y=Y(gy/5); c.beginPath(); c.moveTo(0,y); c.lineTo(W,y); c.stroke(); }
+
+  /* ================= 2 · WHAT IS ON IT THIS MONTH =================
+     All of it goes down BEFORE the land, so anything that strays over a
+     shore is simply buried by the shore. */
+  if(S.id==='open' || S.id==='close'){
+    c.strokeStyle='rgba(150,200,220,.13)'; c.lineWidth=1.1;
+    for(let r=0;r<28;r++){
+      const yy=Y(0.02+r*0.035), amp=2.4+((r*7)%5);
+      c.beginPath();
+      for(let xx=0; xx<=W; xx+=9) c.lineTo(xx, yy+Math.sin((xx+r*23)/26)*amp*0.34);
+      c.stroke();
+    }
+    /* the launchings, in the water, doing the thing the season is for */
+    const boats = S.id==='open'? [[0.470,0.185],[0.505,0.400],[0.545,0.620]]
+                               : [[0.500,0.250]];
+    boats.forEach(([bx,by])=>{
+      const px=X(bx), py=Y(by);
+      c.fillStyle='rgba(0,0,0,.35)'; c.beginPath();
+      c.ellipse(px,py+3,9,2.2,0,0,7); c.fill();
+      c.fillStyle='#33291b'; c.beginPath();
+      c.moveTo(px-8,py-1); c.quadraticCurveTo(px,py+5,px+8,py-1); c.closePath(); c.fill();
+      c.strokeStyle='#8a7050'; c.lineWidth=1; c.stroke();
+      c.strokeStyle='#c8b48a'; c.lineWidth=1.2;
+      c.beginPath(); c.moveTo(px,py-2); c.lineTo(px,py-11); c.stroke();
+      c.fillStyle='rgba(232,220,190,.88)'; c.beginPath();
+      c.moveTo(px,py-11); c.lineTo(px+6,py-4); c.lineTo(px,py-3); c.closePath(); c.fill();
+    });
+    if(S.id==='close'){                       /* new ice making along both shores */
+      c.save(); c.strokeStyle='rgba(206,232,244,.34)'; c.lineWidth=4.5;
+      coastPath(RK_COAST_W); c.stroke(); coastPath(RK_COAST_E); c.stroke(); c.restore();
+    }
+  }
+  if(S.id==='break'){
+    /* FLOES, and the strait is the worst of it. Pieces the size of houses
+       with the gaps between them the reason nothing crosses. */
+    for(let i=0;i<130;i++){
+      const inStrait = (i%3)!==0;
+      const fx = inStrait? (0.40+((i*37)%100)/100*0.22) : (((i*61)%100)/100);
+      const fy = 0.01+((i*23)%100)/100*0.76;
+      const r  = (inStrait? 3.6 : 2.6)+((i*31)%5);
+      c.fillStyle='rgba(214,236,246,'+(0.22+((i*13)%4)*0.11)+')';
+      c.beginPath();
+      for(let k=0;k<5;k++){ const a=k/5*Math.PI*2+i;
+        c.lineTo(X(fx)+Math.cos(a)*r*(0.7+((i+k)%3)*0.2)/((W/H)*0.55), Y(fy)+Math.sin(a)*r*0.8); }
+      c.closePath(); c.fill();
+      c.strokeStyle='rgba(255,255,255,.18)'; c.lineWidth=0.7; c.stroke();
+    }
+  }
+  if(S.ice){
+    /* THE STRAIT SHUTS — and it does not shut in a stripe. The whole sea
+       goes over, which is the entire reason the northern holds are only
+       ever targets in this window and the water holds are not targets
+       at all. The ROAD is the part men actually walk. */
+    { const g=c.createLinearGradient(0,0,0,H);
+      g.addColorStop(0,'#cfe6f2'); g.addColorStop(0.5,'#dcecf6'); g.addColorStop(1,'#c2dbe9');
+      c.fillStyle=g; c.fillRect(0,0,W,H); }
+    c.strokeStyle='rgba(120,168,192,.40)'; c.lineWidth=1.1;   // pressure ridges, everywhere
+    for(let r=0;r<15;r++){
+      const yy=Y(-0.01+r*0.066);
+      c.beginPath(); c.moveTo(0,yy);
+      for(let k=0;k*26<W;k++) c.lineTo(k*26, yy+((k%2)?-3.2:3.2));
+      c.stroke();
+    }
+    c.strokeStyle='rgba(120,168,192,.26)'; c.lineWidth=1.6;   // and the heavy ones in the strait
+    for(let r=0;r<9;r++){
+      const yy=Y(0.02+r*0.095);
+      c.beginPath(); c.moveTo(X(0.38),yy);
+      for(let k=0;k<10;k++) c.lineTo(X(0.38+k*0.026), yy+((k%2)?-5:5));
+      c.stroke();
+    }
+  }
+
+  /* ================= 3 · THE LAND ================= */
+  const landFill=(pts, tail, warm)=>{
+    c.save();
+    c.shadowColor='rgba(0,0,0,.55)'; c.shadowBlur=10; c.shadowOffsetY=3;
+    coastPath(pts, tail);
+    const g=c.createLinearGradient(0,0,0,H);
+    if(warm){ g.addColorStop(0,'#514734'); g.addColorStop(0.55,'#413928'); g.addColorStop(1,'#2e281a'); }
+    else    { g.addColorStop(0,'#3c4741'); g.addColorStop(0.55,'#313b36'); g.addColorStop(1,'#232b27'); }
+    c.fillStyle=g; c.fill();
+    c.restore();
+    /* the fringe just inside the shore — beach, tundra, the strip anybody
+       actually lands on. It is what stops each of these being a blot. */
+    c.save(); coastPath(pts, tail); c.clip();
+    coastPath(pts); c.strokeStyle= warm? 'rgba(150,128,84,.42)' : 'rgba(130,156,164,.40)';
+    c.lineWidth=9; c.stroke();
+    coastPath(pts); c.strokeStyle= warm? 'rgba(182,156,100,.30)' : 'rgba(164,190,198,.28)';
+    c.lineWidth=3.5; c.stroke();
+    c.restore();
+    coastPath(pts); c.strokeStyle= warm? 'rgba(232,195,74,.46)' : 'rgba(186,222,238,.52)';
+    c.lineWidth=1.6; c.stroke();
+  };
+  landFill(RK_COAST_W, RK_COAST_W_END, false);   // theirs: cold grey-green
+  landFill(RK_COAST_E, RK_COAST_E_END, true);    // yours: the ochre the whole coast is drawn in
+  /* interior relief, clipped inside each shore so no ridge floats at sea */
+  const relief=(pts,tail,rows)=>{
+    c.save(); coastPath(pts,tail); c.clip();
+    c.strokeStyle='rgba(255,255,255,.06)'; c.lineWidth=1.2;
+    rows.forEach(([a,b,d,e])=>{ c.beginPath(); c.moveTo(X(a),Y(b));
+      c.quadraticCurveTo(X((a+d)/2),Y((b+e)/2-0.035),X(d),Y(e)); c.stroke(); });
+    c.strokeStyle='rgba(0,0,0,.16)'; c.lineWidth=1.2;
+    rows.forEach(([a,b,d,e])=>{ c.beginPath(); c.moveTo(X(a),Y(b)+2.5);
+      c.quadraticCurveTo(X((a+d)/2),Y((b+e)/2-0.035)+2.5,X(d),Y(e)+2.5); c.stroke(); });
+    c.restore();
+  };
+  relief(RK_COAST_W, RK_COAST_W_END,
+    [[0.00,0.10,0.20,0.16],[0.03,0.24,0.24,0.28],[0.00,0.40,0.19,0.36],
+     [0.02,0.54,0.16,0.50],[0.08,0.66,0.22,0.62]]);
+  relief(RK_COAST_E, RK_COAST_E_END,
+    [[1.00,0.12,0.80,0.18],[0.97,0.28,0.76,0.32],[1.00,0.44,0.82,0.42],
+     [0.98,0.60,0.80,0.58],[0.95,0.74,0.86,0.70]]);
+
+  /* ================= 4 · THE TWO ROCKS IN THE MIDDLE ================= */
+  const rock=(rx,ry,r,name)=>{
+    c.save(); c.shadowColor='rgba(0,0,0,.6)'; c.shadowBlur=7;
+    c.fillStyle='#4d4d46'; c.beginPath();
+    for(let k=0;k<8;k++){ const a=k/8*Math.PI*2;
+      c.lineTo(X(rx)+Math.cos(a)*r*(0.70+((k*3)%3)*0.14)/((W/H)*0.55), Y(ry)+Math.sin(a)*r*0.9); }
+    c.closePath(); c.fill(); c.restore();
+    c.strokeStyle='rgba(200,228,242,.60)'; c.lineWidth=1.2; c.stroke();
+    c.fillStyle='rgba(222,240,250,.30)';
+    c.beginPath(); c.ellipse(X(rx)-r*0.16, Y(ry)-r*0.34, r*0.34, r*0.22, 0,0,7); c.fill();
+    if(name){ c.font='7px Georgia,serif'; c.textAlign='center';
+      c.fillStyle='rgba(200,228,242,.60)'; c.fillText(name, X(rx), Y(ry)+r*0.9+9); }
+  };
+  rock(0.468,0.300, 11, null);        // IMAQLIQ — it has a pin of its own
+  rock(0.532,0.312, 6,  'INALIQ');    // and the little one nobody has ever fought over
+
+  /* ================= 5 · THE NAMES ON THE SHEET ================= */
+  c.textAlign='left';
+  c.font='bold 13px Georgia,serif'; c.fillStyle='rgba(206,230,242,.80)';
+  c.fillText('CHUKOTKA', X(0.028), Y(0.300));
+  c.font='8px Georgia,serif'; c.fillStyle='rgba(178,206,220,.50)';
+  c.fillText('VAAK-RUUN · THE OVER-SHORE', X(0.028), Y(0.338));
+  c.fillStyle='rgba(178,206,220,.34)';
+  c.fillText('and its own people on it, with', X(0.028), Y(0.372));
+  c.fillText('no interest in being counted', X(0.028), Y(0.400));
+  c.textAlign='right';
+  c.font='bold 13px Georgia,serif'; c.fillStyle='rgba(236,202,94,.82)';
+  c.fillText('THE RKRAI SHORE', X(0.972), Y(0.300));
+  c.font='8px Georgia,serif'; c.fillStyle='rgba(214,188,124,.52)';
+  c.fillText('AND EVERY HOLD BEHIND IT IS FULL', X(0.972), Y(0.338));
+  /* the two capes, because the whole crossing is between them */
+  c.font='italic 7.5px Georgia,serif'; c.textAlign='right';
+  c.fillStyle=seaSoft(0.62); c.fillText('THE FAR HORN', X(0.372), Y(0.222));
+  c.textAlign='left';
+  c.fillStyle='rgba(222,196,132,.56)'; c.fillText('THE NEAR HORN', X(0.616), Y(0.238));
+  /* home port */
+  { const hx=X(0.858), hy=Y(0.452);
+    c.fillStyle='rgba(0,0,0,.5)'; c.fillRect(hx-4,hy-4,8,8);
+    c.fillStyle='#e8c34a'; c.fillRect(hx-3,hy-3,6,6);
+    c.fillStyle='#fff2c8'; c.fillRect(hx-3,hy-3,6,2);
+    c.font='bold 8.5px Georgia,serif'; c.textAlign='left'; c.fillStyle='rgba(242,218,156,.86)';
+    c.fillText('LEOKANIS', hx+8, hy+3);
+    c.font='7px Georgia,serif'; c.fillStyle='rgba(214,188,124,.50)';
+    c.fillText('the launchings go from here', hx+8, hy+13); }
+  /* the water's own labels, kept out of the strait */
+  c.textAlign='left'; c.font='italic 9px Georgia,serif';
+  c.fillStyle=seaSoft(0.34);
+  c.fillText('T H E   N O R T H E R N   S E A', X(0.315), Y(0.038));
+  c.fillText('T H E   S O U T H E R N   S E A', X(0.36), Y(0.962));
+  c.save(); c.translate(X(0.088),Y(0.516)); c.rotate(-0.20);
+  c.fillStyle=seaSoft(0.34); c.font='italic 8.5px Georgia,serif';
+  c.fillText('THE ANADYR GULF',0,0); c.restore();
+  c.save(); c.translate(X(0.700),Y(0.512)); c.rotate(0.14);
+  c.fillStyle='rgba(206,182,128,.30)'; c.fillText('THE SOUND',0,0); c.restore();
+
+  /* ================= 6 · FIFTY-TWO MILES, AND THIS MONTH'S WORD FOR IT ================= */
+  { const y0=Y(0.108), x1=X(0.402), x2=X(0.605);
+    c.strokeStyle=seaInk(0.50); c.lineWidth=1;
+    c.beginPath(); c.moveTo(x1,y0); c.lineTo(x2,y0); c.stroke();
+    c.beginPath(); c.moveTo(x1,y0-4.5); c.lineTo(x1,y0+4.5);
+    c.moveTo(x2,y0-4.5); c.lineTo(x2,y0+4.5); c.stroke();
+    c.textAlign='center'; c.font='bold 8.5px Georgia,serif'; c.fillStyle=seaInk(0.78);
+    c.fillText('52 MILES', (x1+x2)/2, y0-7);
+    const wd = S.ice? 'WALKED' : S.boat? 'ROWED' : 'NOT AT ALL';
+    c.font='bold 8px Georgia,serif';
+    c.fillStyle= ICEY? 'rgba(30,62,86,.90)' : rgbA0(S.col,0.90);
+    c.fillText(wd, (x1+x2)/2, y0+14); }
+
+  /* ================= 7 · THE SEVEN ================= */
+  const pins=[];
+  RK_HOLDS.forEach(h=>{
+    const W2=rkHoldWhy(h), mine=rkHoldMine(h);
+    const px=X(h.x), py=Y(h.y);
+    pins.push({id:h.id, x:px, y:py});
+    const col = mine? '#e8c34a'
+              : W2.ok? '#7ad08a'
+              : W2.kind==='season'? (h.reach==='ice'? '#cfe4f0' : '#7fb8cf')
+              : '#8a7a70';
+    const on=mine||W2.ok, hot=(hover===h.id);
+    const off=RK_PIN_LAB[h.id]||[12,-13];
+    /* the leader, then the pin, then the name — in that order so nothing
+       is drawn over the thing it is pointing at */
+    c.strokeStyle='rgba(255,255,255,'+(hot?0.44:0.20)+')'; c.lineWidth=1;
+    c.beginPath(); c.moveTo(px+Math.sign(off[0])*6.5, py+Math.sign(off[1])*3);
+    c.lineTo(px+off[0]*0.86, py+off[1]*0.80); c.stroke();
+    if(hot){ c.fillStyle='rgba(255,242,200,.14)'; c.beginPath(); c.arc(px,py,15,0,7); c.fill(); }
+    c.beginPath(); c.arc(px,py, mine?7:6, 0,7);
+    c.fillStyle= mine? 'rgba(232,195,74,.92)' : on? 'rgba(122,208,138,.26)' : 'rgba(22,20,18,.80)';
+    c.fill();
+    c.strokeStyle=col; c.lineWidth= hot?2.6 : mine?2.1 : 1.5; c.stroke();
+    if(mine){                                   /* cut, the way the post is cut */
+      c.strokeStyle='#2c1c12'; c.lineWidth=1.7;
+      c.beginPath(); c.moveTo(px-2.8,py-2.8); c.lineTo(px+2.8,py+2.8);
+      c.moveTo(px+2.8,py-2.8); c.lineTo(px-2.8,py+2.8); c.stroke();
+    } else if(on){
+      c.fillStyle=col; c.beginPath(); c.arc(px,py,2.1,0,7); c.fill();
+    } else if(W2.kind==='season'){              /* the wrong month, not the wrong man */
+      c.font='bold 9px Georgia,serif'; c.textAlign='center'; c.fillStyle=col;
+      c.fillText(h.reach==='ice'? '❄' : '≈', px, py+3.2);
+    } else {                                    /* behind holds you do not have */
+      c.strokeStyle='rgba(170,152,142,.75)'; c.lineWidth=1.4;
+      c.beginPath(); c.moveTo(px-2.8,py); c.lineTo(px+2.8,py); c.stroke();
+    }
+    /* the name, on a plate so it stays legible over ice, land or water */
+    const nm=h.name.replace(/^THE /,'');
+    const sub= mine? 'HELD' : (rkHoldPower(h)+' · '+(h.reach==='ice'?'on foot':'by hull'));
+    c.font=(mine||hot)? 'bold 8.5px Georgia,serif' : '8.5px Georgia,serif';
+    const tw=Math.max(c.measureText(nm).width, 52);
+    const lx=px+off[0], ly=py+off[1];
+    const bx=(off[0]<0? lx-tw-5 : lx-3), by=ly-9;
+    c.fillStyle= ICEY? (hot? 'rgba(250,254,255,.92)' : 'rgba(244,250,254,.80)')
+                     : (hot? 'rgba(12,18,24,.82)'    : 'rgba(10,16,22,.66)');
+    c.fillRect(bx, by, tw+8, 21);
+    c.strokeStyle= mine? 'rgba(200,150,30,.55)'
+                 : hot? (ICEY? 'rgba(60,84,100,.55)' : 'rgba(255,242,200,.36)')
+                 : (ICEY? 'rgba(120,150,168,.34)' : 'rgba(255,255,255,.10)');
+    c.lineWidth=1; c.strokeRect(bx+0.5, by+0.5, tw+7, 20);
+    c.textAlign= off[0]<0? 'right' : 'left';
+    c.fillStyle= ICEY? (mine? 'rgba(120,80,10,.98)' : on? 'rgba(24,70,44,.92)' : 'rgba(78,92,100,.80)')
+                     : (mine? 'rgba(255,240,186,.96)' : on? 'rgba(214,240,222,.90)' : 'rgba(174,160,152,.72)');
+    c.fillText(nm, lx, ly);
+    c.font='7px Georgia,serif';
+    c.fillStyle= ICEY? (mine? 'rgba(140,96,16,.80)' : 'rgba(72,96,110,.72)')
+                     : (mine? 'rgba(232,195,74,.70)' : 'rgba(174,196,206,.56)');
+    c.fillText(sub, lx, ly+9);
+  });
+  cv.__pins=pins;
+
+  /* the road men actually walk, laid over the pins so it reads as a route */
+  if(S.ice){
+    c.save(); c.setLineDash([6,5]); c.lineCap='round';
+    c.strokeStyle='rgba(255,255,255,.55)'; c.lineWidth=4;
+    c.beginPath(); c.moveTo(X(0.605),Y(0.296)); c.lineTo(X(0.532),Y(0.312));
+    c.lineTo(X(0.468),Y(0.300)); c.lineTo(X(0.402),Y(0.305)); c.stroke();
+    c.strokeStyle='rgba(52,36,26,.72)'; c.lineWidth=2;
+    c.beginPath(); c.moveTo(X(0.605),Y(0.296)); c.lineTo(X(0.532),Y(0.312));
+    c.lineTo(X(0.468),Y(0.300)); c.lineTo(X(0.402),Y(0.305)); c.stroke();
+    c.restore();
+    c.textAlign='center'; c.font='bold 7.5px Georgia,serif'; c.fillStyle='rgba(52,40,30,.80)';
+    c.fillText('THE ICE ROAD', X(0.560), Y(0.392));
+  }
+
+  /* ================= 8 · THE CARTOUCHE ================= */
+  { const bw=192, bh=44, bx=X(0.010), by=Y(0.988)-bh;
+    c.fillStyle='rgba(8,14,20,.86)'; c.fillRect(bx,by,bw,bh);
+    c.strokeStyle='rgba(232,195,74,.36)'; c.lineWidth=1; c.strokeRect(bx+0.5,by+0.5,bw-1,bh-1);
+    c.textAlign='left'; c.font='bold 9px Georgia,serif'; c.fillStyle='rgba(236,202,94,.90)';
+    c.fillText('THE UVRAAK · THE GOING-OVER', bx+8, by+15);
+    c.font='bold 7.5px Georgia,serif'; c.fillStyle=rgbA0(S.col,0.92);
+    c.fillText(S.name+' — '+S.left+' day'+(S.left===1?'':'s')+' left', bx+8, by+28);
+    c.font='7.5px Georgia,serif'; c.fillStyle='rgba(190,210,220,.56)';
+    c.fillText(rkHeldCount()+' of '+RK_HOLDS.length+' held · '+rkCrossPhase().name, bx+8, by+39); }
+  /* north, because a chart without one is a drawing */
+  { const nx=X(0.966), ny=Y(0.900);
+    c.strokeStyle=seaInk(0.58); c.lineWidth=1.3;
+    c.beginPath(); c.moveTo(nx,ny+12); c.lineTo(nx,ny-11); c.stroke();
+    c.fillStyle=seaInk(0.66);
+    c.beginPath(); c.moveTo(nx,ny-15); c.lineTo(nx-3.8,ny-6.5); c.lineTo(nx+3.8,ny-6.5); c.closePath(); c.fill();
+    c.textAlign='center'; c.font='bold 8px Georgia,serif';
+    c.fillText('N', nx, ny-18); }
+}
+
+/* WHICH PIN THE CLICK LANDED ON — the plate keeps its own projected
+   positions, because the sheet is scaled by CSS and the mouse is not. */
+function rkStraitHit(cv, ev){
+  const r=cv.getBoundingClientRect();
+  const mx=(ev.clientX-r.left)*(cv.width/r.width);
+  const my=(ev.clientY-r.top )*(cv.height/r.height);
+  let best=null, bd=1e9;
+  (cv.__pins||[]).forEach(p=>{
+    const d=(p.x-mx)*(p.x-mx)+(p.y-my)*(p.y-my);
+    if(d<bd){ bd=d; best=p; }
+  });
+  return (best && bd<=22*22)? best.id : null;
+}
+
+function rkCrossOn(){ try{ return rkHere() && !(G&&G.isFemale); }catch(e){ return false; } }
+function rkHeld(){ try{ return G.rkHolds||{}; }catch(e){ return {}; } }
+function rkHeldCount(){ return Object.keys(rkHeld()).length; }
+function rkHoldMine(h){ return !!rkHeld()[h.id]; }
+/* WHY YOU CANNOT GO. Three different noes and they are not the same no:
+   the chain is not built yet, the strait is the wrong shape this month, or
+   it is already yours. */
+function rkHoldWhy(h){
+  if(rkHoldMine(h)) return {ok:false, kind:'mine', line:'Yours since day '+(rkHeld()[h.id].day|0)+'.'};
+  if(rkHeldCount() < (h.need|0)){
+    return {ok:false, kind:'chain', line:'You hold '+rkHeldCount()+' of the '+(h.need|0)
+      +' this one sits behind. The far shore is taken in order or not at all.'};
+  }
+  const S=rkCrossSeason();
+  if(h.reach==='boat' && !S.boat)
+    return {ok:false, kind:'season', line:'A water hold, and it is '+S.name+'. '
+      +(S.ice? 'The strait is shut — this one needs a hull under you.'
+             : 'Nothing floats through what is out there now.')
+      +' '+S.left+' day'+(S.left===1?'':'s')+' of this window left.'};
+  if(h.reach==='ice' && !S.ice)
+    return {ok:false, kind:'season', line:'Walked to, not rowed to, and the road is not down. '
+      +'It opens in THE ICE ROAD — '+S.left+' day'+(S.left===1?'':'s')+' of '+S.name+' left.'};
+  return {ok:true, kind:'open', line:'Open. '+(h.reach==='ice'? 'On foot, over the ice.' : 'By hull, on the tide.')};
+}
+/* =====================================================================
+   ⚖ THE LOOK-OVER — your power against theirs, itemised
+   ---------------------------------------------------------------------
+   The user's complaint was exact and it was fair: a fight you cannot look
+   at before you take it is not a decision, it is a button. So both sides
+   are put on the SAME 1-10 scale, out of the same kinds of thing — what is
+   in the hand, what is on the body, what has been drilled, and what the
+   years have taken back — and the gap between the two numbers is the thing
+   that actually scales the bout. A 5 against a 7 is a real 5 against a
+   real 7 and you can see every point of it before you commit.
+   ===================================================================== */
+function rkPowerRows(){
+  const rows=[];
+  const add=(lab,name,pts,note)=>rows.push({lab, name, pts:Math.round(pts*10)/10, note:note||''});
+  let w=null,sh=null,hm=null,ar=null;
+  try{ const L=G.loadout||{};
+    w =gearOf('weapon',L.weapon); sh=gearOf('shield',L.shield);
+    hm=gearOf('helmet',L.helmet); ar=gearOf('armor', L.armor);
+  }catch(e){}
+  if(w)  add('IN HAND',     w.name,  clamp((w.dmg-2.2)/2.6*2.8, 0, 3.2),
+             (w.reach>=42? 'reach on it' : w.reach<=24? 'short' : 'honest length')
+             + (w.forbidden? ' · and it is on the list' : ''));
+  if(sh) add('ON THE ARM',  sh.name, (sh.block||0)*1.8, (sh.block||0)>=0.7? 'a real wall' : (sh.block||0)>0? 'something to hide behind' : 'nothing');
+  if(hm) add('ON THE HEAD', hm.name, (hm.armor||0)*8.5, (hm.armor||0)>0? 'it will take one' : 'bare head');
+  if(ar) add('ON THE BODY', ar.name, (ar.armor||0)*8.5, (ar.armor||0)>=0.24? 'proper harness' : 'a start');
+  { let sk=0; try{ const S=G.skills||{}; sk=(S.footwork|0)+(S.guard|0)+(S.blade|0)+(S.wind|0)+(S.throwing|0); }catch(e){}
+    if(sk) add('DRILL', sk+' levels down', clamp(sk*0.075,0,2.2), 'what the yard put in'); }
+  { let r=null; try{ r=rkWarRank(); }catch(e){}
+    if(r && r.id) add('THE POST', r.name, r.id*0.26, r.id>=4? 'they have heard of you' : 'a face they know'); }
+  { let a=0; try{ a=ageFactor(); }catch(e){}
+    if(a>0) add('THE YEARS', 'the arm is slower', -a*2.4, 'and it does not come back'); }
+  if(G && G.injury) add('THE WOUND', 'carrying one', -1.2, 'and they will find it');
+  { let hp=0; try{ hp=(G.hpBonus|0); }catch(e){}
+    if(hp) add('BONE', hp+' hard winters of it', clamp(hp*0.16,0,1.4), ''); }
+  return rows;
+}
+function rkPower(){
+  const t=rkPowerRows().reduce((a,r)=>a+r.pts, 0);
+  return clamp(Math.round(1.4+t), 1, 12);
+}
+/* THEIRS, ITEMISED THE SAME WAY YOURS IS — the base every body on this
+   coast starts from, every line of their kit, and what holding half a
+   strait has taught them about being surprised by you again. */
+function rkHoldRows(h){
+  const rows=[{lab:'THE MAN', name:'a grown man on his own shore', pts:1.4, note:'the floor everybody starts from'}];
+  (h.kit||[]).forEach(k=>rows.push({lab:k.lab, name:k.n, pts:k.p, note:k.w||''}));
+  const learned=Math.min(2, Math.floor(rkHeldCount()/3));
+  if(learned) rows.push({lab:'THEY HAVE LEARNED', name:'you have taken '+rkHeldCount()+' already',
+    pts:learned, note:'the far shore talks to itself'});
+  return rows;
+}
+function rkHoldPower(h){
+  const t=rkHoldRows(h).reduce((a,r)=>a+r.pts,0);
+  return clamp(Math.round(t), 1, 12);
+}
+/* HOW MANY OF THEM THERE ARE, which is a property of the hold and not of
+   you. The first cut of this shrank the garrison when your kit was good,
+   so buying a scutum removed a man from the far shore. The gap belongs in
+   how hard each of them hits, and that is where it now lives. */
+function rkHoldWaves(h){ return clamp(h.waves|0, 1, 5); }
+function rkVerdict(mine, theirs){
+  const g=theirs-mine;
+  if(g<=-3) return {col:'#7ad08a', line:'You are a '+mine+' and they are a '+theirs+'. This is not a fight, it is a delivery.'};
+  if(g<=-1) return {col:'#7ad08a', line:'You are a '+mine+' and they are a '+theirs+'. You are the better-found man and it will show.'};
+  if(g===0)  return {col:'#e8c34a', line:'A '+mine+' against a '+theirs+'. Dead level, which means it comes down to who tires first.'};
+  if(g<=2)  return {col:'#e8c34a', line:'You are a '+mine+' and they are a '+theirs+'. Winnable, and you will be paying for it afterwards.'};
+  if(g<=4)  return {col:'#e0905b', line:'You are a '+mine+' and they are a '+theirs+'. That gap is gear, not courage. Go and fix the gear.'};
+  return {col:'#e0705b', line:'You are a '+mine+' and they are a '+theirs+'. Men have been carried off this shore for less of a difference than that.'};
+}
+function rkLookOver(h){
+  const mine=rkPower(), theirs=rkHoldPower(h);
+  return {mine, theirs, gap:theirs-mine, waves:rkHoldWaves(h),
+          rows:rkPowerRows(), verdict:rkVerdict(mine,theirs), why:rkHoldWhy(h)};
+}
+/* =====================================================================
+   📣 THE VOICE'S CRIERS — and which of them is lying
+   ---------------------------------------------------------------------
+   A government that needs fifty thousand people to volunteer for the worst
+   water on the coast does not advertise the arithmetic. It advertises
+   whatever works, and on this coast what works is a claim about a body,
+   because this coast appoints its officers off bodies. So the criers on the
+   weighing floor tell men that the crossing lengthens them and tell
+   husbands that it seats their wives.
+   AND SOME OF IT IS TRUE, which is the only reason it keeps working. The
+   true ones pay out on the ledger, in the numbers, where you can check.
+   The false ones are named as false the moment a hold falls.
+   ===================================================================== */
+const RK_CRIER = [
+  {id:'len', truth:true,
+   pitch:'A MAN WHO WINTERS OVER COMES BACK LONGER. ASK ANY OF THEM.',
+   voice:'The crier says the cold draws a man out like wire. He has a cousin. The cousin was measured.',
+   real:'The cold does nothing of the kind and the crier has no idea why his claim keeps holding up. '
+       +'What does it is six months of walking a shore with no boat on it, eating nothing but what '
+       +'the racks give, and being read for it by a district that has started paying attention.',
+   pay:'Your own measure goes up on the chart, and the chart is not being polite.'},
+  {id:'booty', truth:true,
+   pitch:'A WIFE WHO CROSSES WITH HER HUSBAND COMES BACK SEATED.',
+   voice:'Said to husbands, quietly, and always with a glance at whoever is standing behind them.',
+   real:'True, and for a reason the Voice would rather not print: there is nothing to do over '
+       +'there but haul, the racks are waist-high, and a winter of that does to a woman exactly '
+       +'what the crier says it does. Rhauna is not involved. The work is.',
+   pay:'Her reading on the ledger goes up, and the district will notice before you do.'},
+  {id:'purse', truth:true,
+   pitch:'THE COUNCIL PAYS FOR EVERY HOLD. IN COIN. ON THE FLOOR.',
+   voice:'The only claim the criers make that nobody argues with.',
+   real:'It is simply true. The purse is voted, it is public, and it is the cheapest thing '
+       +'the Ten have ever bought.',
+   pay:'The hold’s purse, paid out of the floor, the day it falls.'},
+  {id:'notch', truth:true,
+   pitch:'A HOLD COUNTS ON THE POST AS FIVE MEN.',
+   voice:'Aimed squarely at the pit crowd, who are the easiest audience on the coast.',
+   real:'True and then some. The post has always counted a hold heavier than a bout, because '
+       +'the people who keep the post are the people who bet on the crossing.',
+   pay:'Notches on the post, at the hold’s rate rather than a bout’s.'},
+  {id:'post', truth:false,
+   pitch:'EVERY MAN WHO LANDS IS GIVEN A POST OF HIS OWN OVER THERE.',
+   voice:'Delivered with a gesture at the launchings, as though the posts were already cut.',
+   real:'No. The land is the council’s and what you are given is a tenancy on it, revocable, '
+       +'in a place with no house-post to cut a rank into. Read the wording: "given a post" '
+       +'is the crier’s phrase and the vote says "set to a post", which is a job.',
+   pay:''},
+  {id:'wife', truth:false,
+   pitch:'A MAN WHO GOES OVER UNMARRIED DOES NOT COME BACK UNMARRIED.',
+   voice:'Said to young men and nobody else, and the criers do not say it twice near a woman.',
+   real:'There is no arrangement, there was never an arrangement, and the far shore has its own '
+       +'people with their own opinion of who they marry. Several hundred men have now tested this.',
+   pay:''},
+  {id:'warm', truth:false,
+   pitch:'THE FAR SHORE IS THE WARMER OF THE TWO. THAT IS WHY THE HERDS WINTER THERE.',
+   voice:'The single most confident thing said on the weighing floor all year.',
+   real:'It is worse. It is worse in every month, the herds do not winter there, and the man '
+       +'who first said this on the floor was quoting a launching-master who had never landed.',
+   pay:''},
+  {id:'seat', truth:'half',
+   pitch:'THE TEN WILL SEAT A MAN WHO BRINGS THEM A HOLD.',
+   voice:'True enough that four holders have said it out loud, and vague enough to survive being checked.',
+   real:'Half. A hold gets your name said in session and it moves the district, which is not '
+       +'nothing and is not a seating. Nobody has ever been seated for one. Two men have been '
+       +'seated later, for other reasons, having taken one.',
+   pay:'The district moves. That is all it moves.'},
+];
+function rkCrierById(id){ return RK_CRIER.find(x=>x.id===id)||null; }
+/* WHAT IS BEING SHOUTED THIS WINDOW. Two of them, stable for as long as
+   the window lasts, so you can go away and come back to the same pitch. */
+function rkCrierNow(){
+  const d=rkCrossDay(), win=Math.floor(d/RK_CROSS_WINDOW);
+  const n=RK_CRIER.length;
+  const a=RK_CRIER[(win*3+1)%n], b=RK_CRIER[(win*5+4)%n];
+  return (a===b)? [a, RK_CRIER[(win*5+5)%n]] : [a,b];
+}
+/* WHAT YOU SAID ABOUT IT. Believing a lie and calling a truth both cost
+   you something on this coast, because the district keeps a record of who
+   was right about the Voice. */
+function rkCrierCall(id, believe){
+  const C=rkCrierById(id); if(!C) return null;
+  G.rkVows=G.rkVows||{};
+  G.rkVows[id]={believe:!!believe, day:rkCrossDay()};
+  const truth = C.truth===true;
+  const half  = C.truth==='half';
+  let honor=0, line='';
+  if(half){ honor=0; line='◆ You put it on the record as half a claim, which is what it is. Nobody argues.'; }
+  else if(believe===truth){ honor=+2;
+    line = truth? '◆ You took the Voice at its word on that one, and the ledger will bear you out.'
+                : '◆ You called it on the floor, in front of the crier. The district writes that down.'; }
+  else { honor=-2;
+    line = truth? '◆ You called a true claim a lie in public. When it pays out, that will be remembered.'
+                : '◆ You believed it out loud. When it does not pay out, that will be remembered too.'; }
+  G.honor=clamp((G.honor||50)+honor,0,100);
+  try{ refreshStatbar(); saveQuiet(); }catch(e){}
+  return {line, honor};
+}
+/* AND THE RESOLUTION, WHICH HAPPENS ON A LANDING AND NOT BEFORE.
+   Everything currently being shouted is settled against a hold that has
+   actually fallen: the true claims pay in the numbers, the false ones are
+   named, and the coast's opinion of you moves with whichever of the two
+   you were on. */
+function rkCrierResolve(h){
+  const out=[];
+  rkCrierNow().forEach(C=>{
+    const vow=(G.rkVows||{})[C.id];
+    const said=vow? (vow.believe? 'believed' : 'called') : null;
+    let paid='';
+    if(C.truth===true){
+      if(C.id==='len'){
+        const b=G.body||(G.body={});
+        const was=(b.secret===undefined? 5 : b.secret);
+        if(was<10){ b.secret=clamp(was+1,1,10); paid='Your own measure: '+was+' → '+b.secret+'.'; }
+        else paid='Your own measure is already at the top of the chart.';
+      }
+      else if(C.id==='booty'){
+        const w=G.wife;
+        if(w && !w.male && G.rkCrossedWife){
+          w.body=w.body||{};
+          const was=(w.body.booty===undefined? 5 : w.body.booty);
+          if(was<10){ w.body.booty=clamp(was+1,1,10); paid='Her reading: '+was+' → '+w.body.booty+'.'; }
+          else paid='Hers is already at the top of the chart.';
+        } else if(w && !w.male){
+          paid='She did not cross, so it did not happen to her. The claim was about crossing.';
+        } else paid='There is nobody in this house it could happen to.';
+      }
+      else if(C.id==='purse'){ paid='Paid on the floor, as advertised.'; }
+      else if(C.id==='notch'){ paid='The post counted it as a hold, not a bout.'; }
+      G.rkVowsTrue=(G.rkVowsTrue|0)+1;
+    }
+    else if(C.truth==='half'){
+      G.honor=clamp((G.honor||50)+1,0,100);
+      paid='The district moved a little. Nobody was seated.';
+      G.rkVowsHalf=(G.rkVowsHalf|0)+1;
+    }
+    else { G.rkVowsLies=(G.rkVowsLies|0)+1; }
+    /* and what your own call was worth */
+    if(said){
+      const right = (C.truth==='half') ? null
+                  : (vow.believe === (C.truth===true));
+      if(right===true) G.honor=clamp((G.honor||50)+2,0,100);
+      if(right===false) G.honor=clamp((G.honor||50)-2,0,100);
+    }
+    out.push({id:C.id, pitch:C.pitch, truth:C.truth, real:C.real, paid, said});
+  });
+  return out;
+}
+/* =====================================================================
+   TAKING ONE
+   ===================================================================== */
+function rkHoldTake(id){
+  const h=rkHoldById(id); if(!h) return;
+  const W=rkHoldWhy(h);
+  if(!W.ok){ try{ toast('✗ '+W.line, 4200); }catch(e){} return; }
+  const L=rkLookOver(h);
+  const reg=(typeof regionAny==='function')? regionAny(G.current) : null;
+  if(!reg){ try{ toast('There is nowhere to land.',2600); }catch(e){} return; }
+  G.__rkCross={hold:h.id, waves:L.waves, gap:L.gap, mine:L.mine, theirs:L.theirs,
+               season:rkCrossSeason().id};
+  try{ refreshStatbar(); saveQuiet(); }catch(e){}
+  try{ toast('⛵ '+h.name+' — '+L.waves+' of them, in order. '+L.verdict.line, 4600); }catch(e){}
+  try{
+    startFight(reg, {gauntlet:L.waves, pit:true, rkCross:{hold:h.id, gap:L.gap, kit:h.kit}});
+  }catch(e){ G.__rkCross=null; try{ toast('The landing would not open.',2600); }catch(e2){} }
+}
+/* WHAT A LANDING IS WORTH, and it is settled once, on the way out of the
+   bout, the same way the pit settles. */
+function rkCrossSettle(won, cleared){
+  try{
+    const P=G.__rkCross; if(!P) return null;
+    G.__rkCross=null;
+    const h=rkHoldById(P.hold); if(!h) return null;
+    const of=P.waves|0, got=clamp(cleared|0, 0, of);
+    const S=RK_CROSS_SEASONS.find(x=>x.id===P.season)||RK_CROSS_SEASONS[1];
+    const pivot = !!rkHeld().imaqliq;                       // the rock pays for everything after it
+    const closing = (S.id==='close');
+    let coin = Math.round((h.coin|0) * (won? 1 : 0.22*(got/Math.max(1,of))));
+    if(won && pivot && h.id!=='imaqliq') coin=Math.round(coin*1.33);
+    if(won && closing) coin=Math.round(coin*1.20);
+    const war = won? (h.war|0) : Math.round((h.war|0)*0.30*(got/Math.max(1,of)));
+    G.coin=(G.coin|0)+coin;
+    G.rkWar=(G.rkWar|0)+war;
+    G.rkCrossRuns=(G.rkCrossRuns|0)+1;
+    let vows=null, peak=false;
+    if(won){
+      G.rkHolds=G.rkHolds||{};
+      G.rkHolds[h.id]={day:rkCrossDay(), season:S.id, mine:P.mine, theirs:P.theirs};
+      G.rkPull=(G.rkPull|0)+(h.pull|0);
+      G.honor=clamp((G.honor||50)+4,0,100);
+      vows=rkCrierResolve(h);
+      if(rkHeldCount()>=RK_HOLDS.length){ peak=true; G.rkPeakDay=rkCrossDay(); }
+    } else {
+      G.rkCrossLost=(G.rkCrossLost|0)+1;
+      G.hygiene=clamp((G.hygiene===undefined?70:G.hygiene)-6,0,100);
+    }
+    try{ refreshStatbar(); saveQuiet(); }catch(e){}
+    return {hold:h, won:!!won, cleared:got, of, coin, war, vows, peak,
+            closing, pivot:(pivot&&h.id!=='imaqliq'), held:rkHeldCount()};
+  }catch(e){ return null; }
+}
+/* the standing income the far shore pays once the racks are yours */
+function rkCrossIncome(){
+  try{
+    if(!rkCrossOn()) return 0;
+    const H=rkHeld(); let n=0;
+    if(H.lorino) n+=140;
+    if(H.anadyr) n+=380;
+    if(H.imaqliq) n+=90;
+    n += rkHeldCount()*35;
+    return n|0;
+  }catch(e){ return 0; }
+}
+/* HOW FAR THE PROJECT HAS GOT, in the council's own terms */
+function rkCrossPhase(){
+  const n=rkHeldCount(), tot=RK_HOLDS.length;
+  const t=n/tot;
+  return {n, tot, t,
+    name: n===0? 'NOT BEGUN'
+        : n<2?  'A LANDING'
+        : n<4?  'A BEACHHEAD'
+        : n<6?  'A FRONTIER'
+        : n<tot?'A PROVINCE IN ALL BUT NAME'
+        :       'THE HEIGHT OF THE RKRAUN',
+    line: n===0? 'Nothing has been landed. The arithmetic still says it must be.'
+        : n<2?  'One foothold on the far shore, and the council has stopped calling it a proposal.'
+        : n<4?  'Enough of it held that the launchings run to a timetable.'
+        : n<6?  'The far shore is a frontier with a garrison on it. The Ten now argue about who administers it.'
+        : n<tot?'Everything but the river. One hold between the Rkraun and its height.'
+        :       'All seven. The middle of the century finds the Rkraun at its height, and the record says which day it happened.'};
+}
+/* =====================================================================
    ⚔ THE SKARVEK — the coast's other ladder
    ---------------------------------------------------------------------
    Everything else on this coast is seated: the Ten seat the Rkraun, the
@@ -33070,6 +33944,16 @@ function rkPitWhy(c){
   }
   if((G.coin|0) < (c.fee|0)) return 'The stake is '+c.fee+' and you have '+(G.coin|0)+'.';
   return '';
+}
+/* WHAT THE CARD IS WORTH AS A NUMBER, on the same 1-10 scale the far
+   shore is read on — so a man can look at 1-v-5 and at the Anadyr Mouth
+   and know which of the two he is actually able to do. */
+function rkPitPower(c){
+  return clamp(Math.round(3.4 + (c.n|0)*1.05 + rkWarRank().id*0.22), 1, 12);
+}
+function rkPitLook(c){
+  const mine=rkPower(), theirs=rkPitPower(c);
+  return {mine, theirs, gap:theirs-mine, verdict:rkVerdict(mine,theirs)};
 }
 /* THE PURSE. Waves cleared, the rank's own multiplier, and the card. */
 function rkPitPurse(cardId, waves){
@@ -33502,11 +34386,18 @@ function openSkarvek(){
     d.appendChild(grid);
     RK_PIT.forEach(c=>{
       const open=rkPitOpen(c), why=rkPitWhy(c);
+      const LK=rkPitLook(c);
       const cell=document.createElement('div'); cell.className='shopcard';
       if(open) cell.style.borderColor='#e8c34a';
       cell.innerHTML='<div style="color:'+(open?'#e8c34a':'#8a7a70')+';letter-spacing:1px">'
         +'<b>1 v '+c.n+' — '+c.name+'</b></div>'
         +'<div class="small muted" style="line-height:1.5;margin-top:2px">'+c.note+'</div>'
+        /* ⚖ THE LOOK-OVER, in one line, before you pay for it */
+        +'<div class="small" style="margin-top:5px;padding:3px 5px;border-radius:2px;'
+        +'background:rgba(0,0,0,.22);line-height:1.5">'
+        +'<span class="muted">⚖ </span><b style="color:#7ad08a">YOU '+LK.mine+'</b>'
+        +' <span class="muted">against</span> <b style="color:#e0705b">THEM '+LK.theirs+'</b>'
+        +'<div style="color:'+LK.verdict.col+';margin-top:2px">'+LK.verdict.line+'</div></div>'
         +'<div class="small" style="margin-top:4px">Stake <b>🪙 '+c.fee+'</b>'
         +' · purse about <b style="color:#e8c34a">🪙 '+rkPitPurse(c.id,c.n)+'</b>'
         +' · <b style="color:#e0705b">+'+c.war+'</b> notches</div>'
@@ -33631,12 +34522,243 @@ function rkPitTake(cardId){
   const reg=(typeof regionAny==='function')? regionAny(G.current) : null;
   if(!reg){ toast('There is nowhere to hold it.',2600); return; }
   G.coin=(G.coin|0)-(c.fee|0);
+  const LK=rkPitLook(c);
   G.__rkPit={card:c.id, n:c.n};
   try{ refreshStatbar(); saveQuiet(); }catch(e){}
-  toast('⚔ 1 v '+c.n+' — they come in order. Put them down.', 3400);
+  toast('⚔ 1 v '+c.n+' — they come in order. '+LK.verdict.line, 4200);
   try{
-    startFight(reg, {gauntlet:c.n, pit:true, rkPit:true});
+    /* the look-over said a number, so the number has to be in the bout */
+    startFight(reg, {gauntlet:c.n, pit:true, rkPit:true,
+                     rkCross:{hold:null, gap:LK.gap, pitCard:c.id}});
   }catch(e){ G.__rkPit=null; toast('The field would not open.',2600); }
+}
+/* =====================================================================
+   ⛵ THE SCREEN — the plate, the look-over, and the criers
+   ---------------------------------------------------------------------
+   NOT openCrossing(). There is already a crossing in this game — the sea
+   road to Wa — and two function declarations of one name do not conflict,
+   the later one just wins, which is the quietest possible bug.
+   ===================================================================== */
+let rkCrossSel = 'naukan';
+function openUvraak(){
+  if(!rkCrossOn()){
+    try{ toast('The crossing is not this country’s business.',2400); }catch(e){}
+    try{ enterMap(); }catch(e){} return;
+  }
+  state='villa'; show('scr-villa'); $('statbar').classList.remove('hide'); refreshStatbar();
+  const S=rkCrossSeason(), PH=rkCrossPhase();
+  villaHead('⛵ '+RK_UVRAAK.name+' — THE GOING-OVER', RK_UVRAAK.what, '#8fc0cf');
+  const b=$('villa-body'); b.innerHTML='';
+  const card=(html,col)=>{ const d=document.createElement('div'); d.className='panel';
+    d.style.cssText='padding:9px;border-color:'+(col||'#6b4e2a'); d.innerHTML=html||'';
+    b.appendChild(d); return d; };
+
+  /* ---- 1 · WHY ANY OF THIS IS HAPPENING ---- */
+  card('<div style="color:#8fc0cf;letter-spacing:1px"><b>◆ THE COUNCIL’S ARITHMETIC</b></div>'
+    +'<div class="small muted" style="margin-top:3px;line-height:1.6">'+RK_UVRAAK.why+'</div>'
+    +'<div class="small" style="margin-top:5px;line-height:1.6">'
+    +'<b style="color:'+(PH.n>=RK_HOLDS.length? '#e8c34a' : '#8fc0cf')+'">'+PH.name+'</b>'
+    +' <span class="muted">— '+PH.line+'</span></div>', '#8fc0cf');
+
+  /* ---- 2 · THE PLATE ---- */
+  { const d=card('<div style="color:#e8c34a;letter-spacing:1px"><b>🗺 THE STRAIT</b>'
+      +' <span class="small muted">— click a hold. This sheet is not Rome’s and nothing on it is a province.</span></div>',
+      '#e8c34a');
+    const cv=document.createElement('canvas'); cv.width=760; cv.height=420;
+    cv.style.cssText='position:static;width:100%;height:auto;image-rendering:auto;'
+      +'margin-top:6px;border:2px solid #2a3a44;border-radius:3px;cursor:pointer;background:#0a1620';
+    drawStraitMap(cv, rkCrossSel);
+    cv.onmousemove=(ev)=>{ const id=rkStraitHit(cv,ev);
+      cv.style.cursor= id? 'pointer' : 'default';
+      if(id && id!==cv.__hover){ cv.__hover=id; drawStraitMap(cv, id); }
+      else if(!id && cv.__hover!==rkCrossSel){ cv.__hover=rkCrossSel; drawStraitMap(cv, rkCrossSel); } };
+    cv.onclick=(ev)=>{ const id=rkStraitHit(cv,ev);
+      if(!id) return;
+      rkCrossSel=id; try{ sfx('ui'); }catch(e){} openUvraak(); };
+    d.appendChild(cv);
+    const leg=document.createElement('div'); leg.className='small muted';
+    leg.style.cssText='margin-top:5px;line-height:1.6';
+    leg.innerHTML='<span style="color:#e8c34a">◈ held</span> · '
+      +'<span style="color:#7ad08a">◇ open now</span> · '
+      +'<span style="color:#cfe4f0">❄ needs the ice road</span> · '
+      +'<span style="color:#7ad08a">≈ needs open water</span> · '
+      +'<span style="color:#8a7a70">— behind holds you do not have</span>';
+    d.appendChild(leg);
+  }
+
+  /* ---- 3 · THE WINDOW ---- */
+  { const N=rkCrossNextSeason();
+    card('<div style="color:'+S.col+';letter-spacing:1px"><b>❄ '+S.name+'</b>'
+      +' <span class="small muted">— '+S.left+' day'+(S.left===1?'':'s')+' of it left, then '+N.name+'</span></div>'
+      +'<div class="small muted" style="margin-top:3px;line-height:1.6">'+S.what+'</div>'
+      +'<div class="small" style="margin-top:4px;color:'+S.col+'">'+S.does+'</div>'
+      +'<div class="small muted" style="margin-top:5px;line-height:1.55">'
+      +'<b>The important times are windows, not festivals.</b> Twelve days each and they come round '
+      +'in order: the break-up, the open water, the closing, the ice road. A hold you can row to in '
+      +'the open water cannot be reached at all in the break-up and is WALKED to when the strait '
+      +'shuts. Nothing about this is negotiable and the council has stopped pretending it is.'
+      +'</div>', S.col);
+  }
+
+  /* ---- 4 · THE LOOK-OVER ---- */
+  { const h=rkHoldById(rkCrossSel)||RK_HOLDS[0];
+    const L=rkLookOver(h);
+    const d=card('<div style="color:#e8c34a;letter-spacing:1px"><b>⚖ THE LOOK-OVER — '+h.name+'</b></div>'
+      +'<div class="small muted" style="margin-top:3px;line-height:1.6">'+h.place+'</div>'
+      +(h.prize? '<div class="small" style="margin-top:4px;color:#e8c34a">◆ '+h.prize+'</div>' : ''),
+      '#e8c34a');
+
+    /* the two columns, out of the same kinds of line, so they can be read
+       against each other item by item */
+    const cols=document.createElement('div');
+    cols.style.cssText='display:grid;gap:8px;margin-top:7px;grid-template-columns:repeat(auto-fit,minmax(240px,1fr))';
+    d.appendChild(cols);
+    const column=(title, rows, total, col)=>{
+      const w=document.createElement('div');
+      w.style.cssText='border:1px solid '+col+'55;border-radius:3px;padding:6px;background:rgba(0,0,0,.18)';
+      w.innerHTML='<div class="small" style="color:'+col+';letter-spacing:1px"><b>'+title+'</b>'
+        +'<span style="float:right;font-size:15px">'+total+'</span></div>';
+      const t=document.createElement('div');
+      t.style.cssText='display:grid;gap:3px;margin-top:5px';
+      rows.forEach(r=>{
+        const row=document.createElement('div');
+        row.style.cssText='display:flex;gap:6px;align-items:baseline';
+        const pcol = r.pts<0? '#e0705b' : '#e8dcc8';
+        row.innerHTML='<span class="small muted" style="flex:0 0 78px;font-size:9px;letter-spacing:.5px">'+r.lab+'</span>'
+          +'<span class="small" style="flex:1 1 auto;line-height:1.4">'+r.name
+          +(r.note? ' <span class="muted">— '+r.note+'</span>' : '')+'</span>'
+          +'<span class="small" style="flex:0 0 34px;text-align:right;color:'+pcol+'"><b>'
+          +(r.pts>0?'+':'')+r.pts.toFixed(1)+'</b></span>';
+        t.appendChild(row);
+      });
+      w.appendChild(t);
+      return w;
+    };
+    cols.appendChild(column('YOU', L.rows, L.mine, '#7ad08a'));
+    cols.appendChild(column('THEM — WHAT THEY ARE CARRYING', rkHoldRows(h), L.theirs, '#e0705b'));
+
+    const vd=document.createElement('div'); vd.className='small';
+    vd.style.cssText='margin-top:7px;line-height:1.6;color:'+L.verdict.col;
+    vd.innerHTML='<b>'+L.verdict.line+'</b>'
+      +'<div class="muted" style="margin-top:3px">'+h.read+'</div>'
+      +'<div style="margin-top:3px;color:#e8dcc8">It comes in <b>'+L.waves+'</b> wave'
+      +(L.waves===1?'':'s')+' — one at a time, the next steps over the last.'
+      +'  Purse <b style="color:#e8c34a">🪙 '+h.coin+'</b> · <b style="color:#e0705b">+'+h.war
+      +'</b> notches on the post.</div>';
+    d.appendChild(vd);
+
+    const bt=document.createElement('button');
+    bt.className='btn'+(L.why.ok?' gold':''); bt.style.marginTop='7px';
+    if(L.why.kind==='mine'){ bt.textContent='◈ HELD — '+L.why.line; bt.disabled=true; bt.style.opacity='.55'; }
+    else if(!L.why.ok){ bt.textContent='✗ NOT OPEN'; bt.disabled=true; bt.style.opacity='.5'; }
+    else bt.textContent='⛵ GO OVER  ('+L.mine+' against '+L.theirs+', '+L.waves+' wave'+(L.waves===1?'':'s')+')';
+    bt.onclick=()=>rkHoldTake(h.id);
+    d.appendChild(bt);
+    if(!L.why.ok && L.why.kind!=='mine'){
+      const wh=document.createElement('div'); wh.className='small';
+      wh.style.cssText='margin-top:4px;color:#e0905b;line-height:1.5';
+      wh.textContent='✗ '+L.why.line; d.appendChild(wh);
+    }
+  }
+
+  /* ---- 5 · THE CRIERS ---- */
+  { const d=card('<div style="color:#c9a4ef;letter-spacing:1px"><b>📣 WHAT IS BEING SHOUTED ON THE FLOOR</b>'
+      +' <span class="small muted">— this window’s two, and they change with it</span></div>'
+      +'<div class="small muted" style="margin-top:3px;line-height:1.6">'
+      +'A council that needs volunteers for the worst water on the coast does not advertise the '
+      +'arithmetic — it advertises whatever works, and what works here is a claim about a body, '
+      +'because this coast appoints its officers off bodies. <b style="color:#e8c34a">Some of it is '
+      +'true.</b> That is the only reason it keeps working. You may take the Voice at its word or '
+      +'call it on the floor; either way the ledger settles it the day a hold falls, and the '
+      +'district keeps a record of who was right.</div>', '#c9a4ef');
+    const grid=document.createElement('div');
+    grid.style.cssText='display:grid;gap:7px;margin-top:7px';
+    d.appendChild(grid);
+    rkCrierNow().forEach(C=>{
+      const vow=(G.rkVows||{})[C.id];
+      const cell=document.createElement('div'); cell.className='shopcard';
+      cell.style.borderColor='#6a4e8a';
+      cell.innerHTML='<div style="color:#e8c34a;letter-spacing:.5px;line-height:1.45"><b>“'+C.pitch+'”</b></div>'
+        +'<div class="small muted" style="margin-top:3px;line-height:1.5">'+C.voice+'</div>'
+        +(vow? '<div class="small" style="margin-top:4px;color:'+(vow.believe?'#7ad08a':'#e0905b')+'">'
+               +(vow.believe? '◆ You took it at its word.' : '◆ You called it on the floor.')+'</div>' : '');
+      const row=document.createElement('div');
+      row.style.cssText='display:flex;gap:6px;margin-top:5px;flex-wrap:wrap';
+      const mk=(txt,bel,col)=>{ const x=document.createElement('button');
+        x.className='btn sm'; x.textContent=txt; x.style.borderColor=col; x.style.color=col;
+        x.onclick=()=>{ const r=rkCrierCall(C.id, bel);
+          if(r){ try{ toast(r.line+(r.honor? '   ('+(r.honor>0?'+':'')+r.honor+' honour)' : ''), 4600); }catch(e){}
+                 try{ sfx(r.honor>=0?'ui':'deny'); }catch(e){} }
+          openUvraak(); };
+        return x; };
+      row.appendChild(mk('◆ TAKE ITS WORD', true, '#7ad08a'));
+      row.appendChild(mk('◆ CALL IT', false, '#e0705b'));
+      cell.appendChild(row);
+      grid.appendChild(cell);
+    });
+    const rec=document.createElement('div'); rec.className='small muted';
+    rec.style.cssText='margin-top:6px;line-height:1.6';
+    rec.innerHTML='Settled so far: <b style="color:#7ad08a">'+(G.rkVowsTrue|0)+' true</b> · '
+      +'<b style="color:#e8c34a">'+(G.rkVowsHalf|0)+' half</b> · '
+      +'<b style="color:#e0705b">'+(G.rkVowsLies|0)+' lies</b>. '
+      +'A claim only settles when a hold actually falls, which is the Voice’s own arrangement '
+      +'and not an accident.';
+    d.appendChild(rec);
+  }
+
+  /* ---- 6 · HER BERTH. One of the true claims is about her and it only pays
+       if she is actually on the boat, which is the sort of thing the criers
+       are careful never to say out loud. ---- */
+  { const w=G.wife;
+    if(w && !w.male){
+      const on=!!G.rkCrossedWife;
+      const d=card('<div style="color:#ff8ad0;letter-spacing:1px"><b>♥ HER BERTH</b>'
+        +' <span class="small muted">— 🪙 60, and it is not a formality</span></div>'
+        +'<div class="small muted" style="margin-top:3px;line-height:1.6">'
+        +'The crier’s claim about wives is one of the true ones, and it is true because of the '
+        +'hauling — which means it only happens to a woman who is actually over there doing it. '
+        +'A berth bought here is why that claim pays on your ledger instead of somebody else’s.'
+        +'</div>', '#ff8ad0');
+      const bt=document.createElement('button');
+      bt.className='btn sm'+(on?'':' gold'); bt.style.marginTop='6px';
+      bt.textContent= on? '♥ SHE IS ON THE BOAT — take her off' : '♥ BUY HER A BERTH  (🪙 60)';
+      bt.onclick=()=>{
+        if(on){ G.rkCrossedWife=false; try{ toast('♥ She stays. She had an opinion about it.',3400); }catch(e){} }
+        else if((G.coin|0)<60){ try{ toast('✗ The berth is 60 and you have '+(G.coin|0)+'.',3000); }catch(e){} return; }
+        else { G.coin=(G.coin|0)-60; G.rkCrossedWife=true;
+               try{ toast('♥ Her berth is bought. She is on the launching.',3800); sfx('coin'); }catch(e){} }
+        try{ refreshStatbar(); saveQuiet(); }catch(e){}
+        openUvraak();
+      };
+      d.appendChild(bt);
+    }
+  }
+
+  /* ---- 7 · THE RECORD ---- */
+  { const inc=rkCrossIncome();
+    card('<div style="color:#7ad08a;letter-spacing:1px"><b>▦ THE FAR SHORE, AS THE FLOOR HAS IT</b></div>'
+      +'<div class="small" style="margin-top:4px;line-height:1.8">'
+      +'Holds: <b style="color:#e8c34a">'+rkHeldCount()+' of '+RK_HOLDS.length+'</b>'
+      +' · landings attempted: <b>'+(G.rkCrossRuns|0)+'</b>'
+      +' · thrown back: <b style="color:#e0705b">'+(G.rkCrossLost|0)+'</b>'
+      +'<br>Settlers pulled over: <b style="color:#8fc0cf">'+(G.rkPull|0)+'</b> hundred'
+      +' · the far shore now pays <b style="color:#e8c34a">🪙 '+inc+'</b> standing'
+      +(G.rkPeakDay!==undefined? '<br><b style="color:#e8c34a">THE HEIGHT WAS REACHED ON DAY '+(G.rkPeakDay|0)
+        +'.</b> The record says which day, because on this coast everything says which day.' : '')
+      +'</div>'
+      +'<div class="small muted" style="margin-top:5px;line-height:1.55">'
+      +(rkHeld().imaqliq? 'The rock is yours, so everything taken after it pays a third again. '
+                        : 'Nobody who has held the Imaqliq rock has been thrown off it, and everything '
+                          +'taken after it pays a third again. ')
+      +(rkHeld().lorino? 'The Lorino racks are paying. ' : '')
+      +(rkHeld().anadyr? 'And the river is open, which is the whole reason the arithmetic worked.' : '')
+      +'</div>', '#7ad08a');
+  }
+
+  { const back=document.createElement('button'); back.className='btn gold';
+    back.style.marginTop='4px'; back.textContent='◀ BACK';
+    back.onclick=()=>{ try{ enterMap(); }catch(e){} };
+    b.appendChild(back); }
 }
 function openRaunskar(){
   if(!raunskarOn()){
@@ -34917,7 +36039,7 @@ const HUB_WEST_LABEL={
    country that counts everything on a split stick. */
 const HUB_RK = {
   hide:['btn-circus','btn-forum','btn-legion','btn-silk'],
-  show:['btn-raunskar','btn-skarvek'],
+  show:['btn-raunskar','btn-skarvek','btn-crossing'],
   label:{
     'btn-fightcur':null,                                  // set from the venue itself
     'btn-shop':'⚔ THE RACK',
@@ -34929,13 +36051,15 @@ const HUB_RK = {
     'btn-titles':'✇ NOTCHES & RANK',
     'btn-intrigue':'⚖ THE ARBITRATION',
     'btn-note-map':'✍ SEND WORD',
+    'btn-crossing':'⛵ THE UVRAAK',
   },
 };
 function applyHub(){
   /* the likeness trade is one country's institution — off by default, and
      only the Rkrai branch below turns it on */
   { const rsb=$('btn-raunskar'); if(rsb) rsb.style.display='none';
-    const skb=$('btn-skarvek');  if(skb) skb.style.display='none'; }
+    const skb=$('btn-skarvek');  if(skb) skb.style.display='none';
+    const cxb=$('btn-crossing'); if(cxb) cxb.style.display='none'; }
   const _w  = playerWorld();
   const east = _w==='east';
   const wa   = _w==='wa';
@@ -42373,6 +43497,7 @@ $('btn-herbs').onclick=()=>openHerbs('map');
 $('btn-titles').onclick=()=>openTitles();
 { const rsb=$('btn-raunskar'); if(rsb) rsb.onclick=()=>openRaunskar(); }
 { const skb=$('btn-skarvek');  if(skb) skb.onclick=()=>openSkarvek(); }
+{ const cxb=$('btn-crossing'); if(cxb) cxb.onclick=()=>openUvraak(); }
 $('btn-titles-back').onclick=()=>enterMap();
 $('btn-herb-back').onclick=()=>{ if(herbBack==='villa') openVilla(); else enterMap(); };
 $('btn-prov-back').onclick=()=>enterMap();
@@ -48944,6 +50069,15 @@ window.__SS = {
   rkExpectGap, rkExpectLine, RK_ARMS, rkArmsLegal, rkArmsList,
   RK_PIT, rkPitOpen, rkPitWhy, rkPitPurse, rkWarSettle, rkWarIncome,
   openSkarvek, rkPitTake, drawSkarvekPost,
+  /* ⛵ THE UVRAAK */
+  RK_UVRAAK, RK_CROSS_SEASONS, RK_HOLDS, RK_CRIER, RK_CROSS_WINDOW,
+  rkCrossOn, rkCrossDay, rkCrossSeason, rkCrossNextSeason, rkCrossPhase,
+  rkHoldById, rkHeld, rkHeldCount, rkHoldMine, rkHoldWhy,
+  rkPowerRows, rkPower, rkHoldRows, rkHoldPower, rkHoldWaves, rkVerdict, rkLookOver,
+  rkCrierById, rkCrierNow, rkCrierCall, rkCrierResolve, rkPitPower, rkPitLook,
+  rkHoldTake, rkCrossSettle, rkCrossIncome,
+  drawStraitMap, rkStraitHit, openUvraak,
+  get rkCrossSel(){ return rkCrossSel; }, set rkCrossSel(v){ rkCrossSel=v; },
   get FT(){ return FT; },
   RK_RAUNSKAR, RK_ART_HANDS, RK_ART_FORMS, RK_ART_POSES, RK_ART_DRESS,
   RK_ART_FRAME, RK_ART_FACE, raunskarFrame, raunskarOn,
