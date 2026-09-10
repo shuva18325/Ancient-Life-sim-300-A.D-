@@ -345,6 +345,7 @@
       <button class="btn" id="btn-raunskar" style="display:none">✇ THE RAUNSKAR</button>
       <button class="btn" id="btn-skarvek" style="display:none">⚔ THE SKARVEK</button>
       <button class="btn" id="btn-crossing" style="display:none">⛵ THE UVRAAK</button>
+      <button class="btn" id="btn-selvskar" style="display:none">✎ SOMETHING CAME FOR YOU</button>
       <button class="btn" id="btn-trophies">🏆 TROPHIES</button>
       <button class="btn" id="btn-regalia">⚜ REGALIA</button>
       <button class="btn" id="btn-circus">🏇 CIRCUS</button>
@@ -32998,6 +32999,480 @@ function standardsHere(){
    without ever finding out what any of it was called.
    ===================================================================== */
 /* =====================================================================
+   ✎ THE SELVSKAR — THE ONE SHE CUTS HERSELF
+   ---------------------------------------------------------------------
+   The raunskar is a trade: a paid hand, a witnessed piece, a clerk's
+   entry, and a wall for the district to read it off. Exactly one likeness
+   on this coast has none of that, because no hand will cut it and no
+   clerk will enter it — so if it exists she cut it, on a scrap of hide,
+   with her own stylus, and it went to ONE man by courier.
+
+   It is not a commission and it is not a record. It is a message, and it
+   is sent for one of two reasons: because you are over the water and she
+   has not heard from you, or because she has decided that you have been
+   looking at a shoreline for long enough.
+
+   It also comes with an instruction, which is not written down anywhere
+   and does not need to be.
+   ===================================================================== */
+const RK_SELVSKAR = {
+  name:'THE SELVSKAR',
+  what:'The self-cut. Her own hand, her own hide, her own stylus, and one courier. '
+      +'No hand was paid, no clerk entered it, and nobody in the district will ever read it '
+      +'off a wall, because that is the entire difference between this and a raunskar.',
+  law:'Perfectly legal and completely unregistered — which on this coast are not the same '
+     +'thing at all, and she knows exactly which one she is using.',
+};
+/* WHY IT CAME. Two reasons, and the note is different for each. */
+const RK_SELV_WHY = {
+  over:{ id:'over', head:'◆ SOMETHING CAME OVER WITH THE LAUNCHING',
+    col:'#8fc0cf',
+    line:'A hide roll in the mail sack, in among the council’s dispatches, addressed in a hand '
+        +'the clerk pretended not to recognise.',
+    notes:[
+      '“You have been on that shore for {d} days. This is what is on this one.”',
+      '“The crier says the crossing makes a man longer. I am not waiting to find out from a crier.”',
+      '“Whatever the far shore has, it does not have this. Come back.”',
+      '“I asked the launching-master how long. He would not say. So here.”',
+    ]},
+  focus:{ id:'focus', head:'◆ SOMETHING WAS LEFT ON THE POST',
+    col:'#ff8ad0',
+    line:'Rolled, tied with a boot cord, and wedged into the notches of your own house-post '
+        +'where you could not possibly miss it and nobody else could possibly reach it.',
+    notes:[
+      '“You have been staring at a chart for {d} days. Stare at this.”',
+      '“I am not competing with a headland. I am reminding you what you live with.”',
+      '“The Ten can wait. Look at it.”',
+      '“You have not looked at me properly since the equinox. This is easier than asking.”',
+    ]},
+};
+/* WHAT IT IS OF, in her own choosing rather than a hand's brief */
+const RK_SELV_SUBJ = [
+  {id:'booty', tag:'AND IT IS NOT SUBTLE ABOUT WHAT IT IS OF', expr:'smug'},
+  {id:'bust',  tag:'AND SHE HAS DECIDED WHAT YOU ARE LOOKING AT', expr:'smoulder'},
+  {id:'waist', tag:'AND THE WHOLE OF HER IS IN IT',               expr:'proud'},
+  {id:'legs',  tag:'AND SHE DID NOT STOP AT THE WAIST',           expr:'away'},
+];
+function selvskarOn(){
+  try{
+    return !!(ADULT && G && !G.isFemale && G.married && G.wife && !G.wife.male && rkHere());
+  }catch(e){ return false; }
+}
+function selvskarWaiting(){ try{ return !!(G.selv && !G.selv.used); }catch(e){ return false; } }
+/* WHETHER ONE IS ON ITS WAY. She does not send them weekly and she does not
+   send them to a house she is not speaking to. */
+function selvskarWhy(){
+  if(!selvskarOn()) return null;
+  if(selvskarWaiting()) return null;
+  const d=(G.day|0);
+  if(G.selvDay!==undefined && (d-(G.selvDay|0)) < 6) return null;
+  const rel=(G.wifeRel===undefined? 50 : G.wifeRel);
+  if(rel < 45) return null;
+  const held=(typeof rkHeldCount==='function')? rkHeldCount() : 0;
+  const quiet=d-(G.lastTalkDay===undefined? d : G.lastTalkDay);
+  const cold =d-(G.lastLoveDay===undefined? d : G.lastLoveDay);
+  if(held>=1 && quiet>=3) return {why:'over',  d:quiet};
+  if(rel>=60 && cold>=5)  return {why:'focus', d:cold};
+  return null;
+}
+/* IT ARRIVES. Cut, rolled, and carried — and the game records that it did,
+   because the whole point is that nobody else ever will. */
+function selvskarArrive(whyId, days){
+  try{
+    const W=RK_SELV_WHY[whyId]||RK_SELV_WHY.focus;
+    const w=G.wife, b=(w&&w.body)||{};
+    /* she cuts it of whichever of her the ledger reads highest, because she
+       is not modest and she has seen the chart too */
+    const rank=RK_SELV_SUBJ.slice().sort((x,y)=>
+      ((b[y.id]===undefined?5:b[y.id]) - (b[x.id]===undefined?5:b[x.id])));
+    const S=(Math.random()<0.72)? rank[0] : pick(RK_SELV_SUBJ);
+    const note=pick(W.notes).replace('{d}', String(Math.max(1,days|0)));
+    G.selv={ day:(G.day|0), why:whyId, subj:S.id, expr:S.expr, tag:S.tag,
+             note, used:false, marks:0 };
+    G.selvDay=(G.day|0);
+    G.selvSent=(G.selvSent|0)+1;
+    try{ saveQuiet(); }catch(e){}
+    try{ toast('✎ '+W.head+'  '+W.line, 6800); sfx('cloth'); }catch(e){}
+    try{ setTimeout(()=>{ try{ toast('✎ It is in her own hand. No raunskar shop on this coast '
+      +'would have cut it and she did not ask one to.', 6200); }catch(e){} }, 3200); }catch(e){}
+    return G.selv;
+  }catch(e){ return null; }
+}
+function selvskarPoll(){
+  try{ const R=selvskarWhy(); if(R) return selvskarArrive(R.why, R.d); }catch(e){}
+  return null;
+}
+/* =====================================================================
+   THE PLATE, AND IT IS NOT A PAID HAND'S
+   ---------------------------------------------------------------------
+   A raunskar is cut on a dressed plank or a bone blank, squared up, with a
+   frame. This is a scrap of hide with a torn edge, drawn slightly crooked,
+   with her own uneven border scratched round it and her own mark at the
+   bottom — because the ONE thing the picture has to say before anything
+   else is that no professional was anywhere near it.
+   ===================================================================== */
+let SELV_ANIM=null;      // the running splash, if there is one
+function selvskarFigure(w){
+  /* an offscreen of just her, no backdrop, no garment, no culture's cloth */
+  const N=300;
+  const off=document.createElement('canvas'); off.width=off.height=N;
+  const keep={cov:w._cov, dress:w.dress, skin:w._skinBody, cut:w._cutForce, ex:w._expr};
+  w._cov=0; w.dress=w.skin||'#e6bd94'; w._skinBody=true; w._cutForce=null;
+  w._expr=(G.selv&&G.selv.expr)||'smug';
+  try{ drawBridePortrait(off, w, true, 0); }catch(e){}
+  if(keep.cov===undefined) delete w._cov; else w._cov=keep.cov;
+  w.dress=keep.dress;
+  if(keep.skin===undefined) delete w._skinBody; else w._skinBody=keep.skin;
+  if(keep.cut===undefined) delete w._cutForce; else w._cutForce=keep.cut;
+  if(keep.ex===undefined) delete w._expr; else w._expr=keep.ex;
+  return off;
+}
+function drawSelvskar(cv, t){
+  const c=cv.getContext('2d'), W2=cv.width, H2=cv.height;
+  c.imageSmoothingEnabled=true;
+  c.clearRect(0,0,W2,H2);
+  const S=G.selv||{};
+  /* ---- 1 · THE HIDE. A torn scrap, scraped on the flesh side, with the
+     crease it was rolled along still in it. Rectangular and ragged: the one
+     thing this picture has to say before anything else is that no
+     professional was anywhere near it. ---- */
+  const pad=11;
+  const HX0=pad, HY0=pad, HX1=W2-pad, HY1=H2-pad;
+  const tornPath=(x0,y0,x1,y1,amp,seed)=>{
+    const step=13, jit=i=>Math.sin(i*2.31+seed)*amp + Math.cos(i*1.17+seed*1.7)*amp*0.55;
+    let i=0; c.beginPath();
+    for(let x=x0;x<=x1;x+=step){ const y=y0+jit(i++); if(x===x0) c.moveTo(x,y); else c.lineTo(x,y); }
+    for(let y=y0;y<=y1;y+=step) c.lineTo(x1+jit(i++), y);
+    for(let x=x1;x>=x0;x-=step) c.lineTo(x, y1+jit(i++));
+    for(let y=y1;y>=y0;y-=step) c.lineTo(x0+jit(i++), y);
+    c.closePath();
+  };
+  c.save(); c.shadowColor='rgba(0,0,0,.62)'; c.shadowBlur=15; c.shadowOffsetY=5;
+  tornPath(HX0,HY0,HX1,HY1, 4.2, 1.7);
+  { const g=c.createLinearGradient(0,0,W2,H2);
+    g.addColorStop(0,'#e6d2ab'); g.addColorStop(0.45,'#d8c095'); g.addColorStop(1,'#c1a476');
+    c.fillStyle=g; c.fill(); }
+  c.restore();
+  c.save(); tornPath(HX0,HY0,HX1,HY1, 4.2, 1.7); c.clip();
+  /* the scrape marks of the flesh side */
+  c.strokeStyle='rgba(140,110,70,.09)'; c.lineWidth=1;
+  for(let i=0;i<64;i++){ const y=(i*14+((i*37)%11))%H2;
+    c.beginPath(); c.moveTo(0,y); c.lineTo(W2, y+((i%3)-1)*2); c.stroke(); }
+  /* the roll crease, and the light along the ridge of it */
+  c.strokeStyle='rgba(120,92,56,.20)'; c.lineWidth=2.4;
+  c.beginPath(); c.moveTo(W2*0.37,0); c.lineTo(W2*0.335,H2); c.stroke();
+  c.strokeStyle='rgba(255,246,220,.24)'; c.lineWidth=1.6;
+  c.beginPath(); c.moveTo(W2*0.37+3,0); c.lineTo(W2*0.335+3,H2); c.stroke();
+  /* and the shadow the rolled edge throws along its own top */
+  c.fillStyle='rgba(90,66,38,.12)'; c.fillRect(0,0,W2,10);
+  c.restore();
+  /* her own border, scratched INSIDE the hide, and it does not meet itself */
+  c.save(); c.strokeStyle='rgba(88,62,34,.50)'; c.lineWidth=1.7;
+  tornPath(HX0+13, HY0+13, HX1-13, HY1-13, 1.7, 4.3); c.stroke();
+  c.strokeStyle='rgba(255,246,220,.20)'; c.lineWidth=1;
+  tornPath(HX0+15, HY0+15, HX1-11, HY1-11, 1.7, 4.3); c.stroke();
+  c.restore();
+
+  /* ---- 2 · HER, off the plate's own figure, drawn a little crooked ---- */
+  const w=G.wife;
+  const NOTE_TOP=H2-96;                       // everything below this line is what she wrote
+  if(w && !w.male){
+    const fig=(cv.__fig && cv.__figFor===S.day)? cv.__fig : (cv.__fig=selvskarFigure(w), cv.__figFor=S.day, cv.__fig);
+    const fh=NOTE_TOP-(pad+22), fw=fh;
+    const fx=W2/2-fw/2+4, fy=pad+22;
+    c.save();
+    c.translate(fx+fw/2, fy+fh/2); c.rotate(-0.028); c.translate(-(fx+fw/2), -(fy+fh/2));
+    /* SHE IS NOT A DRAUGHTSMAN. A trace of ink under the figure, offset —
+       the line she laid down first and then did not quite fill. */
+    c.globalAlpha=0.22; c.filter='none';
+    c.drawImage(fig, fx-2, fy+2, fw, fh);
+    c.globalAlpha=1;
+    c.drawImage(fig, fx, fy, fw, fh);
+    /* and a few of her own hatch strokes over it, because she shaded it */
+    c.strokeStyle='rgba(92,64,36,.20)'; c.lineWidth=1.2;
+    for(let i=0;i<16;i++){
+      const hx=fx+fw*0.30+((i*53)%Math.round(fw*0.42));
+      const hy=fy+fh*0.34+((i*71)%Math.round(fh*0.46));
+      c.beginPath(); c.moveTo(hx,hy); c.lineTo(hx+6,hy+9); c.stroke();
+    }
+    c.restore();
+  }
+
+  /* ---- 3 · WHAT SHE WROTE ON IT ---- */
+  { const NT=H2-96;
+    c.strokeStyle='rgba(96,68,38,.22)'; c.lineWidth=1;
+    c.beginPath(); c.moveTo(pad+26, NT+4); c.lineTo(W2-pad-26, NT+1); c.stroke();
+    c.textAlign='center';
+    c.font='italic 14px Georgia,serif'; c.fillStyle='rgba(70,46,22,.90)';
+    const note=String(S.note||'');
+    const words=note.split(' '); let ln=[], cur='';
+    words.forEach(x=>{ const tryv=cur? cur+' '+x : x;
+      if(c.measureText(tryv).width > W2-pad*2-52){ ln.push(cur); cur=x; } else cur=tryv; });
+    if(cur) ln.push(cur);
+    const rows=ln.slice(0,3);
+    rows.forEach((L,i)=>c.fillText(L, W2/2, NT+30+i*18));
+    /* her mark — not a signature. A notch pattern, the way everything on
+       this coast is signed, cut with the same stylus as the border. */
+    const mx=W2-pad-44, my=H2-pad-16;
+    c.strokeStyle='rgba(70,46,22,.72)'; c.lineWidth=2.2;
+    for(let i=0;i<3;i++){ c.beginPath(); c.moveTo(mx+i*6, my-8); c.lineTo(mx+i*6+3, my+2); c.stroke(); }
+    c.beginPath(); c.moveTo(mx-4,my-2); c.lineTo(mx+18,my-5); c.stroke();
+    c.font='9px Georgia,serif'; c.textAlign='right'; c.fillStyle='rgba(96,68,38,.55)';
+    c.fillText('cut by her own hand · entered nowhere', W2-pad-14, H2-pad-30); }
+
+  /* ---- 4 · AND WHAT IS ON IT, IF ANYTHING IS ---- */
+  if((S.marks|0)>0 && !SELV_ANIM) selvskarMarks(c, W2, H2, S.marks|0, 1);
+  if(SELV_ANIM) selvskarSplash(c, W2, H2, t);
+}
+/* the settled marks, drawn from a seed so they land in the same places
+   every time the plate is opened again */
+function selvskarMarks(c, W2, H2, n, alpha){
+  c.save(); c.globalAlpha=alpha;
+  const hash=(k)=>{ let x=Math.sin(k*127.1+n*311.7)*43758.5453; return x-Math.floor(x); };
+  for(let i=0;i<n*4;i++){
+    const sx=W2*(0.28+hash(i*2+1)*0.44);
+    const sy=H2*(0.18+hash(i*2+2)*0.44);
+    const r =6+hash(i+91)*6;
+    const run=22+hash(i+57)*48;
+    selvskarBlob(c, sx, sy, r, run);
+  }
+  c.restore();
+}
+/* ONE FAT CARTOON BLOB WITH A DRIP UNDER IT. Rounded tip, a highlight on
+   the shoulder, and a soft edge — it has to read as comedy at a glance,
+   which is the whole brief. */
+function selvskarBlob(c, x, y, r, run){
+  c.save();
+  c.fillStyle='rgba(252,250,246,.94)';
+  c.beginPath();
+  c.moveTo(x-r, y);
+  c.bezierCurveTo(x-r, y-r*1.25, x+r, y-r*1.25, x+r, y);
+  /* the run: two long curves down to a rounded tip */
+  const tw=Math.max(1.6, r*0.42);
+  c.bezierCurveTo(x+r*0.9, y+run*0.55, x+tw*1.25, y+run*0.72, x+tw, y+run);
+  c.bezierCurveTo(x+tw*0.5, y+run+tw*1.4, x-tw*0.5, y+run+tw*1.4, x-tw, y+run);
+  c.bezierCurveTo(x-tw*1.25, y+run*0.72, x-r*0.9, y+run*0.55, x-r, y);
+  c.closePath();
+  c.fill();
+  c.fillStyle='rgba(226,236,244,.55)';          // the shaded underside of the bead
+  c.beginPath(); c.ellipse(x+r*0.18, y+r*0.30, r*0.52, r*0.30, 0,0,7); c.fill();
+  c.fillStyle='rgba(255,255,255,.98)';          // and the highlight on its shoulder
+  c.beginPath(); c.ellipse(x-r*0.30, y-r*0.42, r*0.34, r*0.24, -0.4,0,7); c.fill();
+  c.restore();
+}
+/* =====================================================================
+   ✽ SPLAISH
+   ---------------------------------------------------------------------
+   The instruction that came with it, animated, and deliberately funny:
+   fat cartoon drops arc in from off-plate, land with a crown and a ring
+   of flecks, and then hang there and DRIP. The word lands with them.
+   ===================================================================== */
+function selvskarSplashStart(){
+  const drops=[];
+  const n=8;
+  for(let i=0;i<n;i++){
+    drops.push({
+      x:0.28+Math.random()*0.46, y:-0.12-Math.random()*0.50,
+      vy:0.80+Math.random()*0.50, r:8+Math.random()*6,
+      land:0.20+Math.random()*0.44, hit:0, run:0, runMax:34+Math.random()*58,
+      d:i*0.07,
+    });
+  }
+  SELV_ANIM={t0:null, t:0, drops, word:0, done:false};
+}
+function selvskarSplash(c, W2, H2, now){
+  const A=SELV_ANIM; if(!A) return;
+  if(A.t0===null) A.t0=now;
+  const t=(now-A.t0)/1000; A.t=t;
+  c.save();
+  A.drops.forEach(d=>{
+    const lt=t-d.d; if(lt<0) return;
+    if(!d.hit){
+      const y=d.y+d.vy*lt*1.9;
+      if(y>=d.land){ d.hit=lt; }
+      else {
+        /* in the air: a stretched bead with a tail, because a falling drop
+           is not a circle */
+        const X=W2*d.x, Y=H2*y;
+        c.fillStyle='rgba(252,250,246,.92)';
+        c.beginPath(); c.ellipse(X, Y, d.r*0.72, d.r*1.55, 0,0,7); c.fill();
+        c.beginPath(); c.moveTo(X-d.r*0.5,Y-d.r*1.2);
+        c.quadraticCurveTo(X, Y-d.r*4.4, X+d.r*0.5, Y-d.r*1.2); c.closePath(); c.fill();
+        c.fillStyle='rgba(255,255,255,.95)';
+        c.beginPath(); c.ellipse(X-d.r*0.22, Y-d.r*0.5, d.r*0.24, d.r*0.5, 0,0,7); c.fill();
+        return;
+      }
+    }
+    /* landed: the crown, the flecks, then the run growing to its length */
+    const age=lt-d.hit;
+    const X=W2*d.x, Y=H2*d.land;
+    if(age<0.30){
+      const k=age/0.30;
+      c.strokeStyle='rgba(252,250,246,'+(0.85*(1-k))+')'; c.lineWidth=2.4;
+      c.beginPath(); c.arc(X, Y, d.r*(1.1+k*2.6), Math.PI*1.05, Math.PI*1.95); c.stroke();
+      for(let f=0;f<6;f++){
+        const a=Math.PI*(1.06+f*0.155), rr=d.r*(1.2+k*3.4);
+        c.fillStyle='rgba(252,250,246,'+(0.9*(1-k))+')';
+        c.beginPath(); c.arc(X+Math.cos(a)*rr, Y+Math.sin(a)*rr*0.8, Math.max(0.8,1.9*(1-k*0.6)), 0,7); c.fill();
+      }
+    }
+    /* it runs fast at first and then keeps going, the way a heavy drop does */
+    d.run=d.runMax*(1-Math.pow(1-Math.min(1, age/1.7), 2.2));
+    selvskarBlob(c, X, Y, d.r*1.2, d.run);
+  });
+  /* THE WORD. It arrives with the first landing, overshoots, and settles. */
+  const first=A.drops[0];
+  if(first && first.hit){
+    const wt=t-(first.d+first.hit);
+    if(wt>=0 && wt<1.9){
+      const k=Math.min(1, wt/0.22);
+      const pop=1+ (wt<0.34? Math.sin(wt/0.34*Math.PI)*0.36 : 0);
+      const fade=wt>1.35? 1-(wt-1.35)/0.55 : 1;
+      c.save();
+      c.translate(W2*0.5, H2*0.30);
+      c.rotate(-0.10+Math.sin(wt*9)*0.016);
+      c.scale(pop*k, pop*k);
+      c.font='bold 40px Georgia,serif'; c.textAlign='center';
+      c.lineWidth=7; c.strokeStyle='rgba(30,20,12,'+(0.86*fade)+')';
+      c.strokeText('SPLAISH', 0, 0);
+      c.lineWidth=3; c.strokeStyle='rgba(214,236,248,'+(0.9*fade)+')';
+      c.strokeText('SPLAISH', 0, 0);
+      c.fillStyle='rgba(255,255,255,'+(0.97*fade)+')';
+      c.fillText('SPLAISH', 0, 0);
+      c.font='bold 12px Georgia,serif';
+      c.fillStyle='rgba(255,240,200,'+(0.8*fade)+')';
+      c.fillText('· as instructed ·', 0, 20);
+      c.restore();
+    }
+  }
+  c.restore();
+  if(t>2.9) A.done=true;
+}
+/* =====================================================================
+   THE SCREEN
+   ===================================================================== */
+let SELV_RAF=0;
+function selvskarStopAnim(){ if(SELV_RAF){ cancelAnimationFrame(SELV_RAF); SELV_RAF=0; } }
+function openSelvskar(){
+  if(!selvskarOn() || !G.selv){
+    try{ toast('Nothing came.',2000); }catch(e){}
+    try{ enterMap(); }catch(e){} return;
+  }
+  selvskarStopAnim();
+  const S=G.selv, W=RK_SELV_WHY[S.why]||RK_SELV_WHY.focus;
+  state='villa'; show('scr-villa'); $('statbar').classList.remove('hide'); refreshStatbar();
+  villaHead('✎ '+RK_SELVSKAR.name+' — '+W.head.replace(/^◆ /,''), W.line, W.col);
+  const b=$('villa-body'); b.innerHTML='';
+  const card=(html,col)=>{ const d=document.createElement('div'); d.className='panel';
+    d.style.cssText='padding:9px;border-color:'+(col||'#6b4e2a'); d.innerHTML=html||'';
+    b.appendChild(d); return d; };
+
+  card('<div style="color:'+W.col+';letter-spacing:1px"><b>✎ HER OWN HAND</b>'
+    +' <span class="small muted">— '+S.tag+'</span></div>'
+    +'<div class="small muted" style="margin-top:3px;line-height:1.6">'+RK_SELVSKAR.what+'</div>'
+    +'<div class="small" style="margin-top:4px;color:#e8c34a">'+RK_SELVSKAR.law+'</div>', W.col);
+
+  /* ---- the plate ---- */
+  const d=card('', W.col);
+  const cvs=document.createElement('canvas'); cvs.width=430; cvs.height=430;
+  cvs.style.cssText='position:static;width:min(100%,430px);height:auto;image-rendering:auto;'
+    +'display:block;margin:0 auto;border-radius:4px';
+  d.appendChild(cvs);
+  const redraw=(t)=>{ try{ drawSelvskar(cvs, t||performance.now()); }catch(e){} };
+  redraw();
+
+  /* ---- and the instruction that came with it ---- */
+  const act=document.createElement('div');
+  act.style.cssText='display:flex;gap:7px;margin-top:8px;flex-wrap:wrap;justify-content:center';
+  d.appendChild(act);
+  const done=!!S.used;
+  const go=document.createElement('button');
+  go.className='btn'+(done?'':' gold');
+  go.textContent= done? '✽ ALREADY SEEN TO  ('+(S.marks|0)+')' : '✽ DO WHAT IT IS FOR';
+  go.onclick=()=>{
+    if(SELV_ANIM && !SELV_ANIM.done) return;
+    selvskarSplashStart();
+    try{ sfx('ahh'); }catch(e){}
+    const step=(now)=>{
+      redraw(now);
+      if(SELV_ANIM && !SELV_ANIM.done){ SELV_RAF=requestAnimationFrame(step); return; }
+      SELV_RAF=0; SELV_ANIM=null;
+      const R=selvskarDo();
+      redraw();
+      if(R) try{ toast(R.line, 6400); }catch(e){}
+      setTimeout(()=>{ try{ openSelvskar(); }catch(e){} }, 900);
+    };
+    SELV_RAF=requestAnimationFrame(step);
+  };
+  act.appendChild(go);
+  const away=document.createElement('button');
+  away.className='btn sm'; away.textContent='◆ ROLL IT UP AND PUT IT AWAY';
+  away.onclick=()=>{ const R=selvskarPutAway(); if(R) try{ toast(R.line, 5200); }catch(e){}
+    selvskarStopAnim(); try{ enterMap(); }catch(e){} };
+  act.appendChild(away);
+
+  /* ---- and what the coast thinks of the whole arrangement ---- */
+  card('<div style="color:#c9a4ef;letter-spacing:1px"><b>◈ WHAT THE HANDS WILL NOT CUT</b></div>'
+    +'<div class="small muted" style="margin-top:3px;line-height:1.6">'
+    +'<b style="color:#e8c34a">'+RK_ART_REFUSED.name+'</b> is not on the raunskar list and it never was. '
+    +RK_ART_REFUSED.why+'</div>'
+    +'<div class="small" style="margin-top:4px;line-height:1.55">'+RK_ART_REFUSED.and+'</div>'
+    +'<div class="small muted" style="margin-top:5px;line-height:1.6">'
+    +'Sent so far: <b style="color:#ff8ad0">'+(G.selvSent|0)+'</b>'
+    +' · seen to: <b style="color:#7ad08a">'+(G.selvDone|0)+'</b>'
+    +' · rolled up and left: <b style="color:#e0905b">'+(G.selvIgnored|0)+'</b>'
+    +'</div>', '#c9a4ef');
+
+  { const back=document.createElement('button'); back.className='btn gold';
+    back.textContent='◀ BACK';
+    back.onclick=()=>{ selvskarStopAnim(); try{ enterMap(); }catch(e){} };
+    b.appendChild(back); }
+}
+/* WHAT IT WAS FOR. She sent it with an instruction and the instruction is
+   the point of it; carrying it out is what the thing is FOR, and the coast
+   has no word for that because it does not need one. */
+const RK_SELV_BACK = [
+  '♥ “Good. That is what it was for.”',
+  '♥ “I knew you would. That is why I sent it and not a letter.”',
+  '♥ “Now come home and do it properly.”',
+  '♥ “The courier is waiting. Send it back and I will know.”',
+  '♥ “That is the correct answer to the question I sent you.”',
+];
+function selvskarDo(){
+  try{
+    const S=G.selv; if(!S) return null;
+    S.marks=(S.marks|0)+1;
+    const first=!S.used;
+    S.used=true;
+    if(first){
+      G.selvDone=(G.selvDone|0)+1;
+      const ceil=(typeof bondCeiling==='function')? bondCeiling() : 100;
+      G.wifeRel=clamp((G.wifeRel===undefined?50:G.wifeRel)+6, 0, ceil);
+      G.wifePhys=clamp((G.wifePhys===undefined?45:G.wifePhys)+5, 0, 100);
+      G.lastLoveDay=(G.day|0);
+      G.jealousy=clamp((G.jealousy||0)-8, 0, 100);
+      G.hygiene=clamp((G.hygiene===undefined?70:G.hygiene)-4, 0, 100);
+    }
+    try{ refreshStatbar(); saveQuiet(); }catch(e){}
+    return {line: pick(RK_SELV_BACK)+(first? '   (+6 💞 · +5 ♀)' : '   (again)'), first};
+  }catch(e){ return null; }
+}
+/* AND IF YOU DO NOT. She sent it for a reason and she is counting. */
+function selvskarPutAway(){
+  try{
+    const S=G.selv; if(!S) return null;
+    if(S.used) return {line:'◆ Rolled up and put away with the rest of the house papers, which is where it does not belong.'};
+    S.used=true;
+    G.selvIgnored=(G.selvIgnored|0)+1;
+    const ceil=(typeof bondCeiling==='function')? bondCeiling() : 100;
+    G.wifeRel=clamp((G.wifeRel===undefined?50:G.wifeRel)-4, 0, ceil);
+    G.jealousy=clamp((G.jealousy||0)+5, 0, 100);
+    try{ refreshStatbar(); saveQuiet(); }catch(e){}
+    return {line:'◆ Rolled up, corded, and put in the chest. She asked the courier what you did with it. '
+      +'The courier told her.   (−4 💞)'};
+  }catch(e){ return null; }
+}
+/* =====================================================================
    ⛵ THE UVRAAK — THE GOING-OVER
    ---------------------------------------------------------------------
    The coast is at 900 and it is not finished. Everything the Rkrai have
@@ -33793,6 +34268,11 @@ function rkCrossSettle(won, cleared){
       G.rkPull=(G.rkPull|0)+(h.pull|0);
       G.honor=clamp((G.honor||50)+4,0,100);
       vows=rkCrierResolve(h);
+      /* ✎ word of a landing gets home before you do, and she answers it */
+      try{ if(typeof selvskarOn==='function' && selvskarOn() && !selvskarWaiting()
+             && Math.random()<0.55){
+        setTimeout(()=>{ try{ selvskarArrive('over', Math.max(1,(G.day|0)-(G.lastTalkDay===undefined?(G.day|0)-3:G.lastTalkDay))); }catch(e){} }, 9000);
+      } }catch(e){}
       if(rkHeldCount()>=RK_HOLDS.length){ peak=true; G.rkPeakDay=rkCrossDay(); }
     } else {
       G.rkCrossLost=(G.rkCrossLost|0)+1;
@@ -34057,9 +34537,27 @@ const RK_ART_DRESS = [
    note:'Undyed, uncut, no yoke and no office on it — what she is in when nobody is being impressed. The district reads a woman who does not need the coat to be read.'},
   {id:'sivrak', name:'THE SIVRAK',  cut:'sivrak', skin:true, mul:1.95, honor:-1,
    note:'The leaf, and the leaf is ALL of it — two at the front, one at the hip, a cord, and the rest of her is the rest of her. It covers what has to be covered and advertises everything either side of it.'},
-  {id:'bare',   name:'NOTHING AT ALL', cut:null, skin:true, bare:true, mul:2.40, honor:-2,
-   note:'No garment, no yoke, no office. Just the measure the piece was commissioned about. The district will have opinions and the district will still look.'},
 ];
+/* AND THE ONE THAT IS NOT ON THAT LIST.
+   There used to be a NOTHING AT ALL on it, and it should never have been
+   there. Every other entry is a garment a paid hand sits in front of her
+   and copies, in a shop, with a clerk entering it — and the piece then
+   goes on a wall to be READ. A likeness on this coast is evidence.
+   Evidence of a woman with nothing on her is evidence her house cannot
+   control, so the trade does not cut it: no hand will put his bench
+   behind it and no clerk will enter it in the register. Both of those are
+   real prices and neither is about modesty.
+   If such a thing exists at all, she cut it herself. See THE SELVSKAR. */
+const RK_ART_REFUSED = {
+  name:'NOTHING AT ALL',
+  why:'The hands will not cut it and the clerks will not enter it. Not because '
+     +'the coast is shy of a body — it appoints its officers off them — but because '
+     +'a raunskar is EVIDENCE, and a likeness of a woman with nothing on her is '
+     +'evidence her own house cannot control. A hand who took that commission would '
+     +'lose his bench over it, and three of them have.',
+  and:'So there is no price for it here, and there is no arguing the price. '
+     +'The only person on this coast who may make that likeness of her is her.',
+};
 /* WHERE THE HAND POINTS THE PIECE. A commission built around her seat that
    comes back as the same waist-up woman in a coat is not a commission, it
    is a stock plate with a different label on it — which is exactly what
@@ -34734,6 +35232,20 @@ function openUvraak(){
     }
   }
 
+  /* ---- 6b · AND SOMETHING THAT IS NOT THE COUNCIL'S BUSINESS ---- */
+  if(typeof selvskarWaiting==='function' && selvskarWaiting()){
+    const S=G.selv, WW=RK_SELV_WHY[S.why]||RK_SELV_WHY.focus;
+    const d=card('<div style="color:'+WW.col+';letter-spacing:1px"><b>✎ '+WW.head.replace(/^◆ /,'')+'</b></div>'
+      +'<div class="small muted" style="margin-top:3px;line-height:1.6">'+WW.line+'</div>'
+      +'<div class="small" style="margin-top:4px;color:#e8c34a">It is in her own hand. No raunskar shop '
+      +'on this coast would have cut it, and she did not ask one to.</div>', WW.col);
+    const bt=document.createElement('button');
+    bt.className='btn gold'; bt.style.marginTop='6px';
+    bt.textContent='✎ OPEN IT';
+    bt.onclick=()=>openSelvskar();
+    d.appendChild(bt);
+  }
+
   /* ---- 7 · THE RECORD ---- */
   { const inc=rkCrossIncome();
     card('<div style="color:#7ad08a;letter-spacing:1px"><b>▦ THE FAR SHORE, AS THE FLOOR HAS IT</b></div>'
@@ -34777,6 +35289,10 @@ function openRaunskar(){
     const back=document.createElement('button'); back.className='btn gold';
     back.textContent='◀ BACK'; back.onclick=()=>enterMap(); b.appendChild(back); return;
   }
+  card('<div style="color:#c9a4ef;letter-spacing:1px"><b>◈ WHAT THE HANDS WILL NOT CUT</b></div>'
+    +'<div class="small muted" style="margin-top:3px;line-height:1.6">'
+    +'<b style="color:#e8c34a">'+RK_ART_REFUSED.name+'</b> — '+RK_ART_REFUSED.why+'</div>'
+    +'<div class="small" style="margin-top:4px;line-height:1.55">'+RK_ART_REFUSED.and+'</div>', '#c9a4ef');
   card('<div class="small muted" style="line-height:1.55"><b style="color:#e8c34a">The rule:</b> '
     +RK_RAUNSKAR.rule+'</div>'
     +'<div class="small muted" style="margin-top:4px">'+RK_RAUNSKAR.gloss+'</div>'
@@ -34828,7 +35344,7 @@ function raunskarOffers(card, w){
   mk('THE HAND',  RK_ART_HANDS, 'hand',  o=>o.name+'  ('+o.where+')  🪙'+o.fee);
   mk('CUT INTO',  RK_ART_FORMS, 'form',  o=>o.name+(o.money?'  ◆ MONEY':''));
   mk('THE POSE',  RK_ART_POSES, 'pose',  o=>o.name);
-  mk('WEARING',   RK_ART_DRESS.filter(r=>!r.bare || ADULT), 'dress',
+  mk('WEARING',   RK_ART_DRESS, 'dress',
      o=>o.name+(o.mul>1? '  ×'+o.mul.toFixed(2) : ''));
   mk('ON HER FACE', RK_ART_FACE, 'expr', o=>o.name);
   const subs=raunskarSubjects(G.wife);
@@ -36060,6 +36576,16 @@ function applyHub(){
   { const rsb=$('btn-raunskar'); if(rsb) rsb.style.display='none';
     const skb=$('btn-skarvek');  if(skb) skb.style.display='none';
     const cxb=$('btn-crossing'); if(cxb) cxb.style.display='none'; }
+  /* ✎ and the one that is only there when there is actually something in
+     the sack — a standing button for this would give the whole thing away */
+  { const svb=$('btn-selvskar');
+    if(svb){ const on=(typeof selvskarWaiting==='function') && selvskarWaiting();
+      svb.style.display= on? '' : 'none';
+      if(on){ const W=(typeof RK_SELV_WHY!=='undefined') && G.selv && RK_SELV_WHY[G.selv.why];
+        svb.textContent = (G.selv && G.selv.why==='over')? '✎ IT CAME OVER WITH THE LAUNCHING'
+                                                         : '✎ SOMETHING IS IN YOUR HOUSE-POST';
+        svb.style.borderColor = W? W.col : '#ff8ad0';
+        svb.style.color = W? W.col : '#ff8ad0'; } } }
   const _w  = playerWorld();
   const east = _w==='east';
   const wa   = _w==='wa';
@@ -36176,6 +36702,10 @@ function enterMap(){
   if(maybeFamily()) return;                      // and the children have opinions now
   // those born to rank must first secure a dynastic marriage
   if(marriageRequired()){ openMarry(true); return; }
+  /* ✎ SHE SENDS THEM WHEN SHE SENDS THEM. Polled here rather than on a
+     timer, because this is the screen a man is on when he has been away —
+     which is exactly the state she is reacting to. */
+  try{ selvskarPoll(); }catch(e){}
   state='map'; show('scr-map'); $('statbar').classList.remove('hide');
   { const fb=$('btn-forum'); if(fb) fb.style.display = G.advocate? '' : 'none'; }   // the courts, for an advocate
   { const lb=$('btn-legion'); if(lb) lb.style.display = G.tribune? '' : 'none'; }   // the legions, for a tribune
@@ -43498,6 +44028,7 @@ $('btn-titles').onclick=()=>openTitles();
 { const rsb=$('btn-raunskar'); if(rsb) rsb.onclick=()=>openRaunskar(); }
 { const skb=$('btn-skarvek');  if(skb) skb.onclick=()=>openSkarvek(); }
 { const cxb=$('btn-crossing'); if(cxb) cxb.onclick=()=>openUvraak(); }
+{ const svb=$('btn-selvskar'); if(svb) svb.onclick=()=>openSelvskar(); }
 $('btn-titles-back').onclick=()=>enterMap();
 $('btn-herb-back').onclick=()=>{ if(herbBack==='villa') openVilla(); else enterMap(); };
 $('btn-prov-back').onclick=()=>enterMap();
@@ -50077,6 +50608,12 @@ window.__SS = {
   rkCrierById, rkCrierNow, rkCrierCall, rkCrierResolve, rkPitPower, rkPitLook,
   rkHoldTake, rkCrossSettle, rkCrossIncome,
   drawStraitMap, rkStraitHit, openUvraak,
+  /* ✎ THE SELVSKAR */
+  RK_SELVSKAR, RK_SELV_WHY, RK_SELV_SUBJ, RK_SELV_BACK, RK_ART_REFUSED,
+  selvskarOn, selvskarWaiting, selvskarWhy, selvskarArrive, selvskarPoll,
+  selvskarFigure, drawSelvskar, selvskarBlob, selvskarMarks,
+  selvskarSplashStart, selvskarSplash, openSelvskar, selvskarDo, selvskarPutAway,
+  get SELV_ANIM(){ return SELV_ANIM; }, set SELV_ANIM(v){ SELV_ANIM=v; },
   get rkCrossSel(){ return rkCrossSel; }, set rkCrossSel(v){ rkCrossSel=v; },
   get FT(){ return FT; },
   RK_RAUNSKAR, RK_ART_HANDS, RK_ART_FORMS, RK_ART_POSES, RK_ART_DRESS,

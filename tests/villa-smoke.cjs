@@ -492,6 +492,8 @@ const ok=(name,cond,detail)=>{
       return S.raunskarWorth(p); };
     out.wCoat=worthOf('parka'); out.wLeaf=worthOf('sivrak');
     out.skinOnes=S.RK_ART_DRESS.filter(d=>d.skin).map(d=>d.id);
+    out.refused=!!(S.RK_ART_REFUSED && S.RK_ART_REFUSED.why && S.RK_ART_REFUSED.and);
+    out.refusedName=S.RK_ART_REFUSED && S.RK_ART_REFUSED.name;
     const d0=G.wife.dress;
     { const cv=document.createElement('canvas'); cv.width=cv.height=120;
       S.raunskarRender(cv, {hand:'ten',form:'bone',pose:'back',subj:'booty',
@@ -518,8 +520,14 @@ const ok=(name,cond,detail)=>{
   ok('and nothing threw',                   !dr.threw, dr.threw||'');
   ok('her garment override is cleaned up',  dr.restored===true);
   ok('the leaf is worth more than the coat', dr.wLeaf>dr.wCoat, dr.wCoat+' -> '+dr.wLeaf);
-  ok('the leaf and the bare one show actual skin',
-     dr.skinOnes.length===2, dr.skinOnes.join(', '));
+  ok('the leaf shows actual skin',
+     dr.skinOnes.length===1 && dr.skinOnes[0]==='sivrak', dr.skinOnes.join(', '));
+  /* ✎ AND NOTHING AT ALL IS NOT ON THE LIST. No hand cuts it and no clerk
+     enters it — that likeness is hers to make and hers to send. */
+  ok('and NOTHING AT ALL is not a commission',
+     dr.dresses.indexOf('bare')<0, dr.dresses.join(', '));
+  ok('the shop says so out loud',
+     dr.refused===true, dr.refusedName||'');
   ok('and a skin garment restores her dress afterwards', dr.dressRestored===true);
   ok('the face is a commission axis', dr.faces>=6, dr.faces+' faces');
   ok('and every one of them paints',  dr.faceThrew===null, dr.faceThrew||'');
