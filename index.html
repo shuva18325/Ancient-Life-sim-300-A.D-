@@ -16410,6 +16410,12 @@ function sceneActions(){
     A.push({k:'d', c:'▶', t:'NEXT'});
     return A;
   }
+  const SA=D.seatAsk;
+  if(SA && !SA.ph){
+    A.push({k:'k', c:'K', t:'LAND ONE  ('+slapToday()+'/'+(slapToday()+SA.owed)+')', hot:true});
+    A.push({k:'x', c:'X', t:'NOT NOW', warn:true});
+    return A;
+  }
   const Tp=D.tempt;
   if(Tp){
     if(Tp.ph==='resist'){ A.push({k:'space', c:'␣', t:'MASH — DO NOT', hot:true});
@@ -22809,6 +22815,9 @@ function updateDomus(dt){
   /* 💬 her turn to have an opinion about you */
   if(D.praise){ updatePraise(dt); if(D.praise && D.praise.locks) return; }
   else if(praiseDue()) startPraise();
+  /* ◈ AND A MESTERI RHAUNEK ASKS, because the figure is public and so is she */
+  if(D.seatAsk){ updateSeatAsk(dt); if(D.seatAsk && D.seatAsk.locks) return; }
+  else if(seatAskDue()) startSeatAsk();
   /* ⌘ and the tablet, which locks hardest of all because it is a menu */
   if(D.tablet){ updateTablet(dt); if(D.tablet && D.tablet.locks) return; }
   else if(consume('t')) openTablet();
@@ -24193,41 +24202,76 @@ function updateCurio(dt){
 const RK_PRAISE=[
   {id:'rod', need:{len:8},
    line:'“That is a big rod on you and I am not going to pretend I have not noticed.”',
+   say:{polite:'“I am told the ledger read well for you. I did not ask. Somebody said it.”',
+        plain :'“That is a big rod on you and I am not going to pretend I have not noticed.”',
+        blunt :'“You are enormous and I have stopped finding polite ways to say it. Sit down.”'},
    replies:[
      {name:'I KNOW',        line:'“I know.” She snorts. “Of course you do.”',            bond:2, phys:3},
      {name:'YOU MEASURED?', line:'“Did you measure it?” “I did. Twice. It did not change.”', bond:3, phys:2},
      {name:'SAY IT AGAIN',  line:'“Say that again at the equinox, in front of the Ten.” She says she will.', bond:4, phys:1} ]},
   {id:'rod2', need:{len:9},
    line:'“The ledger said the number out loud and the whole district heard it.”',
+   say:{polite:'“The number was read at the weighing. People were quiet afterwards.”',
+        plain :'“The ledger said the number out loud and the whole district heard it.”',
+        blunt :'“Half this coast knows your number and the other half has asked me about it. I told them.”'},
    replies:[
      {name:'LET THEM',   line:'“Let them.” She looks at you for a moment too long and says nothing.', bond:3, phys:2},
      {name:'AND YOU?',   line:'“And what did you think of it?” “I am still thinking.”',   bond:4, phys:2},
      {name:'IT IS ONLY A NUMBER', line:'“It is only a number.” “It is not, and you know it is not.”', bond:2, phys:1} ]},
   {id:'stand',need:{stand:true},
    line:'“That is standing, and the kilt is not hiding it, and I am not going to help you.”',
+   say:{polite:'“You might want to turn round before somebody comes in.”',
+        plain :'“That is standing, and the kilt is not hiding it, and I am not going to help you.”',
+        blunt :'“That is up, everyone can see it, and I am not doing anything about it from over here.”'},
    replies:[
      {name:'I DID NOT ASK', line:'“I did not ask for help.” “No,” she says. “You did not.”', bond:2, phys:4},
      {name:'COME HERE',     line:'“Then come here.” She takes her time about it, and she comes.', bond:3, phys:4},
      {name:'IT IS THE COLD', line:'“It is the cold.” She looks at the fire. She looks back at you.', bond:1, phys:2} ]},
   {id:'work',
    line:'“You carried the whole of that load and did not once put it down. I watched.”',
+   say:{polite:'“That looked heavy. You managed it.”',
+        plain :'“You carried the whole of that load and did not once put it down. I watched.”',
+        blunt :'“I watched you carry that and I thought about it afterwards. For a while.”'},
    replies:[
      {name:'YOU WATCHED?', line:'“You watched?” “I watch a great deal. You are not subtle.”', bond:4, phys:1},
      {name:'IT WAS LIGHT', line:'“It was not heavy.” It was. She was there when it was weighed.', bond:2, phys:1},
      {name:'GOOD',         line:'“Good.” She goes back to the rack, pleased about something.', bond:3, phys:0} ]},
   {id:'arms',
    line:'“There is more of you through the shoulders than there was at the thaw.”',
+   say:{polite:'“The oar seems to be agreeing with you.”',
+        plain :'“There is more of you through the shoulders than there was at the thaw.”',
+        blunt :'“You have got bigger. I noticed on the first day and I have said nothing for a month.”'},
    replies:[
      {name:'THE OAR',   line:'“The oar.” “Mm. Keep at the oar.”',                       bond:3, phys:1},
      {name:'FOR YOU',   line:'“For you.” She says nothing at all, which here is the whole sentence.', bond:4, phys:2},
      {name:'HAVE THERE?',line:'“Is there?” She puts a hand on it to check. There is.',  bond:3, phys:3} ]},
   {id:'stay',
    line:'“Nobody on this coast married better than I did and I have said so out loud.”',
+   say:{polite:'“I did not marry badly. I have said as much, when asked.”',
+        plain :'“Nobody on this coast married better than I did and I have said so out loud.”',
+        blunt :'“I married the best thing on this coast and I am done being modest about it. Come here.”'},
    replies:[
      {name:'TO WHO',  line:'“To who?” “To the Ten. At the equinox. You were not there.”', bond:5, phys:1},
      {name:'NOR DID I',line:'“Nor did I.” She lets that sit, and does not correct it.',    bond:4, phys:1},
      {name:'MM',      line:'“Mm.” It is her own word and she notices you using it.',       bond:2, phys:0} ]},
 ];
+/* WHICH REGISTER THE HOUSE IS SPEAKING IN. Bond decides how careful she
+   is being; the physical meter decides how much of it is about the body.
+   At the top she is neither careful nor indirect, which is not rudeness —
+   it is a woman who has stopped translating. */
+function praiseRegister(){
+  const rel=(G.wifeRel===undefined?50:G.wifeRel);
+  const phy=(G.wifePhys===undefined?45:G.wifePhys);
+  const both=Math.min(rel,phy);
+  if(both>=92) return {id:'blunt', lab:'BLUNT',
+    note:'She has stopped using the long way round. On this coast that is not rudeness, it is a woman who has stopped translating.'};
+  if(rel>=70 || phy>=70) return {id:'plain', lab:'PLAIN', note:'A settled house, saying things once.'};
+  return {id:'polite', lab:'CAREFUL', note:'She is still being careful with you.'};
+}
+function praiseLine(p){
+  const R=praiseRegister();
+  return (p.say && (p.say[R.id]||p.say.plain)) || p.line;
+}
 function praiseReady(){
   try{
     if(!rkHere() || !ADULT) return false;
@@ -24274,12 +24318,18 @@ function praiseTake(i){
   const D=DM, P=D&&D.praise; if(!P) return null;
   const R=praiseReplies()[i]; if(!R) return null;
   P.ph='answer'; P.t=0; P.chose=R;
+  /* a blunt house is a warmer house, and it pays a little better for the
+     same answer — the register is a state of the marriage, not a skin */
+  if(praiseRegister().id==='blunt'){
+    P.chose={name:R.name, line:R.line, bond:(R.bond|0)+1, phys:(R.phys|0)+1};
+  }
+  const A=P.chose;
   const ceil=(typeof bondCeiling==='function')? bondCeiling() : 100;
-  G.wifeRel =clamp((G.wifeRel||50)+(R.bond|0), 0, ceil);
-  G.wifePhys=clamp((G.wifePhys===undefined?45:G.wifePhys)+(R.phys|0), 0, 100);
+  G.wifeRel =clamp((G.wifeRel||50)+(A.bond|0), 0, ceil);
+  G.wifePhys=clamp((G.wifePhys===undefined?45:G.wifePhys)+(A.phys|0), 0, 100);
   G.praiseHeard=(G.praiseHeard||0)+1;
   try{ sfx('ahh'); }catch(e){} try{ refreshStatbar(); saveQuiet(); }catch(e){}
-  return R;
+  return A;
 }
 function updatePraise(dt){
   const D=DM, P=D.praise; if(!P) return;
@@ -24304,6 +24354,73 @@ function updatePraise(dt){
       +(R.phys? ', +'+(R.phys|0)+' 🔥' : '')+')', 6000);
   }
 }
+function drawSeatAsk(){
+  const D=DM, X=D&&D.seatAsk; if(!X) return;
+  const w=G.wife; if(!w) return;
+  const FY=214, T=X.t, PX=D.wifeX===undefined? W/2 : D.wifeX;
+  const have=slapToday(), want=X.owed+have, cap=slapCap();
+  /* the room drops back and the lamp comes up on her, the way every other
+     beat in this hall marks itself */
+  ctx.globalAlpha=0.32; px(-4,-4,W+8,H+8,'#180b12'); ctx.globalAlpha=1;
+  { const g=ctx.createRadialGradient(PX,FY-40,6,PX,FY-40,84);
+    g.addColorStop(0,'rgba(255,190,215,.24)'); g.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.fillStyle=g; ctx.fillRect(0,60,W,H-60); }
+  ctx.textAlign='center';
+  /* ---- THE COUNT, CUT IN FIVES, which is how this coast counts anything
+     people stand round. The office's own figure is marked on it. ---- */
+  { const bw=136, bh=26, bx=Math.round(W/2-bw/2), by=64;
+    px(bx-2,by-2,bw+4,bh+4,'rgba(255,138,208,.24)');
+    px(bx,by,bw,bh,'rgba(12,7,14,.92)');
+    px(bx,by,bw,1,'rgba(255,190,220,.50)');
+    let gx=bx+8;
+    for(let i=0;i<cap;i++){
+      const on=i<have, due=i<want;
+      px(gx, by+7, 2, 13, on? '#ffd06a' : due? 'rgba(255,138,208,.42)' : 'rgba(120,104,116,.30)');
+      if(i===4){ px(bx+6, by+11, 24, 2, on? '#ffd06a' : 'rgba(255,138,208,.28)'); gx+=5; }
+      gx+=6;
+    }
+    px(bx+8+want*6-1, by+4, 1, 19, '#ff8ad0');
+    pixelText('◈ '+have+' OF '+want+'  ·  THE OFFICE’S OWN FIGURE',
+              W/2, by+bh+9, 'rgba(255,214,240,.86)', 0.58);
+  }
+  /* ---- HER LINE, in the same box the praise uses, tail aimed at her ---- */
+  { const a=clamp(T/26,0,1);
+    const words=String(X.line).split(' '); let ln='', out=[];
+    words.forEach(wd=>{ const t2=ln?ln+' '+wd:wd;
+      if(t2.length>44 && ln){ out.push(ln); ln=wd; } else ln=t2; });
+    if(ln) out.push(ln);
+    out=out.slice(0,3);
+    const bh=out.length*9+9, by=20;
+    ctx.globalAlpha=a;
+    px(W/2-118, by-7, 236, bh, 'rgba(18,9,15,.88)');
+    px(W/2-118, by-7, 236, 1, 'rgba(255,190,220,.40)');
+    px(W/2-118, by-8+bh, 236, 1, 'rgba(255,190,220,.16)');
+    { const tx=clamp(PX, W/2-90, W/2+90);
+      px(tx-3, by-8+bh, 6, 2, 'rgba(18,9,15,.88)');
+      px(tx-1, by-6+bh, 3, 2, 'rgba(18,9,15,.88)'); }
+    out.forEach((L,i)=>pixelText(L, W/2, by+i*9,
+      'rgba(255,226,236,'+(a*0.95).toFixed(2)+')', 0.62));
+    ctx.globalAlpha=1; }
+  /* ---- AND WHAT CAME OF IT ---- */
+  if(X.ph==='done'){
+    const k=clamp(T/18,0,1);
+    ctx.globalAlpha=k;
+    pixelText('👋 '+(X.got&&X.got.t? X.got.t : 'Landed.'), W/2, FY-6,
+              'rgba(255,208,106,.95)', 0.62);
+    pixelText(slapToday()+' of '+want+' — and she has counted it',
+              W/2, FY+5, 'rgba(255,226,236,.72)', 0.56);
+    ctx.globalAlpha=1;
+    /* a ring off the moment, because the hall marks its hits */
+    if(T<20){ ctx.strokeStyle='rgba(255,208,106,'+(0.5*(1-T/20))+')'; ctx.lineWidth=1;
+      ctx.beginPath(); ctx.ellipse(PX, FY-40, 10+T*1.6, 6+T*1.0, 0,0,7); ctx.stroke(); }
+  } else if(X.ph==='refused'){
+    ctx.globalAlpha=clamp(T/18,0,1);
+    pixelText('She does not say anything else. She writes it down instead.',
+              W/2, FY-6, 'rgba(255,226,236,.86)', 0.60);
+    pixelText('−3 💞', W/2, FY+5, 'rgba(224,112,91,.95)', 0.58);
+    ctx.globalAlpha=1;
+  }
+}
 function drawPraise(){
   const D=DM, P=D.praise; if(!P) return;
   const FY=214, T=P.t, w=G.wife, PX=D.wifeX;
@@ -24316,7 +24433,7 @@ function drawPraise(){
   ctx.textAlign='center';
   /* ---- HER LINE, in a box with a tail that points at her ---- */
   { const a=clamp(T/26,0,1);
-    const words=String(P.p.line).split(' '); let ln='', out=[];
+    const words=String(praiseLine(P.p)).split(' '); let ln='', out=[];
     words.forEach(wd=>{ const t2=ln?ln+' '+wd:wd;
       if(t2.length>44 && ln){ out.push(ln); ln=wd; } else ln=t2; });
     if(ln) out.push(ln);
@@ -27130,7 +27247,81 @@ function slapVerdict(){
 /* HOW MANY TIMES A DAY THIS IS A JOKE RATHER THAN A HABIT. Three in every
    house on this map except one: a Mesteri Rhaunek is seated to the office
    of being seen, and the district reads a silent house as an unhappy one. */
-function slapCap(){ const f=rkTitleFx(); return (f.slap>=1.5)? 6 : 3; }
+function slapCap(){ const f=rkTitleFx(); return (f.slap>=1.5)? 8 : 3; }
+/* WHAT THE OFFICE EXPECTS OF THE DAY, as opposed to what the day allows.
+   Four, out of a possible eight. The coast states appointment criteria as
+   numbers and it does not make an exception for this one. */
+function slapExpect(){ const f=rkTitleFx(); return (f.slap>=1.5)? 4 : 0; }
+function slapToday(){ return ((G.slapDay|0)===((G.day||0)|0))? (G.slapCount|0) : 0; }
+function slapOwed(){ return Math.max(0, slapExpect()-slapToday()); }
+/* and how the house reads today's figure, in her own terms */
+function slapStanding(){
+  const want=slapExpect(); if(!want) return null;
+  const have=slapToday(), cap=slapCap();
+  if(have>=cap)   return {k:'full', col:'#e8c34a',
+    line:'Eight. The day is spent and she has turned round about it, which is also part of the office.'};
+  if(have>=want+2)return {k:'over', col:'#7ad08a',
+    line:have+' of '+want+'. Over the figure, and the district will hear the number before the week is out.'};
+  if(have>=want)  return {k:'met',  col:'#7ad08a',
+    line:have+' of '+want+'. The office is satisfied and the house is not being talked about.'};
+  if(have>0)      return {k:'short',col:'#e8c34a',
+    line:have+' of '+want+'. She has counted. She counts everything; it is the other half of the job.'};
+  return {k:'none', col:'#e0705b',
+    line:'Nothing yet today, against a figure of '+want+'. A house where this is never heard is a house the district assumes is unhappy, and she is aware of that.'};
+}
+/* SHE ASKS. Not a hint — the holder of the senior Mastery does not hint. */
+const RK_SEAT_ASKS=[
+  '“It is past midday and the count is {n}. I am not going to pretend I have not noticed.”',
+  '“{owed} short. You know the figure. I did not invent the figure.”',
+  '“The office is public, husband. So is the number.”',
+  '“I have been seated here for some time and nothing has happened.”',
+  '“Say it is the cold. Go on. Say it is the cold.”',
+];
+function seatAskDue(){
+  try{
+    const D=DM; if(!D) return false;
+    if(!(rkHere() && ADULT && G.married && G.wife && !G.wife.male && !G.isFemale)) return false;
+    if(!slapExpect()) return false;
+    if(slapOwed()<=0) return false;
+    if(D.scene||D.slap||D.rslap||D.tempt||D.husb||D.ardor||D.press
+       ||D.curio||D.clam||D.praise||D.tablet||D.seatAsk) return false;
+    if((D.seatAskFired|0) >= 2) return false;
+    if(D.t < (D.seatAskNext||600)) return false;
+    return Math.random() < 0.012;
+  }catch(e){ return false; }
+}
+function startSeatAsk(){
+  const D=DM; if(!D) return false;
+  const owed=slapOwed();
+  D.seatAsk={ t:0, locks:true, owed,
+    line: pick(RK_SEAT_ASKS).replace('{n}', String(slapToday())).replace('{owed}', String(owed)) };
+  D.wifePause=99999;
+  D.seatAskFired=(D.seatAskFired|0)+1;
+  D.seatAskNext=D.t+1600;
+  try{ sfx('hmm'); }catch(e){}
+  return true;
+}
+function updateSeatAsk(dt){
+  const D=DM, X=D&&D.seatAsk; if(!X) return;
+  X.t+=dt;
+  /* answering it IS the slap — the key that does it everywhere else */
+  if(consume('k') || consume('space')){
+    const v=doSlap('seatask');
+    X.ph='done'; X.t=0; X.got=v;
+    try{ if(typeof shimmyStart==='function') shimmyStart(G.wife, 1.0); }catch(e){}
+    try{ if(typeof slapKick==='function'){ const be=((G.wife.body&&G.wife.body.booty)||5);
+      slapKick(0.9+be*0.08); } }catch(e){}
+  }
+  else if(consume('x') || consume('esc')){
+    X.ph='refused'; X.t=0;
+    /* `||50` on a DECREMENT turns a bond of zero into forty-seven, which
+       is the opposite of what a penalty is for */
+    G.wifeRel=clamp((G.wifeRel===undefined?50:G.wifeRel)-3, 0, bondCeiling());
+    G.rkSeatShort=(G.rkSeatShort|0)+1;
+    try{ refreshStatbar(); saveQuiet(); sfx('deny'); }catch(e){}
+  }
+  if(X.ph && X.t>150){ D.seatAsk=null; D.wifePause=0; }
+}
 function doSlap(where){
   if(!G.married || !G.wife) return null;
   const day=(G.day||0);
@@ -29664,6 +29855,7 @@ function drawDomus(){
     if(D.curio) drawCurio();                            // 🔎 she is looking at something
     if(D.clam)  drawClam();                             // 🐚 she called you over, and then she closed
     if(D.praise) drawPraise();                          // 💬 and she has an opinion about you
+    if(D.seatAsk) drawSeatAsk();                        // ◈ and the office has a figure
     if(D.press) drawRkPress();                          // ◆ the crossing, the contact and the hold
     if(D.ardor) drawArdor();                            // 🏛 and it is your own fault this time
     if(D.kidWalk) drawKidWalk();                        // and so is somebody else's husband
@@ -39388,13 +39580,23 @@ function bedTitle(ard, kids){
   return { title:win.t, note:win.d, from:(kN>=aN?'children':'ardour'),
            ard:a, kids:k };
 }
-// the player's own house, from what has actually happened in it
+/* THE PLAYER'S OWN HOUSE, ON THE SAME SCALE THE AUGURY IS READ ON.
+   ARD_TITLES is shared with the marriage forecast, whose ardour figure
+   runs about 0..7 — so the player's rate has to be converted onto that
+   scale rather than handed over raw. Fifteen days is the unit because
+   this calendar advances one day per bout and a scene every four bouts
+   should read as a normal house, not as a ceremony. */
+const ARD_WINDOW=15;
+function myArdRate(){
+  const since=(G.day||0)-(G.marriedDay===undefined? 0 : G.marriedDay);
+  /* and the window has a floor, or three scenes in the first two days of
+     a marriage reads as a menace to the masonry */
+  const days=Math.max(ARD_WINDOW, Math.max(1, since));
+  return (G.woohooAll||0) / (days/ARD_WINDOW);
+}
 function myBedTitle(){
   const kids=(G.children||[]).filter(c=>!c.dead).length;
-  const days=Math.max(1,(G.day||0)-(G.marriedDay===undefined? 0 : G.marriedDay));
-  // G.woohooAll counts completed scenes; a month is three days on this calendar
-  const perMonth = (G.woohooAll||0) / Math.max(1, days/3);
-  return bedTitle(perMonth, kids);
+  return bedTitle(myArdRate(), kids);
 }
 /* =====================================================================
    THE ESCORT — he takes her to the room, and HOW he does it is the whole
@@ -39432,7 +39634,7 @@ function escortPoseFor(ard, kids){
 function escortPose(){
   const t=myBedTitle();
   const days=Math.max(1,(G.day||0)-(G.marriedDay===undefined?0:G.marriedDay));
-  return escortPoseFor((G.woohooAll||0)/Math.max(1,days/3),
+  return escortPoseFor(myArdRate(),
                        (G.children||[]).filter(c=>!c.dead).length);
 }
 /* both halves of a married child's couple, described the way the sprites
@@ -50896,6 +51098,10 @@ window.__SS = {
   RK_CURIO, curioOn, curioReady, curioDue, startCurio, curioMenu, curioTake,
   curioResolve, updateCurio, drawCurio,
   RK_PRAISE, praiseReady, praisePool, praiseDue, startPraise, praiseReplies,
+  praiseRegister, praiseLine,
+  slapExpect, slapToday, slapOwed, slapStanding, RK_SEAT_ASKS,
+  seatAskDue, startSeatAsk, updateSeatAsk, drawSeatAsk,
+  ARD_WINDOW, myArdRate,
   praiseTake, updatePraise, drawPraise,
   tabletMenu, tabletFire, openTablet, updateTablet, drawTablet,
   sceneActions, syncSceneActs, wifeExpr, drawWifeFace,
