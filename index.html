@@ -16400,6 +16400,7 @@ window.addEventListener('keydown',e=>{
   else if(k==='f'){ setEdge('f'); }                 // and bend for something that is not there
   else if(k==='l'){ setEdge('l'); }                 // 🏛 the ardor
   else if(k==='k'){ setEdge('k'); }                 // ◆ and the standing, which is its own act here
+  else if(k==='o'){ setEdge('o'); }                 // ◇ the urvaak — letting it out, which is a weather question
   else if(k==='x'){ setEdge('x'); }                 // 🍑 the quick decline — skip the bend outright
   else if(k==='t'){ setEdge('t'); }                 // ⌘ the action tablet, in the hall
   else if(k==='j'){ setEdge('j');                   // ◆ and the press, which is how a standing is answered
@@ -16517,6 +16518,13 @@ function sceneActions(){
   if(RW && !RW.ph){
     A.push({k:'k', c:'K', t:'GO TO HER', hot:true});
     A.push({k:'x', c:'X', t:'NOT NOW  (a gift refused)', warn:true});
+    return A;
+  }
+  const LO=D.letout;
+  if(LO){
+    if(LO.ph==='out')  A.push({k:'space', c:'␣', t:'LET IT OUT', hot:true});
+    else if(LO.ph==='read') A.push({k:'space', c:'␣',
+      t:(LO.read&&LO.read.scene)? 'AND THE CUSTOM IS THE CUSTOM' : 'GO ON', hot:!!(LO.read&&LO.read.scene)});
     return A;
   }
   const Tp=D.tempt;
@@ -17486,6 +17494,20 @@ function openCheats(){
     tb('✎ SOMETHING CAME FOR YOU','She sends it herself — no artist ever sees her. Arrives immediately.',
       ()=>{ if(!G.wife){ toast('Wed someone first.',1800); return; }
         G.world='rk'; if(typeof selvskarArrive==='function') selvskarArrive(Math.random()<0.5?'over':'focus', 4); });
+    tb('◇ LET IT OUT — NOW','The urvaak: the parka is sealed for weather and a sealed parka over a long man cooks. Needs a Long.',
+      ()=>{ if(!G.wife){ toast('Wed someone first.',1800); return; }
+        G.world='rk'; G.body=G.body||{};
+        if((G.body.secret===undefined?5:G.body.secret)<RK_LETOUT.need) G.body.secret=9;
+        G.letoutDay=-99; G.letoutCount=0;
+        const st0=state; setTimeout(()=>{ if(state===st0){ openDomus();
+          setTimeout(()=>{ try{ tryLetout(); }catch(e){} }, 80); } },120); }, true);
+    tb('◇ MAKE THE MEASURE IMMENSE','Sets the Length to the top of the human scale, so the urvaak has something to be about.',
+      ()=>{ G.body=G.body||{}; G.body.secret=10; try{ syncPlayerLooks(); }catch(e){}
+        toast('◇ '+SECRET_PART.tiers[4]+'. The room will not have to be told twice.',3600); });
+    tb('❦ BUILD A SIVRAK','Puts one on both of them without asking — an afternoon of southern leaf, and it has a switch.',
+      ()=>{ if(!G.wife){ toast('Wed someone first.',1800); return; }
+        G.world='rk'; rkSivrakWear('both'); if(G.rkSivrak) G.rkSivrak.off=false;
+        toast('❦ Built, and on. The evening is worth a third again while it is.',4200); });
     tb('◈ THE SEATING','The six senior Masteries, her number against each criterion.',
       ()=>{ G.world='rk'; if(typeof openSeating==='function') openSeating(); }, true);
     tb('⛵ THE UVRAAK','The crossing to the far shore: seven holds, four windows, and the criers.',
@@ -17930,6 +17952,10 @@ function openPortrait(){
    closes... and the lamps burn low. (All suggestion, nothing shown.)
    ===================================================================== */
 let BC=null, BEDSPR=null, WH=null;
+/* ✧ SET IMMEDIATELY BEFORE startBedScene and consumed by it. It cannot be
+   an argument: every scene goes through the wife-happy beat first, which
+   re-enters startBedScene with three parameters and would drop a fourth. */
+let KANVEK_ONLY=false;
 function startBedScene(mode,len,place){
   len=len||'quick'; place=place||'bed';
   // FIRST: your domina lights up — a wide, happy, blushing smile before anything else
@@ -17953,8 +17979,12 @@ function startBedScene(mode,len,place){
     drawBridePortrait(cv,G.wife,true); BEDSPR=cv; } else BEDSPR=null;
   if(place==='pool'&&!G.hasPool) place='bed';
   if(place==='wardrobe'&&!G.hasWardrobe) place='bed';
+  /* ✧ HER GIFT IS ITS OWN SCENE. One position, not a running order, and
+     short — it is not a night and the house should not book it as one. */
+  const KAN=!!KANVEK_ONLY; KANVEK_ONLY=false;
   BC={t:0, props:[], hearts:[], splash:[], mode:mode||'heir', len, place,
-      dur: len==='vigil'?18000 : len==='night'?3600 : len==='long'?1800 : 700,
+      kanvekOnly:KAN,
+      dur: KAN? 860 : (len==='vigil'?18000 : len==='night'?3600 : len==='long'?1800 : 700),
       line:pick(['“Veni…”','“Te amo.”','“Nunc, mi gladiator…”','“Tarde venis…”'])};
   G.lastLoveDay=G.day;
   G.woohooAll=(G.woohooAll||0)+1;                    // the house keeps count of this one too
@@ -19063,9 +19093,14 @@ function villaConceive(){
 function finishBed(){
   const mode=BC.mode, w=G.wife, len=BC.len||'quick';
   const _kept=!!BC.finKept;                       // ✧ read before BC is thrown away
+  const _kan =!!BC.kanvekOnly;                    // ✧ and whether it was her gift rather than a night
   const TB=spouseTierBonus();                                       // the tier on the wall, cashed in
-  const emoF= Math.round((len==='night'?9 : len==='long'?6 : 4) * TB.mult);   // fun-mode emotional gain
-  const phys= Math.round((len==='night'?12 : len==='long'?7 : 4) * TB.mult);  // physical gain, always
+  /* ❦ AND THE SIVRAK, WHICH IS WHAT A SIVRAK IS FOR. An afternoon of work
+     that falls apart by morning had no effect whatever on the evening it
+     was built for, which made the whole garment decoration. */
+  const SVB=(typeof sivrakBed==='function')? sivrakBed() : 1;
+  const emoF= Math.round((len==='night'?9 : len==='long'?6 : 4) * TB.mult * SVB);   // fun-mode emotional gain
+  const phys= Math.round((len==='night'?12 : len==='long'?7 : 4) * TB.mult * SVB);  // physical gain, always
   if(len==='vigil'){
     // THE VIGIL OF VENUS — perfection, rewarded
     advanceDay(6);                                                  // TWO months pass; nobody regrets a single day
@@ -19085,6 +19120,21 @@ function finishBed(){
       +'Tonight makes nobody; the next attempt inside three months carries +10%.', 5800), 1500);
     return;
   }
+  /* ✧ A GIFT IS NOT A MONTH. Every other scene in this game advances three
+     days because it stands in for a whole run of them; hers is one evening
+     that she started and it is booked as one. */
+  if(_kan){
+    advanceDay(1);
+    G.hygiene=clamp((G.hygiene===undefined?70:G.hygiene)-3,0,100);
+    G.wifePhys=clamp((G.wifePhys===undefined?45:G.wifePhys)+4,0,100);
+    G.wifeRel=clamp(G.wifeRel+3,0,bondCeiling());
+    saveQuiet(); BC=null; state='menu'; openVilla();
+    toast('✧ '+(G.wife&&G.wife.name? String(G.wife.name).split(' ')[0] : 'She')
+      +' does not explain herself afterwards either. (+3 ♥, +4 🔥)', 4200);
+    if(_kept) setTimeout(()=>toast('✧ '+RK_KANRUK.word+' — the district has it that children are close. '
+      +'The next attempt inside three months carries +10%.', 5400), 1400);
+    return;
+  }
   advanceDay(3);                                                    // a MONTH passes — the house moves on happily
   G.hygiene=clamp((G.hygiene===undefined?70:G.hygiene)-6,0,100);    // worth it
   G.wifePhys=clamp((G.wifePhys===undefined?45:G.wifePhys)+phys,0,100);
@@ -19093,6 +19143,9 @@ function finishBed(){
     if(TB.pop){ G.pop=clamp(G.pop+TB.pop,0,100); G.approval=clamp(G.approval+Math.ceil(TB.pop/2),0,100); }
     BC=null; state='menu'; saveQuiet(); openVilla();
     if(TB.pop) setTimeout(()=>toast('◈ '+TB.name+' — Rome hears about a match like yours. (+'+TB.pop+' pop)',3000),900);
+    if(SVB>1) setTimeout(()=>toast('❦ THE SIVRAK DID WHAT A SIVRAK IS FOR. '
+      +'An afternoon of southern leaf, and the evening was worth a third again for it. '
+      +'It will not survive the night and both of you knew that going in.', 5200), 1200);
     /* ✧ and the sign, if he kept it. The fun branch returns before the heir
        one ever runs, so it says so itself rather than silently swallowing it. */
     if(_kept) setTimeout(()=>toast('✧ '+RK_KANRUK.word+' — the district has it that children are close. '
@@ -19443,19 +19496,20 @@ function drawRkFin(s){
     const k=clamp(T/26,0,1);
     /* the glow, and it is a mark rather than fog — it was reaching eighty
        pixels and washing the whole longhouse out */
+    const mk=clamp((T-26)/26,0,1);              // the mark arrives AFTER the swallow
     { const g=ctx.createRadialGradient(A.x,A.y,3,A.x,A.y,40+T*0.26);
-      g.addColorStop(0,'rgba(255,214,138,'+(0.30*(1-T/200)).toFixed(2)+')');
+      g.addColorStop(0,'rgba(255,214,138,'+(0.30*mk*(1-T/200)).toFixed(2)+')');
       g.addColorStop(1,'rgba(0,0,0,0)');
       ctx.fillStyle=g; ctx.fillRect(0,16,W,H-32); }
-    for(let i=0;i<2;i++){ const r=(T*1.1-i*14); if(r<0) continue;
+    for(let i=0;i<2;i++){ const r=((T-26)*1.1-i*14); if(r<0) continue;
       ctx.strokeStyle='rgba(255,204,92,'+Math.max(0,0.60*(1-r/48)).toFixed(2)+')';
       ctx.lineWidth=1.2;
       ctx.beginPath(); ctx.ellipse(A.x, A.y, 6+r*0.8, 4+r*0.50, 0,0,7); ctx.stroke(); }
     /* KAN'S OWN MARK — the two pages, the one that has been turned and the
        one that is open now. On a plate, and clear of her, because over her
        hair the dark page simply vanished and the gold one read as a brick. */
-    { const mx=A.x+16, my=A.y-22-Math.min(9,T*0.09);
-      ctx.globalAlpha=clamp(T/18,0,1)*clamp(1-(T-150)/50,0,1);
+    { const mx=A.x+16, my=A.y-22-Math.min(9,(T-26)*0.09);
+      ctx.globalAlpha=mk*clamp(1-(T-150)/50,0,1);
       px(mx-12,my-10,24,17,'rgba(10,6,12,.80)');
       px(mx-12,my-10,24,1,'rgba(255,214,138,.55)');
       px(mx-12,my+6, 24,1,'rgba(255,214,138,.22)');
@@ -19469,10 +19523,13 @@ function drawRkFin(s){
       px(mx+8, my-13, 1,3,'rgba(255,240,188,.85)');
       ctx.globalAlpha=1; }
     if((T|0)%7<2 && T<150 && s.hearts) s.hearts.push({x:A.x+rnd(-9,9), y:A.y-8, vy:0.5, life:56, c:'#ffd06a'});
-    ctx.globalAlpha=k;
+    ctx.globalAlpha=mk;
     pixelText('✧ '+RK_KANRUK.word+' — '+RK_KANRUK.claim, W/2, 34, 'rgba(255,214,138,.96)', 0.86);
     pixelText('“That is the one I would have chosen. Everybody will know by the equinox.”',
               W/2, 46, 'rgba(255,226,236,.90)', 0.58);
+    ctx.globalAlpha=clamp(T/12,0,1)*clamp(1-(T-40)/20,0,1);
+    pixelText('— and she swallows, and says nothing about it, which is the whole of the local theory',
+              W/2, 22, 'rgba(255,190,220,.92)', 0.56);
     pixelText('the sign holds for three months  ·  and it is worth a tenth, not a certainty',
               W/2, H-24, 'rgba(226,210,176,.70)', 0.54);
     ctx.globalAlpha=1;
@@ -20432,7 +20489,11 @@ function drawShadowPlay(s,T){
      a pool, a bathhouse and a wardrobe are place-shaped and stay as they are,
      because a Han manual has nothing to say about a cedar cupboard. */
   const _LORE=poseLore();
-  const SET = (place==='bed' && _LORE.order)? _LORE.order : (PLACE_SET[place] || PLACE_SET.bed);
+  /* ✧ AND HER GIFT PLAYS ALONE. A running order is what a NIGHT has; this
+     is one thing she offered and it does not rotate through six others. */
+  const SET = s.kanvekOnly? [22]
+            : (place==='bed' && _LORE.order)? _LORE.order
+            : (PLACE_SET[place] || PLACE_SET.bed);
   const cut = s.len==='quick'? Math.max(3,SET.length-2) : SET.length;
   const step=(((T-520)/160)|0);
   /* ✧ AND THE PICTURE HOLDS while he is deciding. The running order is
@@ -21411,8 +21472,15 @@ function drawShadowPlay(s,T){
        which is read back off the rig rather than guessed at, and how far
        back she kneels is measured off him, because everything on this
        coast is measured. */
-    const gv=Math.max(0,Math.sin(T*0.34));             // the rhythm
+    /* ✧ AND IF HE HAS ALREADY ANSWERED, she is not still working. The
+       whole of Kan's book turning over used to play over a woman who had
+       not been told, which is the one moment in this scene that is hers. */
+    const FIN=(s.fin && (s.fin.ph==='in'||s.fin.ph==='out'))? s.fin : null;
+    const SWAL=(FIN && FIN.ph==='in')? FIN.t : -1;
+    const gv=(SWAL>=0)? 0 : Math.max(0,Math.sin(T*0.34));   // the rhythm, and it stops
     const dip=gv*2.2, sway=gv*1.5;                     // and she rides on it
+    /* she draws back off him — not far, and not quickly */
+    const back=(SWAL<0)? 0 : Math.min(6.5, SWAL*0.20);
     const fs=_sk(false), fsD=mixHex(fs,'#2a150a',0.26);
     const ms=_sk(true),  msD=mixHex(ms,'#2a150a',0.28);
     const HX=cx0-26;                                   // where he is standing
@@ -21457,7 +21525,7 @@ function drawShadowPlay(s,T){
     const plen=4.2+M_LEN*0.92;
     rphallus(HX+4, hy+2, 1, 0.18+gv*0.34);
     /* ---- HER, built backwards off where her mouth has to be ---- */
-    const AX=HX+4+plen+1.6-sway*0.8, AY=hy+3+dip*0.30;  // her chin, and her mouth is at the end of him
+    const AX=HX+4+plen+1.6-sway*0.8+back*0.9, AY=hy+3+dip*0.30-back*0.55;  // her chin, at the end of him
     const SX=AX+7,  SY=AY-12-dip*0.20;                  // shoulders, well ABOVE her own head
     const QX=SX+14, QY=SY+11;                           // hips, kneeling UPRIGHT off her knees
     const KX=QX-3,  KY=base-2;                          // the knee, flat on the boards
@@ -21509,7 +21577,37 @@ function drawShadowPlay(s,T){
         const fx=AX+3+t*1.4+Math.sin(T*0.085+k*0.9)*1.4*t, fy=AY-6+k*4;
         px(fx, fy, 3-k*0.8, 5, shade(HR,-6-k*8));
         px(fx, fy, 3-k*0.8, 1, shade(HR,18)); } }
-    rhead(AX, AY, false, -0.22, -1);                    // and the head, on his hip line
+    rhead(AX, AY, false, -0.22+(SWAL<0?0:0.10), -1);     // and the head, on his hip line
+    /* ---- THE SWALLOW. Three of them, each travelling the neck from the
+       chin up to the collar, with her eyes shut over the whole of it. On
+       this coast the correct thing for him to feel about it is grateful,
+       and the correct thing for her to do about it is nothing at all. ---- */
+    if(SWAL>=0){
+      // her eyes are shut, which is drawn over the eye rhead just put there
+      px(AX-4, AY-6, 4, 1, mixHex(fs,'#2a150a',0.62));
+      px(AX-4, AY-7, 3, 1, mixHex(fs,'#2a150a',0.30));
+      px(AX-3, AY-2, 3, 1, mixHex(fs,'#8a4a44',0.45));        // and her mouth is closed
+      /* the track it runs along — the line of her throat, drawn once so the
+         eye has something to follow the bob DOWN */
+      { const sk2=mixHex(fs,'#2a150a',0.20);
+        for(let i=0;i<5;i++){ const t2=i/4;
+          px(AX+3.4+t2*3.8-1, AY-2-t2*8.0, 2, 1, sk2); } }
+      const gi=Math.floor(SWAL/26);
+      if(gi<3){
+        const gp=(SWAL%26)/26;
+        if(gp<0.74){
+          const t2=gp/0.74;
+          const gx2=AX+3.4+t2*3.8, gy2=AY-2-t2*8.0;           // up the throat to the collar
+          px(gx2-2, gy2-1, 4, 3, mixHex(fs,'#fff6e4',0.34));
+          px(gx2-2, gy2-1, 4, 1, mixHex(fs,'#ffffff',0.46));
+          px(gx2-2, gy2+2, 4, 1, mixHex(fs,'#2a150a',0.36));
+          if(t2<0.40){ ctx.globalAlpha=0.40*(1-t2/0.40);
+            px(gx2-3, gy2, 6, 2, mixHex(fs,'#fff6e4',0.30)); ctx.globalAlpha=1; }
+        }
+      }
+      // and a small beat off each one, so three of them read as three
+      if(gi<3 && (SWAL%26)<3) HB(AX+2, AY-8, 4);
+    }
     /* AND HIS HAND ON HER HEAD, drawn last so it is ON the hair and not
        behind it. In Europe this gesture is his. Here she put it there, and
        the fingers are loose, because he is not doing anything with it. */
@@ -23487,6 +23585,9 @@ function updateDomus(dt){
   /* ✧ AND SHE CALLS HIM OVER, because the gift is hers to offer */
   if(D.reward){ updateRkReward(dt); if(D.reward && D.reward.locks) return; }
   else if(rkRewardDue()) startRkReward();
+  /* ◇ AND THE URVAAK, which he starts and the room answers */
+  if(D.letout){ updateLetout(dt); if(D.letout && D.letout.locks) return; }
+  else if(consume('o')) tryLetout();
   /* ⌘ and the tablet, which locks hardest of all because it is a menu */
   if(D.tablet){ updateTablet(dt); if(D.tablet && D.tablet.locks) return; }
   else if(consume('t')) openTablet();
@@ -27987,7 +28088,7 @@ function slapStanding(){
   const want=slapExpect(); if(!want) return null;
   const have=slapToday(), cap=slapCap();
   if(have>=cap)   return {k:'full', col:'#e8c34a',
-    line:'Eight. The day is spent and she has turned round about it, which is also part of the office.'};
+    line:cap+' of a day that takes '+cap+'. It is spent, and she has turned round about it, which is also part of the office.'};
   if(have>=want+2)return {k:'over', col:'#7ad08a',
     line:have+' of '+want+'. Over the figure, and the district will hear the number before the week is out.'};
   if(have>=want)  return {k:'met',  col:'#7ad08a',
@@ -28122,10 +28223,11 @@ function updateRkReward(dt){
     /* SHE started it, so it is not checked against his daily allowance —
        but it is still counted against the day, or the allowance is a
        loophole with her name on it. */
-    try{ spendLove('long'); }catch(e){}
+    try{ spendLove('quick'); }catch(e){}
     try{ saveQuiet(); }catch(e){}
     D.reward=null; D.wifePause=0; DM=null;
-    startBedScene('fun','long','bed');
+    KANVEK_ONLY=true;                    // ✧ her gift, and only her gift
+    startBedScene('fun','quick','bed');
     return;
   }
   if(X.ph && X.ph!=='go' && X.t>160){ D.reward=null; D.wifePause=0; }
@@ -28189,6 +28291,300 @@ function drawRkReward(){
     ctx.globalAlpha=1;
   }
 }
+/* =====================================================================
+   ◇ THE URVAAK — LETTING IT OUT, AND WHAT THE ROOM IS SUPPOSED TO DO
+   ---------------------------------------------------------------------
+   THE PRACTICAL PART FIRST, because on this coast it always is. The parka
+   is sealed for weather: it has to be, the alternative is dying of it. A
+   sealed garment over a long man indoors, in a longhouse with a hearth
+   trench down the middle of it, cooks. So he lets it out. That is the
+   whole of the reason and the coast has never felt the need for another.
+
+   WHAT DIFFERS IS THE TRAINED RESPONSE. Everywhere else on this map a
+   room is drilled from childhood to look at the ceiling and agree that
+   nothing has happened — the politeness is the whole performance, and
+   the more there is to not look at the harder everybody works at it.
+
+   Here the drill runs the other way. It is noticed, it is said out loud,
+   and what is SUPPOSED to happen next is that something happens. A house
+   where a man lets it out and the room carries on is read exactly the way
+   the district reads a silent house: not scandalous, just unwell. She is
+   not obliged — nobody on this coast is obliged — but the default is not
+   politeness, it is her putting down whatever she is holding.
+
+   AND IT IS MEASURED, like everything else here. Below a Long there is
+   nothing to let out and the joke does not work; at Immense the room does
+   not have to be told twice.
+   ===================================================================== */
+const RK_LETOUT={
+  word:'URVAAK', of:'UVRA, WHO WAITS — and the coast thinks that is funny',
+  why:'The parka is sealed for weather, because the alternative is dying of the weather. Sealed, indoors, over a hearth trench, a long man cooks. So he lets it out. That is the entire reason and nobody here has ever wanted another one.',
+  elsewhere:'Everywhere else on this map a room is trained from childhood to look at the ceiling and agree nothing has happened. The politeness IS the performance, and the more there is to not look at the harder the room works.',
+  here:'Here the drill runs the other way. It is noticed, it is said out loud, and what is supposed to happen next is that something happens. Nobody is obliged. But a house where the room simply carries on gets read the way a silent house gets read — not scandalous, just unwell.',
+  need:6,
+};
+/* is there anything to let out */
+function letoutMeasure(){ try{ const b=G&&G.body; return (b&&b.secret!==undefined)? b.secret : 5; }catch(e){ return 5; } }
+function letoutTier(){
+  const v=letoutMeasure();
+  return v>=11? 'impossible' : v>=8? 'immense' : v>=6? 'long' : 'short';
+}
+function letoutWhy(){
+  if(!ADULT) return 'That lives behind the mature-content switch on the title screen.';
+  if(!rkHere()) return 'Not a custom here. Off this coast a room would work very hard at the ceiling.';
+  if(!(G&&G.married&&G.wife)) return 'There is nobody in this house for the room to do anything about.';
+  if(G.isFemale || G.wife.male) return 'Not your half of this one.';
+  if(letoutTier()==='short') return 'Nothing to let out. The joke needs a Long and you have a '
+    +(SECRET_PART.tiers[Math.min(4,Math.floor(letoutMeasure()/2.2))]||'Modest')+'.';
+  return '';
+}
+function letoutReady(){ try{ return letoutWhy()===''; }catch(e){ return false; } }
+function letoutLeft(){
+  const day=(G&&G.day)||0;
+  const used=((G&&G.letoutDay)===day)? (G.letoutCount|0) : 0;
+  return Math.max(0, 2-used);
+}
+/* ---- HOW SHE READS IT. Ordered, first match wins, and every one of them
+   is a real reading of a real woman rather than a die roll: what she is
+   like, how the house is standing, and what day it is. ---- */
+function letoutRead(){
+  const w=G&&G.wife, rel=(G.wifeRel===undefined?50:G.wifeRel), ph=(G.wifePhys===undefined?45:G.wifePhys);
+  const T=letoutTier(), big=(T==='immense'||T==='impossible');
+  const fest=(typeof festivalToday==='function')? festivalToday() : null;
+  const priv=(typeof privacyNeeded==='function') && privacyNeeded('romantic');
+  const nm=(w&&w.name? String(w.name).split(' ')[0] : 'She');
+  /* the hall being full does not stop him letting it out — it stops what
+     the coast thinks should happen next, which is a different sentence */
+  if(priv) return {k:'hall', scene:false, col:'#e0905b', eyes:false,
+    head:'— AND THE HALL IS FULL.',
+    line:'“Not with half the district in here.” She says it to the room rather than to you, and the room finds somewhere to be.',
+    note:'The custom is indoors. It is not in front of an audience, and she is the one who decides which this is.',
+    bond:0, phys:1};
+  if(hasQuirk('devout') && fest) return {k:'saint', scene:false, col:'#c9a4ef', eyes:false,
+    head:'— ON '+String(fest).toUpperCase()+'.',
+    line:'“On '+fest+'.” A pause. “In the hall.” She has thoughts about this and you are going to hear two of them.',
+    note:'She is not shocked. She is keeping a calendar, and you are on the wrong day of it.',
+    bond:-2, phys:0};
+  if(rel>=90 && ph>=90) return {k:'swarm', scene:true, col:'#ff8ad0', eyes:true, bend:true,
+    head:'— AND SHE IS ALREADY CROSSING THE FLOOR.',
+    line:'“Finally.” '+nm+' does not put anything down so much as drop it, and the lower half of the ulvik is off before she has finished the word.',
+    note:'A house at the top of both bars does not need the custom explained to it. She is used to this and she is faster than you are.',
+    bond:3, phys:6};
+  if(hasQuirk('shameless')) return {k:'fast', scene:true, col:'#ff8ad0', eyes:true, bend:true,
+    head:'— AND SHE GOT THERE FIRST.',
+    line:'“Well.” She is already bent over the bench and looking back at you with an expression of enormous patience.',
+    note:'The district has a word for a house like this one and it is not a complaint.',
+    bond:2, phys:6};
+  if(hasQuirk('insatiable')) return {k:'again', scene:true, col:'#ff8ad0', eyes:true, bend:true,
+    head:'— AND SHE WAS GOING TO ASK ANYWAY.',
+    line:'“I was going to bring that up.” She was. She brings it up most days.',
+    note:'',
+    bond:2, phys:5};
+  if(hasQuirk('possessive')) return {k:'door', scene:true, col:'#e8c34a', eyes:true, bend:true,
+    head:'— AND SHE SHUTS THE DOOR FIRST.',
+    line:'The door, the shutter, and then her. In that order, and the order is not negotiable.',
+    note:'It is not modesty. It is that the district can hear about it afterwards rather than during.',
+    bond:2, phys:5};
+  if(rel>=70 || ph>=70) return {k:'used', scene:true, col:'#e8c34a', eyes:false, bend:true,
+    head:'— AND SHE PUTS DOWN WHAT SHE IS HOLDING.',
+    line:'“Mm.” '+nm+' finishes the line she was counting, sets the tally down where she can find it again, and comes over.',
+    note:'Not swept off her feet. She simply knows what the room is for and she has no argument with it.',
+    bond:2, phys:4};
+  if(hasFlaw('cold')) return {k:'cold', scene:false, col:'#8fc0cf', eyes:false,
+    head:'— AND SHE NOTES IT.',
+    line:'“Mm.” She looks. She looks for exactly as long as it takes to have looked. Then she goes back to the racks.',
+    note:'Correct, on time, and entirely unmoved. She is not pretending it is nothing — pretending is what they do south of here. She has simply read it and filed it.',
+    bond:0, phys:1};
+  if(hasFlaw('nerves')) return {k:'drop', scene:false, col:'#e8c34a', eyes:false,
+    head:'— AND SHE DROPS THE BOWL.',
+    line:'The bowl. Then, a moment later and for no reason anybody can explain, the tally stick as well.',
+    note:'The district would say she is doing the custom correctly. She would like everybody to stop looking at her.',
+    bond:1, phys:2};
+  if(hasFlaw('proud') && (G.rank||0)<1) return {k:'rank', scene:false, col:'#e0905b', eyes:false,
+    head:'— AND SHE IS THINKING ABOUT THE RANK.',
+    line:'“And what post does that hold?” She is not talking about the measure. She is never talking about the measure.',
+    note:'Overproud reads everything through the seating chart, including this.',
+    bond:-1, phys:1};
+  if(rel<30) return {k:'work', scene:false, col:'#8a7a70', eyes:false,
+    head:'— AND THE ROOM CARRIES ON.',
+    line:'Nothing. She does not look up. A house where this happens and nothing else does is a house the district has already formed a view about.',
+    note:'Not politeness — politeness is a southern habit. This is a bond of '+rel+'.',
+    bond:0, phys:0};
+  return {k:'ok', scene:true, col:'#e8c34a', eyes:false, bend:true,
+    head:'— AND THE CUSTOM IS THE CUSTOM.',
+    line:'“…right.” '+nm+' looks at the door, decides against it, and comes over instead.',
+    note:'', bond:1, phys:3};
+}
+function tryLetout(){
+  const D=DM; if(!D) return;
+  const why=letoutWhy();
+  if(why){ toast('◇ '+why, 3400); return; }
+  if(D.scene||D.slap||D.rslap||D.tempt||D.husb||D.ardor||D.press||D.curio||D.clam
+     ||D.praise||D.tablet||D.seatAsk||D.reward||D.letout||D.drop||D.rise){
+    toast('◇ One thing at a time. Something is already happening in this hall.', 2600); return; }
+  if(letoutLeft()<=0){ toast('◇ Twice today already. Even on this coast that is a man with a point to make.', 3200); return; }
+  const day=(G.day||0);
+  if(G.letoutDay!==day){ G.letoutDay=day; G.letoutCount=0; }
+  G.letoutCount=(G.letoutCount|0)+1;
+  G.letoutAll=(G.letoutAll|0)+1;
+  D.letout={ ph:'out', t:0, locks:true, read:null, tier:letoutTier(), v:letoutMeasure() };
+  D.wifePause=99999;
+  try{ sfx('ui'); }catch(e){}
+}
+function updateLetout(dt){
+  const D=DM, X=D&&D.letout; if(!X) return;
+  X.t+=dt;
+  if(X.ph==='out'){
+    /* it takes as long as it takes; space hurries the cloth, not her */
+    if(X.t>72 || consume('space')){ X.ph='read'; X.t=0; X.read=letoutRead(); try{ sfx('hmm'); }catch(e){} }
+    return;
+  }
+  if(X.ph==='read'){
+    const R=X.read||{};
+    if(X.t>110 || consume('space') || consume('o')){
+      G.wifeRel=clamp((G.wifeRel===undefined?50:G.wifeRel)+(R.bond|0), 0, bondCeiling());
+      G.wifePhys=clamp((G.wifePhys===undefined?45:G.wifePhys)+(R.phys|0), 0, 100);
+      try{ refreshStatbar(); saveQuiet(); }catch(e){}
+      if(R.scene){
+        const at=D.wifeX===undefined? D.x : D.wifeX;
+        D.letout=null; D.wifePause=0;
+        G.letoutTook=(G.letoutTook|0)+1;
+        try{ startRomantic(at,'self'); }catch(e){}
+        return;
+      }
+      X.ph='done'; X.t=0;
+    }
+    return;
+  }
+  if(X.t>90){ D.letout=null; D.wifePause=0; }
+}
+/* ---- ONE MEASURED MEMBER, in the villa's own flat blocks. The shadow
+   play has rphallus for this; the hall is a different palette and a
+   different scale, and the score is the same score. ---- */
+function letoutMember(x, y, v, rise, skin){
+  const col=skin||'#caa06a', hi=shade(col,26), lo=shade(col,-32);
+  const ct=mixHex(col,'#1b0e06',0.62);                            // the contour, so it has an edge
+  const len=Math.round(4+v*1.05), th=Math.max(2, Math.round(1.4+v*0.17));
+  const a=(-1.32 + rise*2.52);                                    // HANGING → standing
+  const dx=Math.cos(a), dy=-Math.sin(a);
+  const step=(t)=>({ bx:x+dx*len*t, by:y+dy*len*t - t*t*2.2*(1-rise) });
+  const N=Math.max(4, Math.round(len/2));
+  // ---- the contour pass, one pixel proud all round ----
+  px(x-2, y+1, th+3, th+3, ct);
+  for(let i=0;i<N;i++){ const t=i/(N-1), P=step(t);
+    px(P.bx-1, P.by-th/2-1, th+3, th+2, ct); }
+  { const P=step(1); px(P.bx-2, P.by-th/2-2, th+4, th+4, ct); }
+  // ---- the pair, which do not move ----
+  px(x-1, y+2, th, th, lo); px(x+th-1, y+3, th, th, col);
+  px(x+th-1, y+3, th, 1, hi);
+  // ---- the shaft, in short blocks so it bends along the angle ----
+  for(let i=0;i<N;i++){
+    const t=i/(N-1), P=step(t);
+    const w2=Math.max(2, th - (t>0.86? 1 : 0));
+    px(P.bx, P.by-th/2, w2+1, th, col);
+    px(P.bx, P.by-th/2, w2+1, 1, hi);
+    px(P.bx, P.by+th/2-1, w2+1, 1, lo);
+  }
+  // ---- and the crown of it ----
+  { const P=step(1);
+    px(P.bx-1, P.by-th/2-1, th+2, th+2, mixHex(col,'#c07a68',0.36));
+    px(P.bx-1, P.by-th/2-1, th+2, 1, mixHex(col,'#f0d2ae',0.55)); }
+}
+/* UNDER the figures: the hall drops back and the light comes up on him. */
+function drawLetoutBack(){
+  const D=DM, X=D&&D.letout; if(!X) return;
+  const FY=214, T=X.t, MX=D.x;
+  const a0=clamp(T/20,0,1);
+  ctx.globalAlpha=0.32*a0; px(-4,-4,W+8,H+8,'#0e0a14'); ctx.globalAlpha=1;
+  { const g=ctx.createRadialGradient(MX,FY-34,6,MX,FY-34,86);
+    g.addColorStop(0,'rgba(180,214,255,.20)'); g.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.fillStyle=g; ctx.fillRect(0,60,W,H-60); }
+}
+/* and OVER them: the cloth, the measure, and what the room did about it */
+function drawLetout(){
+  const D=DM, X=D&&D.letout; if(!X) return;
+  const FY=214, T=X.t, w=G.wife;
+  const MX=D.x, WX=(D.wifeX===undefined? W/2 : D.wifeX);
+  const mine=(typeof playerLook==='function')? playerLook() : {};
+  const skin=mine.skin||'#caa06a';
+  ctx.textAlign='center';
+  if(X.ph==='out'){
+    const k=clamp(T/58,0,1);
+    /* THE CLOTH. It goes sideways and hangs off the belt rather than
+       vanishing — it is a sealed garment and it is still attached. */
+    const cloth=(typeof rkHouseDress==='function')? '#5a4a34' : '#5a4a34';
+    const sw=Math.round(k*13);
+    px(MX-6-sw, FY-27, 11, 14, cloth);
+    px(MX-6-sw, FY-27, 11, 2, shade(cloth,26));
+    px(MX+4-sw, FY-27, 1, 14, shade(cloth,-30));
+    for(let i=0;i<3;i++) px(MX-5-sw, FY-23+i*4, 9, 1, '#7a6244');
+    /* and the measure, coming up to standing over the same beat */
+    letoutMember(MX-1, FY-26, X.v, k, skin);
+    /* the air of it — this is the stated reason and the drawing says so */
+    for(let i=0;i<4;i++){ const rr=(T*0.9+i*16)%44;
+      ctx.globalAlpha=clamp(1-rr/44,0,1)*0.22;
+      px(MX+4+Math.sin(T*0.07+i)*4, FY-30-rr*0.55, 2, 2, '#bcd8ec'); }
+    ctx.globalAlpha=1;
+    pixelText('◇ '+RK_LETOUT.word+' — LETTING IT OUT', W/2, 30, 'rgba(188,216,236,.95)', 0.86);
+    pixelText('the parka is sealed for weather, and a sealed parka over a long man cooks',
+              W/2, 42, 'rgba(226,232,240,.74)', 0.56);
+    const TL=X.tier;
+    pixelText(TL==='impossible'? '⛧ and there is no rule on this coast long enough for it'
+            : TL==='immense'?    '◇ IMMENSE — the room will not have to be told twice'
+            :                    '◇ LONG — and that is the whole of the qualification',
+              W/2, FY+6, 'rgba(255,214,138,.88)', 0.60);
+    if(T<58) pixelText('[SPACE]', W/2, FY+16, 'rgba(200,214,230,.55)', 0.54);
+    return;
+  }
+  const R=X.read||{};
+  /* HER, and what she did about it. The bend is hers to do and it is drawn
+     rather than described. */
+  if(R.bend){
+    const k=clamp(T/34,0,1);
+    const bx=WX + (MX-WX)*k*0.62;                    // she crosses the floor
+    try{ drawWifeFig(ctx, bx, FY, w, k, 'bend'); }catch(e){}
+    /* the lower half of the ulvik, off and over her arm */
+    if(k>0.4){ const dcol=(w&&w.dress)||'#2f5f6a';
+      px(bx+9, FY-16, 9, 7, dcol); px(bx+9, FY-16, 9, 1, shade(dcol,26)); }
+  }
+  if(R.eyes){
+    /* HEART EYES. Two of them, on her, and they beat. */
+    const bx=WX + (MX-WX)*clamp(T/34,0,1)*0.62, hy2=FY-42;
+    const b=1+Math.sin(T*0.22)*0.22;
+    ctx.globalAlpha=clamp(T/14,0,1);
+    pixelText('♥', bx+4,  hy2, '#ff5a8a', 0.85*b);
+    pixelText('♥', bx+11, hy2, '#ff5a8a', 0.85*b);
+    ctx.globalAlpha=1;
+    if((T|0)%6<2) D.hearts.push({x:bx+8+rnd(-6,6), y:hy2-5, vy:0.6, life:44, c:'#ff8ad0'});
+  }
+  /* and him, still standing there with the reason for all of this */
+  { const cloth='#5a4a34';
+    px(MX-19, FY-27, 11, 14, cloth); px(MX-19, FY-27, 11, 2, shade(cloth,26));
+    px(MX-9, FY-27, 1, 14, shade(cloth,-30)); }
+  letoutMember(MX-1, FY-26, X.v, 1, skin);
+  /* ---- WHAT THE ROOM DID, said in the room's own terms ---- */
+  { const a=clamp(T/22,0,1);
+    const words=String(R.line||'').split(' '); let ln='', out=[];
+    words.forEach(wd=>{ const t2=ln?ln+' '+wd:wd;
+      if(t2.length>52 && ln){ out.push(ln); ln=wd; } else ln=t2; });
+    if(ln) out.push(ln); out=out.slice(0,3);
+    const bh=out.length*9+20, by=20;
+    ctx.globalAlpha=a;
+    px(W/2-134, by-7, 268, bh, 'rgba(12,7,14,.90)');
+    px(W/2-134, by-7, 268, 1, 'rgba(255,214,138,.46)');
+    px(W/2-134, by-8+bh, 268, 1, 'rgba(255,214,138,.18)');
+    pixelText(R.head||'', W/2, by+1, R.col||'#e8c34a', 0.62);
+    out.forEach((L,i)=>pixelText(L, W/2, by+12+i*9, 'rgba(255,232,236,'+(a*0.95).toFixed(2)+')', 0.58));
+    ctx.globalAlpha=1; }
+  if(R.note) pixelText(R.note, W/2, FY+6, 'rgba(226,210,176,.70)', 0.52);
+  if(X.ph==='read'){
+    const d=[]; if(R.bond) d.push((R.bond>0?'+':'')+R.bond+' 💞');
+    if(R.phys) d.push('+'+R.phys+' 🔥');
+    if(d.length) pixelText(d.join('   '), W/2, FY+16, 'rgba(255,208,106,.92)', 0.58);
+    if(R.scene) pixelText('[SPACE] — and the custom is the custom', W/2, FY+26, 'rgba(255,138,208,.85)', 0.56);
+    else        pixelText('[SPACE]', W/2, FY+26, 'rgba(200,196,186,.55)', 0.54);
+  }
+}
 function seatAskDue(){
   try{
     const D=DM; if(!D) return false;
@@ -28238,16 +28634,21 @@ function doSlap(where){
   if(!G.married || !G.wife) return null;
   const day=(G.day||0);
   if(G.slapDay!==day){ G.slapDay=day; G.slapCount=0; }
-  // THREE A DAY. Past that it stops being a joke and starts being a habit.
-  /* ---- A MESTERI RHAUNEK'S HOUSE RUNS DIFFERENTLY, and this is where it
-     shows. The office is public, the holder is looked at on purpose, and a
-     house where this is never heard is a house the district assumes is
-     unhappy. Six a day rather than three, and it lands twice as hard. ---- */
+  /* HOW MANY THE DAY TAKES IS slapCap()'s BUSINESS, and the line that fires
+     when you go past it now READS THAT NUMBER instead of carrying its own.
+     It used to say "Six" in a house whose cap is eight and in a house whose
+     cap is three — a figure that was in neither branch — so landing ten got
+     you a verdict quoting a rule that does not exist. The office states its
+     criteria as numbers; so does this. */
   const _fx=rkTitleFx();
   const _cap = slapCap();
+  const _ord = (n)=>['no','one','two','three','four','five','six','seven','eight','nine','ten'][n]||String(n);
   if((G.slapCount||0)>=_cap) return {k:'enough', bond:-4, phys:0,
-    t: _cap>3? 'Six. Even a Mesteri Rhaunek turns round eventually, and she has.'
-             : 'That is the fourth time today. She turns round with her whole face.'};
+    t: _cap>3
+      ? (_ord(_cap).replace(/^./,c=>c.toUpperCase())+'. Even a Mesteri Rhaunek turns round eventually, and at '
+         +_cap+' she has.')
+      : ('That is '+_ord(_cap+1)+' today, against a house that takes '+_cap
+         +'. She turns round with her whole face.')};
   G.slapCount=(G.slapCount||0)+1;
   const v=slapVerdict();
   if(_fx.slap && _fx.slap!==1 && v.bond>0) v.bond=Math.round(v.bond*_fx.slap);
@@ -30711,6 +31112,9 @@ function drawDomus(){
       else if(D.husb){ /* his own move draws both of them */ }
       else if(D.drop && D.drop.ph!=='fall'){ /* the drop draws him where HE is, not where he idles */ }
       else if(D.escort){ /* the escort draws BOTH of them, in the hold */ }
+      else if(D.letout && D.letout.read && D.letout.read.bend){
+        /* ◇ the urvaak is drawing her crossing the floor; the hall does not
+           also get to draw her standing where she was */ }
       /* LIT. The lamp in this room now falls on her: a cast shadow on the
          tiles, a rim down the side facing it, occlusion down the other. */
       else if(w.male) litHusband(ctx,D.wifeX,FY,G.wifeRel|0,w.skin,w.dress,w,wPh,wMode);
@@ -30769,6 +31173,7 @@ function drawDomus(){
     if(D.praise) drawPraise();                          // 💬 and she has an opinion about you
     if(D.seatAsk) drawSeatAsk();                        // ◈ and the office has a figure
     if(D.reward)  drawRkReward();                       // ✧ and the gift is hers to offer
+    if(D.letout)  drawLetoutBack();                     // ◇ the room drops back for it
     if(D.press) drawRkPress();                          // ◆ the crossing, the contact and the hold
     if(D.ardor) drawArdor();                            // 🏛 and it is your own fault this time
     if(D.kidWalk) drawKidWalk();                        // and so is somebody else's husband
@@ -30787,6 +31192,9 @@ function drawDomus(){
         turning? 1-(D.turn/14) : (mv? D.t*(run?0.6:0.35) : 0),
         turning? 'turn' : (run?'run':(mv?'walk':'idle')));
       if(!D.floor) drawArdorIcon(D.x,pfy,D.t); }
+    /* ◇ AND THE URVAAK GOES ON TOP OF HIM, because he is still standing
+       there in the ordinary sprite and the ordinary sprite has a cloth on */
+    if(D.letout) drawLetout();
     // THE ASIDE — the big one leading the little one out, explaining nothing well
     if(D.sib){ const S2=D.sib, T3=S2.t;
       const bx=clamp(300-T3*0.55, 40, 300), sx=bx-14;
@@ -37248,10 +37656,39 @@ function openTheTen(tab){
                +'<b style="color:#7ad08a">'+String(FM.part).toUpperCase()+' '+FM.v+'</b> — <span class="muted">'+FM.line+'</span></div>';
            }catch(e){ return ''; }
          })()
-        +(on? '<div class="small" style="margin-top:5px;color:var(--gold)"><b>◈ THERE IS ONE ON THE FLOOR OF THIS HOUSE TONIGHT.</b> '
+        +'<div class="small" style="margin-top:5px;line-height:1.55;color:#e8c34a"><b>◈ AND WHAT IT IS FOR, in numbers:</b> '
+        +'while it is on, an evening in this house is worth <b>a third again</b> in bond and in the other bar, '
+        +'and she is <b>five times</b> as likely to come and find you on the floor of it. '
+        +'The coast does not claim it is romantic. It claims it works.</div>'
+        +(on? '<div class="small" style="margin-top:5px;color:var(--gold)"><b>◈ THERE IS ONE ON THIS HOUSE RIGHT NOW.</b> '
               +'It will not survive until morning and everybody went in knowing that.</div>'
-            : (A.ok? '' : '<div class="small" style="margin-top:5px;color:#e0905b">✗ '+A.why+'</div>')), '#7ad08a');
-      if(!on){ const t=document.createElement('button');
+            : ((typeof rkSivrakBuilt==='function' && rkSivrakBuilt())
+                ? '<div class="small" style="margin-top:5px;color:#8fc0cf">◈ BUILT, AND CURRENTLY OFF. Folded over the post. It will go back on.</div>'
+                : (A.ok? '' : '<div class="small" style="margin-top:5px;color:#e0905b">✗ '+A.why+'</div>'))), '#7ad08a');
+      /* ---- AND THE SWITCH. It is built or it is not; it is ON or it is
+         not; and those are two different questions with two different
+         answers, which is how a garment that takes an afternoon and dies
+         by morning actually works in a house. ---- */
+      if(typeof rkSivrakBuilt==='function' && rkSivrakBuilt()){
+        const worn=(typeof rkSivrakOn==='function') && rkSivrakOn('wife');
+        const sw=document.createElement('button');
+        sw.className='btn sm'+(worn?'':' gold'); sw.style.marginTop='6px';
+        sw.textContent = worn? '◈ TAKE IT OFF FOR NOW' : '❦ PUT IT BACK ON';
+        sw.title = worn
+          ? 'It stays built until morning. Off is a decision, not the end of it.'
+          : 'Still on the floor where it was left. It will go back on once.';
+        sw.onclick=()=>{
+          const now=rkSivrakToggle();
+          toast(now
+            ? '❦ Back on, and it is holding together better than either of you expected. '
+              +'The evening is worth a third again while it is.'
+            : '◈ Off, and folded over the post. It is still built; it is simply not on.', 4600);
+          openTheTen('titles');
+        };
+        d.appendChild(sw);
+      }
+      if(!on && !(typeof rkSivrakBuilt==='function' && rkSivrakBuilt())){
+        const t=document.createElement('button');
         t.className='btn sm'+(A.ok?' gold':''); t.textContent='❦ ASK HER FOR A SIVRAK';
         t.style.marginTop='6px'; if(!A.ok){ t.disabled=true; t.style.opacity='.45'; }
         t.onclick=()=>{
@@ -47807,8 +48244,30 @@ function rkSivrakOn(who){
     if(!rkHere() || !ADULT) return false;
     const S=G&&G.rkSivrak;
     if(!S || S.day!==G.day) return false;
+    if(S.off) return false;                    // built, and currently not on
     return who==='both'? true : (S.who==='both' || S.who===who);
   }catch(e){ return false; }
+}
+/* IT IS BUILT, WHICH IS NOT THE SAME AS BEING WORN. One is an afternoon's
+   work and survives until morning; the other is a decision and can be made
+   twice. */
+function rkSivrakBuilt(){
+  try{ const S=G&&G.rkSivrak; return !!(rkHere() && ADULT && S && S.day===G.day); }
+  catch(e){ return false; }
+}
+function rkSivrakToggle(){
+  if(!rkSivrakBuilt()) return null;
+  G.rkSivrak.off=!G.rkSivrak.off;
+  try{ refreshStatbar(); saveQuiet(); }catch(e){}
+  return !G.rkSivrak.off;
+}
+/* AND WHAT IT IS ACTUALLY FOR, in the numbers rather than in the telling.
+   The coast does not claim it is romantic. It claims it is effective, and
+   here that is a third again on what an evening in this house is worth —
+   plus the five times it already puts on her coming to find you. */
+const RK_SIVRAK_BED=1.34;
+function sivrakBed(){
+  try{ return rkSivrakOn('wife')? RK_SIVRAK_BED : 1; }catch(e){ return 1; }
 }
 /* ---- AND THE ASKING, WHICH IS A REAL QUESTION WITH A REAL ANSWER ---- */
 function rkSivrakAsk(){
@@ -52152,6 +52611,10 @@ window.__SS = {
   RK_KANRUK, RK_KANRUK_WINDOW, RK_KANRUK_ADD,
   kanrukOffered, kanrukActive, kanrukLeft, kanrukArm, kanrukSpend,
   rkFinOn, rkFinAt, startRkFin, updateRkFin, rkFinTake, drawRkFin, updateBed, updateWifeHappy,
+  RK_LETOUT, letoutMeasure, letoutTier, letoutWhy, letoutReady, letoutLeft,
+  letoutRead, tryLetout, updateLetout, drawLetout, letoutMember,
+  rkSivrakBuilt, rkSivrakToggle, sivrakBed, RK_SIVRAK_BED, KANVEK_ONLY_set:(v)=>{KANVEK_ONLY=!!v;},
+  doSlap, slapCap, slapStanding, drawLetoutBack,
   RK_REWARD, RK_REWARD_PLAIN, rkRewardCause, rkRewardClaim,
   rkRewardDue, startRkReward, updateRkReward, drawRkReward,
   RK_SEAT_MAX, rkHeldTitles, rkSeatWifeWhy, rkSeatWife, rkUnseatWife, openSeating,
