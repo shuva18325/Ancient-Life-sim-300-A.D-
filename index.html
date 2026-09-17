@@ -23880,9 +23880,66 @@ const DROP_PROPS=[
 ];
 const DROP_NEED=20;          // reaches to get it in your hand
 const DROP_LOOKS=3;          // and the looks you have to buy yourself time with
+/* =====================================================================
+   ONE ANSWER TO "IS THE HALL BUSY?"
+   ---------------------------------------------------------------------
+   Ten beats in this hall each carried its own hand-written list of what
+   counts as something-already-happening, and no two of the ten agreed.
+   Not one of them looked at D.gripe, so a child could be mid-grievance
+   and she would call you over straight across the top of it — which is
+   the bug as reported, and it is the same bug in about thirty directions.
+
+   The dispatch chain protects one side of it and only one: a locking beat
+   returns, so nothing BELOW it in the chain can start. But everything
+   ABOVE it already ran its own gate that frame. So the curious one, the
+   clam, the praise, the seat-ask and her gift could each open on top of a
+   beat that was already holding the room — two speech boxes deep, both of
+   them reading K and X, and the later one silently winning the input.
+
+   The list lives HERE now. Adding a beat to this hall means adding its key
+   to this array, and every gate in the file knows about it at once. Three
+   things stay out on purpose: a refusal is documented as playing over
+   whatever else is happening, and the aside and the walk-quip are scenery
+   rather than interactions.
+   ===================================================================== */
+const HALL_BEATS=['scene','slap','rslap','tempt','peek','climb','rise','escort',
+                  'kidWalk','gripe','ardor','press','curio','clam','praise',
+                  'seatAsk','reward','letout','tablet','husb','bendAsk','drop'];
+/* '' when the hall is free, otherwise the key of whatever is holding it.
+   `mine` is the caller's own slot, for a caller that has to ask the question
+   while its own beat is still on screen. */
+function hallBusy(mine){
+  const D=DM; if(!D) return 'nowhere';
+  for(let i=0;i<HALL_BEATS.length;i++){
+    const k=HALL_BEATS[i];
+    if(k!==mine && D[k]) return k;
+  }
+  return '';
+}
+/* and what to call it, when somebody has to be told what is in the way */
+const HALL_BEAT_NAMES={
+  scene:'that already under way',      slap:'a slap that has not landed yet',
+  rslap:'that already under way',      tempt:'her, on the low shelf',
+  peek:'the one look',                 climb:'the stairs',
+  rise:'him, not doing anything',      escort:'him taking her somewhere',
+  kidWalk:'somebody small crossing the hall',
+  gripe:'somebody small with a grievance',
+  ardor:'you, already crossing the room', press:'the press',
+  curio:'her, looking at something',   clam:'her, and she started it',
+  praise:'her, having an opinion about you',
+  seatAsk:'the office, asking',        reward:'her, offering you something',
+  letout:'the urvaak',                 tablet:'the tablet',
+  husb:'him, already crossing',        bendAsk:'him, waiting on an answer',
+  drop:'the floor, and her hands full of it',
+  nowhere:'nowhere to do it',
+};
+function hallBusyWhy(mine){
+  const k=hallBusy(mine);
+  return k? (HALL_BEAT_NAMES[k]||k) : '';
+}
 function dropDue(){
   if(!G || !G.isFemale || !G.married || !G.wife || !G.wife.male || !ADULT) return false;
-  const D=DM; if(!D || D.scene || D.tempt || D.drop || D.slap || D.rslap || D.press || D.curio) return false;
+  const D=DM; if(!D || hallBusy()) return false;
   if((D.t||0) - (D.lastDropT===undefined? -9999 : D.lastDropT) < 2600) return false;
   return Math.random() < 0.0016;                 // the same pacing the bend runs on
 }
@@ -24126,7 +24183,7 @@ function drawSlapArm(x, y, t, from, skin){
 }
 function husbandMoveDue(){
   if(!G || !G.isFemale || !G.married || !G.wife || !G.wife.male || !ADULT) return false;
-  const D=DM; if(!D || D.scene || D.drop || D.slap || D.rslap || D.tempt || D.press || D.curio) return false;
+  const D=DM; if(!D || hallBusy()) return false;
   if((D.t||0) - (D.lastHusbT===undefined? -9999 : D.lastHusbT) < 2200) return false;
   if(!spouseWilling()) return false;
   if(hasQuirk('devout') && festivalToday()) return false;      // not today, and asking offends
@@ -24558,7 +24615,7 @@ function drawTunicBump(x, y, w, stage, T, dir, decent){
 function riseDue(){
   if(!G || !G.isFemale || !G.married || !G.wife || !G.wife.male || !ADULT) return false;
   if(!hasTrait('priapic')) return false;
-  const D=DM; if(!D || D.scene || D.drop || D.slap || D.rslap || D.tempt || D.husb || D.rise || D.press || D.curio) return false;
+  const D=DM; if(!D || hallBusy()) return false;
   if((D.t||0) - (D.lastRiseT===undefined? -9999 : D.lastRiseT) < 2600) return false;
   return Math.random() < 0.0018;
 }
@@ -24803,7 +24860,7 @@ function curioReady(){
 function curioDue(){
   const D=DM; if(!D) return false;
   if(!curioReady()) return false;
-  if(D.scene||D.slap||D.rslap||D.tempt||D.husb||D.drop||D.rise||D.ardor||D.press||D.curio||D.clam) return false;
+  if(hallBusy()) return false;
   /* THREE TO A VISIT, and DM is rebuilt on every openDomus, so this is a
      ceiling on one stay in the hall rather than the once-per-save gate
      that used to stop it happening at all. */
@@ -25120,8 +25177,7 @@ function praisePool(){
 function praiseDue(){
   const D=DM; if(!D) return false;
   if(!praiseReady()) return false;
-  if(D.scene||D.slap||D.rslap||D.tempt||D.husb||D.drop||D.rise||D.ardor
-     ||D.press||D.curio||D.clam||D.praise||D.tablet) return false;
+  if(hallBusy()) return false;
   if((D.praiseFired|0) >= 3) return false;
   if(D.t < (D.praiseNext||500)) return false;
   return Math.random() < 0.010;
@@ -25507,7 +25563,7 @@ function clamPulses(mad){
 function clamDue(){
   const D=DM; if(!D) return false;
   if(!clamReady()) return false;
-  if(D.scene||D.slap||D.rslap||D.tempt||D.husb||D.drop||D.rise||D.ardor||D.press||D.curio||D.clam) return false;
+  if(hallBusy()) return false;
   if((D.clamFired|0) >= 4) return false;
   if(D.t < (D.clamNext||300)) return false;
   return Math.random() < 0.012;
@@ -27459,7 +27515,7 @@ function temptDue(){
      the same moment and is drawn with the right two people in it. */
   if(G.wife.male) return false;               // a husband gets THE DROP, not this
   if(kidsPresent() && !villaClear()) return false;   // she is not doing THAT with the children about
-  const D=DM; if(!D || D.scene || D.tempt) return false;
+  const D=DM; if(!D || hallBusy()) return false;
   /* PACING. 0.010 a tick at sixty frames a second is a 45% chance every second
      — with a 900-tick gate that meant it fired again within a breath of the
      cooldown expiring, every time. It is meant to be a thing that happens
@@ -28169,8 +28225,7 @@ function rkRewardDue(){
   try{
     const D=DM; if(!D) return false;
     if(!kanrukOffered()) return false;
-    if(D.scene||D.slap||D.rslap||D.tempt||D.husb||D.ardor||D.press
-       ||D.curio||D.clam||D.praise||D.tablet||D.seatAsk||D.reward) return false;
+    if(hallBusy()) return false;
     if(G.rkRewardForce) return true;                   // ☠ the console asked for it
     if((G.rkRewardDay|0)===((G.day||0)|0)) return false;   // once a day, and she picks the day
     if((D.rewardFired|0)>=1) return false;
@@ -28419,9 +28474,8 @@ function tryLetout(){
   const D=DM; if(!D) return;
   const why=letoutWhy();
   if(why){ toast('◇ '+why, 3400); return; }
-  if(D.scene||D.slap||D.rslap||D.tempt||D.husb||D.ardor||D.press||D.curio||D.clam
-     ||D.praise||D.tablet||D.seatAsk||D.reward||D.letout||D.drop||D.rise){
-    toast('◇ One thing at a time. Something is already happening in this hall.', 2600); return; }
+  { const busy=hallBusyWhy('letout');
+    if(busy){ toast('◇ One thing at a time — there is already '+busy+'.', 3000); return; } }
   if(letoutLeft()<=0){ toast('◇ Twice today already. Even on this coast that is a man with a point to make.', 3200); return; }
   const day=(G.day||0);
   if(G.letoutDay!==day){ G.letoutDay=day; G.letoutCount=0; }
@@ -28591,8 +28645,7 @@ function seatAskDue(){
     if(!(rkHere() && ADULT && G.married && G.wife && !G.wife.male && !G.isFemale)) return false;
     if(!slapExpect()) return false;
     if(slapOwed()<=0) return false;
-    if(D.scene||D.slap||D.rslap||D.tempt||D.husb||D.ardor||D.press
-       ||D.curio||D.clam||D.praise||D.tablet||D.seatAsk) return false;
+    if(hallBusy()) return false;
     if((D.seatAskFired|0) >= 2) return false;
     if(D.t < (D.seatAskNext||600)) return false;
     return Math.random() < 0.012;
@@ -41945,8 +41998,7 @@ function kidWalkEligibleRooms(){
 }
 function kidWalkDue(){
   const D=DM; if(!D) return false;
-  if(D.kidWalk || D.escort || D.scene || D.slap || D.rslap || D.tempt
-     || D.husb || D.drop || D.rise || D.ardor || D.press || D.curio || D.clam) return false;
+  if(hallBusy()) return false;
   if(!kidWalkEligibleRooms().length) return false;
   if((D.t||0) - (D.lastKidWalkT===undefined? -9999 : D.lastKidWalkT) < 500) return false;
   return Math.random() < 0.006;
@@ -42663,6 +42715,10 @@ const ROOM_COMPLAINTS=[
 ];
 function maybeRoomComplaint(force){
   const D=DM; if(!D) return false;
+  /* IT HAD NO CHECK AT ALL. A grievance would land on top of a press, a
+     clam, the tablet, anything — and because nothing else looked at D.gripe
+     either, the next beat then landed on top of the grievance. */
+  if(hallBusy()) return false;
   const kids=livingKids().filter(c=>kidBand(c)!=='baby' && !c.wed);
   if(!kids.length) return false;
   const taken=Object.keys(roomsOccupiedToday()).length;
@@ -52615,6 +52671,7 @@ window.__SS = {
   letoutRead, tryLetout, updateLetout, drawLetout, letoutMember,
   rkSivrakBuilt, rkSivrakToggle, sivrakBed, RK_SIVRAK_BED, KANVEK_ONLY_set:(v)=>{KANVEK_ONLY=!!v;},
   doSlap, slapCap, slapStanding, drawLetoutBack,
+  HALL_BEATS, HALL_BEAT_NAMES, hallBusy, hallBusyWhy,
   RK_REWARD, RK_REWARD_PLAIN, rkRewardCause, rkRewardClaim,
   rkRewardDue, startRkReward, updateRkReward, drawRkReward,
   RK_SEAT_MAX, rkHeldTitles, rkSeatWifeWhy, rkSeatWife, rkUnseatWife, openSeating,
