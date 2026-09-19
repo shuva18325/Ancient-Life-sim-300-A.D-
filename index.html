@@ -8375,6 +8375,21 @@ function drawBodyMap(cnv,w,view,tms){
      proportions, blown up to fill the frame. Same gutter, same readout,
      same scale — only the body is the real one.
      =================================================================== */
+  /* ⬔ THE SOLID. It answers FRONT, SIDE and BACK all at once, so it stands
+     in for all three rather than being a fourth flat drawing. The secret
+     graph and the two eye-views are about something else and keep their
+     own drawings. */
+  if(bodyMap3D && view!=='secret' && view!=='eyes' && view!=='spouse'){
+    c.restore();                                   // the solid works in screen space
+    const yaw = bodyMapWalk? bodyMapYaw : (view==='side'? Math.PI/2 : view==='back'? Math.PI : 0.62);
+    const floorY = H2-FOOT-14;
+    const sc = Math.min((FW-40)/((bodyRings(w).shoulder+9)*2), (floorY-30)/76);
+    try{ drawBody3D(c, w, FW*0.5, floorY, sc, yaw); }catch(e){}
+    drawMapReadout(c,w,W2,H2,GUT,gv,male);
+    drawMapScale(c,W2,H2,imp);
+    drawPartPicker(c,cnv,w,view,W2,H2,GUT);
+    return;
+  }
   if(SETTINGS.bluntBody && view!=='secret'){
     c.save();
     /* FITTED, and drawn per view. drawChartFig stands on y=0 and reaches about
@@ -8454,7 +8469,12 @@ function drawBodyMap(cnv,w,view,tms){
     }
     const cx=FW/2, top=44, K=1.30;
     c.save(); c.translate(cx,top); c.scale(K,K); c.translate(-cx,-top);   // fill the taller chart
-    const aro = secretAroused;
+    /* THE LEVEL, not the switch. Every geometry term below used to read
+       `aro? this : that` and cut between two drawings on one frame; they
+       are all mixes now, so the study rises rather than appearing. */
+    const aro = clamp(secretAroLv, 0, 1.06);
+    const mix = (rest, up)=> rest + (up-rest)*aro;
+    const ARO = aro>0.5;                    // for the words, which do not tween
     const sv=gv('secret');
     // the two derived measures — a chart with only one number on it is not a chart
     const gvGirth = clamp(Math.round(sv*0.62 + bu*0.38), 1, sv>=IMPOSSIBLE_V?IMPOSSIBLE_V:10);
@@ -8500,15 +8520,15 @@ function drawBodyMap(cnv,w,view,tms){
       else if(val<5){ c.fillStyle='rgba(230,214,244,.34)'; c.font='italic 7px Georgia,serif';
         c.fillText((5-val)+' under Rome’s common run', cx, top+168); } }
     // ---- THE STUDY ITSELF. A man's physics live here and nowhere else. ----
-    const phys = anim * (aro? 2.2 : 5.0) * Math.sin(ph*2);
+    const phys = anim * mix(5.0, 2.2) * Math.sin(ph*2);
     if(secretSub==='profile'){
-      const eff = aro? Math.min(IMPOSSIBLE_V, val+2.2) : val;
-      const len = (aro?18:11) + (eff/10)*(aro?96:80);
-      const th  = (aro?11:8.5) + (eff/10)*(aro?8:6);
+      const eff = mix(val, Math.min(IMPOSSIBLE_V, val+2.2));
+      const len = mix(11, 18) + (eff/10)*mix(80, 96);
+      const th  = mix(8.5, 11) + (eff/10)*mix(6, 8);
       const baseX=cx-52, baseY=top+87;
-      const rise = (aro? -14 - eff*0.9 : 6 + eff*0.35) + phys;
-      const tipX = baseX+len + anim*Math.cos(ph*2)*(aro?1.2:2.6), tipY = baseY+rise;
-      const midX = baseX+len*0.55, midY = baseY+rise*0.42 + (aro? -3 : 4) + phys*0.35;
+      const rise = mix(6 + eff*0.35, -14 - eff*0.9) + phys;
+      const tipX = baseX+len + anim*Math.cos(ph*2)*mix(2.6, 1.2), tipY = baseY+rise;
+      const midX = baseX+len*0.55, midY = baseY+rise*0.42 + mix(4, -3) + phys*0.35;
       // a cast shadow on the plate, so the study sits ON something
       c.fillStyle='rgba(0,0,0,.22)';
       c.beginPath(); c.ellipse((baseX+tipX)/2, baseY+th*0.95, len*0.48, th*0.24, 0,0,7); c.fill();
@@ -8532,12 +8552,13 @@ function drawBodyMap(cnv,w,view,tms){
         c.beginPath(); c.moveTo(baseX+8,baseY+th*0.10); c.quadraticCurveTo(midX,midY+th*0.06,tipX-th*0.6,tipY+th*0.04); c.stroke(); }
       // GHOST OF AT REST, drawn OVER the study — when roused, the difference is
       // the entire point of the view, so it must be the thing you can see.
-      if(aro){ const rlen=11+(val/10)*80, rth=8.5+(val/10)*6, rrise=6+val*0.35;
-        c.strokeStyle='rgba(255,255,255,.42)'; c.setLineDash([3,3]); c.lineWidth=1.1;
+      if(aro>0.06){ const rlen=11+(val/10)*80, rth=8.5+(val/10)*6, rrise=6+val*0.35;
+        c.strokeStyle='rgba(255,255,255,'+(0.42*Math.min(1,aro)).toFixed(2)+')'; c.setLineDash([3,3]); c.lineWidth=1.1;
         c.beginPath(); c.moveTo(baseX,baseY-rth*0.5); c.lineTo(baseX+rlen,baseY+rrise-rth*0.45);
         c.arc(baseX+rlen,baseY+rrise,rth*0.5,-1.5708,1.5708);
         c.lineTo(baseX,baseY+rth*0.5); c.closePath(); c.stroke(); c.setLineDash([]);
-        c.font='italic 6px Georgia,serif'; c.fillStyle='rgba(255,255,255,.55)'; c.textAlign='left';
+        c.font='italic 6px Georgia,serif';
+        c.fillStyle='rgba(255,255,255,'+(0.55*Math.min(1,aro)).toFixed(2)+')'; c.textAlign='left';
         c.fillText('at rest', baseX+rlen+4, baseY+rrise+9); }
       // a calliper span across the whole length, because this IS a measurement
       c.strokeStyle='rgba(230,210,240,.34)'; c.lineWidth=1;
@@ -8546,10 +8567,15 @@ function drawBodyMap(cnv,w,view,tms){
       c.moveTo(tipX+th*0.56,cy2-4); c.lineTo(tipX+th*0.56,cy2+4);
       c.moveTo(baseX,cy2); c.lineTo(tipX+th*0.56,cy2); c.stroke();
       c.fillStyle='rgba(230,210,240,.55)'; c.font='bold 8px Georgia,serif'; c.textAlign='left';
-      c.fillText('◐ '+(aro?'AROUSED':'AT REST')+(anim?' · IN MOTION':''), baseX, baseY-th-14);
+      { const moving=!arouseSettled();
+        const word = moving? (secretAroused? 'RISING' : 'SUBSIDING')
+                   : ARO? 'AROUSED' : 'AT REST';
+        c.fillStyle= moving? '#ff8ad0' : 'rgba(230,210,240,.55)';
+        c.fillText('◐ '+word+(moving? '  '+Math.round(Math.min(1,aro)*100)+'%' : '')
+                   +(anim?' · IN MOTION':''), baseX, baseY-th-14); }
     } else if(secretSub==='girth'){
       // HEAD-ON — the ring gauge. Foreshortened to nothing but its section.
-      const eff = aro? Math.min(IMPOSSIBLE_V, val+1.6) : val;
+      const eff = mix(val, Math.min(IMPOSSIBLE_V, val+1.6));
       const R = 6 + (eff/10)*17;
       const ccx=cx, ccy=top+82 + phys*0.4;
       for(let r2=3;r2>=1;r2--){ c.strokeStyle='rgba(220,180,240,'+(0.10*r2)+')'; c.lineWidth=1;
@@ -8610,7 +8636,8 @@ function drawBodyMap(cnv,w,view,tms){
     c.textAlign='center'; c.fillStyle=col; c.font='bold 19px Georgia,serif';
     c.fillText(impS?'IMPOSSIBLE':tier.toUpperCase(), cx, top+2);
     c.fillStyle='#efe3c2'; c.font='bold 10px Georgia,serif';
-    c.fillText(SB.label+' — '+(secretSub==='behind'?'as it stands':(aro?'roused':'at rest'))
+    c.fillText(SB.label+' — '+(secretSub==='behind'?'as it stands'
+                 :(!arouseSettled()? (secretAroused?'rising':'subsiding') : (ARO?'roused':'at rest')))
       +', measured '+(impS?'beyond the rule':val+' of 10'), cx, top+18);
     c.fillStyle='rgba(230,210,240,.6)'; c.font='italic 9px Georgia,serif';
     { const ph2 = bmOnce('quote:'+secretSub+':'+val, ()=> impS? 'No rule in Rome is long enough.'
@@ -9454,6 +9481,41 @@ function wrapSmall(c,txt,x,y,maxw,lh){
   if(line) c.fillText(line,x,yy);
 }
 let bodyMapView='front', secretAroused=false, secretSub='profile', bodyMapWalk=true, bodyMapT=0, bodyMapRAF=0;
+/* WHERE IT ACTUALLY IS, 0..1, as opposed to where it has been told to be.
+   The boolean above is the target; this is the thing the chart draws, and
+   it takes its time getting there. */
+let secretAroLv=0, secretAroLast=0, secretAroOver=false;
+/* ⬔ AND WHETHER THE CHART IS A SOLID. Remembered on the device with the
+   other two things that change how the chart looks. */
+let bodyMap3D = (function(){ try{ return !!(SETTINGS && SETTINGS.map3d); }catch(e){ return false; } })();
+let bodyMapYaw=0.7;
+/* IT GOES UP FASTER THAN IT COMES DOWN, and it overshoots a little at the
+   top before it settles, which is the whole reason this is an animation
+   and not a cut between two drawings. */
+function arouseTick(ms){
+  const want = secretAroused? 1 : 0;
+  const dt = clamp((ms||16)/16.7, 0, 4);
+  const rate = (want>secretAroLv)? 0.085 : 0.030;      // up in ~a second, down in three
+  const d = want - secretAroLv;
+  secretAroLv += d * (1-Math.pow(1-rate, dt));
+  if(Math.abs(d)<0.0015) secretAroLv=want;
+  /* THE OVERSHOOT IS A TRANSIENT. It goes a shade past full and then settles
+     back to it — left as a permanent 1.05 the level never matches the target,
+     so arouseSettled() is false for ever and the chart's animation loop never
+     stops running. A thing that is finished has to be able to say so. */
+  if(want===1){
+    if(!secretAroOver && secretAroLv>0.86){
+      secretAroLv=Math.min(1.06, secretAroLv + (1.06-secretAroLv)*0.10*dt);
+      if(secretAroLv>1.03) secretAroOver=true;
+    }
+    if(secretAroOver) secretAroLv += (1-secretAroLv)*0.055*dt;     // and it comes back down to full
+  } else {
+    secretAroOver=false;
+    if(secretAroLv<0.04) secretAroLv=Math.max(0, secretAroLv-0.004*dt);
+  }
+  return secretAroLv;
+}
+function arouseSettled(){ return Math.abs(secretAroLv-(secretAroused?1:0))<0.01; }
 let bmPart=null, bmCompare=false, bmFlash=null, bmFlashRAF=0;
 /* A STILL CHART DRAWS ONE FRAME OF AN ANIMATION AND STOPS ON IT. The walk
    loop only runs when the figure is walking, so a flash on a still chart
@@ -9785,16 +9847,377 @@ function bmSayIt(w, pid){
     : Math.max(1, Math.round((v-4)*0.8));
   return { v, band, key, line, reply, bond, name:P.name };
 }
+/* =====================================================================
+   ◐ THE RISING — AND THE LEDGER KEEPS COUNT OF IT
+   ---------------------------------------------------------------------
+   The other chart had a toggle: 🔥 AROUSED or 💤 AT REST, two drawings,
+   and it cut between them on the frame you pressed it. Which is a switch
+   on a diagram rather than a thing a body does. A rise has a SHAPE — slow
+   to start, quick through the middle, a small overshoot at the top and
+   then it settles — and it comes down a good deal more slowly than it
+   went up, which anybody who has one already knows.
+
+   So the boolean is the TARGET now and the chart follows it. And because
+   this game counts everything else — the slaps, the crossings, the day's
+   figure — it counts these too, with the REASON for each, because on a
+   chart that is otherwise entirely about one number the interesting
+   column is what put it there.
+   ===================================================================== */
+const AROUSE_WHY={
+  urvaak:  {icon:'◇', name:'THE URVAAK',      line:'He let it out for the air and the air was not the only consideration.'},
+  ardor:   {icon:'🏛', name:'HE CROSSED THE ROOM', line:'His own doing, deliberately, from one side of the hall to the other.'},
+  tempt:   {icon:'🍑', name:'THE LOW SHELF',   line:'She bent for something on the bottom crate and took her time about it.'},
+  curio:   {icon:'🔎', name:'SHE WAS LOOKING', line:'At him, and not at his face, and she did not pretend otherwise.'},
+  clam:    {icon:'🐚', name:'SHE CALLED HIM OVER', line:'She started it, she finished it, and he was not consulted in between.'},
+  kanvek:  {icon:'✧', name:'HER GIFT',        line:'Kan’s giving. Hers to offer, and the correct thing to feel is grateful.'},
+  sivrak:  {icon:'❦', name:'THE SIVRAK',      line:'An afternoon of southern leaf, built round the best thing about her.'},
+  selvskar:{icon:'✎', name:'SOMETHING CAME',  line:'She cut it herself and sent it herself, which is the whole of the point.'},
+  slap:    {icon:'👋', name:'THE HAND',        line:'It landed, she turned round, and the room drew its own conclusions.'},
+  bend:    {icon:'◆', name:'SHE BENT',        line:'No particular reason. She was there and she bent and that was that.'},
+  chart:   {icon:'🗺', name:'THE OTHER LEDGER',line:'He opened her chart to check a number and did not check the number.'},
+  morning: {icon:'☀', name:'THE MORNING',     line:'Nothing to do with anybody. It is simply the hour, and it always has been.'},
+  cheat:   {icon:'☠', name:'THE CONSOLE',      line:'Somebody reached in and moved it. It counts; the ledger does not judge.'},
+};
+const AROUSE_KEEP=60;                     // how many risings the ledger holds before it forgets
+function arouseDayKey(){ return (G&&G.day)|0; }
+function arouseToday(){
+  try{ return ((G.aroDay|0)===arouseDayKey())? (G.aroCount|0) : 0; }catch(e){ return 0; }
+}
+/* WHAT IS ON TODAY'S PAGE, most recent first */
+function arouseLog(){
+  try{ return (G.aroLog||[]).filter(r=>r && (r.day|0)===arouseDayKey()).slice().reverse(); }
+  catch(e){ return []; }
+}
+/* AND WHY, GROUPED — the column that is actually worth reading */
+function arouseByWhy(days){
+  const n=Math.max(1, days|0||1), today=arouseDayKey(), out={};
+  try{
+    (G.aroLog||[]).forEach(r=>{
+      if(!r || (today-(r.day|0)) >= n) return;
+      out[r.why]=(out[r.why]|0)+1;
+    });
+  }catch(e){}
+  return Object.keys(out).map(k=>({why:k, n:out[k], w:AROUSE_WHY[k]||{icon:'·',name:k,line:''}}))
+               .sort((a,b)=>b.n-a.n);
+}
+/* how many a day, averaged over the days the ledger actually covers */
+function arousePerDay(){
+  try{
+    const L=G.aroLog||[]; if(!L.length) return 0;
+    const days=new Set(L.map(r=>r.day|0));
+    return L.length/Math.max(1, days.size);
+  }catch(e){ return 0; }
+}
+/* and the coast's own reading of a day's figure, because every other number
+   in this game is read out loud by somebody */
+function arouseStanding(){
+  const n=arouseToday();
+  if(n>=9) return {k:'much', col:'#ff7ae0', line:n+' today. A day with nine of these in it is a day nothing else got done, and the ledger is not being rude, it is being accurate.'};
+  if(n>=5) return {k:'busy', col:'#e8c34a', line:n+' today. A busy house, and the house knows.'};
+  if(n>=2) return {k:'ord',  col:'#7ad08a', line:n+' today, which is an ordinary number in a married house.'};
+  if(n===1)return {k:'one',  col:'#8fc0cf', line:'One today, and the ledger has written down why.'};
+  return {k:'none', col:'#8a7a70', line:'Nothing on today’s page yet.'};
+}
+/* ---- AND THE ONE CALL THAT RECORDS IT ----------------------------------
+   Anything in this game that would actually do it calls this with its own
+   reason. It sets the chart's target, it bumps the day's figure, and it
+   writes the reason down. */
+function rouse(why, up){
+  try{
+    if(!ADULT || !G) return false;
+    if(G.isFemale) return false;                 // the other ledger is his
+    const day=arouseDayKey();
+    if((G.aroDay|0)!==day){ G.aroDay=day; G.aroCount=0; }
+    G.aroCount=(G.aroCount|0)+1;
+    G.aroLog=(G.aroLog||[]).concat([{day, why:why||'bend', t:Date.now()}]).slice(-AROUSE_KEEP);
+    G.aroAll=(G.aroAll|0)+1;
+    secretAroused=(up===undefined)? true : !!up;
+    /* and if the chart is open it starts moving rather than waiting to be
+       looked at again */
+    try{ if(state==='bodymap') startBodyMapAnim(); }catch(e){}
+    return true;
+  }catch(e){ return false; }
+}
+/* =====================================================================
+   ⬔ THE CHART, TURNED — A THIRD VIEW OF THE SAME NUMBERS
+   ---------------------------------------------------------------------
+   FRONT, SIDE and BACK are three flat drawings of one body, and the thing
+   a reader actually wants from them — how the masses sit in relation to
+   each other — is exactly what a flat drawing cannot show. So the same
+   scores build a SOLID here, and it turns.
+
+   It is built the way a lathe builds: a profile of rings stacked up the
+   figure, each with its own half-WIDTH and its own half-DEPTH, because a
+   body is not a cylinder. A bust pushes forward and a rump pushes back,
+   so each ring carries a z-offset as well as two radii, and turning the
+   model is what makes that legible. The lower half is two columns rather
+   than one revolved mass, or the chart draws a mermaid.
+
+   And it stays a CHART. There is a turntable under it with bearings on
+   it, the rings are visible as rings, and the light is fixed to the room
+   rather than to the model so that turning it tells you something.
+   ===================================================================== */
+/* ONE PROFILE, off the same numbers every other view reads. y runs 0 at the
+   floor to about 74 at the crown, which is the frame the rest of the chart
+   already works in. */
+function bodyRings(w){
+  const b=(w&&w.body)||{}, gv=id=>b[id]===undefined?5:b[id];
+  const male=!!(w&&w.male);
+  const bu=gv('bust'), wa=gv('waist'), be=gv('booty'), lg=gv('legs'), fa=gv('face');
+  /* THE RIBCAGE IS NOT WIDER THAN THE SHOULDERS. Letting the chest ring run
+     to 8.6 against a 6.3 yoke gave her an upper body shaped like a bulb; on
+     a woman the masses carry the size, so the ring stays a ribcage and the
+     shoulders are never narrower than it. */
+  const bustR    = male? (5.6+bu*0.26) : (3.6+bu*0.32);
+  const shoulder = male? (7.2+gv('booty')*0.30) : Math.max(6.0+bu*0.09, bustR*0.98);
+  const hipR     = 3.4 + be*0.60;
+  /* and the waist is a waist. 5.6−wa*0.34 put a waist-8 figure at 2.9 against
+     9.4 hips — thinner than her own neck, and the join read as a slab. */
+  const waistR   = male? (6.6 - wa*0.12) : (6.2 - wa*0.16);
+  const legR     = 1.5 + lg*0.24;
+  const headR    = 3.0 + fa*0.13;
+  /* TORSO — hips to crown, one revolved stack. rx is half the width, rz half
+     the depth, zc how far the whole ring sits forward (+) or back (−). */
+  const torso=[
+    /* AND IT HAS A CROTCH. Ending the stack flat at the hip left a hard
+       horizontal edge across the top of both legs — a pair of shorts. */
+    {y:25.0, rx:hipR*0.56, rz:hipR*0.46, zc:-be*0.015},
+    {y:27.5, rx:hipR*0.74, rz:hipR*0.55, zc:-be*0.030},
+    {y:30.0, rx:hipR*0.92, rz:hipR*0.66, zc:-be*0.055},
+    {y:34.0, rx:hipR,      rz:hipR*0.72, zc:-be*0.085},   // the seat, and it is behind him
+    {y:38.0, rx:hipR*0.96, rz:hipR*0.70, zc:-be*0.075},
+    {y:40.0, rx:(hipR*0.96+waistR*0.86)*0.5,              // the flare, so it is not a cliff
+             rz:(hipR*0.70+waistR*0.62)*0.5, zc:-be*0.05},
+    {y:42.0, rx:waistR*0.86, rz:waistR*0.62, zc:-be*0.02},
+    {y:46.0, rx:waistR*0.76, rz:waistR*0.58, zc:0},       // the cinch
+    {y:50.0, rx:waistR*0.88, rz:waistR*0.66, zc:0.2},
+    {y:53.5, rx:bustR*0.92, rz:(male? bustR*0.52 : bustR*0.74), zc:(male?0.3:bu*0.10)},
+    {y:56.5, rx:bustR,      rz:(male? bustR*0.50 : bustR*0.80), zc:(male?0.4:bu*0.135)},  // forward
+    {y:59.5, rx:shoulder,   rz:shoulder*0.44, zc:0},      // the yoke
+    {y:62.0, rx:shoulder*0.62, rz:shoulder*0.36, zc:0},
+    {y:64.0, rx:1.5,        rz:1.4,  zc:0},               // the neck
+    {y:66.0, rx:1.6,        rz:1.5,  zc:0},
+    {y:68.0, rx:headR*0.78, rz:headR*0.80, zc:0.2},
+    {y:71.0, rx:headR,      rz:headR*0.96, zc:0.1},       // the head
+    {y:74.0, rx:headR*0.58, rz:headR*0.60, zc:0},
+  ];
+  /* and the legs, which are two things */
+  const leg=[
+    {y:0.0,  rx:legR*0.62, rz:legR*1.10, zc:legR*0.55},   // the foot reaches forward
+    {y:1.6,  rx:legR*0.58, rz:legR*0.66, zc:legR*0.18},
+    {y:5.0,  rx:legR*0.56, rz:legR*0.58, zc:0},           // the ankle
+    {y:10.0, rx:legR*0.92, rz:legR*0.86, zc:-legR*0.14},  // the calf, and it is behind the shin
+    {y:15.0, rx:legR*0.80, rz:legR*0.76, zc:-legR*0.06},
+    {y:18.0, rx:legR*0.74, rz:legR*0.74, zc:0},           // the knee
+    {y:23.0, rx:legR*1.10, rz:legR*1.02, zc:0},
+    {y:28.0, rx:legR*1.26, rz:legR*1.12, zc:0},           // the thigh
+    {y:33.5, rx:legR*1.12, rz:legR*1.00, zc:0},           // and up under the hip
+  ];
+  /* the wrist at 0, the shoulder at 25, because that is the span it has to
+     cover — it hangs to the hip like an arm rather than stopping at the rib.
+     THICK ENOUGH TO BE AN ARM: the first cut ran 0.78 at the wrist against a
+     4-unit head and came out as two wires hanging off the ribs. */
+  const armT = male? 1.22 : 1.0;
+  /* AND IT IS JOINED ON. The shoulder end sits inside the yoke and the rest
+     swings OUT to clear the widest thing below it — carrying the whole arm
+     out on a fixed offset instead left a bar of background between her
+     shoulder and her arm. xc is how far out from that offset each ring sits;
+     nearly all of the swing happens in the upper arm, so the forearm hangs. */
+  const armDX  = shoulder*0.80;
+  const reach  = Math.max(shoulder*1.02, hipR*0.94) + 0.9*armT;
+  const H      = Math.max(0, reach - armDX);
+  const arm=[
+    {y:0.0,  rx:1.18*armT, rz:1.20*armT, zc:0.10, xc:H*1.00},  // the hand
+    {y:2.0,  rx:1.02*armT, rz:1.04*armT, zc:0,    xc:H*0.99},  // and the wrist
+    {y:7.0,  rx:1.24*armT, rz:1.26*armT, zc:0,    xc:H*0.94},
+    {y:12.5, rx:1.44*armT, rz:1.46*armT, zc:0,    xc:H*0.82},  // the elbow
+    {y:18.0, rx:1.78*armT, rz:1.80*armT, zc:0,    xc:H*0.55},
+    {y:25.0, rx:2.30*armT, rz:2.30*armT, zc:0,    xc:0},       // into the shoulder
+  ];
+  return {torso, leg, arm, male, shoulder, hipR, legR, headR,
+          legDX: hipR*0.46, armDX, armReach: reach, armTop: 59.0, armLen: 25.0};
+}
+/* ---- ONE RING, TURNED AND PROJECTED ----------------------------------
+   yaw turns the model about its own vertical axis; TILT is fixed and small,
+   so you look very slightly down on it and the rings read as rings rather
+   than as lines. */
+const BODY3D_TILT=0.20;
+function ring3D(c, cx, cy, sc, yaw, R, dx, col, alpha, light){
+  const cs=Math.cos(yaw), sn=Math.sin(yaw);
+  /* the ring is an ellipse in the model's XZ plane, offset in x by dx and in
+     z by R.zc. Turned, its screen width is the projected extent and its
+     screen height is that extent squashed by the tilt. */
+  const ex = Math.sqrt(Math.pow(R.rx*cs,2) + Math.pow(R.rz*sn,2));
+  const ez = Math.sqrt(Math.pow(R.rx*sn,2) + Math.pow(R.rz*cs,2));
+  const ox = dx*cs + R.zc*sn;                 // where the ring's centre lands
+  const oz = -dx*sn + R.zc*cs;
+  const X = cx + ox*sc;
+  const Y = cy - R.y*sc + oz*sc*BODY3D_TILT;
+  /* TALL ENOUGH TO MEET THE NEXT ONE. At the true projected depth the rings
+     sit one pitch apart with the background showing through the gaps. */
+  const rw = ex*sc, rh = Math.max(BODY3D_STEP*sc*0.80, ez*sc*BODY3D_TILT + 0.5);
+  /* LIT FROM THE ROOM, not from the model — which is the whole reason
+     turning it tells you anything. */
+  const lx = Math.cos(light||-2.35), g=c.createLinearGradient(X-rw, 0, X+rw, 0);
+  const k=(v)=>Math.max(0,Math.min(1,v));
+  g.addColorStop(0,    rgbA(shade2(col), k(0.55 - lx*0.35)));
+  g.addColorStop(0.42, rgbA(col, 0.96));
+  g.addColorStop(1,    rgbA(lit2(col,1.18), k(0.40 + lx*0.35)));
+  c.globalAlpha=(alpha===undefined?1:alpha);
+  c.fillStyle=g;
+  c.beginPath(); c.ellipse(X, Y, rw, rh, 0, 0, 7); c.fill();
+  c.globalAlpha=1;
+  return {X, Y, rw, rh};
+}
+/* THE KEYS ARE NOT THE SURFACE. Between any two of them the body changes
+   smoothly, so they are resampled at a fixed pitch and every value is
+   carried across — the two radii and the z-offset alike. */
+function densify(keys, step){
+  const out=[]; step=step||0.6;
+  for(let i=0;i<keys.length-1;i++){
+    const A=keys[i], B=keys[i+1], span=B.y-A.y;
+    const n=Math.max(1, Math.round(span/step));
+    for(let j=0;j<n;j++){
+      const t=j/n;
+      out.push({ y: A.y+span*t,
+                 rx:A.rx+(B.rx-A.rx)*t,
+                 rz:A.rz+(B.rz-A.rz)*t,
+                 zc:A.zc+(B.zc-A.zc)*t,
+                 xc:(A.xc||0)+((B.xc||0)-(A.xc||0))*t });
+    }
+  }
+  out.push(keys[keys.length-1]);
+  return out;
+}
+const BODY3D_STEP=0.55;
+/* a stack of rings, bottom to top, so the upper ones overlap the lower.
+   xs is which way is OUTWARD for this copy of the stack, so a ring's own
+   lateral offset mirrors with the limb instead of leaning both arms the
+   same way. */
+function stack3D(c, cx, cy, sc, yaw, rings, dx, col, yOff, light, xs){
+  let last=null;
+  const dense=densify(rings, BODY3D_STEP);
+  const sg = (xs===undefined)? 1 : xs;
+  for(let i=0;i<dense.length;i++){
+    const R=dense[i];
+    if(R.rx*sc < 0.4) continue;
+    last=ring3D(c, cx, cy, sc, yaw, {y:R.y+(yOff||0), rx:R.rx, rz:R.rz, zc:R.zc},
+                dx + (R.xc||0)*sg, col, 1, light);
+  }
+  return last;
+}
+/* ---- AND THE WHOLE FIGURE ---- */
+function drawBody3D(c, w, cx, cyFloor, sc, yaw, opts){
+  opts=opts||{};
+  const P=bodyRings(w);
+  const skin=(w&&w.skin)||'#e6bd94';
+  const light=-2.35;
+  const cs=Math.cos(yaw), sn=Math.sin(yaw);
+  /* ---- THE TURNTABLE. It is a chart, so it stands on an instrument. ---- */
+  if(opts.plate!==false){
+    c.save();
+    for(let r=3;r>=1;r--){
+      const rr=(P.shoulder+7)*sc*(0.72+r*0.10);
+      c.strokeStyle='rgba(206,158,226,'+(0.06*r+0.04)+')'; c.lineWidth=1;
+      c.beginPath(); c.ellipse(cx, cyFloor, rr, rr*BODY3D_TILT, 0,0,7); c.stroke();
+    }
+    /* bearings, so the turn is legible even when the figure is symmetrical */
+    for(let i=0;i<8;i++){
+      const a=yaw + i*Math.PI/4;
+      const rr=(P.shoulder+7)*sc*1.02;
+      const bx=cx+Math.cos(a)*rr, by=cyFloor+Math.sin(a)*rr*BODY3D_TILT;
+      const front=Math.sin(a)>0;
+      c.fillStyle= front? 'rgba(232,195,74,.75)' : 'rgba(206,158,226,.22)';
+      c.beginPath(); c.arc(bx,by, front?2.0:1.4, 0,7); c.fill();
+    }
+    c.fillStyle='rgba(0,0,0,.30)';
+    c.beginPath(); c.ellipse(cx, cyFloor, P.hipR*sc*1.25, P.hipR*sc*0.30, 0,0,7); c.fill();
+    c.restore();
+  }
+  /* ---- WHAT IS BEHIND GOES DOWN FIRST. With the model turned, one leg and
+     one arm are further from the reader than the torso and one is nearer;
+     painting them in a fixed order puts the far arm in front of the chest
+     a quarter of the way round. ---- */
+  /* the limbs read as limbs rather than as clothing: shaded enough to come
+     off the body, not so much that the legs look like trousers */
+  const limbCol=mixHex(skin, shade2(skin), 0.30);
+  /* THE BUST IS TWO MASSES AND IT IS ALSO A THING WITH A DEPTH. Painted
+     unconditionally after the torso it showed through her back half the way
+     round, so it goes into the same sort as the arms and the legs. */
+  const aMid=(P.armDX+P.armReach)*0.5;          // where the arm sits on average
+  /* THE LEGS ARE NEVER IN FRONT OF THE TORSO. They hang below it and their
+     tops tuck up under the hip, so sorting them by depth only ever gave the
+     hip a hard horizontal line drawn across it. They go down first, always,
+     and the hip covers the join. */
+  const parts = [
+    {k:'arm', dx:-P.armDX, zdx:-aMid}, {k:'arm', dx:+P.armDX, zdx:+aMid},
+  ];
+  if(!P.male){
+    const b=(w&&w.body)||{}, bu=(b.bust===undefined?5:b.bust);
+    if(bu>=3){
+      const br=(1.0+bu*0.28), fwd=(1.0+bu*0.13);
+      /* side by side: holding them at a fixed small offset put a 3.5-unit pair
+         1.7 apart — near enough concentric, which reads as one blob with a
+         circle drawn in the middle of it. They sit apart by their own size. */
+      [-1,1].forEach(side=>parts.push({k:'bust', dx:side*br*0.80, mz:fwd, br:br}));
+    }
+  }
+  /* depth of a part: its own offset turned, plus how far forward it sits */
+  parts.forEach(L=>{ L.z = -(L.zdx===undefined? L.dx : L.zdx)*sn + (L.mz||0)*cs; });
+  const back = parts.filter(L=>L.z<0).sort((a,b)=>a.z-b.z);
+  const front= parts.filter(L=>L.z>=0).sort((a,b)=>a.z-b.z);
+  const drawPart=(L)=>{
+    if(L.k==='leg') stack3D(c, cx, cyFloor, sc, yaw, P.leg, L.dx, limbCol, 0, light);
+    else if(L.k==='arm') stack3D(c, cx, cyFloor, sc, yaw, P.arm, L.dx, limbCol,
+                                 P.armTop-P.armLen, light, L.dx<0? -1 : 1);
+    else {
+      const br=L.br;
+      const X=cx+(L.dx*cs + L.mz*sn)*sc;
+      const Y=cyFloor-55.2*sc + L.z*sc*BODY3D_TILT;
+      const g=c.createRadialGradient(X-br*sc*0.34, Y-br*sc*0.36, br*sc*0.10, X, Y, br*sc*1.15);
+      g.addColorStop(0, rgbA(lit2(skin,1.24),0.98));
+      g.addColorStop(0.55, rgbA(skin,0.98));
+      g.addColorStop(1, rgbA(shade2(skin),0.95));
+      c.fillStyle=g;
+      c.beginPath(); c.ellipse(X, Y, br*sc, br*sc*0.94, 0,0,7); c.fill();
+    }
+  };
+  [-P.legDX, +P.legDX].sort((a,b)=> (-a*sn)-(-b*sn))
+    .forEach(dx=> stack3D(c, cx, cyFloor, sc, yaw, P.leg, dx, limbCol, 0, light));
+  back.forEach(drawPart);
+  stack3D(c, cx, cyFloor, sc, yaw, P.torso, 0, skin, 0, light);
+  front.forEach(drawPart);
+  /* ---- the crown of the head catches the light, so the top reads ---- */
+  { const R=P.torso[P.torso.length-2];
+    const X=cx+(R.zc*sn)*sc, Y=cyFloor-R.y*sc+(R.zc*cs)*sc*BODY3D_TILT;
+    c.fillStyle='rgba(255,255,255,.10)';
+    c.beginPath(); c.ellipse(X-R.rx*sc*0.22, Y-R.rx*sc*0.30, R.rx*sc*0.42, R.rx*sc*0.26, 0,0,7); c.fill(); }
+  /* ---- AND WHICH WAY IT IS FACING, because a turned model with no compass
+     is a lava lamp ---- */
+  if(opts.compass!==false){
+    const deg=Math.round(((yaw*180/Math.PI)%360+360)%360);
+    const face = (deg<45||deg>=315)? 'FRONT' : deg<135? 'LEFT SIDE' : deg<225? 'BACK' : 'RIGHT SIDE';
+    c.font='bold 8px Georgia,serif'; c.textAlign='center';
+    c.fillStyle='rgba(232,195,74,.70)';
+    c.fillText('⬔ '+face+'  ·  '+deg+'°', cx, cyFloor+16);
+  }
+  return P;
+}
 function stopBodyMapAnim(){ if(bodyMapRAF){ cancelAnimationFrame(bodyMapRAF); bodyMapRAF=0; } }
 function startBodyMapAnim(){
   stopBodyMapAnim();
   let lastDraw=0;
   const step=(now)=>{
     if(state!=='bodymap' || !bodyMapSubject){ bodyMapRAF=0; return; }
-    if(!bodyMapWalk && !slapLive()){ bodyMapRAF=0;          // idle chart: stop, but never mid-wobble
+    /* AND IT KEEPS RUNNING WHILE THE RISE IS IN FLIGHT. A still chart used
+       to stop the loop dead, which on a toggle nobody noticed and on an
+       animation means it freezes halfway up. */
+    if(!bodyMapWalk && !slapLive() && arouseSettled() && !bodyMap3D){ bodyMapRAF=0;
       drawBodyMap($('bodymap-cv'), bodyMapSubject, bodyMapView, bodyMapT); return; }
     bodyMapRAF=requestAnimationFrame(step);
     if(now-lastDraw < 33) return;            // 30fps is plenty for a walk cycle and half the work
+    arouseTick(now-lastDraw);                // and the rise runs on wall time too
+    if(bodyMap3D && bodyMapWalk) bodyMapYaw += (now-lastDraw)*0.00042;   // ⬔ and it turns
     slapJigTick((now-lastDraw)/16.7);        // the spring runs on wall time, not on the walk cycle
     lastDraw=now; bodyMapT=now;
     drawBodyMap($('bodymap-cv'), bodyMapSubject, bodyMapView, bodyMapT);
@@ -9899,6 +10322,38 @@ function openBodyMap(w,back){
   //      Selecting a view used to rebuild this whole row, which shoved every
   //      button sideways under the cursor — so the click after it landed on
   //      whatever had slid into that spot. Toggles now live on their own row
+  /* ---- ◐ THE RISINGS, AND WHY. The other ledger is a chart about one
+     number; the interesting column is what put it there, so the day's page
+     is printed under it: the figure, the reasons, and how the days average
+     out. It is his own page — a wife's chart does not carry it. ---- */
+  { const sr3=$('bodymap-secret');
+    if(w.self && !G.isFemale && ADULT && w.male){
+      const log=arouseLog(), why=arouseByWhy(7), st=arouseStanding(), per=arousePerDay();
+      const d=document.createElement('div'); d.className='shopcard';
+      d.style.borderColor = st.col;
+      d.innerHTML='<div style="color:'+st.col+';letter-spacing:1px"><b>◐ THE RISINGS</b>'
+        +' <span class="small muted">— today’s page, and what put it there</span>'
+        +'<span style="float:right;font-size:16px;color:'+st.col+'">'+arouseToday()+'</span></div>'
+        +'<div class="small" style="margin-top:3px;line-height:1.55">'+st.line+'</div>'
+        +(per? '<div class="small muted" style="margin-top:3px">Across the days the ledger still holds: '
+               +'<b style="color:#c9a4ef">'+per.toFixed(1)+'</b> a day, and <b>'+((G.aroAll|0))+'</b> all told.</div>' : '')
+        +(why.length
+          ? '<div style="display:grid;gap:3px;margin-top:5px">'
+            +why.map(r=>'<div class="small" style="display:flex;gap:7px;align-items:flex-start">'
+               +'<span style="flex:0 0 18px">'+r.w.icon+'</span>'
+               +'<span style="flex:0 0 26px;color:'+(r.n>2?'#ff8ad0':'#e8c34a')+'"><b>×'+r.n+'</b></span>'
+               +'<span style="flex:1"><b style="color:#c9a4ef">'+r.w.name+'</b> '
+               +'<span class="muted">— '+r.w.line+'</span></span></div>').join('')
+            +'</div>'
+            +'<div class="small muted" style="margin-top:4px;font-style:italic">Counted over the last seven days.</div>'
+          : '<div class="small muted" style="margin-top:4px">Nothing on the page in a week. '
+            +'The ledger is not worried about you; it simply has nothing to write.</div>')
+        +(log.length
+          ? '<div class="small muted" style="margin-top:5px">Today, most recent first: '
+            +log.slice(0,8).map(r=>(AROUSE_WHY[r.why]||{icon:'·'}).icon).join(' ')
+            +(log.length>8? ' …+'+(log.length-8) : '')+'</div>' : '');
+      sr3.appendChild(d);
+    } }
   //      and keep a fixed width, so nothing ever moves. ----
   /* THE SLAP, ON THE CHART. It belongs here as well as in the villa: the body
      map is where you are already looking at the part in question, and it means
@@ -9912,7 +10367,7 @@ function openBodyMap(w,back){
       bt.style.borderColor=cd?'#6a5a4a':'#e0a0b8'; bt.style.color=cd?'#8a7a6a':'#e0a0b8';
       const note=document.createElement('div'); note.className='small muted';
       note.innerHTML = cd
-        ? 'Three is the day’s ration. A fourth stops being a joke.'
+        ? slapCap()+' is the day’s ration in this house. Number '+(slapCap()+1)+' stops being a joke.'
         : 'Worth real bond when it lands well and costs real bond when it does not — '
           + 'and what comes back is entirely hers: <b>'+((G.slapsAll||0))+'</b> so far, '
           + '<b>'+(slapCap()-(G.slapDay===G.day?(G.slapCount||0):0))+'</b> left today.';
@@ -10031,9 +10486,16 @@ function openBodyMap(w,back){
       });
       const tg=document.createElement('button'); tg.className='btn sm'+(secretAroused?' gold':'');
       tg.style.minWidth='112px';                       // label swaps; the button must NOT resize
-      tg.textContent = secretAroused? '🔥 AROUSED' : '💤 AT REST';
+      tg.textContent = !arouseSettled()? (secretAroused? '🔥 RISING…' : '💤 SUBSIDING…')
+                     : (secretAroused? '🔥 AROUSED' : '💤 AT REST');
       tg.title='The extended reading. The ledger records both states — most of them do.';
-      tg.onclick=()=>{ secretAroused=!secretAroused; bmResetCache(); buildSub(); redraw(); try{sfx('ui');}catch(e){} };
+      tg.onclick=()=>{
+        /* the TARGET moves; the chart takes its own time getting there, and
+           the loop has to be running or it freezes halfway up */
+        if(!secretAroused) rouse('chart');
+        else secretAroused=false;
+        bmResetCache(); buildSub(); startBodyMapAnim();
+        try{sfx('ui');}catch(e){} };
       sv.appendChild(tg);
     }
     const wk=document.createElement('button'); wk.className='btn sm'+(bodyMapWalk?' gold':'');
@@ -10060,6 +10522,24 @@ function openBodyMap(w,back){
     rb.onclick=()=>{ SETTINGS.bluntBody=!SETTINGS.bluntBody; saveSettings();
       bmResetCache(); buildSub(); redraw(); try{sfx('ui');}catch(e){} };
     sv.appendChild(rb);
+    /* ⬔ AND THE THIRD ONE. FRONT, SIDE and BACK are three flat drawings of
+       one body; this is the body. It is off by default because the flat
+       chart is still the easier thing to read a measurement off. */
+    if(bodyMapView!=='secret' && bodyMapView!=='eyes' && bodyMapView!=='spouse'){
+      const d3=document.createElement('button'); d3.className='btn sm'+(bodyMap3D?' gold':'');
+      d3.style.minWidth='112px';
+      d3.textContent = bodyMap3D? '⬔ 3D' : '⬚ FLAT';
+      d3.title = '3D builds the same scores into a solid on a turntable and turns it — '
+               + 'a bust pushes forward and a rump pushes back, and a flat drawing cannot show you that. '
+               + 'WALKING turns it; STILL holds it at whichever of the three views you picked. '
+               + 'Remembered on this device.';
+      d3.onclick=()=>{ bodyMap3D=!bodyMap3D;
+        try{ SETTINGS.map3d=bodyMap3D; saveSettings(); }catch(e){}
+        bmResetCache(); buildSub();
+        if(bodyMap3D || bodyMapWalk) startBodyMapAnim(); else { stopBodyMapAnim(); redraw(); }
+        try{sfx('ui');}catch(e){} };
+      sv.appendChild(d3);
+    }
   };
   views.forEach(([id,label])=>{
     const bt=document.createElement('button'); bt.className='btn sm'; bt.textContent=label;
@@ -10073,7 +10553,7 @@ function openBodyMap(w,back){
   try{sfx('scroll');}catch(e){}
   bodyMapT=performance.now();
   redraw();
-  if(bodyMapWalk) startBodyMapAnim(); else stopBodyMapAnim();
+  if(bodyMapWalk || bodyMap3D) startBodyMapAnim(); else stopBodyMapAnim();
 }
 // preview the roll you just made, before you have a career at all
 function createPreviewMap(){
@@ -17501,6 +17981,12 @@ function openCheats(){
         G.letoutDay=-99; G.letoutCount=0;
         const st0=state; setTimeout(()=>{ if(state===st0){ openDomus();
           setTimeout(()=>{ try{ tryLetout(); }catch(e){} }, 80); } },120); }, true);
+    tb('◐ A DAY OF RISINGS','Writes one of every reason onto the ledger, so the other chart’s page has something on it.',
+      ()=>{ Object.keys(AROUSE_WHY).forEach(k=>{ if(k!=='cheat') rouse(k); });
+        secretAroused=false;
+        toast('◐ '+arouseToday()+' on today’s page, one of every reason. Open the SECRET GRAPH to read them.',5200); });
+    tb('◐ ROUSE HIM NOW','Sets the chart’s target and lets it climb — it takes about a second and it overshoots.',
+      ()=>{ rouse('cheat'); toast('◐ Rising. The chart takes its own time about it.',3000); });
     tb('◇ MAKE THE MEASURE IMMENSE','Sets the Length to the top of the human scale, so the urvaak has something to be about.',
       ()=>{ G.body=G.body||{}; G.body.secret=10; try{ syncPlayerLooks(); }catch(e){}
         toast('◇ '+SECRET_PART.tiers[4]+'. The room will not have to be told twice.',3600); });
@@ -24870,6 +25356,7 @@ function curioDue(){
 }
 function startCurio(){
   const D=DM; if(!D || !curioReady()) return false;
+  rouse('curio');                                   // ◐ and the ledger writes down why
   D.curio={ ph:'look', t:0, bend:0, bare:false, hard:false, sel:0, done:{},
             find:pick(RK_CURIO.finds), look:pick(RK_CURIO.look),
             bond:0, phys:0, locks:true, rub:0 };
@@ -25572,6 +26059,7 @@ function startClam(){
   const D=DM; if(!D || !clamReady()) return false;
   const w=G.wife, be=((w.body&&w.body.booty)||5);
   const mood=clamMood(), mad=(mood==='mad');
+  rouse('clam');                                    // ◐ she started it, and it is on the page
   D.clam={ ph:'call', t:0, pt:0, bend:0, locks:true, mood,
            grip: clamp((be-5)/6, 0, 1.15),
            need: clamPulses(mad), rode:0, flash:0, early:0,
@@ -27109,6 +27597,7 @@ function tryArdor(){
     if(!EX.excuse && loveLeft('quick')<=0) toast('◆ She has no excuse and does not look for one. '
       +'The day was already spent; the seat does not take that as an answer.', 4200); }
   if((G.hygiene|0)<25){ toast('“Bathe. Then come back and ask me that.”',2600); return; }
+  rouse('ardor');                                   // ◐ his own doing, deliberately
   D.ardor={ ph:'wind', t:0, heat:0, got:0, need:ardorNeed(), locks:true,
             stage:0, sel:0, spots:null, chose:null };
   try{ sfx('ui'); }catch(e){}
@@ -27602,6 +28091,7 @@ function startTempt(){
   const beat = rkBendBeat(G.wife);
   const invited = (beat==='invite') ? true : (Math.random() < 0.18);
   const prop = pick(TEMPT_PROPS);
+  rouse('tempt');                                   // ◐ the low shelf, and the ledger notes it
   D.tempt={ ph:'bend', t:0, k:0, x:D.wifeX, hits:0, hold:100, locks:false,
             invited, prop, beat, beatLine: beat? pick(RK_BEND_LINES[beat]) : null,
             shelf: D.wifeX + (D.wifeDir>0? 14 : -14) };
@@ -28281,6 +28771,7 @@ function updateRkReward(dt){
     try{ spendLove('quick'); }catch(e){}
     try{ saveQuiet(); }catch(e){}
     D.reward=null; D.wifePause=0; DM=null;
+    rouse('kanvek');                     // ◐ and the ledger has a column for this
     KANVEK_ONLY=true;                    // ✧ her gift, and only her gift
     startBedScene('fun','quick','bed');
     return;
@@ -28481,6 +28972,7 @@ function tryLetout(){
   if(G.letoutDay!==day){ G.letoutDay=day; G.letoutCount=0; }
   G.letoutCount=(G.letoutCount|0)+1;
   G.letoutAll=(G.letoutAll|0)+1;
+  rouse('urvaak');                                  // ◐ the air was not the only consideration
   D.letout={ ph:'out', t:0, locks:true, read:null, tier:letoutTier(), v:letoutMeasure() };
   D.wifePause=99999;
   try{ sfx('ui'); }catch(e){}
@@ -28703,6 +29195,7 @@ function doSlap(where){
       : ('That is '+_ord(_cap+1)+' today, against a house that takes '+_cap
          +'. She turns round with her whole face.')};
   G.slapCount=(G.slapCount||0)+1;
+  rouse('slap');                                    // ◐ it landed, and the room drew conclusions
   const v=slapVerdict();
   if(_fx.slap && _fx.slap!==1 && v.bond>0) v.bond=Math.round(v.bond*_fx.slap);
   G.wifeRel=clamp(G.wifeRel+v.bond,0,bondCeiling());
@@ -29119,6 +29612,7 @@ function startRomantic(atX, who){
   G.lastLoveDay=G.day;
   try{ sfx(v.k==='bad'||v.k==='cold'?'thud':'kiss'); }catch(e){}
   refreshStatbar(); saveQuiet();
+  rouse('bend');                                    // ◐ she bent, and that was that
   D.rslap={t:0, x:(atX===undefined? D.wifeX : atX), v, bender:(who==='self'?'self':'spouse')};
   D.wifePause=Math.max(D.wifePause||0, 300);
 }
@@ -34653,6 +35147,7 @@ function selvskarArrive(whyId, days){
       ((b[y.id]===undefined?5:b[y.id]) - (b[x.id]===undefined?5:b[x.id])));
     const S=(Math.random()<0.72)? rank[0] : pick(RK_SELV_SUBJ);
     const note=pick(W.notes).replace('{d}', String(Math.max(1,days|0)));
+    rouse('selvskar');                              // ◐ she sent it herself
     G.selv={ day:(G.day|0), why:whyId, subj:S.id, expr:S.expr, tag:S.tag,
              note, used:false, marks:0 };
     G.selvDay=(G.day|0);
@@ -48362,6 +48857,7 @@ function rkSivrakVerdict(){
 function rkSivrakWear(who){
   try{
     if(!G) return false;
+    rouse('sivrak');                                // ◐ an afternoon of southern leaf
     G.rkSivrak={who:who||'wife', day:G.day};
     G.rkSivrakDay=G.day;
     G.rkSivraksWorn=(G.rkSivraksWorn||0)+1;
@@ -52672,6 +53168,10 @@ window.__SS = {
   rkSivrakBuilt, rkSivrakToggle, sivrakBed, RK_SIVRAK_BED, KANVEK_ONLY_set:(v)=>{KANVEK_ONLY=!!v;},
   doSlap, slapCap, slapStanding, drawLetoutBack,
   HALL_BEATS, HALL_BEAT_NAMES, hallBusy, hallBusyWhy,
+  AROUSE_WHY, AROUSE_KEEP, arouseToday, arouseLog, arouseByWhy, arousePerDay, arouseStanding, rouse,
+  arouseTick, arouseSettled, get secretAroLv(){return secretAroLv;},
+  bodyRings, drawBody3D, get bodyMap3D(){return bodyMap3D;}, set3D:(v)=>{bodyMap3D=!!v;},
+  setYaw:(v)=>{bodyMapYaw=v;}, get bodyMapYaw(){return bodyMapYaw;},
   RK_REWARD, RK_REWARD_PLAIN, rkRewardCause, rkRewardClaim,
   rkRewardDue, startRkReward, updateRkReward, drawRkReward,
   RK_SEAT_MAX, rkHeldTitles, rkSeatWifeWhy, rkSeatWife, rkUnseatWife, openSeating,
