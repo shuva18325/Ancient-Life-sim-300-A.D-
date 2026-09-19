@@ -530,8 +530,12 @@
       <div id="bodymap-verdict" class="small" style="text-align:center"></div>
       <div id="bodymap-subject" class="row gap6" style="justify-content:center;align-items:center;flex-wrap:wrap"></div>
       <div id="bodymap-secret" class="col gap6" style="width:100%"></div>
-      <div id="bodymap-views" class="row gap6" style="justify-content:center;flex-wrap:nowrap;overflow-x:auto;min-height:30px;width:100%"></div>
-      <div id="bodymap-subviews" class="row gap6" style="justify-content:center;flex-wrap:nowrap;overflow-x:auto;min-height:30px;width:100%"></div>
+      <!-- THESE ROWS WRAP. They used to be nowrap+overflow-x, so on any narrow
+           panel the last buttons simply sat past the right edge with no scroll
+           bar to hint at it — the 3D switch was invisible for exactly that
+           reason, and nobody scrolls a row they cannot see is scrollable. -->
+      <div id="bodymap-views" class="row gap6" style="justify-content:center;flex-wrap:wrap;min-height:30px;width:100%"></div>
+      <div id="bodymap-subviews" class="row gap6" style="justify-content:center;flex-wrap:wrap;min-height:30px;width:100%"></div>
       <canvas id="bodymap-cv" width="460" height="300" style="position:static;width:min(96%,460px);height:auto;image-rendering:auto;border:2px solid var(--gold);border-radius:4px;cursor:pointer"></canvas>
       <div class="small muted" style="text-align:center">Pale pink is poorest · deep purple is finest. The chart never flatters.<br><span style="color:#c89af0">Click a part of the figure.</span></div>
       <div id="bodymap-parts" class="col gap6" style="width:100%"></div>
@@ -8485,9 +8489,17 @@ function drawBodyMap(cnv,w,view,tms){
       behind: {val:gvSeat,  tiers:['Flat','Plain','Firm','Heavy','Slab'],               label:'RUMP',   ends:['FLAT','SLAB']},
     };
     const SB=SUBS[secretSub]||SUBS.profile;
-    const val=SB.val, impS=val>=IMPOSSIBLE_V;
-    const tier= impS? 'IMPOSSIBLE' : SB.tiers[clamp(Math.floor((val-1)/2),0,SB.tiers.length-1)];
-    const col = impS? '#ff7ae0' : heatColor(val);
+    const val=SB.val;
+    /* ---- THE MEASURE THAT MOVES. The study grew when he rose and the RULE
+       underneath it did not — the run, the ▲ and the reading all sat on the
+       resting score, so the one part of the chart anybody actually watches
+       was frozen while the drawing changed. eff is the live measure, and it
+       is computed HERE so the rule can travel on it too. ---- */
+    const AROGAIN = {profile:2.2, girth:1.6, behind:0.9};
+    const eff = mix(val, Math.min(IMPOSSIBLE_V, val + (AROGAIN[secretSub]||2.2)));
+    const impS=eff>=IMPOSSIBLE_V;
+    const tier= impS? 'IMPOSSIBLE' : SB.tiers[clamp(Math.floor((eff-1)/2),0,SB.tiers.length-1)];
+    const col = impS? '#ff7ae0' : heatColor(eff);
     /* ---- THE RULE. A surveyor's rule with numerals, a coloured run up to the
        measure, and ROME'S AVERAGE pinned on it — a number with nothing to read
        it against is not a measurement, it is a boast. ---- */
@@ -8497,14 +8509,20 @@ function drawBodyMap(cnv,w,view,tms){
       c.strokeStyle='rgba(220,180,240,.16)'; c.lineWidth=1; c.strokeRect(cx-66.5,top-13.5,132,190); }
     c.strokeStyle='rgba(220,180,240,.35)'; c.lineWidth=1;
     c.beginPath(); c.moveTo(cx-52,top+128); c.lineTo(cx+52,top+128); c.stroke();
-    c.fillStyle=rgbA(col,0.30); c.fillRect(cx-52, top+125, (clamp(val,0,10)/10)*104, 3);   // the run made good
+    c.fillStyle=rgbA(col,0.30); c.fillRect(cx-52, top+125, (clamp(eff,0,10)/10)*104, 3);   // the run made good
     for(let i2=0;i2<=10;i2++){
       const gx2=cx-52+(i2/10)*104, big=(i2%2===0);
-      c.strokeStyle= i2<=val? heatColor(i2||1) : 'rgba(255,255,255,.18)';
+      c.strokeStyle= i2<=eff? heatColor(i2||1) : 'rgba(255,255,255,.18)';
       c.lineWidth= big?2:1; c.beginPath(); c.moveTo(gx2,top+128); c.lineTo(gx2,top+128-(big?9:5)); c.stroke();
-      if(big && i2){ c.font='6px Georgia,serif'; c.fillStyle= i2<=val?'rgba(240,220,250,.55)':'rgba(230,210,240,.26)';
+      if(big && i2){ c.font='6px Georgia,serif'; c.fillStyle= i2<=eff?'rgba(240,220,250,.55)':'rgba(230,210,240,.26)';
         c.textAlign='center'; c.fillText(String(i2), gx2, top+136); }
     }
+    /* WHERE IT STARTED, so the travel is visible as travel and not just as a
+       bigger number. A hollow pip stays behind at the resting measure. */
+    if(aro>0.06){ const rx2=cx-52+(clamp(val,0,10)/10)*104;
+      c.strokeStyle='rgba(255,255,255,'+(0.50*Math.min(1,aro)).toFixed(2)+')'; c.lineWidth=1;
+      c.beginPath(); c.arc(rx2, top+126.5, 2.4, 0, 7); c.stroke();
+      c.beginPath(); c.moveTo(rx2, top+121); c.lineTo(rx2, top+124); c.stroke(); }
     { const ax2=cx-52+(5/10)*104;                                       // where everyone else stands
       c.strokeStyle='rgba(255,255,255,.36)'; c.setLineDash([2,2]); c.lineWidth=1;
       c.beginPath(); c.moveTo(ax2,top+117); c.lineTo(ax2,top+128); c.stroke(); c.setLineDash([]);
@@ -8513,16 +8531,16 @@ function drawBodyMap(cnv,w,view,tms){
     c.font='bold 8px Georgia,serif'; c.fillStyle='rgba(230,210,240,.5)';
     c.textAlign='left';  c.fillText(SB.ends[0], cx-52, top+147);
     c.textAlign='right'; c.fillText(SB.ends[1], cx+52, top+147);
-    { const mx=clamp(cx-52+(val/10)*104, cx-40, cx+40);
-      c.textAlign='center'; c.fillStyle=col; c.fillText('▲ '+tier.toUpperCase(), mx, top+158);
-      if(val>5){ c.fillStyle='rgba(230,214,244,.40)'; c.font='italic 7px Georgia,serif';
-        c.fillText('+'+(val-5)+' over Rome’s common run', cx, top+168); }
-      else if(val<5){ c.fillStyle='rgba(230,214,244,.34)'; c.font='italic 7px Georgia,serif';
-        c.fillText((5-val)+' under Rome’s common run', cx, top+168); } }
+    { const mx=clamp(cx-52+(eff/10)*104, cx-40, cx+40);
+      c.textAlign='center'; c.fillStyle=readOn(col); c.fillText('▲ '+tier.toUpperCase(), mx, top+158);
+      const ov=eff-5, d1=(n)=>(Math.round(n*10)/10).toFixed(1);
+      if(ov>0.05){ c.fillStyle='rgba(230,214,244,.40)'; c.font='italic 7px Georgia,serif';
+        c.fillText('+'+d1(ov)+' over Rome’s common run', cx, top+168); }
+      else if(ov<-0.05){ c.fillStyle='rgba(230,214,244,.34)'; c.font='italic 7px Georgia,serif';
+        c.fillText(d1(-ov)+' under Rome’s common run', cx, top+168); } }
     // ---- THE STUDY ITSELF. A man's physics live here and nowhere else. ----
     const phys = anim * mix(5.0, 2.2) * Math.sin(ph*2);
     if(secretSub==='profile'){
-      const eff = mix(val, Math.min(IMPOSSIBLE_V, val+2.2));
       const len = mix(11, 18) + (eff/10)*mix(80, 96);
       const th  = mix(8.5, 11) + (eff/10)*mix(6, 8);
       const baseX=cx-52, baseY=top+87;
@@ -8575,7 +8593,6 @@ function drawBodyMap(cnv,w,view,tms){
                    +(anim?' · IN MOTION':''), baseX, baseY-th-14); }
     } else if(secretSub==='girth'){
       // HEAD-ON — the ring gauge. Foreshortened to nothing but its section.
-      const eff = mix(val, Math.min(IMPOSSIBLE_V, val+1.6));
       const R = 6 + (eff/10)*17;
       const ccx=cx, ccy=top+82 + phys*0.4;
       for(let r2=3;r2>=1;r2--){ c.strokeStyle='rgba(220,180,240,'+(0.10*r2)+')'; c.lineWidth=1;
@@ -8604,7 +8621,7 @@ function drawBodyMap(cnv,w,view,tms){
       c.fillText('◧ HEAD-ON · ACROSS', cx, top+56);
     } else {
       // BEHIND — the rump, as the chart measures every other rear on it
-      const eff=val, W3=11+(eff/10)*18, H3=7+(eff/10)*10;
+      const W3=11+(eff/10)*18, H3=7+(eff/10)*10;
       const bx=cx, by=top+82;
       const roll=anim*Math.sin(ph*2)*H3*0.10;
       c.fillStyle='rgba(0,0,0,.24)';                                          // it stands on something
@@ -8633,12 +8650,13 @@ function drawBodyMap(cnv,w,view,tms){
       c.fillText('◨ FROM BEHIND', cx, top+56);
     }
     // the reading, stacked with real clearance
-    c.textAlign='center'; c.fillStyle=col; c.font='bold 19px Georgia,serif';
+    c.textAlign='center'; c.fillStyle=readOn(col); c.font='bold 19px Georgia,serif';
     c.fillText(impS?'IMPOSSIBLE':tier.toUpperCase(), cx, top+2);
     c.fillStyle='#efe3c2'; c.font='bold 10px Georgia,serif';
     c.fillText(SB.label+' — '+(secretSub==='behind'?'as it stands'
                  :(!arouseSettled()? (secretAroused?'rising':'subsiding') : (ARO?'roused':'at rest')))
-      +', measured '+(impS?'beyond the rule':val+' of 10'), cx, top+18);
+      +', measured '+(impS? 'beyond the rule'
+         : (aro>0.03? (Math.round(eff*10)/10).toFixed(1) : String(val))+' of 10'), cx, top+18);
     c.fillStyle='rgba(230,210,240,.6)'; c.font='italic 9px Georgia,serif';
     { const ph2 = bmOnce('quote:'+secretSub+':'+val, ()=> impS? 'No rule in Rome is long enough.'
         : secretSub==='girth'? 'The ledger notes this one second, and underlines it.'
@@ -9311,6 +9329,19 @@ function lit2(rgb,k){ k=k===undefined?1.34:k;
 }
 function rgbA(rgb,a){ const t=rgbTriple(rgb); if(!t) return rgb;
   return `rgba(${t[0]},${t[1]},${t[2]},${a})`; }
+/* A HEAT COLOUR BRIGHT ENOUGH TO READ. The top of the scale is very nearly
+   black-purple, which is right for a filled mass on a pale plate and wrong
+   for a word on a dark one — and once the reading started climbing as he
+   rose, the heading climbed straight into the unreadable end of the ramp.
+   This lifts a colour toward white only as far as it has to. */
+function readOn(rgb, min){
+  const t=rgbTriple(rgb); if(!t) return rgb;
+  min = (min===undefined)? 0.52 : min;
+  const L=(t[0]*0.299+t[1]*0.587+t[2]*0.114)/255;
+  if(L>=min) return rgb;
+  const k=(min-L)/(1-L);
+  return `rgb(${Math.round(t[0]+(255-t[0])*k)},${Math.round(t[1]+(255-t[1])*k)},${Math.round(t[2]+(255-t[2])*k)})`;
+}
 // the readout down the right gutter, with each part's NAMED tier
 function drawMapReadout(c,w,W2,H2,GUT,gv,male){
   c.textAlign='left';
@@ -9495,7 +9526,10 @@ let bodyMapYaw=0.7;
 function arouseTick(ms){
   const want = secretAroused? 1 : 0;
   const dt = clamp((ms||16)/16.7, 0, 4);
-  const rate = (want>secretAroLv)? 0.085 : 0.030;      // up in ~a second, down in three
+  /* SLOW ENOUGH TO WATCH. At 0.085 the whole rise was over in a third of a
+     second — the level was doing everything it was told and the chart still
+     read as a cut, because nobody can see four hundred milliseconds. */
+  const rate = (want>secretAroLv)? 0.038 : 0.016;      // ~1.2s up, ~2.6s down
   const d = want - secretAroLv;
   secretAroLv += d * (1-Math.pow(1-rate, dt));
   if(Math.abs(d)<0.0015) secretAroLv=want;
@@ -9505,10 +9539,10 @@ function arouseTick(ms){
      stops running. A thing that is finished has to be able to say so. */
   if(want===1){
     if(!secretAroOver && secretAroLv>0.86){
-      secretAroLv=Math.min(1.06, secretAroLv + (1.06-secretAroLv)*0.10*dt);
+      secretAroLv=Math.min(1.06, secretAroLv + (1.06-secretAroLv)*0.055*dt);
       if(secretAroLv>1.03) secretAroOver=true;
     }
-    if(secretAroOver) secretAroLv += (1-secretAroLv)*0.055*dt;     // and it comes back down to full
+    if(secretAroOver) secretAroLv += (1-secretAroLv)*0.030*dt;     // and it comes back down to full
   } else {
     secretAroOver=false;
     if(secretAroLv<0.04) secretAroLv=Math.max(0, secretAroLv-0.004*dt);
@@ -10523,23 +10557,33 @@ function openBodyMap(w,back){
       bmResetCache(); buildSub(); redraw(); try{sfx('ui');}catch(e){} };
     sv.appendChild(rb);
     /* ⬔ AND THE THIRD ONE. FRONT, SIDE and BACK are three flat drawings of
-       one body; this is the body. It is off by default because the flat
-       chart is still the easier thing to read a measurement off. */
-    if(bodyMapView!=='secret' && bodyMapView!=='eyes' && bodyMapView!=='spouse'){
-      const d3=document.createElement('button'); d3.className='btn sm'+(bodyMap3D?' gold':'');
-      d3.style.minWidth='112px';
-      d3.textContent = bodyMap3D? '⬔ 3D' : '⬚ FLAT';
-      d3.title = '3D builds the same scores into a solid on a turntable and turns it — '
-               + 'a bust pushes forward and a rump pushes back, and a flat drawing cannot show you that. '
-               + 'WALKING turns it; STILL holds it at whichever of the three views you picked. '
-               + 'Remembered on this device.';
-      d3.onclick=()=>{ bodyMap3D=!bodyMap3D;
-        try{ SETTINGS.map3d=bodyMap3D; saveSettings(); }catch(e){}
-        bmResetCache(); buildSub();
-        if(bodyMap3D || bodyMapWalk) startBodyMapAnim(); else { stopBodyMapAnim(); redraw(); }
-        try{sfx('ui');}catch(e){} };
-      sv.appendChild(d3);
-    }
+       one body; this is the body.
+       IT HAS TO SAY 3D. When it was off it read "⬚ FLAT", which is a
+       description of what you are already looking at, not an offer — and it
+       was built only on front/side/back, so on the secret graph, which is
+       where anyone reading a measurement actually sits, there was no button
+       at all. It is on every view now, it always carries the word 3D, and
+       from a view that has no solid it takes you to the one that does. */
+    const solidView = (bodyMapView!=='secret' && bodyMapView!=='eyes' && bodyMapView!=='spouse');
+    const d3=document.createElement('button'); d3.className='btn sm'+(bodyMap3D&&solidView?' gold':'');
+    d3.style.minWidth='118px';
+    d3.style.borderColor = bodyMap3D? '#7fd4ff' : '#4d8fb0';
+    if(!(bodyMap3D&&solidView)) d3.style.color='#9fdcf5';
+    d3.textContent = !solidView ? '⬔ SEE IT IN 3D'
+                   : bodyMap3D  ? '⬔ 3D: ON' : '⬔ 3D: OFF';
+    d3.title = solidView
+      ? '3D builds the same scores into a solid on a turntable and turns it — a bust pushes '
+        + 'forward and a rump pushes back, and a flat drawing cannot show you that. WALKING turns '
+        + 'it; STILL holds it at whichever of the three views you picked. Remembered on this device.'
+      : 'The solid is built from FRONT, SIDE and BACK. This takes you there and switches it on.';
+    d3.onclick=()=>{
+      if(!solidView){ bodyMapView='front'; bodyMap3D=true; styleViews(); }
+      else bodyMap3D=!bodyMap3D;
+      try{ SETTINGS.map3d=bodyMap3D; saveSettings(); }catch(e){}
+      bmResetCache(); buildSub();
+      if(bodyMap3D || bodyMapWalk) startBodyMapAnim(); else { stopBodyMapAnim(); redraw(); }
+      redraw(); try{sfx('ui');}catch(e){} };
+    sv.appendChild(d3);
   };
   views.forEach(([id,label])=>{
     const bt=document.createElement('button'); bt.className='btn sm'; bt.textContent=label;
@@ -53121,6 +53165,7 @@ window.__SS = {
   openMirror, createPreviewMap, bodyMapSubjects, secretAllowed,
   setBodyMapView:(v)=>{ bodyMapView=v; }, get bodyMapView(){return bodyMapView;},
   setBodyMapWalk:(v)=>{ bodyMapWalk=v; }, get bodyMapSubject(){return bodyMapSubject;},
+  redrawBodyMap:()=>{ try{ drawBodyMap($('bodymap-cv'), bodyMapSubject, bodyMapView, bodyMapT); }catch(e){} },
   ARCHETYPES, ARCH_ORDER, BODY_PARTS, BODY_PARTS_M, IMPOSSIBLE_V,
   IMPOSSIBLE_CHANCE, SECRET_SELLERS, drawShadowPlayTest:drawShadowPlay, drawWifeFig, drawDomusPlayer,
   openCoup, coupDue, purpleRisk, makeCourt, ageBodies, ageOneBody, upkeepScore, spouseTierBonus, finishBed,

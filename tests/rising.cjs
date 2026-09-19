@@ -232,6 +232,90 @@ const ok=(name,cond,note)=>{ if(cond){pass++; console.log('  PASS  '+name+(note?
   ok('and the bust does not show through her back',
      R.noBustBehind===true, 'humps across the chest: front '+R.bustFront+' · back '+R.bustBack);
 
+  /* ◐ THE TWO THINGS A PERSON ACTUALLY REPORTED, and neither of them was a
+     thrown error. The switch existed and was labelled "⬚ FLAT" — a
+     description of what you are already looking at — and it was built only
+     on front/side/back, so on the secret graph, which is where anyone
+     reading a measurement sits, there was no button at all. And the rise
+     animated the DRAWING while the rule underneath it stayed nailed to the
+     resting score, so the part of the chart you watch never moved. */
+  console.log('\n=== ◐ AND YOU CAN SEE IT HAPPEN ===');
+  await setup();
+  R=await pg.evaluate(async()=>{
+    const S=window.__SS, G=S.G, o={};
+    S.set3D(false); S.setBodyMapWalk(false); S.setSecretSub('profile'); S.setSecretAroused(false);
+    S.openBodyMap({self:true, male:true, skin:'#caa06a', body:G.body, name:'Kaiq', looks:7}, 'villa');
+    await new Promise(r=>setTimeout(r,120));
+    const subs=()=>[...document.querySelectorAll('#bodymap-subviews button')].map(b=>b.textContent.trim());
+    const row =()=>{ const r=document.getElementById('bodymap-subviews');
+                     return {vis:r.clientWidth, content:r.scrollWidth}; };
+    o.frontSubs=subs(); o.frontRow=row();
+    /* it says 3D wherever you are, including the view that has no solid */
+    const secret=[...document.querySelectorAll('#bodymap-views button')].find(x=>/SECRET/.test(x.textContent));
+    secret.click(); await new Promise(r=>setTimeout(r,120));
+    o.secretSubs=subs(); o.secretRow=row();
+    o.saysThreeD = o.frontSubs.some(t=>/3D/.test(t)) && o.secretSubs.some(t=>/3D/.test(t));
+    o.noOverflow = o.frontRow.content<=o.frontRow.vis+1 && o.secretRow.content<=o.secretRow.vis+1;
+    /* and from the secret graph the switch takes you to a view that has one */
+    const d3=[...document.querySelectorAll('#bodymap-subviews button')].find(b=>/3D/.test(b.textContent));
+    if(d3){ d3.click(); await new Promise(r=>setTimeout(r,140));
+      o.tookYouThere = (S.bodyMap3D===true) && !/SECRET/.test(
+        (document.querySelector('#bodymap-views button.gold')||{textContent:''}).textContent);
+    } else o.tookYouThere='no switch on this view at all';
+    /* ---- back to the graph, and does the RULE move? ---- */
+    S.set3D(false); secret.click(); await new Promise(r=>setTimeout(r,120));
+    const cv=document.getElementById('bodymap-cv'), c=cv.getContext('2d');
+    const band=()=>c.getImageData(0,195,cv.width,36).data;      // the rule, the ticks and the ▲
+    /* THE RUN MADE GOOD, measured as a width. Diffing the band is not enough:
+       the bar's COLOUR tracks the measure too, so a bar pinned to the resting
+       score still repaints and still looks like movement. Its right-hand edge
+       is the thing that has to travel. */
+    const barEdge=()=>{ const row=c.getImageData(0,208,cv.width,1).data;
+      /* the bar is chopped into segments by the tick strokes drawn over it, so
+         this walks the runs and takes the right edge of the last SUBSTANTIAL
+         one — a lone stray pixel further out on the plate is not the bar, and
+         taking the last hit of any size found one at 256 in every render and
+         reported the bar as never moving. */
+      const runs=[]; let on=false, x0=0;
+      for(let x=0;x<=250;x++){ const i=x*4;
+        const r=row[i], g=row[i+1], b=row[i+2];
+        const hit = (x<250) && b>r+8 && b>60 && (r+g+b)>90;   // the purple run, not the grey plate
+        if(hit&&!on){ on=true; x0=x; } else if(!hit&&on){ on=false; if(x-x0>=3) runs.push(x); }
+      }
+      return runs.length? runs[runs.length-1] : -1; };
+    const settle=async()=>{ for(let i=0;i<400 && !S.arouseSettled();i++){ S.arouseTick(33);
+                              await new Promise(r=>setTimeout(r,0)); }
+                            S.redrawBodyMap(); };
+    S.setSecretAroused(false); await settle();
+    const rest=Uint8ClampedArray.from(band()); o.restEdge=barEdge();
+    S.setSecretAroused(true);  await settle();
+    const up=band(); o.upEdge=barEdge();
+    let diff=0; for(let i=0;i<up.length;i+=4) if(Math.abs(up[i]-rest[i])>12 ||
+                                                  Math.abs(up[i+2]-rest[i+2])>12) diff++;
+    o.ruleRepainted=diff;
+    o.ruleMoved = o.upEdge > o.restEdge + 6;
+    /* and it is a TRAVEL, not a jump: intermediate levels are their own pictures */
+    S.setSecretAroused(false); await settle();
+    S.setSecretAroused(true);
+    const seen={};
+    for(let i=0;i<40;i++){ S.arouseTick(33); S.redrawBodyMap();
+      const D=band(); let h=2166136261;
+      for(let k=0;k<D.length;k+=4) h=(Math.imul(h^D[k],16777619)^D[k+2])>>>0;
+      seen[h]=1; }
+    o.stages=Object.keys(seen).length;
+    return o;
+  });
+  ok('the switch says 3D wherever you are standing', R.saysThreeD===true,
+     R.secretSubs.join(' | '));
+  ok('and no button sits off the end of the row',    R.noOverflow===true,
+     'front '+R.frontRow.content+'/'+R.frontRow.vis+'px · secret '+R.secretRow.content+'/'+R.secretRow.vis+'px');
+  ok('from the secret graph it takes you to a view that has a solid',
+     R.tookYouThere===true, R.tookYouThere===true? '' : String(R.tookYouThere));
+  ok('THE RULE MOVES, not just the drawing',        R.ruleMoved===true,
+     'the run ends at '+R.restEdge+'px at rest and '+R.upEdge+'px roused ('
+     +R.ruleRepainted+' px of the band repainted)');
+  ok('and it travels through it rather than cutting', R.stages>=8, R.stages+' distinct stages in 40 frames');
+
   console.log('\n--- PAGE ERRORS ---');
   ok('none', errs.length===0, errs.join(' | '));
 
