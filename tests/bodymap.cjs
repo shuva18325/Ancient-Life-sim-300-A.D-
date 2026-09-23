@@ -142,15 +142,22 @@ const ok=(name,cond,note)=>{ if(cond){pass++; console.log('  PASS  '+name+(note?
     o.hip=P.hipR; o.sh=P.shoulder; o.notHourglass = P.hipR < P.shoulder*0.80;
     const cv=document.createElement('canvas'); cv.width=260; cv.height=380; const c=cv.getContext('2d');
     const shot=(yaw,opts)=>{ c.clearRect(0,0,260,380); S.drawBody3D(c, window.__me, 130, 350, 3.9, yaw, Object.assign({plate:false,compass:false},opts)); return c.getImageData(0,0,260,380).data; };
-    const dif=(A,B)=>{ let n=0; for(let i=0;i<A.length;i+=4) if(Math.abs(A[i]-B[i])+Math.abs(A[i+1]-B[i+1])+Math.abs(A[i+2]-B[i+2])+Math.abs(A[i+3]-B[i+3])>40) n++; return n; };
-    o.side = dif(shot(Math.PI/2,{aro:1}), shot(Math.PI/2,{aro:1,len:false}));
-    o.back = dif(shot(Math.PI,{aro:0}),   shot(Math.PI,{aro:0,len:false}));
+    const dif=(A,B)=>{ let n=0, y0=1e9; for(let i=0;i<A.length;i+=4) if(Math.abs(A[i]-B[i])+Math.abs(A[i+1]-B[i+1])+Math.abs(A[i+2]-B[i+2])+Math.abs(A[i+3]-B[i+3])>40){ n++; y0=Math.min(y0,(i/4/260)|0); } return {n, y0}; };
+    o.side = dif(shot(Math.PI/2,{aro:1}), shot(Math.PI/2,{aro:1,len:false})).n;
+    const rest=dif(shot(Math.PI/2,{aro:0}), shot(Math.PI/2,{aro:0,len:false}));
+    const back=dif(shot(Math.PI,{aro:0}),   shot(Math.PI,{aro:0,len:false}));
+    o.back=back.n; o.backTop=back.y0; o.root=rest.y0; o.restN=rest.n;
     return o;
   });
   ok('a man’s solid is not an hourglass — his hips are not built off his shoulders', R.notHourglass===true,
      'hips '+R.hip.toFixed(1)+' · shoulders '+R.sh.toFixed(1));
   ok('his length is on the solid, standing out in profile', R.side>60, R.side+' px of it');
-  ok('and from behind the body is in front of it', R.back<15, R.back+' px show through');
+  /* From behind, a long man's tip hangs below the crotch and shows between
+     his thighs — that is right. What must not show is the root or the shaft
+     painted over his seat: the body has to be in front of all of that. */
+  ok('and from behind the body is in front of it — only the hanging tip shows, below the seat',
+     R.back===0 || (R.backTop > R.root+12 && R.back < R.restN*0.35),
+     R.back+' px show · from row '+R.backTop+' (root at '+R.root+')');
 
   console.log('\n=== 🔥 GET HARD, WHEREVER HE CAN SHOW IT ===');
   R=await pg.evaluate(async()=>{
