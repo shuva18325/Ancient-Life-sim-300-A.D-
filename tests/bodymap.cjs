@@ -53,7 +53,9 @@ const ok=(name,cond,note)=>{ if(cond){pass++; console.log('  PASS  '+name+(note?
   });
   ok('every rank has its own name for when he is hard', R.long===true, R.names.join(' · '));
   ok('and girth has its own; the rump does not rise at all', R.girth===true && R.rump===true);
-  ok('the length in digits climbs — the rank never does', R.dig[1] > R.dig[0]*1.35,
+  /* by at least a quarter — a big man hangs heavier than an ordinary one and
+     climbs by less of himself, but he always climbs */
+  ok('the length in digits climbs — the rank never does', R.dig[1] > R.dig[0]*1.25,
      R.dig.map(d=>d.toFixed(1)).join(' → ')+' digiti');
   ok('the rise has an order: it swells first, lifts second, flushes last', R.staged===true);
 

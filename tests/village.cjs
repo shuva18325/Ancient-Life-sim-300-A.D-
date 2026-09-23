@@ -1,8 +1,8 @@
 /* 🗣 THE VILLAGE, THE MEASURE, THE BEND AND THE COAST'S OWN CUT
    ---------------------------------------------------------------------
    Everything a player sent back from the last round, as checks:
-     · "impossible should be like 10-13 inches" — his length is sized in
-       real inches, per man, and IMPOSSIBLE is 10–13;
+     · "impossible should be like 10-13 inches", and then "still too short" —
+       his length is sized in real inches, per man, and IMPOSSIBLE is 14–18;
      · the front view shrank him to a stub when he got hard;
      · "he might be smiling because he is hard";
      · "wife satisfiers … booty destroyer" — the village names him, and now
@@ -53,7 +53,7 @@ const ok=(name,cond,note)=>{ if(cond){pass++; console.log('  PASS  '+name+(note?
     o.differ=new Set(['Aqal','Torvak','Kraun','Leok'].map(n=>S.lengthInches(man(n,8),1).hard.toFixed(2))).size>1;
     o.rest=S.lengthInches(man('Aqal',11),0).now < S.lengthInches(man('Aqal',11),1).now;
     return o; });
-  ok('IMPOSSIBLE is 10–13 inches hard, for every man', !R.err && R.imp.every(x=>x>=10 && x<=13), R.err||R.imp.map(x=>x.toFixed(1)).join(' '));
+  ok('IMPOSSIBLE is 14–18 inches hard, for every man', !R.err && R.imp.every(x=>x>=14 && x<=18), R.err||R.imp.map(x=>x.toFixed(1)).join(' '));
   ok('an ordinary rank-5 man is an ordinary 5.9–6.4 in', !R.err && R.five>=5.9 && R.five<=6.4, R.err||R.five.toFixed(2));
   ok('the same man measures the same every time', R.same===true);
   ok('and two men of one rank are not identical', R.differ===true);
@@ -85,13 +85,25 @@ const ok=(name,cond,note)=>{ if(cond){pass++; console.log('  PASS  '+name+(note?
       S.drawRealFig(c,him,'front',undefined,{showLen:false,aro}); c.restore();
       return c.getImageData(40,70,120,60).data; };
     const out={};
-    for(const world of ['rk','rome']){ G.world=world; const a=face(0), b=face(1); let n=0;
-      for(let i=0;i<a.length;i+=4) if(Math.abs(a[i]-b[i])+Math.abs(a[i+1]-b[i+1])+Math.abs(a[i+2]-b[i+2])>36) n++;
-      out[world]=n; }
+    const dif=(a,b)=>{ let n=0; for(let i=0;i<a.length;i+=4) if(Math.abs(a[i]-b[i])+Math.abs(a[i+1]-b[i+1])+Math.abs(a[i+2]-b[i+2])>36) n++; return n; };
+    const force=(f)=>{ if('HARD_FACE_FORCE' in S) S.HARD_FACE_FORCE=f; };
+    force('grin');     G.world='rk';   out.rk=dif(face(0), face(1));
+    force('sheepish'); G.world='rome'; out.rome=dif(face(0), face(1));
+    force('stoic');    out.stoic=dif(face(0), face(1));
+    /* NOT ALWAYS A SMILE: roll forty rises and count the faces */
+    force('auto'); G.world='rk'; const seen={}, pub={};
+    if(S.hardFace){ for(let i=0;i<200;i++){ S.HARD_ROLL=i; if(i<40) seen[S.hardFace(him,'chart').id]=1; pub[S.hardFace(him,'public').id]=(pub[S.hardFace(him,'public').id]||0)+1; } }
+    out.kinds=Object.keys(seen); out.pubGrin=(pub.grin||0); out.pubQuiet=(pub.sheepish||0)+(pub.stoic||0);
+    /* and it holds for the length of one rise */
+    if(S.hardFace){ S.HARD_ROLL=7; const a1=S.hardFace(him,'chart').id, a2=S.hardFace(him,'chart').id; out.stable=(a1===a2); }
     G.world='rk';
     return out; });
-  ok('hard, his mouth turns up — the face changes round the mouth', !R.err && R.rk>150, R.err||(R.rk+' px'));
-  ok('and in Rome too (a sheepish one, colour in the cheeks)', !R.err && R.rome>150, R.err||(R.rome+' px'));
+  ok('picked GRINNING, his mouth turns up and the teeth show', !R.err && R.rk>150, R.err||(R.rk+' px'));
+  ok('picked SHEEPISH, a small smile and the colour comes up', !R.err && R.rome>120, R.err||(R.rome+' px'));
+  ok('picked STRAIGHT-FACED, hard and it barely moves his face', !R.err && R.stoic < R.rk*0.35, R.err||(R.stoic+' px'));
+  ok('left on AUTO he does NOT always smile — forty rises, at least four different faces', !R.err && (R.kinds||[]).length>=4, R.err||(R.kinds||[]).join(','));
+  ok('in PUBLIC EYES he grins rarely and mostly keeps it quiet', !R.err && R.pubGrin<=24 && R.pubQuiet>=100, R.err||('grin '+R.pubGrin+' · straight-faced or sheepish '+R.pubQuiet+' of 200'));
+  ok('and one rise is one face — it does not flicker', R.stable===true);
 
   console.log('\n=== 🗣 WHAT THE VILLAGE CALLS THEM ===');
   R=await T(()=>{
