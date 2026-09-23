@@ -262,44 +262,43 @@ const ok=(name,cond,note)=>{ if(cond){pass++; console.log('  PASS  '+name+(note?
       o.tookYouThere = (S.bodyMap3D===true) && !/SECRET/.test(
         (document.querySelector('#bodymap-views button.gold')||{textContent:''}).textContent);
     } else o.tookYouThere='no switch on this view at all';
-    /* ---- back to the graph, and does the RULE move? ---- */
+    /* ---- back to the graph. THE RULE CHANGED, and so does this check.
+       The last version of this chart moved the rank when he rose — which a
+       player then reported as breaking the scale: a LONG walked up into
+       IMMENSE and read 10.2 of 10. The contract now is the other way round:
+       the RANK HOLDS, and the RISE GAUGE is the thing that fills. ---- */
     S.set3D(false); secret.click(); await new Promise(r=>setTimeout(r,120));
     const cv=document.getElementById('bodymap-cv'), c=cv.getContext('2d');
-    const band=()=>c.getImageData(0,195,cv.width,36).data;      // the rule, the ticks and the ▲
-    /* THE RUN MADE GOOD, measured as a width. Diffing the band is not enough:
-       the bar's COLOUR tracks the measure too, so a bar pinned to the resting
-       score still repaints and still looks like movement. Its right-hand edge
-       is the thing that has to travel. */
-    const barEdge=()=>{ const row=c.getImageData(0,208,cv.width,1).data;
-      /* the bar is chopped into segments by the tick strokes drawn over it, so
-         this walks the runs and takes the right edge of the last SUBSTANTIAL
-         one — a lone stray pixel further out on the plate is not the bar, and
-         taking the last hit of any size found one at 256 in every render and
-         reported the bar as never moving. */
+    // the plate is drawn at K=1.15 about (155,44): the run sits at RY-3..RY, RY=top+157
+    const RUNROW=Math.round(44+(157-1.5)*1.15), GAUGEROW=Math.round(44+48*1.15);
+    const barEdge=()=>{ const row=c.getImageData(0,RUNROW,cv.width,1).data;
+      /* chopped into segments by the tick strokes drawn over it, so this takes
+         the right edge of the last SUBSTANTIAL run, not the last stray pixel */
       const runs=[]; let on=false, x0=0;
       for(let x=0;x<=250;x++){ const i=x*4;
         const r=row[i], g=row[i+1], b=row[i+2];
-        const hit = (x<250) && b>r+8 && b>60 && (r+g+b)>90;   // the purple run, not the grey plate
+        const hit = (x<250) && (r+g+b)>150 && (r>g+20 || b>g+20);   // the heat-coloured run, not the grey plate
         if(hit&&!on){ on=true; x0=x; } else if(!hit&&on){ on=false; if(x-x0>=3) runs.push(x); }
       }
       return runs.length? runs[runs.length-1] : -1; };
+    const gaugeFill=()=>{ const row=c.getImageData(90,GAUGEROW,130,1).data; let n=0;
+      for(let i=0;i<row.length;i+=4) if(row[i]>150 && row[i+2]>100 && row[i+1]<150 && row[i]>row[i+1]+50) n++;
+      return n; };
     const settle=async()=>{ for(let i=0;i<400 && !S.arouseSettled();i++){ S.arouseTick(33);
                               await new Promise(r=>setTimeout(r,0)); }
                             S.redrawBodyMap(); };
     S.setSecretAroused(false); await settle();
-    const rest=Uint8ClampedArray.from(band()); o.restEdge=barEdge();
+    o.restEdge=barEdge(); o.restGauge=gaugeFill();
     S.setSecretAroused(true);  await settle();
-    const up=band(); o.upEdge=barEdge();
-    let diff=0; for(let i=0;i<up.length;i+=4) if(Math.abs(up[i]-rest[i])>12 ||
-                                                  Math.abs(up[i+2]-rest[i+2])>12) diff++;
-    o.ruleRepainted=diff;
-    o.ruleMoved = o.upEdge > o.restEdge + 6;
+    o.upEdge=barEdge(); o.upGauge=gaugeFill();
+    o.rankHolds = o.restEdge>0 && o.restEdge===o.upEdge;
+    o.gaugeFills = o.upGauge > o.restGauge + 60;
     /* and it is a TRAVEL, not a jump: intermediate levels are their own pictures */
     S.setSecretAroused(false); await settle();
     S.setSecretAroused(true);
     const seen={};
     for(let i=0;i<40;i++){ S.arouseTick(33); S.redrawBodyMap();
-      const D=band(); let h=2166136261;
+      const D=c.getImageData(0,GAUGEROW-6,cv.width,12).data; let h=2166136261;
       for(let k=0;k<D.length;k+=4) h=(Math.imul(h^D[k],16777619)^D[k+2])>>>0;
       seen[h]=1; }
     o.stages=Object.keys(seen).length;
@@ -311,9 +310,10 @@ const ok=(name,cond,note)=>{ if(cond){pass++; console.log('  PASS  '+name+(note?
      'front '+R.frontRow.content+'/'+R.frontRow.vis+'px · secret '+R.secretRow.content+'/'+R.secretRow.vis+'px');
   ok('from the secret graph it takes you to a view that has a solid',
      R.tookYouThere===true, R.tookYouThere===true? '' : String(R.tookYouThere));
-  ok('THE RULE MOVES, not just the drawing',        R.ruleMoved===true,
-     'the run ends at '+R.restEdge+'px at rest and '+R.upEdge+'px roused ('
-     +R.ruleRepainted+' px of the band repainted)');
+  ok('THE RANK HOLDS when he rises — the rule does not walk him up a tier', R.rankHolds===true,
+     'the run ends at '+R.restEdge+'px at rest and '+R.upEdge+'px hard');
+  ok('and the RISE gauge is what fills',            R.gaugeFills===true,
+     R.restGauge+' px of gauge at rest · '+R.upGauge+' px hard');
   ok('and it travels through it rather than cutting', R.stages>=8, R.stages+' distinct stages in 40 frames');
 
   console.log('\n--- PAGE ERRORS ---');

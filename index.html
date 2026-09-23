@@ -7426,75 +7426,81 @@ function bondCeiling(){ return hasBane('hollow')? 45 : 100; }
    things move where the tunic had one.
    ===================================================================== */
 function drawKiltLift(x, y, w, stage, T, dir, decent){
-  if(decent) stage=Math.min(stage, RISE_STAGES-2);
+  const TOPS=RISE_STAGES-1;
+  if(decent) stage=Math.min(stage, TOPS-1);
   const B=(w&&w.body)||{}, gv=(id,d)=>B[id]===undefined?d:B[id];
-  const len=gv('secret',5), lg=gv('legs',6);
-  const skin=w.skin||'#c08a5e';
+  const len=gv('secret',5), sh=gv('booty',6), mid=gv('waist',6);
+  const skin=hexOf(w.skin||'#c08a5e');
   /* AND IF HE IS IN A SIVRAK IT IS NOT HIDE AT ALL. Same brief as hers,
-     read off HIS ledger: the leaves go where the best of him is, and on
-     this coast that is stated rather than implied. The panel is then a
-     course of leaf on a cord, which is stiffer than a tunic and looser
-     than a kilt and moves like neither. */
+     read off HIS ledger: leaf on a cord, stiffer than a tunic and looser
+     than a kilt, and it moves like neither. */
   const SVK = (typeof rkSivrakOn==='function') && rkSivrakOn('self');
-  const hideC = SVK? '#4a7a34' : mixHex(w.dress||w.tunic||'#6a4a2e','#4a3826',0.45);
-  const hideHi=mixHex(hideC,'#ffffff',0.26), hideSh=mixHex(hideC,'#120a06',0.44);
-  const band= SVK? '#6a5a2a'
-            : ((typeof rkOfficeBand==='function')? rkOfficeBand(G&&G.wife) : '#8a6a3a');
-  const bandHi=mixHex(band,'#ffffff',0.34), bandSh=mixHex(band,'#120a06',0.40);
-  const legLen=Math.round(15+lg*0.62), hipY=y-18-legLen+11;
-  const k=clamp(stage/(RISE_STAGES-1),0,1);
-  const bare=stage>=RISE_STAGES-1;
+  const T0  = hexOf(w.dress||w.tunic||'#6a4a2e');
+  const hideC = SVK? '#4a7a34' : mixHex(T0,'#a07a4c',0.55);
+  const hideHi=mixHex(hideC,'#ffffff',0.30), hideSh=mixHex(hideC,'#120a06',0.44);
+  const band= SVK? '#6a5a2a' : ((typeof rkOfficeBand==='function')? rkOfficeBand(G&&G.wife) : '#8a6a3a');
+  const bandHi=mixHex(hexOf(band),'#ffffff',0.34), bandSh=mixHex(hexOf(band),'#120a06',0.40);
   const P=(a,b2,ww,h,c2)=>{ ctx.fillStyle=c2;
     const ax = dir>0? (x+a) : (x-a-ww);
-    ctx.fillRect(Math.round(ax),Math.round(b2),Math.round(ww),Math.round(h)); };
-  /* ---- THE PANEL, hinged at the belt and swung out as ONE stiff piece.
-     It does not taper the way a tent does, because hide does not. ---- */
-  const swing=Math.max(2, Math.round((3.0+len*0.86)*k));      // how far the front kicks out
-  const panelH=Math.max(4, Math.round(7+len*0.30));           // and how deep the panel is
-  const lift=Math.round(swing*0.55);
-  for(let i=0;i<swing;i++){
-    const t2=i/Math.max(1,swing-1);
-    const yy=hipY-Math.round(t2*lift);
-    P(1+i, yy+panelH-Math.round(t2*2), 1, 2, hideSh);         // its own shadow on the thigh
-    P(1+i, yy, 1, panelH-Math.round(t2*2), bare? skin : hideC);
-    P(1+i, yy, 1, 1, bare? mixHex(skin,'#ffffff',0.24) : hideHi);
-    /* leaf, not hide: a midrib every third column, which is all it takes
-       for the eye to stop reading a panel and start reading foliage */
-    if(SVK && !bare && (i%3===1)) P(1+i, yy+1, 1, Math.max(1,panelH-4), hideSh);
+    ctx.fillRect(Math.round(ax),Math.round(y+b2),Math.round(ww),Math.round(h)); };
+  /* WHERE HIS KILT ACTUALLY IS — the same numbers drawOutfitM hangs it by:
+     belted his cut's rise above the hem line, falling his cut's length. */
+  const K=(typeof rkCutM==='function')? rkCutM(w) : {rise:4,len:12};
+  const HEM=-24, beltY=HEM-(K.rise||4), kTop=beltY+3, KLEN=Math.max(8,(K.len||12)+3), kBot=kTop+KLEN;
+  const shW=Math.round(8+sh*0.62), waistHalf=Math.round(4+(10-mid)*0.62);
+  const kw=Math.round(shW+(waistHalf-shW)*0.86);
+  const pw=Math.max(3, Math.round(kw*0.55));        // the front panel, hinged at the belt
+  const kk=clamp(stage/(TOPS-1),0,1), bare=stage>=TOPS-0.02;
+  /* ---- THE PANEL SWINGS UP TOWARD YOU. Seen from the front that is a
+     panel whose hem RISES and whose face tips into the light, and under it,
+     in shadow, what is lifting it. At the last stage it has gone past
+     level and all that shows of it is its underside at the belt. ---- */
+  const th = bare? 2.25 : kk*1.15;
+  const cth = Math.cos(th), panelH=kBot-kTop;
+  const hv = Math.round(panelH*cth);
+  // what the panel was covering: shadow high up under it, thigh further down
+  const gapTop = kTop + Math.max(0,hv);
+  for(let yy=gapTop; yy<kBot; yy++){ const t=(yy-gapTop)/Math.max(1,kBot-gapTop);
+    P(-pw, yy, pw*2, 1, t<0.35? mixHex(skin,'#1a0a06',0.55) : mixHex(skin,'#1a0a06',0.22*(1-t)));
+    P(-1, yy, 2, 1, mixHex(skin,'#1a0a06',0.45)); }                                // between the thighs
+  if(hv>0){
+    // the panel's face, tipped toward the light — brighter the further it has come up
+    /* coming toward you, its hem is nearer than its hinge — so it widens
+       row by row down to the edge, which is what makes it read as lifting
+       rather than as a lighter patch sewn on */
+    let ew=pw;
+    for(let yy=kTop; yy<kTop+hv; yy++){ const t=(yy-kTop)/Math.max(1,hv); ew=pw+Math.round(t*kk*2.2);
+      P(-ew, yy, ew*2, 1, mixHex(hideC, hideHi, 0.20+0.55*kk*(1-t)));
+      P(-ew, yy, 1, 1, hideHi); P(ew-1, yy, 1, 1, hideSh);
+      if(SVK && (yy%3===0)) P(-ew+1, yy, ew*2-2, 1, hideSh); }                     // leaf, in courses
+    P(-ew, kTop+hv, ew*2, 2, hideSh); P(-ew, kTop+hv, ew*2, 1, mixHex(hideSh,'#ffffff',0.10));  // its edge, thick
+    P(-ew, kTop+hv+2, ew*2, 1, mixHex(skin,'#1a0a06',0.65));                        // casting its shadow
+  } else {
+    const uh=Math.max(1,Math.round(-hv*0.45));                                      // flipped up: the underside
+    P(-pw, kTop-uh, pw*2, uh, hideSh); P(-pw, kTop-uh, pw*2, 1, mixHex(hideSh,'#ffffff',0.12));
   }
-  if(SVK && !bare){                                            // and one broad leaf hung over the front
-    const F=(typeof rkSivrakFrame==='function')? rkSivrakFrame({body:B, male:true}) : null;
-    const big=(F && (F.part==='secret'||F.hang))? 1.5 : 1.0;
-    sivrakLeaf((a,b2,ww,h2,c2)=>P(a, b2, ww, h2, c2),
-      Math.round(1+swing*0.5), hipY-1, Math.max(4,Math.round((4+len*0.30)*big)),
-      Math.max(6,Math.round((7+len*0.42)*big)), '#3f6c2c', '#7cb050', '#243f1a');
+  if(!bare && kk>0.25){
+    /* what is lifting it, in the shadow under the edge: dark, rounded, and
+       plainly the reason the panel is where it is */
+    const n=Math.round(2+kk*4), sy=kTop+Math.max(0,hv)+2;
+    for(let i=0;i<n;i++){ const hw=Math.max(1, Math.round(2.0-i*0.20));
+      P(Math.round(i*0.35)-hw+1, sy+i, hw*2, 1, mixHex(skin,'#1a0a06',0.28));
+      P(Math.round(i*0.35)-hw+1, sy+i, 1, 1, mixHex(skin,'#ffffff',0.10)); }
+    P(-1, sy+n, 4, 2, mixHex(skin,'#1a0a06',0.40));                                // and what hangs under it
   }
-  const tipY=hipY-lift;
-  if(bare){
-    const th=Math.max(2,Math.round(2.0+len*0.22));
-    P(1+swing, tipY-1, th, th+1, mixHex(skin,'#c07a68',0.42));
-    P(1+swing, tipY-1, th, 1,    mixHex(skin,'#ffffff',0.28));
-  } else if(stage>=2){
-    P(1+swing, tipY, 2, Math.max(2,panelH-3), hideSh);        // the stiff edge of the hide, standing proud
-    P(1+swing, tipY, 2, 1, hideHi);
-  }
+  if(bare) pxLengthUp(P, len, 1, skin, HEM+1, T);
   /* ---- THE BELT TAKES THE STRAIN, and on this coast the belt is the part
      everybody can read, because it carries the house's Mastery. ---- */
-  { const bw2=Math.round(7+k*3);
-    P(-3, hipY-3, bw2, 4, band);
-    P(-3, hipY-3, bw2, 1, bandHi);
-    P(-3, hipY,   bw2, 1, bandSh);
-    for(let q=0;q<bw2;q+=3) P(-3+q, hipY-2, 1, 2, bandHi);    // the bead courses
-    if(stage>=2){ P(-3+bw2-1, hipY-4, 2, 6, bandSh);          // it pulls up at the near end
-                  P(-3+bw2-1, hipY-4, 2, 1, bandHi); } }
+  if(stage>=1.5){ P(-3, beltY+2, 7, 1, bandSh); P(-2, beltY+3, 5, 1, bandSh);       // it dips where it is pulled
+                  P(-2, beltY+2, 5, 1, bandHi); }
   /* ---- AND HE IS NOT EMBARRASSED. Kan holds appetite, the Mastery of it
      takes a fee, and the coast treats the whole subject as a matter of
      record. No sweat bead, no looking away — he is simply not hiding it,
      which visitors find the single most disorienting thing here. ---- */
   if(stage>=2 && ((T|0)%44)<22){ ctx.textAlign='center';
-    pixelText('◆', x-9*dir, hipY-26, 'rgba(255,180,220,.72)', 0.85); ctx.textAlign='left'; }
+    pixelText('◆', x-9*dir, y-44, 'rgba(255,180,220,.72)', 0.85); ctx.textAlign='left'; }
   if(stage>=3 && ((T|0)%34)<18){ ctx.textAlign='center';
-    pixelText('KAN', x+13*dir, hipY-30, 'rgba(255,214,190,.62)', 0.62); ctx.textAlign='left'; }
+    pixelText('KAN', x+13*dir, y-48, 'rgba(255,214,190,.62)', 0.62); ctx.textAlign='left'; }
 }
 /* Quirks do NOT follow quality — that is the point of them. A flawless
    senator's daughter is exactly as likely to be insatiable, or to check
@@ -8153,174 +8159,685 @@ function chartLandmarks(w){
     legW  : 2.2 + lg*0.16,
     headW : 4.6 + fa*0.16 };
 }
-function drawChartFig(c, w, view, ph){
+/* =====================================================================
+   ◐ HIS LENGTH, DRAWN AS A THING AND NOT A SAUSAGE
+   ---------------------------------------------------------------------
+   It used to be two capsules and a circle in the chart's heat colour —
+   the same purple tube at every score, which is what a person meant by
+   "the get hard animation is so simple". One renderer now, used by the
+   secret graph, the REAL figure in all three views, the walking figure
+   and the solid, so the same man is the same shape wherever he is shown.
+
+   TWO THINGS HAPPEN WHEN HE RISES AND THEY DO NOT HAPPEN AT ONCE. It
+   swells first — fills, lengthens, thickens — and lifts second, from a
+   hang to standing proud. Then the glans flushes and the hood draws back,
+   and at the top there is a throb every second and a half. A rise that is
+   a single tween between two drawings reads as a cut however slowly it
+   runs; a rise with an order to it reads as something happening.
+   ===================================================================== */
+function hexOf(col){ const t=rgbTriple(col); if(!t) return '#caa06a';
+  return '#'+(0x1000000+(t[0]<<16)+(t[1]<<8)+t[2]).toString(16).slice(1); }
+function sstep(a,b,x){ const t=clamp((x-a)/(b-a),0,1); return t*t*(3-2*t); }
+function lengthPose(aro){
+  const a=clamp(aro||0,0,1.06);
+  return { swell:sstep(0.00,0.70,a), lift:sstep(0.20,0.96,a),
+           flush:sstep(0.50,1.00,a), over:Math.max(0,a-1) };
+}
+const LEN_GROW=0.42, LEN_THICK=0.30;      // how much longer and thicker all the way up
+/* A PHYSICAL MEASURE, in Roman digiti — a finger's breadth, about 1.85cm.
+   The ten-point RANK is what he is and it does not change because he is
+   interested; what changes is the length in digits, and that is the number
+   that climbs while he does. */
+function lengthDigits(val, aro){
+  return (2.2+clamp(val,0,IMPOSSIBLE_V)*0.42)*(1+LEN_GROW*lengthPose(aro).swell); }
+function girthDigits(val, aro){
+  return (0.95+clamp(val,0,IMPOSSIBLE_V)*0.10)*(1+LEN_THICK*lengthPose(aro).swell); }
+/* o: {x,y}  the root, on the body wall
+      dir     1 points it toward +x, -1 toward −x
+      L, D    its RESTING length and diameter, in the caller's units
+      aro     0..1.06, the level — secretAroLv, usually
+      skin    his skin; tint + tintK pull it toward the chart's heat colour
+      hair    for the curls at the root
+      sway    radians, from a walk — a hang swings from the tip, a stand bobs
+      T       ms, for the throb
+      ghost   true draws the outline dashed and nothing else
+      scrot, pubic, hood — false to leave that part off
+   Returns where the root and the far end of it landed, in caller space. */
+function drawLength(c, o){
+  const P=lengthPose(o.aro);
+  const T=(o.T===undefined)? ((typeof performance!=='undefined')? performance.now() : 0) : o.T;
+  let pulse=0;
+  if((o.aro||0)>=0.97 && o.throb!==false){
+    const k=(T%1450)/1450; pulse=Math.pow(Math.max(0,Math.sin(k*Math.PI*2)),10); }
+  const len = o.L*(1+LEN_GROW*P.swell)*(1+pulse*0.015);
+  const dia = o.D*(1+LEN_THICK*P.swell)*(1+pulse*0.04);
+  const sway=o.sway||0, hang=1-P.lift, dir=(o.dir===-1)? -1 : 1, S=o.s||1;
+  /* line widths in the CALLER's pixels: lw is how big one of the caller's
+     units is on screen, so an outline is a hairline at figure scale too */
+  const LW=(o.lw||1)/S;
+  /* the tangent at the root and at the far end. Hanging, it leaves the body
+     forward and falls; standing, it leaves slightly up and keeps going. */
+  let a0 = (0.62 + (-0.24-0.62)*P.lift) + sway*(0.30+0.40*hang) - pulse*0.05 - P.over*0.30;
+  let a1 = (1.42 + (-0.36-1.42)*P.lift) + sway*(0.55+0.90*hang) - pulse*0.07 - P.over*0.45;
+  /* FROM THE FRONT it hangs straight down and swings side to side with the
+     walk; rising, it comes TOWARD you, so what the eye gets is a length that
+     shortens as it turns and then climbs past the root. From behind there is
+     only what hangs between the thighs. */
+  const FRONT=(o.view==='front'), BACKV=(o.view==='back');
+  let proj=1;
+  if(FRONT){ const phi=P.lift*Math.PI*0.70 + P.over*0.30 + pulse*0.04, cph=Math.cos(phi);
+    proj=Math.max(0.30, Math.abs(cph));
+    a0=(cph<0? -Math.PI/2 : Math.PI/2) + sway*0.30*hang;
+    a1=a0 + sway*0.60*hang; }
+  const h=len*proj*0.5;
+  let Cx=Math.cos(a0)*h, Cy=Math.sin(a0)*h, Tx=Cx+Math.cos(a1)*h, Ty=Cy+Math.sin(a1)*h;
+  /* OR A CURVE SOMEBODY ELSE PROJECTED — the solid builds it in model space
+     and turns it, and hands over where the middle and the tip landed */
+  if(o.curve){ Cx=o.curve.C.x; Cy=o.curve.C.y; Tx=o.curve.T.x; Ty=o.curve.T.y;
+    proj=clamp((Math.hypot(Cx,Cy)+Math.hypot(Tx-Cx,Ty-Cy))/Math.max(1e-6,len),0.2,1.2); }
+  const at =(t)=>{ const u=1-t; return {x:2*u*t*Cx+t*t*Tx, y:2*u*t*Cy+t*t*Ty}; };
+  const tan=(t)=>{ const dx=2*(1-t)*Cx+2*t*(Tx-Cx), dy=2*(1-t)*Cy+2*t*(Ty-Cy);
+                   const m=Math.hypot(dx,dy)||1; return {x:dx/m, y:dy/m}; };
+  const gk=(FRONT||o.curve)? Math.max(0.62,Math.min(1,proj)) : 1;
+  const gLen=dia*1.0*gk, tg=clamp(1-(gLen/(len*proj))*0.9, 0.45, 0.92);
+  const hw=(t)=> dia*0.5*(1-0.08*t) + dia*0.07*(1-sstep(0,0.14,t));
+  // ---- colour ----
+  const sk0=hexOf(o.skin||'#caa06a');
+  const tint=o.tint? hexOf(o.tint) : null, tk=(o.tintK===undefined)? 0.55 : o.tintK;
+  const TT=(hx)=> tint? mixHex(hx,tint,tk) : hx;
+  const sk   = TT(mixHex(sk0,'#8a4a3a',0.16));             // a shade warmer than the rest of him
+  const skLit= TT(mixHex(sk0,'#ffffff',0.30));
+  const skSh = TT(mixHex(sk0,'#1a0c08',0.42));
+  const gl   = TT(mixHex(sk0,'#b04a58',0.24+0.28*P.flush));   // the glans flushes as he rises
+  const glLit=mixHex(gl,'#ffffff',0.40), glSh=mixHex(gl,'#1a0808',0.45);
+  const hairC= o.hair? hexOf(o.hair) : '#2a1a10';
+  // ---- geometry of the shaft ----
+  const N=26, Lp=[], Rp=[];
+  for(let i=0;i<=N;i++){ const t=tg*i/N, p=at(t), d=tan(t), w=hw(t);
+    Lp.push({x:p.x+d.y*w, y:p.y-d.x*w}); Rp.push({x:p.x-d.y*w, y:p.y+d.x*w}); }
+  const shaft=()=>{ c.beginPath(); c.moveTo(Lp[0].x,Lp[0].y);
+    for(let i=1;i<Lp.length;i++) c.lineTo(Lp[i].x,Lp[i].y);
+    for(let i=Rp.length-1;i>=0;i--) c.lineTo(Rp[i].x,Rp[i].y); c.closePath(); };
+  const along=(k,t0,t1,wob)=>{ c.beginPath();
+    for(let i=0;i<=N;i++){ const t=t0+(t1-t0)*i/N, p=at(t), d=tan(t);
+      const w=hw(t)*(typeof k==='function'? k(t,i) : k);
+      const x=p.x+d.y*w, y=p.y-d.x*w; if(i) c.lineTo(x,y); else c.moveTo(x,y); } };
+  // ---- the glans, in its own frame ----
+  const gp=at(tg+(1-tg)*0.45), gd=tan(0.99), ga=Math.atan2(gd.y,gd.x);
+  const grx=gLen*0.56, gry=hw(tg)*(1.10+0.06*P.flush);
+  const glans=()=>{ c.beginPath(); c.moveTo(-grx*0.95,-gry);
+    c.bezierCurveTo(grx*0.35,-gry*1.05, grx*1.05,-gry*0.55, grx*1.02,0);
+    c.bezierCurveTo(grx*1.05, gry*0.55, grx*0.35, gry*1.02, -grx*0.95, gry*0.96);
+    c.quadraticCurveTo(-grx*0.70,0,-grx*0.95,-gry); c.closePath(); };
+  c.save(); c.translate(o.x,o.y); c.scale(dir*S,S);
+  c.lineJoin='round'; c.lineCap='round';
+  if(o.ghost){
+    c.globalAlpha=(o.alpha===undefined)? 0.45 : o.alpha;
+    c.strokeStyle='#ffffff'; c.lineWidth=1.0*LW; c.setLineDash([3*LW,3*LW]);
+    shaft(); c.stroke();
+    c.save(); c.translate(gp.x,gp.y); c.rotate(ga); glans(); c.stroke(); c.restore();
+    c.setLineDash([]); c.restore();
+    return {x:o.x, y:o.y, tipX:o.x+dir*S*(gp.x+gd.x*grx), tipY:o.y+S*(gp.y+gd.y*grx), len, dia};
+  }
+  if(o.alpha!==undefined) c.globalAlpha=o.alpha;
+  // ---- 1. the curls at the root, behind everything. Seeded, so they do
+  //         not reroll sixty times a second and read as static. ----
+  if(o.pubic!==false && !BACKV){
+    /* SMALL TIGHT LOOPS on the mound above the root. Long strokes read as
+       somebody's signature scrawled across the chart; curls are curls. A
+       soft shadow goes down first so they sit ON the skin. */
+    c.save(); c.globalAlpha*=(o.hairK===undefined? 1 : o.hairK);
+    const mx=FRONT? 0 : -dia*0.28, my=FRONT? -dia*0.62 : -dia*0.52, mrx=FRONT? dia*1.30 : dia*0.95;
+    const sg=c.createRadialGradient(mx,my,0, mx,my,mrx);
+    sg.addColorStop(0,rgbA(hairC,0.34)); sg.addColorStop(1,rgbA(hairC,0));
+    c.fillStyle=sg; c.beginPath(); c.ellipse(mx,my,mrx,dia*0.62,0,0,7); c.fill();
+    c.strokeStyle=rgbA(hairC,0.62); c.lineWidth=Math.max(0.4*LW,dia*0.038);
+    let sd=90417; const r=()=>{ sd=(sd*16807)%2147483647; return sd/2147483647; };
+    for(let i=0;i<46;i++){
+      const an=r()*Math.PI*2, rr=Math.sqrt(r());
+      const x=mx+Math.cos(an)*rr*mrx*0.9, y=my+Math.sin(an)*rr*dia*0.52;
+      const cr=dia*(0.045+r()*0.05), st=r()*6.28;
+      c.beginPath(); c.arc(x,y,cr,st,st+3.6+r()*1.8); c.stroke(); }
+    c.restore(); }
+  // ---- 2. the scrotum, which hangs loose at rest and draws up tight ----
+  if(o.scrot!==false){
+    const tight=P.swell*0.75+P.lift*0.25;
+    const FB=FRONT||BACKV;
+    const sx0= FB? -sway*dia*(0.30+0.50*hang) : dia*(0.16-0.30*tight) - sway*dia*(0.45+0.65*hang);
+    const sy0= FB? dia*(0.72-0.30*tight) : dia*(0.98-0.42*tight);
+    const rx=dia*0.60*(1-0.10*tight), ry=dia*0.76*(1-0.22*tight);
+    const E= FB? [[-rx*0.54, ry*0.10, 0.96],[rx*0.54, 0, 1.0]]         // side by side, one lower
+               : [[-rx*0.42, ry*0.12, 0.96],[rx*0.40, 0, 1.0]];      // the far one hangs lower
+    E.forEach(([dx,dy,k])=>{ const x=sx0+dx, y=sy0+dy;
+      const g3=c.createRadialGradient(x-rx*0.35,y-ry*0.40,rx*0.10, x,y,Math.max(rx,ry)*1.12);
+      g3.addColorStop(0,skLit); g3.addColorStop(0.55,sk); g3.addColorStop(1,skSh);
+      c.fillStyle=g3; c.beginPath(); c.ellipse(x,y,rx*k,ry*k,0.12,0,7); c.fill(); });
+    c.save(); c.beginPath();
+    E.forEach(([dx,dy,k])=>{ c.moveTo(sx0+dx+rx*k,sy0+dy); c.ellipse(sx0+dx,sy0+dy,rx*k,ry*k,0.12,0,7); });
+    c.clip();
+    c.strokeStyle=rgbA(skSh,0.30); c.lineWidth=Math.max(0.5*LW,dia*0.035);     // the creases
+    for(let i=0;i<5;i++){ const yy=sy0-ry*0.55+i*ry*0.30; c.beginPath();
+      c.moveTo(sx0-rx*1.1,yy); c.quadraticCurveTo(sx0,yy+ry*0.14*(1-tight*0.5),sx0+rx*1.1,yy-ry*0.05); c.stroke(); }
+    c.strokeStyle=rgbA(skSh,0.50); c.lineWidth=Math.max(0.5*LW,dia*0.045);     // and the seam
+    c.beginPath(); c.moveTo(sx0+rx*0.04,sy0-ry*0.9); c.quadraticCurveTo(sx0-rx*0.06,sy0,sx0,sy0+ry*1.0); c.stroke();
+    c.restore();
+    c.strokeStyle='rgba(0,0,0,.26)'; c.lineWidth=0.6*LW;
+    E.forEach(([dx,dy,k])=>{ c.beginPath(); c.ellipse(sx0+dx,sy0+dy,rx*k,ry*k,0.12,0,7); c.stroke(); });
+  }
+  if(BACKV){ c.restore(); return {x:o.x, y:o.y, tipX:o.x, tipY:o.y, len, dia, pose:P}; }
+  // ---- 3. the shaft: filled, then modelled as a cylinder ----
+  c.fillStyle=sk; shaft(); c.fill();
+  c.save(); shaft(); c.clip();
+    c.strokeStyle=rgbA(skSh,0.58); c.lineWidth=dia*0.46; along(-0.95,0,tg); c.stroke();   // underneath, in shadow
+    c.strokeStyle=rgbA(skLit,0.46); c.lineWidth=dia*0.24; along(0.52,0,tg); c.stroke();   // along the top, lit
+    c.strokeStyle=rgbA('#ffffff',0.08+0.24*P.swell); c.lineWidth=Math.max(0.4*LW,dia*0.07);
+    along(0.50,0.08,tg*0.96); c.stroke();                                                  // and it SHINES once it is taut
+    const vk=sstep(0.45,1.0,o.aro||0);
+    if(vk>0){                                                                              // the veins stand up with it
+      c.strokeStyle=rgbA(mixHex(sk,'#4a3a6a',0.45),0.44*vk); c.lineWidth=Math.max(0.5*LW,dia*0.075);
+      along((t)=>0.16+0.22*Math.sin(t*17+1.3), 0.06, tg*0.92); c.stroke();
+      c.lineWidth=Math.max(0.45*LW,dia*0.05);
+      along((t)=>-0.30+0.90*((t-0.30)/0.28), 0.30, 0.58); c.stroke();
+    }
+    c.strokeStyle=rgbA(skSh,0.36); c.lineWidth=Math.max(0.4*LW,dia*0.04);
+    along(-0.68,0.05,tg); c.stroke();                                                       // the raphe
+  c.restore();
+  c.strokeStyle='rgba(0,0,0,.30)'; c.lineWidth=0.7*LW; shaft(); c.stroke();
+  // ---- 4. the glans: a crown, not a ball on a stick ----
+  c.save(); c.translate(gp.x,gp.y); c.rotate(ga);
+  { const g2=c.createRadialGradient(-grx*0.10,-gry*0.45,gry*0.10, 0,0,grx*1.25);
+    g2.addColorStop(0,glLit); g2.addColorStop(0.5,gl); g2.addColorStop(1,glSh);
+    c.fillStyle=g2; glans(); c.fill();
+    c.strokeStyle=rgbA(glSh,0.80); c.lineWidth=Math.max(0.6*LW,dia*0.075);                  // the corona
+    c.beginPath(); c.moveTo(-grx*0.95,-gry); c.quadraticCurveTo(-grx*0.70,0,-grx*0.95,gry*0.96); c.stroke();
+    c.strokeStyle=rgbA('#2a0a0a',0.62); c.lineWidth=Math.max(0.5*LW,dia*0.05);              // the meatus
+    c.beginPath(); c.moveTo(grx*0.99,-gry*0.14); c.lineTo(grx*0.80,gry*0.03); c.stroke();
+    c.fillStyle='rgba(255,255,255,'+(0.16+0.24*P.flush).toFixed(2)+')';                  // and it catches the light
+    c.beginPath(); c.ellipse(grx*0.22,-gry*0.52,grx*0.30,gry*0.16,-0.15,0,7); c.fill();
+    /* THE HOOD. At rest it covers most of the glans; it draws back behind
+       the corona as he rises — which is the last thing that happens, and
+       the one that says he is all the way there. */
+    const cover=(1-P.flush)*0.80*((o.hood===false)? 0 : 1);
+    if(cover>0.02){ c.save(); glans(); c.clip();
+      const hx=-grx*1.0+(grx*2.05)*cover;
+      c.fillStyle=sk; c.fillRect(-grx*1.3,-gry*1.4, hx+grx*1.3, gry*2.8);
+      c.fillStyle=rgbA(skLit,0.36); c.fillRect(-grx*1.3,-gry*1.4, hx+grx*1.3, gry*0.75);
+      c.fillStyle=rgbA(skSh,0.42);  c.fillRect(-grx*1.3, gry*0.45, hx+grx*1.3, gry*0.95);
+      c.strokeStyle=rgbA(skSh,0.80); c.lineWidth=Math.max(0.6*LW,dia*0.065);
+      c.beginPath(); c.moveTo(hx,-gry*1.1); c.quadraticCurveTo(hx+grx*0.20,0,hx,gry*1.1); c.stroke();
+      c.restore(); }
+    c.strokeStyle='rgba(0,0,0,.30)'; c.lineWidth=0.7*LW; glans(); c.stroke(); }
+  c.restore();
+  c.restore();
+  return {x:o.x, y:o.y, tipX:o.x+dir*S*(gp.x+gd.x*grx), tipY:o.y+S*(gp.y+gd.y*grx), len:len*S, dia:dia*S, pose:P};
+}
+/* THE NAMES HE IS CALLED WHEN HE IS UP, one per rank — so a LONG that
+   rises is ELONGATED and not suddenly IMMENSE. Adding the swell to the
+   score and reading the ladder off the sum walked every man up a tier
+   the moment he was interested, and put him at 10.2 out of 10, which is a
+   scale that has stopped being a scale. The rank is what he is. This is
+   what he is like right now. */
+const ROUSED_NAMES={
+  profile:['PERKED','RAISED','STANDING','ELONGATED','EXTRA LARGE'],
+  girth:  ['FIRMED','FILLED','SWELLED','ENGORGED','EXTRA THICK'],
+};
+const ROUSED_IMP={profile:'MONUMENTAL', girth:'UNGRASPABLE'};
+function tierIdxOf(val){ return clamp(Math.floor((clamp(val,1,10)-1)/2),0,4); }
+function rousedName(sub, val){
+  if(!ROUSED_NAMES[sub]) return null;
+  return (val>=IMPOSSIBLE_V)? ROUSED_IMP[sub] : ROUSED_NAMES[sub][tierIdxOf(val)];
+}
+function restName(sub, val){
+  const T={profile:SECRET_PART.tiers, girth:['Slight','Slim','Middling','Thick','Immense'],
+           behind:['Flat','Plain','Firm','Heavy','Slab']}[sub]||SECRET_PART.tiers;
+  return (val>=IMPOSSIBLE_V)? 'IMPOSSIBLE' : T[tierIdxOf(val)].toUpperCase();
+}
+/* =====================================================================
+   🧍 THE REAL FIGURE
+   ---------------------------------------------------------------------
+   It was built out of fillRect — two bars for legs, two bars for arms, a
+   stack of one-pixel rows for a trunk and a rectangle stuck on the front
+   of him in profile — and "a joke" was a fair review. It is drawn with
+   curves now. Every silhouette is a smooth closed path through anatomical
+   landmarks; the whole body is lit by ONE light across its width, so the
+   parts join into a body instead of a pile of pieces; and each view is
+   its own drawing — front, back and a real profile — rather than one
+   drawing flipped. The walk steps: a heel lifts, a knee bends, the arms
+   swing against the legs, and what hangs, swings.
+   Same landmarks as before (chartLandmarks), so it stands in the same
+   frame: feet on y=0, crown near −72.
+   opt: showLen  his length is drawn (caller has already asked secretAllowed)
+        aro      the level, if not the chart's own
+        clothed  'public' — a subligaculum, and a strophium on her
+   ===================================================================== */
+function smoothPath(c, pts, closed){
+  const n=pts.length; if(n<2) return;
+  const P=(i)=> closed? pts[((i%n)+n)%n] : pts[clamp(i,0,n-1)];
+  c.moveTo(pts[0][0],pts[0][1]);
+  const last=closed? n : n-1;
+  for(let i=0;i<last;i++){ const p0=P(i-1), p1=P(i), p2=P(i+1), p3=P(i+2);
+    c.bezierCurveTo(p1[0]+(p2[0]-p0[0])/6, p1[1]+(p2[1]-p0[1])/6,
+                    p2[0]-(p3[0]-p1[0])/6, p2[1]-(p3[1]-p1[1])/6, p2[0], p2[1]); }
+  if(closed) c.closePath();
+}
+/* a limb from a centreline and a radius at each joint — down one side,
+   round the end, back up the other */
+function limbPts(pts){
+  const L=[], R=[], n=pts.length;
+  for(let i=0;i<n;i++){
+    const A=pts[Math.max(0,i-1)], B=pts[Math.min(n-1,i+1)];
+    let dx=B[0]-A[0], dy=B[1]-A[1]; const m=Math.hypot(dx,dy)||1; dx/=m; dy/=m;
+    const r=pts[i][2];
+    L.push([pts[i][0]-dy*r, pts[i][1]+dx*r]); R.push([pts[i][0]+dy*r, pts[i][1]-dx*r]);
+  }
+  const e=pts[n-1], e0=pts[n-2]; let ex=e[0]-e0[0], ey=e[1]-e0[1]; const em=Math.hypot(ex,ey)||1; ex/=em; ey/=em;
+  const r=e[2];
+  const cap=[[e[0]+ex*r*0.85-ey*r*0.55, e[1]+ey*r*0.85+ex*r*0.55],
+             [e[0]+ex*r*0.85+ey*r*0.55, e[1]+ey*r*0.85-ex*r*0.55]];
+  return L.concat(cap, R.reverse());
+}
+/* WHERE THE EYES LAND on the real figure — the gaze overlay was pinned to
+   the diagram's proportions and would have pointed at his forehead for
+   his face and his collarbone for her bust */
+function realAnchors(w){
+  const M=chartLandmarks(w), o=69;
+  /* on a man the booty slot is read and labelled as SHOULDERS — the same
+     part table the readout down the gutter uses — so it anchors there */
+  return { face:[0,M.headY-M.headH*0.50+o], hairq:[0,M.headY-M.headH-0.6+o],
+           bust:[0,M.chestY+3.2+o], waist:[0,M.waistY+o],
+           booty:[0,(M.male? M.shY+1.2 : M.hipY-1.0)+o],
+           legs:[0,M.hipY*0.45+o], secret:[0,M.hipY+2.2+o] };
+}
+function drawRealFig(c, w, view, ph, opt){
+  opt=opt||{};
   const M=chartLandmarks(w), male=M.male;
-  const skin=w.skin||(male?'#caa06a':'#e6bd94');
-  const hi=shade(skin,20), sh=shade(skin,-24), sh2=shade(skin,-40);
-  const hair=w.hair||(male?'#3a2618':'#5a3a1e'), hHi=shade(hair,26);
-  const R=(x,y,ww,hh,col)=>{ c.fillStyle=col; c.fillRect(x,y,ww,hh); };
-  const E=(x,y,rx,ry,col)=>{ c.fillStyle=col; c.beginPath(); c.ellipse(x,y,Math.max(0.4,rx),Math.max(0.4,ry),0,0,7); c.fill(); };
-  const sw = ph===undefined? 0 : Math.sin(ph);
-  const STR = sw*(1.6+M.lg*0.10), lift = Math.abs(sw)*1.4;
-  const side = (view==='side'), back = (view==='back');
-  const SJ = (!male)? slapJig() : 0;
+  const skin=hexOf(w.skin||(male?'#caa06a':'#e6bd94'));
+  const sLit=mixHex(skin,'#fff2e6',0.30), sSh=mixHex(skin,'#2a1408',0.30), sDeep=mixHex(skin,'#1a0a06',0.55);
+  const hair=hexOf(w.hair||(male?'#3a2618':'#5a3a1e')), hHi=mixHex(hair,'#ffffff',0.24), hSh=mixHex(hair,'#000000',0.38);
+  const walking=(ph!==undefined), P0=walking? ph : 0;
+  const side=(view==='side'), back=(view==='back');
+  const SJ=(!male)? slapJig() : 0;
+  const bu=M.bu, be=M.be, wa=M.wa, lg=M.lg, fa=M.fa, hq=M.hairq;
+  const hy=M.hipY, wy=M.waistY, cy=M.chestY, sy=M.shY, ny=M.headY, HH=M.headH;
+  const HW = male? M.hipW*0.95 : Math.min(M.hipW*0.80, 12.8);
+  const WW = male? M.waistW*0.86 : M.waistW*0.80;
+  const CW = male? M.chestW*0.80 : Math.max(M.chestW*0.98, WW+1.4);
+  const SW = male? M.shW*0.92 : Math.max(M.shW*0.95, CW+0.5);
+  const NW = male? 1.85+fa*0.05 : 1.40+fa*0.04;
+  const HR = M.headW*0.80;
+  const jB = walking&&!male? Math.sin(P0*2+0.9)*(0.18+bu*0.05) : 0;
+  const jG = walking&&!male? Math.sin(P0*2+0.15)*(0.15+be*0.04) : 0;
+  const clothed = (opt.clothed==='public') || !ADULT;
+  const LEN = !!opt.showLen && male && ADULT && !clothed;
+  const aro = LEN? clamp(opt.aro===undefined? secretAroLv : opt.aro, 0, 1.06) : 0;
+  const lw=0.30;                                        // a hairline, in figure units
+  // ---- ONE LIGHT across the whole body ----
+  const G = side? (()=>{ const g=c.createLinearGradient(9,0,-10,0);
+                     g.addColorStop(0,sLit); g.addColorStop(0.40,skin); g.addColorStop(1,sSh); return g; })()
+                : (()=>{ const g=c.createLinearGradient(-SW-3,0,SW+3,0);
+                     g.addColorStop(0,sLit); g.addColorStop(0.40,skin); g.addColorStop(1,sSh); return g; })();
+  const fillPts=(pts, fs, closed)=>{ c.beginPath(); smoothPath(c,pts,closed!==false); c.fillStyle=fs; c.fill(); };
+  const edge=(pts, a2)=>{ c.beginPath(); smoothPath(c,pts,true); c.strokeStyle='rgba(40,18,8,'+(a2||0.34)+')'; c.lineWidth=lw; c.stroke(); };
+  /* a limb gets the body's light AND its own roundness: lit down the near
+     edge, shadowed down the far one, clipped to itself */
+  const limb=(pts, dark)=>{
+    const O=limbPts(pts);
+    fillPts(O, G);
+    c.save(); c.beginPath(); smoothPath(c,O,true); c.clip();
+    let xmin=1e9,xmax=-1e9,ymin=1e9,ymax=-1e9; O.forEach(p=>{ xmin=Math.min(xmin,p[0]); xmax=Math.max(xmax,p[0]); ymin=Math.min(ymin,p[1]); ymax=Math.max(ymax,p[1]); });
+    const g=c.createLinearGradient(xmin,0,xmax,0);
+    g.addColorStop(0,rgbA(sLit,0.30)); g.addColorStop(0.42,'rgba(0,0,0,0)'); g.addColorStop(1,rgbA(sDeep,0.30));
+    c.fillStyle=g; c.fillRect(xmin-1,ymin-1,xmax-xmin+2,ymax-ymin+2);
+    if(dark){ c.fillStyle='rgba(20,8,4,'+dark+')'; c.fillRect(xmin-1,ymin-1,xmax-xmin+2,ymax-ymin+2); }
+    c.restore(); edge(O, 0.30);
+    return O;
+  };
+  const ball=(x,y,rx,ry,col,rot)=>{ const cc=hexOf(col);
+    const g=c.createRadialGradient(x-rx*0.38,y-ry*0.42,Math.min(rx,ry)*0.08, x,y,Math.max(rx,ry)*1.10);
+    g.addColorStop(0,mixHex(cc,'#fff4ea',0.34)); g.addColorStop(0.55,cc); g.addColorStop(1,mixHex(cc,'#1a0a06',0.34));
+    c.fillStyle=g; c.beginPath(); c.ellipse(x,y,Math.max(0.2,rx),Math.max(0.2,ry),rot||0,0,7); c.fill(); };
+  const crease=(x0,y0,qx,qy,x1,y1,al,wd)=>{ c.strokeStyle=rgbA(sDeep,al===undefined?0.40:al); c.lineWidth=wd||lw;
+    c.beginPath(); c.moveTo(x0,y0); c.quadraticCurveTo(qx,qy,x1,y1); c.stroke(); };
+  const soft=(x,y,r,col,al)=>{ const g=c.createRadialGradient(x,y,0,x,y,r); g.addColorStop(0,rgbA(col,al)); g.addColorStop(1,rgbA(col,0));
+    c.fillStyle=g; c.beginPath(); c.arc(x,y,r,0,7); c.fill(); };
+  const lenDims=()=>{ const v=clamp(M.secret,1,IMPOSSIBLE_V); return {L:2.4+v*0.36, D:1.20+v*0.07}; };
+  const linen='#efe7d6', linSh='#bfb39a', linHi='#fffaf0';
 
-  // ---------------- LEGS ----------------
-  if(side){
-    // in profile the legs overlap: the far one darker and behind
-    R(-M.legW*0.9 - STR*0.6, M.hipY, M.legW*1.5, -M.hipY-1, sh);
-    R(-M.legW*0.5 + STR*0.6, M.hipY, M.legW*1.6, -M.hipY-1, skin);
-    R(-M.legW*0.5 + STR*0.6, M.hipY, M.legW*0.5, -M.hipY-1, hi);
-    R(-M.legW*1.4 + STR*0.6, -1.6, M.legW*3.0, 1.6, '#6a4a2c');
+  if(!side){
+    // =========================== FRONT & BACK ===========================
+    /* ---- her hair falls down her back: behind everything from the front,
+       over everything from behind ---- */
+    const fall = male? 0 : (3 + hq*0.95);
+    const hairBack=()=>{ if(male) return;
+      const P=[[0,ny-HH-1.2],[HR*1.10,ny-HH*0.80],[HR*1.22,ny-HH*0.30],[HR*1.05+jB*0.1,sy+fall*0.50],
+               [HR*0.80,sy+fall],[0,sy+fall+0.9],[-HR*0.80,sy+fall],[-HR*1.05,sy+fall*0.50],[-HR*1.22,ny-HH*0.30],[-HR*1.10,ny-HH*0.80]];
+      const g=c.createLinearGradient(-HR*1.3,0,HR*1.3,0); g.addColorStop(0,hHi); g.addColorStop(0.4,hair); g.addColorStop(1,hSh);
+      fillPts(P,g);
+      c.strokeStyle=rgbA(hSh,0.55); c.lineWidth=lw;
+      for(let i=-3;i<=3;i++){ c.beginPath(); c.moveTo(i*HR*0.30,ny-HH*0.6); c.quadraticCurveTo(i*HR*0.40,sy,i*HR*0.34,sy+fall*0.92); c.stroke(); } };
+    if(!back) hairBack();
+    // ---- LEGS, before the trunk so the pelvis covers where they join ----
+    const legFB=(s)=>{
+      const k = walking? Math.max(0, Math.sin(P0 + (s>0?0:Math.PI))) : 0;     // this leg is the one stepping
+      const L=-hy;
+      const xt=s*HW*0.50, xm=s*Math.max(2.6,HW*0.40), xk=s*Math.max(2.3,HW*0.30)+s*0.3*k, xc=s*Math.max(2.2,HW*0.28), xa=s*Math.max(2.0,HW*0.24);
+      const rt=HW*0.52, rm=(male? M.legW*1.40 : M.legW*1.50+be*0.06), rk=M.legW*0.92, rc=M.legW*(male?1.22:1.12), ra=M.legW*0.50;
+      const yt=hy-0.5, ym=hy+L*0.24, yk=hy+L*0.52-0.7*k, yc=hy+L*0.68-0.9*k, ya=-2.0-1.4*k;
+      limb([[xt,yt,rt],[xm,ym,rm],[xk,yk,rk],[xc,yc,rc],[xa,ya,ra]], back? 0.05 : 0);
+      // the knee, and the calf's turn
+      soft(xk-s*0.2, yk-0.3, rk*0.9, sLit, 0.22);
+      crease(xk-rk*0.6, yk+0.9, xk, yk+1.5, xk+rk*0.6, yk+0.9, 0.22);
+      if(back){ crease(xk-rk*0.7, yk-0.2, xk, yk+0.5, xk+rk*0.7, yk-0.2, 0.30); soft(xc-s*0.3, yc-0.8, rc*1.1, sLit, 0.18); }
+      // the foot
+      const fy=-1.4*k;
+      c.beginPath();
+      if(back) smoothPath(c,[[xa-ra*1.0,fy-2.2],[xa+ra*1.0,fy-2.2],[xa+ra*1.15,fy-0.6],[xa+ra*0.6,fy],[xa-ra*0.6,fy],[xa-ra*1.15,fy-0.6]],true);
+      else smoothPath(c,[[xa-ra*1.0,fy-2.4],[xa+ra*1.0,fy-2.4],[xa+s*ra*0.4+ra*1.35,fy-0.9],[xa+s*ra*0.5+ra*1.1,fy+0.1],[xa+s*ra*0.5-ra*1.1,fy+0.1],[xa+s*ra*0.4-ra*1.35,fy-0.9]],true);
+      c.fillStyle=G; c.fill(); c.strokeStyle='rgba(40,18,8,.30)'; c.lineWidth=lw; c.stroke();
+      if(!back){ c.strokeStyle=rgbA(sDeep,0.28); c.lineWidth=lw*0.8;               // the toes
+        for(let t=-1;t<=1;t++){ c.beginPath(); c.moveTo(xa+s*ra*0.5+t*ra*0.55,fy-0.45); c.lineTo(xa+s*ra*0.5+t*ra*0.55,fy+0.05); c.stroke(); } }
+      return {xk,yk,xa,ya};
+    };
+    legFB(-1); legFB(1);
+    // ---- THE TRUNK: one path, hips to jaw ----
+    const R=[
+      [HW*0.97, hy+2.4], [HW*1.00, hy-1.2], [HW*0.90, hy-4.4],
+      [(WW+HW*0.90)/2, (hy-4.4+wy)/2], [WW, wy],
+      [(WW+CW)/2*1.02, (wy+cy)/2+1.0], [CW*0.98, cy+3.6], [CW, cy-0.4],
+      [SW*0.98, sy+1.3], [SW*0.78, sy-0.9], [NW*1.45, sy-1.7], [NW, ny+0.9]];
+    const T=R.slice().concat(R.slice().reverse().map(p=>[-p[0],p[1]]),
+                             [[-HW*0.42,hy+4.6],[0,hy+3.3],[HW*0.42,hy+4.6]]);
+    fillPts(T, G);
+    c.save(); c.beginPath(); smoothPath(c,T,true); c.clip();
+    // it is a CYLINDER, not a plank: lit down one flank, turning away down the other
+    { const g=c.createLinearGradient(-SW,0,SW,0);
+      g.addColorStop(0,rgbA(sLit,0.22)); g.addColorStop(0.35,'rgba(0,0,0,0)'); g.addColorStop(0.80,'rgba(0,0,0,0)'); g.addColorStop(1,rgbA(sDeep,0.30));
+      c.fillStyle=g; c.fillRect(-SW-3, ny, SW*2+6, -ny+hy+6); }
+    if(!back){
+      // collarbones, the pit of the throat, the ribs' edge, the navel
+      crease(-NW*1.3,sy-0.6, -SW*0.45,sy+0.2, -SW*0.82,sy-0.1, 0.30);
+      crease( NW*1.3,sy-0.6,  SW*0.45,sy+0.2,  SW*0.82,sy-0.1, 0.30);
+      soft(0, sy-0.2, 0.9, sDeep, 0.30);
+      soft(0, wy+1.3, 0.55, sDeep, 0.65); soft(0.12, wy+1.0, 0.30, sLit, 0.45);
+      if(male){
+        // the chest plates, and the lines a lean waist earns
+        [-1,1].forEach(q=>{ const px=q*CW*0.48, py=cy+2.6, rx=CW*0.52, ry=2.6+bu*0.10;
+          soft(px-0.8, py-0.8, rx*0.9, sLit, 0.22);
+          crease(px-q*rx*0.95, py+ry*0.55, px, py+ry*1.25, px+q*rx*0.65, py+ry*0.35, 0.42, lw*1.2);
+          soft(q*CW*0.56, cy+3.9, 0.36, mixHex(skin,'#6a3a30',0.4), 0.95); });
+        crease(0, sy+0.6, 0.05, cy+2.6, 0, cy+6.4, 0.30);
+        if(wa>=6){ for(let r2=0;r2<3;r2++){ const yy=cy+7.2+r2*((wy+2.2-(cy+7.2))/3);
+            crease(-WW*0.55,yy, -WW*0.28,yy+0.5, -0.2,yy, 0.26); crease(WW*0.55,yy, WW*0.28,yy+0.5, 0.2,yy, 0.26); }
+          crease(0, cy+6.4, 0, wy, 0, wy+0.4, 0.26); }
+        crease(-HW*0.70, hy-4.2, -HW*0.40, hy-1.6, -1.2, hy+1.8, 0.30);        // the iliac V
+        crease( HW*0.70, hy-4.2,  HW*0.40, hy-1.6,  1.2, hy+1.8, 0.30);
+      } else {
+        soft(-CW*0.2, wy-2.5, WW*0.9, sLit, 0.16);                                // the soft of the belly
+        crease(0, cy+6.0, 0.05, wy-0.8, 0, wy+0.2, 0.16);
+        crease(-HW*0.62, hy-4.0, -HW*0.30, hy-1.0, -1.4, hy+2.2, 0.20);
+        crease( HW*0.62, hy-4.0,  HW*0.30, hy-1.0,  1.4, hy+2.2, 0.20);
+      }
+    } else {
+      // THE BACK: a groove down the spine, the blades, the small of it
+      { const g=c.createLinearGradient(-1.2,0,1.2,0); g.addColorStop(0,'rgba(0,0,0,0)'); g.addColorStop(0.5,rgbA(sDeep,0.36)); g.addColorStop(1,'rgba(0,0,0,0)');
+        c.fillStyle=g; c.fillRect(-1.2, sy-0.5, 2.4, hy-4.5-sy); }
+      [-1,1].forEach(q=>{ crease(q*CW*0.22, cy-0.8, q*CW*0.68, cy-1.2, q*CW*0.62, cy+3.4, 0.30, lw*1.1);
+                          soft(q*CW*0.46, cy+0.6, CW*0.42, sLit, 0.18); });
+      if(!male){ soft(-1.7, hy-4.7, 0.6, sDeep, 0.55); soft(1.7, hy-4.7, 0.6, sDeep, 0.55); }
+    }
+    c.restore();
+    edge(T, 0.32);
+    // ---- THE SEAT, from behind: two masses, a cleft, and the folds under them ----
+    if(back){
+      const Gr = male? HW*0.50 : HW*0.52+be*0.04, gy2=hy-0.8+jG*0.5+SJ*0.35;
+      [-1,1].forEach(q=>{ ball(q*Gr*0.84, gy2 - q*jG*0.25, Gr, Gr*(male?0.92:1.0)+be*0.05, skin); });
+      crease(0, hy-4.6, 0.2, gy2, 0, gy2+Gr*0.95, 0.55, lw*1.3);
+      [-1,1].forEach(q=>crease(q*0.4, gy2+Gr*0.92, q*Gr*0.9, gy2+Gr*1.12, q*Gr*1.7, gy2+Gr*0.72, 0.45, lw*1.2));
+      if(LEN && aro<0.5) drawLength(c,{x:0,y:hy+2.4,L:lenDims().L,D:lenDims().D,aro,view:'back',skin,hair,lw});
+    }
+    // ---- THE GROIN ----
+    if(!back){
+      if(male && LEN){
+        const d=lenDims();
+        drawLength(c,{x:0, y:hy+1.4, L:d.L, D:d.D, aro, view:'front', skin, hair, lw,
+          sway: walking? Math.sin(P0)*0.55*(1-lengthPose(aro).lift) : 0, T:performance.now()});
+      } else if(!male && !clothed){
+        crease(-1.6, hy+1.8, -0.5, hy+2.4, 0, hy+3.2, 0.30);
+        crease( 1.6, hy+1.8,  0.5, hy+2.4, 0, hy+3.2, 0.30);
+        crease(0, hy+3.2, 0.05, hy+3.9, 0, hy+4.5, 0.36);
+      }
+    }
+    // ---- ARMS, hanging clear of the hips and swinging against the legs ----
+    const armFB=(s)=>{
+      const sw = walking? Math.sin(P0 + (s>0?Math.PI:0)) : 0;
+      const ex = s*Math.max(WW+2.1, SW*0.90), eyy = wy-0.4;
+      const hx = s*Math.max(HW*0.92+1.5, SW*0.92), hyy = hy+2.0-Math.abs(sw)*0.5;
+      const r0=(male?2.10:1.60)+lg*0.04, r1=(male?1.55:1.22), r2=(male?1.22:0.98), r3=(male?0.92:0.74);
+      limb([[s*(SW-0.8), sy+0.8, r0],[s*(SW*0.98+0.25), sy+4.6, r0*0.90],[ex, eyy, r1],[(ex+hx)/2+s*0.2, (eyy+hyy)/2, r2],[hx, hyy+sw*0.3, r3]], back? 0.06 : 0);
+      soft(s*(SW-0.4), sy+1.6, r0*1.1, sLit, 0.26);                                 // the round of the shoulder
+      crease(ex-r1*0.7, eyy+0.2, ex, eyy+0.7, ex+r1*0.7, eyy+0.2, 0.20);
+      // the hand: a palm, a thumb, fingers suggested
+      const hX=hx+s*0.05, hY=hyy+sw*0.3+1.9;
+      c.beginPath(); smoothPath(c,[[hX-r3*1.15,hY-1.5],[hX+r3*1.15,hY-1.5],[hX+r3*1.25,hY+0.6],[hX+r3*0.6,hY+1.9],[hX-r3*0.6,hY+1.9],[hX-r3*1.25,hY+0.6]],true);
+      c.fillStyle=G; c.fill(); c.strokeStyle='rgba(40,18,8,.30)'; c.lineWidth=lw; c.stroke();
+      c.strokeStyle=rgbA(sDeep,0.28); c.lineWidth=lw*0.8;
+      for(let t=-1;t<=1;t++){ c.beginPath(); c.moveTo(hX+t*r3*0.55,hY+0.4); c.lineTo(hX+t*r3*0.55,hY+1.7); c.stroke(); }
+      if(!back){ ball(hX-s*r3*1.05, hY-0.5, r3*0.45, r3*0.85, skin, s*0.4); }
+    };
+    armFB(-1); armFB(1);
+    // ---- THE BUST ----
+    if(!back && !male){
+      const r=0.95+bu*0.60, by2=cy+2.8+r*0.10+jB*0.6+SJ*0.3;
+      const bx=(q)=>q*(r*0.78+0.55);
+      if(bu>=4){ const g=c.createLinearGradient(-r*0.5,0,r*0.5,0);                  // the cleavage, in shadow
+        g.addColorStop(0,'rgba(0,0,0,0)'); g.addColorStop(0.5,rgbA(sDeep,0.30)); g.addColorStop(1,'rgba(0,0,0,0)');
+        c.fillStyle=g; c.fillRect(-r*0.5, by2-r*0.8, r, r*1.3); }
+      [1,-1].forEach(q=>{ const x=bx(q), y=by2 - q*jB*0.18;
+        ball(x, y, r*1.0, r*0.94, q>0? mixHex(skin,'#1a0a06',0.06) : skin);
+        crease(x-r*0.85, y+r*0.55, x, y+r*1.12, x+r*0.85, y+r*0.55, 0.40, lw*1.2);   // the fold under it
+        if(!clothed){ const ax=x+q*r*0.10, ay=y+r*0.20;
+          c.fillStyle=mixHex(skin,'#8a4a44',0.40); c.beginPath(); c.ellipse(ax,ay,r*0.22+0.2,(r*0.22+0.2)*0.92,0,0,7); c.fill();
+          c.fillStyle=mixHex(skin,'#6a3030',0.52); c.beginPath(); c.arc(ax,ay,r*0.07+0.14,0,7); c.fill();
+          c.fillStyle='rgba(255,255,255,.35)'; c.beginPath(); c.arc(ax-0.1,ay-0.12,0.1+r*0.02,0,7); c.fill(); } });
+      if(clothed){                                                                   // the strophium
+        const top2=by2-r*0.35, bot=by2+r*0.95;
+        const P=[[-bx(1)-r*0.90,top2+0.3],[0,top2+r*0.25],[bx(1)+r*0.90,top2+0.3],[bx(1)+r*0.84,bot-0.4],[0,bot],[-bx(1)-r*0.84,bot-0.4]];
+        const g=c.createLinearGradient(-r*2,0,r*2,0); g.addColorStop(0,linHi); g.addColorStop(0.45,linen); g.addColorStop(1,linSh);
+        fillPts(P,g); edge(P,0.35);
+        c.strokeStyle=rgbA(linSh,0.8); c.lineWidth=lw;
+        for(let q=-2;q<=2;q++){ c.beginPath(); c.moveTo(q*r*0.4,top2+r*0.3); c.lineTo(q*r*0.45,bot-0.2); c.stroke(); } }
+    }
+    // ---- A SUBLIGACULUM, in public (and with the mature switch off) ----
+    if(clothed){
+      const P = back
+        ? [[-HW*1.0,hy-3.4],[HW*1.0,hy-3.4],[HW*0.98,hy-0.8],[HW*0.55,hy+2.6],[0,hy+2.2],[-HW*0.55,hy+2.6],[-HW*0.98,hy-0.8]]
+        : [[-HW*1.0,hy-3.4],[HW*1.0,hy-3.4],[HW*0.96,hy-1.6],[HW*0.40,hy+1.0],[0,hy+3.8],[-HW*0.40,hy+1.0],[-HW*0.96,hy-1.6]];
+      const g=c.createLinearGradient(-HW,0,HW,0); g.addColorStop(0,linHi); g.addColorStop(0.45,linen); g.addColorStop(1,linSh);
+      fillPts(P,g); edge(P,0.35);
+      c.fillStyle=rgbA(linSh,0.9); c.fillRect(-HW*0.98, hy-3.4, HW*1.96, 0.5);
+      c.strokeStyle=rgbA(linSh,0.8); c.lineWidth=lw;
+      for(let q=-2;q<=2;q++){ c.beginPath(); c.moveTo(q*HW*0.28,hy-2.8); c.lineTo(q*HW*0.16,hy+(back?1.6:2.2)); c.stroke(); }
+      if(male && !back) soft(0.3, hy+0.6, 2.2, linHi, 0.35);
+    }
+    // ---- THE HEAD ----
+    const face=[[0,ny-HH],[HR*0.74,ny-HH*0.93],[HR*0.99,ny-HH*0.70],[HR*0.96,ny-HH*0.44],
+                [HR*(male?0.86:0.74),ny-HH*0.20],[HR*0.40,ny-HH*0.02],[0,ny+0.18],
+                [-HR*0.40,ny-HH*0.02],[-HR*(male?0.86:0.74),ny-HH*0.20],[-HR*0.96,ny-HH*0.44],[-HR*0.99,ny-HH*0.70],[-HR*0.74,ny-HH*0.93]];
+    [-1,1].forEach(q=>ball(q*HR*0.98, ny-HH*0.46, 0.75, 1.40, skin));               // the ears
+    { const g=c.createRadialGradient(-HR*0.35,ny-HH*0.66,0.3, 0,ny-HH*0.5,HR*1.4);
+      g.addColorStop(0,sLit); g.addColorStop(0.55,skin); g.addColorStop(1,sSh);
+      fillPts(face,g); edge(face,0.30); }
+    if(!back){
+      const eY=ny-HH*0.48, eX=HR*0.40;
+      [-1,1].forEach(q=>{ const x=q*eX;
+        c.fillStyle='#f4eee6'; c.beginPath(); c.ellipse(x,eY,HR*0.19,0.42,0,0,7); c.fill();
+        c.fillStyle='#3b2a1c'; c.beginPath(); c.arc(x+0.05,eY+0.02,0.36,0,7); c.fill();
+        c.fillStyle='#0e0806'; c.beginPath(); c.arc(x+0.05,eY+0.02,0.16,0,7); c.fill();
+        c.fillStyle='rgba(255,255,255,.8)'; c.beginPath(); c.arc(x-0.08,eY-0.12,0.08,0,7); c.fill();
+        c.strokeStyle='#1e120a'; c.lineWidth= male? lw*1.0 : lw*1.5;                  // the upper lid, and her lashes
+        c.beginPath(); c.moveTo(x-HR*0.21,eY+0.05); c.quadraticCurveTo(x,eY-0.72,x+HR*0.21,eY-0.02); c.stroke();
+        if(!male){ c.beginPath(); c.moveTo(x+q*HR*0.20,eY-0.10); c.lineTo(x+q*HR*0.27,eY-0.34); c.stroke(); }
+        c.strokeStyle=hSh; c.lineWidth= male? lw*2.2 : lw*1.4;                        // the brow
+        c.beginPath(); c.moveTo(x-q*HR*0.20,eY-1.25); c.quadraticCurveTo(x+q*HR*0.02,eY-(male?1.55:1.75),x+q*HR*0.26,eY-(male?1.25:1.35)); c.stroke(); });
+      crease(0.35, eY+0.5, 0.55, ny-HH*0.30, 0.1, ny-HH*0.25, 0.32);                  // the nose, by its shadow
+      soft(-0.2, ny-HH*0.29, 0.7, sLit, 0.35);
+      [-1,1].forEach(q=>{ c.fillStyle=rgbA(sDeep,0.55); c.beginPath(); c.ellipse(q*0.52,ny-HH*0.245,0.22,0.13,0,0,7); c.fill(); });
+      const mY=ny-HH*0.13, lipC=male? mixHex(skin,'#8a4a44',0.30) : mixHex(skin,'#b0484c',0.52), mw=male? HR*0.34 : HR*0.36;
+      c.fillStyle=lipC; c.beginPath(); c.moveTo(-mw,mY);                               // the upper lip, a bow
+      c.quadraticCurveTo(-mw*0.4,mY-(male?0.35:0.55),0,mY-(male?0.2:0.32)); c.quadraticCurveTo(mw*0.4,mY-(male?0.35:0.55),mw,mY);
+      c.quadraticCurveTo(0,mY+0.12,-mw,mY); c.fill();
+      c.fillStyle=mixHex(lipC,'#ffffff',0.12); c.beginPath(); c.moveTo(-mw*0.9,mY+0.05);  // the lower
+      c.quadraticCurveTo(0,mY+(male?0.55:0.85),mw*0.9,mY+0.05); c.quadraticCurveTo(0,mY+0.15,-mw*0.9,mY+0.05); c.fill();
+      c.strokeStyle=rgbA(mixHex(lipC,'#1a0808',0.5),0.7); c.lineWidth=lw*0.8;
+      c.beginPath(); c.moveTo(-mw,mY); c.quadraticCurveTo(0,mY+0.18,mw,mY); c.stroke();
+      if(!male){ soft(-HR*0.56,ny-HH*0.30,HR*0.34,'#e07a80',0.16); soft(HR*0.56,ny-HH*0.30,HR*0.34,'#e07a80',0.12); }
+      else if(fa>=6) crease(-HR*0.75,ny-HH*0.18, 0,ny+0.9, HR*0.75,ny-HH*0.18, 0.18);  // the jaw's shadow
+    }
+    // ---- HAIR: a cap, and on her the fall ----
+    { const g=c.createLinearGradient(-HR*1.2,0,HR*1.2,0); g.addColorStop(0,hHi); g.addColorStop(0.45,hair); g.addColorStop(1,hSh);
+      const vol=0.4+hq*0.09;
+      const cap = back
+        ? [[0,ny-HH-vol],[HR*1.06,ny-HH*0.82],[HR*1.08,ny-HH*0.35],[HR*0.80,ny-HH*(male?0.14:0.05)],[0,ny-HH*(male?0.08:0.0)],[-HR*0.80,ny-HH*(male?0.14:0.05)],[-HR*1.08,ny-HH*0.35],[-HR*1.06,ny-HH*0.82]]
+        : male
+        ? [[0,ny-HH-vol],[HR*0.90,ny-HH*0.92],[HR*1.06,ny-HH*0.66],[HR*1.00,ny-HH*0.52],[HR*0.86,ny-HH*0.70],[HR*0.30,ny-HH*0.80],[-HR*0.20,ny-HH*0.78],[-HR*0.86,ny-HH*0.70],[-HR*1.00,ny-HH*0.52],[-HR*1.06,ny-HH*0.66],[-HR*0.90,ny-HH*0.92]]
+        : [[0,ny-HH-vol],[HR*0.95,ny-HH*0.90],[HR*1.10,ny-HH*0.60],[HR*1.06,ny-HH*0.25],[HR*0.84,ny-HH*0.45],[HR*0.60,ny-HH*0.78],[HR*0.05,ny-HH*0.86],[-HR*0.05,ny-HH*0.86],[-HR*0.60,ny-HH*0.78],[-HR*0.84,ny-HH*0.45],[-HR*1.06,ny-HH*0.25],[-HR*1.10,ny-HH*0.60],[-HR*0.95,ny-HH*0.90]];
+      fillPts(cap,g); edge(cap,0.25);
+      c.strokeStyle=rgbA(hHi,0.55); c.lineWidth=lw*0.8;
+      for(let i=-2;i<=2;i++){ c.beginPath(); c.moveTo(i*HR*0.22,ny-HH-vol*0.6); c.quadraticCurveTo(i*HR*0.40,ny-HH*0.9,i*HR*0.46,ny-HH*0.70); c.stroke(); }
+      if(!male && !back){                                                             // two locks over the shoulders
+        [-1,1].forEach(q=>{ const P=[[q*HR*0.95,ny-HH*0.50],[q*HR*1.16,ny-HH*0.20],[q*(HR*1.20),sy+fall*0.55],[q*(HR*0.95),sy+fall*0.72],[q*(HR*0.80),sy+1],[q*HR*0.82,ny-HH*0.25]];
+          fillPts(P,g); edge(P,0.22); }); }
+    }
+    if(back) hairBack();
   } else {
-    const inner = male? 0.5 : 0.9;
-    R(-M.hipW*0.62 - STR, M.hipY, M.legW*1.6, -M.hipY-1-lift, back? sh : skin);
-    R( M.hipW*0.62 - M.legW*1.6 + STR, M.hipY, M.legW*1.6, -M.hipY-1, back? sh : sh);
-    R(-M.hipW*0.62 - STR, M.hipY, M.legW*0.5, -M.hipY-1-lift, hi);
-    R(-M.hipW*0.62-0.6 - STR, -1.6-lift, M.legW*2.2, 1.6, '#6a4a2c');
-    R( M.hipW*0.62-M.legW*1.8 + STR, -1.6, M.legW*2.2, 1.6, '#6a4a2c');
-    if(!male && M.be>=6){ // the inner line of the thigh, which only a full figure has
-      R(-inner, M.hipY+1, inner*2, -M.hipY*0.34, sh2); }
-  }
-
-  // ---------------- HIPS / SEAT ----------------
-  if(side){
-    /* THE SEAT PROJECTS BACKWARD — the whole point of a profile. It was
-       centred behind the figure and read as a balloon on a string; it hangs
-       off the back of the hip now, overlapping it, with the hip drawn first
-       so the two are one mass. */
-    const d=M.seatD + SJ*0.5;
-    R(-M.waistW*0.55, M.hipY-9, M.waistW*1.5, 9.5, skin);          // the hip block itself
-    R(-M.waistW*0.55, M.hipY-9, M.waistW*0.4, 9.5, hi);
-    E(-M.waistW*0.35-d*0.5, M.hipY-4.4, d, 4.6+M.be*0.20, skin);   // and the seat off the back of it
-    E(-M.waistW*0.35-d*0.55, M.hipY-5.6, d*0.52, 2.2, hi);
-    E(-M.waistW*0.35-d*0.30, M.hipY-2.4, d*0.7, 1.6, sh);
-  } else if(back){
-    const bw=M.hipW + SJ*0.34;
-    E(0, M.hipY-4.5, bw, 6.2, skin);
-    E(-bw*0.48, M.hipY-4.5, bw*0.46, 5.0, hi);         // the two halves, lit
-    E( bw*0.48, M.hipY-4.5, bw*0.46, 5.0, sh);
-    R(-0.5, M.hipY-8, 1, 7, sh2);                       // and the cleft between them
-  } else {
-    const bw=M.hipW + SJ*0.22;
-    E(0, M.hipY-4, bw, 5.6, skin);
-    E(-bw*0.34, M.hipY-5, bw*0.5, 3.4, hi);
-    if(!male) R(-1.6, M.hipY-2, 3.2, 2, mixHex(skin,'#8a5a52',0.34));
-  }
-
-  // ---------------- WAIST / TRUNK ----------------
-  { const wTop=M.chestY, wBot=M.hipY-3;
-    /* THE TRUNK IS NOT A TRAPEZIUM. Interpolating chest-width to waist-width in
-       a straight line gave a cardboard sandwich board; a real one pinches — it
-       comes IN faster than linear at the top and flares back out at the hip.
-       And it is lit: a rim down one side, a shadow down the other, and a soft
-       core, which is the whole reason the old ellipse chart read as a body. */
-    for(let y=wTop; y<wBot; y+=1){
-      const t=(y-wTop)/(wBot-wTop);
-      const pinch = Math.sin(t*Math.PI);                 // 0 at both ends, 1 at the waist
-      const lin = side? (M.waistW*0.60 + M.bustD*0.42*(1-t))
-                      : (M.chestW*0.86*(1-t) + M.hipW*0.80*t);
-      const hw = Math.max(1.2, lin - pinch*(male? 0.9 : 2.0));
-      R(-hw, y, hw*2, 1.05, back? shade(skin,-8) : skin);
-      R(-hw, y, hw*0.34, 1.05, hi);                       // the lit edge
-      R(hw-hw*0.30, y, hw*0.30, 1.05, sh);                // and the turn away
-      if(!side && !back && !male && t>0.30 && t<0.86)
-        R(-0.5, y, 1, 1.05, shade(skin,-12));             // the line down the middle of her
-    }
-    if(male && M.wa>=7 && !side){                       // the abdominal bands
-      for(let i=0;i<3;i++) R(-M.waistW*0.5, M.waistY-1-i*2.6, M.waistW, 0.7, sh2); }
-    if(back){                                           // the spine, and the blades
-      R(-0.5, M.chestY+1, 1, (M.hipY-3)-M.chestY-1, sh2);
-      R(-M.chestW*0.62, M.chestY+2, M.chestW*0.40, 1.1, sh2);
-      R( M.chestW*0.22, M.chestY+2, M.chestW*0.40, 1.1, sh2); }
-  }
-
-  // ---------------- CHEST / BUST ----------------
-  if(!back){
-    if(side){
-      const d=M.bustD;
-      if(male){ E(d*0.4, M.chestY+3.4, d*1.15, 3.0+M.bu*0.10, skin);
-                E(d*0.4, M.chestY+2.6, d*0.6, 1.6, hi); }
-      else    { E(d*0.72, M.chestY+3.6, d, 2.6+M.bu*0.22, skin);
-                E(d*0.72, M.chestY+2.8, d*0.55, 1.5, hi);
-                E(d*1.30, M.chestY+4.2, 0.9, 0.9, mixHex(skin,'#8a5248',0.5)); }
-    } else if(male){
-      const cw=M.chestW;
-      E(-cw*0.46, M.chestY+3.2, cw*0.50, 2.8+M.bu*0.12, skin);
-      E( cw*0.46, M.chestY+3.2, cw*0.50, 2.8+M.bu*0.12, shade(skin,-8));
-      E(-cw*0.46, M.chestY+2.4, cw*0.28, 1.2, hi);
-      R(-0.5, M.chestY+1.6, 1, 5.4, sh2);
+    // =============================== PROFILE ===============================
+    // facing +x. Far limbs first, darker; the trunk; then the near limbs.
+    const chestF = male? 3.3+bu*0.20 : 3.0+bu*0.05;
+    const backX  = -(male? 3.6 : 3.2);
+    const bellyF = (male? 2.4 : 2.1)+(10-wa)*0.16;
+    const seat   = M.seatD + 2.2;
+    const J=[0.2, hy+0.6];
+    const rotV=(a,len)=>[Math.sin(a)*len, Math.cos(a)*len];
+    const legS=(s)=>{
+      const th = walking? Math.sin(P0 + (s>0?0:Math.PI))*0.26 : 0;
+      const kb = walking? Math.max(0,-Math.sin(P0 + (s>0?0:Math.PI)))*0.40 : 0;
+      const L=-hy-0.6, lt=L*0.50, ls=L*0.50-2.0;
+      const t1=rotV(th,lt), K=[J[0]+t1[0], J[1]+t1[1]];
+      const t2=rotV(th-kb,ls), A=[K[0]+t2[0], K[1]+t2[1]];
+      const mid=[J[0]+t1[0]*0.45, J[1]+t1[1]*0.45];
+      const calf=[K[0]+t2[0]*0.30-Math.cos(th-kb)*0.45, K[1]+t2[1]*0.30+Math.sin(th-kb)*0.45];
+      const rt=male? 3.4 : 3.1+be*0.12, rm=M.legW*1.45, rk=M.legW*0.90, rc=M.legW*1.18, ra=M.legW*0.50;
+      limb([[J[0],J[1],rt],[mid[0],mid[1],rm],[K[0],K[1],rk],[calf[0],calf[1],rc],[A[0],A[1],ra]], s<0? 0.10 : 0);
+      const fa2=(th-kb)*0.5, cs=Math.cos(fa2), sn=Math.sin(fa2);
+      const ft=(x,y)=>[A[0]+x*cs+y*sn, A[1]+2.0-x*sn+y*cs];
+      const P=[ft(-1.5,-2.2),ft(0.9,-2.3),ft(1.6,-1.6),ft(3.8,-0.8),ft(4.2,-0.1),ft(3.9,0.2),ft(-1.2,0.2),ft(-1.8,-0.6)];
+      fillPts(P,G); if(s<0){ c.fillStyle='rgba(20,8,4,.10)'; c.beginPath(); smoothPath(c,P,true); c.fill(); } edge(P,0.30);
+      soft(K[0]+0.6,K[1]-0.2,rk*0.9,sLit,s<0?0.08:0.22);
+    };
+    const armS=(s)=>{
+      const aS = walking? -Math.sin(P0 + (s>0?0:Math.PI))*0.32 : 0;
+      /* AT HIS SIDE, NOT OVER HIS GROIN. Hung from the front of the shoulder
+         with the forearm canted forward, the hand arrived exactly where the
+         thing the view is partly about is, and covered it. */
+      const S0=[-0.5+(s<0?-0.4:0), sy+1.1], up=(wy-sy)+0.6, fo=(hy-wy)+1.2;
+      const e=rotV(aS,up), E=[S0[0]+e[0], S0[1]+e[1]];
+      const f=rotV(aS+0.05,fo), Wr=[E[0]+f[0], E[1]+f[1]];
+      const r0=(male?2.10:1.60)+lg*0.04, r1=(male?1.55:1.22), r3=(male?0.92:0.74);
+      limb([[S0[0],S0[1],r0],[S0[0]+e[0]*0.45,S0[1]+e[1]*0.45,r0*0.86],[E[0],E[1],r1],[Wr[0],Wr[1],r3]], s<0? 0.22 : 0);
+      const hx=Wr[0]+Math.sin(aS)*1.6-0.3, hyy=Wr[1]+1.6;
+      const P=[[hx-1.0,hyy-1.6],[hx+0.9,hyy-1.6],[hx+1.2,hyy+0.4],[hx+0.5,hyy+1.8],[hx-0.6,hyy+1.6],[hx-1.1,hyy+0.2]];
+      fillPts(P,G); if(s<0){ c.fillStyle='rgba(20,8,4,.22)'; c.beginPath(); smoothPath(c,P,true); c.fill(); } edge(P,0.30);
+      if(s>0) soft(S0[0]-0.2, S0[1]+0.8, r0*1.1, sLit, 0.24);
+    };
+    // her hair falls behind her back — far side of everything
+    const fall = male? 0 : (3 + hq*0.95);
+    if(!male){ const P=[[-HR*0.30,ny-HH-0.8],[-HR*1.05,ny-HH*0.70],[-HR*1.30,sy],[-HR*1.20+jB*0.1,sy+fall],[-HR*0.40,sy+fall+0.4],[-HR*0.30,sy+1],[HR*0.1,ny-HH*0.4]];
+      const g=c.createLinearGradient(-HR*1.4,0,HR*0.2,0); g.addColorStop(0,hSh); g.addColorStop(0.6,hair); g.addColorStop(1,hHi);
+      fillPts(P,g); }
+    armS(-1); legS(-1); legS(1);
+    // ---- THE TRUNK IN PROFILE — throat to crotch down the front, and
+    //      back up past the seat, the small of the back and the nape ----
+    const T=[
+      [NW*1.00, ny+0.8], [NW*1.30, sy-0.4], [chestF*0.92, sy+1.6], [chestF, cy+2.0], [chestF*0.94, cy+5.5],
+      [bellyF*0.88, wy], [bellyF, wy+3.0], [bellyF*0.88, hy-1.4], [1.9, hy+1.2], [0.8, hy+2.9],
+      [-1.2, hy+3.1], [-seat*0.72, hy+2.4+jG*0.3], [-seat, hy-0.8+jG*0.5], [-seat*0.82, hy-3.8],
+      [backX*0.84, wy+0.6], [backX, cy+4.0], [backX*1.05, cy-0.5], [backX*0.85, sy], [-NW*1.20, sy-1.8], [-NW*1.05, ny-0.4]];
+    fillPts(T,G);
+    c.save(); c.beginPath(); smoothPath(c,T,true); c.clip();
+    soft(-seat*0.62, hy-1.4, seat*0.85, sLit, 0.22);                                // light rolls round the seat
+    crease(-seat*0.95, hy+2.0, -seat*0.45, hy+3.2, -0.6, hy+2.8, 0.40, lw*1.2);     // and the fold under it
+    soft(backX*0.6, wy+0.4, 2.2, sDeep, 0.20);                                      // the hollow of the back
+    if(male && wa>=6) for(let r2=0;r2<3;r2++) crease(bellyF*0.55, cy+7+r2*2.4, bellyF*0.85, cy+7.4+r2*2.4, bellyF*0.95, cy+7.0+r2*2.4, 0.22);
+    soft(bellyF*0.7, wy+1.4, 0.45, sDeep, 0.55);                                    // the navel, edge-on
+    c.restore();
+    edge(T,0.32);
+    // ---- the bust in profile — a mass off the front of the chest ----
+    if(!male){
+      /* AS DEEP AS THE PROFILE SAYS. It was the front's radius used as its
+         depth, and a bust-8 came out as a beach ball held against her. */
+      const ry=(0.95+bu*0.60)*0.80, rx=Math.max(0.8,M.bustD*0.78), bx=chestF+rx*0.40, by2=cy+2.8+ry*0.14+jB*0.6+SJ*0.3;
+      c.beginPath(); c.moveTo(chestF*0.80, sy+1.2); c.quadraticCurveTo(bx+rx*0.4, by2-ry*0.9, bx+rx*0.95, by2-ry*0.05);
+      c.lineTo(bx, by2+ry*0.6); c.lineTo(chestF*0.8, by2+ry*0.6); c.closePath(); c.fillStyle=G; c.fill();
+      ball(bx, by2, rx, ry, skin);
+      crease(bx-rx*0.7, by2+ry*0.82, bx+rx*0.2, by2+ry*1.08, bx+rx*0.88, by2+ry*0.45, 0.40, lw*1.2);
+      const r=ry;
+      if(!clothed){ c.fillStyle=mixHex(skin,'#8a4a44',0.40); c.beginPath(); c.ellipse(bx+rx*0.93,by2+ry*0.16,0.26,ry*0.20+0.12,0,0,7); c.fill();
+        c.fillStyle=mixHex(skin,'#6a3030',0.52); c.beginPath(); c.arc(bx+rx*0.99,by2+ry*0.16,0.18+ry*0.03,0,7); c.fill(); }
+      else { const P=[[bx-rx*1.3,by2-ry*0.40],[bx+rx*0.70,by2-ry*0.62],[bx+rx*1.06,by2+ry*0.10],[bx+rx*0.72,by2+ry*0.92],[bx-rx*1.3,by2+ry*0.95]];
+        const g=c.createLinearGradient(bx+rx,0,bx-rx,0); g.addColorStop(0,linHi); g.addColorStop(0.5,linen); g.addColorStop(1,linSh);
+        fillPts(P,g); edge(P,0.35); }
     } else {
-      const r=1.0+M.bu*0.62, dy=SJ*0.30;
-      E(-r*0.92, M.chestY+3.2+dy, r, r*0.90, skin);
-      E( r*0.92, M.chestY+3.2+dy, r, r*0.90, shade(skin,-6));
-      E(-r*1.05, M.chestY+2.4+dy, r*0.45, r*0.36, hi);
-      if(M.bu>=4){ E(-r*0.92, M.chestY+3.6+dy, 0.85, 0.7, mixHex(skin,'#8a5248',0.5));
-                   E( r*0.92, M.chestY+3.6+dy, 0.85, 0.7, mixHex(skin,'#8a5248',0.5)); }
+      soft(chestF*0.8, cy+2.0, 2.6, sLit, 0.20);
+      crease(chestF*0.55, cy+4.9, chestF*0.95, cy+5.2, chestF*1.0, cy+4.3, 0.36, lw*1.2);
+      soft(chestF*1.0, cy+3.4, 0.34, mixHex(skin,'#6a3030',0.45), 0.9);
     }
-  }
-
-  // ---------------- SHOULDERS + ARMS (drawn last, so they are ON him) ----------------
-  { const sW = side? M.shW*0.42 : M.shW;
-    R(-sW, M.shY, sW*2, 3.2, back? shade(skin,-6) : skin);
-    R(-sW, M.shY, sW*2, 0.9, hi);
-    const armL = 17 + M.lg*0.35, aw=1.5+M.lg*0.10;
-    const aSw = sw*1.2;
-    if(side){
-      R(-aw*0.4, M.shY+1, aw*1.9, armL*0.9, shade(skin,-14));
-    } else {
-      // clear of the trunk, so a broad man does not swallow his own arms
-      R(-sW-aw*1.5, M.shY+1 - aSw, aw*2.0, armL, back? sh : skin);
-      R( sW-aw*0.5, M.shY+1 + aSw, aw*2.0, armL, sh);
-      R(-sW-aw*1.5, M.shY+1 - aSw, aw*0.7, armL, hi);
-      R( sW+aw*1.0, M.shY+1 + aSw, aw*0.5, armL, sh2);
-      E(-sW-aw*0.5, M.shY+1+armL - aSw, aw*1.1, aw*1.2, skin);      // the hands
-      E( sW+aw*0.5, M.shY+1+armL + aSw, aw*1.1, aw*1.2, sh);
+    if(clothed){                                                                     // the subligaculum, wrapped round
+      const P=[[bellyF*0.92, hy-3.4],[bellyF*0.98, hy-0.8],[1.8, hy+2.4],[-1.2, hy+3.3],[-seat*0.75, hy+2.6],[-seat*1.03, hy-0.8],[-seat*0.86, hy-3.6]];
+      const g=c.createLinearGradient(bellyF,0,-seat,0); g.addColorStop(0,linHi); g.addColorStop(0.5,linen); g.addColorStop(1,linSh);
+      fillPts(P,g); edge(P,0.35);
+      c.strokeStyle=rgbA(linSh,0.8); c.lineWidth=lw; c.beginPath(); c.moveTo(bellyF*0.92,hy-2.9); c.lineTo(-seat*0.86,hy-3.1); c.stroke();
     }
-  }
-
-  // ---------------- NECK + HEAD ----------------
-  { const nw=1.6+M.fa*0.10;
-    R(-nw, M.headY, nw*2, 4.2, sh);
-    const hw=M.headW, hh=M.headH, hy=M.headY-hh;
-    if(side){
-      E(hw*0.18, hy+hh*0.5, hw*0.92, hh*0.54, skin);
-      E(hw*0.10, hy+hh*0.35, hw*0.45, hh*0.28, hi);
-      if(!back){ R(hw*0.86, hy+hh*0.46, 0.9, 1.4, skin);          // the nose
-                 R(hw*0.55, hy+hh*0.40, 0.9, 0.9, '#2a1a10'); }   // the eye
-    } else {
-      E(0, hy+hh*0.5, hw, hh*0.54, back? shade(skin,-6) : skin);
-      E(-hw*0.32, hy+hh*0.34, hw*0.42, hh*0.26, hi);
-      if(!back){ R(-hw*0.44, hy+hh*0.44, 1.1, 1.0, '#2a1a10');
-                 R( hw*0.34-0.2, hy+hh*0.44, 1.1, 1.0, '#2a1a10');
-                 R(-1.2, hy+hh*0.86, 2.4, 0.8, mixHex(skin,'#a04a4a',0.5)); }
+    if(male && LEN){
+      const d=lenDims(), P2=lengthPose(aro);
+      drawLength(c,{x:1.95, y:hy+1.2, L:d.L, D:d.D, aro, skin, hair, lw,
+        sway: walking? Math.sin(P0*2+0.6)*0.30*(1-P2.lift) + Math.sin(P0*2)*0.05*P2.lift : 0, T:performance.now()});
     }
-    // hair: a cap in front, a fall behind, a silhouette in profile
-    const fall = (male? 1.5 : 4.0) + M.hairq*(male?0.20:0.72);
-    if(side){
-      E(hw*0.02, hy+hh*0.34, hw*0.96, hh*0.40, hair);
-      R(-hw*0.95, hy+hh*0.30, hw*0.7, fall, hair);
-      R(-hw*0.95, hy+hh*0.30, hw*0.25, fall, hHi);
-    } else if(back){
-      E(0, hy+hh*0.46, hw*1.02, hh*0.52, hair);
-      R(-hw*0.86, hy+hh*0.40, hw*1.72, fall, hair);
-      R(-hw*0.86, hy+hh*0.40, hw*0.34, fall, hHi);
-    } else {
-      E(0, hy+hh*0.30, hw*1.02, hh*0.34, hair);
-      R(-hw*1.02, hy+hh*0.24, hw*0.42, fall*0.9, hair);
-      R( hw*0.60, hy+hh*0.24, hw*0.42, fall*0.9, shade(hair,-18));
-      R(-hw*1.02, hy+hh*0.24, hw*0.16, fall*0.9, hHi);
-    }
-  }
-  // ---------------- HIS OWN MEASURE, in profile only ----------------
-  if(male && side && !back && secretAllowed(w)){
-    const len=2.0+M.secret*0.80, th=1.0+M.secret*0.10;
-    R(1.0, M.hipY-4, len, th*1.6, skin);
-    R(1.0, M.hipY-4, len, 0.6, hi);
-    E(1.0+len, M.hipY-4+th*0.8, th*0.9, th*0.9, mixHex(skin,'#c07a68',0.34));
-    E(0.8, M.hipY-2.6, th*1.1, th*1.0, shade(skin,-16));
+    // ---- the head in profile: a real face, not a bead with a dot ----
+    const hx0=0.2;
+    const H=[[hx0-0.2,ny-HH-0.1],[hx0+HR*0.70,ny-HH*0.90],[hx0+HR*0.88,ny-HH*0.66],[hx0+HR*0.80,ny-HH*0.53],
+             [hx0+HR*1.12,ny-HH*0.36],[hx0+HR*0.86,ny-HH*0.28],[hx0+HR*0.93,ny-HH*0.19],[hx0+HR*0.86,ny-HH*0.12],
+             [hx0+HR*0.82,ny-HH*0.03],[hx0+HR*0.48,ny+0.4],[hx0-HR*0.10,ny-HH*0.10],[hx0-HR*0.62,ny-HH*0.28],
+             [hx0-HR*1.02,ny-HH*0.58],[hx0-HR*0.72,ny-HH*0.90]];
+    { const g=c.createRadialGradient(hx0+HR*0.4,ny-HH*0.6,0.3, hx0,ny-HH*0.5,HR*1.5);
+      g.addColorStop(0,sLit); g.addColorStop(0.55,skin); g.addColorStop(1,sSh); fillPts(H,g); edge(H,0.30); }
+    ball(hx0-HR*0.16, ny-HH*0.45, 0.95, 1.55, skin);                                   // the ear
+    crease(hx0-HR*0.10, ny-HH*0.56, hx0-HR*0.30, ny-HH*0.45, hx0-HR*0.14, ny-HH*0.34, 0.40);
+    { const ex=hx0+HR*0.60, eY=ny-HH*0.50;
+      c.fillStyle='#f4eee6'; c.beginPath(); c.ellipse(ex,eY,0.55,0.36,0,0,7); c.fill();
+      c.fillStyle='#3b2a1c'; c.beginPath(); c.arc(ex+0.25,eY+0.02,0.30,0,7); c.fill();
+      c.strokeStyle='#1e120a'; c.lineWidth= male? lw : lw*1.5;
+      c.beginPath(); c.moveTo(ex-0.55,eY); c.quadraticCurveTo(ex,eY-0.62,ex+0.58,eY-0.08); c.stroke();
+      c.strokeStyle=hSh; c.lineWidth= male? lw*2.2 : lw*1.4;
+      c.beginPath(); c.moveTo(ex-0.7,eY-1.2); c.quadraticCurveTo(ex+0.1,eY-(male?1.5:1.7),ex+0.85,eY-1.25); c.stroke(); }
+    { const lipC=male? mixHex(skin,'#8a4a44',0.30) : mixHex(skin,'#b0484c',0.52);
+      c.fillStyle=lipC; c.beginPath(); c.ellipse(hx0+HR*0.88,ny-HH*0.185,0.34,0.30,0,0,7); c.fill();
+      c.beginPath(); c.ellipse(hx0+HR*0.84,ny-HH*0.115,0.32,0.30,0,0,7); c.fill();
+      crease(hx0+HR*0.93,ny-HH*0.15, hx0+HR*0.78,ny-HH*0.15, hx0+HR*0.62,ny-HH*0.16, 0.50);
+      c.fillStyle=rgbA(sDeep,0.5); c.beginPath(); c.ellipse(hx0+HR*0.94,ny-HH*0.29,0.25,0.14,0,0,7); c.fill(); }
+    // hair: a cap over the skull, and her fall off the back of it
+    { const g=c.createLinearGradient(hx0+HR,0,hx0-HR*1.2,0); g.addColorStop(0,hHi); g.addColorStop(0.5,hair); g.addColorStop(1,hSh);
+      const vol=0.4+hq*0.09;
+      const cap = male
+        ? [[hx0-0.2,ny-HH-vol],[hx0+HR*0.66,ny-HH*0.94],[hx0+HR*0.72,ny-HH*0.80],[hx0+HR*0.10,ny-HH*0.76],[hx0-HR*0.10,ny-HH*0.52],[hx0-HR*0.40,ny-HH*0.40],[hx0-HR*0.78,ny-HH*0.26],[hx0-HR*1.08,ny-HH*0.52],[hx0-HR*0.80,ny-HH*0.92]]
+        : [[hx0-0.2,ny-HH-vol],[hx0+HR*0.72,ny-HH*0.94],[hx0+HR*0.76,ny-HH*0.78],[hx0+HR*0.20,ny-HH*0.80],[hx0-HR*0.05,ny-HH*0.55],[hx0-HR*0.40,ny-HH*0.20],[hx0-HR*1.12,ny-HH*0.25],[hx0-HR*1.14,ny-HH*0.62],[hx0-HR*0.84,ny-HH*0.94]];
+      fillPts(cap,g); edge(cap,0.25);
+      c.strokeStyle=rgbA(hHi,0.5); c.lineWidth=lw*0.8;
+      for(let i=0;i<4;i++){ c.beginPath(); c.moveTo(hx0+HR*(0.5-i*0.3),ny-HH-vol*0.5); c.quadraticCurveTo(hx0-HR*(0.2+i*0.2),ny-HH*0.85,hx0-HR*(0.5+i*0.15),ny-HH*(0.5-i*0.05)); c.stroke(); } }
+    armS(1);
   }
 }
+/* the old name, kept, because three call sites and a preview use it */
+function drawChartFig(c, w, view, ph, opt){ return drawRealFig(c, w, view, ph, opt); }
 function drawBodyMap(cnv,w,view,tms){
   view=view||'front';
   const c=cnv.getContext('2d'); c.imageSmoothingEnabled=true;
@@ -8394,7 +8911,12 @@ function drawBodyMap(cnv,w,view,tms){
     drawPartPicker(c,cnv,w,view,W2,H2,GUT);
     return;
   }
-  if(SETTINGS.bluntBody && view!=='secret'){
+  /* THE STARING VIEWS ARE NOT CAUGHT HERE. This branch used to take every
+     view but the secret one and return, so with REAL on the PUBLIC EYES and
+     SPOUSE'S EYES views drew a man standing still with no eyes on him at all
+     — the entire point of those views, gone. They draw the real figure in
+     their own branch now, walking, with the eyes on it. */
+  if(SETTINGS.bluntBody && view!=='secret' && view!=='eyes' && view!=='spouse'){
     c.save();
     /* FITTED, and drawn per view. drawChartFig stands on y=0 and reaches about
        -72, so it always lands inside the frame whatever the scores say — the
@@ -8403,7 +8925,7 @@ function drawBodyMap(cnv,w,view,tms){
        than one geometry flipped. */
     c.translate(0, 69 - bob*0.8);
     c.imageSmoothingEnabled=true;
-    try{ drawChartFig(c, w, view, bodyMapWalk? ph : undefined); }catch(e){}
+    try{ drawRealFig(c, w, view, bodyMapWalk? ph : undefined, {showLen: male && secretAllowed(w)}); }catch(e){}
     c.restore();
     // the slap still rings through it, and she still stands on something
     c.fillStyle='rgba(0,0,0,.30)';
@@ -8462,209 +8984,239 @@ function drawBodyMap(cnv,w,view,tms){
        secret graph read as a chart about nobody. The real man stands beside his
        own measurements now, at the same walk phase as the rest of the chart. */
     if(SETTINGS.bluntBody){
-      c.save();
-      c.translate(30, H2-FOOT-10 - bob*1.2);
-      c.scale(1.15,1.15);
-      // the PROFILE, because that is the view his own measure is drawn in
-      try{ drawChartFig(c, w, 'side', bodyMapWalk? ph : undefined); }catch(e){}
-      c.restore();
+      /* AT A SIZE YOU CAN SEE. He stood at 1.15x — eighty pixels of man
+         beside a two-hundred-pixel chart about him. He is full height now, in
+         profile, and his own length rises on him while it rises on the chart. */
+      const K2=Math.min(3.0, (H2-FOOT-40)/74);
       c.globalAlpha=0.30; c.fillStyle='#000';
-      c.beginPath(); c.ellipse(26, H2-FOOT-8, 15, 3, 0,0,7); c.fill(); c.globalAlpha=1;
+      c.beginPath(); c.ellipse(40, H2-FOOT-6, 20, 3.4, 0,0,7); c.fill(); c.globalAlpha=1;
+      c.save();
+      c.translate(38, H2-FOOT-6 - bob*1.2);
+      c.scale(K2,K2);
+      try{ drawRealFig(c, w, 'side', bodyMapWalk? ph : undefined, {showLen:true}); }catch(e){}
+      c.restore();
     }
-    const cx=FW/2, top=44, K=1.30;
-    c.save(); c.translate(cx,top); c.scale(K,K); c.translate(-cx,-top);   // fill the taller chart
-    /* THE LEVEL, not the switch. Every geometry term below used to read
-       `aro? this : that` and cut between two drawings on one frame; they
-       are all mixes now, so the study rises rather than appearing. */
+    /* ---- THE LAYOUT, top to bottom, in plate units: the reading, the quote,
+       the RISE gauge, the study, and the rank rule with its ladder. K is what
+       fits all of that between the header and the scale strip at y=266. ---- */
+    const cx=FW/2, top=44, K=1.15;
+    c.save(); c.translate(cx,top); c.scale(K,K); c.translate(-cx,-top);
     const aro = clamp(secretAroLv, 0, 1.06);
     const mix = (rest, up)=> rest + (up-rest)*aro;
-    const ARO = aro>0.5;                    // for the words, which do not tween
+    const pose = lengthPose(aro);
     const sv=gv('secret');
     // the two derived measures — a chart with only one number on it is not a chart
     const gvGirth = clamp(Math.round(sv*0.62 + bu*0.38), 1, sv>=IMPOSSIBLE_V?IMPOSSIBLE_V:10);
     const gvSeat  = clamp(Math.round(lg*0.34 + wa*0.30 + be*0.36), 1, imp?IMPOSSIBLE_V:10);
     const SUBS={
-      profile:{val:sv,      tiers:SECRET_PART.tiers,                                   label:'LENGTH', ends:['SHORT','IMMENSE']},
-      girth:  {val:gvGirth, tiers:['Slight','Slim','Middling','Thick','Immense'],       label:'GIRTH',  ends:['SLIGHT','IMMENSE']},
-      behind: {val:gvSeat,  tiers:['Flat','Plain','Firm','Heavy','Slab'],               label:'RUMP',   ends:['FLAT','SLAB']},
+      profile:{val:sv,      tiers:SECRET_PART.tiers,                             label:'LENGTH'},
+      girth:  {val:gvGirth, tiers:['Slight','Slim','Middling','Thick','Immense'], label:'GIRTH'},
+      behind: {val:gvSeat,  tiers:['Flat','Plain','Firm','Heavy','Slab'],         label:'RUMP'},
     };
     const SB=SUBS[secretSub]||SUBS.profile;
-    const val=SB.val;
-    /* ---- THE MEASURE THAT MOVES. The study grew when he rose and the RULE
-       underneath it did not — the run, the ▲ and the reading all sat on the
-       resting score, so the one part of the chart anybody actually watches
-       was frozen while the drawing changed. eff is the live measure, and it
-       is computed HERE so the rule can travel on it too. ---- */
-    const AROGAIN = {profile:2.2, girth:1.6, behind:0.9};
-    const eff = mix(val, Math.min(IMPOSSIBLE_V, val + (AROGAIN[secretSub]||2.2)));
-    const impS=eff>=IMPOSSIBLE_V;
-    const tier= impS? 'IMPOSSIBLE' : SB.tiers[clamp(Math.floor((eff-1)/2),0,SB.tiers.length-1)];
-    const col = impS? '#ff7ae0' : heatColor(eff);
-    /* ---- THE RULE. A surveyor's rule with numerals, a coloured run up to the
-       measure, and ROME'S AVERAGE pinned on it — a number with nothing to read
-       it against is not a measurement, it is a boast. ---- */
-    { const pl=bmOnce('plate',()=>{ const gg=c.createLinearGradient(0,top-14,0,top+176);
+    const val=SB.val, impS=val>=IMPOSSIBLE_V;
+    /* ---- THE RANK DOES NOT MOVE. Adding the swell to the score walked a
+       LONG straight up into IMMENSE and read him at 10.2 of 10, which is a
+       scale that has stopped being one. The rank is what he is; the rise
+       has its own gauge, its own name for each rank, and a length in digits
+       that climbs while the rank sits still. ---- */
+    const RISES = (secretSub!=='behind');
+    const tier = restName(secretSub, val);
+    const upName = RISES? rousedName(secretSub, val) : null;
+    const col  = impS? '#ff7ae0' : heatColor(val);
+    const REALC = !!SETTINGS.bluntBody;                   // skin in REAL, the chart's heat in DIAGRAM
+    // ---- the plate ----
+    { const pl=bmOnce('plate2',()=>{ const gg=c.createLinearGradient(0,top-14,0,top+191);
         gg.addColorStop(0,'rgba(255,255,255,.10)'); gg.addColorStop(1,'rgba(255,255,255,.03)'); return gg; });
-      c.fillStyle=pl; c.fillRect(cx-66,top-14,132,190);
-      c.strokeStyle='rgba(220,180,240,.16)'; c.lineWidth=1; c.strokeRect(cx-66.5,top-13.5,132,190); }
+      c.fillStyle=pl; c.fillRect(cx-66,top-14,132,205);
+      c.strokeStyle='rgba(220,180,240,.16)'; c.lineWidth=1; c.strokeRect(cx-66.5,top-13.5,132,205); }
+    /* ---- THE RULE, pinned to the rank. Ticks, numerals, ROME's common run,
+       and the five rungs of the ladder written under their own stretch of
+       it, so the tier name is read off the rule rather than asserted. ---- */
+    const RY=top+157, RX0=cx-52, RW=104, rx=(v)=>RX0+(clamp(v,0,10)/10)*RW;
     c.strokeStyle='rgba(220,180,240,.35)'; c.lineWidth=1;
-    c.beginPath(); c.moveTo(cx-52,top+128); c.lineTo(cx+52,top+128); c.stroke();
-    c.fillStyle=rgbA(col,0.30); c.fillRect(cx-52, top+125, (clamp(eff,0,10)/10)*104, 3);   // the run made good
+    c.beginPath(); c.moveTo(RX0,RY); c.lineTo(RX0+RW,RY); c.stroke();
+    c.fillStyle=rgbA(col,0.34); c.fillRect(RX0, RY-3, rx(val)-RX0, 3);            // the run made good
     for(let i2=0;i2<=10;i2++){
-      const gx2=cx-52+(i2/10)*104, big=(i2%2===0);
-      c.strokeStyle= i2<=eff? heatColor(i2||1) : 'rgba(255,255,255,.18)';
-      c.lineWidth= big?2:1; c.beginPath(); c.moveTo(gx2,top+128); c.lineTo(gx2,top+128-(big?9:5)); c.stroke();
-      if(big && i2){ c.font='6px Georgia,serif'; c.fillStyle= i2<=eff?'rgba(240,220,250,.55)':'rgba(230,210,240,.26)';
-        c.textAlign='center'; c.fillText(String(i2), gx2, top+136); }
+      const gx2=rx(i2), big=(i2%2===0);
+      c.strokeStyle= i2<=val? heatColor(i2||1) : 'rgba(255,255,255,.18)';
+      c.lineWidth= big?2:1; c.beginPath(); c.moveTo(gx2,RY); c.lineTo(gx2,RY-(big?9:5)); c.stroke();
+      if(big && i2){ c.font='6px Georgia,serif'; c.fillStyle= i2<=val?'rgba(240,220,250,.60)':'rgba(230,210,240,.28)';
+        c.textAlign='center'; c.fillText(String(i2), gx2, RY+8); }
     }
-    /* WHERE IT STARTED, so the travel is visible as travel and not just as a
-       bigger number. A hollow pip stays behind at the resting measure. */
-    if(aro>0.06){ const rx2=cx-52+(clamp(val,0,10)/10)*104;
-      c.strokeStyle='rgba(255,255,255,'+(0.50*Math.min(1,aro)).toFixed(2)+')'; c.lineWidth=1;
-      c.beginPath(); c.arc(rx2, top+126.5, 2.4, 0, 7); c.stroke();
-      c.beginPath(); c.moveTo(rx2, top+121); c.lineTo(rx2, top+124); c.stroke(); }
-    { const ax2=cx-52+(5/10)*104;                                       // where everyone else stands
+    /* the five rungs, STAGGERED onto two rows — side by side at this size
+       they ran together into SHORTMODESTAVERAGELONGIMMENSE */
+    { const ti=tierIdxOf(val);
+      for(let b2=0;b2<5;b2++){ const x0=rx(b2*2), x1=rx(b2*2+2), on=(b2===ti)&&!impS;
+        const yy= RY + ((b2%2)? 21 : 15);
+        if(on){ c.fillStyle=rgbA(col,0.26); c.fillRect(x0+0.5, RY+1, x1-x0-1, 3); }
+        c.font=(on?'bold ':'')+'5.5px Georgia,serif'; c.textAlign='center';
+        c.fillStyle= on? readOn(col) : 'rgba(230,210,240,.36)';
+        c.fillText(SB.tiers[b2].toUpperCase(), (x0+x1)/2, yy); } }
+    { const ax2=rx(5);                                                          // where everyone else stands
       c.strokeStyle='rgba(255,255,255,.36)'; c.setLineDash([2,2]); c.lineWidth=1;
-      c.beginPath(); c.moveTo(ax2,top+117); c.lineTo(ax2,top+128); c.stroke(); c.setLineDash([]);
-      c.font='6px Georgia,serif'; c.fillStyle='rgba(230,214,244,.50)'; c.textAlign='center';
-      c.fillText('ROME', ax2, top+114); }
-    c.font='bold 8px Georgia,serif'; c.fillStyle='rgba(230,210,240,.5)';
-    c.textAlign='left';  c.fillText(SB.ends[0], cx-52, top+147);
-    c.textAlign='right'; c.fillText(SB.ends[1], cx+52, top+147);
-    { const mx=clamp(cx-52+(eff/10)*104, cx-40, cx+40);
-      c.textAlign='center'; c.fillStyle=readOn(col); c.fillText('▲ '+tier.toUpperCase(), mx, top+158);
-      const ov=eff-5, d1=(n)=>(Math.round(n*10)/10).toFixed(1);
-      if(ov>0.05){ c.fillStyle='rgba(230,214,244,.40)'; c.font='italic 7px Georgia,serif';
-        c.fillText('+'+d1(ov)+' over Rome’s common run', cx, top+168); }
-      else if(ov<-0.05){ c.fillStyle='rgba(230,214,244,.34)'; c.font='italic 7px Georgia,serif';
-        c.fillText(d1(-ov)+' under Rome’s common run', cx, top+168); } }
+      c.beginPath(); c.moveTo(ax2,RY-15); c.lineTo(ax2,RY); c.stroke(); c.setLineDash([]);
+      c.font='5.5px Georgia,serif'; c.fillStyle='rgba(230,214,244,.50)'; c.textAlign='center';
+      c.fillText('ROME', ax2, RY-17); }
+    { const mx=rx(val);                                                         // the ▲, on the rank and nowhere else
+      c.fillStyle=readOn(col); c.beginPath(); c.moveTo(mx,RY-10); c.lineTo(mx-3.2,RY-15.5); c.lineTo(mx+3.2,RY-15.5); c.closePath(); c.fill();
+      const ov=val-5;
+      c.font='italic 7px Georgia,serif'; c.textAlign='center';
+      if(impS){ c.fillStyle='#ff9ae6'; c.fillText('past the end of the rule', cx, RY+30); }
+      else if(ov>0){ c.fillStyle='rgba(230,214,244,.42)'; c.fillText('+'+ov+' over Rome’s common run', cx, RY+30); }
+      else if(ov<0){ c.fillStyle='rgba(230,214,244,.36)'; c.fillText((-ov)+' under Rome’s common run', cx, RY+30); }
+      else { c.fillStyle='rgba(230,214,244,.36)'; c.fillText('Rome’s common run, exactly', cx, RY+30); } }
+    /* ---- THE RISE GAUGE. This is the thing that moves when he does. ---- */
+    if(RISES){
+      const gx=cx-52, gy=top+46, gw=104, f=clamp(aro,0,1), moving=!arouseSettled();
+      c.fillStyle='rgba(0,0,0,.40)'; c.fillRect(gx-1,gy-1,gw+2,6);
+      const gg=c.createLinearGradient(gx,0,gx+gw,0); gg.addColorStop(0,'#6a2f5a'); gg.addColorStop(0.7,'#e05aa8'); gg.addColorStop(1,'#ffb0e0');
+      c.fillStyle=gg; c.fillRect(gx,gy,gw*f,4);
+      if(f>0.01){ c.fillStyle='rgba(255,255,255,.35)'; c.fillRect(gx,gy,gw*f,1); }
+      for(let i=1;i<10;i++){ c.fillStyle='rgba(0,0,0,.38)'; c.fillRect(gx+gw*i/10-0.3,gy,0.6,4); }
+      /* SHORT ON THE LEFT, THE DESTINATION ON THE RIGHT. "◐ RISING" and
+         "36% → ELONGATED" both at full length met in the middle and
+         printed over one another. */
+      c.font='bold 6px Georgia,serif'; c.textAlign='left';
+      c.fillStyle= moving? '#ff8ad0' : (f>0.5? '#ffb0e0' : 'rgba(230,210,240,.62)');
+      c.fillText('RISE '+Math.round(f*100)+'%', gx, gy-2.5);
+      c.textAlign='right'; c.fillStyle= f>0.5? '#ffb0e0' : 'rgba(230,210,240,.50)';
+      c.fillText('→ '+upName, gx+gw, gy-2.5);
+    }
     // ---- THE STUDY ITSELF. A man's physics live here and nowhere else. ----
-    const phys = anim * mix(5.0, 2.2) * Math.sin(ph*2);
+    const sway = anim*Math.sin(ph*2)*(0.30-0.24*pose.lift);
     if(secretSub==='profile'){
-      const len = mix(11, 18) + (eff/10)*mix(80, 96);
-      const th  = mix(8.5, 11) + (eff/10)*mix(6, 8);
-      const baseX=cx-52, baseY=top+87;
-      const rise = mix(6 + eff*0.35, -14 - eff*0.9) + phys;
-      const tipX = baseX+len + anim*Math.cos(ph*2)*mix(2.6, 1.2), tipY = baseY+rise;
-      const midX = baseX+len*0.55, midY = baseY+rise*0.42 + mix(4, -3) + phys*0.35;
-      // a cast shadow on the plate, so the study sits ON something
-      c.fillStyle='rgba(0,0,0,.22)';
-      c.beginPath(); c.ellipse((baseX+tipX)/2, baseY+th*0.95, len*0.48, th*0.24, 0,0,7); c.fill();
-      // the study, modelled: lit along the top, shadowed underneath
-      const grad=c.createLinearGradient(0,baseY-th*0.6,0,baseY+th*0.7);
-      grad.addColorStop(0, lit2(col,1.30)); grad.addColorStop(0.42, col); grad.addColorStop(1, shade2(col));
-      const capseg=(x1,y1,x2,y2,r1,r2)=>{ const a2=Math.atan2(y2-y1,x2-x1); c.fillStyle=grad;
-        c.beginPath(); c.arc(x1,y1,r1,a2+1.5708,a2-1.5708); c.arc(x2,y2,r2,a2-1.5708,a2+1.5708); c.closePath(); c.fill();
-        c.strokeStyle='rgba(0,0,0,.30)'; c.lineWidth=0.8; c.stroke(); };
-      capseg(baseX,baseY, midX,midY, th*0.54, th*0.50);
-      capseg(midX,midY, tipX,tipY, th*0.50, th*0.46);
-      c.fillStyle=grad; c.beginPath(); c.arc(tipX,tipY,th*0.56,0,7); c.fill();
-      c.strokeStyle='rgba(0,0,0,.30)'; c.lineWidth=0.8; c.beginPath(); c.arc(tipX,tipY,th*0.56,0,7); c.stroke();
-      c.fillStyle='rgba(0,0,0,.20)'; c.beginPath(); c.ellipse(tipX-th*0.16,tipY,th*0.16,th*0.5,0,0,7); c.fill();
-      c.fillStyle=grad;
-      c.beginPath(); c.arc(baseX+2, baseY+th*0.52+anim*Math.sin(ph*2+0.6)*1.1, th*0.44,0,7); c.fill();
-      c.beginPath(); c.arc(baseX+11, baseY+th*0.56+anim*Math.sin(ph*2+1.2)*1.1, th*0.42,0,7); c.fill();
-      c.strokeStyle='rgba(255,255,255,.26)'; c.lineWidth=1.1;                 // the lit ridge along the top
-      c.beginPath(); c.moveTo(baseX+4,baseY-th*0.34); c.quadraticCurveTo(midX,midY-th*0.42,tipX-th*0.3,tipY-th*0.34); c.stroke();
-      if(val>=8){ c.strokeStyle='rgba(255,255,255,.13)'; c.lineWidth=0.8;      // and the definition a high score earns
-        c.beginPath(); c.moveTo(baseX+8,baseY+th*0.10); c.quadraticCurveTo(midX,midY+th*0.06,tipX-th*0.6,tipY+th*0.04); c.stroke(); }
-      // GHOST OF AT REST, drawn OVER the study — when roused, the difference is
-      // the entire point of the view, so it must be the thing you can see.
-      if(aro>0.06){ const rlen=11+(val/10)*80, rth=8.5+(val/10)*6, rrise=6+val*0.35;
-        c.strokeStyle='rgba(255,255,255,'+(0.42*Math.min(1,aro)).toFixed(2)+')'; c.setLineDash([3,3]); c.lineWidth=1.1;
-        c.beginPath(); c.moveTo(baseX,baseY-rth*0.5); c.lineTo(baseX+rlen,baseY+rrise-rth*0.45);
-        c.arc(baseX+rlen,baseY+rrise,rth*0.5,-1.5708,1.5708);
-        c.lineTo(baseX,baseY+rth*0.5); c.closePath(); c.stroke(); c.setLineDash([]);
-        c.font='italic 6px Georgia,serif';
-        c.fillStyle='rgba(255,255,255,'+(0.55*Math.min(1,aro)).toFixed(2)+')'; c.textAlign='left';
-        c.fillText('at rest', baseX+rlen+4, baseY+rrise+9); }
-      // a calliper span across the whole length, because this IS a measurement
-      c.strokeStyle='rgba(230,210,240,.34)'; c.lineWidth=1;
-      const cy2=baseY+th*1.5;
-      c.beginPath(); c.moveTo(baseX,cy2-4); c.lineTo(baseX,cy2+4);
-      c.moveTo(tipX+th*0.56,cy2-4); c.lineTo(tipX+th*0.56,cy2+4);
-      c.moveTo(baseX,cy2); c.lineTo(tipX+th*0.56,cy2); c.stroke();
-      c.fillStyle='rgba(230,210,240,.55)'; c.font='bold 8px Georgia,serif'; c.textAlign='left';
-      { const moving=!arouseSettled();
-        const word = moving? (secretAroused? 'RISING' : 'SUBSIDING')
-                   : ARO? 'AROUSED' : 'AT REST';
-        c.fillStyle= moving? '#ff8ad0' : 'rgba(230,210,240,.55)';
-        c.fillText('◐ '+word+(moving? '  '+Math.round(Math.min(1,aro)*100)+'%' : '')
-                   +(anim?' · IN MOTION':''), baseX, baseY-th-14); }
+      const V=clamp(val,1,IMPOSSIBLE_V);
+      const Lr=18+V*3.9, Dr=8+V*0.70;
+      const baseX=cx-46, baseY=top+88;
+      const skinC=w.skin||'#caa06a';
+      /* THE BODY IT BELONGS TO, faintly: the belly, the mound and the top of
+         the thigh in profile. A length floating in the middle of a plate is
+         a specimen; attached to somebody it is a man. */
+      c.save(); c.beginPath(); c.rect(cx-66,top-14,132,204); c.clip();
+      { const bc= REALC? hexOf(skinC) : hexOf(heatColor(Math.max(1,val-2)));
+        const bg2=c.createLinearGradient(cx-66,0,baseX+4,0);
+        bg2.addColorStop(0,rgbA(bc,0.10)); bg2.addColorStop(1,rgbA(bc,0.34));
+        c.fillStyle=bg2; c.beginPath();
+        c.moveTo(cx-70, top+56);
+        c.bezierCurveTo(baseX-14,top+58, baseX-2,baseY-26, baseX-1,baseY-6);   // down the belly to the mound
+        c.quadraticCurveTo(baseX+1,baseY+4, baseX-5,baseY+14);                 // under it, into the fold
+        c.bezierCurveTo(baseX-2,baseY+30, baseX-6,top+140, baseX-10,top+150);  // the front of the thigh
+        c.lineTo(cx-70, top+150); c.closePath(); c.fill();
+        c.strokeStyle=rgbA(bc,0.55); c.lineWidth=0.9; c.stroke(); }
+      // a soft heat behind it that comes up as he does
+      if(aro>0.04){ const hg=c.createRadialGradient(baseX+34,baseY-10,2, baseX+34,baseY-10,72);
+        hg.addColorStop(0,'rgba(255,120,200,'+(0.18*Math.min(1,aro)).toFixed(3)+')'); hg.addColorStop(1,'rgba(255,120,200,0)');
+        c.fillStyle=hg; c.fillRect(cx-66,top+40,132,120); }
+      c.restore();
+      const G0 = (aro>0.06)? drawLength(c,{x:baseX,y:baseY,L:Lr,D:Dr,aro:0,ghost:true,alpha:0.40*Math.min(1,aro)}) : null;
+      const G2=drawLength(c,{x:baseX,y:baseY,L:Lr,D:Dr,aro, skin:skinC, tint:REALC? null : col, tintK:0.50,
+                             hair:w.hair||'#2a1a10', sway, T:tms});
+      if(G0){ c.font='italic 6px Georgia,serif'; c.textAlign='right';              // labelled at its own tip,
+        c.fillStyle='rgba(255,255,255,'+(0.55*Math.min(1,aro)).toFixed(2)+')';  // on the side ROME is not
+        c.fillText('at rest', G0.tipX-4, G0.tipY+3); }
+      /* A CALLIPER ALONG IT, root to tip, with the length in digits between
+         the jaws. It lies to whichever side is clear: forward of a hang,
+         under a stand. */
+      { const dx=G2.tipX-baseX, dy=G2.tipY-baseY, m=Math.hypot(dx,dy)||1, ux=dx/m, uy=dy/m;
+        let px2=-uy, py2=ux; if(px2+py2 < (uy)+(-ux)) { px2=uy; py2=-ux; }
+        const off=G2.dia*0.85+5, ax=baseX+px2*off, ay=baseY+py2*off, bx2=G2.tipX+px2*off, by2=G2.tipY+py2*off;
+        c.strokeStyle='rgba(230,210,240,.40)'; c.lineWidth=0.9;
+        c.beginPath(); c.moveTo(ax,ay); c.lineTo(bx2,by2);
+        c.moveTo(ax-px2*3,ay-py2*3); c.lineTo(ax+px2*3,ay+py2*3);
+        c.moveTo(bx2-px2*3,by2-py2*3); c.lineTo(bx2+px2*3,by2+py2*3); c.stroke();
+        const d=lengthDigits(V, aro);
+        c.save(); c.translate((ax+bx2)/2+px2*7,(ay+by2)/2+py2*7);
+        let an=Math.atan2(uy,ux); if(an>Math.PI/2) an-=Math.PI; if(an<-Math.PI/2) an+=Math.PI; c.rotate(an);
+        c.font='bold 7px Georgia,serif'; c.textAlign='center';
+        c.fillStyle= aro>0.06? '#ffb0e0' : 'rgba(240,220,250,.70)';
+        c.fillText(d.toFixed(1)+' digiti', 0, 2.5); c.restore(); }
     } else if(secretSub==='girth'){
       // HEAD-ON — the ring gauge. Foreshortened to nothing but its section.
-      const R = 6 + (eff/10)*17;
-      const ccx=cx, ccy=top+82 + phys*0.4;
+      const Rr = 6 + (clamp(val,1,IMPOSSIBLE_V)/10)*15, R = Rr*(1+LEN_THICK*pose.swell);
+      const ccx=cx, ccy=top+96 + anim*Math.sin(ph*2)*1.4;
       for(let r2=3;r2>=1;r2--){ c.strokeStyle='rgba(220,180,240,'+(0.10*r2)+')'; c.lineWidth=1;
         c.beginPath(); c.arc(ccx,ccy,R+r2*4,0,7); c.stroke(); }
+      if(aro>0.06){ c.strokeStyle='rgba(255,255,255,'+(0.40*Math.min(1,aro)).toFixed(2)+')'; c.setLineDash([2,2]);
+        c.beginPath(); c.arc(ccx,ccy,Rr,0,7); c.stroke(); c.setLineDash([]); }
+      const base = REALC? hexOf(w.skin||'#caa06a') : hexOf(col);
+      const tint2= REALC? base : mixHex(hexOf(w.skin||'#caa06a'), base, 0.50);
       c.fillStyle='rgba(0,0,0,.24)'; c.beginPath(); c.ellipse(ccx,ccy+R*1.30,R*0.92,R*0.20,0,0,7); c.fill();
-      c.fillStyle=col;                                        // the pair, tucked behind and in shadow
-      c.beginPath(); c.arc(ccx-R*0.72,ccy+R*0.9,R*0.42,0,7); c.fill();
-      c.beginPath(); c.arc(ccx+R*0.72,ccy+R*0.9,R*0.40,0,7); c.fill();
-      c.fillStyle='rgba(0,0,0,.22)';
-      c.beginPath(); c.arc(ccx-R*0.72,ccy+R*0.9,R*0.42,0,7); c.fill();
-      c.beginPath(); c.arc(ccx+R*0.72,ccy+R*0.9,R*0.40,0,7); c.fill();
-      { const rg=c.createRadialGradient(ccx-R*0.34,ccy-R*0.38,R*0.10, ccx,ccy,R*1.06);   // a sphere, not a disc
-        rg.addColorStop(0, lit2(col,1.42)); rg.addColorStop(0.52, col); rg.addColorStop(1, shade2(col));
-        c.fillStyle=rg; c.beginPath(); c.arc(ccx,ccy,R,0,7); c.fill(); }
-      c.fillStyle='rgba(255,255,255,.22)'; c.beginPath(); c.arc(ccx-R*0.32,ccy-R*0.34,R*0.30,0,7); c.fill();
-      c.strokeStyle='rgba(0,0,0,.35)'; c.lineWidth=1.2; c.beginPath(); c.arc(ccx,ccy,R,0,7); c.stroke();
-      // CALLIPER JAWS actually closing on it, with the span written between them
+      [[-0.72,0.42],[0.72,0.40]].forEach(([k,r])=>{                          // the pair, tucked behind and in shadow
+        const g4=c.createRadialGradient(ccx+R*k-R*0.1,ccy+R*0.8,1, ccx+R*k,ccy+R*0.9,R*r*1.1);
+        g4.addColorStop(0,mixHex(tint2,'#ffffff',0.18)); g4.addColorStop(1,mixHex(tint2,'#120808',0.50));
+        c.fillStyle=g4; c.beginPath(); c.arc(ccx+R*k,ccy+R*(0.9-0.25*pose.swell),R*r,0,7); c.fill(); });
+      { const gl=mixHex(tint2,'#b04a58',0.20+0.30*pose.flush);
+        const rg=c.createRadialGradient(ccx-R*0.34,ccy-R*0.38,R*0.10, ccx,ccy,R*1.06);   // a sphere, not a disc
+        rg.addColorStop(0, mixHex(gl,'#ffffff',0.42)); rg.addColorStop(0.52, gl); rg.addColorStop(1, mixHex(gl,'#120808',0.48));
+        c.fillStyle=rg; c.beginPath(); c.arc(ccx,ccy,R,0,7); c.fill();
+        c.strokeStyle=rgbA(mixHex(gl,'#120808',0.5),0.55); c.lineWidth=1.2;               // the corona, seen end-on
+        c.beginPath(); c.arc(ccx,ccy,R*0.97,0,7); c.stroke();
+        c.strokeStyle='rgba(40,8,8,.55)'; c.lineWidth=1.1;                                 // and the meatus
+        c.beginPath(); c.moveTo(ccx,ccy-R*0.18); c.lineTo(ccx,ccy+R*0.14); c.stroke();
+        const cover=(1-pose.flush)*0.8;                                                     // the hood, from the front: a ring closing in
+        if(cover>0.02){ c.strokeStyle=rgbA(tint2,0.95); c.lineWidth=R*cover*0.9;
+          c.beginPath(); c.arc(ccx,ccy,R*(1-cover*0.45),0,7); c.stroke(); } }
+      c.fillStyle='rgba(255,255,255,.20)'; c.beginPath(); c.arc(ccx-R*0.32,ccy-R*0.34,R*0.26,0,7); c.fill();
+      // CALLIPER JAWS actually closing on it, with the span in digits between them
       c.strokeStyle='rgba(240,220,250,.55)'; c.lineWidth=1.4;
       c.beginPath(); c.moveTo(ccx-R-9,ccy-9); c.lineTo(ccx-R-2,ccy-2); c.lineTo(ccx-R-2,ccy+2); c.lineTo(ccx-R-9,ccy+9); c.stroke();
       c.beginPath(); c.moveTo(ccx+R+9,ccy-9); c.lineTo(ccx+R+2,ccy-2); c.lineTo(ccx+R+2,ccy+2); c.lineTo(ccx+R+9,ccy+9); c.stroke();
       c.strokeStyle='rgba(240,220,250,.30)'; c.lineWidth=1; c.setLineDash([2,2]);
       c.beginPath(); c.moveTo(ccx-R-2,ccy); c.lineTo(ccx+R+2,ccy); c.stroke(); c.setLineDash([]);
-      c.fillStyle='rgba(240,220,250,.70)'; c.font='bold 7px Georgia,serif'; c.textAlign='left';
-      c.fillText('◄ '+val+'/10', ccx+R+13, ccy+3);
-      c.fillStyle='rgba(230,210,240,.55)'; c.font='bold 8px Georgia,serif';
-      c.fillText('◧ HEAD-ON · ACROSS', cx, top+56);
+      c.fillStyle= aro>0.06? '#ffb0e0' : 'rgba(240,220,250,.72)'; c.font='bold 7px Georgia,serif'; c.textAlign='left';
+      c.fillText(girthDigits(val,aro).toFixed(1)+' digiti', ccx+R+11, ccy+3);
     } else {
-      // BEHIND — the rump, as the chart measures every other rear on it
-      const W3=11+(eff/10)*18, H3=7+(eff/10)*10;
-      const bx=cx, by=top+82;
+      // BEHIND — the rump, as the chart measures every other rear on it. It does not rise.
+      const W3=11+(clamp(val,1,IMPOSSIBLE_V)/10)*18, H3=7+(clamp(val,1,IMPOSSIBLE_V)/10)*10;
+      const bx=cx, by=top+92;
       const roll=anim*Math.sin(ph*2)*H3*0.10;
       c.fillStyle='rgba(0,0,0,.24)';                                          // it stands on something
       c.beginPath(); c.ellipse(bx,by+H3*1.85,W3*1.05,H3*0.22,0,0,7); c.fill();
+      const base = REALC? hexOf(w.skin||'#caa06a') : hexOf(col);
       const half=(sx,sy,rot)=>{ const rg=c.createRadialGradient(bx+sx-W3*0.20,by+sy-H3*0.34,H3*0.12, bx+sx,by+sy,W3*0.62);
-        rg.addColorStop(0, lit2(col,1.34)); rg.addColorStop(0.55, col); rg.addColorStop(1, shade2(col));
+        rg.addColorStop(0, mixHex(base,'#ffffff',0.30)); rg.addColorStop(0.55, base); rg.addColorStop(1, mixHex(base,'#120808',0.42));
         c.fillStyle=rg; c.beginPath(); c.ellipse(bx+sx,by+sy,W3*0.56,H3,rot,0,7); c.fill();
         c.strokeStyle='rgba(0,0,0,.42)'; c.lineWidth=1; c.stroke(); };
       half(-W3*0.5, roll, 0.10); half(W3*0.5, -roll, -0.10);
       c.strokeStyle='rgba(0,0,0,.45)'; c.lineWidth=1.4;
       c.beginPath(); c.moveTo(bx,by-H3*0.85); c.lineTo(bx,by+H3*0.85); c.stroke();
-      c.fillStyle=shade2(col);                                                // the backs of the thighs
+      c.fillStyle=mixHex(base,'#120808',0.40);                                // the backs of the thighs
       c.beginPath(); c.ellipse(bx-W3*0.52,by+H3*1.15,W3*0.40,H3*0.45,0,0,7); c.fill();
       c.beginPath(); c.ellipse(bx+W3*0.52,by+H3*1.15,W3*0.40,H3*0.45,0,0,7); c.fill();
-      c.strokeStyle='rgba(0,0,0,.30)'; c.lineWidth=0.8;
-      c.beginPath(); c.ellipse(bx-W3*0.52,by+H3*1.15,W3*0.40,H3*0.45,0,0,7); c.stroke();
-      c.beginPath(); c.ellipse(bx+W3*0.52,by+H3*1.15,W3*0.40,H3*0.45,0,0,7); c.stroke();
-      if(eff>=8){ c.strokeStyle='rgba(255,255,255,.20)'; c.lineWidth=0.9;      // light rolls round a high score
+      if(val>=8){ c.strokeStyle='rgba(255,255,255,.20)'; c.lineWidth=0.9;     // light rolls round a high score
         c.beginPath(); c.arc(bx-W3*0.5,by,W3*0.44,3.5,5.5); c.stroke();
         c.beginPath(); c.arc(bx+W3*0.5,by,W3*0.44,3.9,5.9); c.stroke(); }
-      c.strokeStyle='rgba(240,220,250,.34)'; c.lineWidth=1;                    // measured across, as ever
+      c.strokeStyle='rgba(240,220,250,.34)'; c.lineWidth=1;                   // measured across, as ever
       c.beginPath(); c.moveTo(bx-W3*1.06,by+H3*1.55); c.lineTo(bx+W3*1.06,by+H3*1.55);
       c.moveTo(bx-W3*1.06,by+H3*1.55-3); c.lineTo(bx-W3*1.06,by+H3*1.55+3);
       c.moveTo(bx+W3*1.06,by+H3*1.55-3); c.lineTo(bx+W3*1.06,by+H3*1.55+3); c.stroke();
       c.fillStyle='rgba(230,210,240,.55)'; c.font='bold 8px Georgia,serif'; c.textAlign='center';
-      c.fillText('◨ FROM BEHIND', cx, top+56);
+      c.fillText('◨ FROM BEHIND', cx, top+48);
     }
-    // the reading, stacked with real clearance
-    c.textAlign='center'; c.fillStyle=readOn(col); c.font='bold 19px Georgia,serif';
-    c.fillText(impS?'IMPOSSIBLE':tier.toUpperCase(), cx, top+2);
-    c.fillStyle='#efe3c2'; c.font='bold 10px Georgia,serif';
-    c.fillText(SB.label+' — '+(secretSub==='behind'?'as it stands'
-                 :(!arouseSettled()? (secretAroused?'rising':'subsiding') : (ARO?'roused':'at rest')))
-      +', measured '+(impS? 'beyond the rule'
-         : (aro>0.03? (Math.round(eff*10)/10).toFixed(1) : String(val))+' of 10'), cx, top+18);
-    c.fillStyle='rgba(230,210,240,.6)'; c.font='italic 9px Georgia,serif';
+    /* ---- THE READING. The rank name, and — once he is up — the name for
+       that rank when it is up, crossing over rather than cutting. ---- */
+    /* OUT, THEN IN. Crossfading the two over the same stretch left both on
+       the plate at half strength and ELONGATED read with LONG printed across
+       it. The rank name leaves first and the roused one arrives after. */
+    { const kOut = RISES? sstep(0.36,0.56,aro) : 0, kIn = RISES? sstep(0.56,0.78,aro) : 0;
+      c.textAlign='center'; c.font='bold 19px Georgia,serif';
+      if(kOut<0.999){ c.globalAlpha=1-kOut; c.fillStyle=readOn(col); c.fillText(tier, cx, top+2-kOut*5); }
+      if(kIn>0.001){ c.globalAlpha=kIn; c.fillStyle='#ffb0e0'; c.fillText(upName, cx, top+2+(1-kIn)*5); }
+      c.globalAlpha=1; }
+    c.fillStyle='#efe3c2'; c.font='bold 9.5px Georgia,serif';
+    { const state = !RISES? 'as it stands'
+        : !arouseSettled()? (secretAroused? 'rising' : 'easing')
+        : (aro>0.5? 'hard' : 'at rest');
+      c.fillText(SB.label+' — '+(impS? 'beyond the rule' : 'ranked '+val+' of 10')+' · '+state, cx, top+16); }
+    c.fillStyle='rgba(230,210,240,.6)'; c.font='italic 8.5px Georgia,serif';
     { const ph2 = bmOnce('quote:'+secretSub+':'+val, ()=> impS? 'No rule in Rome is long enough.'
         : secretSub==='girth'? 'The ledger notes this one second, and underlines it.'
         : secretSub==='behind'? 'The wives compare this over wine and never write it down.'
         : (partPhrase('secret',val,true) || 'Exactly what the ledger calls average — and the ledger does not flatter.'));
-      const maxw=(FW-24)/K, words=('“'+ph2+'”').split(' '); let line='', yy=top+32;
+      const maxw=(FW-24)/K, words=('“'+ph2+'”').split(' '); let line='', yy=top+27, n=0;
       words.forEach(wd=>{ const t=line?line+' '+wd:wd;
-        if(c.measureText(t).width>maxw && line){ c.fillText(line,cx,yy); yy+=11; line=wd; } else line=t; });
+        if(c.measureText(t).width>maxw && line && n<1){ c.fillText(line,cx,yy); yy+=10; n++; line=wd; } else line=t; });
       if(line) c.fillText(line,cx,yy); }
     c.restore();
     drawMapReadout(c,w,W2,H2,GUT,gv,true);
@@ -8673,9 +9225,19 @@ function drawBodyMap(cnv,w,view,tms){
   }
   if(view==='eyes' || view==='spouse'){
     // the figure walks; the eyes are drawn over it in screen space afterwards
-    drawWalkFigure(c,{male,bu,wa,be,lg,fa,ha,bustR,hipR,waistR,legR,headR,bustDY,hipDY,swing,STR});
+    const REALV=!!SETTINGS.bluntBody;
+    if(REALV){
+      /* THE REAL ONE, WALKING, and dressed for where it is. Down a public
+         colonnade that is a subligaculum (and a strophium on her), and the
+         mob does not get his measure — it never did. His spouse gets all of
+         him, which is what the other view is FOR. */
+      c.save(); c.translate(0, 69 - bob*0.8);
+      try{ drawRealFig(c, w, 'front', ph, { clothed: view==='eyes'? 'public' : undefined,
+                                            showLen: view==='spouse' && male && secretAllowed(w) }); }catch(e){}
+      c.restore();
+    } else drawWalkFigure(c,{male,bu,wa,be,lg,fa,ha,bustR,hipR,waistR,legR,headR,bustDY,hipDY,swing,STR});
     c.restore();
-    drawGazeOverlay(c,w,view,W2,H2,GUT,{male,headR,bustR,hipR,toScreenX,toScreenY,SC});
+    drawGazeOverlay(c,w,view,W2,H2,GUT,{male,headR,bustR,hipR,toScreenX,toScreenY,SC, anchors: REALV? realAnchors(w) : null});
     drawMapScale(c,W2,H2,false);
     return;
   }
@@ -8713,6 +9275,16 @@ function drawBodyMap(cnv,w,view,tms){
       cap(-4.6,39,-4.8+fx,54,lR,lR*0.76, heatColor(lg)); cap(4.6,39,4.8-fx,54,lR,lR*0.76, heatColor(lg));
       cap(-4.8+fx,54,-4.8+fx*1.7,66,lR*0.76,lR*0.58, heatColor(lg)); cap(4.8-fx,54,4.8-fx*1.7,66,lR*0.76,lR*0.58, heatColor(lg));
       cap(-shW-1.4,19,-shW-2.6+ax,33,2.5,2.0, heatColor(be)); cap(shW+1.4,19,shW+2.6-ax,33,2.5,2.0, heatColor(be));
+    }
+    /* AND HIS LENGTH ON THE DIAGRAM, in the chart's own heat. The diagram
+       man was smooth where it mattered, so GET HARD on his front view would
+       have been a button that did nothing anybody could see. */
+    if(ADULT && secretAllowed(w) && view!=='back'){
+      const v=clamp(gv('secret'),1,IMPOSSIBLE_V), sideV=(view==='side');
+      drawLength(c,{x: sideV? 2.2 : 0, y: sideV? 37.4 : 38.4, L:2.6+v*0.40, D:1.3+v*0.08,
+        aro:clamp(secretAroLv,0,1.06), view: sideV? undefined : 'front',
+        skin:w.skin||'#caa06a', tint:heatColor(v), tintK:0.62, hair:w.hair||'#2a1a10', lw:0.30,
+        sway: anim? Math.sin(ph*(sideV?2:1))*0.45*(1-lengthPose(secretAroLv).lift) : 0, T:tms});
     }
     c.fillStyle='rgba(0,0,0,.30)'; c.beginPath(); c.ellipse(0,69,shW*0.9,2.4,0,0,7); c.fill();
     c.fillStyle='#3a2a18';
@@ -9351,8 +9923,25 @@ function drawMapReadout(c,w,W2,H2,GUT,gv,male){
     c.strokeStyle=isSec?'rgba(255,122,224,.9)':'rgba(0,0,0,.6)'; c.lineWidth=1; c.strokeRect(W2-GUT,y-9,11,11);
     c.fillStyle=isSec?'#ff7ae0':'#efe3c2'; c.font='bold 9px Georgia,serif'; c.textAlign='left';
     c.fillText(P.name,W2-GUT+15,y);
-    c.fillStyle=isImp?'#ff7ae0':heatColor(v); c.font='bold 9px Georgia,serif'; c.textAlign='right';
-    c.fillText(partTier(P.id,v,male).toUpperCase(),W2-8,y); c.textAlign='left';
+    /* IT HAS TO FIT, AND IT HAS TO BE READABLE. The tier was right-aligned
+       with no width check, so on the Rkrai coast "CAN WAIT THROUGH THE
+       WINTER" ran left straight across the word Waist and the swatch; and
+       the top of the heat ramp is near-black purple, which printed IMMENSE
+       on a near-black gutter. It shrinks to fit, drops under the name if it
+       still will not, and is lifted to a colour you can read. */
+    { const tt=partTier(P.id,v,male).toUpperCase();
+      const nameW=c.measureText(P.name).width;
+      const avail=(W2-8)-(W2-GUT+15+nameW+6);
+      c.fillStyle=isImp?'#ff7ae0':readOn(heatColor(v),0.46); c.textAlign='right';
+      let fs=9; c.font='bold '+fs+'px Georgia,serif';
+      while(c.measureText(tt).width>avail && fs>7){ fs-=0.5; c.font='bold '+fs+'px Georgia,serif'; }
+      if(c.measureText(tt).width<=avail) c.fillText(tt,W2-8,y);
+      else { c.font='bold 7px Georgia,serif';
+        let t2=tt; const maxW=GUT-12;
+        while(c.measureText(t2).width>maxW && t2.length>6) t2=t2.slice(0,-2);
+        if(t2!==tt) t2=t2.replace(/\s+\S*$/,'')+'…';
+        c.fillText(t2,W2-8,y+9); }
+      c.textAlign='left'; }
   });
   /* ---- AND WHAT THE ARENA TOOK. Only your own chart carries these: a
      matchmaker does not sell you a list of another man's scars. ---- */
@@ -9435,8 +10024,8 @@ function drawGazeOverlay(c,w,mode,W2,H2,GUT,F){
   const rank = bmOnce('gaze:'+mode, ()=>gazeWeights(w, mode, viewer));
   const top = rank[0];
   const FW=W2-GUT;
-  // anchors on the figure, in figure space
-  const A = male
+  // anchors on the figure, in figure space — the real figure brings its own
+  const A = F.anchors ? F.anchors : male
     ? {face:[0,5], hairq:[0,-3], bust:[0,21], waist:[0,33], booty:[0,17], legs:[0,54], secret:[0,39]}
     : {face:[0,5], hairq:[0,-4], bust:[0,18.6], waist:[0,29], booty:[0,34], legs:[0,54]};
   // eyes down each side, so nothing ever sits on the figure or on another eye
@@ -9585,7 +10174,9 @@ function bmHotspots(cnv, w){
   const male=!!w.male, W2=cnv.width, H2=cnv.height;
   const GUT=150, FW=W2-GUT, FOOT=34, TOP=34;
   const SC=Math.min(FW/40,(H2-FOOT-TOP-4)/74), CX=FW*0.5;
-  const A = male
+  /* the REAL figure is proportioned off its own landmarks, so a click on
+     its chest has to be looked up against ITS chest */
+  const A = (SETTINGS && SETTINGS.bluntBody && !bodyMap3D)? realAnchors(w) : male
     ? {face:[0,5], hairq:[0,-3], bust:[0,21], waist:[0,33], booty:[0,17], legs:[0,54], secret:[0,39]}
     : {face:[0,5], hairq:[0,-4], bust:[0,18.6], waist:[0,29], booty:[0,34], legs:[0,54]};
   const parts=partsFor(w);
@@ -10004,7 +10595,12 @@ function bodyRings(w){
      shoulders are never narrower than it. */
   const bustR    = male? (5.6+bu*0.26) : (3.6+bu*0.32);
   const shoulder = male? (7.2+gv('booty')*0.30) : Math.max(6.0+bu*0.09, bustR*0.98);
-  const hipR     = 3.4 + be*0.60;
+  /* ON A MAN THE BOOTY SLOT IS HIS SHOULDERS — the same part table the
+     readout and the diagram use — and building his hips off it gave a
+     broad-shouldered man a woman's hips and turned him into an hourglass.
+     His hips come off his legs, and his seat sits back only a little. */
+  const hipR     = male? (5.2 + lg*0.12) : (3.4 + be*0.60);
+  const seatK    = male? 3.0 : be;
   /* and the waist is a waist. 5.6−wa*0.34 put a waist-8 figure at 2.9 against
      9.4 hips — thinner than her own neck, and the join read as a slab. */
   const waistR   = male? (6.6 - wa*0.12) : (6.2 - wa*0.16);
@@ -10015,14 +10611,14 @@ function bodyRings(w){
   const torso=[
     /* AND IT HAS A CROTCH. Ending the stack flat at the hip left a hard
        horizontal edge across the top of both legs — a pair of shorts. */
-    {y:25.0, rx:hipR*0.56, rz:hipR*0.46, zc:-be*0.015},
-    {y:27.5, rx:hipR*0.74, rz:hipR*0.55, zc:-be*0.030},
-    {y:30.0, rx:hipR*0.92, rz:hipR*0.66, zc:-be*0.055},
-    {y:34.0, rx:hipR,      rz:hipR*0.72, zc:-be*0.085},   // the seat, and it is behind him
-    {y:38.0, rx:hipR*0.96, rz:hipR*0.70, zc:-be*0.075},
+    {y:25.0, rx:hipR*0.56, rz:hipR*0.46, zc:-seatK*0.015},
+    {y:27.5, rx:hipR*0.74, rz:hipR*0.55, zc:-seatK*0.030},
+    {y:30.0, rx:hipR*0.92, rz:hipR*0.66, zc:-seatK*0.055},
+    {y:34.0, rx:hipR,      rz:hipR*0.72, zc:-seatK*0.085},   // the seat, and it is behind him
+    {y:38.0, rx:hipR*0.96, rz:hipR*0.70, zc:-seatK*0.075},
     {y:40.0, rx:(hipR*0.96+waistR*0.86)*0.5,              // the flare, so it is not a cliff
-             rz:(hipR*0.70+waistR*0.62)*0.5, zc:-be*0.05},
-    {y:42.0, rx:waistR*0.86, rz:waistR*0.62, zc:-be*0.02},
+             rz:(hipR*0.70+waistR*0.62)*0.5, zc:-seatK*0.05},
+    {y:42.0, rx:waistR*0.86, rz:waistR*0.62, zc:-seatK*0.02},
     {y:46.0, rx:waistR*0.76, rz:waistR*0.58, zc:0},       // the cinch
     {y:50.0, rx:waistR*0.88, rz:waistR*0.66, zc:0.2},
     {y:53.5, rx:bustR*0.92, rz:(male? bustR*0.52 : bustR*0.74), zc:(male?0.3:bu*0.10)},
@@ -10196,6 +10792,18 @@ function drawBody3D(c, w, cx, cyFloor, sc, yaw, opts){
       [-1,1].forEach(side=>parts.push({k:'bust', dx:side*br*0.80, mz:fwd, br:br}));
     }
   }
+  /* ⬔ AND HIS LENGTH, IN THE SOLID TOO. The turntable turned a man with
+     nothing there at all — and standing OUT is exactly the thing a model
+     you can turn is best at showing. Root on the front of the pelvis,
+     hanging at rest, forward and up when he is hard, and in the same depth
+     sort as the arms, so from behind the body is in front of it. */
+  if(P.male && ADULT && w && secretAllowed(w) && opts.len!==false){
+    const B2=(w.body||{});
+    const v=clamp(B2.secret===undefined? 5 : B2.secret, 1, IMPOSSIBLE_V);
+    const aroL=clamp(opts.aro===undefined? secretAroLv : opts.aro, 0, 1.06);
+    const rootZ=P.hipR*0.55 - (B2.booty===undefined? 5 : B2.booty)*0.03 + 0.15;
+    parts.push({k:'len', dx:0, mz:rootZ+1.5+2.0*lengthPose(aroL).lift, v, aro:aroL, rootY:28.2, rootZ});
+  }
   /* depth of a part: its own offset turned, plus how far forward it sits */
   parts.forEach(L=>{ L.z = -(L.zdx===undefined? L.dx : L.zdx)*sn + (L.mz||0)*cs; });
   const back = parts.filter(L=>L.z<0).sort((a,b)=>a.z-b.z);
@@ -10204,6 +10812,22 @@ function drawBody3D(c, w, cx, cyFloor, sc, yaw, opts){
     if(L.k==='leg') stack3D(c, cx, cyFloor, sc, yaw, P.leg, L.dx, limbCol, 0, light);
     else if(L.k==='arm') stack3D(c, cx, cyFloor, sc, yaw, P.arm, L.dx, limbCol,
                                  P.armTop-P.armLen, light, L.dx<0? -1 : 1);
+    else if(L.k==='len'){
+      const Lm=2.2+L.v*0.30, Dm=1.1+L.v*0.06, Pz=lengthPose(L.aro);
+      const len=Lm*(1+LEN_GROW*Pz.swell), hh=len*0.5;
+      const th0=-0.95+(0.30+0.95)*Pz.lift, th1=-1.50+(0.40+1.50)*Pz.lift;   // pitch, from forward
+      const pr=(y,z)=>({X:cx+(z*sn)*sc, Y:cyFloor-y*sc+(z*cs)*sc*BODY3D_TILT});
+      const By=L.rootY, Bz=L.rootZ;
+      const Cy=By+Math.sin(th0)*hh, Cz=Bz+Math.cos(th0)*hh;
+      const Ty=Cy+Math.sin(th1)*hh, Tz=Cz+Math.cos(th1)*hh;
+      const pB=pr(By,Bz), pC=pr(Cy,Cz), pT=pr(Ty,Tz);
+      const facing=(sn>=0)? 1 : -1, frontish=Math.abs(sn)<0.40;
+      const loc=(p)=>({x:(p.X-pB.X)*facing, y:p.Y-pB.Y});
+      drawLength(c,{x:pB.X, y:pB.Y, dir:facing, L:Lm*sc, D:Dm*sc, aro:L.aro,
+        skin:(w&&w.skin)||'#caa06a', hair:(w&&w.hair)||'#2a1a10',
+        view: frontish? 'front' : undefined, curve:{C:loc(pC), T:loc(pT)}, lw:1,
+        T:(typeof performance!=='undefined')? performance.now() : 0});
+    }
     else {
       const br=L.br;
       const X=cx+(L.dx*cs + L.mz*sn)*sc;
@@ -10237,6 +10861,7 @@ function drawBody3D(c, w, cx, cyFloor, sc, yaw, opts){
   }
   return P;
 }
+let bodyMapRebuildSub=null;           // the open chart's toggle row, so the loop can relabel it
 function stopBodyMapAnim(){ if(bodyMapRAF){ cancelAnimationFrame(bodyMapRAF); bodyMapRAF=0; } }
 function startBodyMapAnim(){
   stopBodyMapAnim();
@@ -10250,7 +10875,11 @@ function startBodyMapAnim(){
       drawBodyMap($('bodymap-cv'), bodyMapSubject, bodyMapView, bodyMapT); return; }
     bodyMapRAF=requestAnimationFrame(step);
     if(now-lastDraw < 33) return;            // 30fps is plenty for a walk cycle and half the work
-    arouseTick(now-lastDraw);                // and the rise runs on wall time too
+    { const was=arouseSettled();
+      arouseTick(now-lastDraw);              // and the rise runs on wall time too
+      /* and the button says so when it arrives — it used to read RISING…
+         for ever, because nothing rebuilt it once the level settled */
+      if(!was && arouseSettled() && bodyMapRebuildSub){ try{ bodyMapRebuildSub(); }catch(e){} } }
     if(bodyMap3D && bodyMapWalk) bodyMapYaw += (now-lastDraw)*0.00042;   // ⬔ and it turns
     slapJigTick((now-lastDraw)/16.7);        // the spring runs on wall time, not on the walk cycle
     lastDraw=now; bodyMapT=now;
@@ -10507,6 +11136,7 @@ function openBodyMap(w,back){
   const styleViews=()=>{ for(const id in viewBtns) viewBtns[id].className='btn sm'+(bodyMapView===id?' gold':''); };
   // the second row: sub-views and toggles. Nothing here ever resizes the row above.
   const buildSub=()=>{
+    bodyMapRebuildSub=buildSub;
     if(!sv) return; sv.innerHTML='';
     if(bodyMapView==='secret'){
       [['profile','◐ PROFILE'],['girth','◧ HEAD-ON'],['behind','◨ BEHIND']].forEach(([id,label])=>{
@@ -10518,25 +11148,39 @@ function openBodyMap(w,back){
         sb.onclick=()=>{ if(secretSub===id) return; secretSub=id; bmResetCache(); buildSub(); redraw(); try{sfx('ui');}catch(e){} };
         sv.appendChild(sb);
       });
-      const tg=document.createElement('button'); tg.className='btn sm'+(secretAroused?' gold':'');
-      tg.style.minWidth='112px';                       // label swaps; the button must NOT resize
-      tg.textContent = !arouseSettled()? (secretAroused? '🔥 RISING…' : '💤 SUBSIDING…')
-                     : (secretAroused? '🔥 AROUSED' : '💤 AT REST');
-      tg.title='The extended reading. The ledger records both states — most of them do.';
-      tg.onclick=()=>{
-        /* the TARGET moves; the chart takes its own time getting there, and
-           the loop has to be running or it freezes halfway up */
-        if(!secretAroused) rouse('chart');
-        else secretAroused=false;
-        bmResetCache(); buildSub(); startBodyMapAnim();
-        try{sfx('ui');}catch(e){} };
-      sv.appendChild(tg);
+    }
+    /* 🔥 GET HARD, WHEREVER HIS FIGURE CAN SHOW IT. It only existed on the
+       secret graph; the REAL figure, the diagram and the solid all carry his
+       length now, so the button goes where they are — front, side, the solid
+       from any angle, and his spouse's view of him. Not in PUBLIC EYES:
+       the mob does not get this one and never did. */
+    const canHard = !!(w.male && ADULT && secretAllowed(w)) &&
+      ( bodyMapView==='secret' || bodyMapView==='front' || bodyMapView==='side'
+        || (bodyMapView==='back' && bodyMap3D) || (bodyMapView==='spouse' && SETTINGS.bluntBody) );
+    if(canHard){
+        const tg=document.createElement('button'); tg.className='btn sm'+(secretAroused?' gold':'');
+        tg.style.minWidth='112px';                       // label swaps; the button must NOT resize
+        /* AN ACTION, NOT A STATE. It read "💤 AT REST", which describes the
+           chart rather than offering anything — the same mistake the 3D switch
+           made when it said FLAT. It says what pressing it does. */
+        tg.textContent = !arouseSettled()? (secretAroused? '🔥 RISING…' : '💤 EASING…')
+                       : (secretAroused? '💤 SOFTEN' : '🔥 GET HARD');
+        tg.title='Get hard, and watch it happen: it swells, then lifts, then the hood draws back. '
+                +'The rank does not change — the ledger records both states, most of them do.';
+        tg.onclick=()=>{
+          /* the TARGET moves; the chart takes its own time getting there, and
+             the loop has to be running or it freezes halfway up */
+          if(!secretAroused) rouse('chart');
+          else secretAroused=false;
+          bmResetCache(); buildSub(); startBodyMapAnim();
+          try{sfx('ui');}catch(e){} };
+        sv.appendChild(tg);
     }
     const wk=document.createElement('button'); wk.className='btn sm'+(bodyMapWalk?' gold':'');
     wk.style.minWidth='112px';                         // ditto — 🚶 WALKING and 🧍 STILL must occupy the same box
     wk.textContent = bodyMapWalk? '🚶 WALKING' : '🧍 STILL';
     wk.title = w.male
-      ? 'Walk the figure. A man carries no jiggle on this chart — his physics live on the SECRET GRAPH and nowhere else.'
+      ? 'Walk the figure — a stride, the arms against it, and what hangs, swings. Hard, it bobs instead.'
       : 'Walk the figure — stride, sway and the physics that come with them.';
     wk.onclick=()=>{ bodyMapWalk=!bodyMapWalk; buildSub();
       if(bodyMapWalk) startBodyMapAnim(); else { stopBodyMapAnim(); redraw(); }
@@ -23613,15 +24257,18 @@ function drawWifeFig(c,x,y,w,ph,mode,preg){
     const bh3=Math.round(9+term*7), by0=top-17;
     for(let i=0;i<bh3;i++){
       const rw=Math.max(1,Math.round(1+maxw*Math.sin((i/(bh3-1))*Math.PI)));
-      P(-rw, by0+i, rw*2, 1, dress);
+      P(-rw, by0+i, rw*2, 1, RKD? hide : dress);
     }
-    P(-Math.round(maxw*0.45), by0+Math.round(bh3*0.28), 1, Math.round(bh3*0.5), dHi);  // lit near flank
-    P(Math.round(maxw*0.40), by0+Math.round(bh3*0.32), 1, Math.round(bh3*0.42), dSh);  // shaded far flank
+    P(-Math.round(maxw*0.45), by0+Math.round(bh3*0.28), 1, Math.round(bh3*0.5), RKD? hideHi : dHi);  // lit near flank
+    P(Math.round(maxw*0.40), by0+Math.round(bh3*0.32), 1, Math.round(bh3*0.42), RKD? hideSh : dSh);  // shaded far flank
     if(noble) P(-1, by0+bh3-2, 2, 3, '#e8c34a');                   // the sash, riding under the swell now
   } else {
     /* the cinch is CLOTH, and a sivrak has none between the cord and the
        leaves — it left a purple tile sitting in the middle of her */
-    P(-waistW/2, top-13, waistW, 8, RKS? shade(skin,-10) : shade(dress,-8));
+    /* and on the coast the cinch is HIDE like the rest of it — this was the
+       raw gown colour, a bright yellow stripe between a hide bodice and a
+       hide skirt, the two-wardrobes accident again */
+    P(-waistW/2, top-13, waistW, 8, RKS? shade(skin,-10) : RKD? shade(hide,-8) : shade(dress,-8));
   }
   // ================= BODICE + BUST =================
   /* ONE GARMENT, NOT TWO. The skirt below is tanned inner hide and this
@@ -23673,42 +24320,72 @@ function drawWifeFig(c,x,y,w,ph,mode,preg){
       P(-3+LXn, top-23, 7, 1, shade(skin,-18));            // the line of the collarbone
     }
   }
+  /* ---- THE ARMS GO ON BEFORE THE BUST. They were painted after it, over
+     its outer halves, and from a bust-10 what survived was a plate the
+     width of her ribs. Her bust sits in front of her upper arms, so the
+     arms go down first and it goes on top. ---- */
+  const armSw = walking? stride*0.7 : 0;
+  if(mode!=='god'){
+    P(-8-armSw*0.4, top-23, 3, 12, skin);
+    P( 5+armSw*0.4, top-23, 3, 12, skin);
+  }
   /* ---- THE BUST, ON THE SAME FIVE RUNGS AS THE REAR: FLAT · RAISED · GOOD ·
-     BIG · HUGE. Width, depth, spill and bounce all come off her score, and a
-     flat chest is drawn flat — there is nothing there to bounce. ---- */
+     BIG · HUGE. Width, depth and bounce all come off her score. They are
+     ROUND now — each row of each one as wide as an ellipse is at that row,
+     lit on top and turning away underneath — where they were stacks of
+     rectangles that read as a shelf. ---- */
+  let bustUnder = top-17;                             // where the underside of her bust is, for the band that lifts it
   { const uT = bu>=9?4 : bu>=7?3 : bu>=5?2 : bu>=3?1 : 0;
-    const bH2=Math.max(1,bustH+Math.round(bSquash));           // squashes on the fall, stretches on the rise
-    const LX=lean*0.4+bSway;                                    // it does not bounce straight down either
+    const LX=lean*0.4+bSway;
     if(uT===0){
       P(-5+LX, top-22, 11, 1, shade(GARM,-18));                             // one plain fall of cloth
-    } else if(uT===1){
-      P(-bustW+LX, top-22+bJig, bustW-1, Math.max(1,bH2-1), shade(GARM,10));  // a shallow swell either side
-      P( 1+LX,     top-22+bJig, bustW-1, Math.max(1,bH2-1), shade(GARM,10));
-      P( 0+LX,     top-22+bJig, 1, Math.max(1,bH2-1), shade(GARM,-20));
-    } else if(uT===2){
-      P(-bustW-1+LX, top-23+bJig, bustW, bH2, shade(GARM,14));
-      P( 1+LX,       top-23+bJig, bustW, bH2, shade(GARM,14));
-      P(-1+LX,       top-23+bJig, 2, bH2-1, shade(GARM,-26));               // the line between
-      P(-bustW-1+LX, top-23+bH2+bJig, bustW, 1, shade(GARM,-30));           // under-curves
-      P( 1+LX,       top-23+bH2+bJig, bustW, 1, shade(GARM,-30));
-    } else if(uT===3){
-      P(-bustW-2+LX, top-24+bJig, bustW+1, bH2+1, shade(GARM,14));
-      P( 1+LX,       top-24+bJig, bustW+1, bH2+1, shade(GARM,14));
-      P(-1+LX,       top-24+bJig, 2, bH2, shade(GARM,-32));
-      P(-bustW-2+LX, top-25+bJig, bustW*2+4, 1, shade(GARM,34));            // catches the light right across
-      P(-bustW-2+LX, top-23+bH2+bJig, bustW+1, 2, shade(GARM,-38));         // and the weight under it
-      P( 1+LX,       top-23+bH2+bJig, bustW+1, 2, shade(GARM,-38));
     } else {
-      P(-bustW-3+LX, top-25+bJig, bustW+2, bH2+2, shade(GARM,14));          // it clears the bodice
-      P( 1+LX,       top-25+bJig, bustW+2, bH2+2, shade(GARM,14));
-      P(-bustW-2+LX, top-26+bJig, bustW,   1, shade(GARM,26));               // rounded at the crown
-      P( 2+LX,       top-26+bJig, bustW,   1, shade(GARM,26));
-      P(-1+LX,       top-25+bJig, 2, bH2+1, shade(GARM,-42));
-      P(-bustW-4+LX, top-24+bJig, 1, bH2, shade(GARM,4));                   // spilling past the ribs
-      P( bustW+3+LX, top-24+bJig, 1, bH2, shade(GARM,-14));
-      P(-bustW-3+LX, top-23+bH2+bJig, bustW+2, 3, shade(GARM,-46));         // heavy double underfold
-      P( 1+LX,       top-23+bH2+bJig, bustW+2, 3, shade(GARM,-46));
-      P(-2+LX, top-27+bJig, 5, 2, skin);                                      // and skin above the neckline
+      const rw = Math.max(1.6, bustW*0.62+0.7), rh = Math.max(1.3, (bustH+bSquash)*0.55+0.3);
+      const cyB = top-21.5 + bJig + (uT>=3? 0.8 : 0) + (uT>=4? 0.6 : 0);
+      bustUnder = Math.round(cyB+rh)+1;
+      const gap = rw*0.92+0.2;
+      /* HOW MUCH OF HER THE GARMENT COVERS. A gown anywhere else covers all
+         of it. Indoors on the Rkrai coast the ulvik is cut to be READ — six
+         of the ten Masteries are seated on the evidence of a body — so it is
+         scooped, and the top of the bust is skin; and the Ulvanne cut, which
+         exists for exactly this, opens to a deep V and bares the inner curves
+         as well. More than any other people's dress, because that is the
+         whole theory of this coast. */
+      const lace = RKD && RKC && RKC.neck==='lace' && !RKS;
+      const skinTop = RKS? 1.0 : !RKD? 0 : lace? 0.60 : 0.40;
+      if(RKD && !RKS){                                                         // the scoop, down to the bust
+        const y0=top-26, y1=Math.round(cyB-rh*(1-skinTop*2));
+        for(let yy2=y0; yy2<=y1; yy2++){ const k2=(yy2-y0)/Math.max(1,y1-y0);
+          const hw2=Math.round(2+k2*(gap+rw*(lace?0.55:0.35)));
+          P(-hw2+LX, yy2, hw2*2, 1, skin); P(-hw2+LX, yy2, 1, 1, shade(skin,14)); P(hw2-1+LX, yy2, 1, 1, shade(skin,-18)); } }
+      let hemDrawn={};
+      [-1,1].forEach(q=>{
+        const cx0=q*gap+LX, R=Math.ceil(rh);
+        for(let r=-R; r<=R; r++){
+          const t=r/rh; if(Math.abs(t)>1) continue;
+          const half=Math.max(0.5, rw*Math.sqrt(1-t*t));
+          const yRow=Math.round(cyB+r), frac=(r+rh)/(2*rh);
+          const x0=Math.round(cx0-half), x1=Math.round(cx0+half), wRow=Math.max(1,x1-x0);
+          const bare = frac < skinTop;
+          const base = bare? skin : GARM;
+          const col  = frac<0.22? shade(base,16) : frac>0.80? shade(base,-26) : base;
+          P(x0, yRow, wRow, 1, col);
+          // the deep V: the inner half of each is skin nearly all the way down
+          if(lace && !bare && frac<0.86){ const xi = q<0? Math.round(cx0) : x0, wi = q<0? x1-Math.round(cx0) : Math.round(cx0)-x0;
+            if(wi>0){ P(xi, yRow, wi, 1, frac>0.72? shade(skin,-16) : skin);
+              P(q<0? xi : xi+wi-1, yRow, 1, 1, shade(GARM,-24)); } }       // the edge of the cloth, cutting in
+          // the rim: lit on her near side, turning away on the far
+          P(q<0? x0 : x1-1, yRow, 1, 1, q<0? shade(col,18) : shade(col,-22));
+          // where the cloth starts, a hem — so it reads as cloth over skin
+          if(RKD && !RKS && !bare && !hemDrawn[q] ){ hemDrawn[q]=1; P(x0, yRow, wRow, 1, shade(GARM,26)); }
+        }
+        // the fold underneath, cast onto the bodice
+        P(Math.round(cx0-rw*0.8), Math.round(cyB+rh)+1, Math.max(1,Math.round(rw*1.6)), 1, shade(GARM,-40));
+      });
+      if(uT>=2){ const ch=Math.round(rh*(RKD? 1.2 : 0.9));                     // the line between them
+        for(let r=0;r<ch;r++){ const yRow=Math.round(cyB-rh*0.55+r), bareR=RKD && ((r/ch)<(lace?0.95:skinTop+0.1));
+          P(Math.round(LX)-(uT>=3?1:0), yRow, uT>=3?2:1, 1, bareR? shade(skin,-30) : shade(GARM,-30)); } }
+      if(uT>=4 && !RKD) P(-2+LX, top-27+bJig, 5, 2, skin);                      // and skin above the neckline
     }
     /* A GLINT AT THE PEAK OF THE BOUNCE — the fabric catching real light at
        the top of its swing, not just moving. Only at the crest of the wave,
@@ -23775,13 +24452,9 @@ function drawWifeFig(c,x,y,w,ph,mode,preg){
   }
   // ================= NECK / ARMS =================
   P(-2+lean*0.5, top-28, 5, 5, skin);
-  const armSw = walking? stride*0.7 : 0;
-  if(mode==='god'){
+  if(mode==='god'){                                  // the arms of every other pose went on before the bust
     P(-8, top-23, 3, 11, skin);                      // one arm hangs
     P( 5, top-20, 3, 8, skin); P(7, top-13, 3, 3, skin);   // the other holds the gathered cloth
-  } else {
-    P(-8-armSw*0.4, top-23, 3, 12, skin);
-    P( 5+armSw*0.4, top-23, 3, 12, skin);
   }
   /* ---- THE SIVRAK, ABOVE THE WAIST -----------------------------------
      Last of everything, because the bodice, the neck, the arms and the
@@ -23816,14 +24489,16 @@ function drawWifeFig(c,x,y,w,ph,mode,preg){
       /* THE BAND THAT DOES THE LIFTING — under, not over, and hard enough
          to carry. The tally-cord for the store-count is knotted into it
          where she can find it without looking down. */
-      const bwl=Math.max(5, bustW+2);
-      P(-bwl+LXn, top-17, bwl*2, 3, BAND);
-      P(-bwl+LXn, top-17, bwl*2, 1, BHI);
-      P(-bwl+LXn, top-15, bwl*2, 1, BSH);
-      for(let q=-bwl+1;q<bwl-1;q+=3) P(q+LXn, top-17, 1, 3, BHI);
-      P( bwl-1+LXn, top-18, 2, 7, BSH);
-      P( bwl-1+LXn, top-18, 2, 1, BHI);
-      P( bwl-1+LXn, top-11, 1, 4, shade(BAND,-14));        // the cord, hanging
+      /* UNDER IT, where it does its work — pinned at top-17 it ran across the
+         lower half of a big bust instead of beneath it */
+      const bwl=Math.max(5, bustW+2), by3=Math.max(top-17, bustUnder);
+      P(-bwl+LXn, by3, bwl*2, 3, BAND);
+      P(-bwl+LXn, by3, bwl*2, 1, BHI);
+      P(-bwl+LXn, by3+2, bwl*2, 1, BSH);
+      for(let q=-bwl+1;q<bwl-1;q+=3) P(q+LXn, by3, 1, 3, BHI);
+      P( bwl-1+LXn, by3-1, 2, 7, BSH);
+      P( bwl-1+LXn, by3-1, 2, 1, BHI);
+      P( bwl-1+LXn, by3+6, 1, 4, shade(BAND,-14));         // the cord, hanging
     } else if(RKC.neck==='collar'){
       /* A STIFF STANDING BAND. It holds the face up, and it is the first
          thing anyone coming to this office sees — which is half the job. */
@@ -25084,63 +25759,93 @@ const RISE_LINES=[
 ];
 /* THE BUMP, in five. Drawn over whatever he is wearing, at his hip, growing
    from a fold you could argue with into one you cannot. */
+/* =====================================================================
+   🏛 GET HARD, IN THE HALL — drawn FRONT-ON, because he is.
+   ---------------------------------------------------------------------
+   The man in the villa is a front-facing sprite and the rise was a
+   profile drawing: a diagonal stick poking out sideways from one hip, on a
+   man looking straight at you. It is built on him now. A tent that stands
+   out of the middle of the tunic, with the cloth pulled taut from the belt
+   down to it and the hem lifting under it; and at the last stage, behind a
+   door, what the hem gave up on — in three-quarter, standing up toward the
+   side he is facing, because a thing pointed straight at the viewer is a
+   dot. The stage is a NUMBER now, not one of five, so it climbs rather
+   than stepping, and once he is there it throbs.
+   ===================================================================== */
+/* THE THING ITSELF at sprite scale, in three-quarter — shared by the tunic
+   and the kilt. P is the caller's mirrored plotter; rootY the groin. */
+function pxLengthUp(P, len, k, skin, rootY, T){
+  const pulse = (k>=0.999 && ((T|0)%1450)<130)? 1 : 0;
+  const L  = Math.max(4, Math.round((4.0+len*0.55)*(0.72+0.28*k))) + pulse;
+  const th = len>=6? 3 : 2;
+  const sk=mixHex(hexOf(skin),'#8a4a3a',0.14), skHi=mixHex(sk,'#ffffff',0.28), skSh=mixHex(sk,'#1a0a06',0.40);
+  const gl=mixHex(sk,'#c05a64',0.34+0.18*k), glHi=mixHex(gl,'#ffffff',0.36), glSh=mixHex(gl,'#1a0808',0.36);
+  // what hangs under it, drawn first
+  P(-3, rootY+1, 6, 4, skSh); P(-3, rootY+1, 6, 1, sk); P(-3, rootY+2, 1, 2, sk); P(0, rootY+2, 1, 3, mixHex(skSh,'#000000',0.25));
+  P(-2, rootY-1, 5, 1, '#2a1a10'); P(-1, rootY-2, 3, 1, '#3a2418');                 // and the curls at the root
+  let tx=0, ty=rootY;
+  for(let i=0;i<L;i++){ tx=Math.round(i*0.46); ty=rootY-Math.round(i*0.90);
+    P(tx-1, ty, th, 1, sk); P(tx-1, ty, 1, 1, skHi); P(tx-2+th, ty, 1, 1, skSh); }
+  P(tx-1, ty-3, th+1+pulse, 3, gl); P(tx-1, ty-3, th, 1, glHi); P(tx, ty-3, 1, 1, mixHex(glHi,'#ffffff',0.4));  // the glans
+  P(tx+th-1+pulse, ty-2, 1, 2, glSh); P(tx-1, ty, th+1, 1, glSh);                   // and the corona under it
+}
 function drawTunicBump(x, y, w, stage, T, dir, decent){
-  if(stage<=0) return;
-  dir = (dir===-1)? -1 : 1;                        // it belongs on the side he is facing
+  if(!(stage>0)) return;
+  dir = (dir===-1)? -1 : 1;                        // it leans toward the side he is facing
   if(typeof rkHere==='function' && rkHere()){ drawKiltLift(x,y,w,stage,T,dir,decent); return; }
   /* NOT IN FRONT OF THE HOUSEHOLD. The last stage is the one where the hem
      gives up and there is skin — which is fine behind a door and is not fine
      in an atrium with three children and the kitchen staff in it. `decent`
-     holds it one stage short: the tunic is doing a great deal of work, and
+     holds it short of that: the tunic is doing a great deal of work, and
      it is still a tunic. */
-  if(decent) stage=Math.min(stage, RISE_STAGES-2);
+  const TOPS=RISE_STAGES-1;
+  if(decent) stage=Math.min(stage, TOPS-1);
   const B=(w&&w.body)||{}, gv=(id,d)=>B[id]===undefined?d:B[id];
-  const len=gv('secret',5), lg=gv('legs',6);
-  const tun=w.dress||w.tunic||'#7a2f22';
-  const skin=w.skin||'#caa06a';
-  // it starts in the SKIRT of the tunic, not up on the belt buckle
-  const legLen=Math.round(15+lg*0.62), hipY=y-18-legLen+11;
-  const k=clamp(stage/(RISE_STAGES-1),0,1);
-  const bare=stage>=RISE_STAGES-1;                 // by the last one the hem has given up
-  const base=bare? skin : tun;
-  const lit =mixHex(base,'#ffffff',0.34);          // a REAL highlight, on any tunic colour
-  const dark=mixHex(base,'#120a06',0.46);          // and a real shadow, so it leaves the cloth
+  const len=gv('secret',5);
+  const tun=hexOf(w.dress||w.tunic||'#7a2f22'), skin=hexOf(w.skin||'#caa06a');
+  const lit =mixHex(tun,'#ffffff',0.34), mid=mixHex(tun,'#120a06',0.22), dark=mixHex(tun,'#120a06',0.48);
   const P=(a,b2,ww,h,c2)=>{ ctx.fillStyle=c2;
     const ax = dir>0? (x+a) : (x-a-ww);
-    ctx.fillRect(Math.round(ax),Math.round(b2),Math.round(ww),Math.round(h)); };
-  /* THE TENT. This used to be four tunic-coloured pixels drawn ON a tunic —
-     measured at fifteen changed pixels by stage three, which is nothing at all
-     at 480x270, so the whole five-stage build was invisible. It is a wedge now:
-     a cast shadow underneath, the mass, and a lit ridge along the top, every
-     colour mixed against what he is actually wearing so it reads on any of them. */
-  const L2=Math.max(2, Math.round((2.4+len*0.92)*k));   // how far it stands out
-  const th=Math.max(2, Math.round(2.0+len*0.22));       // and how thick through
-  const climb=0.26+0.46*k;                              // low and deniable, then up
-  for(let i=0;i<L2;i++){
-    const t2=i/Math.max(1,L2-1);
-    const yy=hipY-1-Math.round(t2*L2*climb);
-    const hh=Math.max(1, Math.round(th*(1-t2*0.26)));   // tapers a little towards the end
-    P(2+i, yy+hh, 1, 2, dark);                          // it casts down onto the leg
-    P(2+i, yy, 1, hh, base);
-    P(2+i, yy, 1, 1, lit);
-  }
-  const tipY=hipY-1-Math.round(L2*climb);
-  if(bare){
-    P(2+L2, tipY-1, th, th+1, mixHex(skin,'#c07a68',0.40));
-    P(2+L2, tipY-1, th, 1,    mixHex(skin,'#ffffff',0.28));
-    P(1, hipY+1, th+2, th+2,  mixHex(skin,'#2a150a',0.18));
-  } else if(stage>=2){
-    P(2+L2, tipY, th, 2, dark);                         // the hem, straining
-  }
-  if(!bare && stage>=2){                                // the cloth comes FROM somewhere
-    P(0, hipY+1, 2, 1, dark);
-    P(1, hipY+3, 2, 1, mixHex(base,'#120a06',0.28));
+    ctx.fillRect(Math.round(ax),Math.round(y+b2),Math.round(ww),Math.round(h)); };
+  const kk=clamp(stage/(TOPS-1),0,1);              // the tent, stages 1..3
+  const bare=stage>=TOPS-0.02;
+  const hemY=-24;
+  if(!bare){
+    const lift=Math.round(kk*4.6);                 // the hem rises in the middle
+    const apexY=hemY-2-Math.round(kk*6.2), apexX=Math.round(kk*1.6);
+    const lit=mixHex(tun,'#ffffff',0.46), dark=mixHex(tun,'#0a0604',0.58);
+    // the underside of the hem, lifted: dark cloth, and under it a sliver of thigh
+    for(let j=0;j<lift;j++){ const hw=lift-j;
+      P(apexX-hw, hemY+1-j, hw*2+1, 1, j===0? mixHex(skin,'#1a0a06',0.35) : dark); }
+    // THE TENT: a wedge standing out of the cloth, lit on the near face
+    const baseY=hemY-lift;
+    for(let yy=apexY; yy<=baseY; yy++){ const t=(yy-apexY)/Math.max(1,baseY-apexY);
+      const hw=1+Math.round(t*(1.8+kk*3.0));
+      for(let q=-hw;q<=hw;q++){ const u=(q+hw)/Math.max(1,hw*2);
+        P(apexX+q, yy, 1, 1, u<0.34? lit : u>0.66? dark : tun); }
+      P(apexX+hw+1, yy+1, 1, 1, mixHex(tun,'#0a0604',0.70)); }                    // its shadow, thrown to the side
+    P(apexX-1, apexY-1, 3, 1, mixHex(lit,'#ffffff',0.35));                        // the light on its peak
+    // THE CLOTH PULLED TAUT from the belt down to it — the tell at any distance
+    const beltY2=-36, nF=Math.max(2, Math.round((apexY-beltY2)*kk));
+    for(let i=1;i<=nF;i++){ const f=i/Math.max(1,apexY-beltY2);
+      P(apexX-1-Math.round(i*0.62), apexY-i, 1, 1, dark);
+      P(apexX+1+Math.round(i*0.55), apexY-i, 1, 1, mid); }
+    if(kk>0.5) for(let i=1;i<=2;i++) P(apexX-1-i*2, baseY-i, 1, 1, dark);            // and slack gathering below it
+  } else {
+    /* THE HEM HAS GIVEN UP. Lifted high in the middle into an arch, its dark
+       underside showing, and what it was covering standing out of it. */
+    const archH=9;
+    for(let j=0;j<archH;j++){ const hw=Math.round(1+(archH-j)*0.62);
+      P(-hw, hemY+1-j, hw*2+1, 1, j===archH-1? dark : mixHex(skin,'#1a0a06',0.10+0.02*j)); }
+    for(let j=0;j<archH;j++){ const hw=Math.round(1+(archH-j)*0.62);                  // the edge of the lifted cloth
+      P(-hw-1, hemY+1-j, 1, 1, dark); P(hw+1, hemY+1-j, 1, 1, dark); }
+    pxLengthUp(P, len, 1, skin, hemY+1, T);
   }
   // and he is aware of it: a bead of sweat from stage two, a look away from three
   if(stage>=2 && ((T|0)%40)<20){ ctx.textAlign='center';
-    pixelText('💧', x-9*dir, hipY-26, 'rgba(190,220,255,.75)', 0.9); ctx.textAlign='left'; }
+    pixelText('💧', x-9*dir, y-44, 'rgba(190,220,255,.75)', 0.9); ctx.textAlign='left'; }
   if(stage>=3 && ((T|0)%30)<16){ ctx.textAlign='center';
-    pixelText('…', x+11*dir, hipY-30, 'rgba(255,214,190,.8)', 1); ctx.textAlign='left'; }
+    pixelText('…', x+11*dir, y-48, 'rgba(255,214,190,.8)', 1); ctx.textAlign='left'; }
 }
 function riseDue(){
   if(!G || !G.isFemale || !G.married || !G.wife || !G.wife.male || !ADULT) return false;
@@ -25222,7 +25927,7 @@ function drawRise(){
   ctx.restore();
   if(X.ph==='build' && X.stage<4){                  // the scroll, until he puts it down
     px(hx-4,FY-40,9,6,'#e6dcc2'); px(hx-4,FY-40,9,1,'#f6efdc'); px(hx-4,FY-40,1,6,'#b8a882'); }
-  drawTunicBump(hx, FY, w, X.ph==='build'? X.stage : RISE_STAGES-1, T, D.x<hx? -1 : 1,
+  drawTunicBump(hx, FY, w, X.ph==='build'? Math.min(RISE_STAGES-1, X.t/90) : RISE_STAGES-1, T, D.x<hx? -1 : 1,
     houseIsWatching());
   // ---- YOU ----
   drawWifeFig(ctx, D.x, FY, playerLook(), 0, 'idle');
@@ -27777,7 +28482,9 @@ function drawArdor(){
   drawHusbandFig(ctx,0,0,G.wifeRel|0,null,null,me, mv? T*0.35:0, mv?'walk':'idle');
   ctx.restore();
   const decent=houseIsWatching();
-  drawTunicBump(D.x, FY, me, X.ph==='wind'? X.stage : RISE_STAGES-1, T, dir, decent);
+  /* the stage as a NUMBER — heat, not the five-step ladder — so the tent
+     grows while the bar fills instead of jumping at four fixed points */
+  drawTunicBump(D.x, FY, me, X.ph==='wind'? clamp(X.heat/100,0,1)*(RISE_STAGES-1) : RISE_STAGES-1, T, dir, decent);
   if(X.ph==='wind'){
     const bx=W/2-70, by=H-40, bw=140, bh=10;
     px(bx-2,by-2,bw+4,bh+4,'#120c08');
@@ -47738,8 +48445,20 @@ const RK_CUTS={
    pub:'The parka. Same as everybody.'},
 };
 function rkCut(w){
-  try{ const t=rkWifeTitle(w); return RK_CUTS[(t&&t.id)||'plain']||RK_CUTS.plain; }
-  catch(e){ return RK_CUTS.plain; }
+  try{
+    const t=rkWifeTitle(w);
+    if(t && RK_CUTS[t.id]) return RK_CUTS[t.id];
+    /* AND AN UNSEATED WOMAN IS NOT IN A SACK EITHER. The men's table already
+       said so — "the house cuts him for the best thing about him" — and the
+       women's never did, so a wife with the finest bust on the coast and no
+       office wore THE PLAIN ULVIK, which does nothing for anybody, and the
+       one thing the coast is supposed to read off her indoors could not be
+       read at all. Same rule as his, same plain words: the house cuts her
+       for her best part, and everyone knows which seat she is angling for. */
+    const B=rkBestPart(w);
+    const BY={bust:'bosom', booty:'seat', legs:'reach', face:'love', hairq:'voice', waist:'cold'};
+    return RK_CUTS[BY[B&&B.id]] || RK_CUTS.plain;
+  }catch(e){ return RK_CUTS.plain; }
 }
 /* =====================================================================
    AND THE MEN'S SEVEN, BECAUSE A BODY IS A BODY
@@ -53166,6 +53885,7 @@ window.__SS = {
   setBodyMapView:(v)=>{ bodyMapView=v; }, get bodyMapView(){return bodyMapView;},
   setBodyMapWalk:(v)=>{ bodyMapWalk=v; }, get bodyMapSubject(){return bodyMapSubject;},
   redrawBodyMap:()=>{ try{ drawBodyMap($('bodymap-cv'), bodyMapSubject, bodyMapView, bodyMapT); }catch(e){} },
+  drawRealFig, realAnchors, drawLength, lengthPose, lengthDigits, girthDigits, ROUSED_NAMES, rousedName, restName, tierIdxOf,
   ARCHETYPES, ARCH_ORDER, BODY_PARTS, BODY_PARTS_M, IMPOSSIBLE_V,
   IMPOSSIBLE_CHANCE, SECRET_SELLERS, drawShadowPlayTest:drawShadowPlay, drawWifeFig, drawDomusPlayer,
   openCoup, coupDue, purpleRisk, makeCourt, ageBodies, ageOneBody, upkeepScore, spouseTierBonus, finishBed,
