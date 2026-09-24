@@ -192,6 +192,7 @@
       <div class="panel pad col center gap" style="max-width:86%;">
         <canvas id="logo-cv" width="320" height="72" style="position:static;width:min(84vw,440px);height:auto;image-rendering:pixelated;"></canvas>
         <div class="small" style="color:var(--blood);font-size:clamp(9px,2vw,15px);letter-spacing:3px;">⚔ GLADIATORS OF 200 A.D. ⚔</div>
+        <div id="build-stamp" class="small muted" style="font-size:10px;letter-spacing:1px;opacity:.75"></div>
         <div class="small muted" style="max-width:420px;line-height:1.5;">
           The reign of Emperor Septimius Severus. Rise from a nameless tiro in a
           provincial ludus to a champion fighting before the Emperor in Roma.
@@ -8867,6 +8868,23 @@ function hardFace(w, where){
    blade went in, the belly the announcement named — and the real figure,
    the one that is supposed to be the truth of it, carried none. Read out
    here because inside drawRealFig the name G is its light, not the game. */
+/* 👗 WHAT THEY HAVE ON, for the REAL chart's DRESSED switch — the same
+   garments the hall and the scenes put on them: a Roman tunic or the
+   coast's hide kilt for him; a stola, or on the coast the ulvik in her
+   office's cut, for her. */
+function realDressInfo(w){
+  const out={coast:false, cloth:'#7a2f22', band:'#8a6a3a', cut:null, noble:false};
+  try{
+    out.coast=(typeof rkHere==='function' && rkHere());
+    const base = w.self? (G.isFemale? (w.dress||G.tunic) : G.tunic) : w.dress;
+    out.cloth=hexOf(base||(w.male? '#7a2f22' : '#8a2f5a'));
+    out.noble=(w.rank==='noble'||w.tier==='elite'||w.tier==='imperial'||(w.self && (G.socialClass==='elite'||G.socialClass==='imperial')));
+    if(out.coast){ out.band=(typeof rkOfficeBand==='function')? rkOfficeBand(w.male? (G&&G.wife) : w) : '#8a6a3a';
+      if(!w.male){ out.cloth=mixHex(out.cloth,'#7a5a3a',0.50); try{ out.cut=rkCut(w); }catch(e){} }
+      else out.cloth=mixHex(out.cloth,'#5a4028',0.35); }
+  }catch(e){}
+  return out;
+}
 function realFigExtras(w){
   const out={age:25, preg:0, scars:null};
   try{
@@ -9084,7 +9102,7 @@ function drawRealFig(c, w, view, ph, opt){
     }
     // ---- THE GROIN ----
     if(!back){
-      if(male && LEN){
+      if(male && LEN && !opt.dressed){
         const d=lenDims();
         drawLength(c,{x:0, y:hy+1.4, L:d.L, D:d.D, grow:d.grow, aro, view:'front', skin, hair, lw,
           sway: walking? Math.sin(P0)*0.55*(1-lengthPose(aro).lift) : 0, T:performance.now()});
@@ -9152,6 +9170,56 @@ function drawRealFig(c, w, view, ph, opt){
                arm:[-(SW*0.98+0.25)-1.2, sy+2.5, 2.4, Math.max(2,wy-(sy+2.5))],
                leg:[-HW*0.62, hy+4, HW*0.50, Math.max(2,(-hy)*0.40)] };
     if(!back) drawScars(FZ, ['torso','arm','leg']);
+    /* ---- 👗 DRESSED: the garment, over the body, following it ---- */
+    if(opt.dressed && ADULT){
+      const DI=opt.dressInfo||{}, cl=hexOf(DI.cloth||(male?'#7a2f22':'#8a2f5a'));
+      const cHi=mixHex(cl,'#ffffff',0.26), cSh=mixHex(cl,'#120a06',0.42), L=-hy;
+      const sym=(R)=>R.concat(R.slice().reverse().map(p=>[-p[0],p[1]]));
+      const cloth=(pts)=>{ const g=c.createLinearGradient(-SW-3,0,SW+3,0); g.addColorStop(0,cHi); g.addColorStop(0.42,cl); g.addColorStop(1,cSh);
+        fillPts(pts,g); edge(pts,0.35); };
+      const fold=(x0,y0,x1,y1)=>crease(x0,y0,(x0+x1)/2+0.2,(y0+y1)/2,x1,y1,0.35,lw*1.1);
+      /* a belt is only as wide as she is where it is tied */
+      const band=(y,col,h,hw)=>{ hw=hw||HW*1.08; c.fillStyle=col; c.beginPath(); smoothPath(c,[[-hw,y],[hw,y],[hw*0.98,y+(h||1.2)],[-hw*0.98,y+(h||1.2)]],true); c.fill(); };
+      if(male && !DI.coast){                                        // the TUNIC: shoulders to mid-thigh, sleeves capped
+        const P=sym([[NW*1.7,sy-1.0],[SW*1.02,sy+0.1],[SW*1.10+1.3,sy+4.6],[SW*0.84,sy+5.0],[CW*1.03,cy+1],[WW*1.14+0.4,wy],[HW*1.08,hy-1],[HW*1.04+0.6,hy+L*0.30]]);
+        if(!back) P.splice(P.length/2,0,[0,hy+L*0.31]);
+        cloth(P.concat(back? [] : [[-NW*1.7,sy-1.0],[0,sy+1.8]]));
+        for(const q of [-1,1]){ fold(q*WW*0.5,wy+2,q*WW*0.62,hy+L*0.28); fold(q*HW*0.9,hy-0.5,q*HW*0.98,hy+L*0.27); }
+        band(wy+0.4, DI.noble? '#e8c34a' : mixHex(cl,'#1a0e06',0.6), 1.2, WW*1.16+0.4);
+        c.strokeStyle=rgbA(cSh,0.8); c.lineWidth=lw*1.4; c.beginPath(); c.moveTo(-HW*1.05,hy+L*0.30); c.lineTo(HW*1.05,hy+L*0.30); c.stroke();
+      } else if(male){                                             // the coast's KILT: hooked at the hip, bare above
+        const P=sym([[HW*1.02,hy-3.6],[HW*1.10,hy-0.5],[HW*1.12,hy+L*0.28]]);
+        cloth(P);
+        band(hy-3.8, hexOf(DI.band||'#8a6a3a'), 1.4, HW*1.04);
+        for(let i=-3;i<=3;i++){ fold(i*HW*0.28,hy-1.8,i*HW*0.30,hy+L*0.26); }
+        c.fillStyle=cSh; for(let i=-5;i<=5;i++) c.fillRect(i*HW*0.20-0.2, hy+L*0.28, 0.5, 1.3);   // the fringe
+      } else if(!DI.coast){                                        // the STOLA: over the bust, belted under it, to the floor
+        const r=0.95+bu*0.60, by2=cy+2.8+r*0.10, bxx=r*0.78+0.55;
+        const P=sym(back? [[CW*0.52,sy+0.2],[CW*0.66,sy+0.3],[CW*1.02,cy+0.8],[WW*1.10,wy],[HW*1.10,hy],[HW*0.98+1.2,hy+L*0.55],[HW*1.06+2.2,-1.4]]
+                        : [[CW*0.52,sy+0.2],[CW*0.66,sy+0.3],[CW*1.05,cy+0.8],[bxx+r*0.95,by2+r*0.2],[WW*1.10,wy],[HW*1.10,hy],[HW*0.98+1.2,hy+L*0.55],[HW*1.06+2.2,-1.4]]);   // from behind there is no bust to go round
+        cloth(P.concat(back? [] : [[-CW*0.52,sy+0.2],[0,by2-r*0.55]]));
+        if(!back){ [1,-1].forEach(q=>ball(q*bxx, by2, r*0.98, r*0.92, cl));   // the bust, under the cloth
+          crease(-bxx,by2+r*0.9,0,by2+r*1.2,bxx,by2+r*0.9,0.4,lw*1.2); }
+        band(by2+r*0.95, DI.noble? '#e8c34a' : mixHex(cl,'#1a0e06',0.55), 1.0, Math.max(WW*1.2, CW*0.98));
+        for(const q of [-1,1]){ fold(q*HW*0.35,hy,q*HW*0.55,-2); fold(q*HW*0.8,hy+1,q*(HW*1.0+1.5),-2); }
+      } else {                                                     // the coast's ULVIK, in her office's cut
+        const K=DI.cut||{len:14,neck:'plain'}, r=0.95+bu*0.60, by2=cy+2.8+r*0.10, bxx=r*0.78+0.55;
+        const hem=hy+L*(0.14+((K.len||14)-11)*0.012), belt=hy-2.4;
+        // the bodice: under the bust to the belt, and each side cupped from underneath
+        cloth(sym(back? [[CW*0.98,cy+1.0],[WW*1.10,wy],[HW*1.02,belt+0.4]] : [[bxx+r*0.95,by2+r*0.1],[WW*1.10,wy],[HW*1.02,belt+0.4]]));
+        if(!back){ const bareTop = K.neck==='lace'? 0.10 : 0.0;
+          [1,-1].forEach(q=>{ c.save(); c.beginPath(); c.rect(q*bxx-r*1.2, by2+r*(bareTop), r*2.4, r*1.3); c.clip();
+            ball(q*bxx, by2, r*1.0, r*0.94, cl); c.restore();
+            c.strokeStyle=rgbA(cHi,0.9); c.lineWidth=lw*1.2; c.beginPath(); c.moveTo(q*bxx-r*0.95,by2+r*bareTop); c.lineTo(q*bxx+r*0.95,by2+r*bareTop); c.stroke();
+            c.strokeStyle=rgbA(cl,0.9); c.lineWidth=lw*1.3; c.beginPath(); c.moveTo(q*(bxx+r*0.6),by2); c.lineTo(q*SW*0.62,sy+0.4); c.stroke(); });   // the straps
+          if(K.neck==='lace'){ c.strokeStyle=hexOf(DI.band||'#c0a02a'); c.lineWidth=lw; for(let i=0;i<3;i++){ const y=by2+r*(0.3+i*0.25); c.beginPath(); c.moveTo(-0.6,y); c.lineTo(0.6,y+0.4); c.stroke(); } } }
+        // the belt, the office's colour, and the short skirt below it
+        band(belt, hexOf(DI.band||'#8a6a3a'), 1.3, HW*1.04);
+        cloth(sym([[HW*1.04,belt+1.2],[HW*1.10+0.4,hy+0.5],[HW*1.12+0.8,hem]]));
+        c.fillStyle=cSh; for(let i=-5;i<=5;i++) c.fillRect(i*HW*0.21-0.2, hem, 0.5, 1.4);
+        if(K.neck==='sash'){ for(let i=0;i<3;i++) band(wy-2+i*1.2, i%2? hexOf(DI.band||'#6a7a8a') : mixHex(hexOf(DI.band||'#6a7a8a'),'#ffffff',0.25), 1.0, WW*1.2); }
+      }
+    }
     // ---- THE HEAD ----
     const face=[[0,ny-HH],[HR*0.74,ny-HH*0.93],[HR*0.99,ny-HH*0.70],[HR*0.96,ny-HH*0.44],
                 [HR*(male?0.86:0.74),ny-HH*0.20],[HR*0.40,ny-HH*0.02],[0,ny+0.18],
@@ -9333,7 +9401,37 @@ function drawRealFig(c, w, view, ph, opt){
       fillPts(P,g); edge(P,0.35);
       c.strokeStyle=rgbA(linSh,0.8); c.lineWidth=lw; c.beginPath(); c.moveTo(bellyF*0.92,hy-2.9); c.lineTo(-seat*0.86,hy-3.1); c.stroke();
     }
-    if(male && LEN){
+    /* ---- 👗 DRESSED, in profile ---- */
+    if(opt.dressed && ADULT){
+      const DI=opt.dressInfo||{}, cl=hexOf(DI.cloth||(male?'#7a2f22':'#8a2f5a'));
+      const cHi=mixHex(cl,'#ffffff',0.26), cSh=mixHex(cl,'#120a06',0.42), L=-hy;
+      const cloth=(pts)=>{ const g=c.createLinearGradient(chestF+2,0,-seat-1,0); g.addColorStop(0,cHi); g.addColorStop(0.45,cl); g.addColorStop(1,cSh);
+        fillPts(pts,g); edge(pts,0.35); };
+      if(male && !DI.coast){
+        cloth([[NW*1.3,sy-0.6],[chestF*0.98,sy+1.5],[chestF+0.3,cy+2.0],[chestF*0.96,cy+5.5],[bellyF*0.92+0.4,wy],[bellyF+0.5,wy+3],[bellyF*0.95+0.4,hy-1.2],
+               [3.8,hy+L*0.30],[-seat*0.95,hy+L*0.30],[-seat-0.5,hy-0.8],[-seat*0.86,hy-3.8],[backX*0.84-0.4,wy+0.6],[backX-0.4,cy+4],[backX*1.05-0.3,cy-0.5],[backX*0.85,sy],[-NW*1.2,sy-1.8]]);
+        c.fillStyle=mixHex(cl,'#1a0e06',0.6); c.fillRect(backX*0.9, wy+0.2, (bellyF+0.6)-backX*0.9, 1.2);
+        crease(1.2,hy-0.4,1.8,hy+L*0.12,2.2,hy+L*0.28,0.35,lw);
+      } else if(male){
+        cloth([[bellyF*0.95+0.5,hy-3.6],[bellyF+0.6,hy-0.8],[4.2,hy+L*0.28],[-seat*0.95,hy+L*0.28],[-seat-0.5,hy-0.8],[-seat*0.86,hy-3.8]]);
+        c.fillStyle=hexOf(DI.band||'#8a6a3a'); c.fillRect(-seat*0.9, hy-3.9, bellyF+seat*0.9+0.6, 1.3);
+      } else if(!DI.coast){
+        const ry=(0.95+bu*0.60)*0.80, rx=Math.max(0.8,M.bustD*0.78), bx=chestF+rx*0.40, by2=cy+2.8+ry*0.14;
+        cloth([[NW*1.2,sy-0.3],[chestF*0.9,sy+1.2],[bx+rx*0.7,by2-ry*0.7],[bx+rx*1.05,by2+ry*0.1],[bx+rx*0.6,by2+ry*0.95],[bellyF+0.4,wy+1],[bellyF+0.9,hy],
+               [5.2,-L*0.45],[6.4,-1.4],[-seat-1.4,-1.4],[-seat-0.6,hy+2],[-seat-0.4,hy-1],[-seat*0.85,hy-3.8],[backX*0.84-0.4,wy+0.6],[backX-0.3,cy+4],[backX*0.85,sy],[-NW*1.2,sy-1.8]]);
+        crease(bx-rx*0.5,by2+ry*1.0,bx,by2+ry*1.1,bx+rx*0.6,by2+ry*0.9,0.45,lw*1.2);
+        for(let i=0;i<3;i++) crease(-seat*0.3+i*2.2,hy+1,-seat*0.2+i*2.6,-L*0.5,-seat*0.1+i*2.9,-2,0.3,lw);
+      } else {
+        const K=DI.cut||{len:14,neck:'plain'}, ry=(0.95+bu*0.60)*0.80, rx=Math.max(0.8,M.bustD*0.78), bx=chestF+rx*0.40, by2=cy+2.8+ry*0.14;
+        const hem=hy+L*(0.14+((K.len||14)-11)*0.012), belt=hy-2.4;
+        // the cup under the bust, the bodice down to the belt, the short skirt below — and the top of her bare
+        c.save(); c.beginPath(); c.rect(chestF*0.5, by2+ry*(K.neck==='lace'? 0.15 : 0.02), rx*3, ry*2); c.clip(); ball(bx, by2, rx, ry, cl); c.restore();
+        cloth([[chestF*0.9,by2+ry*0.5],[bx+rx*0.5,by2+ry*0.9],[bellyF+0.4,wy+1],[bellyF+0.6,belt],[-seat*0.86,belt],[backX*0.84-0.4,wy+0.6],[backX-0.3,cy+4],[backX*0.9,by2]]);
+        c.fillStyle=hexOf(DI.band||'#8a6a3a'); c.fillRect(-seat*0.9, belt, bellyF+seat*0.9+0.7, 1.3);
+        cloth([[bellyF+0.7,belt+1.2],[bellyF+1.2,hy],[4.8,hem],[-seat*1.02,hem-(K.back||0.2)*4],[-seat-0.6,hy-0.6],[-seat*0.9,belt+1.2]]);
+      }
+    }
+    if(male && LEN && !opt.dressed){
       const d=lenDims(), P2=lengthPose(aro);
       drawLength(c,{x:1.95, y:hy+1.2, L:d.L, D:d.D, grow:d.grow, aro, skin, hair, lw,
         sway: walking? Math.sin(P0*2+0.6)*0.30*(1-P2.lift) + Math.sin(P0*2)*0.05*P2.lift : 0, T:performance.now()});
@@ -9379,6 +9477,11 @@ function drawRealFig(c, w, view, ph, opt){
       c.strokeStyle=rgbA(hHi,0.5); c.lineWidth=lw*0.8;
       for(let i=0;i<4;i++){ c.beginPath(); c.moveTo(hx0+HR*(0.5-i*0.3),ny-HH-vol*0.5); c.quadraticCurveTo(hx0-HR*(0.2+i*0.2),ny-HH*0.85,hx0-HR*(0.5+i*0.15),ny-HH*(0.5-i*0.05)); c.stroke(); } }
     armS(1);
+    if(opt.dressed && ADULT && male && !(opt.dressInfo||{}).coast){           // the tunic's sleeve over the near arm
+      const cl=hexOf((opt.dressInfo||{}).cloth||'#7a2f22');
+      const P=[[-1.9,sy-0.2],[1.6,sy+0.4],[1.4,sy+4.4],[-2.1,sy+4.6]];
+      const g=c.createLinearGradient(2,0,-2,0); g.addColorStop(0,mixHex(cl,'#ffffff',0.2)); g.addColorStop(1,mixHex(cl,'#120a06',0.35));
+      fillPts(P,g); edge(P,0.3); }
   }
 }
 /* the old name, kept, because three call sites and a preview use it */
@@ -9470,7 +9573,8 @@ function drawBodyMap(cnv,w,view,tms){
        than one geometry flipped. */
     c.translate(0, 69 - bob*0.8);
     c.imageSmoothingEnabled=true;
-    try{ drawRealFig(c, w, view, bodyMapWalk? ph : undefined, {showLen: male && secretAllowed(w)}); }catch(e){}
+    try{ drawRealFig(c, w, view, bodyMapWalk? ph : undefined, {showLen: male && secretAllowed(w) && !bmDressed,
+      dressed:bmDressed, dressInfo: bmDressed? realDressInfo(w) : null}); }catch(e){}
     c.restore();
     // the slap still rings through it, and she still stands on something
     c.fillStyle='rgba(0,0,0,.30)';
@@ -10680,6 +10784,7 @@ function wrapSmall(c,txt,x,y,maxw,lh){
     if(c.measureText(t).width>maxw && line){ c.fillText(line,x,yy); yy+=lh; line=wd; } else line=t; });
   if(line) c.fillText(line,x,yy);
 }
+let bmDressed=false;                         // 👗 the REAL chart, with their clothes on
 let bodyMapView='front', secretAroused=false, secretSub='profile', bodyMapWalk=true, bodyMapT=0, bodyMapRAF=0;
 /* WHERE IT ACTUALLY IS, 0..1, as opposed to where it has been told to be.
    The boolean above is the target; this is the thing the chart draws, and
@@ -11809,6 +11914,16 @@ function openBodyMap(w,back){
     rb.onclick=()=>{ SETTINGS.bluntBody=!SETTINGS.bluntBody; saveSettings();
       bmResetCache(); buildSub(); redraw(); try{sfx('ui');}catch(e){} };
     sv.appendChild(rb);
+    /* 👗 AND WITH THEIR CLOTHES ON. The real figure was only ever bare or in a
+       loincloth; the switch puts on what they actually wear, cut the way
+       their people cut it, so the chart can be read against the person you
+       see in the hall. */
+    if(SETTINGS.bluntBody && ADULT){
+      const db=document.createElement('button'); db.className='btn sm'+(bmDressed?' gold':'');
+      db.textContent = bmDressed? '👗 DRESSED' : '🫥 BARE';
+      db.title='Put on what they actually wear — a tunic or the coast kilt for him, a stola or her office\'s ulvik for her — or take it off again.';
+      db.onclick=()=>{ bmDressed=!bmDressed; bmResetCache(); buildSub(); redraw(); try{sfx('ui');}catch(e){} };
+      sv.appendChild(db); }
     /* ⬔ AND THE THIRD ONE. FRONT, SIDE and BACK are three flat drawings of
        one body; this is the body.
        IT HAS TO SAY 3D. When it was off it read "⬚ FLAT", which is a
@@ -13050,6 +13165,12 @@ function setAdult(on){ ADULT=!!on; try{ localStorage.setItem(ADULT_KEY, on?'1':'
 
 /* ---------- SETTINGS (sound · screen shake · difficulty), device-local ---------- */
 const SETTINGS_KEY='SANDSTEEL_SETTINGS';
+/* WHICH BUILD IS THIS. Printed on the title screen, in Settings and in the
+   corner of the hall — because an old link to an old build looks exactly
+   like a fix that did not work. */
+const BUILD_STAMP='V37 · profile pair';
+try{ document.addEventListener('DOMContentLoaded',()=>{ const e=document.getElementById('build-stamp'); if(e) e.textContent='build '+BUILD_STAMP; });
+     const e0=document.getElementById('build-stamp'); if(e0) e0.textContent='build '+BUILD_STAMP; }catch(e){}
 const SETTINGS=(function(){ const d={sound:true,shake:true,difficulty:'normal',
     bluntBody:false,      // the chart draws the real game model instead of the diagram
     blunt:false,          // and the marriage cards say what they mean
@@ -24644,6 +24765,7 @@ function drawMateFig(bk, fr, M){
     const lp=lengthPose(Math.min(aro,1));
     let ang=(Math.PI/2-0.28) + ((-0.14)-(Math.PI/2-0.28))*lp.lift;
     if(M.aim && (M.aimK||0)>0){ const aa=Math.atan2(M.aim[1]-R[1], M.aim[0]-R[0]); ang=ang+(aa-ang)*clamp(M.aimK,0,1); }
+    if(M.lenAng!==undefined && M.lenAng!==null) ang=M.lenAng;                // the scene is swinging it
     const lenPx=Math.max(3, M.lenIn*(M.pxi||1)), dia=Math.max(1.8, (M.diaIn||1.6)*(M.pxi||1)*(1+0.25*lp.swell));
     let shown=lenPx;
     if(M.clip && M.aim){ shown=clamp(Math.hypot(M.aim[0]-R[0], M.aim[1]-R[1])+0.6, 0, lenPx); }   // the rest of it is in her
@@ -24747,7 +24869,11 @@ function drawPair(c, o){
   if(o.he && HG){
     const E=o.he, J=out.join;
     const stroke=E.stroke===undefined? 3.2 : E.stroke;
-    const gapPx=(E.gap||0) + stroke*(1-clamp(E.drive||0,0,1));
+    let gapPx=(E.gap||0) + stroke*(1-clamp(E.drive||0,0,1));
+    if(E.reachSeat && out.seat){                                   // stand where, laid out level, it lands ON her seat
+      const IN0=(typeof lengthInches==='function')? lengthInches(E.look||{}, 1) : {now:6};
+      const lp=IN0.now*(E.pxi||1.0), back=out.seat[0]-(out.rs||6)+1;
+      gapPx=Math.max(3, J[0]+0.4+lp-back) + (E.gap||0); }
     /* he only comes DOWN to her height once he is at her — standing back he
        stands at his own, which is a good deal taller than a bent-over wife */
     const look0=E.look||{}, lg0=((look0.body||{}).legs===undefined? 6 : look0.body.legs);
@@ -24759,6 +24885,7 @@ function drawPair(c, o){
                : h==='hair'? [out.head[0]-3.2, out.head[1]-2.4]
                : h==='seat'? [out.seat[0]-(out.rs||6)*0.55, out.seat[1]-(out.rs||6)*0.2]
                : h==='cocked'? [hip[0]-5, hip[1]-26]
+               : h==='wave'? [hip[0]+8, hip[1]-34]
                : h==='belt'? [hip[0]+4.6, hip[1]-4.5]
                : h==='hem'? [hip[0]+4.2, hip[1]+4]
                : h==='up'? [hip[0]+3.5, hip[1]-40]
@@ -24768,7 +24895,7 @@ function drawPair(c, o){
     const look=E.look||{};
     const IN=(typeof lengthInches==='function')? lengthInches(look, E.aro||0) : {now:6,dia:1.6};
     const MR=drawMateFig(X(pk), X(pf), {hip, floor:FYb, lean:E.lean||0, u:E.u||0, aro:E.aro||0,
-      hands:{near, far}, face:E.face||HARD_FACES.stoic, aim:J, aimK:E.aimK||0, clip:(E.aimK||0)>0.5,
+      hands:{near, far}, face:E.face||HARD_FACES.stoic, aim:J, aimK:E.aimK||0, clip:(E.aimK||0)>0.5, lenAng:E.lenAng,
       look, coast:!!E.coast, cloth:E.cloth, band:E.band, lenIn:IN.now, diaIn:IN.dia, pxi:E.pxi||1.0});
     const W2b=(p)=>p? [o.x+(p[0]-FXb)*dir, FY+(p[1]-FYb)] : null;
     out.hisHead=MR.head; out.hisHand=MR.hand; out.hisShoulder=MR.shoulder; out.hisHip=MR.hip; out.hisTip=MR.tip; out.hisRoot=MR.root;
@@ -24804,6 +24931,258 @@ function villaRevealLine(v, fem, N){
               :        ['~ '+who+'. '+(fem? 'You are' : 'She is')+' very kind about it. ~', null];
   return {lines, expr: v>=9? 'bite' : v>=7? 'pleased' : 'smug', brace: v>=10};
 }
+/* HIM ON HIS OWN, standing, in profile — the same figure the pair uses,
+   for scenes that need a man and not a pair. dir +1 faces right. Hands
+   are given relative to his hips. Returns where his head and hand are. */
+let MAN_CV=null;
+function drawManProfile(c, x, fy, look, M, dir){
+  const BW=140, BH=110, FXb=70, FYb=106;
+  if(!MAN_CV) MAN_CV=[0,1].map(()=>{ const k=document.createElement('canvas'); k.width=BW; k.height=BH; return k; });
+  const [bk,fr]=MAN_CV; [bk,fr].forEach(k=>{ const g=k.getContext('2d'); g.setTransform(1,0,0,1,0,0); g.clearRect(0,0,BW,BH); });
+  M=M||{}; const lg=((look&&look.body)||{}).legs; const L0=(lg===undefined? 6 : lg);
+  const hip=[FXb, FYb-2.2-(15.6+L0*0.22+16.2+L0*0.22)*0.975+(M.crouch||0)];
+  const rel=(v)=> v? [hip[0]+v[0], hip[1]+v[1]] : null;
+  const IN=(typeof lengthInches==='function')? lengthInches(look||{}, M.aro||0) : {now:6,dia:1.6};
+  const R=drawMateFig(bk.getContext('2d'), fr.getContext('2d'), {hip, floor:FYb, lean:M.lean||0.02, u:M.u||0, aro:M.aro||0,
+    hands:{near:rel(M.near), far:rel(M.far)}, face:M.face||HARD_FACES.stoic, look:look||{}, coast:!!M.coast,
+    cloth:M.cloth||'#7a2f22', band:M.band, lenIn:IN.now, diaIn:IN.dia, pxi:1.0});
+  for(const k of [bk,fr]){ const g=k.getContext('2d'), im=g.getImageData(0,0,BW,BH), d=im.data;
+    for(let i=3;i<d.length;i+=4) d[i]= d[i]>=110? 255 : 0; g.putImageData(im,0,0); }
+  c.save(); if(dir<0){ c.translate(x,0); c.scale(-1,1); c.translate(-x,0); }
+  c.drawImage(bk, Math.round(x-FXb), Math.round(fy-FYb)); c.drawImage(fr, Math.round(x-FXb), Math.round(fy-FYb));
+  c.restore();
+  const W2=(p)=>p? [x+(p[0]-FXb)*dir, fy+(p[1]-FYb)] : null;
+  return {head:W2(R.head), hand:W2(R.hand), hip:W2(R.hip), root:W2(R.root)};
+}
+/* =====================================================================
+   👁 THE PEEK — WHAT YOU WALK IN ON, AND THE MOMENT THEY SEE YOU
+   ---------------------------------------------------------------------
+   It stood two little sprites side by side and rotated one of them
+   ninety degrees for "bent over the bed", so the wife floated in the air
+   for the lap and the wall. It is a room now: a real bed with a frame,
+   pillows and linen, and the couple drawn with the same figures as the
+   hall. And the picture is the INTERRUPTION — the door opens and they
+   break apart: she has the sheet up round herself, he has a cushion,
+   both of them are looking at you, and depending on who they are a
+   pillow is already in the air. It is the grown child of the house and
+   their spouse (adults only — adultCouple() keeps anyone younger out of
+   every room), and what you see is them being caught, not the act.
+   ===================================================================== */
+/* what they lie on and grab from, room by room: linen in the bedchamber,
+   bath towels on a stone bench by the lagoon, and in the wardrobe the
+   cloaks they pulled down off the rail */
+function peekLinen(room){
+  return room==='wardrobe'? {lin:'#7a4a72', linSh:'#553050', linHi:'#9a6a92', cushion:'#3a5a4a'}
+       : room==='pool'?     {lin:'#e4eef0', linSh:'#b0c4c8', linHi:'#ffffff', cushion:'#a8407a'}
+       :                    {lin:'#ece2cc', linSh:'#c8baa0', linHi:'#fffaf0', cushion:'#8a2f4a'};
+}
+function drawPeekBed(fx, fy2, FW, FH, T, rumple, sheetTo, room){
+  if(room && room!=='bed') return drawPeekLow(fx, fy2, FW, FH, T, rumple, room);
+  const bx=fx+Math.round(FW*0.06), bw=Math.round(FW*0.44), top=fy2+FH-Math.round(FH*0.30), fl=fy2+FH-Math.round(FH*0.10);
+  const wood='#6a4222', woodHi='#8a5a30', woodSh='#3a2410', lin='#ece2cc', linSh='#c8baa0', linHi='#fffaf0';
+  px(bx-3, top-22, 5, fl-top+22, wood); px(bx-3, top-22, 5, 2, woodHi);                  // the headboard post
+  px(bx-2, top-18, bw*0.20, 14, wood); px(bx-2, top-18, bw*0.20, 1, woodHi);
+  px(bx, top, bw, 7, '#b89868'); px(bx, top, bw, 1, '#d8b888');                          // the mattress
+  px(bx, top+7, bw, 4, wood); px(bx, top+7, bw, 1, woodHi); px(bx, top+10, bw, 1, woodSh); // the rail
+  px(bx+1, top+11, 3, fl-top-11, woodSh); px(bx+bw-4, top+11, 3, fl-top-11, woodSh);    // legs
+  px(bx+bw-3, top-8, 4, fl-top+8, wood); px(bx+bw-3, top-8, 4, 1, woodHi);              // the foot post
+  // two pillows, lit
+  for(const [ox,w2] of [[2,15],[16,14]]){ px(bx+ox, top-5, w2, 5, lin); px(bx+ox, top-5, w2, 1, linHi); px(bx+ox, top-1, w2, 1, linSh); }
+  // the sheet: ONE piece of linen, lit from the lamp, with a few soft folds — rumpled as far as the evening has got
+  { const sx=bx+10, sw=bw-12, pts=[];
+    for(let i=0;i<=8;i++){ const u=i/8; pts.push([sx+u*sw, top-2-Math.sin(u*Math.PI)*rumple*1.3-Math.sin(u*9.0)*rumple*0.5]); }
+    ctx.beginPath(); ctx.moveTo(pts[0][0], top+6); pts.forEach(p=>ctx.lineTo(p[0],p[1])); ctx.lineTo(sx+sw+1, top+9); ctx.lineTo(sx, top+8); ctx.closePath();
+    const g=ctx.createLinearGradient(sx, top-6, sx, top+8); g.addColorStop(0,linHi); g.addColorStop(0.5,lin); g.addColorStop(1,linSh);
+    ctx.fillStyle=g; ctx.fill();
+    ctx.strokeStyle='rgba(150,134,110,.55)'; ctx.lineWidth=0.8;
+    for(let f=0;f<3;f++){ const u=0.25+f*0.25; ctx.beginPath(); ctx.moveTo(sx+u*sw, top-1-rumple*0.6); ctx.quadraticCurveTo(sx+u*sw+3, top+3, sx+u*sw+1, top+7); ctx.stroke(); }
+    ctx.fillStyle=lin; ctx.fillRect(Math.round(sx+sw-1), Math.round(top+6), 2, 5); }                        // hanging off the end
+  if(sheetTo){ // a trailing corner, off the bed and to the one holding it
+    ctx.strokeStyle=lin; ctx.lineWidth=3; ctx.beginPath(); ctx.moveTo(bx+bw-6, top+2);
+    ctx.quadraticCurveTo((bx+bw+sheetTo[0])/2, top+8, sheetTo[0], sheetTo[1]); ctx.stroke();
+    ctx.strokeStyle=linSh; ctx.lineWidth=1; ctx.stroke(); }
+  return {bx, bw, top, floor:fl};
+}
+function drawPeekLow(fx, fy2, FW, FH, T, rumple, room){
+  const L=peekLinen(room), fl=fy2+FH-Math.round(FH*0.10);
+  const bx=fx+Math.round(FW*0.06), bw=Math.round(FW*0.40), top=fl-(room==='pool'? 12 : 7);
+  if(room==='pool'){
+    // a stone bench along the kerb, towels folded on it
+    px(bx, top+3, bw, fl-top-3, '#7a8a94'); px(bx, top+3, bw, 1, '#a8b8c0'); px(bx, fl-2, bw, 2, '#4a5a64');
+    for(let i=1;i<4;i++) px(bx+Math.round(bw*i/4), top+4, 1, fl-top-6, '#5a6a74');
+    px(bx+2, top-2, 14, 5, L.lin); px(bx+2, top-2, 14, 1, L.linHi); px(bx+2, top+2, 14, 1, L.linSh);
+  } else {
+    // a heap of cloaks pulled down off the rail, on the floor
+    const cols=['#6a3f66','#3a5a4a','#8a6a2a','#2f4f6a'];
+    for(let i=0;i<4;i++){ ctx.fillStyle=cols[i]; ctx.beginPath();
+      ctx.ellipse(bx+bw*(0.14+i*0.24), fl-3-(i%2), bw*0.17, 4.2, 0, 0, 7); ctx.fill();
+      ctx.fillStyle=shade(cols[i],24); ctx.fillRect(Math.round(bx+bw*(0.08+i*0.24)), Math.round(fl-7-(i%2)), Math.round(bw*0.10), 1); }
+    px(bx+2, top-1, 14, 4, L.lin); px(bx+2, top-1, 14, 1, L.linHi);
+  }
+  // the one piece they are under or were under, rumpled
+  { const sx=bx+10, sw=bw-12, pts=[];
+    for(let i=0;i<=8;i++){ const u=i/8; pts.push([sx+u*sw, top-1-Math.sin(u*Math.PI)*rumple*1.2-Math.sin(u*8.0)*rumple*0.5]); }
+    ctx.beginPath(); ctx.moveTo(pts[0][0], top+5); pts.forEach(p=>ctx.lineTo(p[0],p[1])); ctx.lineTo(sx+sw, top+5); ctx.closePath();
+    const g=ctx.createLinearGradient(sx, top-4, sx, top+5); g.addColorStop(0,L.linHi); g.addColorStop(0.5,L.lin); g.addColorStop(1,L.linSh);
+    ctx.fillStyle=g; ctx.fill(); }
+  return {bx, bw, top, floor:fl};
+}
+function drawPeekTableau(pcx, pfy, P, T, fx, fy2, FW, FH){
+  const him=P.looks.him, her=P.looks.her, tier=clamp((P.stage&&P.stage.tier)||0,0,4);
+  const act=(P.act&&P.act.id)||'talk', R=P.react||PEEK_REACT[PEEK_REACT.length-1];
+  const since=T-PEEK_OPEN, see=clamp(since/10,0,1);                         // they have seen you
+  const bare = tier>=3, loose = tier>=2;
+  const face = R.id==='shameless'? HARD_FACES.smirk : (R.id==='tempest'? HARD_FACES.intent : HARD_FACES.sheepish);
+  const herExpr = R.id==='shameless'? 'smug' : (R.id==='tempest'||R.id==='highmaint')? 'cross' : 'flush';
+  const room=P.room||'bed', LN=peekLinen(room), lin=LN.lin, linSh=LN.linSh, linHi=LN.linHi;
+  if(act==='sleep'){
+    /* ASLEEP. Two heads on the pillows and the sheet over the rest; the
+       door has woken nobody. */
+    const B=drawPeekBed(fx, fy2, FW, FH, T, 0.4, null, room);
+    const top=B.top;
+    /* Side by side, seen from the side of the bed: his head a little behind
+       and above hers (further from you), both on their backs, faces up. */
+    const liePos={ him:[B.bx+17, top-8.5], her:[B.bx+9, top-4.5] };
+    const head=(hx, hy, look, fem)=>{ const sk=look.skin||'#caa06a', hr=look.hair||'#3a2618', dk=shade(sk,-46);
+      // hair: hers fanned out over the pillow toward the headboard; his a short cap at the crown
+      ctx.fillStyle=hr;
+      if(fem){ ctx.beginPath(); ctx.ellipse(hx-4.2, hy+0.6, 5.6, 3.4, 0.15, 0,7); ctx.fill();
+               ctx.fillRect(Math.round(hx-9), Math.round(hy+1), 3, 4); ctx.fillRect(Math.round(hx-6), Math.round(hy+2), 2, 4); }
+      else   { ctx.beginPath(); ctx.ellipse(hx-2.6, hy+0.2, 3.2, 3.6, 0, 0,7); ctx.fill(); }
+      // the head, on its back: crown to the headboard, chin to the foot
+      ctx.fillStyle=sk; ctx.beginPath(); ctx.ellipse(hx, hy, 4.4, 3.8, 0, 0,7); ctx.fill();
+      ctx.fillStyle=shade(sk,22); ctx.fillRect(Math.round(hx-2), Math.round(hy-3), 4, 1);          // lamp on the brow
+      ctx.fillStyle=sk; ctx.fillRect(Math.round(hx+0.5), Math.round(hy-5), 2, 1);                  // the nose, pointing up
+      ctx.fillStyle=dk; ctx.fillRect(Math.round(hx-1.5), Math.round(hy-3), 2, 1);                  // the closed eye
+      ctx.fillRect(Math.round(hx-0.5), Math.round(hy), 1, 1);                                        // the ear
+      if(fem){ ctx.fillStyle='#b8505a'; ctx.fillRect(Math.round(hx+2.5), Math.round(hy-4), 1, 1); } // her lips
+      else   { ctx.fillStyle=hr; ctx.fillRect(Math.round(hx+1.5), Math.round(hy-3), 3, 3); ctx.fillRect(Math.round(hx+3.5), Math.round(hy-2), 1, 2); } // his beard
+    };
+    // the pillows under them (the back one higher)
+    px(B.bx+9, top-6, 16, 5, linSh); px(B.bx+9, top-6, 16, 1, lin);
+    px(B.bx+2, top-3, 16, 5, lin); px(B.bx+2, top-3, 16, 1, linHi);
+    head(liePos.him[0], liePos.him[1], him, false);
+    head(liePos.her[0], liePos.her[1], her, true);
+    // her bare shoulder above the edge of the sheet
+    ctx.fillStyle=her.skin||'#e6bd94'; ctx.beginPath(); ctx.ellipse(B.bx+15, top-2.6, 3.0, 1.7, 0, 0,7); ctx.fill();
+    // the sheet over the two of them, with the shape of them in it:
+    // shoulders, her hip (the high point), knees, and their feet at the end
+    const s0=B.bx+14, len=Math.min(B.bw-18, 76);
+    { const prof=(u)=> 2.6 + Math.exp(-Math.pow((u-0.45)/0.10,2))*3.4 + Math.exp(-Math.pow((u-0.72)/0.07,2))*1.2 + Math.exp(-Math.pow((u-0.97)/0.035,2))*3.0 - Math.exp(-Math.pow((u-0.24)/0.08,2))*0.8;
+      const pts=[]; for(let i=0;i<=24;i++){ const u=i/24; pts.push([s0+u*len, top-prof(u)]); }
+      ctx.beginPath(); ctx.moveTo(s0-1, top+7); ctx.lineTo(s0-1, top-2.4); pts.forEach(p=>ctx.lineTo(p[0],p[1]));
+      ctx.lineTo(s0+len+2, top-1); ctx.lineTo(B.bx+B.bw-2, top-1); ctx.lineTo(B.bx+B.bw-2, top+7); ctx.closePath();
+      const g=ctx.createLinearGradient(s0, top-7, s0, top+7); g.addColorStop(0,linHi); g.addColorStop(0.45,lin); g.addColorStop(1,linSh);
+      ctx.fillStyle=g; ctx.fill();
+      ctx.strokeStyle='rgba(120,104,84,.45)'; ctx.lineWidth=0.8;
+      for(const u of [0.36,0.55,0.84]){ ctx.beginPath(); ctx.moveTo(s0+u*len, top-prof(u)+1); ctx.quadraticCurveTo(s0+u*len+2, top+2, s0+u*len+0.5, top+6); ctx.stroke(); }
+      ctx.fillStyle=linHi; ctx.fillRect(Math.round(s0-1), Math.round(top-3), 7, 1);                // the turned-down edge
+      // and his arm over her, on top of the sheet
+      const ax=liePos.him[0]+3, ay=top-3.4, ex=s0+len*0.30, ey=top-prof(0.30)-0.6;
+      ctx.strokeStyle=him.skin||'#caa06a'; ctx.lineWidth=2.2; ctx.lineCap='round';
+      ctx.beginPath(); ctx.moveTo(ax, ay); ctx.quadraticCurveTo((ax+ex)/2, ay-1.6, ex, ey); ctx.stroke();
+      ctx.strokeStyle=shade(him.skin||'#caa06a',-30); ctx.lineWidth=0.7; ctx.beginPath(); ctx.moveTo(ax+1, ay+1.1); ctx.quadraticCurveTo((ax+ex)/2, ay-0.4, ex, ey+1.1); ctx.stroke();
+      ctx.fillStyle=him.skin||'#caa06a'; ctx.beginPath(); ctx.ellipse(ex+1.2, ey+0.4, 1.6, 1.1, 0.3, 0,7); ctx.fill();
+      ctx.lineCap='butt'; }
+    ctx.textAlign='center'; const z=(T*0.4)%30;
+    ctx.globalAlpha=clamp(1-z/30,0,1); pixelText('z', B.bx+22+z*0.3, B.top-15-z*0.4, '#e8e0f0', 0.8); ctx.globalAlpha=1; ctx.textAlign='left';
+    return;
+  }
+  const B=drawPeekBed(fx, fy2, FW, FH, T, bare? 2.2 : 0.8, null, room);
+  const fl=B.floor;
+  /* WHERE THEY ARE STANDING. Close for a kiss or a lap, a step apart once
+     they have broken it off for the door; together whatever it was. */
+  const close = (act==='kiss'||act==='lap'||R.id==='shameless'||R.id==='possessive')? 1 : 0;
+  const hx = pcx + (close? 9 : 14), sx = pcx - (close? 6 : 12);
+  // ---- HER, standing, in profile, turned to him — clothes by the stage ----
+  BEND_OPT = { top: bare, bare: tier>=4, expr: see>0.5? herExpr : 'pleased', blush: see*(R.id==='shameless'? 0.3 : 0.9),
+               headUp: see*0.35 };
+  const H = drawWifeFig(ctx, sx, fl, her, 0.04, 'bend');
+  BEND_OPT = null;
+  // ---- HIM, facing her; undressed as far as the stage says; one hand wherever the reaction put it ----
+  const u = [0, 0.26, 0.50, 1, 1][tier];
+  const wave = R.id==='shameless';
+  const M = drawManProfile(ctx, hx, fl, him, { u, aro:0, lean:0.03, face,
+      near: wave? [7,-30] : (bare? [4,1.5] : [3,6]), far: close? [-12,-10] : [2,8],
+      coast:(typeof rkHere==='function' && rkHere()), cloth:him.dress||'#7a2f22' }, -1);
+  // ---- AND WHAT THEY GRABBED ----
+  if(bare && H && H.head){
+    /* her: the sheet, pulled up to the collarbone and held there, trailing
+       back to the bed it came off */
+    const hx0=sx, top=H.head[1]!==undefined? fl+H.head[1]+6 : fl-46;
+    const sh=[[hx0+1,top],[hx0+6,top-1],[hx0+7,top+10],[hx0+6,fl-12],[hx0+3,fl-6],[hx0-2,fl-10],[hx0-3,top+12]];
+    ctx.fillStyle=lin; ctx.beginPath(); smoothPath(ctx, sh, true); ctx.fill();
+    ctx.strokeStyle=linSh; ctx.lineWidth=0.8; for(let i=0;i<3;i++){ ctx.beginPath(); ctx.moveTo(hx0+1+i*2, top+3); ctx.lineTo(hx0+i*2.4, fl-9); ctx.stroke(); }
+    ctx.fillStyle=linHi; ctx.fillRect(Math.round(hx0+1), Math.round(top), 5, 1);
+    ctx.strokeStyle=lin; ctx.lineWidth=2.4; ctx.beginPath(); ctx.moveTo(hx0-2, fl-9);
+    ctx.quadraticCurveTo((hx0+B.bx+B.bw)/2, fl-4, B.bx+B.bw-6, B.top+3); ctx.stroke();
+  }
+  if(bare && M && M.root && !wave){
+    /* him: a cushion off the bed, held where it needs to be */
+    const [cx2,cy2]=M.root; const col=LN.cushion;
+    ctx.fillStyle=col; ctx.beginPath(); ctx.ellipse(cx2-2, cy2+1, 4.6, 5.2, 0.2, 0,7); ctx.fill();
+    ctx.fillStyle=shade(col,28); ctx.fillRect(Math.round(cx2-4), Math.round(cy2-3), 4, 1);
+    ctx.fillStyle='#e8c34a'; ctx.fillRect(Math.round(cx2-6), Math.round(cy2+5), 1, 2); ctx.fillRect(Math.round(cx2+2), Math.round(cy2+5), 1, 2); }
+  // ---- THE MOMENT: they turn, and it shows ----
+  if(since>0 && since<70 && R.freeze>0.5){ ctx.textAlign='center'; const b=Math.sin(since*0.4)*1.2;
+    const a=clamp(1-since/70,0,1);
+    if(H && H.head) pixelText('!', sx+H.head[0], fl+H.head[1]-10+b, 'rgba(255,220,200,'+a.toFixed(2)+')', 1.1);
+    if(M && M.head) pixelText('!', M.head[0], M.head[1]-10+b, 'rgba(255,220,200,'+a.toFixed(2)+')', 1.1);
+    ctx.textAlign='left'; }
+  if(R.id==='tempest' && since>6){                                           // and something is thrown
+    const k2=clamp((since-6)/40,0,1), px0=hx+4, py0=fl-50, tx=fx+FW+30, ty=fy2+FH*0.3;
+    const x2=px0+(tx-px0)*k2, y2=py0+(ty-py0)*k2-Math.sin(k2*Math.PI)*20;
+    if(k2<1){ ctx.save(); ctx.translate(x2,y2); ctx.rotate(k2*6);
+      ctx.fillStyle=lin; ctx.fillRect(-6,-3,12,6); ctx.fillStyle=linHi; ctx.fillRect(-6,-3,12,1); ctx.fillStyle=linSh; ctx.fillRect(-6,2,12,1);
+      ctx.restore(); } }
+  if(R.id==='possessive' && M && M.hand){                                    // an arm across her, and a stare
+    ctx.strokeStyle=him.skin||'#caa06a'; ctx.lineWidth=2.2; ctx.beginPath(); ctx.moveTo(hx-4, fl-40); ctx.lineTo(sx+2, fl-36); ctx.stroke(); }
+}
+/* =====================================================================
+   ❦ HER FACE — ROLLED PER SCENE, THE SAME WAY HIS IS
+   ---------------------------------------------------------------------
+   Every scene had one expression written into it, so every wife in the
+   game pulled the same face at the same moment. Her face is rolled once
+   per scene now (HER_ROLL moves when one starts) and weighted by who she
+   is: a vakran runs the thing and looks it; a curious one is somewhere
+   else entirely; a cold marriage gets a cross face and no pleasure; the
+   coast is frank about it and Rome colours up; and a very big man gets
+   braced for. The scene can still escalate her — at the height of it she
+   flushes, whatever she started as — but it starts from HER.
+   ===================================================================== */
+let HER_ROLL=0;
+function herFaceWeights(w, where){
+  const W = where==='reveal'? {bite:2, smug:2, pleased:2, absorbed:1, flush:1, brace:0.6, cross:0.2}
+          : where==='after'?  {pleased:3, smug:2, flush:1.5, absorbed:1, bite:0.3, brace:0.1, cross:0.3}
+          :                   {flush:3, bite:2.5, brace:1.5, smug:1, pleased:1, absorbed:0.5, cross:0.2};
+  const mul=(o)=>{ for(const k in o) if(W[k]!==undefined) W[k]*=o[k]; };
+  try{
+    const tr=((w&&w.traits)||[]).concat((w&&w.quirks)||[],(w&&w.flaws)||[]).map(t=>String(t).toLowerCase());
+    const has=(re)=>tr.some(t=>re.test(t));
+    if(has(/vakran|bold|brazen|shameless|possessive/)) mul({smug:2.2, pleased:1.2, flush:0.7});
+    if(has(/curious|dreamy|absent/)) mul({absorbed:2.4});
+    if(has(/shy|modest|devout|prude|timid/)) mul({flush:2.2, smug:0.4});
+    if(has(/tempest|hot|fiery|temper/)) mul({bite:1.6, cross:1.8});
+    const rel=(G&&G.wifeRel!==undefined)? G.wifeRel : 55;
+    if(rel<35) mul({cross:6, pleased:0.3, flush:0.6}); else if(rel>75) mul({pleased:1.5, flush:1.3, cross:0.3});
+    if(typeof rkHere==='function' && rkHere()) mul({smug:1.5, pleased:1.2}); else mul({flush:1.5});
+    const him=(typeof pairHimLook==='function')? pairHimLook() : null;
+    const v=Math.round(((him&&him.body)||{}).secret||5);
+    if(v>=10) mul({brace:2.2, bite:1.5}); else if(v<=3) mul({pleased:1.3, smug:1.3, brace:0.3});
+    // a cold marriage shows through whatever else she is: the cross face leads
+    if(rel<35){ const rest=Object.keys(W).reduce((a,k)=>k==='cross'? a : a+W[k],0); W.cross=Math.max(W.cross, rest*0.6); }
+  }catch(e){}
+  return W;
+}
+function herFace(w, where){
+  const W=herFaceWeights(w, where), keys=Object.keys(W), tot=keys.reduce((a,k)=>a+W[k],0);
+  let r=((typeof kinHash==='function')? kinHash(String((w&&w.name)||'her')+'·herface·'+HER_ROLL+'·'+(where||'')) : 0)%100000/100000*tot;
+  for(const k of keys){ r-=W[k]; if(r<=0) return k; }
+  return 'flush';
+}
+/* the reaction a slap gets, as one of HER expressions — on her own face in
+   profile, rather than a front-facing face stamped over the back of a head */
+function reactExpr(kind){ return ({sting:'brace', swoon:'flush', blush:'pleased', scowl:'cross', smirk:'smug'})[kind] || 'flush'; }
 /* his look for the pair: whoever the man in this house is */
 function pairHimLook(){
   try{
@@ -27073,6 +27452,7 @@ function curioDue(){
   return Math.random() < 0.005;
 }
 function startCurio(){
+  HER_ROLL++; HARD_ROLL++;
   const D=DM; if(!D || !curioReady()) return false;
   rouse('curio');                                   // ◐ and the ledger writes down why
   D.curio={ ph:'look', t:0, bend:0, bare:false, hard:false, sel:0, done:{},
@@ -27774,6 +28154,7 @@ function clamDue(){
   return Math.random() < 0.012;
 }
 function startClam(){
+  HER_ROLL++; HARD_ROLL++;
   const D=DM; if(!D || !clamReady()) return false;
   const w=G.wife, be=((w.body&&w.body.booty)||5);
   const mood=clamMood(), mad=(mood==='mad');
@@ -28097,7 +28478,7 @@ function drawClam(){
   const PR = drawPair(ctx, {x:PX, FY, dir:dirC, w, k:X.bend||0,
     her:{ squeeze:sq, rock: inDrive? stroke : (held? sq*0.45 : 0), headUp:gp*0.9,
           blush:(X.stood? clamp(X.blush||0,0,1) : 0),
-          expr: held? (mad? 'cross' : (inDrive? 'flush' : 'bite')) : (inBend? 'smug' : (X.ph==='call'? 'smug' : null)) },
+          expr: held? (mad? 'cross' : (inDrive? 'flush' : (X.herF||(X.herF=herFace(w,'act'))))) : (inBend? 'smug' : (X.ph==='call'? 'smug' : null)) },
     he:{ gap:gapC, drive: inDrive? stroke : (held? 0.55+sq*0.45 : 0), stroke: inDrive? 3.6 : 1.4,
          u:0, aro:pressK, hands, handFrom, handK, farHands: pressK>0.6? 'hips' : 'side', aimK: held? 1 : 0,
          lean:0.03+pressK*0.12+stroke*0.08, face:X.face, look:himL, coast:true,
@@ -28259,6 +28640,7 @@ function tryRkPress(){
   /* THE FIRST BEAT IS THE SIGNAL, and if it is already standing the beat
      is short rather than absent — you still see what you are signalling. */
   const up=(typeof rkStandOn==='function') && rkStandOn();
+  HER_ROLL++;
   D.press={ph:'signal', t:0, x:D.wifeX, sparks:[], locks:true, stand:up?1:0, was:up,
            side:(D.x<=D.wifeX)? -1 : 1};
   D.wifePause=99999;
@@ -28681,7 +29063,7 @@ function drawCurio(){
   const barePh = (actId==='bare' && ak>0.55) || !!X.bare;
   const PR = drawPair(ctx, {x:PX, FY, dir:dirC, w, k:X.bend||0,
     her:{ top:barePh, lifted:heavy && inC>0.2, rock: goPh? Math.max(0,rubN)*(heavy? 1 : 0.5) : 0,
-          expr: goPh? (heavy? 'flush' : 'bite') : (X.ph==='look'||X.ph==='choose'||X.ph==='act'? 'absorbed' : null),
+          expr: goPh? (heavy? (X.herF||(X.herF=herFace(w,'act'))) : 'bite') : (X.ph==='look'||X.ph==='choose'||X.ph==='act'? 'absorbed' : null),
           blush: goPh? pressK*0.8 : 0 },
     he:{ gap:gapC, drive: goPh? 0.5+rubN*0.5 : 0, stroke: heavy? 3.4 : 1.6,
          u:uC, aro:(X.hard||goPh||actId==='hard')? Math.max(goPh? 1 : 0, actId==='hard'? ak : (X.hard? 1 : 0)) : 0,
@@ -28822,121 +29204,33 @@ function drawRkPress(){
   { const g=ctx.createRadialGradient(PX,FY-34,6,PX,FY-34,78);
     g.addColorStop(0,'rgba(255,190,170,'+(0.16+heat*0.16)+')');
     g.addColorStop(1,'rgba(0,0,0,0)'); ctx.fillStyle=g; ctx.fillRect(0,60,W,H-60); }
-  /* ---- BOTH BACKS TO THE ROOM, which is the only way this beat draws.
-     He is BEHIND her, so he is the back layer and she is painted over him;
-     what shows at the join is exactly what the gesture is about. ---- */
+  /* ---- THE TWO OF THEM, IN PROFILE. It drew both of them from behind,
+     standing, with a hide-coloured bar painted across her for the contact.
+     She is standing, turned from him, the new figure; he signals where he
+     is — standing it up under the kilt so the hall can read it — crosses,
+     comes up behind her and puts it against her seat, hands on her hips,
+     and holds it there. Her body covers where they meet. ---- */
   const side=X.side||((D.x<=PX)? -1 : 1);
   const pressK = X.ph==='press'? clamp(T/40,0,1) : (X.ph==='held'? 1 : 0);
-  const give   = pressK*(0.55+((w&&w.body&&w.body.booty)||5)*0.045);
-  /* how far behind her he is: a whole body away in the signal, closing
-     through the cross, and against her from contact on */
-  /* BEHIND HER, which means very nearly ON her centre line — he is the
-     taller and wider of the two, so what shows is his head over her
-     shoulder and his arms round either side of her, which is the whole
-     read. Standing him off to one side made it a queue. */
-  const gap = X.ph==='signal'? 32
-            : X.ph==='cross' ? Math.max(7, 32 - clamp(T/110,0,1)*25)
-            : 7 - pressK*1.4;
-  const hx = X.ph==='signal'? (PX + side*30)
-           : X.ph==='cross' ? D.x
-           : (PX + side*gap);
-  /* THE STROKE. He moves with it, she moves on her own spring, and the
-     contact slides — three things on one sine, which is what makes it a
-     motion rather than a picture of one. */
   const rub=(X.ph==='held')? (X.rub||0) : 0;
-  let HM=null;
-  /* WHERE IT IS AIMED: the middle of her seat, which is the only place
-     this gesture has ever been aimed and was the one thing not being
-     measured. Before contact it still comes off his own belt. */
-  const AK=rkBackBones(FY, (w&&w.body&&w.body.legs)||5, (w&&w.body&&w.body.booty)||5,
-                           (w&&w.body&&w.body.waist)||5, false);
-  const aimY = AK.seatY + Math.round(AK.seatH*0.42);
-  try{ HM=drawRkBehindHim(hx+rub*0.55, FY-Math.abs(rub)*0.42,
-        {stand:X.stand||0, press:pressK,
-         aimY: (pressK>0? aimY : undefined),
-         leaf:(typeof rkSivrakOn==='function' && rkSivrakOn('self'))}); }catch(e){}
-  try{ drawRkBack(PX, FY, w, {give, rim: pressK>0? side : 0}); }catch(e){}
-  /* ---- WHERE IT MEETS HER, painted ON her. Between two bodies it is
-     hidden, which is true and also hides the entire subject of the beat —
-     so the near end of it is drawn over her seat, pressed in, with her own
-     tone giving round it. This is the mark the gesture is named for. ---- */
-  if(pressK>0.05 && HM){
-    const CK=rkBackBones(FY, (w&&w.body&&w.body.legs)||5, (w&&w.body&&w.body.booty)||5,
-                             (w&&w.body&&w.body.waist)||5, false);
-    const be2=((w&&w.body&&w.body.booty)||5);
-    const seatW2=4.6+be2*0.48, sk2=(w&&w.skin)||'#e6bd94';
-    const len2=(typeof ardorLen==='function')? ardorLen() : 5;
-    const HIDc=mixHex((G&&G.tunic)||'#6a4a2e','#4a3826',0.42);
-    const leaf=(typeof rkSivrakOn==='function' && rkSivrakOn('self'));
-    const M2=leaf?'#4a7a30':shade(HIDc,-4), MH2=leaf?'#9fd070':shade(HIDc,86),
-          MS2=leaf?'#1a3a12':shade(HIDc,-62);
-    const cy=CK.seatY+Math.round(CK.seatH*0.42)+Math.round(rub*0.55);
-    const th=Math.max(2, Math.round(1.6+len2*0.18));
-    const into=Math.round((2.2+len2*0.24)*pressK + Math.abs(rub)*0.5);
-    /* he is BEHIND her now, so it enters at the cleft rather than at an
-       edge — which is where the gesture actually puts it */
-    const x0 = Math.round(PX - into*0.5 + rub*0.45);
-    ctx.globalAlpha=clamp(pressK*1.6,0,1);
-    /* the hide gives round it — a darker crescent in her own tone first */
-    px(Math.round(x0-(side<0?1:0)), cy-th-1, into+2, th*2+3, mixHex(sk2,'#7a4a3e',0.34));
-    /* then the thing itself, moulded, ending in the seat */
-    for(let q=-th;q<=th;q++){
-      const u=(q+th)/Math.max(1,th*2);
-      px(x0, cy+q, into+1, 1, (u<0.26)? MH2 : (u<0.70)? M2 : MS2);
-    }
-    px(x0, cy-th-1, into+1, 1, MS2);
-    px(x0, cy+th+1, into+1, 1, MS2);
-    ctx.globalAlpha=1;
-  }
-  /* ---- HIS HAND ON HER HIP, painted ON her. Everything else in this
-     sprite can be argued with; an arm that ends on the far side of her
-     cannot, and it is what turns two overlapping figures into one pose. ---- */
-  if(pressK>0 && HM){
-    const HK=rkBackBones(FY, (w&&w.body&&w.body.legs)||5, (w&&w.body&&w.body.booty)||5,
-                             (w&&w.body&&w.body.waist)||5, false);
-    const hs=mixHex((G&&G.skin)||'#caa06a','#1a0e08',0.10);
-    const armY=HK.waistY+3;                                   // on her hips, over the hem
-    const waW=HK.waistW+2.0;
-    const reach=Math.round(4+pressK*3);
-    ctx.globalAlpha=clamp(pressK*1.5,0,1);
-    /* BOTH FOREARMS, round either side of her, because a man standing
-       behind somebody has two arms and drawing one of them is what made
-       the pose read as standing next to her. */
-    for(const sgn of [-1,1]){
-      const x0 = sgn<0? Math.round(PX-waW-reach+1) : Math.round(PX+waW-1);
-      px(x0, armY, reach, 3, sgn<0? hs : shade(hs,-18));
-      px(x0, armY, reach, 1, shade(hs, sgn<0? 20 : 4));
-      px(x0, armY+2, reach, 1, shade(hs,-28));
-      const hxx = sgn<0? x0+reach-1 : x0-2;                   // and the hands, on her hips
-      px(hxx, armY-1, 3, 4, sgn<0? hs : shade(hs,-14));
-      px(hxx, armY-1, 3, 1, shade(hs, sgn<0? 22 : 6));
-      px(hxx, armY+2, 3, 1, shade(hs,-30));
-    }
-    ctx.globalAlpha=1;
-  }
-  /* THE CONTACT BAND — the moment, and only the moment. */
-  { const _K=rkBackBones(FY, (w&&w.body&&w.body.legs)||5, (w&&w.body&&w.body.booty)||5,
-                              (w&&w.body&&w.body.waist)||5, false);
-    const seatY=_K.seatY+Math.round(_K.seatH*0.5);
-    if(X.ph==='press' && T<26){
-      const a=1-T/26;
-      ctx.globalAlpha=0.60*a; ctx.fillStyle='#efe6d6';
-      ctx.fillRect(Math.round(PX-7), Math.round(seatY-3), 14, 6);
-      ctx.globalAlpha=0.28*a; ctx.fillRect(Math.round(PX-10), Math.round(seatY-2), 20, 4);
-      ctx.globalAlpha=1;
+  const gapP = X.ph==='signal'? 26
+             : X.ph==='cross' ? Math.max(1, Math.min(26, Math.abs((D.x||PX)-PX)-12))
+             : (1-pressK)*4;
+  const dirP=(side<0)? 1 : -1;
+  const PR=drawPair(ctx, {x:PX, FY, dir:dirP, w, k:0.16+pressK*0.10,
+    her:{ squeeze:pressK*0.35, rock:Math.max(0,rub)*0.3, expr: pressK>0.5? (X.herF||(X.herF=herFace(w,'act'))) : (X.ph==='cross'? 'absorbed' : null), blush:pressK*0.6 },
+    he:{ gap:gapP, drive: X.ph==='held'? clamp(0.5+rub*0.4,0,1) : pressK, stroke:1.6,
+         u:0, aro:Math.max(clamp(X.stand||0,0,1), pressK), hands: pressK>0.3? 'hips' : 'side', farHands: pressK>0.3? 'hips' : 'side',
+         aimK:pressK, lean:0.03+pressK*0.10, face: X.face || (X.face=hardFace(pairHimLook(),'act')), look:pairHimLook(), coast:true,
+         cloth:mixHex((G&&G.tunic)||'#6a4a2e','#5a4028',0.35), band:(typeof rkOfficeBand==='function')? rkOfficeBand(w) : '#8a6a3a' }});
+  if(PR && PR.join){ X.seatY=PR.join[1]; X.seatX=PR.join[0];
+    const [jx,jy]=PR.join;
+    if(X.ph==='press' && T<26){ const a=1-T/26;                               // the moment of contact
       for(let i=0;i<10;i++){ const a2=(i/10)*6.283, r=3+(1-a)*14;
-        ctx.globalAlpha=a; px(PX+Math.cos(a2)*r, seatY+Math.sin(a2)*r*0.54, 2,2,'#fff0dc'); }
-      ctx.globalAlpha=1;
-    }
-    X.seatY=seatY; }
-  /* AND IT IS STILL THERE. The band under the join does not flash off in
-     the hold — that is the entire point of the beat. */
-  if(X.ph==='held'){
-    const a=clamp(1-(T-260)/140,0,1)*0.34;
-    ctx.globalAlpha=a; ctx.fillStyle='#f0c8b0';
-    ctx.fillRect(Math.round(PX-8+(X.rub||0)*0.5), Math.round((X.seatY||FY-30)-2), 16, 5);
-    ctx.globalAlpha=1;
-  }
+        ctx.globalAlpha=a; px(jx+Math.cos(a2)*r, jy+Math.sin(a2)*r*0.54, 2,2,'#fff0dc'); } ctx.globalAlpha=1; }
+    if(pressK>0.05){ const g=ctx.createRadialGradient(jx,jy,0,jx,jy,9);          // and it is still there
+      g.addColorStop(0,'rgba(255,200,215,'+(0.10+pressK*0.16).toFixed(2)+')'); g.addColorStop(1,'rgba(0,0,0,0)');
+      ctx.fillStyle=g; ctx.fillRect(jx-12,jy-12,24,24); } }
   if(X.sparks) X.sparks.forEach(p=>{ const a=clamp(1-p.t/90,0,1);
     if(a<=0) return; ctx.globalAlpha=a; px(Math.round(p.x),Math.round(p.y),1,1,p.c); });
   ctx.globalAlpha=1;
@@ -29491,6 +29785,7 @@ function startTempt(){
   const invited = (beat==='invite') ? true : (Math.random() < 0.18);
   const prop = pick(TEMPT_PROPS);
   rouse('tempt');                                   // ◐ the low shelf, and the ledger notes it
+  HER_ROLL++;
   D.tempt={ ph:'bend', t:0, k:0, x:D.wifeX, hits:0, hold:100, locks:false,
             invited, prop, beat, beatLine: beat? pick(RK_BEND_LINES[beat]) : null,
             shelf: D.wifeX + (D.wifeDir>0? 14 : -14), fdir:(D.wifeDir>0? 1 : -1) };
@@ -29688,7 +29983,7 @@ function startVillaLove(atX, invited, force){
   spendLove('quick');
   const keepProp=(D.tempt&&D.tempt.prop)||TEMPT_PROPS[0];         // read BEFORE the tempt is cleared, not after
   D.tempt=null; D.wifePause=99999;
-  try{ HARD_ROLL++; }catch(e){}                                     // a new rise, a new face
+  try{ HARD_ROLL++; HER_ROLL++; }catch(e){}                        // a new rise, a new face — his and hers
   D.scene={kind:'villalove', t:0, x:clamp(atX,150,400), invited:!!invited, prop:keepProp,
            fromTook:!invited,                    // explicit: only a FAILED hold owes her an explanation
            choice:null, burst:[], asked:false,
@@ -31017,6 +31312,7 @@ function startRomantic(atX, who){
   try{ sfx(v.k==='bad'||v.k==='cold'?'thud':'kiss'); }catch(e){}
   refreshStatbar(); saveQuiet();
   rouse('bend');                                    // ◐ she bent, and that was that
+  HER_ROLL++;
   D.rslap={t:0, x:(atX===undefined? D.wifeX : atX), v, bender:(who==='self'?'self':'spouse')};
   D.wifePause=Math.max(D.wifePause||0, 300);
 }
@@ -31067,7 +31363,7 @@ function updateRomantic(dt){
     const cnt=8+bT*3;
     for(let i=0;i<cnt;i++){
       const a=(-0.35 - Math.random()*2.45), sp=0.5+Math.random()*1.25;
-      S.sparks.push({ x:S.x+rnd(-7,7), y:214-30-rnd(0,10),
+      S.sparks.push({ x:(S.hitX!==undefined? S.hitX : S.x)+rnd(-5,5), y:(S.hitY!==undefined? S.hitY : 214-30)-rnd(0,8),
         vx:Math.cos(a)*sp*1.15, vy:Math.sin(a)*sp*0.9-0.30, t:0,
         c: Math.random()<0.5? '#ffb8d4' : (Math.random()<0.5? '#ffd8a8':'#ffe9cf') });
     }
@@ -31419,21 +31715,47 @@ function drawRomantic(){
      couch. The scene carries who, and the other one does the striking. */
   const BENT = (S.bender==='self')? romanticSelf() : w;
   const k = T<70? clamp(T/70,0,1) : T<330? 1 : clamp(1-(T-330)/90,0,1);
-  drawRomanticFig(X, FY, BENT, k, T, !!BENT.male);
+  const SW = romanticSwing(T);
+  const shift = SW.lean*1.8 + SW.hit*1.2;
+  const cool  = T>386? (T-386)/70 : 0;
+  /* ---- THE TWO OF THEM, IN PROFILE. She is braced over against the wall
+     (the new bend, stopped at the brace); he comes out of his own garment
+     his own way, stands at his own measure — and the three strikes are
+     HIS LENGTH, at his real inches, drawn back and brought down onto her
+     seat, where her body takes it and her face answers it. ---- */
+  const PAIRED = !BENT.male;
+  let RP=null;
+  if(PAIRED){
+    const dirR=(D.x<=X)? 1 : -1, kind=(SW.d>=0)? reactKindFor(S.v,true) : null;
+    const uR=cool>0? 1-clamp(cool,0,1) : clamp((T-40)/140,0,1), aroR=clamp((T-110)/90,0,1)*(1-clamp(cool*1.5,0,1));
+    RP=drawPair(ctx, {x:X, FY, dir:dirR, w:BENT, k:k*0.62,
+      her:{ rock:SW.hit, expr: kind? reactExpr(kind) : (T>150? (S.herF||(S.herF=herFace(BENT,'reveal'))) : null), blush:clamp((T-150)/120,0,1)*0.8 },
+      he:{ reachSeat:true, gap:(1-clamp(T/60,0,1))*16+cool*10, drive:clamp(0.5+SW.lean*0.5,0,1), stroke:2.2,
+           u:uR, aro:aroR, lenAng:(T>=STRIKES[0]-34 && T<392)? SW.a : null,
+           hands:(uR>0.28 && uR<0.9)? ((typeof rkHere==='function' && rkHere())? 'hem' : 'up') : (T>150? 'hips' : 'side'),
+           farHands:(T>150 && uR>=0.9)? 'hips' : 'side', lean:0.04+Math.max(0,SW.lean)*0.06,
+           face: S.face || (S.face=hardFace(pairHimLook(),'act')), look:pairHimLook(),
+           coast:(typeof rkHere==='function' && rkHere()),
+           cloth:(typeof rkHere==='function' && rkHere())? mixHex((G&&G.tunic)||'#6a4a2e','#5a4028',0.35) : ((G&&G.tunic)||'#7a2f22') }});
+    if(RP && RP.seat){ S.hitX=RP.seat[0]-(RP.rs||6)*0.7*dirR; S.hitY=RP.seat[1]; }
+  } else drawRomanticFig(X, FY, BENT, k, T, !!BENT.male);
   /* HE undresses on the SAME four stages the villa scene uses — reused, not
      rebuilt. What he DOES with the result is this scene's own, and it is not
      a thrust. A thrust is a sine wave that pushes him back and forth forever;
      a slap is one discrete event — draw back, snap through, crack, ring down —
      and then a pause before the next one. Three of them, each on its own
      schedule, each with its own kick into the spring. */
-  const SW = romanticSwing(T);
-  const shift = SW.lean*1.8 + SW.hit*1.2;
-  const cool  = T>386? (T-386)/70 : 0;
-  drawVillaMale(X-15+shift, FY, Math.min(T,300), Math.max(0,SW.lean), cool, SW.a);
+  if(!PAIRED) drawVillaMale(X-15+shift, FY, Math.min(T,300), Math.max(0,SW.lean), cool, SW.a);
   /* THE ARC. He is skin over her skin at this scale, so a ten-pixel shaft
      changing angle is true but nearly invisible. Tracing where the tip has just
      been is the thing that actually makes a strike read as a strike. */
-  if(SW.d>=-7 && SW.d<12 && VM_SHAFT.r){
+  if(PAIRED && RP && RP.hisRoot && SW.d>=-7 && SW.d<12){             // the arc its tip has just swept
+    const IN=lengthInches(pairHimLook(),1), L=IN.now*1.0;
+    for(let n=1;n<=9;n++){ const pa=romanticSwing(T-n*1.1).a, fade=(1-n/10);
+      const tx=RP.hisRoot[0]+Math.cos(pa)*L*RP.dir, ty=RP.hisRoot[1]+Math.sin(pa)*L;
+      ctx.globalAlpha=fade*fade*0.6; px(Math.round(tx), Math.round(ty), 2, 2, '#ffe9cf'); }
+    ctx.globalAlpha=1; }
+  if(!PAIRED && SW.d>=-7 && SW.d<12 && VM_SHAFT.r){
     for(let n=1;n<=9;n++){
       const pa=romanticSwing(T-n*1.1).a, fade=(1-n/10);
       const tx=VM_SHAFT.x+Math.cos(pa)*VM_SHAFT.r, ty=VM_SHAFT.y+Math.sin(pa)*VM_SHAFT.r;
@@ -31443,7 +31765,7 @@ function drawRomantic(){
     ctx.globalAlpha=1;
   }
   // his OTHER hand holds her hip through all of it — it is the near one that swings
-  if(T>150){ const ha=clamp((T-150)/40,0,1)*clamp((404-T)/40,0,1);
+  if(!PAIRED && T>150){ const ha=clamp((T-150)/40,0,1)*clamp((404-T)/40,0,1);
     const hs=G.skin||'#caa06a';
     ctx.globalAlpha=ha;
     px(Math.round(X-11+shift), Math.round(FY-30-SW.lean*1.2), 6, 3, hs);
@@ -31454,14 +31776,14 @@ function drawRomantic(){
      across the join for a hundred and eighty ticks — which covered the entire
      swing it was there to cover the end of. You cannot watch a strike through
      a sheet. It flashes on the crack and is gone again with it. */
-  if(SW.hit>0.02){ const a=SW.hit;
+  if(!PAIRED && SW.hit>0.02){ const a=SW.hit;
     ctx.globalAlpha=0.62*a; ctx.fillStyle='#efe6d6';
     ctx.fillRect(Math.round(X-13+shift), Math.round(FY-31), 17, 7);
     ctx.globalAlpha=0.30*a; ctx.fillRect(Math.round(X-16+shift), Math.round(FY-30), 23, 5);
     ctx.globalAlpha=1; }
   // ---- THE CRACK: the ring, the sting on her, and the word for it ----
   if(SW.hit>0.02){
-    const IX=X+1, IY=FY-29;
+    const IX=(PAIRED && S.hitX!==undefined)? S.hitX : X+1, IY=(PAIRED && S.hitY!==undefined)? S.hitY : FY-29;
     ctx.globalAlpha=SW.hit;                                            // the impact ring
     for(let i=0;i<10;i++){ const a2=(i/10)*6.283, r=3+(1-SW.hit)*16;
       px(IX+Math.cos(a2)*r, IY+Math.sin(a2)*r*0.58, 2,2,'#fff0dc'); }
@@ -31487,7 +31809,7 @@ function drawRomantic(){
   /* ---- THE MARK. It blooms hot on contact and settles to a warm print. ---- */
   if(S.mark){ const m=S.mark.t;
     const hot=clamp(1-m/14,0,1), settle=clamp(1-m/150,0,1);
-    const my=FY-30, mx=X-4;
+    const my=(PAIRED && S.hitY!==undefined)? S.hitY-2 : FY-30, mx=(PAIRED && S.hitX!==undefined)? S.hitX-4 : X-4;
     if(settle>0){
       ctx.globalAlpha=settle*0.42;
       px(mx-1, my-1, 11, 6, 'rgba(226,138,150,1)');
@@ -31501,7 +31823,7 @@ function drawRomantic(){
       px(mx-3, my-3, 15, 10, 'rgba(255,226,208,1)'); ctx.globalAlpha=1; }
   }
   // HER FACE, over her shoulder, for whichever strike just landed
-  if(SW.d>=0 && RF_HEAD)
+  if(!PAIRED && SW.d>=0 && RF_HEAD)
     drawReactFace(X, FY, w, reactKindFor(S.v, true), SW.d, RF_HEAD);
   ctx.textAlign='center';
   if(T<70) pixelText('~ he is not reaching for her hand ~', W/2, 34, 'rgba(255,214,190,.85)', 1.02);
@@ -31627,6 +31949,7 @@ function startSlapAnim(atX){
     startRefusal('slap', privacyTier()==='strict'?'devout':privacyTier()==='mid'?'tempest':'kids'); return; }
   const v=doSlap('villa');
   if(!v) return;
+  HER_ROLL++;
   D.slap={t:0, x:(atX===undefined? D.wifeX : atX), v, sparks:null, dust:null};
   D.wifePause=Math.max(D.wifePause||0, 150);
 }
@@ -31646,10 +31969,11 @@ function updateSlap(dt){
        travelling, not evenly in a circle — the old ring of seven dots was
        the same picture whichever way the hand came in. */
     const H=slapHand(S.x, 214, CT), tan=H.a+1.5708;
+    const hx0=(S.hitX!==undefined)? S.hitX : H.hx, hy0=(S.hitY!==undefined)? S.hitY : H.hy;   // where it actually landed on her
     S.sparks=[]; const n=11+Math.round(be*0.7);
     for(let i=0;i<n;i++){
       const spread=(i/(n-1)-0.5)*2.1, sp=1.15+Math.random()*1.9;
-      S.sparks.push({ x:H.hx, y:H.hy, vx:Math.cos(tan+spread)*sp, vy:Math.sin(tan+spread)*sp-0.35, t:0 });
+      S.sparks.push({ x:hx0, y:hy0, vx:Math.cos(tan+spread)*sp, vy:Math.sin(tan+spread)*sp-0.35, t:0 });
     }
     S.dust=[];                                             // and the tiles let go of some dust
     for(let i=0;i<7;i++) S.dust.push({ x:S.x-8+Math.random()*16, y:212+Math.random()*3,
@@ -31697,21 +32021,48 @@ function drawSlap(){
   const hit=T>=CT, since=T-CT;
   const striking = T>=SLAP_T.draw && T<CT;
   const skin=G.skin||'#caa06a';
-  const H=slapHand(S.x, FY, T);
+  let H=slapHand(S.x, FY, T);
+  const recoil = hit? Math.max(0,1-since/26)*2.4 : 0;
+  /* ---- THE TWO OF THEM, IN PROFILE. His real arm draws back off his own
+     shoulder, whips through and lands on HER seat — wherever her pose has
+     put it — and she lurches away from it and answers it with her face.
+     It was a free-floating forearm arriving from off-screen at a standing
+     sprite. (A woman slapping her husband is not this pose; that one keeps
+     its own drawing.) ---- */
+  if(!w.male && !G.isFemale){
+    S.pair=true;
+    let hands='side', handFrom=null, handK;
+    const F0=CT+SLAP_T.follow;
+    if(T<SLAP_T.draw){ hands='cocked'; handFrom='side'; handK=1-Math.pow(1-clamp(T/SLAP_T.draw,0,1),2.6); }
+    else if(T<CT){ hands='seat'; handFrom='cocked'; handK=Math.pow(clamp((T-SLAP_T.draw)/SLAP_T.strike,0,1),2); }
+    else if(T<F0){ hands='seat'; }
+    else if(T<SLAP_T.gone){ hands='side'; handFrom='seat'; handK=clamp((T-F0)/(SLAP_T.gone-F0),0,1); }
+    const dirS=(D.x<=S.x)? 1 : -1, kind=hit? reactKindFor(S.v,false) : null;
+    const PR=drawPair(ctx, {x:S.x+recoil*dirS, FY, dir:dirS, w, k:0.10+(hit? Math.max(0,1-since/30)*0.10 : 0),
+      her:{ rock: hit? Math.max(0,1-since/18) : 0, expr: hit? reactExpr(kind) : null,
+            blush: hit? clamp(1-since/90,0,1)*((S.v&&S.v.bond>=0)? 0.9 : 0.4) : 0 },
+      he:{ gap:6, stand:1, u:0, aro:0, hands, handFrom, handK, farHands:'side', lean:0.03+(striking? 0.06 : 0),
+           face:(S.v&&S.v.k==='love')? HARD_FACES.smirk : HARD_FACES.stoic, look:pairHimLook(),
+           coast:(typeof rkHere==='function' && rkHere()), cloth:(G&&G.tunic)||'#7a2f22',
+           band:(typeof rkOfficeBand==='function')? rkOfficeBand(w) : '#8a6a3a' }});
+    /* everything that follows the hand — the smear, the bloom, the sparks —
+       reads H, so H is where HIS hand actually is now */
+    if(PR && PR.hisHand){ const pv=S._last||PR.hisHand; S._last=PR.hisHand;
+      H={a:Math.atan2(PR.hisHand[1]-pv[1], PR.hisHand[0]-pv[0]), hx:PR.hisHand[0], hy:PR.hisHand[1], vis:false, px:PR.hisShoulder? PR.hisShoulder[0] : S.x, py:PR.hisShoulder? PR.hisShoulder[1] : FY-50};
+      if(PR.seat){ S.hitX=PR.seat[0]-(PR.rs||6)*0.55*dirS; S.hitY=PR.seat[1]-(PR.rs||6)*0.2; }
+      if(striking){ ctx.save(); ctx.globalCompositeOperation='lighter';                 // the smear the swing leaves
+        ctx.strokeStyle='rgba(255,236,214,.55)'; ctx.lineWidth=2.4; ctx.lineCap='round';
+        ctx.beginPath(); ctx.moveTo(pv[0],pv[1]); ctx.lineTo(PR.hisHand[0],PR.hisHand[1]); ctx.stroke(); ctx.restore(); }
+      if(hit){ H.hx=S.hitX||H.hx; H.hy=S.hitY||H.hy; } }
+    S._PR=PR;
+  } else {
   /* ---- HER, and she is lit like everything else in this room now.
      A slap makes her lean AWAY on contact — the recoil that used to be a
      sideways jitter of the whole sprite is a real weight-shift instead. ---- */
-  const recoil = hit? Math.max(0,1-since/26)*2.4 : 0;
   const paint=(bc,bx,by)=>{ if(w.male) drawHusbandFig(bc,bx,by,G.wifeRel|0,w.skin,w.dress,w,0,'idle');
                             else drawWifeFig(bc,bx,by,w,0,'idle'); };
   litFigure(ctx, S.x+recoil, FY, paint);
-  /* ---- THE ARM BEHIND HER during the wind-up and in front on the way
-     through, and WITHDRAWN once the follow-through is spent ---- */
   const armFront = H.vis;
-  /* ---- THE SMEAR. Between the last frame and this one the hand covered
-     nearly half a radian; drawing it once leaves a strobing sprite. The
-     swept arc is filled in with ghosts and a tapered streak, which is what
-     an animator draws on the two frames either side of an impact. ---- */
   if(striking || (hit && since<5)){
     const back=Math.max(SLAP_T.draw, T-5);
     ctx.globalAlpha=0.30;
@@ -31720,13 +32071,13 @@ function drawSlap(){
       ctx.globalAlpha=0.07+0.15*(i/5);
       drawSlapArm(ctx, Gh, mixHex(skin,'#fff2e0',0.35), true); }
     ctx.globalAlpha=1;
-    // and the leading streak, along the arc itself
     ctx.globalAlpha=0.40; ctx.strokeStyle='rgba(255,240,220,.55)'; ctx.lineWidth=1.6;
     ctx.beginPath();
     ctx.arc(H.px, H.py, SLAP_PIV.r, slapAng(back), slapAng(T), slapAng(T)<slapAng(back));
     ctx.stroke(); ctx.globalAlpha=1;
   }
   if(armFront) drawSlapArm(ctx, H, skin, T<CT+12);
+  }
   // ================= CONTACT =================
   if(hit && since<3){
     /* a real bloom, added to the light already there rather than painted
@@ -31772,8 +32123,11 @@ function drawSlap(){
       ctx.beginPath(); ctx.ellipse(H.hx, H.hy, 6, 4, 0,0,6.284); ctx.fill();
       ctx.globalAlpha=1;
     }
-    drawSlapAfter(S.x, FY, w, since, 'hand', !!(S.v && (S.v.bond||0)>=0));
-    drawReactFace(S.x+recoil, FY, w, reactKindFor(S.v,false), since);
+    if(S.pair){ if(S.hitX!==undefined && since<90){                          // the print it leaves, where it landed
+        ctx.globalAlpha=clamp(1-since/90,0,1)*0.55; ctx.fillStyle=mixHex(w.skin||'#e6bd94','#d0574a',0.55);
+        ctx.beginPath(); ctx.ellipse(S.hitX, S.hitY, 3.2, 2.2, 0,0,7); ctx.fill(); ctx.globalAlpha=1; } }
+    else { drawSlapAfter(S.x, FY, w, since, 'hand', !!(S.v && (S.v.bond||0)>=0));
+      drawReactFace(S.x+recoil, FY, w, reactKindFor(S.v,false), since); }
   }
   ctx.textAlign='center';
   if(!hit && T<SLAP_T.draw) pixelText('~ he draws back ~', W/2, 34, 'rgba(255,214,190,.62)', 0.92);
@@ -32006,8 +32360,8 @@ function drawVillaLove(){
   const herW = (G.isFemale && G.wife && G.wife.male)? playerLook() : w;
   const PR=drawPair(ctx, {x:X+dr*2.4*inK, FY, dir:dirV, w:herW, k:1-cool*0.78,
     her:{ lifted:true, rock:dr*inK, blush:Math.max(inK*heat, (uV>=0.95 && inK<0.3)? 0.35 : 0),
-          expr: inK>0.5? ((RV.brace && heat<0.5)? 'brace' : (heat>0.7? 'flush' : 'bite'))
-                       : (uV>=0.95? RV.expr : (T>120? 'smug' : null)) },
+          expr: inK>0.5? ((heat>0.8 && sc.herAct!=='cross' && sc.herAct!=='smug')? 'flush' : (sc.herAct||(sc.herAct=herFace(herW,'act'))))
+                       : (uV>=0.95? (sc.herRev||(sc.herRev=herFace(herW,'reveal'))) : (T>120? 'smug' : null)) },
     he:{ gap:gapV, drive:dr, stroke:3.6, u:uV, aro:aroV, hands:handsV, farHands:(inK>0.35? 'hips' : handsV),
          aimK:inK, lean:0.03+inK*(0.12+dr*0.10), face:sc.face, look:pairHimLook(), coast:coastV,
          cloth: coastV? mixHex((G&&G.tunic)||'#6a4a2e','#5a4028',0.35) : ((G&&G.tunic)||'#7a2f22'),
@@ -33057,6 +33411,7 @@ function drawDomus(){
   const HALLNAME=(hallStyle()==='forest')
     ? (playerCulture().id==='celt'? 'THE ROUNDHOUSE' : 'THE LONGHOUSE')+' — your hall'
     : 'VILLA RUSTICA — your halls';
+  { ctx.textAlign='right'; pixelText(BUILD_STAMP, W-3, H-3, 'rgba(232,195,74,.34)', 0.42); ctx.textAlign='left'; }   // which build this is, always
   px(-4,-4,W+8,16,'#0a0705'); ctx.textAlign='center'; pixelText(HALLNAME+' · A/D walk · S run · SPACE act · ⌘ T: TABLET'
     +((typeof ardorReady==='function' && ardorReady())? ' · L: GET HARD':'')
     /* AND THE COAST'S OWN TWO. They only exist here, so they are only
@@ -33166,7 +33521,7 @@ function drawDomus(){
        standing in the middle of somebody else's bedchamber at full
        brightness, which is exactly the "leftover model" it looked like. */
     if(D.climb) drawClimb();                            // he is on the flight, between storeys
-    else if(!D.peek && !D.rslap && !D.press && !D.curio && !D.clam && !D.husb && !D.ardor && !D.escort && !(D.rise && D.rise.ph!=='build')
+    else if(!D.peek && !D.rslap && !D.press && !D.curio && !D.clam && !D.husb && !D.ardor && !D.escort && !(D.slap && D.slap.pair) && !(D.rise && D.rise.ph!=='build')
        && !(D.drop && D.drop.ph!=='fall')){ const mv=(held.a||held.d), run=mv&&held.s, turning=(D.turn||0)>0;
       const pfy=domusFloorY();                          // the gallery is a floor too
       drawDomusPlayer(D.x,pfy,
@@ -33482,6 +33837,8 @@ function closeSettings(){
 }
 function buildSettings(){
   const b=$('settings-body'); if(!b) return; b.innerHTML='';
+  { const st=document.createElement('div'); st.className='small muted'; st.style.textAlign='right';
+    st.textContent='build '+BUILD_STAMP; b.appendChild(st); }
   const mkRow=(label,desc,valText,gold,onClick)=>{
     const row=document.createElement('div'); row.className='row gap'; row.style.justifyContent='space-between'; row.style.alignItems='center';
     const left=document.createElement('div'); left.style.textAlign='left';
@@ -44236,6 +44593,7 @@ function peekReactFor(ch){
 function startPeek(room, occ){
   const D=DM; if(!D || D.peek) return false;
   if(!occ || !occ.ref) return false;
+  if(!adultCouple(occ.ref)) return false;               // and never anyone under eighteen, whatever called this
   if(peekUsed(room)){
     toast('🔒 You have already had your look today. The latch is across and it is staying across.',3800);
     try{ sfx('deny'); }catch(e){}
@@ -44558,15 +44916,7 @@ function drawPeekRoom(x0, y0, w2, h2, room, T){
   const fy=y0+h2-Math.round(h2*0.10);
   px(x0, fy+Math.round(h2*0.055), w2, Math.round(h2*0.06), shade(R.cool,-22));   // the floor line
   if(room==='bed'){
-    // a proper bed, running most of the width, behind where they are standing
-    const bw=S2(0.52), bx=x0+S2(0.05), bh=Math.round(h2*0.16);
-    px(bx, fy-bh, bw, bh+Math.round(h2*0.05), '#5a3a24');
-    px(bx, fy-bh, bw, 3, '#7a5436');
-    px(bx+2, fy-bh-Math.round(h2*0.055), bw-4, Math.round(h2*0.06), '#c8b8a0');
-    px(bx+2, fy-bh-Math.round(h2*0.055), bw-4, 2, '#e6dcc8');
-    px(bx+S2(0.03), fy-bh-Math.round(h2*0.085), S2(0.10), Math.round(h2*0.045), '#e8dcc0'); // a pillow
-    px(bx-3, fy-bh-Math.round(h2*0.20), 5, Math.round(h2*0.26), '#4a3222');       // posts
-    px(bx+bw-2, fy-bh-Math.round(h2*0.20), 5, Math.round(h2*0.26), '#4a3222');
+    // (the bed itself is drawPeekBed's, in front of this wall, with the couple)
     // the lamp that is lighting all of this
     const lx=x0+w2-S2(0.13), ly=fy-Math.round(h2*0.30);
     px(lx, ly, S2(0.05), Math.round(h2*0.30), '#4a3222');
@@ -44627,13 +44977,16 @@ function drawPeek(){
     /* THE LAMP IS ON ONE SIDE, SO THEY THROW SHADOWS. Two soft blocks on the
        back wall, leaning away from the light and swaying with its flicker —
        it is what stops the pair looking pasted onto a flat panel. */
-    { const fl=0.68+0.22*Math.sin(T*0.11)+0.08*Math.sin(T*0.29);
-      const lean=6*fl;
-      ctx.globalAlpha=0.24*fl;
-      px(pcx-40-lean, pfy-Math.round(FH*0.46), 26, Math.round(FH*0.46), '#100a06');
-      px(pcx+6-lean,  pfy-Math.round(FH*0.52), 28, Math.round(FH*0.52), '#100a06');
-      ctx.globalAlpha=1; }
-    drawPeekPair(pcx, pfy, P, T);
+    if(!(P.act && P.act.id==='sleep')){ const fl=0.68+0.22*Math.sin(T*0.11)+0.08*Math.sin(T*0.29);
+      const lean=7*fl, hgt=Math.round(FH*0.50);
+      for(const [ox,wd] of [[-14,11],[12,12]]){                  // her, then him — thrown away from the lamp on the right
+        const cx3=pcx+ox-lean, cy3=pfy-hgt*0.52;
+        const g=ctx.createRadialGradient(cx3, cy3, 2, cx3, cy3, hgt*0.55);
+        g.addColorStop(0,'rgba(16,10,6,'+(0.34*fl).toFixed(3)+')'); g.addColorStop(1,'rgba(16,10,6,0)');
+        ctx.save(); ctx.translate(cx3, cy3); ctx.scale(wd/(hgt*0.55), 1); ctx.translate(-cx3, -cy3);
+        ctx.fillStyle=g; ctx.beginPath(); ctx.arc(cx3, cy3, hgt*0.55, 0, 7); ctx.fill(); ctx.restore();
+        ctx.globalAlpha=0.20*fl; ctx.fillStyle='#100a06'; ctx.beginPath(); ctx.ellipse(cx3, cy3-hgt*0.40, 4.6, 5.2, 0, 0, 7); ctx.fill(); ctx.globalAlpha=1; } }
+    drawPeekTableau(pcx, pfy, P, T, fx, fy2, FW, FH);
     // a vignette inside the opening, so the eye goes to the middle of it
     { const g2=ctx.createRadialGradient(fx+FW/2, fy2+FH/2, FH*0.30, fx+FW/2, fy2+FH/2, FH*0.95);
       g2.addColorStop(0,'rgba(0,0,0,0)'); g2.addColorStop(1,'rgba(8,5,3,.58)');
@@ -45383,8 +45736,24 @@ function annivCard(b){
    answer every time you ask, and different rooms genuinely differ.
    ===================================================================== */
 const HOUSE_ROOMS=['bed','pool','wardrobe'];
+/* NOBODY UNDER EIGHTEEN IS EVER BEHIND ONE OF THESE DOORS. A family 'match'
+   can wed a child from fourteen — the years allowed it, and the events keep
+   it — but nothing intimate in this house is ever shown, implied or walked
+   in on for a couple unless BOTH of them are adults: the child counted off
+   their own birthday, the spouse off the age they married at plus the years
+   since. An under-age couple simply is not in any room, ever. */
+function adultCouple(c){
+  try{
+    if(!c || c.dead || kidAgeYears(c) < 18) return false;
+    const sp=c.spouse;
+    if(sp && sp.age!==undefined){
+      const since=(c.wedDay!==undefined)? childYears(Math.max(0,(G.day||0)-c.wedDay)) : 0;
+      if((sp.age||0)+since < 18) return false; }
+    return true;
+  }catch(e){ return false; }
+}
 function roomsOccupiedToday(){
-  const home=(G.children||[]).filter(c=>!c.dead && c.wed && c.livesHome);
+  const home=(G.children||[]).filter(c=>!c.dead && c.wed && c.livesHome && adultCouple(c));
   const out={};
   if(!home.length) return out;
   const d=(G.day||0);
@@ -54686,7 +55055,7 @@ window.__SS = {
   setBodyMapWalk:(v)=>{ bodyMapWalk=v; }, get bodyMapSubject(){return bodyMapSubject;},
   redrawBodyMap:()=>{ try{ drawBodyMap($('bodymap-cv'), bodyMapSubject, bodyMapView, bodyMapT); }catch(e){} },
   drawRealFig, realAnchors, drawLength, lengthPose, lengthDigits, girthDigits, ROUSED_NAMES, rousedName, restName, tierIdxOf,
-  drawBendFig, get BEND_OPT(){return BEND_OPT;}, set BEND_OPT(v){ BEND_OPT=v; }, realFigExtras, drawPair, drawMateFig, pairHimLook, ik2, villaRevealLine, get PAIR_DRAWS(){return PAIR_DRAWS;}, get PAIR_LAST(){return PAIR_LAST;},
+  BUILD_STAMP, reactExpr, realDressInfo, get bmDressed(){return bmDressed;}, set bmDressed(v){ bmDressed=!!v; }, drawBendFig, get BEND_OPT(){return BEND_OPT;}, set BEND_OPT(v){ BEND_OPT=v; }, realFigExtras, drawPair, drawMateFig, pairHimLook, ik2, herFace, herFaceWeights, get HER_ROLL(){return HER_ROLL;}, set HER_ROLL(v){ HER_ROLL=v; }, drawManProfile, drawPeekTableau, adultCouple, villaRevealLine, get PAIR_DRAWS(){return PAIR_DRAWS;}, get PAIR_LAST(){return PAIR_LAST;},
   LEN_INCH, LEN_GROW_BY, lenGrow, lengthInches, lenFrac, VILLAGE_NAMES, villageName, villageNameNews, get HUSB_SMILE(){return HUSB_SMILE;},
   VILLAGE_NAMES_F, VILLAGE_HOUSE, villageNameF, villageHouseName, villageStreet, villageRank, villageNameReaction, openVillageTalk, fmtLen,
   drawHusbandFigSmiling:(c2,w2,face)=>{ HUSB_SMILE=1; HUSB_FACE=face? HARD_FACES[face] : null; try{ drawHusbandFig(c2,0,0,70,null,null,w2,0,'idle'); } finally{ HUSB_SMILE=0; HUSB_FACE=null; } },
