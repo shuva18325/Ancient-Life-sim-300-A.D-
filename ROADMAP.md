@@ -9,6 +9,31 @@ grounds produce nine distinct pictures" is.
 
 ---
 
+## 0 — NEXT, PROPOSED AFTER V41 (in the order they would help most)
+
+1. **The villa walkers onto the template.** The hall still walks the old lit sprites
+   (`litWife` / `litHusband`); the bend and the scenes are already the new figures, so the
+   walk is the last place the two of them change body mid-room.
+2. **Faces in the arena.** The face library is shared — a fighter could grit his teeth on a
+   swing, go HURT on a hit, SHOCKED on a knockdown and grin on a win, instead of four states.
+3. **Wear on the kit.** Dents in the bronze, torn cloth and a shield that loses planks as the
+   bout goes on, read off HP — the kit already knows where every piece sits.
+4. **Beasts in the same hand.** The venatio lion, bear, bull and leopard are still block
+   pixel quadrupeds; a vector body with IK legs would match the men they fight.
+5. **Scars on the new body.** `drawScarsOn` marks the old sprite; the template body carries
+   none of the scars the ledger records.
+6. **The crowd and the charioteers** as cached template sprites, the way the soldiers are.
+7. **A comic-size switch.** Immense and Impossible are too big on purpose now; a Settings
+   toggle between the comic and the realistic ladder would let either taste play.
+8. **Performance pass.** The fighter body is re-drawn and pixel-snapped every frame; caching
+   frames per pose would halve the cost on slow phones.
+
+### ~~0.9 Hungry for both, and too big on purpose~~ — DONE (V41)
+**Result:** `tests/bodies.cjs` (30 checks). Hungry resolves by who is hungry — a bouncing length
+in her eyes, a booty in his, a heart with mature content off; STARVING, HYPNOTIZED, THIRSTY and
+OVERWHELMED join it; the faces come up in the hall by themselves with a bubble; Immense is
+14–21in and Impossible 26–34in; a big one is slower, with a shocked reveal and her tongue out.
+
 ## 1 — GAPS THAT ARE VISIBLE RIGHT NOW
 
 ### ~~1.0 The woohoo's bodies stop at the bedroom door~~ — DONE (V40)

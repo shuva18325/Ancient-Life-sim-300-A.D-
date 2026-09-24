@@ -69,6 +69,15 @@ publicly, leaving it off keeps the game safe for a general audience.
   caption *"~ CHASING IT ~"*), shared by every new body, the villa sprite and the body map,
   where a face picker works for either spouse. Her moods follow what just happened: a slap that
   stings leaves her hurt, a gift leaves her smitten, a good talk makes her laugh.
+- **Hungry for both (V41)** — a hungry wife has a length reflected in her eyes, and it bounces;
+  a hungry husband has a booty in his. Beside it: **starving** (it has been days), **hypnotized**
+  (spiral eyes, following the sway), **thirsty** and **overwhelmed**. They come up in the villa by
+  themselves with a bubble over the head — she goes hungry when you GET HARD (hypnotized if you are
+  Impossible), he goes hungry when she bends for him, she is spent after a night — and the villa
+  card says what her face is doing right now. With mature content off the reflection is a heart.
+- **Immense and Impossible, too big on purpose** — Immense is 14–21 inches, Impossible 26–34 on a
+  seventy-inch man. A big one is taken slower, she is shocked at the reveal, and her tongue is out
+  a little in the positions.
 - **Woohoo stages** — every session climbs *warming up → finding the rhythm → faster → the peak
   → afterglow*, the tempo rising with it, and a quick one now actually has positions in it.
 - **Fighter cards** — choose a champion (Roman Legionary, Celtic Warrior, Parthian Cataphract,

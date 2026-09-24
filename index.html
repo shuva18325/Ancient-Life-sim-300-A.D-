@@ -8198,8 +8198,13 @@ const LEN_GROW=0.42, LEN_THICK=0.30;      // how much longer and thicker all the
    the ones the words are for, so they get the room: LONG is eight to ten
    inches, IMMENSE ten to thirteen, and IMPOSSIBLE fourteen to eighteen —
    a thing the village talks about, not a thing it measures. */
+/* AND THEN "MAKE IMMENSE AND IMPOSSIBLE COMICALLY BIG — TOO BIG." So the
+   top two rungs stop pretending to be anatomy: IMMENSE (9–10) runs fourteen
+   to twenty-one inches, and IMPOSSIBLE is twenty-six to thirty-four on a man
+   seventy inches tall — a thing that enters the room slightly before he does.
+   The ladder below them is untouched. */
 const LEN_INCH=[null,[3.0,4.0],[4.0,4.8],[4.8,5.4],[5.4,5.9],[5.9,6.4],[6.4,7.2],
-                     [7.8,8.8],[8.8,10.0],[10.0,11.5],[11.5,13.0],[14.0,18.0]];
+                     [7.8,8.8],[8.8,10.0],[14.0,17.0],[17.0,21.0],[26.0,34.0]];
 /* HOW MUCH OF IT IS THERE AT REST. An ordinary man roughly doubles his
    visible length in a rise; a very big one hangs most of what he has — so
    a LONG, IMMENSE or IMPOSSIBLE man at rest reads as exactly that, rather
@@ -8221,7 +8226,7 @@ function lengthInches(w, aro){
   const v=clamp(Math.round(B.secret===undefined? 5 : B.secret), 1, IMPOSSIBLE_V);
   const r=LEN_INCH[v], hard=r[0]+(r[1]-r[0])*lenFrac(w), grow=lenGrow(v), rest=hard/(1+grow);
   return {v, hard, rest, grow, now:rest*(1+grow*lengthPose(aro||0).swell),
-          dia:0.95+hard*0.13};                              // how thick through, to go with it
+          dia:0.95+Math.min(hard,13)*0.13+Math.max(0,hard-13)*0.06};   // how thick through — and past thirteen inches it keeps going, a little less
 }
 /* the old measure, in Roman digiti (a finger's breadth, 0.73in), off the
    middle of a rank's range — kept for anything that has a score and no man */
@@ -8861,13 +8866,26 @@ const FACE_EX={
   sulk:    {lid:0.45,brow:-1,   smile:-0.8, open:0,   pucker:1},
   dreamy:  {lid:0.55,brow:0.3,  smile:0.5,  open:0,   eyes:'sparkle'},
   smitten: {lid:0.1, brow:0.4,  smile:0.9,  open:0.2, eyes:'heart'},
-  hungry:  {lid:0.3, brow:0.5,  smile:0.55, open:0.6, eyes:'booty', drool:1},
+  /* 'want' is resolved by WHO is hungry: in her eyes it is a length, bouncing;
+     in his it is a booty. With mature content off it is a heart for both. */
+  hungry:  {lid:0.3, brow:0.5,  smile:0.55, open:0.6, eyes:'want', drool:1},
+  starving:{lid:0,   brow:0.75, smile:0.3,  open:0.9, eyes:'want', wide:1, drool:2, tongue:1, sweat:1, fast:1},
+  hypnotized:{lid:0.15,brow:0.6,smile:0.15, open:0.4, eyes:'spiral'},
+  thirsty: {lid:0.35,brow:0.45, smile:0.4,  open:0.6, tongue:1, sweat:1},
+  overwhelmed:{lid:0.62,brow:0.85,smile:0.1,open:0.8, tongue:1, sweat:1, sad:0},
   coin:    {lid:0.35,brow:-0.2, smile:0.45, open:0,   eyes:'coin'},
   spent:   {lid:0.9, brow:0,    smile:0.25, open:0.2, sweat:1},
 };
+/* whose eyes: what a hungry face is looking at depends on who is making it */
+function wantEyes(male){ try{ if(!ADULT) return 'heart'; }catch(e){ return 'heart'; } return male? 'booty' : 'length'; }
+function resolveEyes(kind, male){ if(kind==='want') return wantEyes(male); if(kind==='spiral') return 'spiral-'+wantEyes(male); return kind; }
 /* the body map's picker, in the order it cycles — each with the caption the chart prints */
 const CHART_FACES={
   hungry:  {name:'HUNGRY',      icon:'🤤', caption:'CHASING IT'},
+  starving:{name:'STARVING',    icon:'😵', caption:'IT HAS BEEN DAYS'},
+  hypnotized:{name:'HYPNOTIZED',icon:'😵‍💫', caption:'FOLLOWING THE SWAY'},
+  thirsty: {name:'THIRSTY',     icon:'🥵', caption:'IS IT HOT IN HERE?'},
+  overwhelmed:{name:'OVERWHELMED',icon:'🫠', caption:'TOO MUCH OF A GOOD THING'},
   smitten: {name:'SMITTEN',     icon:'😍', caption:'GONE, ENTIRELY'},
   hurt:    {name:'HURT',        icon:'🥺', caption:'THAT STUNG'},
   shock:   {name:'SHOCKED',     icon:'😳', caption:'…ALL OF THAT?'},
@@ -8878,7 +8896,7 @@ const CHART_FACES={
   sulk:    {name:'SULKING',     icon:'😤', caption:'NOT TALKING TO YOU'},
   spent:   {name:'SPENT',       icon:'😴', caption:'THAT WAS A LOT'},
 };
-const CHART_FACE_ORDER=['auto','hungry','smitten','hurt','shock','smug','dreamy','coin','laugh','sulk','spent'];
+const CHART_FACE_ORDER=['auto','hungry','starving','hypnotized','thirsty','smitten','hurt','shock','smug','dreamy','coin','laugh','sulk','overwhelmed','spent'];
 let CHART_FACE='auto';
 function chartFace(){ return (CHART_FACE!=='auto' && FACE_EX[CHART_FACE])? CHART_FACE : null; }
 /* the same face as HARD_FACES numbers, for the renderers that speak that dialect */
@@ -8887,11 +8905,12 @@ function faceAsHard(id){
   return {id, name:(CHART_FACES[id]||{}).name||id.toUpperCase(), icon:(CHART_FACES[id]||{}).icon||'☺',
           smile:E.smile, teeth:!!(id==='laugh'), blush:(id==='hungry'||id==='smitten'||id==='shock')? 0.8 : id==='hurt'? 0.35 : 0.2,
           brow:E.brow, lids:E.lid, open:E.open>0.4? 1 : 0, lop:(id==='smug'||id==='coin')? 1 : 0, shut:!!E.shut,
-          eyes:E.eyes, tear:!!E.tear, drool:!!E.drool, sweat:!!E.sweat, sad:!!E.sad, wide:!!E.wide};
+          eyes:E.eyes, tear:!!E.tear, drool:E.drool||0, sweat:!!E.sweat, sad:!!E.sad, wide:!!E.wide, tongue:!!E.tongue, fast:!!E.fast};
 }
 /* ---- what goes IN an eye. x,y the pupil, r how big the pupil is drawn ---- */
 function drawEyeFx(c, kind, x, y, r, t){
   if(!kind || kind==='wide') return;
+  if(kind==='want') kind='heart';                     // unresolved: a heart is safe for anybody
   c.save();
   if(kind==='booty'){
     // two round cheeks, the cleft between them, and the shine — reflected, so it is lit from the window
@@ -8900,6 +8919,23 @@ function drawEyeFx(c, kind, x, y, r, t){
     c.fillStyle='#e8927e'; c.beginPath(); c.arc(x-r*0.42, y+r*0.22, cr*0.55, 0, Math.PI); c.arc(x+r*0.42, y+r*0.22, cr*0.55, 0, Math.PI); c.fill();
     c.strokeStyle='#9a4a3e'; c.lineWidth=Math.max(0.25, r*0.12); c.beginPath(); c.moveTo(x, y-r*0.34); c.lineTo(x, y+r*0.44); c.stroke();
     c.fillStyle='rgba(255,255,255,.95)'; c.beginPath(); c.arc(x-r*0.55, y-r*0.18, Math.max(0.2,r*0.14), 0, 7); c.fill();
+  } else if(kind==='length'){
+    /* what SHE is chasing, reflected, and it bounces: a rounded shaft angled up with its tip,
+       the pair at the base, the shine — the same skin-pink as the booty so the two read as a set */
+    const T0=(t||0), bob=Math.sin(T0*0.38)*r*0.20, wob=Math.sin(T0*0.38+0.7)*0.20;
+    c.translate(x, y+bob); c.rotate(-0.62+wob);
+    c.fillStyle='#ffc6ae'; c.beginPath(); c.arc(-r*0.62, r*0.30, r*0.30, 0, 7); c.arc(-r*0.34, r*0.46, r*0.30, 0, 7); c.fill();
+    c.beginPath(); c.moveTo(-r*0.55,-r*0.17); c.lineTo(r*0.45,-r*0.15); c.arc(r*0.45,0,r*0.15,-Math.PI/2,Math.PI/2); c.lineTo(-r*0.55,r*0.17); c.closePath(); c.fill();
+    c.fillStyle='#f09888'; c.beginPath(); c.ellipse(r*0.60, 0, r*0.24, r*0.20, 0, 0, 7); c.fill();
+    c.fillStyle='rgba(255,255,255,.95)'; c.beginPath(); c.arc(r*0.05, -r*0.08, Math.max(0.2,r*0.09), 0, 7); c.fill();
+  } else if(kind && kind.indexOf('spiral')===0){
+    // the spiral, turning — and what put it there swaying across it, side to side
+    const T0=(t||0), sp=T0*0.12;
+    c.strokeStyle='rgba(255,255,255,.95)'; c.lineWidth=Math.max(0.2,r*0.12); c.beginPath();
+    for(let a=0;a<Math.PI*5;a+=0.3){ const rr=r*0.08+a/(Math.PI*5)*r*0.85, px2=x+Math.cos(a+sp)*rr, py2=y+Math.sin(a+sp)*rr; if(a===0) c.moveTo(px2,py2); else c.lineTo(px2,py2); }
+    c.stroke();
+    const inner=kind.slice(7)||'heart', sway=Math.sin(T0*0.09)*r*0.45;
+    c.globalAlpha=0.85; drawEyeFx(c, inner, x+sway, y+r*0.1, r*0.55, T0); c.globalAlpha=1;
   } else if(kind==='heart'){
     const s=r*1.25, b=0.5+0.5*Math.sin((t||0)*0.25);
     c.fillStyle='#ff3a72'; c.beginPath(); c.moveTo(x, y+s*0.55);
@@ -8944,14 +8980,47 @@ function drawSweatFx(c, x, y, s, t){
 }
 /* HER PROFILE FACE, the extras: called by drawFemFig and the bend after the
    face is drawn. Rp maps head-local to canvas; t is the clock. */
+function drawTongueFx(c, x, y, s, ang, t){
+  // a little of it, out past the lip — pink, lit on top, and it moves a touch
+  const k=1+Math.sin((t||0)*0.07)*0.12;
+  c.save(); c.translate(x,y); c.rotate(ang||0);
+  c.fillStyle='#e0607a'; c.beginPath(); c.ellipse(s*0.55*k, s*0.18, s*0.62*k, s*0.36, 0.25, 0, 7); c.fill();
+  c.fillStyle='#b03a58'; c.fillRect(s*0.25, s*0.12, s*0.55, Math.max(0.2,s*0.08));
+  c.fillStyle='rgba(255,210,220,.9)'; c.beginPath(); c.arc(s*0.45*k, s*0.02, Math.max(0.2,s*0.12), 0, 7); c.fill();
+  c.restore();
+}
 function faceFxProfile(oc, Rp, EX, t, big){
   if(!EX) return;
-  const E0=Rp(2.75,-0.55), R=(big? 1.7 : 0.9)*(EX.eyes==='booty'? 1.25 : 1);
-  if(EX.eyes){ const [x,y]=E0; drawEyeFx(oc, EX.eyes, x, y, R, t); }
+  const ek=resolveEyes(EX.eyes, false);                // her profile: what she wants is a length
+  const E0=Rp(2.75,-0.55), R=(big? 1.7 : 0.9)*((ek==='booty'||ek==='length'||(ek&&ek.indexOf('spiral')===0))? 1.3 : 1)*(EX.fast? 1.15 : 1);
+  if(ek){ const [x,y]=E0; drawEyeFx(oc, ek, x, y, R, (t||0)*(EX.fast? 1.8 : 1)); }
+  if(EX.tongue){ const q=Rp(3.85,2.55); drawTongueFx(oc, q[0], q[1], big? 1.2 : 0.8, 0.35, t); }
   if(EX.tear){ const q=Rp(2.2,0.7); drawTearFx(oc, q[0], q[1], big? 1.3 : 0.8, t); }
-  if(EX.drool){ const q=Rp(3.7,2.9); drawDroolFx(oc, q[0], q[1], big? 1.2 : 0.7, t); }
+  if(EX.drool){ const q=Rp(3.7,2.9); drawDroolFx(oc, q[0], q[1], (big? 1.2 : 0.7)*(EX.drool>1? 1.5 : 1), (t||0)*(EX.drool>1? 1.6 : 1)); }
   if(EX.sweat){ const q=Rp(0.8,-3.2); drawSweatFx(oc, q[0], q[1], big? 1.4 : 0.9, t); }
   if(EX.sad){ const a=Rp(1.2,-2.0), b=Rp(2.0,-2.9); oc.strokeStyle='rgba(40,22,14,.7)'; oc.lineWidth=0.4; oc.beginPath(); oc.moveTo(a[0],a[1]); oc.lineTo(b[0],b[1]); oc.stroke(); }
+}
+/* ---- 😋 IN THE VILLA, ON THEIR OWN ----
+   The faces were only ever seen by somebody who went looking in the body map.
+   In the hall they now come up by themselves when the moment calls for them,
+   and a small bubble over the head says which one it is for a few seconds —
+   the WANT faces carry the thing they want drawn in the bubble, big enough to
+   read at hall size, since an eye there is two pixels. */
+const NEW_FACES=['hungry','starving','hypnotized','thirsty','overwhelmed','smitten','hurt','shock','laugh','sulk','dreamy','coin','spent','wink','teary','pout'];
+const WANT_FACES=['hungry','starving','hypnotized'];
+/* which WANT face his size earns from her: bigger is not hungrier, it is worse */
+function wantFaceFor(v){ return v>=11? 'hypnotized' : v>=9? 'starving' : 'hungry'; }
+function hisSecretV(){ try{ const h=(typeof pairHimLook==='function')? pairHimLook() : null; return Math.round(((h&&h.body)||{}).secret||5); }catch(e){ return 5; } }
+function drawMoodBubble(x, y, id, male, t){
+  const F=CHART_FACES[id]||(id==='wink'? {name:'WINK',icon:'😉'} : id==='teary'? {name:'TEARY',icon:'🥲'} : id==='pout'? {name:'POUTING',icon:'😗'} : null);
+  if(!F) return;
+  const want=WANT_FACES.indexOf(id)>=0, w=want? 34 : 30, h=want? 22 : 12, bx=Math.round(x-w/2), by=Math.round(y-h);
+  ctx.save();
+  ctx.fillStyle='rgba(20,10,16,.84)'; ctx.fillRect(bx, by, w, h); ctx.strokeStyle='#ff9ad0'; ctx.lineWidth=1; ctx.strokeRect(bx+0.5, by+0.5, w-1, h-1);
+  ctx.fillStyle='rgba(20,10,16,.84)'; ctx.beginPath(); ctx.moveTo(x-3,by+h); ctx.lineTo(x,by+h+4); ctx.lineTo(x+3,by+h); ctx.fill();
+  if(want){ const ek=resolveEyes(id==='hypnotized'? 'spiral' : 'want', !!male); drawEyeFx(ctx, ek, x, by+8, 5.5, (t||0)*(id==='starving'? 1.8 : 1)); }
+  ctx.textAlign='center'; pixelText(F.name, x, by+h-3, '#ffd0e4', 0.55); ctx.textAlign='left';
+  ctx.restore();
 }
 /* the caption the body map prints under a picked face: a small plate with a tail to the head */
 function drawFaceCaption(c, id, x, y){
@@ -8968,19 +9037,21 @@ function drawFaceCaption(c, id, x, y){
   c.restore();
 }
 /* the diagram's blank oval heads get a line face for a picked expression */
-function drawDiagFaceFx(c, x0, sideV, headR, id, t){
+function drawDiagFaceFx(c, x0, sideV, headR, id, t, male){
   const E=FACE_EX[id]; if(!E) return;
+  const EK=resolveEyes(E.eyes, !!male);
   const ink='rgba(40,10,30,.85)', ey=5-headR*0.20, my=5+headR*0.32;
   c.save(); c.strokeStyle=ink; c.fillStyle=ink; c.lineWidth=0.55; c.lineCap='round';
   const eyeAt=(ex)=>{ if(E.shut){ c.beginPath(); c.arc(ex, ey+0.2, 0.55, Math.PI*1.05, Math.PI*1.95); c.stroke(); }
       else { const r=E.wide? 0.7 : 0.5; c.fillStyle='#fbf4ec'; c.beginPath(); c.ellipse(ex,ey,r*1.35,r*1.1,0,0,7); c.fill(); c.fillStyle=ink; c.beginPath(); c.arc(ex,ey,r*0.62,0,7); c.fill();
-        if(E.eyes) drawEyeFx(c, E.eyes, ex, ey, 0.95, t);
+        if(EK) drawEyeFx(c, EK, ex, ey, 0.95, t);
         if(E.lid>0.3){ c.beginPath(); c.moveTo(ex-0.8,ey-0.35+E.lid*0.2); c.lineTo(ex+0.8,ey-0.35+E.lid*0.2); c.stroke(); } }
     const inner=E.sad? -0.45 : (E.brow<0? 0.45 : 0); c.beginPath(); c.moveTo(ex-0.8, ey-1.25-Math.max(0,E.brow)*0.3+(E.brow<0?0:0)); c.lineTo(ex+0.8, ey-1.25-Math.max(0,E.brow)*0.3+inner); c.stroke(); };
   const mouth=(mx, w)=>{ if(E.open>0.5){ c.beginPath(); c.ellipse(mx, my+0.2, w*0.35, 0.5+E.open*0.35, 0, 0, 7); c.fill(); }
       else if(E.pucker){ c.beginPath(); c.arc(mx, my, 0.45, 0, 7); c.stroke(); }
       else { c.beginPath(); c.moveTo(mx-w, my-E.smile*0.6); c.quadraticCurveTo(mx, my+E.smile*0.9, mx+w, my-E.smile*0.6); c.stroke(); } };
   if(!sideV){ const lx=x0-headR*0.30, rx=x0+headR*0.30; eyeAt(lx); eyeAt(rx); mouth(x0, headR*0.32);
+    if(E.tongue) drawTongueFx(c, x0-0.1, my+0.3, 0.8, Math.PI/2, t);
     if(E.tear) drawTearFx(c, lx-0.1, ey+1.2, 0.7, t); if(E.drool) drawDroolFx(c, x0+headR*0.28, my+0.3, 0.6, t); if(E.sweat) drawSweatFx(c, rx+1.2, ey-1.4, 0.8, t);
     if(E.eyes==='heart'||E.eyes==='booty'||id==='shock'){ c.fillStyle='rgba(230,80,110,.45)'; c.beginPath(); c.arc(lx-0.4,my-0.9,0.8,0,7); c.arc(rx+0.4,my-0.9,0.8,0,7); c.fill(); } }
   else { const ex=x0+headR*0.40; eyeAt(ex); mouth(x0+headR*0.46, headR*0.22);
@@ -8995,8 +9066,8 @@ const HARD_FACES={
   stoic:   {id:'stoic',    name:'STRAIGHT-FACED', icon:'😐', smile:0.00, teeth:false, blush:0.00, brow: 0.00, lids:0.10, open:0, lop:0},
   lost:    {id:'lost',     name:'LOST IN IT',     icon:'😮', smile:0.10, teeth:false, blush:0.75, brow: 0.85, lids:0.65, open:1, lop:0},
 };
-['hungry','smitten','hurt','shock','laugh','spent'].forEach(id=>{ HARD_FACES[id]=faceAsHard(id); });   // 😋 and his side of the new faces
-const HARD_FACE_ORDER=['auto','grin','smirk','sheepish','intent','stoic','lost','hungry','smitten','hurt','shock','laugh','spent'];
+['hungry','starving','hypnotized','thirsty','overwhelmed','smitten','hurt','shock','laugh','spent'].forEach(id=>{ HARD_FACES[id]=faceAsHard(id); });   // 😋 and his side of the new faces
+const HARD_FACE_ORDER=['auto','grin','smirk','sheepish','intent','stoic','lost','hungry','starving','hypnotized','thirsty','smitten','hurt','shock','laugh','spent'];
 let HARD_FACE_FORCE='auto';          // the chart's picker; 'auto' rolls
 let HARD_ROLL=0;                     // bumped as each rise begins, so each rise rolls its own
 function hardFaceWeights(w, where){
@@ -9408,9 +9479,9 @@ function drawRealFig(c, w, view, ph, opt){
         c.fillStyle='#3b2a1c'; c.beginPath(); c.arc(x+0.05,eY+0.02,0.36,0,7); c.fill();
         c.fillStyle='#0e0806'; c.beginPath(); c.arc(x+0.05,eY+0.02,0.16,0,7); c.fill();
         c.fillStyle='rgba(255,255,255,.8)'; c.beginPath(); c.arc(x-0.08,eY-0.12,0.08,0,7); c.fill();
-        if(CF && CF.eyes){ c.save(); c.beginPath(); c.ellipse(x,eY,HR*0.19,0.42,0,0,7); c.clip();   // 😋 the booty, reflected — or hearts, or coin
+        if(CF && CF.eyes){ c.save(); c.beginPath(); c.ellipse(x,eY,HR*0.19,0.42,0,0,7); c.clip();   // 😋 what they want, reflected — hers a length, his a booty
           c.fillStyle='#1a0e08'; c.beginPath(); c.arc(x+0.05,eY+0.02,0.42,0,7); c.fill(); c.restore();
-          drawEyeFx(c, CF.eyes, x+0.05, eY+0.02, CF.eyes==='sparkle'? 0.4 : 0.62, FXt); }
+          const ek=resolveEyes(CF.eyes, male); drawEyeFx(c, ek, x+0.05, eY+0.02, ek==='sparkle'? 0.4 : 0.66, FXt*(CF.fast? 1.8 : 1)); }
         c.strokeStyle='#1e120a'; c.lineWidth= male? lw*1.0 : lw*1.5;                  // the upper lid, and her lashes
         c.beginPath(); c.moveTo(x-HR*0.21,eY+0.05); c.quadraticCurveTo(x,eY-0.72,x+HR*0.21,eY-0.02); c.stroke();
         if(!male){ c.beginPath(); c.moveTo(x+q*HR*0.20,eY-0.10); c.lineTo(x+q*HR*0.27,eY-0.34); c.stroke(); }
@@ -9466,7 +9537,8 @@ function drawRealFig(c, w, view, ph, opt){
       if(AM.sag>0.1) crease(-HR*0.70,ny-HH*0.10, -HR*0.45,ny+0.4, -HR*0.20,ny+0.1, 0.25*AM.sag);
       drawScars(FZ, ['face']);
       if(CF){ if(CF.tear) drawTearFx(c, -eX, eY+0.75, 0.30, FXt);
-        if(CF.drool) drawDroolFx(c, HR*0.30, ny-HH*0.10, 0.26, FXt);
+        if(CF.tongue) drawTongueFx(c, -0.05, ny-HH*0.10, 0.34, Math.PI/2, FXt);
+        if(CF.drool) drawDroolFx(c, HR*0.30, ny-HH*0.10, 0.26*(CF.drool>1? 1.5 : 1), FXt);
         if(CF.sweat) drawSweatFx(c, HR*0.80, ny-HH*0.78, 0.32, FXt);
         if(!male && blushF>0.3){ soft(-HR*0.56,ny-HH*0.30,HR*0.34,'#e05070',0.26*blushF); soft(HR*0.56,ny-HH*0.30,HR*0.34,'#e05070',0.22*blushF); } }
     }
@@ -9629,7 +9701,7 @@ function drawRealFig(c, w, view, ph, opt){
     { const ex=hx0+HR*0.60, eY=ny-HH*0.50;
       c.fillStyle='#f4eee6'; c.beginPath(); c.ellipse(ex,eY,0.55,0.36,0,0,7); c.fill();
       c.fillStyle='#3b2a1c'; c.beginPath(); c.arc(ex+0.25,eY+0.02,0.30,0,7); c.fill();
-      if(CF && CF.eyes) drawEyeFx(c, CF.eyes, ex+0.25, eY+0.02, CF.eyes==='sparkle'? 0.34 : 0.52, FXt);
+      if(CF && CF.eyes){ const ek=resolveEyes(CF.eyes, male); drawEyeFx(c, ek, ex+0.25, eY+0.02, ek==='sparkle'? 0.34 : 0.56, FXt*(CF.fast? 1.8 : 1)); }
       if(CF && CF.tear) drawTearFx(c, ex-0.1, eY+0.7, 0.28, FXt);
       c.strokeStyle='#1e120a'; c.lineWidth= male? lw : lw*1.5;
       c.beginPath(); c.moveTo(ex-0.55,eY); c.quadraticCurveTo(ex,eY-0.62,ex+0.58,eY-0.08); c.stroke();
@@ -9648,6 +9720,7 @@ function drawRealFig(c, w, view, ph, opt){
       if(smP>0.05){ soft(hx0+HR*0.50, ny-HH*0.30, HR*0.32, sLit, 0.24*smP);                            // the cheek it lifts
         crease(hx0+HR*0.60,ny-HH*0.25, hx0+HR*0.56,ny-HH*0.19, hx0+HR*0.60,ny-HH*0.12, 0.28*smP); }
       if((male||CF) && blushF>0.05) soft(hx0+HR*0.46, ny-HH*0.28, HR*0.34, '#e05060', 0.22*blushF);
+      if(CF && CF.tongue) drawTongueFx(c, hx0+HR*0.90, ny-HH*0.15, 0.32, 0.35, FXt);
       if(CF && CF.drool) drawDroolFx(c, hx0+HR*0.84, ny-HH*0.08, 0.24, FXt);
       c.fillStyle=rgbA(sDeep,0.5); c.beginPath(); c.ellipse(hx0+HR*0.94,ny-HH*0.29,0.25,0.14,0,0,7); c.fill(); }
     // hair: a cap over the skull, and her fall off the back of it
@@ -10115,7 +10188,7 @@ function drawBodyMap(cnv,w,view,tms){
       c.restore(); };
     if(view==='front'){
       ell(0,5,5.6+ha*0.20,6.8+ha*0.16, heatColor(ha));
-      ell(0,5,headR*0.84,headR, heatColor(fa)); if(chartFace()) drawDiagFaceFx(c,0,false,headR,chartFace(),(tms||0)/16); else face2(0,false);
+      ell(0,5,headR*0.84,headR, heatColor(fa)); if(chartFace()) drawDiagFaceFx(c,0,false,headR,chartFace(),(tms||0)/16,true); else face2(0,false);
       cap(0,10.5,0,14,2.6,3.0, heatColor((fa+bu)/2));
       cap(-shW,17,shW,17,3.6,3.6, heatColor(be));                          // the great shoulder yoke
       ell(0,21,chR*1.5,chR*0.86, heatColor(bu));                           // chest slab
@@ -10126,7 +10199,7 @@ function drawBodyMap(cnv,w,view,tms){
       cap(-shW-1.4,19,-shW-2.6+ax,33,2.5,2.0, heatColor(be)); cap(shW+1.4,19,shW+2.6-ax,33,2.5,2.0, heatColor(be));
     } else if(view==='side'){
       ell(-2.2,5,5.4+ha*0.18,6.8+ha*0.16, heatColor(ha));
-      ell(0.6,5,headR*0.74,headR, heatColor(fa)); ell(headR*0.60,5.4,1.5,1.2, heatColor(fa)); if(chartFace()) drawDiagFaceFx(c,0.6,true,headR,chartFace(),(tms||0)/16); else face2(0.6,true);
+      ell(0.6,5,headR*0.74,headR, heatColor(fa)); ell(headR*0.60,5.4,1.5,1.2, heatColor(fa)); if(chartFace()) drawDiagFaceFx(c,0.6,true,headR,chartFace(),(tms||0)/16,true); else face2(0.6,true);
       cap(0,10.5,0,14,2.6,3.0, heatColor((fa+bu)/2));
       ell(chR*0.52,20,chR*0.88,chR*0.92, heatColor(bu));                   // chest in profile
       cap(0,17,0,32,3.8,wR*0.44, heatColor(wa));
@@ -13394,7 +13467,7 @@ const SETTINGS_KEY='SANDSTEEL_SETTINGS';
 /* WHICH BUILD IS THIS. Printed on the title screen, in Settings and in the
    corner of the hall — because an old link to an old build looks exactly
    like a fix that did not work. */
-const BUILD_STAMP='V40 · the woohoo bodies everywhere, the hub as a place';
+const BUILD_STAMP='V41 · hungry for both, too big on purpose';
 try{ document.addEventListener('DOMContentLoaded',()=>{ const e=document.getElementById('build-stamp'); if(e) e.textContent='build '+BUILD_STAMP; });
      const e0=document.getElementById('build-stamp'); if(e0) e0.textContent='build '+BUILD_STAMP; }catch(e){}
 const SETTINGS=(function(){ const d={sound:true,shake:true,difficulty:'normal',
@@ -20245,7 +20318,7 @@ function startBedScene(mode,len,place){
      short — it is not a night and the house should not book it as one. */
   const KAN=!!KANVEK_ONLY; KANVEK_ONLY=false;
   BC={t:0, props:[], hearts:[], splash:[], mode:mode||'heir', len, place,
-      kanvekOnly:KAN, breedLine:_breedLine,
+      kanvekOnly:KAN, breedLine:_breedLine, bigV:bedBigV(), bigSlow:bedBigSlow(bedBigV()),
       dur: bedSessionDur(len, KAN),
       line:pick(['“Veni…”','“Te amo.”','“Nunc, mi gladiator…”','“Tarde venis…”'])};
   G.lastLoveDay=G.day;
@@ -20345,7 +20418,7 @@ function updateRkFin(s, dt){
 }
 function updateBed(dt){ const s=BC; s.t+=dt; const T=s.t;
   /* ✦ the stage, and the rhythm clock it drives */
-  { const st=bedStage(s); s.stage=st; s.tT = (s.tT===undefined || !st)? T : s.tT + dt*st.tempo;
+  { const st=bedStage(s); s.stage=st; s.tT = (s.tT===undefined || !st)? T : s.tT + dt*st.tempo*(s.bigSlow||1);   // ✦ and a big one, slower
     if(st && st.peak && (T|0)%6<1) s.hearts.push({x:200+rnd(-60,60), y:150+rnd(-20,20), vy:rnd(0.5,1.1), life:rnd(30,52), c:pick(['#ff6a9a','#ffb0d0','#ff8ad0'])}); }
   for(const p of s.props){ p.x+=p.vx*dt; p.y+=p.vy*dt; p.vy+=0.16*dt; p.r+=p.vr*dt;
     if(p.y>222){ p.y=222; p.vx*=0.5; p.vy=0; p.vr*=0.3; } }
@@ -20390,7 +20463,7 @@ function updateBed(dt){ const s=BC; s.t+=dt; const T=s.t;
   // ...and then the sounds carry through the closed door
   if(T>500 && !inter){
     const hour=1+(T/3500|0);
-    const pace = (vigil? Math.max(0.55,1-0.09*hour) : (night && T>1600)? 0.8 : 1) / ((s.stage && s.stage.tempo) || 1);   // each hour: bolder — and each stage faster
+    const pace = (vigil? Math.max(0.55,1-0.09*hour) : (night && T>1600)? 0.8 : 1) / (((s.stage && s.stage.tempo) || 1)*(s.bigSlow||1));   // each hour: bolder — each stage faster — a big one slower
     if(!s.nextClap||T>=s.nextClap){ sfx('clap'); s.nextClap=T+(28+Math.random()*14)*pace; }
     if(!s.nextMoan||T>=s.nextMoan){ sfx('moan'); s.nextMoan=T+(64+Math.random()*46)*pace; }
     if(!s.nextKiss||T>=s.nextKiss){ sfx('kiss'); s.nextKiss=T+(46+Math.random()*40)*pace; }
@@ -21357,6 +21430,7 @@ function villaConceive(){
 }
 function finishBed(){
   const mode=BC.mode, w=G.wife, len=BC.len||'quick';
+  try{ if(ADULT && w && !w.male) setWifeMood((BC.bigV||0)>=9? 'overwhelmed' : 'spent', 14000); }catch(e){}   // 😋 and she walks back into the hall wearing it
   const _kept=!!BC.finKept;                       // ✧ read before BC is thrown away
   const _kan =!!BC.kanvekOnly;                    // ✧ and whether it was her gift rather than a night
   const TB=spouseTierBonus();                                       // the tier on the wall, cashed in
@@ -21601,7 +21675,7 @@ function drawRoomPlace(s,T,dx,dw,place){
         if(rise>=1){ px(gx-17,158,2,1,'rgba(255,176,80,.55)'); px(gx-18,160,1,3,'rgba(255,176,80,.4)'); }
         if(rise>=1 && (T|0)%20<1.5) s.hearts.push({x:gx-8,y:146,vy:0.7,life:40,c:'#e26a8a'});
       }
-      if(T>444 && T<478){ pixelText(G.isFemale?'“Veni, domina mea…”':s.line,dx+dw/2,120,'#f0c8d4',1); }
+      if(T>444 && T<478){ pixelText((s.bigV||0)>=9? (G.isFemale? '“…ALL of that. Oh. OH.”' : '“…ALL of that?!”') : (G.isFemale?'“Veni, domina mea…”':s.line),dx+dw/2,120,'#f0c8d4',1); }
       if(T>458 && T<474){ pixelText('♥',dx+46,150,'#e26a8a',1.3); }                            // the lean-in
     }
   }
@@ -22471,6 +22545,12 @@ const BED_UNDRESS=230;                            // ticks the clothes take to c
    and a pip-bar in the corner says where in it you are.
    ===================================================================== */
 const BED_INTRO=520+BED_UNDRESS;
+/* HOW BIG HE IS, for the bedchamber: IMMENSE (9–10) and IMPOSSIBLE (11). A big
+   one is taken SLOWER — the whole rhythm clock runs under the stage's tempo —
+   and it shows on her: the reveal is a shocked face, and in the positions her
+   tongue is out a little, she is half-lidded, flushed and damp with it. */
+function bedBigV(){ try{ const h=(typeof pairHimLook==='function')? pairHimLook() : null; const v=Math.round(((h&&h.body)||{}).secret||5); return v>=9? v : 0; }catch(e){ return 0; } }
+function bedBigSlow(v){ return v>=11? 0.6 : v>=9? 0.78 : 1; }
 const BED_STEP=160;                                // ticks per position: the positions' own beats are cut to this
 const BED_STAGES=[
   {id:'warm',  name:'WARMING UP',          tempo:0.78, at:0.00, col:'#e8c34a'},
@@ -22510,7 +22590,9 @@ function drawBedStageUI(s){
   for(let k=0;k<BED_STAGES.length;k++){ const on=k<=st.i;
     ctx.fillStyle= on? BED_STAGES[k].col : 'rgba(120,100,80,.5)'; ctx.fillRect(x0+k*12, y0+6, 9, 3);
     if(k===st.i){ ctx.globalAlpha=0.5+0.4*Math.sin((s.t||0)*0.2); ctx.fillRect(x0+k*12, y0+5, 9, 5); ctx.globalAlpha=0.9; } }
-  ctx.textAlign='left'; pixelText(['①','②','③','④','⑤'][st.i]+' '+st.name, x0, y0, st.col, 0.8);
+  pixelText(['①','②','③','④','⑤'][st.i]+' '+st.name, x0+55, y0, st.col, 0.8);          // (pixelText centres on x)
+  if(s.bigV>=9){ ctx.fillStyle='rgba(12,8,6,.62)'; ctx.fillRect(x0-4, y0+13, 118, 11);
+    pixelText(s.bigV>=11? '⛧ IMPOSSIBLE · MUCH SLOWER' : '◆ IMMENSE · SLOWER', x0+55, y0+19, s.bigV>=11? '#ff7ae0' : '#ffb0d0', 0.62); }
   ctx.restore(); ctx.textAlign='left';
 }
 function drawBedPose(vi, E){
@@ -22519,9 +22601,12 @@ function drawBedPose(vi, E){
   const her = G.isFemale? playerLook() : (G.wife||{});
   const him = (typeof pairHimLook==='function')? pairHimLook() : playerLook();
   if(!him || !her) return false;
-  if(!s.nf || s.nf.vi!==vi){ s.nf={ vi, hf:hardFace(him,'act'), he:herFace(her,'act'), hr:herFace(her,'reveal') }; }
+  if(!s.nf || s.nf.vi!==vi){ s.nf={ vi, hf:hardFace(him,'act'), he:herFace(her,'act'), hr:herFace(her,'reveal') };
+    /* ✦ AND IF HE IS BIG: she is shocked at the reveal, and in the positions her tongue is out a little */
+    if((s.bigV||0)>=9){ s.nf.hr='shock'; if(vi!=='undress') s.nf.he= (s.bigV>=11 || (kinHash? kinHash('big·'+vi)%5>0 : true))? 'overwhelmed' : 'brace'; } }
   const coastB=(typeof rkHere==='function') && rkHere();
   const HF=s.nf.hf, HE=s.nf.he==='cross'? 'flush' : s.nf.he;
+  const OH=((s.bigV||0)>=9)? 'overwhelmed' : 'oh';                 // ✦ the peak of a beat, and with a big one it is the tongue
   const shut=Object.assign({}, HF, {shut:1, open:0});
   const IN1=lengthInches(him,1);
   const HIM=(M)=>{ const a=(M.aro===undefined)? 1 : M.aro, IN=lengthInches(him,a);
@@ -22592,7 +22677,7 @@ function drawBedPose(vi, E){
                    : uS<0.2? {near:[hipW[0]+2.5, hipW[1]-23], far:[hipW[0]-0.5, hipW[1]-24]}
                    : uS<0.85? {near:[hipW[0]+4.2, hipW[1]-3+push*16], far:[hipW[0]-3.5, hipW[1]-3+push*16]}
                    : {near:L(wx,[hx+3, base-52]), far:L(wx,[hx+1, base-46])};
-    const herF={hip:hipW, lean:0.02+close*0.06, headAng:-0.18-close*0.12, expr:(ut<100? 'smug' : 'flush'), blush:0.2+uS*0.5, rock:Math.sin(T*0.2)*0.2*uS,
+    const herF={hip:hipW, lean:0.02+close*0.06, headAng:-0.18-close*0.12, expr:(ut<100? 'smug' : ((s.bigV||0)>=9? 'shock' : 'flush')), blush:0.2+uS*0.5, rock:Math.sin(T*0.2)*0.2*uS,
                 ankles:{near:[wx+0.5, base-3.2], far:[wx+3, base-2.6]}, hands:herHands,
                 dress:{col:hexOf((her&&her.dress)||'#8a2f5a'), cut:(coastB? 'ulvik' : 'stola'), u:uS, band, noble:!!(her&&her.tier&&her.tier!=='common')}};
     shadow(cx0, base-1, 24);
@@ -22649,12 +22734,12 @@ function drawBedPose(vi, E){
       top=base-3;
       const hip=[cx0-6+d*1.2, top-15];
       herF={hip, lean:1.05, headAng:0.30-d*0.2, rock:rk*0.7, ankles:{near:[hip[0]-15, top-1], far:[hip[0]-13, top-1.5]},
-            hands:{near:[TB2.x+TB2.w-10, TB2.rim+1], far:[TB2.x+TB2.w-13, TB2.rim]}, expr:(d>0.55? 'oh' : HE), blush:0.6, floor:top};
+            hands:{near:[TB2.x+TB2.w-10, TB2.rim+1], far:[TB2.x+TB2.w-13, TB2.rim]}, expr:(d>0.55? OH : HE), blush:0.6, floor:top};
     } else if(vi===2){
       top=base-18; BED(cx0-66, 120, top);
       const hip=[cx0-4+d*1.2, top-15];
       herF={hip, lean:1.42, headAng:0.62-d*0.25, rock:rk*0.7, ankles:{near:[hip[0]-16, top-1], far:[hip[0]-14, top-1.5]},
-            hands:{near:[hip[0]+26, top-0.5], far:[hip[0]+23.5, top-1]}, expr:(d>0.55? 'oh' : HE), blush:0.5, floor:top};
+            hands:{near:[hip[0]+26, top-0.5], far:[hip[0]+23.5, top-1]}, expr:(d>0.55? OH : HE), blush:0.5, floor:top};
     } else {
       if(vi===21){ WALLBOARDS('#5a4630','#4e3c28');
         // her house-post, her lineage cut into it, Rhauna carved at the top looking down
@@ -22674,7 +22759,7 @@ function drawBedPose(vi, E){
       const lean = vi===21? 1.22 : vi===24? 0.62 : vi===14? 0.34 : 0.42;
       const hip=[cx0+2+d*1.4, base-33+(vi===21? 1 : 0)];
       const post=cx0+34;
-      herF={hip, lean:lean+rk*0.02, headAng:(vi===21? 0.35 : vi===24? 0.2 : 0.05)-d*0.18, rock:rk*0.55, expr:(d>0.6? 'oh' : HE), blush:0.45,
+      herF={hip, lean:lean+rk*0.02, headAng:(vi===21? 0.35 : vi===24? 0.2 : 0.05)-d*0.18, rock:rk*0.55, expr:(d>0.6? OH : HE), blush:0.45,
             ankles: vi===24? {near:[cx0+28, base-26.5], far:[hip[0]+1.5, base-2.6]} : {near:[hip[0]+0.5, base-2.8], far:[hip[0]+3.5, base-2.4]},
             kneeBend: -1,
             hands: vi===21? {near:[post, base-44], far:[post+1, base-49]} : vi===24? {near:[cx0+33, base-30], far:[cx0+30, base-29]}
@@ -22714,7 +22799,7 @@ function drawBedPose(vi, E){
       const root=HMd.root;
       // her astride, facing his head (to the right), knees down either side of him
       const hipY=root[1]-10-b*3.6, hip=[root[0]+1.5, hipY];
-      const herF={hip, lean:-0.12+rk*0.05, headAng:-0.28+b*0.14, rock:rk, expr:(b>0.6? 'oh' : HE), blush:0.3+b*0.4,
+      const herF={hip, lean:-0.12+rk*0.05, headAng:-0.28+b*0.14, rock:rk, expr:(b>0.6? OH : HE), blush:0.3+b*0.4,
                   ankles:{near:[hip[0]-13, top-1.5], far:[hip[0]-11, top-2.2]}, floor:top,
                   hands:{near:[hip[0]+10, hip[1]+5], far:[hip[0]-3, hip[1]-8]}};
       hims.hands={near:L(hx,[hip[0]-1, hip[1]-3]), far:L(hx,[hip[0]+1, hip[1]-4])};
@@ -22746,7 +22831,7 @@ function drawBedPose(vi, E){
     HMd=HIM(Object.assign({dry:true}, hims));
     const root=HMd.root;
     const wx=root[0]+5, hipY=root[1]-8-b*(vi===17? 1.6 : 3.2);
-    const herF={hip:[wx, hipY], lean:-0.12, headAng:-0.20+b*0.18, rock:rk, expr:(b>0.6 && vi!==17? 'oh' : (vi===17? 'shut' : HE)), blush:0.35+b*0.4,
+    const herF={hip:[wx, hipY], lean:-0.12, headAng:-0.20+b*0.18, rock:rk, expr:(b>0.6 && vi!==17? OH : (vi===17? 'shut' : HE)), blush:0.35+b*0.4,
                 ankles:{near:L(wx,[hx-4, seatTop-1.6]), far:L(wx,[hx-2, seatTop-2.4])}, floor:seatTop,
                 hands:{near:L(wx,[HMd.head[0]+2, HMd.head[1]+9]), far:L(wx,[HMd.head[0]-2, HMd.head[1]+6])}};
     // his hands: at her waist — or, for the prahanana, the striking, on her seat
@@ -22771,10 +22856,10 @@ function drawBedPose(vi, E){
     shadow(cx0, base-1, 18);
     const lifted=(vi===4);
     const wx=wallX-6, hipY= lifted? base-44-b*2.8 : base-34;
-    const herF= lifted? {hip:[wx, hipY], lean:-0.16, headAng:-0.35+b*0.1, rock:sn(0.4)*0.8, expr:(b>0.6? 'oh' : HE), blush:0.5,
+    const herF= lifted? {hip:[wx, hipY], lean:-0.16, headAng:-0.35+b*0.1, rock:sn(0.4)*0.8, expr:(b>0.6? OH : HE), blush:0.5,
                          ankles:{near:L(wx,[hx-12, hipY+8]), far:L(wx,[hx-10, hipY+6])}, kneeBend:-1,
                          hands:{near:L(wx,[hx+1, base-62]), far:L(wx,[hx-3, base-60])}}
-                      : {hip:[wx, hipY], lean:-0.10, headAng:-0.30+b*0.1, rock:sn(0.4)*0.6, expr:(b>0.6? 'oh' : HE), blush:0.5,
+                      : {hip:[wx, hipY], lean:-0.10, headAng:-0.30+b*0.1, rock:sn(0.4)*0.6, expr:(b>0.6? OH : HE), blush:0.5,
                          ankles:{near:L(wx,[hx-12, hipY+6]), far:[wx+0.5, base-2.6]}, kneeBend:-1, kneeBendFar:-1,
                          hands:{near:L(wx,[hx+1, base-62]), far:[wx+4, base-60]}};
     const HRd=MX(wx,()=>HER(Object.assign({dry:true},herF)));
@@ -22848,7 +22933,11 @@ function drawBedPose(vi, E){
       HRd=MX(herF.hip[0],()=>HER(Object.assign({dry:true},herF)));
       hims.aim=[HRd.mouth[0]-0.8, HRd.mouth[1]]; hims.aimK=1; hims.clip=true; }
     const hxW=herF.hip[0];
-    if(vi===22 || vi===18) hims.hands.near=[HRd.head[0]-0.5, HRd.head[1]-4.5];                       // his hand on her head — she put it there
+    if(vi===22 || vi===18){ const hd=[HRd.head[0]-0.5, HRd.head[1]-4.5];                              // his hand on her head — she put it there
+      /* and with a length that big she is a long way off, so he bends over it until his hand gets there */
+      for(let k=0;k<14;k++){ const Sd=HIM(Object.assign({dry:true},hims)).shoulder;
+        if(!Sd || Math.hypot(hd[0]-Sd[0], hd[1]-Sd[1])<=18.5 || (hims.lean||0)>=1.15) break; hims.lean=(hims.lean||0)+0.08; }
+      hims.hands.near=hd; }
     if(!seated) shadow(cx0-8, base-1, 30);
     MX(hxW,()=>HER(Object.assign({only:'far'},herF)));
     HIM(Object.assign({only:'far'}, hims)); const HM=HIM(Object.assign({only:'main'}, hims));
@@ -22914,7 +23003,7 @@ function drawBedPose(vi, E){
     }
     if(vi===7){ // at rest: side by side, her a little behind him, his arm under her, and the reach for the bowl
       const reach=clamp(((E.vt||0)-60)/50,0,1), fall=clamp(((E.vt||0)-104)/20,0,1), br=sn(0.06)*0.6;
-      const herF={hip:[cx0+6, top-6.5], lean:-1.5708, headAng:-1.05, expr:(fall>0.5? 'oh' : 'pleased'), blush:0.3, floor:top,
+      const herF={hip:[cx0+6, top-6.5], lean:-1.5708, headAng:-1.05, expr:(fall>0.5? OH : 'pleased'), blush:0.3, floor:top,
                   ankles:{near:[cx0+36, top-6], far:[cx0+34, top-7]}, kneeBend:-1,
                   hands:{near:[cx0+6+reach*56, top-12-reach*9], far:[cx0-6, top-9]}};
       const hims={hip:[cx0+2, top-4+br*0.2], lean:-1.5708, headAng:-1.25, face:Object.assign({},HARD_FACES.grin,{shut:1}), floor:top,
@@ -22933,7 +23022,7 @@ function drawBedPose(vi, E){
     }
     // 11 THE WARM MARBLE and 19 SHUNGA: she is on her back, knees up; he kneels between them
     const b=bt(vi===19? 0.30 : 0.36), rk=sn(vi===19? 0.30 : 0.36);
-    const herF={hip:[cx0-4, top-5], lean:-1.5708+0.12, headAng:-1.05, expr:(b>0.6? 'oh' : HE), blush:0.4+b*0.3, rock:rk*0.6, floor:top,
+    const herF={hip:[cx0-4, top-5], lean:-1.5708+0.12, headAng:-1.05, expr:(b>0.6? OH : HE), blush:0.4+b*0.3, rock:rk*0.6, floor:top,
                 ankles:{near:[cx0+10, top-2], far:[cx0+12, top-2.6]}, kneeBend:-1, robe:(vi===19? ((her&&her.dress)||'#8a2f5a') : null),
                 hands:{near:[cx0-24, top-2], far:[cx0-26, top-3]}};
     const HRd=HER(Object.assign({dry:true},herF));
@@ -22962,7 +23051,7 @@ function drawBedPose(vi, E){
         for(let k=0;k<12;k++){ c.fillStyle=k%2?'#a8663a':'#96562e'; c.beginPath(); c.ellipse(cx0-46+k*8.4, ry+7, 2.4, 5, 0, 0, 7); c.fill(); } }
       box(cx0+2, edge, 58, 5, '#6a5238', '#8a6e48', '#3a2a18'); c.fillStyle='#4e3c26'; c.fillRect(cx0+6, edge+5, 4, base-edge-5); c.fillRect(cx0+52, edge+5, 4, base-edge-5); }
     const wx=cx0+14;
-    const herF={hip:[wx, edge-3.5], lean:-0.30+rk*0.03, headAng:-0.30+b*0.12, rock:rk*0.7, expr:(b>0.6? 'oh' : HE), blush:0.4+b*0.3,
+    const herF={hip:[wx, edge-3.5], lean:-0.30+rk*0.03, headAng:-0.30+b*0.12, rock:rk*0.7, expr:(b>0.6? OH : HE), blush:0.4+b*0.3,
                 ankles:{near:L(wx,[wx-26, edge+6]), far:L(wx,[wx-23, edge+9])}, kneeBend:-1, floor:edge,
                 hands:{near:L(wx,[wx+12, edge-1]), far: vi===23? L(wx,[wx+4, edge-24]) : L(wx,[wx+11, edge-1.5])}};
     const HRd=MX(wx,()=>HER(Object.assign({dry:true},herF)));
@@ -25803,10 +25892,19 @@ function setWifeMood(id, ms){ try{ WIFE_MOOD={id, until:(typeof performance!=='u
 function wifeMood(){ try{ const now=(typeof performance!=='undefined'? performance.now() : Date.now()); return (WIFE_MOOD.id && now<WIFE_MOOD.until)? WIFE_MOOD.id : null; }catch(e){ return null; } }
 function wifeExpr(w){
   try{
+    /* 😋 YOU, if you are the woman of the house: when he rises in the hall, your face says what you think of it */
+    if(w && w.self && G && G.isFemale){ const D0=(typeof DM!=='undefined')? DM : null;
+      if(D0 && D0.rise && (D0.rise.stage|0)>=2) return wantFaceFor(hisSecretV());
+      return 'flat'; }
     if(!w || w!==(G&&G.wife)) return 'flat';
     const MD=wifeMood(); if(MD) return MD;
     const D=(typeof DM!=='undefined')? DM : null;
     if(D){
+      /* 😋 HIS GET HARD, from her side of the room: it is on her face, and how big he is decides which face */
+      if(D.ardor){ const X=D.ardor;
+        if(X.ph==='ready'||X.ph==='ask'||X.ph==='go') return wantFaceFor(hisSecretV());
+        if(X.ph==='wind' && (X.heat||0)>55) return 'hungry';
+        if(X.ph==='fizz') return 'laugh'; }
       const C=D.clam;
       if(C){
         if(C.stood && (C.blush||0)>0.5) return 'flush';
@@ -25914,10 +26012,23 @@ function drawWifeFace(P, hx, hy, skin, expr){
       P(hx, hy+3, 2, 1, MO); P(hx+2, hy+2, 1, 1, MO);
       P(hx-2, hy+1, 2, 2, mixHex(skin,'#e0708a',0.45));
       break;
-    case 'hungry':                         // two little round cheeks in the eye, and a bead at the mouth — chasing it
-      P(hx-1, hy-1, 1, 2, '#ffc6ae'); P(hx+1, hy-1, 1, 2, '#ffc6ae'); P(hx, hy, 1, 1, '#9a4a3e');
+    case 'hungry': case 'starving': {      // what SHE is chasing, in her eye — a length, and it bobs — and a bead at the mouth
+      const up=((performance.now()/220)|0)%2, W2=(typeof ADULT!=='undefined' && ADULT);
+      if(W2){ P(hx-1, hy+1-up, 1, 1, '#ffc6ae'); P(hx, hy-up, 1, 1, '#ffc6ae'); P(hx+1, hy-1-up, 1, 1, '#f09888'); }
+      else { P(hx-1, hy-1, 1, 1, '#ff3a72'); P(hx+1, hy-1, 1, 1, '#ff3a72'); P(hx-1, hy, 3, 1, '#ff3a72'); }
       P(hx-1, hy-3, 3, 1, BR);
-      P(hx, hy+3, 2, 1, '#4a1a1e'); P(hx+1, hy+4, 1, 2, '#c8ecff');
+      P(hx, hy+3, 2, 1, '#4a1a1e'); P(hx+1, hy+4, 1, expr==='starving'? 3 : 2, '#c8ecff');
+      if(expr==='starving'){ P(hx+2, hy+3, 1, 1, '#e0607a'); P(hx-3, hy-3, 1, 2, '#b8e4ff'); }
+      break; }
+    case 'hypnotized': {                   // a spiral where the eye was
+      const ph=((performance.now()/160)|0)%4;
+      P(hx-1, hy-1, 3, 3, '#f4eee6'); P(hx+[0,1,0,-1][ph], hy+[-1,0,1,0][ph], 1, 1, DK); P(hx, hy, 1, 1, DK);
+      P(hx, hy+3, 2, 1, MO);
+      break; }
+    case 'thirsty': case 'overwhelmed':    // tongue out a little, and damp with it
+      P(hx-1, hy, 2, 1, DK); if(expr==='overwhelmed') P(hx-1, hy-1, 2, 1, shade(BR,-10));
+      P(hx, hy+3, 2, 1, '#4a1a1e'); P(hx+1, hy+4, 1, 1, '#e0607a'); P(hx+2, hy+4, 1, 1, '#e0607a');
+      P(hx-3, hy-3, 1, 2, '#b8e4ff'); P(hx-2, hy+1, 2, 1, mixHex(skin,'#e0708a',0.45));
       break;
     case 'coin':                           // the dowry, in each eye
       P(hx-1, hy-1, 2, 2, '#e8c34a'); P(hx-1, hy-1, 1, 1, '#fff6c8');
@@ -26569,9 +26680,11 @@ function drawMateFig(bk, fr, M){
     { const dn=Math.max(0,-F.brow), up=Math.max(0,F.brow);
       if(F.sad) line([[ex-1.1,ey-1.4],[ex+1.3,ey-2.4]], hSh, 0.75);                                  // 🥺 the inner end goes UP
       else line([[ex-1.1,ey-1.7-up*0.35],[ex+1.3,ey-1.6-up*0.25+dn*0.65]], hSh, 0.75); }
-    if(F.eyes) drawEyeFx(oc, F.eyes, ex+0.6, ey, 1.5, M.t||0);                                        // 😋 what is in his eye
+    if(F.eyes){ const ek=resolveEyes(F.eyes, true);                                                  // 😋 what is in HIS eye: a booty
+      drawEyeFx(oc, ek, ex+0.6, ey, (ek==='booty'||ek.indexOf('spiral')===0)? 1.9 : 1.5, (M.t||0)*(F.fast? 1.8 : 1)); }
+    if(F.tongue) drawTongueFx(oc, HC[0]+4.0, HC[1]+2.4, 0.8, 0.3, M.t||0);
     if(F.tear) drawTearFx(oc, ex, ey+1.8, 0.8, M.t||0);
-    if(F.drool) drawDroolFx(oc, HC[0]+3.4, HC[1]+2.9, 0.7, M.t||0);
+    if(F.drool) drawDroolFx(oc, HC[0]+3.4, HC[1]+2.9, 0.7*(F.drool>1? 1.5 : 1), (M.t||0)*(F.drool>1? 1.6 : 1));
     if(F.sweat) drawSweatFx(oc, HC[0]-0.6, HC[1]-3.6, 0.9, M.t||0);
     { const my=HC[1]+2.2, mx=HC[0]+3.7, cy=my-(F.smile*0.9)+(Math.max(0,-F.brow)*0.2);
       if(F.open){ oc.fillStyle='#3a1416'; oc.fillRect(mx-0.2, my-0.4, 1.1, 1.3); }
@@ -27653,11 +27766,14 @@ function drawPair(c, o){
   if(o.he && HG){
     const E=o.he, J=out.join;
     const stroke=E.stroke===undefined? 3.2 : E.stroke;
-    let gapPx=(E.gap||0) + stroke*(1-clamp(E.drive||0,0,1));
+    let gapPx=(E.gap||0) + stroke*(1-clamp(E.drive||0,0,1)), seatLevel=null;
     if(E.reachSeat && out.seat){                                   // stand where, laid out level, it lands ON her seat
       const IN0=(typeof lengthInches==='function')? lengthInches(E.look||{}, 1) : {now:6};
       const lp=IN0.now*(E.pxi||1.0), back=out.seat[0]-(out.rs||6)+1;
-      gapPx=Math.max(3, J[0]+0.4+lp-back) + (E.gap||0); }
+      gapPx=Math.max(3, J[0]+0.4+lp-back) + (E.gap||0);
+      /* and a LONG one stands so far back he would straighten up and swing it over her head —
+         so past a foot of it, his hips stay level with her seat */
+      if(lp>12) seatLevel=out.seat[1]-1.4; }
     /* he only comes DOWN to her height once he is at her — standing back he
        stands at his own, which is a good deal taller than a bent-over wife */
     /* or put him exactly where he IS in the room (the player's x) — so a scene
@@ -27668,6 +27784,7 @@ function drawPair(c, o){
     const standY=FYb-2.2-(15.6+lg0*0.22+16.2+lg0*0.22)*0.975;
     const standK=(E.stand!==undefined)? clamp(E.stand,0,1) : clamp((((E.atX!==undefined)? gapPx : (E.gap||0))-2)/8,0,1);
     const hip=[J[0]-3.6-gapPx, (J[1]+0.4)+(standY-(J[1]+0.4))*standK];
+    if(seatLevel!==null) hip[1]=clamp(seatLevel, standY, J[1]+3);
     const tgt=(h)=> h==='hips'? [out.hip[0]-1.2, out.hip[1]-1.6]
                : h==='waist'? [out.waist[0]-0.5, out.waist[1]]
                : h==='hair'? [out.head[0]-3.2, out.head[1]-2.4]
@@ -32433,6 +32550,8 @@ function drawDrop(){
     ctx.restore();
     // the scroll he is so absorbed in
     if(away){ px(hx-4,FY-40,9,6,'#e6dcc2'); px(hx-4,FY-40,9,1,'#f6efdc'); px(hx-4,FY-40,1,6,'#b8a882'); }
+    if((X.ph==='caught'||X.ph==='taken') && ADULT){                   // 😋 he looked, and there is a booty in his eyes
+      const _bb=Math.round(((playerLook()||{}).body||{}).booty||6); drawMoodBubble(hx, FY-72, _bb>=11? 'hypnotized' : _bb>=9? 'starving' : 'hungry', true, T); }
     if(X.backT>0 && (T|0)%16<9){ ctx.textAlign='center';
       pixelText('🙄', hx, FY-58, '#9ad4ff', 1); ctx.textAlign='left'; }
     else if(X.lookT>0 && (T|0)%14<8){ ctx.textAlign='center';
@@ -35235,8 +35354,10 @@ function drawVillaLove(){
 function temptHimPose(X){
   const lose = X.ph==='resist'? clamp(1-X.hold/100,0,1) : 0;
   const P={ hands:'side', far:null, face:HARD_FACES.stoic, aro:0, u:0, lean:0.02, from:null, k:undefined };
-  if(X.ph==='bend'){ P.face = X.shook? HARD_FACES.lost : HARD_FACES.stoic; P.aro = X.shook? 0.18 : 0; }
-  else if(X.ph==='approach'){ P.face=HARD_FACES.lost; P.aro=0.20+0.25*clamp(X.t/150,0,1); }
+  /* 😋 and when she shakes it at him, HIS eyes have a booty in them — how bad depends on hers */
+  const _bb=Math.round((((G&&G.wife)||{}).body||{}).booty||6), _want=HARD_FACES[_bb>=11? 'hypnotized' : _bb>=9? 'starving' : 'hungry'];
+  if(X.ph==='bend'){ P.face = X.shook? _want : HARD_FACES.stoic; P.aro = X.shook? 0.18 : 0; }
+  else if(X.ph==='approach'){ P.face=_want; P.aro=0.20+0.25*clamp(X.t/150,0,1); }
   else if(X.ph==='resist'){
     P.face = lose>0.72? X.face : (lose>0.35? HARD_FACES.sheepish : HARD_FACES.stoic);
     P.aro  = 0.22 + lose*0.9;
@@ -35297,6 +35418,9 @@ function drawTempt(){
     pixelText(X.beatLine || (X.prop||TEMPT_PROPS[0]).line, W/2, 30,
       X.beat? 'rgba(255,190,214,.92)' : 'rgba(255,222,200,.85)', 1.02); ctx.textAlign='left'; }
   drawTemptFigures(X, FY, w);
+  /* 😋 HIS face has a booty in its eyes now — and a bubble over him saying how bad it is */
+  { const P0=temptHimPose(X), fid=P0&&P0.face&&P0.face.id;
+    if(WANT_FACES.indexOf(fid)>=0){ const hh=X.himHead||[D.x, FY-70]; drawMoodBubble(hh[0], hh[1]-12, fid, true, D.t); } }
   if(X.ph==='bend' && X.k>0.45 && !X.shook){ ctx.textAlign='center';
     pixelText('…', X.x, FY-46, 'rgba(255,214,190,.7)', 1); ctx.textAlign='left'; }
   if(X.ph==='bend'||X.ph==='approach'){ ctx.textAlign='center';
@@ -36309,7 +36433,17 @@ function drawDomus(){
          tiles, a rim down the side facing it, occlusion down the other. */
       else if(w.male) litHusband(ctx,D.wifeX,FY,G.wifeRel|0,w.skin,w.dress,w,wPh,wMode);
       else litWife(ctx,D.wifeX,FY,w,wPh,wMode,wifePregMonth());
+      /* 😋 A NEW FACE, AND IT SAYS SO. When her face turns into one of the new ones the bubble
+         comes up over her head for a few seconds; the WANT faces keep theirs while they last. */
+      if(!w.male && !D.tempt && !D.press && !D.curio && !D.clam && !D.rslap){
+        const id=wifeExpr(w);
+        if(!D.moodW || D.moodW.id!==id) D.moodW={id, since:D.t};
+        const fresh=(D.t-D.moodW.since)<220, want=WANT_FACES.indexOf(id)>=0;
+        if(NEW_FACES.indexOf(id)>=0 && (fresh || want)){ const hb=figHeadBox(w); drawMoodBubble(D.wifeX, FY+hb.y-6, id, false, D.t); }
+      }
     }
+    /* and YOU, if you are the woman of the house and he is rising: it is on your face too */
+    if(G.isFemale && D.rise && (D.rise.stage|0)>=2){ const id=wantFaceFor(hisSecretV()); drawMoodBubble(D.x, FY-80, id, false, D.t); }
     /* ---- THE NEXT GENERATION, underfoot and growing ----
        Not during the romantic one. You send them out, they take a couple of
        hundred ticks to actually clear the doorway, and nothing about this
@@ -50711,6 +50845,7 @@ function buildMarriageCard(b){
     const info=document.createElement('div'); info.innerHTML=
       `<div><b style="color:var(--gold)">⚭ ${w.name}</b> ${tierBadge(w.tier, w.male)} <span class="small muted">— your ${w.adj} ${w.rank} ${w.male?'husband':'wife'}${w.age!==undefined?', '+w.age:''}</span></div>
        ${(()=>{const st=lookStage(w.looks===undefined?5:w.looks); return `<div class="small"><b style="color:${st.col}">${st.name}</b> <span class="muted">— ${st.blurb}</span></div>`;})()}
+       ${(()=>{ const id=wifeExpr(w), F=CHART_FACES[id]; return F? `<div class="small" style="color:#ffb0d8">Right now: ${F.icon} <b>${F.name}</b> <span class="muted">— <i>${F.caption.toLowerCase()}</i></span></div>` : ''; })()}
        <div class="small">♥ Emotional: ${mkbar(v.e,eC)} <b style="color:${eC}">${v.e}</b>/100 <span class="muted">${v.ew}</span></div>
        <div class="small">${ADULT?'🔥 Physical':'🔥 Devotion'}: ${mkbar(v.p,pC)} <b style="color:${pC}">${v.p}</b>/100 <span class="muted">${v.pw}</span></div>
        <div style="margin-top:4px">${traitsDetailHtml(w)}</div>
@@ -58022,7 +58157,8 @@ window.__SS = {
   VILLAGE_NAMES_F, VILLAGE_HOUSE, villageNameF, villageHouseName, villageStreet, villageRank, villageNameReaction, openVillageTalk, fmtLen,
   drawHusbandFigSmiling:(c2,w2,face)=>{ HUSB_SMILE=1; HUSB_FACE=face? HARD_FACES[face] : null; try{ drawHusbandFig(c2,0,0,70,null,null,w2,0,'idle'); } finally{ HUSB_SMILE=0; HUSB_FACE=null; } },
   HARD_FACES, HARD_FACE_ORDER, hardFace, hardFaceWeights, FACE_EX, CHART_FACES, CHART_FACE_ORDER, chartFace, faceAsHard, drawEyeFx, drawFaceCaption, drawDiagFaceFx,
-  get CHART_FACE(){return CHART_FACE;}, set CHART_FACE(v){ CHART_FACE=v; }, setWifeMood, wifeMood, get HARD_ROLL(){return HARD_ROLL;}, set HARD_ROLL(v){ HARD_ROLL=v; },
+  get CHART_FACE(){return CHART_FACE;}, set CHART_FACE(v){ CHART_FACE=v; }, setWifeMood, wifeMood,
+  wantEyes, resolveEyes, drawTongueFx, NEW_FACES, WANT_FACES, wantFaceFor, hisSecretV, drawMoodBubble, bedBigV, bedBigSlow, get HARD_ROLL(){return HARD_ROLL;}, set HARD_ROLL(v){ HARD_ROLL=v; },
   get HARD_FACE_FORCE(){return HARD_FACE_FORCE;}, set HARD_FACE_FORCE(v){ HARD_FACE_FORCE=v; },
   ARCHETYPES, ARCH_ORDER, BODY_PARTS, BODY_PARTS_M, IMPOSSIBLE_V,
   IMPOSSIBLE_CHANCE, SECRET_SELLERS, drawShadowPlayTest:drawShadowPlay, drawWifeFig, drawDomusPlayer,

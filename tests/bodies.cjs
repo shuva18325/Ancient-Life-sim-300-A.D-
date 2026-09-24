@@ -14,6 +14,7 @@
 const {chromium}=require('playwright');
 const FILE=process.env.FILE || ('file://'+require('path').resolve(__dirname,'..','index.html'));
 let pass=0, fail=0;
+const S_WANT=(id)=>['hungry','starving','hypnotized'].indexOf(id)>=0;
 const ok=(name,cond,note)=>{ if(cond){pass++; console.log('  PASS  '+name+(note?'   '+note:''));}
                              else {fail++; console.log('  FAIL  '+name+(note?'   '+note:''));} };
 (async()=>{
@@ -129,6 +130,50 @@ const ok=(name,cond,note)=>{ if(cond){pass++; console.log('  PASS  '+name+(note?
   ok('a slap that stings leaves her HURT, and a mood she is in shows on her body', !R.err && R.sting==='hurt' && R.mood==='hurt', R.err||JSON.stringify([R.sting,R.mood]));
   ok('on the new body they are different faces (a tear; the reflection and the drool)', !R.err && R.hurt>4 && R.hungry>4, R.err||JSON.stringify([R.hurt,R.hungry]));
   ok('the body map picks HUNGRY for either of them, and prints “CHASING IT” over the figure', !R.err && R.btn && R.caption>200 && R.cap==='CHASING IT', R.err||JSON.stringify([R.btn,R.caption]));
+
+  console.log('\n=== 🤤 HUNGRY FOR BOTH, AND WHAT EACH OF THEM IS CHASING ===');
+  R=await T((src)=>{ const S=window.__SS; const G=eval(src)('rome'); const out={};
+    out.her=S.resolveEyes('want', false); out.him=S.resolveEyes('want', true); out.spiral=S.resolveEyes('spiral', false);
+    out.faces=['starving','hypnotized','thirsty','overwhelmed'].every(k=>!!S.FACE_EX[k] && !!S.CHART_FACES[k] && !!S.HARD_FACES[k]);
+    // her eye with a length in it is a different picture from her eye with a heart
+    const cv=document.createElement('canvas'); cv.width=40; cv.height=40; const c=cv.getContext('2d');
+    const shot=(k)=>{ c.clearRect(0,0,40,40); S.drawEyeFx(c,k,20,20,12,0); return c.getImageData(0,0,40,40).data; };
+    const dif=(A,B)=>{ let n=0; for(let i=0;i<A.length;i+=4) if(Math.abs(A[i+3]-B[i+3])>60) n++; return n; };
+    const L0=shot('length'), H0=shot('heart'); out.lenVsHeart=dif(L0,H0);
+    c.clearRect(0,0,40,40); S.drawEyeFx(c,'length',20,20,12,12); out.bounce=dif(L0, c.getImageData(0,0,40,40).data);
+    // watching her bend: HIS face wants her booty
+    out.tempt=S.temptHimPose({ph:'bend', shook:true, t:10, hold:100}).face.id;
+    // his GET HARD, from her side of the room: bigger is worse
+    G.body=G.body||{}; G.body.secret=11; S.openDomus(); S.DM.ardor={ph:'ready', t:0, heat:100};
+    out.ardorBig=S.wifeExpr(G.wife); G.body.secret=6; out.ardorMid=S.wifeExpr(G.wife); S.DM.ardor=null;
+    return out; }, src);
+  ok('hungry is for both: in her eyes a length, in his a booty (a heart with mature content off)', !R.err && R.her==='length' && R.him==='booty' && R.spiral==='spiral-length', R.err||JSON.stringify([R.her,R.him,R.spiral]));
+  ok('and the length bounces — it is a different picture from a heart, and from itself a moment later', !R.err && R.lenVsHeart>20 && R.bounce>5, R.err||JSON.stringify([R.lenVsHeart,R.bounce]));
+  ok('STARVING, HYPNOTIZED, THIRSTY and OVERWHELMED join it, for her, for him and on the chart', !R.err && R.faces, R.err||'');
+  ok('he gets the hungry face watching her bend; she gets it when he GETS HARD — and an Impossible man hypnotizes her', !R.err && S_WANT(R.tempt) && R.ardorBig==='hypnotized' && R.ardorMid==='hungry', R.err||JSON.stringify([R.tempt,R.ardorBig,R.ardorMid]));
+
+  console.log('\n=== 📏 IMMENSE AND IMPOSSIBLE, TOO BIG ON PURPOSE ===');
+  R=await T((src)=>{ const S=window.__SS; const G=eval(src)('rome'); const L=(v)=>S.lengthInches({name:'x', body:{secret:v, secretFrac:0.5}},1).hard;
+    const out={avg:L(6), long:L(8), imm:L(10), imp:L(11)};
+    G.body=G.body||{}; G.body.secret=11; S.setWH('done'); S.startBedScene('fun','long','bed'); out.bigV=S.BC.bigV; out.slow=S.BC.bigSlow;
+    S.setBCT(1100); S.BC.stage=S.bedStage(S.BC); S.BC.tT=1100; S.drawBed(); out.he=S.BC.nf&&S.BC.nf.he;
+    G.body.secret=6; S.setWH('done'); S.startBedScene('fun','long','bed'); out.midSlow=S.BC.bigSlow;
+    return out; }, src);
+  ok('an Immense man is 14–21in and an Impossible one 26–34in on a 70in frame; the middle of the ladder is untouched', !R.err && R.imm>=14 && R.imp>=26 && R.avg<7.3 && R.long<10.1, R.err||JSON.stringify(R));
+  ok('when she takes a big one it goes slower, and her tongue is out a little', !R.err && R.bigV===11 && R.slow<1 && R.midSlow===1 && R.he==='overwhelmed', R.err||JSON.stringify(R));
+
+  console.log('\n=== 😋 THE FACES COME UP IN THE VILLA ON THEIR OWN ===');
+  R=await T((src)=>{ const S=window.__SS; const G=eval(src)('rome'); G.wifeRel=82; G.wifePhys=96; G.jealousy=0; S.setWifeMood(null,1);
+    S.openVilla(); const card=[...document.querySelectorAll('#villa-body .small')].map(e=>e.textContent).find(t=>/Right now:/.test(t))||'';
+    S.openDomus(); S.DM.wifeX=300; S.DM.x=200; S.drawDomus(); const mood=S.DM.moodW&&S.DM.moodW.id;
+    return {expr:S.wifeExpr(G.wife), card, mood}; }, src);
+  ok('a wife who is running hot is HUNGRY in the hall, with a bubble saying so', !R.err && R.expr==='hungry' && R.mood==='hungry', R.err||JSON.stringify(R));
+  ok('and the villa card says what her face is doing right now', !R.err && /HUNGRY/.test(R.card), R.err||R.card);
+
+  console.log('\n=== 🔞 AND WITH MATURE CONTENT OFF ===');
+  await pg.evaluate(()=>localStorage.setItem('SANDSTEEL_ADULT','0')); await pg.reload(); await pg.waitForTimeout(400);
+  R=await T(()=>{ const S=window.__SS; return {her:S.resolveEyes('want',false), him:S.resolveEyes('want',true), spiral:S.resolveEyes('spiral',true)}; });
+  ok('hungry is a heart for both of them, and nothing else is reflected', !R.err && R.her==='heart' && R.him==='heart' && R.spiral==='spiral-heart', R.err||JSON.stringify(R));
 
   console.log('\n--- PAGE ERRORS ---');
   ok('none', errs.length===0, errs.slice(0,3).join(' | '));
