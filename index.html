@@ -137,6 +137,12 @@
     #bodymap-views .btn.sm, #bodymap-subviews .btn.sm{ font-size:9px; padding:3px 5px; min-width:0 !important; }
     #scr-herbs .panel, #scr-tree .panel, #scr-prov .panel{ width:98% !important; }
   }
+  /* A PHONE HELD UPRIGHT gets a 16:9 stage about two hundred pixels tall, which the title and the
+     oath row fill on their own — so there the whole creation panel scrolls, oath button and all. */
+  @media (orientation:portrait){
+    #scr-create > .panel{ overflow:auto; }
+    #create-body{ flex:0 0 auto !important; overflow:visible !important; }
+  }
   .shopcard{border:2px solid #000;border-radius:4px;background:linear-gradient(#251a10,#170f08);
     padding:9px;display:flex;flex-direction:column;gap:4px;
     box-shadow:inset 0 0 0 1px rgba(232,195,74,.14), 0 2px 6px rgba(0,0,0,.45);}
@@ -223,7 +229,12 @@
       <div class="row" style="align-items:center;gap:10px;flex-wrap:wrap;">
         <h2 style="color:var(--gold)">CHOOSE YOUR CHAMPION</h2>
         <span class="small muted">— pick a fighter card, then take the oath</span>
+        <button class="btn sm" id="btn-jump-cards" style="margin-left:auto" title="Scroll down to the champion cards">▼ THE CARDS</button>
       </div>
+      <!-- EVERYTHING BETWEEN THE TITLE AND THE OATH SCROLLS AS ONE. The cards were the only
+           scroller, squeezed under the rows above them, so on the eastern sheet, in Japan and on the
+           Rkrai shore (long notes, two rows of rungs) the list came out four pixels tall. -->
+      <div id="create-body" class="scrollbox col gap" style="flex:1 1 auto;min-height:0;overflow:auto;padding-right:3px;">
       <div class="row gap6" style="align-items:center;flex-wrap:wrap;">
         <span class="small">Name:</span>
         <input id="inp-name" maxlength="14" value="" style="background:#000;color:var(--bone);
@@ -246,10 +257,12 @@
         <span id="class-note" class="small muted"></span>
       </div>
       <!-- ===== THE ROLL: your own blood, your own body, your own luck ===== -->
-      <div id="roll-panel" class="panel" style="padding:7px;border-color:#8a6f35;"></div>
-      <div id="card-list" class="scrollbox" style="display:grid;gap:10px;
-        grid-template-columns:repeat(auto-fill,minmax(176px,1fr));overflow:auto;padding:2px;"></div>
-      <div class="row gap" style="justify-content:space-between;align-items:center;">
+      <div id="roll-panel" class="panel" style="padding:7px;border-color:#8a6f35;flex:0 0 auto;"></div>
+      <div id="card-count" class="small" style="flex:0 0 auto;color:var(--gold);letter-spacing:1px;"></div>
+      <div id="card-list" style="display:grid;gap:10px;flex:0 0 auto;
+        grid-template-columns:repeat(auto-fill,minmax(176px,1fr));padding:2px;"></div>
+      </div>
+      <div class="row gap" style="justify-content:space-between;align-items:center;flex:0 0 auto;">
         <span id="create-hint" class="small muted">Select a champion card to begin.</span>
         <div class="row gap">
           <button class="btn" id="btn-create-back">BACK</button>
@@ -11953,7 +11966,7 @@ function openBodyMap(w,back){
      is printed under it: the figure, the reasons, and how the days average
      out. It is his own page — a wife's chart does not carry it. ---- */
   { const sr3=$('bodymap-secret');
-    if(w.self && !G.isFemale && ADULT && w.male){
+    if(w.self && G && !G.isFemale && ADULT && w.male){
       const log=arouseLog(), why=arouseByWhy(7), st=arouseStanding(), per=arousePerDay();
       const d=document.createElement('div'); d.className='shopcard';
       d.style.borderColor = st.col;
@@ -11985,7 +11998,7 @@ function openBodyMap(w,back){
      map is where you are already looking at the part in question, and it means
      the button is reachable without walking anywhere. */
   { const sr2=$('bodymap-secret');
-    if(!w.self && G.married && G.wife && ADULT){
+    if(!w.self && G && G.married && G.wife && ADULT){
       const cd=(G.slapDay===G.day && (G.slapCount||0)>=slapCap());
       const d=document.createElement('div'); d.className='shopcard'; d.style.borderColor=cd?'#6a5a4a':'#e0a0b8';
       const bt=document.createElement('button'); bt.className='btn sm'; bt.disabled=cd;
@@ -12239,11 +12252,31 @@ function openBodyMap(w,back){
   if(bodyMapWalk || bodyMap3D) startBodyMapAnim(); else stopBodyMapAnim();
 }
 // preview the roll you just made, before you have a career at all
+/* =====================================================================
+   AND IT HAS TO WORK WITH NO LIFE BEHIND IT
+   ---------------------------------------------------------------------
+   "When in character selection the body map doesn't work." It did not: the
+   chart asked the career a question (is this a woman? how is the marriage?)
+   on a fresh page, where there is no career yet, fell over on the first one,
+   and left half a screen with no figure and no buttons. And with an old
+   career still in memory it was worse in a quieter way — the new roll was
+   charted beside the OLD life's risings, stage and spouse.
+   So the preview runs with no career at all. The old one is put aside on
+   the way in and handed back on the way out; nothing is saved meanwhile.
+   ===================================================================== */
+let BM_STASH;                                    // the career put aside while a roll is previewed
 function createPreviewMap(){
   const R=sel.roll||rollCreation();
   const subj={name:($('inp-name').value||'You'), male:R.male, self:true, body:R.body,
-    looks:R.looks, smarts:R.smarts, traits:R.traits, flaws:R.flaws, adj:'', rank:'', tier:'common'};
+    looks:R.looks, smarts:R.smarts, traits:R.traits, flaws:R.flaws, adj:'', rank:'', tier:'common',
+    preview:true, eth: (sel.arch && ARCH_CULTURE[sel.arch]) || (sel.world==='wa'? 'wa' : sel.world==='east'? 'han' : sel.world==='rk'? 'rkrai' : 'roman')};
+  if(BM_STASH===undefined){ BM_STASH=G; G=null; }
   openBodyMap(subj,'create');
+}
+function bmEndPreview(){
+  if(BM_STASH===undefined) return;
+  if(!G) G=BM_STASH;
+  BM_STASH=undefined;
 }
 // the mirror in your own house — always available, married or not
 function openMirror(){ openBodyMap(selfSubject(),'map'); }
@@ -13227,6 +13260,11 @@ function slotInfo(n){
 }
 let G = null;  // player career
 function freshCareer(name,origin,arch,social){
+  const g=freshCareerBase(name,origin,arch,social);
+  applyStartKit(g, startKitFor(ARCHETYPES[arch]? arch : 'Roman', social||'gladiator'));
+  return g;
+}
+function freshCareerBase(name,origin,arch,social){
   /* THE SILENT DEFAULT. An unknown archetype key came back as a Roman
      legionary in the western world, which is how a chosen samurai ended up
      in the Colosseum. It still has to return something, but it says so. */
@@ -13573,7 +13611,7 @@ function refreshStatbar(){
     const wr=$('s-coin-wrap'); if(wr) wr.title=CU.note+'  —  '+CU.src; }
   $('s-honor').textContent=G.honor;
   $('s-food').textContent=G.food;
-  $('s-mount').textContent=MOUNTS[G.mount].short;
+  $('s-mount').textContent=mountOf(G.mount).short;
   $('s-lvl').textContent=G.level;
   { const ag=$('s-age'); if(ag){ ag.textContent=(G.age||19); ag.style.color=(G.age||19)>=50?'#d0a0e0':(G.age||19)>=40?'#e8c34a':''; } }
   $('s-rec').textContent=G.wins+'–'+G.losses;
@@ -13584,6 +13622,99 @@ function refreshStatbar(){
 }
 const MOUNTS=[{name:'On foot',short:'—',cost:0,range:1},{name:'Mule',short:'Mule',cost:120,range:2},
   {name:'Horse',short:'Horse',cost:300,range:3},{name:'Chariot',short:'Chariot',cost:700,range:4}];
+/* ---- AND THE STABLE SPEAKS THE LOCAL LANGUAGE. It sold a CHARIOT in Sengoku Japan and a HORSE on
+   an Arctic coast. Same four steps of range and the same prices; what stands in the stall is
+   whatever that country actually travelled on. ---- */
+const MOUNT_WORDS={
+  west:[null,['Mule','Mule','🐴'],['Horse','Horse','🐎'],['Chariot','Chariot','🏇']],
+  east:[null,['Pack mule','Mule','🐴'],['Steppe horse','Horse','🐎'],['War chariot','Chariot','🏇']],
+  wa:  [null,['Pack horse','Packhorse','🐴'],['War horse','Horse','🐎'],['A string of remounts','Remounts','🏇']],
+  rk:  [null,['Pack dogs','Dogs','🐕'],['Dog sled','Sled','🛷'],['Caribou sled','Caribou','🦌']],
+};
+function mountOf(i, world){
+  const M=MOUNTS[i]||MOUNTS[0];
+  const w=world || ((typeof playerWorld==='function')? playerWorld() : 'west');
+  const t=(MOUNT_WORDS[w]||MOUNT_WORDS.west)[i];
+  return t? Object.assign({}, M, {name:t[0], short:t[1], icon:t[2]}) : Object.assign({}, M, {icon:'🚶'});
+}
+const BOAT_WORD={west:'a sailing ship', east:'a river junk', wa:'a coasting boat', rk:'a skin boat'};
+/* =====================================================================
+   WHAT YOU START WITH IS WHAT THE CARD SAYS YOU START WITH
+   ---------------------------------------------------------------------
+   "They advertise gear and stuff but they don't give it." They did not.
+   The SAMURAI card promised "a horse under him" and he woke up on foot. The
+   GUNNER was "a matchlock man of the Saika bands" with no matchlock. The
+   IKKI man packed his own clay bomb and never got to throw it; the RŌNIN
+   "kept the pair of swords" and was handed one; the Kushan and Parthian
+   cataphracts — the word MEANS armoured cavalry — had no horse; the
+   Water-hand went "out beyond the ice in a skin boat" without a boat.
+   And a rung that said "a hundred riders answer your horn" had nobody.
+   So there is ONE place a starting kit is written down. The card draws
+   from it and the oath grants from it, so the two cannot drift again.
+   ===================================================================== */
+const ARCH_START_EXTRA={
+  /* Rome */
+  Persian:    {mount:2},                                   // a cataphract is a man on a horse, by definition
+  Tribunus:   {mount:2},                                   // a tribune rode; a commission came with the horse
+  Retiarius:  {spare:{weapon:['pugio']}},                  // trident, net — and the dagger the armatura names
+  /* the east */
+  SteppeRider:{mount:2},                                   // a horse-ARCHER
+  Cataphract: {mount:2},                                   // "man and horse in scale to the fetlock"
+  /* Wa */
+  WaIkki:     {bow:'horoku', spare:{weapon:['kama']}},     // "a sickle off the wall, and a clay pot you packed yourself"
+  WaRonin:    {spare:{weapon:['wakizashi']}},              // "all you kept was the PAIR of swords"
+  WaSamurai:  {mount:2, spare:{weapon:['wakizashi']}},     // "the daishō through the sash and a horse under him"
+  WaTeppo:    {bow:'tanegashima'},                         // "a matchlock man of the Saika bands"
+  WaTaisho:   {bow:'tanegashima', mount:2},                // "you own the powder" — and a general rides
+  /* the Rkrai shore */
+  RkAqalik:   {boat:true},                                 // "out beyond the ice in a skin boat"
+  RkTaqrun:   {boat:true},                                 // "the far launchings" — distance is the office
+};
+/* and a rung whose note PROMISES something hands it over */
+const RUNG_START_EXTRA={
+  'steppe.hundredhorse': {mount:2},
+  'steppe.hundredriders':{mount:2, men:100,  word:'riders who answer your horn'},
+  'steppe.thousand':     {mount:2, men:1000, word:'riders of your section'},
+  'steppe.royal':        {mount:2},
+  'wa.samurai':          {men:20,   word:'men owed to your lord, written down'},
+  'wa.kokujin':          {men:300,  word:'retainers of your own'},
+  'wa.daimyo':           {mount:2, men:3000, word:'spears'},
+};
+function startLadderOf(key){ const A=ARCHETYPES[key]||{};
+  return A.rk? 'rkrai' : A.wa? 'wa' : A.east? (ARCH_CULTURE[key]||'han') : 'roman'; }
+function startKitFor(key, social){
+  const A=ARCHETYPES[key]||ARCHETYPES.Roman;
+  const lo=Object.assign({}, (CLASSES[A.cls]&&CLASSES[A.cls].start)||{}, A.loadout||{});
+  const X=ARCH_START_EXTRA[key]||{}, R=RUNG_START_EXTRA[startLadderOf(key)+'.'+(social||'')]||{};
+  const spare={};
+  for(const sl in (X.spare||{})) spare[sl]=(X.spare[sl]||[]).filter(id=>id!==lo[sl] && GEAR[sl] && GEAR[sl].some(g=>g.id===id));
+  return { loadout:lo, spare, pila:A.pila||0,
+    bow:(X.bow && bowOf(X.bow))? X.bow : null,
+    mount:Math.max(X.mount||0, R.mount||0), boat:!!(X.boat||R.boat),
+    men:R.men||0, menWord:R.word||'' };
+}
+/* the same kit, as the lines a card prints under the weapon and the armour */
+function startKitExtrasHTML(K, world){
+  const out=[];
+  if(K.mount){ const M=mountOf(K.mount, world); out.push(M.icon+' '+M.name); }
+  if(K.bow){ const b=bowOf(K.bow); out.push((b.bomb? '💣 ' : b.gun? '🔫 ' : '🏹 ')+b.name); }
+  if(K.pila) out.push('➶ '+K.pila+' javelins');
+  for(const sl in K.spare) K.spare[sl].forEach(id=>{ const g=gearOf(sl,id); if(g) out.push('+ '+g.name); });
+  if(K.boat) out.push('⛵ '+(BOAT_WORD[world]||BOAT_WORD.west));
+  return out;
+}
+/* and put it in his hands */
+function applyStartKit(g, K){
+  if(!g||!K) return g;
+  g.owned=g.owned||{};
+  for(const sl in K.spare){ g.owned[sl]=g.owned[sl]||[];
+    K.spare[sl].forEach(id=>{ if(g.owned[sl].indexOf(id)<0) g.owned[sl].push(id); }); }
+  if(K.bow){ g.bow=K.bow; g.bowsOwned=(g.bowsOwned||[]).filter(b=>b!==K.bow).concat([K.bow]); }
+  if(K.mount>(g.mount||0)) g.mount=K.mount;
+  if(K.boat) g.boat=true;
+  if(K.men){ g.soldiers=(g.soldiers||0)+K.men; g.army=g.army||{}; g.army.levy=(g.army.levy||0)+K.men; }
+  return g;
+}
 let toastT=0;
 function toast(msg,ms=1400){ const t=$('hud-toast'); t.textContent=msg; t.style.display='block'; toastT=performance.now()+ms; }
 
@@ -38968,6 +39099,8 @@ function drawBridePortrait(cnv,b,bare,preg){
 }
 function openCreate(){
   show('scr-create');
+  /* the list is rebuilt on every click; where you were looking is not */
+  const _cb=$('create-body'), _keep=_cb? _cb.scrollTop : 0;
   /* AND THE NAME OFFERED FITS THE WORLD. This handed a Sengoku farmer the
      name BRENNUS, which is a Gaulish chieftain, and a Han crossbowman the
      name Lucius. The pool follows the card you have picked. */
@@ -39049,8 +39182,19 @@ function openCreate(){
   { const SET=socialSetForSel();
     const order = SET? SET.order : SOCIAL_ORDER;
     const get = k => SET? SET.ranks[k] : SOCIAL[k];
-    // a world switch leaves the old world's rung selected — snap to a real one
-    if(!get(sel.social)) sel.social=order[0];
+    /* THE EASTERN SHEET HAS FIVE LADDERS ON ONE PAGE — the Han, the hordes, the Kushan, the
+       Tamil — and the ladder follows the card. Picking the Xianbei horse-archer switched to the
+       HORDES' ladder, found no Han rung on it, and snapped to the BOTTOM rung, where the card is
+       locked; so it was deselected the moment it was picked and the horse-archer, the Tamil
+       champion and the Kushan cataphract could never be chosen at all. A new ladder on the SAME
+       sheet now keeps the height you were standing at. A new world still starts at the foot. */
+    if(!get(sel.social)){
+      const prev=sel._ladder, pOrd=prev&&prev.order, pi=pOrd? pOrd.indexOf(sel.social) : -1;
+      if(pi>=0 && sel._ladderWorld===sel.world && pOrd.length>1)
+        sel.social=order[Math.round(pi/(pOrd.length-1)*(order.length-1))];
+      else sel.social=order[0];
+    }
+    sel._ladder={order:order.slice()}; sel._ladderWorld=sel.world;
     order.forEach(k=>{ const S=get(k); if(!S) return;
       const bt=document.createElement('button');
       bt.className='btn sm'+(sel.social===k?' gold':'');
@@ -39061,6 +39205,11 @@ function openCreate(){
     const nt=$('class-note');
     const cur=get(sel.social)||SOCIAL.gladiator;
     nt.textContent=cur.note;
+    { const RX=RUNG_START_EXTRA[(SET? Object.keys(SOCIAL_EAST).find(k=>SOCIAL_EAST[k]===SET) : 'roman')+'.'+sel.social];
+      if(RX && (RX.men||RX.mount)){ const b=document.createElement('b'); b.style.color='#bfe0a8';
+        b.textContent='  \u2192 comes with '+[RX.mount? mountOf(RX.mount, sel.world).name.toLowerCase() : '',
+          RX.men? RX.men.toLocaleString('en-US')+' '+RX.word : ''].filter(Boolean).join(' and ')+'.';
+        nt.appendChild(b); } }
     // and name the ladder itself, because "rank" means something different here
     const lbl=$('class-ladder');
     if(lbl) lbl.textContent = SET? ('— '+(/^THE /.test(SET.name)?'':'the ')+SET.name
@@ -39124,6 +39273,14 @@ function openCreate(){
   }
   // cards
   const cl=$('card-list'); cl.innerHTML='';
+  { const _S0=socialSetForSel(), _o0=_S0? _S0.order : SOCIAL_ORDER, _a0=Math.max(0,_o0.indexOf(sel.social));
+    const _r0=Math.round(_a0/Math.max(1,_o0.length-1)*4), _all=WORLDS[sel.world].archs;
+    const _open=_all.filter(k=>archRank(k)<=_r0).length, cc=$('card-count');
+    if(cc) cc.textContent='\u25bc '+_all.length+' CHAMPIONS ON THIS SHEET \u00b7 '+_open+' OPEN TO YOUR BIRTH'
+      +(_open<_all.length? ' \u2014 \ud83d\udd12 the other '+(_all.length-_open)+' need a higher rank' : '');
+    const jb=$('btn-jump-cards');
+    if(jb){ jb.textContent='\u25bc THE CARDS ('+_all.length+')';
+      jb.onclick=()=>{ const t=$('card-count'); if(t&&t.scrollIntoView) t.scrollIntoView({block:'start', behavior:'smooth'}); }; } }
   /* WHERE THE PLAYER IS STANDING ON THE LADDER, as an index 0..4, whichever
      ladder this world happens to climb. */
   const _SET=socialSetForSel();
@@ -39170,7 +39327,7 @@ function openCreate(){
     /* ---- WHAT YOU ARE ACTUALLY HOLDING. The card named a trade and never
        once said what was in the man's hands, so the difference between two
        cards was a paragraph of prose and a stat bar. ---- */
-    { const kit=A.loadout;
+    { const SK=startKitFor(key, sel.social), kit=SK.loadout;
       const line=(sl)=>{ const g=gearOf(sl,kit[sl]); return g? g.name : '—'; };
       const kb=document.createElement('div');
       kb.className='small'; kb.style.cssText='margin-top:4px;text-align:left;font-size:8.5px;line-height:1.45;'
@@ -39183,6 +39340,8 @@ function openCreate(){
         +(W? ' <span class="muted">('+W.reach+'\u2011reach \u00b7 '+W.dmg.toFixed(1)+'dmg \u00b7 '+W.spd.toFixed(2)+'spd)</span>':'')+'</div>'
         +'<div class="muted">\u26e8 '+line('armor')+' \u00b7 '+line('helmet')
         +(kit.shield!=='none'? ' \u00b7 '+line('shield') : '')+'</div>'
+        +(()=>{ const ex=startKitExtrasHTML(SK, sel.world); return ex.length?
+            '<div style="color:#bfe0a8;margin-top:1px">'+ex.join(' \u00b7 ')+'</div>' : ''; })()
         +(_armed? '' : '<div style="color:#c8a0e0;margin-top:2px">\u2640 '+womanArmsNote(A, sel.social)+'</div>');
       body.appendChild(kb); }
     if(shut){
@@ -39221,6 +39380,7 @@ function openCreate(){
       : (A2? 'That life is out of reach from this birth \u2014 choose another card, or a higher rank.'
            : 'Select a champion card to begin.');
     if(!ok && sel.arch && A2 && worldOfArch(sel.arch)!==sel.world) sel.arch=null; }
+  if(_cb) _cb.scrollTop=_keep;
 }
 $('btn-create-back').onclick=()=>show('scr-title');
 $('btn-create-go').onclick=()=>{
@@ -43981,7 +44141,7 @@ function travelTo(r){
   if((r.sea||cur.sea) && !G.boat){
     toast('That crossing is over open sea — buy a boat at the Stable & Harbour first.',2400); return false; }
   if(!r.sea && !cur.sea && MOUNTS[G.mount].range < t.needRange){
-    toast('Too far on '+MOUNTS[G.mount].short.toLowerCase()+'. A stronger mount is needed — visit the Stable.',2200); return false; }
+    toast('Too far on '+mountOf(G.mount).short.toLowerCase()+'. A stronger mount is needed — visit the Stable.',2200); return false; }
   if(G.food < t.rations){
     toast('Need '+t.rations+' rations to travel there (you have '+G.food+'). Stock the Larder.',2200); return false; }
   G.food-=t.rations; G.current=r.id;
@@ -44082,11 +44242,11 @@ function openTravel(r,imperial){
      <div class="row center gap6" style="flex-wrap:wrap;margin-top:4px">
        <span class="pill">🗓 ${t.days} days${seaCross?' by sea':''}</span>
        <span class="pill">🍖 ${t.rations} rations</span>
-       <span class="pill">🐎 ${MOUNTS[G.mount].name}${seaCross?' + ship':''}</span>
+       <span class="pill">${mountOf(G.mount).icon} ${mountOf(G.mount).name}${seaCross?' + ship':''}</span>
      </div>
      <div class="small muted">Bigger journeys cost more time &amp; rations. A dashed line on the map traces your road.</div>`+
     (noBoat?`<div class="small" style="color:var(--blood)">✕ Open-sea crossing — you need a ship (buy one at the Stable).</div>`:'')+
-    (needMount?`<div class="small" style="color:var(--blood)">✕ Too far on ${MOUNTS[G.mount].short.toLowerCase()} — a stronger mount is needed.</div>`:'')+
+    (needMount?`<div class="small" style="color:var(--blood)">✕ Too far on ${mountOf(G.mount).short.toLowerCase()} — a stronger mount is needed.</div>`:'')+
     (noFood?`<div class="small" style="color:var(--blood)">✕ Not enough rations (need ${t.rations}, have ${G.food}).</div>`:'');
   $('btn-travel-go').disabled = noBoat||needMount||noFood;
 }
@@ -44128,11 +44288,11 @@ function openStable(){
   });
   lard.appendChild(lr); b.appendChild(lard);
   // mounts
-  MOUNTS.forEach((m,i)=>{
+  MOUNTS.forEach((m0,i)=>{
     if(i===0) return;
-    const owned=G.mount>=i;
+    const m=mountOf(i), owned=G.mount>=i;
     const card=document.createElement('div'); card.className='shopcard'+(G.mount===i?' eq':'');
-    card.innerHTML=`<div><b style="color:var(--gold)">🐎 ${m.name}</b> <span class="small muted">— reaches ${['','near','mid','far','farthest'][m.range]} provinces</span></div>`;
+    card.innerHTML=`<div><b style="color:var(--gold)">${m.icon} ${m.name}</b> <span class="small muted">— reaches ${['','near','mid','far','farthest'][m.range]} provinces</span></div>`;
     const row=document.createElement('div'); row.className='row gap6';
     if(G.mount===i){ const e=document.createElement('span'); e.className='pill'; e.textContent='SADDLED'; row.appendChild(e); }
     else if(owned){ const e=document.createElement('span'); e.className='pill'; e.textContent='OWNED'; row.appendChild(e); }
@@ -44142,7 +44302,8 @@ function openStable(){
   });
   // boat (harbour) — needed for overseas islands (Britannia, Sicilia, Creta, Cyprus, Bosporus)
   const boat=document.createElement('div'); boat.className='shopcard'+(G.boat?' eq':'');
-  boat.innerHTML=`<div><b style="color:var(--gold)">⛵ Sailing Ship</b> <span class="small muted">— cross open sea to islands (Creta, Cyprus, Sicilia, Britannia…)</span></div>`;
+  { const bw=playerWorld(), bn=(BOAT_WORD[bw]||BOAT_WORD.west);
+    boat.innerHTML=`<div><b style="color:var(--gold)">⛵ ${bn.charAt(0).toUpperCase()+bn.slice(1)}</b> <span class="small muted">— ${bw==='west'? 'cross open sea to islands (Creta, Cyprus, Sicilia, Britannia…)' : 'cross open water to the far shore'}</span></div>`; }
   const brow=document.createElement('div'); brow.className='row gap6';
   if(G.boat){ const e=document.createElement('span'); e.className='pill'; e.textContent='MOORED'; brow.appendChild(e); }
   else { const bt=document.createElement('button'); bt.className='btn sm gold'; bt.textContent='BUY 240d';
@@ -51367,7 +51528,7 @@ $('btn-legion').onclick=()=>openLegion();
 $('btn-legion-back').onclick=()=>enterMap();
 $('btn-bodymap-back').onclick=()=>{
   if(bodyMapBack==='villa') openVilla();
-  else if(bodyMapBack==='create') openCreate();
+  else if(bodyMapBack==='create'){ bmEndPreview(); openCreate(); }
   else if(bodyMapBack==='map') enterMap();
   else openMarry(marryForced); };
 $('btn-mirror').onclick=()=>openMirror();
