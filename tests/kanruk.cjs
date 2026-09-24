@@ -225,7 +225,10 @@ const ok=(name,cond,note)=>{ if(cond){pass++; console.log('  PASS  '+name+(note?
     o.locks=!!(D.reward && D.reward.locks);
     o.forced=G.rkRewardForce;                      // the console's flag is spent
     o.line=(D.reward&&D.reward.line||'').slice(0,14);
-    /* declining a GIFT is the expensive move on this coast — not the gift */
+    /* declining a GIFT is the expensive move on this coast — not the gift.
+       (A randomly rolled HOLLOW bane caps bond at 45 and would clamp the
+       measurement, so the bride here carries none.) */
+    if(G.wife) G.wife.banes=[];
     const rel0=G.wifeRel;
     S.setEdge('x'); S.updateRkReward(1);
     o.ph=D.reward.ph; o.cost=G.wifeRel-rel0; o.refused=G.rkGiftsRefused|0;

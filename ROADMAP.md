@@ -11,6 +11,20 @@ grounds produce nine distinct pictures" is.
 
 ## 1 — GAPS THAT ARE VISIBLE RIGHT NOW
 
+### ~~1.0 The woohoo's bodies stop at the bedroom door~~ — DONE (V40)
+The best-drawn people in the game — drawMateFig and drawFemFig — only ever appeared behind a
+door; the arena, the cards and the field still drew the block rig.
+**Done when:** a fighter, a card, a soldier, a fallen man and the wife in the stands are all
+the template, and a harness can measure it.
+**Result:** `tests/bodies.cjs`. Every helmet and harness draws on the new body (29 distinct
+pictures from 34 kits), the arm is posed off the fight, the kit keeps the groin and the bust
+covered whatever the pose, CLASSIC puts the old rig back, the 14 weapons that were grey bars
+are drawn, 14 armed cards render as fighters, soldiers come from a sprite cache.
+Caught on the way: a QUICK woohoo showed **no positions at all** (the session ended at tick
+700, the first position started at 750) — sessions are measured from the positions now and
+climb five stages; the bedchamber prelude drew her at 62px in a 130px door.
+
+
 ### ~~1.1 The husband's romantic scene does not exist~~ — DONE
 `startRomantic()` refuses outright when `G.wife.male` is true and says so in
 a toast: *"the scene is not drawn yet."* A player who chose to be a woman

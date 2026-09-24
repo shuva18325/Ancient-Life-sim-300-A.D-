@@ -49,6 +49,28 @@ publicly, leaving it off keeps the game safe for a general audience.
 ---
 
 ## Feature highlights
+- **One body template, everywhere (V40)** — the posable figures the villa and bedchamber were
+  rebuilt on (a real skeleton, IK arms and legs, a round lit trunk, a profile head with its own
+  face) now draw the **fighters**, the **enrolment cards** of every armed career, the **armies**
+  in a field battle, the **fallen** in a skirmish and your **wife in the stands**. Each wears a
+  **kit** built over the body: loincloth and (for her) breast-band always on in public, belt,
+  greaves, the manica on the sword arm, sleeves and trousers where the coat has them,
+  **29 harnesses shaped to the trunk** and **23 helmets drawn in profile on the head**. The
+  weapons and shields are the same historical pixel pieces, held in a hand the arm actually
+  reaches. The hop, stance, swing, thrust, elbow, javelin wind-up, matchlock beats, hits and
+  knockdowns all move the body. *Settings → Bodies → CLASSIC* brings back the old block rig.
+- **The hub is a place for it — on the Rkrai coast only** — the breeding house and the house's
+  own hub are woohoo places in the villa's *Place* row (the hub builds in place if you have
+  not built it), in the talk, and in GET HARD's "where". In a Rkrai house the hub has its own
+  glowing, marked door on the walk through the hall (and a chalked plot you can build at
+  before it exists). Off the coast none of it appears.
+- **Faces that say something** — hurt, shocked, laughing, sulking, smitten, dreamy, calculating,
+  spent and **hungry** (a pair of round cheeks reflected in each eye, a bead of drool, and the
+  caption *"~ CHASING IT ~"*), shared by every new body, the villa sprite and the body map,
+  where a face picker works for either spouse. Her moods follow what just happened: a slap that
+  stings leaves her hurt, a gift leaves her smitten, a good talk makes her laugh.
+- **Woohoo stages** — every session climbs *warming up → finding the rhythm → faster → the peak
+  → afterglow*, the tempo rising with it, and a quick one now actually has positions in it.
 - **Fighter cards** — choose a champion (Roman Legionary, Celtic Warrior, Parthian Cataphract,
   Pit Brawler, Blood Fanatic, Net-Fighter), each a real gladiator class with a drawn portrait
   and stat bars. No default — you must pick.
@@ -533,7 +555,7 @@ This is an original work and does not reference, reuse, or depict any existing g
 
 ## Tech
 
-- Single file, vanilla JavaScript + Canvas 2D. **~5,600 lines**, zero dependencies.
+- Single file, vanilla JavaScript + Canvas 2D, zero dependencies.
 - Fixed-timestep-ish physics loop, nearest-neighbour scaling for crisp pixels.
 - Progress auto-saves to `localStorage` (and warns you if the browser blocks storage).
 - Optional adult content is gated behind a device-local flag, **off by default**.

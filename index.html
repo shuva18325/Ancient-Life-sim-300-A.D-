@@ -8820,6 +8820,173 @@ function realAnchors(w){
      · HIM: his traits, his measure (a big man knows it — he smirks), his years.
    And the body map has a FACE picker for anyone who wants to choose.
    ===================================================================== */
+/* =====================================================================
+   😋 THE FACES THAT SAY SOMETHING — hungry, smitten, hurt, and friends
+   ---------------------------------------------------------------------
+   The new bodies had nine faces between them, and every one of them was
+   some shade of "in the mood". Nobody on them could be HURT, or laugh,
+   or sulk, or look at somebody the way a man looks at a roast. So there
+   is one table of faces now, shared by her profile (drawFemFig and the
+   bend), his (drawMateFig), the pixel face on the villa sprite and both
+   body-map figures, and a few of them do something to the EYES:
+     · HUNGRY   — two little round cheeks reflected in each eye, a bead of
+                  drool, and the caption says what it is: CHASING IT;
+     · SMITTEN  — hearts where the pupils were;
+     · CALCULATING — a coin in each eye, because the dowry is on the table;
+     · DREAMY   — a sparkle; HURT and LAUGHING — a tear; SPENT — sweat.
+   At villa size an eye is two pixels, so the eye effects there are drawn
+   big and cartoonish ON the eye rather than faithfully IN it; on the body
+   map, where the eye is a real eye, the reflection sits in the iris.
+   ===================================================================== */
+const FACE_EX={
+  flat:    {lid:0.1, brow:0,    smile:0,    open:0},
+  flush:   {lid:0.45,brow:0.3,  smile:0.2,  open:0.6},
+  bite:    {lid:0.35,brow:0.2,  smile:0,    open:0,   bite:1},
+  brace:   {lid:0,   brow:0.9,  smile:-0.1, open:1.0},
+  smug:    {lid:0.5, brow:-0.2, smile:0.8,  open:0},
+  pleased: {lid:0,   brow:0.2,  smile:1,    open:0,   shut:1},
+  absorbed:{lid:0.2, brow:0.1,  smile:0,    open:0.3},
+  cross:   {lid:0.3, brow:-1,   smile:-0.8, open:0},
+  shut:    {lid:0,   brow:0.3,  smile:0,    open:0,   shut:1},
+  kiss:    {lid:0.6, brow:0.2,  smile:0,    open:0,   pucker:1},
+  oh:      {lid:0.1, brow:0.7,  smile:0,    open:1.2},
+  asleep:  {lid:0,   brow:0,    smile:0.1,  open:0,   shut:1},
+  // ---- and the new ones ----
+  hurt:    {lid:0.35,brow:0.95, smile:-1.2, open:0.3, sad:1, tear:1},
+  teary:   {lid:0.2, brow:0.7,  smile:-0.3, open:0,   sad:1, tear:1},
+  shock:   {lid:0,   brow:1.0,  smile:0,    open:1.3, wide:1},
+  laugh:   {lid:0,   brow:0.55, smile:1,    open:1.1, shut:1, tear:1},
+  wink:    {lid:0,   brow:0.3,  smile:0.85, open:0,   shut:1, eyes:'sparkle'},
+  pout:    {lid:0.3, brow:-0.5, smile:-0.3, open:0,   pucker:1},
+  sulk:    {lid:0.45,brow:-1,   smile:-0.8, open:0,   pucker:1},
+  dreamy:  {lid:0.55,brow:0.3,  smile:0.5,  open:0,   eyes:'sparkle'},
+  smitten: {lid:0.1, brow:0.4,  smile:0.9,  open:0.2, eyes:'heart'},
+  hungry:  {lid:0.3, brow:0.5,  smile:0.55, open:0.6, eyes:'booty', drool:1},
+  coin:    {lid:0.35,brow:-0.2, smile:0.45, open:0,   eyes:'coin'},
+  spent:   {lid:0.9, brow:0,    smile:0.25, open:0.2, sweat:1},
+};
+/* the body map's picker, in the order it cycles — each with the caption the chart prints */
+const CHART_FACES={
+  hungry:  {name:'HUNGRY',      icon:'🤤', caption:'CHASING IT'},
+  smitten: {name:'SMITTEN',     icon:'😍', caption:'GONE, ENTIRELY'},
+  hurt:    {name:'HURT',        icon:'🥺', caption:'THAT STUNG'},
+  shock:   {name:'SHOCKED',     icon:'😳', caption:'…ALL OF THAT?'},
+  smug:    {name:'SMUG',        icon:'😏', caption:'KNOWS EXACTLY WHAT THIS IS'},
+  dreamy:  {name:'DREAMY',      icon:'🥰', caption:'SOMEWHERE ELSE ENTIRELY'},
+  coin:    {name:'CALCULATING', icon:'🤑', caption:'COUNTING THE DOWRY'},
+  laugh:   {name:'LAUGHING',    icon:'😂', caption:'CANNOT BREATHE'},
+  sulk:    {name:'SULKING',     icon:'😤', caption:'NOT TALKING TO YOU'},
+  spent:   {name:'SPENT',       icon:'😴', caption:'THAT WAS A LOT'},
+};
+const CHART_FACE_ORDER=['auto','hungry','smitten','hurt','shock','smug','dreamy','coin','laugh','sulk','spent'];
+let CHART_FACE='auto';
+function chartFace(){ return (CHART_FACE!=='auto' && FACE_EX[CHART_FACE])? CHART_FACE : null; }
+/* the same face as HARD_FACES numbers, for the renderers that speak that dialect */
+function faceAsHard(id){
+  const E=FACE_EX[id]; if(!E) return null;
+  return {id, name:(CHART_FACES[id]||{}).name||id.toUpperCase(), icon:(CHART_FACES[id]||{}).icon||'☺',
+          smile:E.smile, teeth:!!(id==='laugh'), blush:(id==='hungry'||id==='smitten'||id==='shock')? 0.8 : id==='hurt'? 0.35 : 0.2,
+          brow:E.brow, lids:E.lid, open:E.open>0.4? 1 : 0, lop:(id==='smug'||id==='coin')? 1 : 0, shut:!!E.shut,
+          eyes:E.eyes, tear:!!E.tear, drool:!!E.drool, sweat:!!E.sweat, sad:!!E.sad, wide:!!E.wide};
+}
+/* ---- what goes IN an eye. x,y the pupil, r how big the pupil is drawn ---- */
+function drawEyeFx(c, kind, x, y, r, t){
+  if(!kind || kind==='wide') return;
+  c.save();
+  if(kind==='booty'){
+    // two round cheeks, the cleft between them, and the shine — reflected, so it is lit from the window
+    const cr=r*0.52;
+    c.fillStyle='#ffc6ae'; c.beginPath(); c.arc(x-r*0.42, y+r*0.06, cr, 0, 7); c.arc(x+r*0.42, y+r*0.06, cr, 0, 7); c.fill();
+    c.fillStyle='#e8927e'; c.beginPath(); c.arc(x-r*0.42, y+r*0.22, cr*0.55, 0, Math.PI); c.arc(x+r*0.42, y+r*0.22, cr*0.55, 0, Math.PI); c.fill();
+    c.strokeStyle='#9a4a3e'; c.lineWidth=Math.max(0.25, r*0.12); c.beginPath(); c.moveTo(x, y-r*0.34); c.lineTo(x, y+r*0.44); c.stroke();
+    c.fillStyle='rgba(255,255,255,.95)'; c.beginPath(); c.arc(x-r*0.55, y-r*0.18, Math.max(0.2,r*0.14), 0, 7); c.fill();
+  } else if(kind==='heart'){
+    const s=r*1.25, b=0.5+0.5*Math.sin((t||0)*0.25);
+    c.fillStyle='#ff3a72'; c.beginPath(); c.moveTo(x, y+s*0.55);
+    c.bezierCurveTo(x-s*1.0, y-s*0.05, x-s*0.55, y-s*0.85, x, y-s*0.35);
+    c.bezierCurveTo(x+s*0.55, y-s*0.85, x+s*1.0, y-s*0.05, x, y+s*0.55); c.fill();
+    c.fillStyle='rgba(255,230,238,'+(0.6+0.4*b).toFixed(2)+')'; c.beginPath(); c.arc(x-s*0.35, y-s*0.25, Math.max(0.2,s*0.14), 0, 7); c.fill();
+  } else if(kind==='coin'){
+    c.fillStyle='#e8c34a'; c.beginPath(); c.arc(x, y, r*0.9, 0, 7); c.fill();
+    c.strokeStyle='#8a6414'; c.lineWidth=Math.max(0.2,r*0.14); c.beginPath(); c.arc(x, y, r*0.62, 0, 7); c.stroke();
+    c.beginPath(); c.moveTo(x, y-r*0.4); c.lineTo(x, y+r*0.4); c.stroke();
+    c.fillStyle='#fff6c8'; c.fillRect(x-r*0.5, y-r*0.5, Math.max(0.25,r*0.25), Math.max(0.25,r*0.25));
+  } else if(kind==='sparkle'){
+    const s=r*0.9, a=0.55+0.45*Math.sin((t||0)*0.3);
+    c.fillStyle='rgba(255,255,255,'+a.toFixed(2)+')'; c.beginPath();
+    c.moveTo(x-r*0.25, y-r*0.25-s); c.lineTo(x-r*0.25+s*0.22, y-r*0.25-s*0.22); c.lineTo(x-r*0.25+s, y-r*0.25); c.lineTo(x-r*0.25+s*0.22, y-r*0.25+s*0.22);
+    c.lineTo(x-r*0.25, y-r*0.25+s); c.lineTo(x-r*0.25-s*0.22, y-r*0.25+s*0.22); c.lineTo(x-r*0.25-s, y-r*0.25); c.lineTo(x-r*0.25-s*0.22, y-r*0.25-s*0.22); c.closePath(); c.fill();
+  }
+  c.restore();
+}
+/* a tear, sliding — s is its size; t moves it down the cheek and starts another */
+function drawTearFx(c, x, y, s, t){
+  const k=(((t||0)*0.02)%1), yy=y+k*s*3.2;
+  c.save();
+  // the wet streak it leaves, always there once it has started — this is what reads at villa size
+  c.globalAlpha=0.85; c.strokeStyle='#8ac8ff'; c.lineWidth=Math.max(0.45,s*0.42); c.lineCap='round';
+  c.beginPath(); c.moveTo(x, y-s*0.8); c.quadraticCurveTo(x+s*0.3, y+s*1.4, x-s*0.1, y+s*3.4); c.stroke();
+  c.globalAlpha=0.95*(1-k*0.35);
+  c.fillStyle='#9ad0ff'; c.beginPath(); c.moveTo(x, yy-s*0.9); c.quadraticCurveTo(x+s*0.75, yy+s*0.1, x, yy+s*0.7); c.quadraticCurveTo(x-s*0.75, yy+s*0.1, x, yy-s*0.9); c.fill();
+  c.fillStyle='rgba(255,255,255,.95)'; c.fillRect(x-s*0.2, yy-s*0.25, Math.max(0.3,s*0.25), Math.max(0.3,s*0.25));
+  c.restore();
+}
+/* a bead of it, at the corner of the mouth, that stretches and lets go */
+function drawDroolFx(c, x, y, s, t){
+  const k=(((t||0)*0.012)%1), L=s*(0.6+k*2.4);
+  c.save(); c.strokeStyle='rgba(200,236,255,.85)'; c.lineWidth=Math.max(0.2,s*0.22); c.beginPath(); c.moveTo(x, y); c.quadraticCurveTo(x+s*0.2, y+L*0.5, x, y+L); c.stroke();
+  c.fillStyle='rgba(210,240,255,.95)'; c.beginPath(); c.arc(x, y+L, Math.max(0.3,s*0.34), 0, 7); c.fill();
+  c.fillStyle='#ffffff'; c.fillRect(x-s*0.12, y+L-s*0.14, Math.max(0.2,s*0.14), Math.max(0.2,s*0.14)); c.restore();
+}
+function drawSweatFx(c, x, y, s, t){
+  const k=(((t||0)*0.015)%1);
+  c.save(); c.globalAlpha=0.85; c.fillStyle='#b8e4ff'; c.beginPath(); c.moveTo(x, y-s+k*s); c.quadraticCurveTo(x+s*0.7, y+k*s, x, y+s*0.6+k*s); c.quadraticCurveTo(x-s*0.7, y+k*s, x, y-s+k*s); c.fill(); c.restore();
+}
+/* HER PROFILE FACE, the extras: called by drawFemFig and the bend after the
+   face is drawn. Rp maps head-local to canvas; t is the clock. */
+function faceFxProfile(oc, Rp, EX, t, big){
+  if(!EX) return;
+  const E0=Rp(2.75,-0.55), R=(big? 1.7 : 0.9)*(EX.eyes==='booty'? 1.25 : 1);
+  if(EX.eyes){ const [x,y]=E0; drawEyeFx(oc, EX.eyes, x, y, R, t); }
+  if(EX.tear){ const q=Rp(2.2,0.7); drawTearFx(oc, q[0], q[1], big? 1.3 : 0.8, t); }
+  if(EX.drool){ const q=Rp(3.7,2.9); drawDroolFx(oc, q[0], q[1], big? 1.2 : 0.7, t); }
+  if(EX.sweat){ const q=Rp(0.8,-3.2); drawSweatFx(oc, q[0], q[1], big? 1.4 : 0.9, t); }
+  if(EX.sad){ const a=Rp(1.2,-2.0), b=Rp(2.0,-2.9); oc.strokeStyle='rgba(40,22,14,.7)'; oc.lineWidth=0.4; oc.beginPath(); oc.moveTo(a[0],a[1]); oc.lineTo(b[0],b[1]); oc.stroke(); }
+}
+/* the caption the body map prints under a picked face: a small plate with a tail to the head */
+function drawFaceCaption(c, id, x, y){
+  const F=CHART_FACES[id]; if(!F) return;
+  const txt='~ '+F.caption+' ~';
+  c.save(); c.font='bold 9px Georgia,serif'; c.textAlign='center';
+  const w=Math.max(90, c.measureText(txt).width+18), h=26;
+  c.fillStyle='rgba(28,14,24,.86)'; c.strokeStyle='#ff9ad0'; c.lineWidth=1;
+  c.beginPath(); c.moveTo(x-w/2+4,y); c.lineTo(x+w/2-4,y); c.quadraticCurveTo(x+w/2,y,x+w/2,y+4); c.lineTo(x+w/2,y+h-4); c.quadraticCurveTo(x+w/2,y+h,x+w/2-4,y+h);
+  c.lineTo(x+6,y+h); c.lineTo(x,y+h+6); c.lineTo(x-6,y+h); c.lineTo(x-w/2+4,y+h); c.quadraticCurveTo(x-w/2,y+h,x-w/2,y+h-4); c.lineTo(x-w/2,y+4); c.quadraticCurveTo(x-w/2,y,x-w/2+4,y); c.closePath();
+  c.fill(); c.stroke();
+  c.fillStyle='#ffd0e4'; c.font='bold 7px Georgia,serif'; c.fillText(F.icon+' '+F.name, x, y+10);
+  c.fillStyle='#ffffff'; c.font='italic bold 9px Georgia,serif'; c.fillText(txt, x, y+21);
+  c.restore();
+}
+/* the diagram's blank oval heads get a line face for a picked expression */
+function drawDiagFaceFx(c, x0, sideV, headR, id, t){
+  const E=FACE_EX[id]; if(!E) return;
+  const ink='rgba(40,10,30,.85)', ey=5-headR*0.20, my=5+headR*0.32;
+  c.save(); c.strokeStyle=ink; c.fillStyle=ink; c.lineWidth=0.55; c.lineCap='round';
+  const eyeAt=(ex)=>{ if(E.shut){ c.beginPath(); c.arc(ex, ey+0.2, 0.55, Math.PI*1.05, Math.PI*1.95); c.stroke(); }
+      else { const r=E.wide? 0.7 : 0.5; c.fillStyle='#fbf4ec'; c.beginPath(); c.ellipse(ex,ey,r*1.35,r*1.1,0,0,7); c.fill(); c.fillStyle=ink; c.beginPath(); c.arc(ex,ey,r*0.62,0,7); c.fill();
+        if(E.eyes) drawEyeFx(c, E.eyes, ex, ey, 0.95, t);
+        if(E.lid>0.3){ c.beginPath(); c.moveTo(ex-0.8,ey-0.35+E.lid*0.2); c.lineTo(ex+0.8,ey-0.35+E.lid*0.2); c.stroke(); } }
+    const inner=E.sad? -0.45 : (E.brow<0? 0.45 : 0); c.beginPath(); c.moveTo(ex-0.8, ey-1.25-Math.max(0,E.brow)*0.3+(E.brow<0?0:0)); c.lineTo(ex+0.8, ey-1.25-Math.max(0,E.brow)*0.3+inner); c.stroke(); };
+  const mouth=(mx, w)=>{ if(E.open>0.5){ c.beginPath(); c.ellipse(mx, my+0.2, w*0.35, 0.5+E.open*0.35, 0, 0, 7); c.fill(); }
+      else if(E.pucker){ c.beginPath(); c.arc(mx, my, 0.45, 0, 7); c.stroke(); }
+      else { c.beginPath(); c.moveTo(mx-w, my-E.smile*0.6); c.quadraticCurveTo(mx, my+E.smile*0.9, mx+w, my-E.smile*0.6); c.stroke(); } };
+  if(!sideV){ const lx=x0-headR*0.30, rx=x0+headR*0.30; eyeAt(lx); eyeAt(rx); mouth(x0, headR*0.32);
+    if(E.tear) drawTearFx(c, lx-0.1, ey+1.2, 0.7, t); if(E.drool) drawDroolFx(c, x0+headR*0.28, my+0.3, 0.6, t); if(E.sweat) drawSweatFx(c, rx+1.2, ey-1.4, 0.8, t);
+    if(E.eyes==='heart'||E.eyes==='booty'||id==='shock'){ c.fillStyle='rgba(230,80,110,.45)'; c.beginPath(); c.arc(lx-0.4,my-0.9,0.8,0,7); c.arc(rx+0.4,my-0.9,0.8,0,7); c.fill(); } }
+  else { const ex=x0+headR*0.40; eyeAt(ex); mouth(x0+headR*0.46, headR*0.22);
+    if(E.tear) drawTearFx(c, ex-0.2, ey+1.2, 0.7, t); if(E.drool) drawDroolFx(c, x0+headR*0.62, my+0.3, 0.6, t); }
+  c.restore();
+}
 const HARD_FACES={
   grin:    {id:'grin',     name:'GRINNING',       icon:'😁', smile:1.00, teeth:true,  blush:0.00, brow: 0.60, lids:0.00, open:0, lop:0},
   smirk:   {id:'smirk',    name:'SMIRKING',       icon:'😏', smile:0.75, teeth:false, blush:0.00, brow: 0.15, lids:0.40, open:0, lop:1},
@@ -8828,7 +8995,8 @@ const HARD_FACES={
   stoic:   {id:'stoic',    name:'STRAIGHT-FACED', icon:'😐', smile:0.00, teeth:false, blush:0.00, brow: 0.00, lids:0.10, open:0, lop:0},
   lost:    {id:'lost',     name:'LOST IN IT',     icon:'😮', smile:0.10, teeth:false, blush:0.75, brow: 0.85, lids:0.65, open:1, lop:0},
 };
-const HARD_FACE_ORDER=['auto','grin','smirk','sheepish','intent','stoic','lost'];
+['hungry','smitten','hurt','shock','laugh','spent'].forEach(id=>{ HARD_FACES[id]=faceAsHard(id); });   // 😋 and his side of the new faces
+const HARD_FACE_ORDER=['auto','grin','smirk','sheepish','intent','stoic','lost','hungry','smitten','hurt','shock','laugh','spent'];
 let HARD_FACE_FORCE='auto';          // the chart's picker; 'auto' rolls
 let HARD_ROLL=0;                     // bumped as each rise begins, so each rise rolls its own
 function hardFaceWeights(w, where){
@@ -8930,8 +9098,13 @@ function drawRealFig(c, w, view, ph, opt){
   const aroF = (male && ADULT)? clamp(opt.aro===undefined? secretAroLv : opt.aro, 0, 1) : 0;
   const act = sstep(0.35, 0.95, aroF), RKf = (typeof rkHere==='function') && rkHere();
   const HF = (male && act>0)? ((opt.face && (HARD_FACES[opt.face]||opt.face)) || hardFace(w, opt.clothed==='public'? 'public' : (opt.where||'chart'))) : HARD_FACES.stoic;
-  const smile = act*HF.smile, blushF = act*HF.blush, browF = act*HF.brow, lidsF = act*HF.lids, openF = act*HF.open;
-  const lop = act*HF.lop;                                    // a smirk lifts ONE corner
+  let smile = act*HF.smile, blushF = act*HF.blush, browF = act*HF.brow, lidsF = act*HF.lids, openF = act*HF.open;
+  let lop = act*HF.lop;                                      // a smirk lifts ONE corner
+  /* 😋 A FACE PICKED ON THE CHART — hungry, smitten, hurt… — for either of them, and it wins */
+  const CFid = (opt.clothed==='public')? null : chartFace(), CF = CFid? FACE_EX[CFid] : null;
+  const FXt = (typeof performance!=='undefined')? performance.now()/16 : 0;
+  if(CF){ smile=CF.smile; browF=CF.brow; lidsF=CF.eyes? 0 : CF.lid; openF=CF.open;   // eyes with something in them stay OPEN lop=(CFid==='smug'||CFid==='coin')? 1 : 0;
+    blushF=(CF.eyes==='heart'||CF.eyes==='booty'||CFid==='shock')? 0.85 : CFid==='hurt'? 0.4 : 0.2; }
   // ---- ONE LIGHT across the whole body ----
   const G = side? (()=>{ const g=c.createLinearGradient(9,0,-10,0);
                      g.addColorStop(0,sLit); g.addColorStop(0.40,skin); g.addColorStop(1,sSh); return g; })()
@@ -9235,6 +9408,9 @@ function drawRealFig(c, w, view, ph, opt){
         c.fillStyle='#3b2a1c'; c.beginPath(); c.arc(x+0.05,eY+0.02,0.36,0,7); c.fill();
         c.fillStyle='#0e0806'; c.beginPath(); c.arc(x+0.05,eY+0.02,0.16,0,7); c.fill();
         c.fillStyle='rgba(255,255,255,.8)'; c.beginPath(); c.arc(x-0.08,eY-0.12,0.08,0,7); c.fill();
+        if(CF && CF.eyes){ c.save(); c.beginPath(); c.ellipse(x,eY,HR*0.19,0.42,0,0,7); c.clip();   // 😋 the booty, reflected — or hearts, or coin
+          c.fillStyle='#1a0e08'; c.beginPath(); c.arc(x+0.05,eY+0.02,0.42,0,7); c.fill(); c.restore();
+          drawEyeFx(c, CF.eyes, x+0.05, eY+0.02, CF.eyes==='sparkle'? 0.4 : 0.62, FXt); }
         c.strokeStyle='#1e120a'; c.lineWidth= male? lw*1.0 : lw*1.5;                  // the upper lid, and her lashes
         c.beginPath(); c.moveTo(x-HR*0.21,eY+0.05); c.quadraticCurveTo(x,eY-0.72,x+HR*0.21,eY-0.02); c.stroke();
         if(!male){ c.beginPath(); c.moveTo(x+q*HR*0.20,eY-0.10); c.lineTo(x+q*HR*0.27,eY-0.34); c.stroke(); }
@@ -9289,6 +9465,10 @@ function drawRealFig(c, w, view, ph, opt){
         [-1,1].forEach(q=>crease(q*0.78, ny-HH*0.28, q*(mw+0.50), ny-HH*0.21, q*(mw+0.36), ny-HH*0.07, la*1.1)); }
       if(AM.sag>0.1) crease(-HR*0.70,ny-HH*0.10, -HR*0.45,ny+0.4, -HR*0.20,ny+0.1, 0.25*AM.sag);
       drawScars(FZ, ['face']);
+      if(CF){ if(CF.tear) drawTearFx(c, -eX, eY+0.75, 0.30, FXt);
+        if(CF.drool) drawDroolFx(c, HR*0.30, ny-HH*0.10, 0.26, FXt);
+        if(CF.sweat) drawSweatFx(c, HR*0.80, ny-HH*0.78, 0.32, FXt);
+        if(!male && blushF>0.3){ soft(-HR*0.56,ny-HH*0.30,HR*0.34,'#e05070',0.26*blushF); soft(HR*0.56,ny-HH*0.30,HR*0.34,'#e05070',0.22*blushF); } }
     }
     // ---- HAIR: a cap, and on her the fall ----
     { const g=c.createLinearGradient(-HR*1.2,0,HR*1.2,0); g.addColorStop(0,hHi); g.addColorStop(0.45,hair); g.addColorStop(1,hSh);
@@ -9449,6 +9629,8 @@ function drawRealFig(c, w, view, ph, opt){
     { const ex=hx0+HR*0.60, eY=ny-HH*0.50;
       c.fillStyle='#f4eee6'; c.beginPath(); c.ellipse(ex,eY,0.55,0.36,0,0,7); c.fill();
       c.fillStyle='#3b2a1c'; c.beginPath(); c.arc(ex+0.25,eY+0.02,0.30,0,7); c.fill();
+      if(CF && CF.eyes) drawEyeFx(c, CF.eyes, ex+0.25, eY+0.02, CF.eyes==='sparkle'? 0.34 : 0.52, FXt);
+      if(CF && CF.tear) drawTearFx(c, ex-0.1, eY+0.7, 0.28, FXt);
       c.strokeStyle='#1e120a'; c.lineWidth= male? lw : lw*1.5;
       c.beginPath(); c.moveTo(ex-0.55,eY); c.quadraticCurveTo(ex,eY-0.62,ex+0.58,eY-0.08); c.stroke();
       if(lidsF>0.05){ c.strokeStyle='#1e120a'; c.lineWidth=lw*1.3; c.beginPath(); c.moveTo(ex-0.5,eY-0.25+lidsF*0.45); c.lineTo(ex+0.55,eY-0.30+lidsF*0.45); c.stroke(); }
@@ -9465,7 +9647,8 @@ function drawRealFig(c, w, view, ph, opt){
       crease(hx0+HR*0.93,ny-HH*0.15, hx0+HR*0.78,ny-HH*0.15, hx0+HR*0.62,ny-HH*(0.16+0.09*smP-0.03*Math.max(0,-browF)), 0.50+0.2*smP);  // the corner
       if(smP>0.05){ soft(hx0+HR*0.50, ny-HH*0.30, HR*0.32, sLit, 0.24*smP);                            // the cheek it lifts
         crease(hx0+HR*0.60,ny-HH*0.25, hx0+HR*0.56,ny-HH*0.19, hx0+HR*0.60,ny-HH*0.12, 0.28*smP); }
-      if(male && blushF>0.05) soft(hx0+HR*0.46, ny-HH*0.28, HR*0.34, '#e05060', 0.22*blushF);
+      if((male||CF) && blushF>0.05) soft(hx0+HR*0.46, ny-HH*0.28, HR*0.34, '#e05060', 0.22*blushF);
+      if(CF && CF.drool) drawDroolFx(c, hx0+HR*0.84, ny-HH*0.08, 0.24, FXt);
       c.fillStyle=rgbA(sDeep,0.5); c.beginPath(); c.ellipse(hx0+HR*0.94,ny-HH*0.29,0.25,0.14,0,0,7); c.fill(); }
     // hair: a cap over the skull, and her fall off the back of it
     { const g=c.createLinearGradient(hx0+HR,0,hx0-HR*1.2,0); g.addColorStop(0,hHi); g.addColorStop(0.5,hair); g.addColorStop(1,hSh);
@@ -9580,6 +9763,7 @@ function drawBodyMap(cnv,w,view,tms){
     c.fillStyle='rgba(0,0,0,.30)';
     c.beginPath(); c.ellipse(0,69,10,2.2,0,0,7); c.fill();
     c.restore();
+    if(chartFace() && view!=='back') drawFaceCaption(c, chartFace(), CX, 3);          // 😋 ~ CHASING IT ~
     drawMapReadout(c,w,W2,H2,GUT,gv,male);
     drawMapScale(c,W2,H2,imp);
     drawPartPicker(c,cnv,w,view,W2,H2,GUT);
@@ -9931,7 +10115,7 @@ function drawBodyMap(cnv,w,view,tms){
       c.restore(); };
     if(view==='front'){
       ell(0,5,5.6+ha*0.20,6.8+ha*0.16, heatColor(ha));
-      ell(0,5,headR*0.84,headR, heatColor(fa)); face2(0,false);
+      ell(0,5,headR*0.84,headR, heatColor(fa)); if(chartFace()) drawDiagFaceFx(c,0,false,headR,chartFace(),(tms||0)/16); else face2(0,false);
       cap(0,10.5,0,14,2.6,3.0, heatColor((fa+bu)/2));
       cap(-shW,17,shW,17,3.6,3.6, heatColor(be));                          // the great shoulder yoke
       ell(0,21,chR*1.5,chR*0.86, heatColor(bu));                           // chest slab
@@ -9942,7 +10126,7 @@ function drawBodyMap(cnv,w,view,tms){
       cap(-shW-1.4,19,-shW-2.6+ax,33,2.5,2.0, heatColor(be)); cap(shW+1.4,19,shW+2.6-ax,33,2.5,2.0, heatColor(be));
     } else if(view==='side'){
       ell(-2.2,5,5.4+ha*0.18,6.8+ha*0.16, heatColor(ha));
-      ell(0.6,5,headR*0.74,headR, heatColor(fa)); ell(headR*0.60,5.4,1.5,1.2, heatColor(fa)); face2(0.6,true);
+      ell(0.6,5,headR*0.74,headR, heatColor(fa)); ell(headR*0.60,5.4,1.5,1.2, heatColor(fa)); if(chartFace()) drawDiagFaceFx(c,0.6,true,headR,chartFace(),(tms||0)/16); else face2(0.6,true);
       cap(0,10.5,0,14,2.6,3.0, heatColor((fa+bu)/2));
       ell(chR*0.52,20,chR*0.88,chR*0.92, heatColor(bu));                   // chest in profile
       cap(0,17,0,32,3.8,wR*0.44, heatColor(wa));
@@ -9978,6 +10162,7 @@ function drawBodyMap(cnv,w,view,tms){
     const fx=swing*STR, ax=-swing*2.0;
     ell(0,5,6.6+ha*0.30,8.0+ha*0.26, heatColor(ha));                       // hair behind
     ell(0,5,headR*0.86,headR, heatColor(fa));                              // face
+    if(chartFace()) drawDiagFaceFx(c,0,false,headR,chartFace(),(tms||0)/16);
     cap(0,10.5,0,13.5,1.8,2.2, heatColor((fa+bu)/2));                      // neck
     cap(-6.6,16,6.6,16,3.0,3.0, heatColor((bu+wa)/2));                     // shoulders
     // ---- THE BUST, BY TIER: FLAT · RAISED · GOOD · BIG · HUGE. The same five
@@ -10025,6 +10210,7 @@ function drawBodyMap(cnv,w,view,tms){
     ell(-2.4,5,6.2+ha*0.26,8.0+ha*0.24, heatColor(ha));                    // hair falls down the back
     ell(0.6,5,headR*0.76,headR, heatColor(fa));                            // profile of the face
     ell(headR*0.62,5.4,1.5,1.2, heatColor(fa));                            // nose
+    if(chartFace()) drawDiagFaceFx(c,0.6,true,headR,chartFace(),(tms||0)/16);
     cap(0,10.5,0,13.5,1.9,2.2, heatColor((fa+bu)/2));                      // neck
     cap(0,16,0,29,3.4,waistR*0.52, heatColor(wa));                         // the trunk seen edge-on
     // ---- IN PROFILE the same five rungs read as how far it carries forward ----
@@ -10102,6 +10288,7 @@ function drawBodyMap(cnv,w,view,tms){
     else { c.fillRect(-hipR*0.40-2.4+fx*1.7,66,4.8,2.4); c.fillRect(hipR*0.40-2.4-fx*1.7,66,4.8,2.4); }
     c.restore();
   }
+  if(chartFace() && view!=='back' && view!=='secret') drawFaceCaption(c, chartFace(), CX, 3);    // 😋 and what the face is saying
   drawMapReadout(c,w,W2,H2,GUT,gv,male);
   drawMapScale(c,W2,H2,imp);
   drawPartPicker(c,cnv,w,view,W2,H2,GUT);
@@ -11890,6 +12077,17 @@ function openBodyMap(w,back){
           bmResetCache(); buildSub(); startBodyMapAnim(); try{sfx('ui');}catch(e){} };
         sv.appendChild(fb);
     }
+    /* 😋 AND THEIR FACE, whoever it is — hungry, smitten, hurt, shocked… each with its caption.
+       AUTO leaves the face to the chart (his rolls when he is up); anything else wins. */
+    if(bodyMapView!=='secret' && bodyMapView!=='back'){
+      const xb=document.createElement('button'); xb.className='btn sm'+(CHART_FACE!=='auto'?' gold':'');
+      const cf=CHART_FACES[CHART_FACE];
+      xb.textContent = cf? (cf.icon+' '+cf.name) : '☺ FACE: AUTO';
+      xb.title='Pick a face for the figure on the chart. HUNGRY puts what they are chasing in their eyes; each face prints what it means.';
+      xb.onclick=()=>{ const i=CHART_FACE_ORDER.indexOf(CHART_FACE); CHART_FACE=CHART_FACE_ORDER[(i+1)%CHART_FACE_ORDER.length];
+        bmResetCache(); buildSub(); redraw(); if(CHART_FACE!=='auto') startBodyMapAnim(); try{sfx('ui');}catch(e){} };
+      sv.appendChild(xb);
+    }
     const wk=document.createElement('button'); wk.className='btn sm'+(bodyMapWalk?' gold':'');
     wk.style.minWidth='112px';                         // ditto — 🚶 WALKING and 🧍 STILL must occupy the same box
     wk.textContent = bodyMapWalk? '🚶 WALKING' : '🧍 STILL';
@@ -13128,7 +13326,8 @@ function elevateWife(rank){
 function migrate(g){ const d={world:null,socialSet:null,eastAxis:{},crossedToWa:false,waEra:0,purseMix:null,nanban:{},powder:0,waHouse:null,blade:null,drawnBlade:false,ventDone:{},ventRuns:0,ventLost:0,ventNet:0,silkRuns:0,silkLost:0,silkNet:0,silkDone:{},honor:50,food:4,mount:0,slaves:0,hasVilla:false,boat:false,favor:0,soldiers:0,hidden:[],plotTier:0,emperor:false,approval:50,legions:0,rivals:0,retired:false,detachments:[],day:0,titles:{},clears:{},socialClass:'gladiator',army:{},armyGear:0,armyTrain:0,hasOrganizer:false,generals:[],wife:null,married:false,marryPrompted:false,children:[],pregnant:null,lastLoveDay:-9,injury:null,lastDebateDay:-9,office:0,path:null,parthia:50,parthiaPact:false,wifeRel:50,lastTalkDay:-9,isFemale:false,lineage:[],hygiene:70,wifePhys:45,hasPool:false,hasWardrobe:false,legacy:null,lastFeastDay:-9,loveDay:-1,loveQuick:0,loveLong:0,loveNight:0,loveVigil:0,venusUntil:-1,lastWashDay:-9,lastPoolDay:-9,lastWardrobeDay:-9,lastKidsDay:-9,lastBathDay:-9,pila:0,bow:null,bowsOwned:[],nemesis:null,rivalsList:[],trophies:[],nemesisCount:0,pendingDeath:false,ageBase:0,wonProvinceByFight:false,familyMan:false,infamy:0,gladiatrixStage:0,pardoned:false,lastNoteDay:-9,lastNoteReply:'',regalia:[],marryRolls:0,hasBodyMap:false,hasSecretMap:false,jealousy:0,lastJealousDay:-9,traits:[],flaws:[],looks:5,smarts:5,advocate:false,tutorialDone:false,patrons:[],rivalAdv:null,landmarks:[],faction:null,oratory:1,casesWon:0,casesLost:0,renown:0,senate:false,royal:false,lastCaseDay:-9,skills:{footwork:0,guard:0,blade:0,wind:0,throwing:0},scars:[],fatigue:0,lastTrainDay:-9,tribune:false,rank:0,campaigns:0,legionRep:0,lastCampaignDay:-9,units:{legionary:0,auxilia:0,cavalry:0,archers:0,engineers:0},supply:0,sieges:0,body:null,family:null,provinces:{},complaints:[],leniency:50,lastCalloutDay:-9,lastGiftDay:-9,giftsTaken:0,calloutWins:0,crownWorn:false,court:null,lastCoupDay:-99,herbs:{},herbLore:0,ill:null,midwife:false,titlesWorn:[],warExhaust:0,lastExhaustWhy:'',titleRites:[],tombs:[],inheritedFrom:null,hairStyle:null,hairCol:null,beardStyle:null,outfit:null,courtLog:{},lastAskDay:-9,retirePromise:null,promiseBreaks:0,promiseFights:0,tutor:false,freedmen:0,askLog:{},temptHeld:0,temptTook:0,rkSeats:null,rkSeatsTaken:0,rkMyTitleW:null,rkProv:{},rkProvTaken:0,rkSivrak:null,rkSivrakDay:-9,rkSivraksWorn:0,rkSnubs:0,rkStand:null,rkStandsRaised:0,rkTaqrunKept:0,rkTaqrunLapses:0,rkPublicMad:0,rkPressed:0,rkPressDay:-9,rkPressToday:0,rkSeatAsk:{},rkSeatAsks:0,rkSeatsYielded:0,curioSeen:0,curioWoohoo:0,curioDay:-9,curioToday:0,bmFelt:0,bmFeltOf:{},slapDay:-9,slapCount:0,slapsAll:0,doorShut:0,caughtByHouse:0,romanticAll:0,clearedHall:0,lastFamilyDay:-9,namedHeir:null,willSplit:false,purpleWatch:0,kidHouses:[],weddings:0,woohooAll:0,marriedDay:0,osImpurum:0,lastAct:null,
     feuds:[],grandkids:0,annivYears:0,morningAfter:null,peeked:{},gravitas:60,peeksTaken:0,parthianSide:false,
     offType:false,bendToldFor:null,bendYes:0,bendNo:0,
-    bodySkills:{bone:0,hide:0,thews:0}}; for(const k in d){ if(g[k]===undefined) g[k]=d[k]; }
+    bodySkills:{bone:0,hide:0,thews:0},
+    rkHub:false,rkBreedVisits:0,rkHubNights:0,rkHubWoohoos:0}; for(const k in d){ if(g[k]===undefined) g[k]=d[k]; }
   /* =====================================================================
      AN OLD SAVE MUST NOT LOSE WHAT IT WAS ALREADY CARRYING
      ---------------------------------------------------------------------
@@ -13195,13 +13394,14 @@ const SETTINGS_KEY='SANDSTEEL_SETTINGS';
 /* WHICH BUILD IS THIS. Printed on the title screen, in Settings and in the
    corner of the hall — because an old link to an old build looks exactly
    like a fix that did not work. */
-const BUILD_STAMP='V39 · undress, pregnancy, the hub';
+const BUILD_STAMP='V40 · the woohoo bodies everywhere, the hub as a place';
 try{ document.addEventListener('DOMContentLoaded',()=>{ const e=document.getElementById('build-stamp'); if(e) e.textContent='build '+BUILD_STAMP; });
      const e0=document.getElementById('build-stamp'); if(e0) e0.textContent='build '+BUILD_STAMP; }catch(e){}
 const SETTINGS=(function(){ const d={sound:true,shake:true,difficulty:'normal',
     bluntBody:false,      // the chart draws the real game model instead of the diagram
     blunt:false,          // and the marriage cards say what they mean
-    rkUnlocked:false};    // THE RKRAI SHORE — a secret fourth world, typed into being in Settings
+    rkUnlocked:false,     // THE RKRAI SHORE — a secret fourth world, typed into being in Settings
+    classicBodies:false}; // ⚔ the body template: OFF draws the woohoo's figures everywhere; ON is the old block rig
   try{ return Object.assign(d, JSON.parse(localStorage.getItem(SETTINGS_KEY)||'{}')); }catch(e){ return d; } })();
 function saveSettings(){ try{ localStorage.setItem(SETTINGS_KEY, JSON.stringify(SETTINGS)); }catch(e){} }
 const DIFF={ easy:{name:'Easy', foeHp:0.72, foeDmg:0.75}, normal:{name:'Normal', foeHp:1, foeDmg:1}, brutal:{name:'Brutal', foeHp:1.34, foeDmg:1.3} };
@@ -13542,13 +13742,15 @@ function pushSwingTrail(f){
   const ang = f.atkType==='slash'? lerp(-1.5,1.0,Math.min(1,p*1.5)) : -0.05;
   const lunge = f.atkType==='thrust'? Math.sin(Math.min(1,p*1.6)*Math.PI)*12 : 0;
   const L = 13 + lunge + weaponTipLen(f);
-  const wx = f.x + f.facing*(5 + Math.cos(ang)*L);
-  const wy = f.y - 32 + Math.sin(ang)*L;
+  /* ⚔ on the new body the arc runs off HIS shoulder, at his drawn scale */
+  const pv = f._nbPiv || [5,-32], SC = f._nbPiv? 1.35*(f.scale||1) : 1;
+  const wx = f.x + f.facing*SC*(pv[0] + Math.cos(ang)*L);
+  const wy = f.y + SC*(pv[1] + Math.sin(ang)*L);
   /* THE INNER EDGE. At 0.42 of the arm the ribbon was a hair's width at
      480x270 and read as a scratch. A blade sweeps most of its own length,
      so the ribbon runs from a quarter of the way out to the tip. */
-  const hx = f.x + f.facing*(5 + Math.cos(ang)*L*0.26);
-  const hy = f.y - 32 + Math.sin(ang)*L*0.26;
+  const hx = f.x + f.facing*SC*(pv[0] + Math.cos(ang)*L*0.26);
+  const hy = f.y + SC*(pv[1] + Math.sin(ang)*L*0.26);
   FT.trails=FT.trails||[];
   const g=f.gear.weapon;
   FT.trails.push({ x:wx, y:wy, ix:hx, iy:hy, life:11, max:11,
@@ -13648,6 +13850,9 @@ function swingSfx(f){
 }
 function drawGladiator(f){
   if(f.beast){ drawBeast(f); return; }
+  /* ⚔ THE NEW BODY — the woohoo's figure, in his kit (Settings → Bodies to go back to the old rig) */
+  if(nbOn()){ try{ drawGladiatorNB(f); return; }catch(e){ if(!drawGladiator._warned){ drawGladiator._warned=true; console.warn('new body failed, old rig', e); } } }
+  f._nbPiv=null;
   ctx.save();
   const lean = clamp(f.vx*0.035,-0.45,0.45) + f.rot;
   ctx.translate(f.x, f.y);
@@ -13814,7 +14019,7 @@ function drawSlashFx(f,C){
   const p=1-(f.atkT/f.atkDur);
   if(p<0.12||p>0.95) return;
   const reach=((f.gear.weapon.reach||28)*(f.reachMul||1))*0.9 + (f.atkType==='thrust'?16:8);
-  const sx=5, sy=-30;                                   // shoulder pivot
+  const sx=f._nbPiv? f._nbPiv[0] : 5, sy=f._nbPiv? f._nbPiv[1] : -30;   // shoulder pivot (the new body's own shoulder, when it is the new body)
   const a = f.atkType==='thrust' ? -0.08 : lerp(-1.45,1.05,Math.min(1,p*1.5));
   ctx.save();
   const col = f.gear.weapon.gold ? '#ffe9a0' : '#ffffff';
@@ -14188,7 +14393,13 @@ function drawShield2(f,C){
   const sh=f.gear.shield.id;
   if(sh==='none') return;
   ctx.save();
-  ctx.translate(-4,-27);
+  if(NB_SHIELD_AT){ ctx.translate(NB_SHIELD_AT[0],NB_SHIELD_AT[1]);   // ⚔ on the new body it is where his far hand is —
+    /* — and it is seen from the side, turned three-quarters toward the man he is facing, so it is
+       foreshortened instead of a full face-on board hiding the whole body behind it */
+    if(sh==='sode'){ ctx.scale(0.66,0.66); } else {
+    const fs = sh==='rete'? 0.72 : sh==='tate'? 0.62 : (sh==='scutum'||sh==='scutum_pictum'||sh==='plank_shield'||sh==='te_date')? 0.5 : 0.62;
+    ctx.scale(fs, (sh==='scutum'||sh==='scutum_pictum')? 0.88 : 0.94); } }
+  else ctx.translate(-4,-27);
   if(sh==='scutum'){
     px(-5,-13,10,26,'#a52828');
     px(-5,-13,10,2,'#d8c089'); px(-5,11,10,2,'#7a1414');
@@ -14255,6 +14466,17 @@ function drawShield2(f,C){
     px(-2,-14,5,6,C.gold); px(-1,-13,3,4,shade(C.gold,-24));   // the crest painted on it
     px(5,-14,2,30,'#4a3620'); px(4,12,5,2,'#4a3620');          // the prop
     for(let i=0;i<4;i++) px(-4+i*3,-4+((i*5)%9),1,1,'#2a2a2e'); // and it has been shot
+  } else if(sh==='talik_targe'){
+    // a hoop of bent spruce, hide stretched over it, the house-mark burnt into the face
+    for(let i=0;i<9;i++){ const w=(10-Math.abs(4-i)*1.6)|0; px((-w/2)|0,-9+i*2,w,2, i<4?'#c8a878':'#a8885a'); }
+    px(-5,-1,10,1,'#6a4a2a'); px(-1,-6,2,11,'#6a4a2a');                     // the lashing cross behind the hide
+    px(-2,-3,4,4,'#3a2412'); px(-1,-2,2,2,'#c8452a');                      // the burnt house-mark
+  } else if(sh==='plank_shield'){
+    // vertical cedar planks sewn edge to edge with root cord, painted with the crest
+    px(-6,-14,12,28,'#7a5634');
+    for(let i=0;i<12;i+=3){ px(-6+i,-14,1,28,'#4a3420'); px(-5+i,-14,1,28,'#9a7448'); }
+    for(let y=-11;y<13;y+=6) px(-6,y,12,1,'#c8b088');                       // the root-cord stitching
+    px(-3,-6,6,7,'#1a1a1a'); px(-2,-5,4,5,'#c8452a'); px(-1,-4,2,1,'#e8e0cc'); px(-1,-2,2,1,'#e8e0cc');   // the crest: a painted face
   } else if(sh==='dhal'){
     for(let i=0;i<11;i++){ const w=(12-Math.abs(5-i)*1.1)|0;
       px((-w/2)|0,-10+i*2,w,2, i<5?'#c89a5a':'#8a6236'); }
@@ -14672,6 +14894,81 @@ function drawWeapon2(id,C){
       px(xx,yy,1,1, shade(m,-30)); }                                   // the inner edge
     px(5,-7,3,1,'#fff6df');                                            // and the light on the rim
   }
+  /* ================= THE COAST'S OWN, AND THREE MORE FROM WA =================
+     Fourteen of these were falling through to a grey bar — so a harpooner,
+     a tally-clerk and the head of state all fought with the same stick.
+     Each is built round the one thing that makes it itself. ================= */
+  else if(id==='harpuun'){
+    // a long shaft, a bone foreshaft, the TOGGLING head with its barb, and the line looped back along the shaft
+    px(-2,-1,30,2,wood); px(-2,-2,30,1,woodHi);
+    px(28,-1,5,2,'#e2d8c0'); px(28,-2,5,1,'#fffaec');
+    px(33,-2,6,3,'#5a6068'); px(33,-2,6,1,'#8a929c'); px(39,-1,2,1,'#8a929c'); px(35,1,2,2,'#5a6068');   // head + the toggle barb
+    for(let i=0;i<6;i++) px(4+i*4,1+(i%2),2,1,'#c8b088');                                                 // the line
+  }
+  else if(id==='herd_spear'){
+    px(-2,-1,34,2,'#9a7a4a'); px(-2,-2,34,1,'#b89a66');
+    px(29,-2,2,4,'#6a4a2a');                                           // the blunting knob a hand back from the point
+    px(32,-2,5,3,m); px(32,-2,5,1,mh); px(37,-1,2,1,m);
+  }
+  else if(id==='torv_spear'){
+    px(-2,-1,26,2,wood); px(-2,-2,26,1,woodHi);
+    px(20,-2,1,4,'#c8452a'); px(21,-2,1,4,'#e8c34a'); px(22,-2,1,4,'#2f7a8a');   // the carved collar naming the house
+    px(24,-4,8,7,'#3e4a54'); px(24,-4,8,1,'#6a7a86'); px(32,-3,3,5,'#3e4a54'); px(35,-1,2,2,'#3e4a54');   // the heavy slate head
+    px(26,-1,5,1,'#26303a');                                           // its ground edge
+  }
+  else if(id==='ulaq'){
+    // the grip OVER the blade: a bar on top, the crescent hanging under it
+    px(-1,-3,7,2,'#8a6a44'); px(-1,-3,7,1,'#a8886a');
+    px(2,-1,1,2,'#5a4a3a');
+    for(let i=0;i<9;i++){ const yy=Math.round(Math.sin(i/8*Math.PI)*4); px(-2+i,-1+yy,2,2, i<4? mh : m); }
+    px(-2,0,11,1,ms);
+  }
+  else if(id==='adze'){
+    px(-2,-1,14,2,wood); px(-2,-2,14,1,woodHi);
+    px(11,-4,2,6,'#c8b088');                                           // the sinew lashing
+    px(12,1,3,6,'#5a6068'); px(12,1,1,6,'#8a929c'); px(12,6,5,1,'#8a929c');   // the blade, crosswise at the end
+  }
+  else if(id==='flenser'){
+    px(-2,-1,6,3,'#6a4a2a'); px(-2,-1,6,1,'#8a6a44');
+    px(4,-1,15,2,m); px(4,-1,15,1,mh); px(19,0,2,1,m);                // long and thin
+  }
+  else if(id==='talk_staff'){
+    px(-3,-1,30,2,'#6a4424'); px(-3,-2,30,1,'#8a5c34');
+    for(let i=0;i<5;i++) px(4+i*5,-2,2,4,['#c8452a','#e8c34a','#2f7a8a','#e8e0cc','#6a3a8a'][i]);   // the lineage, ringed
+    px(27,-4,5,7,'#8a5c34'); px(28,-3,1,1,'#1a0e06'); px(30,-3,1,1,'#1a0e06'); px(28,1,3,1,'#1a0e06');   // the carved face at the top
+  }
+  else if(id==='tally_baton'){
+    for(let k=0;k<4;k++){ px(0,-2+k,16-k%2,1, k%2? '#c8b088' : '#e0cca0'); }                      // four split sticks
+    for(let k=2;k<15;k+=3) px(k,-2,1,4,'#8a7a5a');                                                   // the notches
+    px(-1,-3,3,6,'#6a4a2a');                                           // bound in sinew at the grip
+  }
+  else if(id==='reach_pole'){
+    px(-8,-1,44,2,'#9a7a4a'); px(-8,-2,44,1,'#b89a66');
+    px(36,-4,2,6,'#6a4a2a'); px(34,-5,5,2,'#6a4a2a');                 // the hook for the load
+    px(-9,-1,2,4,'#c8b088');                                           // and the rope knotted at the other end
+  }
+  else if(id==='weigh_rod'){
+    // the steelyard: one arm, marked; a hook at the short end; the sliding stone hanging off it
+    px(-2,-1,24,2,gold); px(-2,-2,24,1,'#fff0b0');
+    for(let i=4;i<22;i+=3) px(i,1,1,1,'#8a6414');
+    px(22,-1,1,5,'#8a6414'); px(21,3,3,1,'#8a6414');                   // the hook
+    px(13,1,1,3,'#5a4a3a'); px(11,4,5,4,'#8a8a88'); px(11,4,5,1,'#b8b8b0');   // the stone on its cord
+  }
+  else if(id==='nagamaki'){
+    px(-3,-1,14,3,'#2a2a30'); for(let i=-2;i<11;i+=3) px(i,-1,1,3,'#e8e0cc');                          // the wrapped haft
+    px(11,-2,2,5,'#c8a24a');                                           // the tsuba
+    for(let i=0;i<16;i++){ const yy=-1-((i*i*0.012)|0); px(13+i,yy,2,2,m); px(13+i,yy,1,1,mh); }
+  }
+  else if(id==='uchigatana'){
+    px(-3,-1,7,3,'#2a2a30'); px(-2,-1,1,3,'#e8e0cc'); px(1,-1,1,3,'#e8e0cc');
+    px(4,-2,2,5,'#3a3a40');                                            // a plain iron guard
+    for(let i=0;i<18;i++){ const yy=-1-((i*i*0.008)|0); px(6+i,yy,2,2,m); px(6+i,yy,1,1,mh); }
+  }
+  else if(id==='bokuto'){
+    px(-3,-1,7,3,'#6a4424'); px(4,-2,1,5,'#3a2412');
+    px(5,-1,19,3,'#a8783e'); px(5,-1,19,1,'#c8985a'); px(24,0,1,1,'#a8783e');   // solid oak, shaped like a sword
+  }
+  else if(id==='sumo_bare'){ /* no weapon at all — the open hand is the hand */ }
   else { px(0,-1,12,2,m); }
 }
 
@@ -17723,16 +18020,20 @@ function drawArena(){
   if(t.wifeWatch && G.wife){
     const wfx = t.pit? 60 : W/2-86, wfy = t.pit? GROUND-44 : 13;
     const wave=((t.time*0.13)|0)%2;
+    if(nbOn() && !G.wife.male && drawStandsWifeNB(wfx+3, wfy+8, wave)){ if((t.time|0)%80<36) pixelText('♥',wfx+3,wfy-12,'#e26a8a',1); }
+    else {
     px(wfx-1,wfy+2,8,9,G.wife.dress); px(wfx-1,wfy+2,8,2,shade(G.wife.dress,26));   // her gown stands out
     px(wfx+1,wfy-1,5,4,G.wife.skin); px(wfx+1,wfy-2,5,2,G.wife.hair);
     px(wfx-2,wfy-3-(wave?2:0),2,5,G.wife.skin); px(wfx+6,wfy-3-(wave?0:2),2,5,G.wife.skin); // waving to you
     if((t.time|0)%80<36) pixelText('♥',wfx+3,wfy-7,'#e26a8a',1);
+    }
   }
   // blood decals soaked into the sand
   for(const d of t.decals){ ctx.globalAlpha=d.a; px(d.x,d.y,d.w,d.h,d.c); }
   ctx.globalAlpha=1;
   // fallen gladiators from earlier skirmish waves stay where they dropped
   if(t.gauntlet) for(const cp of t.gauntlet.corpses){
+    if(nbOn()){ try{ drawFallenNB(cp); continue; }catch(e){} }                         // ⚔ where he dropped, on the body
     ctx.globalAlpha=.45; px(cp.x-12,GROUND,26,3,'#5a1010'); ctx.globalAlpha=1;      // blood pool
     px(cp.x-9,GROUND-4,16,4,cp.tunic); px(cp.x-9,GROUND-4,16,1,shade(cp.tunic,20)); // torso lying
     px(cp.x+7,GROUND-4,4,3,cp.skin); px(cp.x+6,GROUND-6,6,2,'#9aa4ae');             // head + helm rolled off
@@ -18633,6 +18934,7 @@ function updateBattle(dt){
 }
 // one detailed mini-legionary (8px): helm, face, tunic, shield, spear; ranks bob as they march
 function drawBattleSoldier(sx,sy,facing,tunic,shieldC,crest,i){
+  if(nbOn()){ try{ drawBattleSoldierNB(sx,sy,facing,tunic,shieldC,crest,i); return; }catch(e){} }   // ⚔ the template, in the field
   const bob=Math.sin((BT.t*0.25)+i*1.7)*0.8;
   sy+=bob;
   px(sx,sy+4,1,3,'#6a4a2e'); px(sx+2,sy+4,1,3,'#5a3c24');            // legs
@@ -18655,7 +18957,9 @@ function drawBattleHorse(sx,sy,facing,col){
 }
 function drawBattleHost(x,men,maxMen,facing,col,crest,advance,shieldC){
   const cols=9, rows=5, icons=Math.max(1,Math.min(cols*rows, Math.round(men/maxMen*cols*rows)));
-  for(let i=icons-1;i>=0;i--){
+  /* the new men are taller than a rank's spacing, so the far rank goes down first and the near ranks stand in front of it */
+  const NBo=nbOn();
+  for(let j=0;j<icons;j++){ const i= NBo? j : icons-1-j;
     const cc=i%cols, rr=(i/cols)|0;
     const sx=x + facing*(cc*8) + advance*facing + (rr%2)*2*facing;
     const sy=132 + rr*11;
@@ -19942,7 +20246,7 @@ function startBedScene(mode,len,place){
   const KAN=!!KANVEK_ONLY; KANVEK_ONLY=false;
   BC={t:0, props:[], hearts:[], splash:[], mode:mode||'heir', len, place,
       kanvekOnly:KAN, breedLine:_breedLine,
-      dur: KAN? 860 : (len==='vigil'?18000 : len==='night'?3600 : len==='long'?1800 : 700),
+      dur: bedSessionDur(len, KAN),
       line:pick(['“Veni…”','“Te amo.”','“Nunc, mi gladiator…”','“Tarde venis…”'])};
   G.lastLoveDay=G.day;
   G.woohooAll=(G.woohooAll||0)+1;                    // the house keeps count of this one too
@@ -20040,6 +20344,9 @@ function updateRkFin(s, dt){
   }
 }
 function updateBed(dt){ const s=BC; s.t+=dt; const T=s.t;
+  /* ✦ the stage, and the rhythm clock it drives */
+  { const st=bedStage(s); s.stage=st; s.tT = (s.tT===undefined || !st)? T : s.tT + dt*st.tempo;
+    if(st && st.peak && (T|0)%6<1) s.hearts.push({x:200+rnd(-60,60), y:150+rnd(-20,20), vy:rnd(0.5,1.1), life:rnd(30,52), c:pick(['#ff6a9a','#ffb0d0','#ff8ad0'])}); }
   for(const p of s.props){ p.x+=p.vx*dt; p.y+=p.vy*dt; p.vy+=0.16*dt; p.r+=p.vr*dt;
     if(p.y>222){ p.y=222; p.vx*=0.5; p.vy=0; p.vr*=0.3; } }
   for(const h of s.hearts){ h.y-=h.vy*dt; h.x+=Math.sin(h.y*0.09)*0.4*dt; h.life-=dt; }
@@ -20083,7 +20390,7 @@ function updateBed(dt){ const s=BC; s.t+=dt; const T=s.t;
   // ...and then the sounds carry through the closed door
   if(T>500 && !inter){
     const hour=1+(T/3500|0);
-    const pace = vigil? Math.max(0.55,1-0.09*hour) : (night && T>1600)? 0.8 : 1;   // each hour: bolder
+    const pace = (vigil? Math.max(0.55,1-0.09*hour) : (night && T>1600)? 0.8 : 1) / ((s.stage && s.stage.tempo) || 1);   // each hour: bolder — and each stage faster
     if(!s.nextClap||T>=s.nextClap){ sfx('clap'); s.nextClap=T+(28+Math.random()*14)*pace; }
     if(!s.nextMoan||T>=s.nextMoan){ sfx('moan'); s.nextMoan=T+(64+Math.random()*46)*pace; }
     if(!s.nextKiss||T>=s.nextKiss){ sfx('kiss'); s.nextKiss=T+(46+Math.random()*40)*pace; }
@@ -21180,37 +21487,47 @@ function drawBed(){
    and filled with the shadow's colour — so the silhouette in the door is
    her silhouette, and the sundial is his, rising for real.
    ===================================================================== */
+/* ✦ AT THE ROOM'S OWN SCALE. The doorway is a hundred and thirty pixels
+   tall and the old shadow-walkers stood eighty-odd in it; the new figures
+   came in at one unit to the pixel — sixty-two — and she ran for the door
+   looking like a child's doll. Everything in the prelude is drawn at
+   BED_FIG_K now: the runner, the shadow in the door, the one who answers. */
+const BED_FIG_K=1.38;
 let SIL_CV=null, SIL_DRAWS=0;
-function drawSilhouette(c, x, fy, dir, col, fn){
-  if(!SIL_CV){ SIL_CV=document.createElement('canvas'); SIL_CV.width=180; SIL_CV.height=128; }
-  const g=SIL_CV.getContext('2d'); g.setTransform(1,0,0,1,0,0); g.globalCompositeOperation='source-over'; g.clearRect(0,0,180,128);
+function drawSilhouette(c, x, fy, dir, col, fn, k){
+  k=k||1; const BW=Math.max(180,Math.ceil(180*k)), BH=Math.max(128,Math.ceil(128*k));
+  if(!SIL_CV || SIL_CV.width!==BW || SIL_CV.height!==BH){ SIL_CV=document.createElement('canvas'); SIL_CV.width=BW; SIL_CV.height=BH; }
+  const g=SIL_CV.getContext('2d'); g.setTransform(1,0,0,1,0,0); g.globalCompositeOperation='source-over'; g.clearRect(0,0,BW,BH);
+  g.setTransform(k,0,0,k,0,0);
   try{ fn(g, 90, 124); }catch(e){}
-  g.globalCompositeOperation='source-in'; g.fillStyle=col; g.fillRect(0,0,180,128); g.globalCompositeOperation='source-over';
+  g.setTransform(1,0,0,1,0,0);
+  g.globalCompositeOperation='source-in'; g.fillStyle=col; g.fillRect(0,0,BW,BH); g.globalCompositeOperation='source-over';
   c.save(); if(dir<0){ c.translate(x,0); c.scale(-1,1); c.translate(-x,0); }
-  c.drawImage(SIL_CV, Math.round(x-90), Math.round(fy-124)); c.restore();
+  c.drawImage(SIL_CV, Math.round(x-90*k), Math.round(fy-124*k)); c.restore();
   SIL_DRAWS++;
 }
-function silHer(c, x, fy, dir, col, P){                 // her shadow, posed
+function silHer(c, x, fy, dir, col, P, k){              // her shadow, posed
   const her=(G&&G.isFemale)? playerLook() : ((G&&G.wife)||{});
-  drawSilhouette(c, x, fy, dir, col, (g,ox,oy)=>drawFemFig(g, g, Object.assign({look:her, floor:oy, hip:[ox, oy-33]}, P(ox,oy))));
+  drawSilhouette(c, x, fy, dir, col, (g,ox,oy)=>drawFemFig(g, g, Object.assign({look:her, floor:oy, hip:[ox, oy-33]}, P(ox,oy))), k);
 }
-function silHim(c, x, fy, dir, col, P){                 // his, posed — and nothing about him is hidden by a shadow
+function silHim(c, x, fy, dir, col, P, k){              // his, posed — and nothing about him is hidden by a shadow
   const him=(typeof pairHimLook==='function')? pairHimLook() : playerLook();
   drawSilhouette(c, x, fy, dir, col, (g,ox,oy)=>{ const M=Object.assign({look:him, floor:oy, hip:[ox, oy-36], bare:true, noFloorCloth:true, pxi:1.0, aro:0}, P(ox,oy));
-    const IN=lengthInches(him, M.aro||0); M.lenIn=IN.now; M.diaIn=IN.dia; drawMateFig(g, g, M); });
+    const IN=lengthInches(him, M.aro||0); M.lenIn=IN.now; M.diaIn=IN.dia; drawMateFig(g, g, M); }, k);
 }
 const silWalkHer=(ph)=>(ox,oy)=>({lean:0.06, ankles:{near:[ox+Math.sin(ph)*6, oy-2.2-Math.max(0,Math.cos(ph))*3], far:[ox+Math.sin(ph+Math.PI)*6, oy-2.2-Math.max(0,Math.cos(ph+Math.PI))*3]}});
 function silDoorway(c, x, fy, T, female){                // the undressed shadow, beckoning after T 260
   const bk=T>260? Math.sin(T*0.25) : 0;
   if(female) silHer(c, x, fy, -1, '#1c130c', (ox,oy)=>({lean:-0.04, headAng:-0.1, rock:Math.sin(T*0.1)*0.3,
-      hands: T>260? {near:[ox+13+bk*3, oy-58+bk*2], far:[ox-4, oy-30]} : {near:[ox+3, oy-40], far:[ox-5, oy-38]}}));
-  else silHim(c, x, fy, -1, '#1c130c', (ox,oy)=>({lean:0.02, aro:0.35+Math.sin(T*0.05)*0.1, hands:{near: T>260? [ox+14+bk*3, oy-60+bk*2] : null, far:null}}));
+      hands: T>260? {near:[ox+13+bk*3, oy-58+bk*2], far:[ox-4, oy-30]} : {near:[ox+3, oy-40], far:[ox-5, oy-38]}}), BED_FIG_K);
+  else silHim(c, x, fy, -1, '#1c130c', (ox,oy)=>({lean:0.02, aro:0.35+Math.sin(T*0.05)*0.1, hands:{near: T>260? [ox+14+bk*3, oy-60+bk*2] : null, far:null}}), BED_FIG_K);
 }
 /* her, RUNNING for the door in her robe — the new body, not the old sprite (him, if you are her) */
 function drawPreludeRunner(c, x, fy, T){
   const her=(G&&G.isFemale)? null : ((G&&G.wife)||{});
   if(!her){ const me=(typeof pairHimLook==='function')? pairHimLook() : playerLook(); drawManProfile(c, x, fy, me, {u:0, aro:0.3, walk:1, walkPh:T*0.6, lean:0.12, face:HARD_FACES.grin,
-      cloth:(G&&G.tunic)||'#7a2f22'}, 1); return; }
+      cloth:(G&&G.tunic)||'#7a2f22', k:BED_FIG_K}, 1); return; }
+  c.save(); c.translate(x,fy); c.scale(BED_FIG_K,BED_FIG_K); c.translate(-x,-fy);      // ✦ at the room's scale, not a doll's
   const ph=T*0.55, bob=Math.abs(Math.sin(ph))*1.6, hip=[x, fy-33-bob];
   const st=(o)=>[hip[0]+Math.sin(ph+o)*8.5, fy-2.2-Math.max(0,Math.cos(ph+o))*5];
   c.save(); c.globalAlpha=0.28; c.fillStyle='#120b08'; c.beginPath(); c.ellipse(x, fy-1, 11, 2.6, 0,0,7); c.fill(); c.restore();
@@ -21218,6 +21535,7 @@ function drawPreludeRunner(c, x, fy, T){
     ankles:{near:st(0), far:st(Math.PI)}, kneeBend:-1,
     hands:{near:[hip[0]-Math.sin(ph)*7+3, hip[1]-8], far:[hip[0]+Math.sin(ph)*7+3, hip[1]-9]},
     robe:hexOf((her&&her.dress)||'#e8dcc2')});
+  c.restore();
 }
 function drawRoomPlace(s,T,dx,dw,place){
   const ward=place==='wardrobe';
@@ -21314,8 +21632,8 @@ function drawRoomPlace(s,T,dx,dw,place){
   }
   // the other answers the call — FULL height, striding to the door
   if(T>280 && T<352){ const mx=90+Math.min(1,(T-280)/64)*(dx+16-90);
-    if(!G.isFemale) silHim(ctx, mx, 216, 1, '#1c130c', (ox,oy)=>({walk:1, walkPh:T*0.35, lean:0.06, aro:0.2}));
-    else silHer(ctx, mx, 216, 1, '#1c130c', silWalkHer(T*0.35));
+    if(!G.isFemale) silHim(ctx, mx, 216, 1, '#1c130c', (ox,oy)=>({walk:1, walkPh:T*0.35, lean:0.06, aro:0.2}), BED_FIG_K);
+    else silHer(ctx, mx, 216, 1, '#1c130c', silWalkHer(T*0.35), BED_FIG_K);
   }
   // a small invader makes for the shaking wardrobe — and is scooped up by a slave
   if(ward && T>560 && T<700 && G.children.some(c=>!c.wed && (G.day-c.born)<40)){
@@ -21623,6 +21941,7 @@ function drawShadowTheatre(s,T){
     pixelText('· '+s.poseName.toUpperCase()+' ·', W/2, MEDIUM_CENSOR? 246 : 232, s.poseCol||'#e8c34a', 1.1);
     ctx.globalAlpha=1; ctx.textAlign='left';
   }
+  drawBedStageUI(s);                                        // ✦ where in it you are
 }
 /* =====================================================================
    AND NOT EVERY COUNTRY IS DOING THE SAME THING — the pose lore
@@ -22132,6 +22451,68 @@ function drawHall(gx,gy,gw,gh,T,MED,WALLA){
    ===================================================================== */
 let BEDPOSE_DRAWS=0, BEDPOSE_LAST=null;
 const BED_UNDRESS=230;                            // ticks the clothes take to come off, before the first position
+/* =====================================================================
+   ✦ THE STAGES OF IT — and a quick one that actually has some in it
+   ---------------------------------------------------------------------
+   "The woohoo stages are so limited." They were worse than limited: a
+   QUICK session ended at tick 700 and the first position did not start
+   until tick 750 — the doorway gag (520) and the clothes (230) ate the
+   whole thing, so a quick one showed NO positions at all, and a long one
+   fitted about six. The sessions are measured from where the positions
+   start now, and every session climbs through five stages instead of
+   playing one flat loop:
+       ① WARMING UP        slow, a long look at each other
+       ② FINDING IT        the rhythm arrives
+       ③ FASTER            and keeps arriving
+       ④ THE PEAK          the fastest it gets — the room fills with hearts
+       ⑤ AFTERGLOW         everything slows right down, and they rest
+   The stage sets the TEMPO every position moves at (the rhythm clock runs
+   faster or slower than the room's), the afterglow always ends at rest,
+   and a pip-bar in the corner says where in it you are.
+   ===================================================================== */
+const BED_INTRO=520+BED_UNDRESS;
+const BED_STEP=160;                                // ticks per position: the positions' own beats are cut to this
+const BED_STAGES=[
+  {id:'warm',  name:'WARMING UP',          tempo:0.78, at:0.00, col:'#e8c34a'},
+  {id:'find',  name:'FINDING THE RHYTHM',  tempo:1.00, at:0.20, col:'#f0b060'},
+  {id:'fast',  name:'FASTER',              tempo:1.30, at:0.44, col:'#ff8a5a'},
+  {id:'peak',  name:'THE PEAK',            tempo:1.72, at:0.70, col:'#ff5a8a', peak:true},
+  {id:'after', name:'AFTERGLOW',           tempo:0.42, at:0.88, col:'#c8a8ff', rest:true},
+];
+/* how long each length of session runs, so it has room for positions after the doorway and the clothes */
+function bedSessionDur(len, kan){
+  if(kan) return 860;
+  return len==='vigil'? 18000 : len==='night'? 3600 : len==='long'? BED_INTRO+7*BED_STEP+40 : BED_INTRO+3*BED_STEP+40;
+}
+/* where the positions start in THIS place: the quay has the walk in from outside, the hub does not */
+function bedIntroFor(s){
+  if(!s) return BED_INTRO;
+  if(s.place==='breed') return 150+230;
+  if(s.place==='hub') return 230;
+  return BED_INTRO;
+}
+function bedStage(s){
+  if(!s || s.kanvekOnly) return null;
+  const T=s.t||0, d=s.dur||700, intro=bedIntroFor(s);
+  if(T<intro || d<=intro) return null;
+  const p=clamp((T-intro)/(d-intro),0,1);
+  let i=0; for(let k=0;k<BED_STAGES.length;k++) if(p>=BED_STAGES[k].at) i=k;
+  return Object.assign({i, p}, BED_STAGES[i]);
+}
+/* the position they rest in: 'at rest' if this repertoire has it, else its last */
+function bedRestPose(SET){ return SET.indexOf(7)>=0? 7 : SET[SET.length-1]; }
+/* the pip-bar: which stage, and how far through the whole of it */
+function drawBedStageUI(s){
+  const st=s && s.stage; if(!st) return;
+  const x0=12, y0=24;
+  ctx.save(); ctx.globalAlpha=0.9;
+  ctx.fillStyle='rgba(12,8,6,.62)'; ctx.fillRect(x0-4, y0-9, 118, 22);
+  for(let k=0;k<BED_STAGES.length;k++){ const on=k<=st.i;
+    ctx.fillStyle= on? BED_STAGES[k].col : 'rgba(120,100,80,.5)'; ctx.fillRect(x0+k*12, y0+6, 9, 3);
+    if(k===st.i){ ctx.globalAlpha=0.5+0.4*Math.sin((s.t||0)*0.2); ctx.fillRect(x0+k*12, y0+5, 9, 5); ctx.globalAlpha=0.9; } }
+  ctx.textAlign='left'; pixelText(['①','②','③','④','⑤'][st.i]+' '+st.name, x0, y0, st.col, 0.8);
+  ctx.restore(); ctx.textAlign='left';
+}
 function drawBedPose(vi, E){
   const c=E.c, T=E.T, s=E.s, cx0=E.cx0, base=E.base, HB=E.HB||(()=>{});
   if(!G) return false;
@@ -22666,6 +23047,130 @@ function rkSendKidsToBreed(c){
   G.pop=clamp((G.pop||0)+1,0,100);
   return {ok:true, hit};
 }
+/* =====================================================================
+   ◆ THE HUB IS A PLACE FOR IT — ON THE COAST, AND NOWHERE ELSE
+   ---------------------------------------------------------------------
+   The hub was a renovation you bought and a button on a card. It is one of
+   the places a woohoo happens now, the same as the bedchamber or the bath:
+   it is in the WHERE picker on the villa card, the talk has a line for it,
+   the ardor offers it when she is choosing, and on the walk through the
+   house it has its own door — round-topped cedar with the lineage cut in
+   the post and steam coming out over the lintel — and you walk up to it.
+
+   And that is ONE COUNTRY'S INSTITUTION. Every one of those surfaces asks
+   rkBreedOn() first, and every one of them is simply not there in Rome,
+   Luoyang or Kai: no button, no line, no door, and a place remembered from
+   the coast falls back to the bedchamber the moment you are not on it.
+   ===================================================================== */
+const RK_HUB_DOOR={x:145, y:130, w:42, h:84, cx:166};
+function rkHubInHouse(){ try{ return !!(rkBreedOn() && G && G.rkHub && G.hasVilla); }catch(e){ return false; } }
+/* may a woohoo go to this place, here, now? Anything that is not the coast's is always yes */
+function rkPlaceOk(place){
+  if(place==='breed') return rkBreedOn();
+  if(place==='hub')   return rkBreedOn() && !!(G && G.rkHub);
+  return true;
+}
+/* a place picked on the coast is not carried off it */
+function sanitizeBedPlace(){ try{ if(!rkPlaceOk(bedPlace)) bedPlace='bed'; }catch(e){} return bedPlace; }
+function rkBuildHub(){
+  if(!rkBreedOn()) return {ok:false, why:'There is no such thing as a hub here. It is a coast institution.'};
+  if(!G.hasVilla)  return {ok:false, why:'A hub goes inside a house. Buy the villa first.'};
+  if(G.rkHub)      return {ok:false, why:'The house already has its hub.'};
+  if((G.coin|0)<RK_HUB_COST) return {ok:false, why:'The coopers want '+RK_HUB_COST+' before they cut a stave.'};
+  G.coin-=RK_HUB_COST; G.rkHub=true; G.pop=clamp((G.pop||0)+3,0,100);
+  return {ok:true, line:'◆ The coopers and the carvers take a month. The hub stands warm in the middle of the house, your lineage cut round its rim — and the district, which counted every stave, approves. (+3 pop)'};
+}
+/* the walk through the house: are you standing at the hub's door? */
+function nearHubDoor(){
+  try{ return rkHubInHouse() && !!DM && !DM.floor && Math.abs(DM.x-RK_HUB_DOOR.cx)<18; }catch(e){ return false; }
+}
+/* AND BEFORE IT IS BUILT, WHERE IT GOES. A coast house without one shows the
+   plot — the round room chalked on the planks, the lineage post already set —
+   so the hub is something you can SEE in your own hall and walk up to, not a
+   line in a list of renovations. SPACE at the plot builds it. */
+function rkHubPlotHere(){ try{ return !!(rkBreedOn() && G && G.hasVilla && !G.rkHub); }catch(e){ return false; } }
+function nearHubPlot(){ try{ return rkHubPlotHere() && !!DM && !DM.floor && Math.abs(DM.x-RK_HUB_DOOR.cx)<18; }catch(e){ return false; } }
+function tryHubPlot(){
+  const R=rkBuildHub();
+  if(!R.ok){ toast('◆ '+R.why,3000); try{ sfx('deny'); }catch(e){} return; }
+  try{ refreshStatbar(); saveQuiet(); sfx('clap'); }catch(e){}
+  toast(R.line+' Its door is right here now — SPACE at it, or W to ask for a child.',6200);
+}
+/* the marker over it — bobbing, lit, and it says what it is from across the hall */
+function drawHubMarker(T, built){
+  const {x,y,w}=RK_HUB_DOOR, cx=x+w/2, bob=Math.sin(T*0.09)*2.2, my=y-34+bob;
+  const col= built? '#ffd08a' : '#ffb0d8';
+  ctx.globalAlpha=0.30+0.20*Math.sin(T*0.09); ctx.fillStyle=col; ctx.beginPath(); ctx.ellipse(cx, my+2, 26, 8, 0, 0, 7); ctx.fill(); ctx.globalAlpha=1;
+  ctx.fillStyle='rgba(14,8,4,.78)'; ctx.fillRect(cx-30, my-6, 60, 11);
+  ctx.strokeStyle=col; ctx.lineWidth=1; ctx.strokeRect(cx-30+0.5, my-5.5, 59, 10);
+  ctx.textAlign='center'; pixelText(built? '◆ THE HUB' : '◆ ROOM FOR A HUB', cx, my+2, col, 0.72); ctx.textAlign='left';
+  px(cx-2, my+6, 5, 2, col); px(cx-1, my+8, 3, 2, col); px(cx, my+10, 1, 1, col);          // ▾ pointing at the door
+}
+function drawHubPlot(T){
+  if(!rkHubPlotHere()) return;
+  const {x,y,w,h}=RK_HUB_DOOR, FY=y+h, cx=x+w/2, arch=12;
+  // the round room, chalked on the planks where it will be cut through
+  ctx.save(); ctx.setLineDash([3,2]); ctx.strokeStyle='rgba(240,228,200,.75)'; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(x-5,FY); ctx.lineTo(x-5,y+arch); ctx.quadraticCurveTo(cx,y-arch-6,x+w+5,y+arch); ctx.lineTo(x+w+5,FY); ctx.stroke();
+  ctx.setLineDash([]); ctx.restore();
+  // the lineage post is already standing — it goes in first, on this coast
+  const pX=x+w+6;
+  px(pX, y-6, 8, FY-y+6, '#6a4424'); px(pX, y-6, 2, FY-y+6, '#8a5c34'); px(pX+6, y-6, 2, FY-y+6, '#3a2412');
+  for(let k=0;k<5;k++){ const ry=y+6+k*15; px(pX, ry, 8, 3, ['#c8452a','#e8c34a','#2f7a8a'][k%3]); }
+  // staves stacked against the wall, and a coil of hoop-iron
+  for(let k=0;k<6;k++) px(x+4+k*5, FY-30+((k*7)%6), 3, 30-((k*7)%6), k%2? '#a8683a' : '#8a5428');
+  ctx.strokeStyle='#8a6a4a'; ctx.lineWidth=1.4; ctx.beginPath(); ctx.ellipse(cx+2, FY-4, 9, 3, 0, 0, 7); ctx.stroke();
+  ctx.textAlign='center'; pixelText('SPACE: BUILD ('+RK_HUB_COST+'d)', cx, y+arch+8, 'rgba(255,208,230,.85)', 0.62); ctx.textAlign='left';
+  drawHubMarker(T, false);
+}
+/* SPACE at the door is for the two of you; W at the door asks her in for a child */
+function tryHubDoor(mode){
+  if(!rkHubInHouse()) return false;
+  if(!G.married || !G.wife){ toast('◆ The hub is warm and empty. It was built for two, and you are one.',2800); return true; }
+  if(typeof jealousyBlocksBed==='function' && jealousyBlocksBed()){ toast('◆ The hub door is barred from the inside. Talk, write, or bring a gift.',3400); return true; }
+  if(loveLeft(bedLen)<=0){ toast('“AGAIN?!” — no '+bedLen+' sessions left today.',2400); return true; }
+  if((G.hygiene|0)<25){ toast('◆ “The tub is not a bath for the arena. Wash FIRST.”',2800); return true; }
+  if(!spouseWilling()){ toast('◆ “Not tonight — not even in the hub.” Win the heart first.',2800); return true; }
+  if(mode==='heir' && G.pregnant){ toast('◆ There is already a child on the way. The hub can wait for the next one.',3000); return true; }
+  G.rkHubWoohoos=(G.rkHubWoohoos|0)+1;
+  spendLove(bedLen); saveQuiet(); DM=null; startBedScene(mode||'fun', bedLen, 'hub');
+  return true;
+}
+/* the door itself: round-topped split cedar, a carved post beside it, warm
+   light through the gap and steam out over the lintel */
+function drawHubDoor(T){
+  if(!rkHubInHouse()) return;
+  const {x,y,w,h}=RK_HUB_DOOR, FY=y+h, cx=x+w/2, arch=12;
+  const busy=!!(DM && DM.scene && DM.scene.kind==='hub');
+  // the opening, cut into the plank wall, with its dark surround
+  ctx.fillStyle='#1a120a'; ctx.beginPath(); ctx.moveTo(x-5,FY); ctx.lineTo(x-5,y+arch); ctx.quadraticCurveTo(cx,y-arch-6,x+w+5,y+arch); ctx.lineTo(x+w+5,FY); ctx.closePath(); ctx.fill();
+  // the warm room behind, glowing through the gap
+  const fl=0.75+0.25*Math.sin(T*0.09);
+  const g=ctx.createLinearGradient(0,y,0,FY); g.addColorStop(0,'#ffb060'); g.addColorStop(1,'#a8501e');
+  ctx.globalAlpha=fl; ctx.fillStyle=g; ctx.beginPath(); ctx.moveTo(x,FY); ctx.lineTo(x,y+arch); ctx.quadraticCurveTo(cx,y-arch,x+w,y+arch); ctx.lineTo(x+w,FY); ctx.closePath(); ctx.fill(); ctx.globalAlpha=1;
+  // the hide curtain, hooked back to one side, and the cedar leaf ajar
+  const leaf=w*0.62;
+  for(let k=0;k<6;k++){ const bx=x+k*(leaf/6), c=['#9a5a2a','#8a4e24','#a8683a'][k%3];
+    px(bx, y+arch-2+Math.abs(2.5-k)*1.2, leaf/6+0.5, FY-(y+arch-2+Math.abs(2.5-k)*1.2), c); px(bx, y+arch, 1, FY-y-arch, '#5a2e12'); }
+  px(x, y+22, leaf, 3, '#5a3a22'); px(x, y+FY-y-26, leaf, 3, '#5a3a22');          // the lashing cross-pieces
+  px(x+leaf-5, y+h*0.5, 3, 5, '#e8c070');                                            // the bone toggle
+  // the carved lineage post beside it — painted rings, a face at the top
+  const pX=x+w+6;
+  px(pX, y-6, 8, FY-y+6, '#6a4424'); px(pX, y-6, 2, FY-y+6, '#8a5c34'); px(pX+6, y-6, 2, FY-y+6, '#3a2412');
+  for(let k=0;k<5;k++){ const ry=y+6+k*15; px(pX, ry, 8, 3, ['#c8452a','#e8c34a','#2f7a8a'][k%3]); px(pX+2, ry+5, 4, 4, '#2a1a0e'); }
+  px(pX-1, y-10, 10, 5, '#8a5c34'); px(pX+1, y-8, 2, 2, '#1a0e06'); px(pX+5, y-8, 2, 2, '#1a0e06');
+  // steam out over the lintel, and more of it while the tub is in use
+  const n=busy? 10 : 7;
+  for(let k=0;k<n;k++){ const t=((T*0.6+k*23)%60)/60, sx=cx-10+((k*11)%20)+Math.sin(T*0.03+k)*4, sy=y-4-t*34;
+    ctx.globalAlpha=0.28*(1-t); ctx.fillStyle='#fff4e8'; ctx.beginPath(); ctx.ellipse(sx,sy,3+t*6,2+t*3,0,0,7); ctx.fill(); }
+  ctx.globalAlpha=1;
+  // warm spill on the floor, and a halo round the door so it reads across the whole hall
+  ctx.globalAlpha=0.22*fl; ctx.fillStyle='#ffb060'; ctx.beginPath(); ctx.ellipse(cx, FY+4, w*1.1, 7, 0, 0, 7); ctx.fill();
+  { const g=ctx.createRadialGradient(cx, y+h*0.45, 6, cx, y+h*0.45, w*1.3); g.addColorStop(0,'rgba(255,190,110,.22)'); g.addColorStop(1,'rgba(255,190,110,0)');
+    ctx.globalAlpha=fl; ctx.fillStyle=g; ctx.fillRect(cx-w*1.4, y-10, w*2.8, h+14); }
+  ctx.globalAlpha=1;
+  drawHubMarker(T, true);
+}
 /* ---- THE ROOMS, DRAWN ----------------------------------------------------
    The hub is the house's own tub room and it is meant to look like the most
    expensive room in the house: a round cedar room, the rafters running up to
@@ -23000,7 +23505,7 @@ function drawBreedPlace(s,T,place){
   const TX=cx0+2, TW=hub? 52 : 48, rimY=base-21;
   const undressing=(!forced && TT<UND_T) || s.forceUndress!==undefined;
   const SET=RK_BREED_POSES[place]||RK_BREED_POSES.breed;
-  const TP=TT-UND_T, step=Math.floor(TP/230), vi=forced? s.forcePose : SET[((step%SET.length)+SET.length)%SET.length];
+  const TP=TT-UND_T, step=Math.floor(TP/230), vi=forced? s.forcePose : (s.stage && s.stage.rest)? SET[SET.length-1] : SET[((step%SET.length)+SET.length)%SET.length];
   const vt=((TP%230)+230)%230;
   const HB=(x,y,c)=>{ const iv=Math.max(4,c||14); if((T|0)%iv<2){ const p=toS(x,y); s.hearts.push({x:p[0], y:p[1], vy:0.6, life:46, c:'#ff8ad0'}); } };
   ctx.save(); ctx.translate(CX,172); ctx.scale(Z,Z); ctx.translate(-SX0,-SY0+22);
@@ -23016,7 +23521,7 @@ function drawBreedPlace(s,T,place){
     s.poseName='the clothes come off'+(hub? ' — in the house’s own hub' : ' — at the breeding house');
     s.poseFade=clamp(TT/30,0,1)*clamp((UND_T-TT)/30,0,1);
   } else {
-    try{ drawBedPose(vi, {c:ctx, s, T, vt, cx0, base, place, HB, tub:{x:TX, w:TW, rim:rimY}}); }catch(e){}
+    try{ drawBedPose(vi, {c:ctx, s, T:(s.stage? s.tT : T), vt, cx0, base, place, HB, tub:{x:TX, w:TW, rim:rimY}}); }catch(e){}
     ctx.restore();
     // what is under the water is under it
     { const a=toS(TX-TW+3, rimY+1.2), b=toS(TX+TW-3, rimY+9); brdRefract(a[0], a[1], b[0]-a[0], b[1]-a[1], T); }
@@ -23037,6 +23542,7 @@ function drawBreedPlace(s,T,place){
     if(hub && s.breedLine) pixelText(s.breedLine, W/2, 36, 'rgba(255,224,200,.85)', 0.7);
     ctx.globalAlpha=1; }
   if(s.poseName && s.poseFade>0.02){ ctx.globalAlpha=s.poseFade; pixelText('· '+s.poseName.toUpperCase()+' ·', W/2, H-14, hub? '#ffd08a' : '#ffb0d0', 0.9); ctx.globalAlpha=1; }
+  drawBedStageUI(s);
   if(T>220 && T<(s.dur||700)-120) pixelText('[SPACE] slip away to morning', W-72, 12, 'rgba(200,176,96,.55)', 1);
   ctx.textAlign='left';
   for(const h of s.hearts){ ctx.globalAlpha=clamp(h.life/40,0,1); pixelText('♥', h.x, h.y, h.c||'#e26a8a', 1); } ctx.globalAlpha=1;
@@ -23423,18 +23929,20 @@ function drawShadowPlay(s,T){
   const SET = s.kanvekOnly? [22]
             : (place==='bed' && _LORE.order)? _LORE.order
             : (PLACE_SET[place] || PLACE_SET.bed);
-  const cut = s.len==='quick'? Math.max(3,SET.length-2) : SET.length;
+  const cut = SET.length;                                  // ✦ every session has room for the whole repertoire now
   /* ✦ AND FIRST THE CLOTHES COME OFF, on the new bodies — a beat of its own
      before the running order (not for her gift, which is its own thing) */
   const UND = (RIG && !s.kanvekOnly && s.forcePose===undefined)? BED_UNDRESS : 0;
   const _T0 = 520+UND;
-  const step=(((T-_T0)/160)|0);
+  const step=(((T-_T0)/BED_STEP)|0);
   /* ✧ AND THE PICTURE HOLDS while he is deciding. The running order is
      still the running order; this is one pose pinned for one beat. */
   const vi = (s.forcePose!==undefined)? s.forcePose                       // the tests (and the gallery) can pin one
              : (s.rkFinPose!==undefined && SET.indexOf(s.rkFinPose)>=0)
-             ? s.rkFinPose : SET[ ((step%cut)+cut)%cut ];
-  const vt=((T-_T0)%160+160)%160;
+             ? s.rkFinPose
+             : (s.stage && s.stage.rest && !s.kanvekOnly)? bedRestPose(SET)   // ✦ the afterglow always ends at rest
+             : SET[ ((step%cut)+cut)%cut ];
+  const vt=((T-_T0)%BED_STEP+BED_STEP)%BED_STEP;
   const POSE_NAMES=['the embrace','the kiss','from behind','the ride','the lift','the sundial','the tangle','at rest',
                     'on the pool rim','the ledge','afloat',
                     'on the warm marble','the bench','under the spout',
@@ -23579,7 +24087,7 @@ function drawShadowPlay(s,T){
     const ut=(s.forceUndress!==undefined)? s.forceUndress : T-520;
     drawBedPose('undress', {c:ctx, s, T, vt, cx0, base, place, HB, ut});
     s.poseName='the clothes come off'; s.poseFade=clamp(ut/30,0,1)*clamp((BED_UNDRESS-ut)/30,0,1); }
-  else if(RIG && typeof drawBedPose==='function' && drawBedPose(vi, {c:ctx, s, T, vt, cx0, base, place, HB})){ /* drawn */ }
+  else if(RIG && typeof drawBedPose==='function' && drawBedPose(vi, {c:ctx, s, T:(s.stage? s.tT : T), vt, cx0, base, place, HB})){ /* drawn — at the stage's tempo */ }
   else if(vi===0){ // THE EMBRACE — he grinds against her in a real, hungry rhythm; the tease reads in the gap
     const beat=Math.max(0,Math.sin(T*0.30)), sw=beat*3;                 // fast, insistent — not a tap
     const hx=cx0-16+beat*7, wx=cx0+13;                                  // he presses in (7px) then eases back, again and again
@@ -24888,12 +25396,12 @@ function drawPoolPlace(s,T,dx,dw,kind){
     if(T>260 && (T|0)%28<1.5) s.hearts.push({x:dx-4,y:140,vy:0.6,life:52,c:'#e26a8a'});
   }
   if(T>280 && T<352){ const mx=90+Math.min(1,(T-280)/64)*(dx+16-90);
-    if(!G.isFemale) silHim(ctx, mx, 216, 1, '#1c130c', (ox,oy)=>({walk:1, walkPh:T*0.35, lean:0.06, aro:0.2}));
-    else silHer(ctx, mx, 216, 1, '#1c130c', silWalkHer(T*0.35));
+    if(!G.isFemale) silHim(ctx, mx, 216, 1, '#1c130c', (ox,oy)=>({walk:1, walkPh:T*0.35, lean:0.06, aro:0.2}), BED_FIG_K);
+    else silHer(ctx, mx, 216, 1, '#1c130c', silWalkHer(T*0.35), BED_FIG_K);
   }
   // the first one crosses from the screen to the water — a silhouette, nothing more
   if(T>352 && T<400){ const cxw=dx+10-((T-352)/48)*(dx+10-(px0+pw2-24));
-    if(!G.isFemale) silHer(ctx, cxw, 216, -1, '#1c130c', silWalkHer(T*0.3)); else silHim(ctx, cxw, 216, -1, '#1c130c', (ox,oy)=>({walk:1, walkPh:T*0.35, aro:0.3}));
+    if(!G.isFemale) silHer(ctx, cxw, 216, -1, '#1c130c', silWalkHer(T*0.3), BED_FIG_K); else silHim(ctx, cxw, 216, -1, '#1c130c', (ox,oy)=>({walk:1, walkPh:T*0.35, aro:0.3}), BED_FIG_K);
   }
   if(T>400&&T<430){ const sp2=(T-400)/30;                                       // SPLASH one
     for(let i=0;i<7;i++){ const a2=i/7*Math.PI; px(px0+pw2-24+Math.cos(a2)*16*sp2, wy-4-Math.sin(a2)*14*sp2,2,2,'#8ac4e0'); } }
@@ -25287,9 +25795,16 @@ function litHusband(c,x,y,bond,sk,tn,w,ph,mode,opt){
    they are the states her face has: it reads the live scene first and
    falls back on the standing of the house.
    ===================================================================== */
+/* 😋 A MOOD SHE IS IN FOR A WHILE — set by what just happened to her (a slap
+   that stung, a husband who did not look up, a gift, a joke) and worn for a
+   few seconds on whichever body she is in, before her usual face comes back */
+let WIFE_MOOD={id:null, until:0};
+function setWifeMood(id, ms){ try{ WIFE_MOOD={id, until:(typeof performance!=='undefined'? performance.now() : Date.now())+(ms||5000)}; }catch(e){} }
+function wifeMood(){ try{ const now=(typeof performance!=='undefined'? performance.now() : Date.now()); return (WIFE_MOOD.id && now<WIFE_MOOD.until)? WIFE_MOOD.id : null; }catch(e){ return null; } }
 function wifeExpr(w){
   try{
     if(!w || w!==(G&&G.wife)) return 'flat';
+    const MD=wifeMood(); if(MD) return MD;
     const D=(typeof DM!=='undefined')? DM : null;
     if(D){
       const C=D.clam;
@@ -25314,7 +25829,10 @@ function wifeExpr(w){
     }
     const rel=(G&&G.wifeRel)|0, phys=(G&&G.wifePhys===undefined?45:G.wifePhys)|0;
     if(rel<30) return 'cross';
+    if(typeof jealousyLevel==='function' && jealousyLevel()>=2) return 'sulk';     // 😤 and she is not saying why, because you know why
+    if(phys>=92 && rel>=70) return 'hungry';                                     // 🤤 chasing it
     if(phys>=80) return 'flush';
+    if(rel>=96) return 'smitten';                                                 // 😍 gone, entirely
     if(rel>=85) return 'pleased';
     return 'flat';
   }catch(e){ return 'flat'; }
@@ -25359,6 +25877,55 @@ function drawWifeFace(P, hx, hy, skin, expr){
       P(hx, hy, 2, 1, shade(BR,-30));
       P(hx-1, hy-2, 3, 1, BR);
       P(hx, hy+3, 3, 1, shade(MO,-14));
+      break;
+    /* ---- 😋 the new ones, in the same three pixels ---- */
+    case 'hurt': case 'teary':             // brows up at the middle, the mouth goes down, and a tear
+      P(hx, hy, 1, 1, DK);
+      P(hx-1, hy-1, 1, 1, BR); P(hx, hy-2, 1, 1, BR);
+      P(hx, hy+3, 2, 1, MO); P(hx-1, hy+4, 1, 1, MO); P(hx+2, hy+4, 1, 1, MO);
+      P(hx, hy+1, 1, 2, '#9ad0ff');
+      break;
+    case 'shock':                          // all white, and an O
+      P(hx-1, hy-1, 2, 2, '#f4eee6'); P(hx, hy, 1, 1, DK);
+      P(hx-1, hy-3, 3, 1, BR);
+      P(hx, hy+3, 2, 2, '#4a1a1e');
+      break;
+    case 'laugh':                          // eyes squeezed to a line, mouth wide open, a tear of it
+      P(hx-1, hy, 3, 1, DK);
+      P(hx, hy+2, 3, 2, '#4a1a1e'); P(hx, hy+2, 3, 1, '#f4efe4');
+      P(hx-1, hy+1, 1, 1, '#9ad0ff');
+      break;
+    case 'wink':                           // shut on this side, the smile, and a sparkle off it
+      P(hx-1, hy, 2, 1, DK); P(hx+2, hy-2, 1, 1, '#ffffff');
+      P(hx, hy+3, 2, 1, MO); P(hx+2, hy+2, 1, 1, MO);
+      break;
+    case 'pout': case 'sulk':              // brow down, the mouth pushed into a bud
+      P(hx, hy, 1, 1, DK);
+      P(hx-1, hy-1, 1, 1, shade(BR,-24)); P(hx, hy-2, 2, 1, shade(BR,-24));
+      P(hx+1, hy+3, 1, 1, mixHex(skin,'#b83a4a',0.7));
+      if(expr==='sulk') P(hx-2, hy+1, 2, 1, mixHex(skin,'#e0708a',0.4));
+      break;
+    case 'dreamy':                         // half-lidded, a small smile, a sparkle
+      P(hx, hy, 2, 1, DK); P(hx-1, hy-2, 3, 1, BR); P(hx+2, hy-1, 1, 1, '#ffffff');
+      P(hx, hy+3, 2, 1, MO); P(hx+2, hy+2, 1, 1, MO);
+      break;
+    case 'smitten':                        // hearts where the eye was
+      P(hx-1, hy-1, 1, 1, '#ff3a72'); P(hx+1, hy-1, 1, 1, '#ff3a72'); P(hx-1, hy, 3, 1, '#ff3a72'); P(hx, hy+1, 1, 1, '#ff3a72');
+      P(hx, hy+3, 2, 1, MO); P(hx+2, hy+2, 1, 1, MO);
+      P(hx-2, hy+1, 2, 2, mixHex(skin,'#e0708a',0.45));
+      break;
+    case 'hungry':                         // two little round cheeks in the eye, and a bead at the mouth — chasing it
+      P(hx-1, hy-1, 1, 2, '#ffc6ae'); P(hx+1, hy-1, 1, 2, '#ffc6ae'); P(hx, hy, 1, 1, '#9a4a3e');
+      P(hx-1, hy-3, 3, 1, BR);
+      P(hx, hy+3, 2, 1, '#4a1a1e'); P(hx+1, hy+4, 1, 2, '#c8ecff');
+      break;
+    case 'coin':                           // the dowry, in each eye
+      P(hx-1, hy-1, 2, 2, '#e8c34a'); P(hx-1, hy-1, 1, 1, '#fff6c8');
+      P(hx, hy+3, 2, 1, MO); P(hx+2, hy+2, 1, 1, MO);
+      break;
+    case 'spent':                          // done in, and damp with it
+      P(hx-1, hy, 2, 1, DK); P(hx-3, hy-3, 1, 2, '#b8e4ff');
+      P(hx, hy+3, 2, 1, MO);
       break;
     default:                               // flat: the one it has always had
       P(hx, hy, 1, 1, DK);
@@ -25724,9 +26291,7 @@ function drawBendFig(c, x, y, w, k, Q){
     const face=smooth([[-4.0,-1.2],[-2.6,-4.5],[1.3,-4.7],[3.5,-2.3],[3.9,-0.4],[4.6,0.7],[3.9,1.3],[4.0,2.2],[3.6,2.6],[3.8,3.2],
                        [2.8,4.5],[1.6,4.7],[-0.6,4.4],[-3.2,2.6]].map(q=>Rp(q[0],q[1])));
     lit(face, skin, rgbA(sLit,0.85), rgbA(sDeep,0.42));
-    const EX = { flat:{lid:0.1,brow:0,smile:0,open:0}, flush:{lid:0.45,brow:0.3,smile:0.2,open:0.6}, bite:{lid:0.35,brow:0.2,smile:0,open:0,bite:1},
-                 brace:{lid:0,brow:0.9,smile:-0.1,open:1.0}, smug:{lid:0.5,brow:-0.2,smile:0.8,open:0}, pleased:{lid:0,brow:0.2,smile:1,open:0,shut:1},
-                 absorbed:{lid:0.2,brow:0.1,smile:0,open:0.3}, cross:{lid:0.3,brow:-1,smile:-0.8,open:0} }[opt.expr||Q.expr||'flat'] || {lid:0.1,brow:0,smile:0,open:0};
+    const EX = FACE_EX[opt.expr||Q.expr||'flat'] || FACE_EX.flat;                          // 😋 the shared table
     // the ear, if the cut leaves it out
     if(!long) lit(ell(...Rp(-0.9,0.4), 1.0, 1.5, aH), mixHex(skin,sSh,0.4), rgbA(sLit,0.5), rgbA(sDeep,0.5));
     // the eye: white, iris, a lash line, the lid by the expression
@@ -25744,6 +26309,7 @@ function drawBendFig(c, x, y, w, k, Q){
       oc.fillStyle=lipC; oc.fill(ell(...Rp(3.55,2.0),0.45,0.32,aH)); oc.fill(ell(...Rp(3.45,2.85),0.5,0.34,aH));   // upper and lower lip
       if(EX.bite){ oc.fillStyle='#f4efe4'; oc.fillRect(Rp(3.1,2.5)[0], Rp(3.1,2.5)[1]-0.2, 0.9, 0.45); } }
     if(opt.blush>0){ oc.fillStyle='rgba(236,88,116,'+(0.50*clamp(opt.blush,0,1)).toFixed(2)+')'; oc.fill(ell(...Rp(1.5,1.2),1.5,0.9,aH)); }
+    faceFxProfile(oc, Rp, EX, (typeof performance!=='undefined'? performance.now()/16 : 0), true);
     // HER CUT: a lit cap over the crown and the back of the head, the fringe if she wears one, the knot if she pins it
     const hc=smooth([[-4.5,1.9],[-4.4,-2.8],[-1.6,-5.5],[1.6,-5.4],[3.7,-3.2],[2.4,-3.1],[0.4,-2.6],[-1.4,-1.0],[-1.8,1.4],[-2.6,3.6]].map(q=>Rp(q[0],q[1])));
     lit(hc, hair, rgbA(hHi,0.85), rgbA(hSh,0.8));
@@ -25840,6 +26406,7 @@ function drawMateFig(bk, fr, M){
   const hair=hexOf(L.hair||'#2a1a10'), hHi=mixHex(hair,'#ffffff',0.22), hSh=mixHex(hair,'#000000',0.35);
   const cloth=hexOf(M.cloth||'#7a2f22'), cHi=mixHex(cloth,'#ffffff',0.26), cSh=mixHex(cloth,'#120a06',0.42);
   const RK=!!M.coast, u=clamp(M.u||0,0,1), aro=clamp(M.aro||0,0,1.06), F=M.face||HARD_FACES.stoic;
+  const KIT=M.kit||null, HK=M.headK||1;                   // ⚔ the body template: a kit to wear, and a head a little heroic
   const Lt=15.6+lg*0.22, Ls=16.2+lg*0.22, Ltor=24.5, Lup=10.2, Lfo=9.8;
   const add=(p,v)=>[p[0]+v[0], p[1]+v[1]], lerp=(a,b,t)=>[a[0]+(b[0]-a[0])*t, a[1]+(b[1]-a[1])*t];
   // ---- the hips go where the scene says, unless his legs cannot reach: then he stands as tall as he can
@@ -25865,13 +26432,21 @@ function drawMateFig(bk, fr, M){
   // where the garment is on him, for everything that has to know (Rome: s is the hem, −0.55 on the thigh up to +0.85 at the chest; coast: the kilt's top, down the legs)
   const sHem = -0.55 + clamp((u-0.28)/0.42,0,1)*1.40;
   const kTop = RK? (u<0.28? -0.16 : -0.16 + clamp((u-0.28)/0.60,0,1)*1.00) : 0;   // it stops bunched at his shins
-  const groinCovered = RK? (kTop<0.10 && u<0.95) : (sHem<0.04 && u<0.72);
+  const groinCovered = KIT? true : (RK? (kTop<0.10 && u<0.95) : (sHem<0.04 && u<0.72));   // in kit there is ALWAYS a loincloth
   const legPt=(Lg,f)=> f<=0.5? lerp(Lg.hip, Lg.K, f/0.5) : lerp(Lg.K, Lg.ank, (f-0.5)/0.5);
   const handsOf=(which)=>{ const h=M.hands&&M.hands[which]; if(h) return h;
     const sw=Math.sin(wph+(which==='far'? 0 : Math.PI))*3.4*wk;                    // the arm swings against its leg
     const dn=[-tB[0], -tB[1]], fwd=[-nB[0], -nB[1]], r=Lup+Lfo-1.2-Math.abs(sw)*0.25, f2=1.8+(which==='far'?1:0)+sw;   // down his side, whichever way he is lying
     return add(S0,[dn[0]*r+fwd[0]*f2, dn[1]*r+fwd[1]*f2]); };
   if(M.dry) return {hip:Hp, head:HC, shoulder:S0, knee:LN.K, ankle:LN.ank, neck:Nk, root:add(at(0.0,-(3.8+(10-wa)*0.12)+0.3),[0,1.3])};
+  /* ⚔ what the kit needs to know about this body */
+  let Qm=null;
+  if(KIT){ const tsM=[0,0.30,0.55,0.80,1], linM=(arr,t)=>{ if(t<=0) return arr[0]; for(let i=1;i<5;i++) if(t<=tsM[i]){ const f=(t-tsM[i-1])/(tsM[i]-tsM[i-1]); return arr[i-1]+(arr[i]-arr[i-1])*f; } return arr[4]; };
+    const seatExt=Math.max(0, bw[0]*0.72+3.5+shd*0.12-bw[0]);
+    Qm={ at, bwAt:(t)=>linM(bw,t), fwAt:(t)=>linM(fw,t), bustB:()=>0, seatB:(t)=>seatExt*Math.exp(-Math.pow((t-0.05)/0.12,2)),
+         LN, LF, legR:3.9+shd*0.10, S:S0, Nk, shN:S0, hN:handsOf('near'), shF:add(S0,[1.2,-0.5]), hF:add(handsOf('far'),[1.4,-0.8]),
+         Lup, Lfo, elbow:(M.elbowNear===undefined? 1 : M.elbowNear), armR:2.7, fem:false, hair,
+         seatE:[{c:at(0.05,bw[0]*0.72), rx:3.5+shd*0.12, ry:3.1+shd*0.10, rot:aT}] }; }
   // ---- one pass per layer ----
   const drawIn=(oc, layer)=>{
     const K=vecKit(oc), {smooth,capsule,ell,lit,line}=K;
@@ -25882,22 +26457,26 @@ function drawMateFig(bk, fr, M){
       let d=[Lg.ank[0]-Lg.K[0], Lg.ank[1]-Lg.K[1]]; const m=Math.hypot(d[0],d[1])||1; d=[d[0]/m,d[1]/m];
       const f=[d[1], -d[0]], fa=Math.atan2(f[1],f[0]);                                  // the foot, off the end of the shin
       oc.fill(ell(Lg.ank[0]+f[0]*2.0+d[0]*0.6, Lg.ank[1]+f[1]*2.0+d[1]*0.6, 3.1, 1.25, fa)); };
-    const arm=(from, to, dark)=>{ const E=ik2(from, to, Lup, Lfo, 1), Wr=E.end;
+    const arm=(from, to, dark)=>{ const E=ik2(from, to, Lup, Lfo, (!dark && M.elbowNear!==undefined)? M.elbowNear : 1), Wr=E.end;
       const p=capsule([[from[0],from[1],2.7],[E.J[0],E.J[1],2.0],[Wr[0],Wr[1],1.45]]);
       lit(p, dark? sSh : skin, dark? rgbA(skin,0.4) : rgbA(sLit,0.7), rgbA(sDeep,0.45));
       oc.fillStyle= dark? sSh : skin; oc.fill(ell(Wr[0]+0.6, Wr[1]+0.4, 1.7, 1.45, 0));
       return Wr; };
-    if(layer==='front'){ if(!M.only || M.only==='near') M._hand=arm(S0, handsOf('near'), false); return; }
+    if(layer==='front'){ if(!M.only || M.only==='near'){ M._hand=arm(S0, handsOf('near'), false); if(KIT) nbKit(oc,K,Qm,KIT,'armNear'); } return; }
     // ---- far leg, far arm ----
     if(!M.only || M.only==='far' || M.only==='back'){
       { lit(legCap(LF), sSh, rgbA(skin,0.45), rgbA(sDeep,0.5)); foot(LF, sSh); }
-      arm(add(S0,[1.2,-0.5]), add(handsOf('far'),[1.4,-0.8]), true); }
+      if(KIT) nbKit(oc,K,Qm,KIT,'legFar');
+      arm(add(S0,[1.2,-0.5]), add(handsOf('far'),[1.4,-0.8]), true);
+      if(KIT) nbKit(oc,K,Qm,KIT,'armFar'); }
     if(M.only==='far' || M.only==='near') return;
     // ---- near leg ----
     { lit(legCap(LN), skin, rgbA(sLit,0.75), rgbA(sDeep,0.45)); foot(LN, skin);
       line([[LN.K[0]-1.0,LN.K[1]+0.7],[LN.K[0]+0.4,LN.K[1]+1.0]], rgbA(sDeep,0.4), 0.6); }
+    if(KIT) nbKit(oc,K,Qm,KIT,'legNear');
     // ---- his seat, and the trunk ----
-    lit(ell(at(0.05,bw[0]*0.72)[0], at(0.05,bw[0]*0.72)[1], 3.5+shd*0.12, 3.1+shd*0.10, aT), skin, rgbA(sLit,0.7), rgbA(sDeep,0.45));
+    { const sc=KIT? nbCol(KIT.loin||'#c8b494') : null;                                                  // in kit his seat is in the loincloth
+      lit(ell(at(0.05,bw[0]*0.72)[0], at(0.05,bw[0]*0.72)[1], 3.5+shd*0.12, 3.1+shd*0.10, aT), sc? sc[0] : skin, rgbA(sc? sc[1] : sLit,0.7), rgbA(sc? sc[2] : sDeep,0.45)); }
     const ts=[0,0.30,0.55,0.80,1];
     const trunk=smooth(ts.map((t,i)=>at(t,bw[i])).concat(ts.map((t,i)=>at(t,-fw[i])).reverse()));
     lit(trunk, skin, rgbA(sLit,0.85), rgbA(sDeep,0.5));
@@ -25967,8 +26546,10 @@ function drawMateFig(bk, fr, M){
         const t0=add(R,[0,-1.6]), t1=add(R,[0,2.4]), tip=add(R,[Math.cos(-0.1)*tl, Math.sin(-0.1)*tl+0.5]);
         lit(smooth([t0, tip, t1]), cloth, rgbA(cHi,0.85), rgbA(cSh,0.7)); }
     }
+    if(KIT) nbKit(oc,K,Qm,KIT,'body');
     // ---- neck, head, hair, beard, and his face ----
     lit(capsule([[S0[0]+0.6,S0[1]-0.5,2.2],[Nk[0],Nk[1],1.9]]), skin, rgbA(sLit,0.6), rgbA(sDeep,0.4));
+    if(HK!==1){ oc.save(); oc.translate(Nk[0],Nk[1]); oc.scale(HK,HK); oc.translate(-Nk[0],-Nk[1]); }
     if(HA!==null){ oc.save(); oc.translate(HC[0],HC[1]); oc.rotate(HA); oc.translate(-HC[0],-HC[1]); }
     const hp=smooth([[HC[0]-4.3,HC[1]-1.0],[HC[0]-2.8,HC[1]-4.8],[HC[0]+1.5,HC[1]-5.0],[HC[0]+4.0,HC[1]-2.2],
                      [HC[0]+4.6,HC[1]+0.2],[HC[0]+5.2,HC[1]+1.2],[HC[0]+4.2,HC[1]+1.9],[HC[0]+4.0,HC[1]+3.4],
@@ -25986,14 +26567,21 @@ function drawMateFig(bk, fr, M){
     oc.fillStyle='#1a0e08'; oc.fillRect(ex+0.2, ey-0.5, 0.9, 1.0);
     if(F.lids>0.2){ oc.fillStyle=mixHex(skin,sSh,0.4); oc.fillRect(ex-0.7, ey-0.7, 1.9, 0.5+F.lids*0.5); }
     { const dn=Math.max(0,-F.brow), up=Math.max(0,F.brow);
-      line([[ex-1.1,ey-1.7-up*0.35],[ex+1.3,ey-1.6-up*0.25+dn*0.65]], hSh, 0.75); }
+      if(F.sad) line([[ex-1.1,ey-1.4],[ex+1.3,ey-2.4]], hSh, 0.75);                                  // 🥺 the inner end goes UP
+      else line([[ex-1.1,ey-1.7-up*0.35],[ex+1.3,ey-1.6-up*0.25+dn*0.65]], hSh, 0.75); }
+    if(F.eyes) drawEyeFx(oc, F.eyes, ex+0.6, ey, 1.5, M.t||0);                                        // 😋 what is in his eye
+    if(F.tear) drawTearFx(oc, ex, ey+1.8, 0.8, M.t||0);
+    if(F.drool) drawDroolFx(oc, HC[0]+3.4, HC[1]+2.9, 0.7, M.t||0);
+    if(F.sweat) drawSweatFx(oc, HC[0]-0.6, HC[1]-3.6, 0.9, M.t||0);
     { const my=HC[1]+2.2, mx=HC[0]+3.7, cy=my-(F.smile*0.9)+(Math.max(0,-F.brow)*0.2);
       if(F.open){ oc.fillStyle='#3a1416'; oc.fillRect(mx-0.2, my-0.4, 1.1, 1.3); }
       line([[mx+0.7,my],[mx-0.6,my+0.1],[mx-1.4,cy]], mixHex(skin,'#5a2018',0.6), 0.6);
       if(F.teeth) { oc.fillStyle='#f4efe4'; oc.fillRect(mx-0.5, my-0.3, 1.0, 0.45); }
       if(F.blush>0.2){ oc.fillStyle='rgba(232,90,100,'+(0.45*F.blush).toFixed(2)+')'; oc.fillRect(HC[0]+0.6, HC[1]+0.8, 2.2, 1.1); } }
     if(F.shut){ oc.fillStyle=mixHex(skin,sSh,0.3); oc.fillRect(ex-0.8, ey-0.7, 2.1, 1.3); line([[ex-0.8,ey+0.2],[ex+1.2,ey+0.1]], hSh, 0.5); }   // eyes shut
+    if(KIT){ oc.save(); oc.translate(HC[0],HC[1]); nbKit(oc,K,Qm,KIT,'head'); oc.restore(); }              // ⚔ the helmet, ON the head
     if(HA!==null) oc.restore();
+    if(HK!==1) oc.restore();
     /* a fur cloak over his shoulders — nobody undresses all the way in a longhouse in winter */
     if(M.cloak){ const kc=hexOf(M.cloak), kHi=mixHex(kc,'#ffffff',0.22), kSh=mixHex(kc,'#000000',0.4);
       const cp=smooth([at(1.02,bw[4]+1.4), at(0.98,-fw[4]*0.2), at(0.78,bw[3]*0.2), at(0.40,bw[2]+2.2), at(0.30,bw[1]+2.4), at(0.60,bw[3]+2.8), at(0.95,bw[4]+2.4)]);
@@ -26001,7 +26589,7 @@ function drawMateFig(bk, fr, M){
       line([at(1.03,bw[4]+1.8), at(1.0,-fw[4]*0.4)], mixHex(kc,'#e8dcc2',0.4), 1.4); }                           // the fur at the collar
   };
   drawIn(bk,'back'); drawIn(fr,'front');
-  return {hip:Hp, head:HC, shoulder:S0, hand:M._hand, root:M._root, tip:M._tip, knee:LN.K, ankle:LN.ank, neck:Nk,
+  return {hip:Hp, head:(HK!==1? [Nk[0]+(HC[0]-Nk[0])*HK, Nk[1]+(HC[1]-Nk[1])*HK] : HC), shoulder:S0, hand:M._hand, root:M._root, tip:M._tip, knee:LN.K, ankle:LN.ank, neck:Nk,
           chest:at(0.78,-fw[3]), belly:at(0.35,-fw[1]), back:at(0.6,bw[2])};
 }
 /* =====================================================================
@@ -26036,6 +26624,7 @@ function drawFemFig(bk, fr, F){
   const add=(p,v)=>[p[0]+v[0],p[1]+v[1]], nrm=(v)=>{ const m=Math.hypot(v[0],v[1])||1; return [v[0]/m,v[1]/m]; };
   const lerp=(a,b,t)=>[a[0]+(b[0]-a[0])*t, a[1]+(b[1]-a[1])*t];
   const H=[F.hip[0],F.hip[1]], aB=F.lean||0, RK2=clamp(F.rock||0,-1,1);
+  const KIT=F.kit||null, HK=F.headK||1;                   // ⚔ the body template (see nbKit)
   const tB=[Math.sin(aB), -Math.cos(aB)], nB=[-Math.cos(aB), -Math.sin(aB)], nF=[-nB[0],-nB[1]];
   const at=(t,off)=>[H[0]+tB[0]*Lb*t+nB[0]*off, H[1]+tB[1]*Lb*t+nB[1]*off];
   const Sh=at(1,0);
@@ -26083,6 +26672,16 @@ function drawFemFig(bk, fr, F){
   const out={hip:H, seat:SC, rs, head:HC, neck:Nk, shoulder:Sh, knee:LN.K, ankle:LN.ank, mouth:Rp(4.1,2.5), chest:at(0.74,-fw[3]), preg:PM, belly:bellyB,
              crotch:add(H,[thighDir[0]*2.2+nF[0]*fw[0]*0.55, thighDir[1]*2.2+nF[1]*fw[0]*0.55]),
              join:add(SC,[thighDir[0]*rs*0.72+sd[0]*rs*0.30, thighDir[1]*rs*0.72+sd[1]*rs*0.30]), waist:at(0.30,0)};
+  /* ⚔ what the kit needs to know about her */
+  let Qf=null;
+  if(KIT){ let bustBf=()=>0, seatBf=()=>0;
+    if(BG){ const c0=BG.c0n, bz=((c0[0]-H[0])*tB[0]+(c0[1]-H[1])*tB[1])/Lb, ext=((c0[0]-H[0])*nF[0]+(c0[1]-H[1])*nF[1])+BG.rb*1.02, dep=Math.max(0, ext-fwAt(bz));
+      bustBf=(z)=>dep*Math.exp(-Math.pow((z-bz)/(BG.rb*1.15/Lb),2)); }
+    { const sRx=rs*(0.80+0.20*dK), zs=((SC[0]-H[0])*tB[0]+(SC[1]-H[1])*tB[1])/Lb, sDepth=((SC[0]-H[0])*nB[0]+(SC[1]-H[1])*nB[1])+sRx;
+      seatBf=(z)=>Math.max(0, sDepth-bwAt(zs))*Math.exp(-Math.pow((z-zs)/(rs*0.95/Lb),2)); }
+    Qf={ at, bwAt, fwAt, bustB:bustBf, seatB:seatBf, LN, LF, legR:3.4+be*0.20, S:Sh, Nk, shN, hN, shF, hF, Lup, Lfo,
+         elbow:(F.elbowNear!==undefined? F.elbowNear : (F.elbow===undefined? 1 : F.elbow)), armR:1.9, fem:true, bandCol:(KIT.band||KIT.loin||'#c8b494'), hair,
+         seatE:[{c:SC, rx:rs*(0.80+0.20*dK), ry:rs*0.94, rot:sRot}, {c:add(SC,[tB[0]*1.4,tB[1]*1.4]), rx:rs*0.92*dK, ry:rs*0.86, rot:sRot}], bustE:[] }; }
   const drawIn=(oc, part)=>{
     const K=vecKit(oc), {smooth,capsule,ell,crescent,lit,line}=K;
     const legCap=(Lg,hr)=>{ const mid=lerp(Lg.hip,Lg.K,0.5), calf=[Lg.K[0]+(Lg.ank[0]-Lg.K[0])*0.32, Lg.K[1]+(Lg.ank[1]-Lg.K[1])*0.32];
@@ -26092,19 +26691,23 @@ function drawFemFig(bk, fr, F){
       oc.fillStyle=col;
       if(standing) oc.fill(ell(Lg.ank[0]+2.0, Math.min(fl-1.0, Lg.ank[1]+1.0), 2.9, 1.15, 0));
       else oc.fill(ell(Lg.ank[0]+f[0]*1.8+d[0]*0.5, Lg.ank[1]+f[1]*1.8+d[1]*0.5, 2.8, 1.1, Math.atan2(f[1],f[0]))); };
-    const arm=(from,to,dark)=>{ const E=ik2(from,to,Lup,Lfo,F.elbow===undefined? 1 : F.elbow), Wr=E.end;
+    const arm=(from,to,dark)=>{ const E=ik2(from,to,Lup,Lfo,(!dark && F.elbowNear!==undefined)? F.elbowNear : (F.elbow===undefined? 1 : F.elbow)), Wr=E.end;
       const p=capsule([[from[0],from[1],1.9],[E.J[0],E.J[1],1.35],[Wr[0],Wr[1],1.0]]);
       lit(p, dark? sSh : skin, dark? rgbA(skin,0.4) : rgbA(sLit,0.7), rgbA(sDeep,0.45));
       oc.fillStyle=dark? sSh : skin; oc.fill(ell(Wr[0]+(to[0]-E.J[0])*0.08, Wr[1]+(to[1]-E.J[1])*0.08, 1.45, 1.75, Math.atan2(to[1]-E.J[1],to[0]-E.J[0])+1.57));
       return Wr; };
-    if(part==='near'){ out.hand=arm(shN, hN, false); return; }
+    if(part==='near'){ out.hand=arm(shN, hN, false); if(KIT) nbKit(oc,K,Qf,KIT,'armNear'); return; }
     if(part==='far'){ lit(legCap(LF,3.3+be*0.18), sSh, rgbA(skin,0.5), rgbA(sDeep,0.5)); foot(LF, sSh);
-      out.handFar=arm(shF, hF, true); return; }
+      if(KIT) nbKit(oc,K,Qf,KIT,'legFar');
+      out.handFar=arm(shF, hF, true); if(KIT) nbKit(oc,K,Qf,KIT,'armFar'); return; }
     // ---- MAIN: the seat behind, the near leg, the trunk, the bust, the head ----
     const seatFar=ell(SC[0]+tB[0]*1.4, SC[1]+tB[1]*1.4, rs*0.92*dK, rs*0.86, sRot), seatNear=ell(SC[0],SC[1], rs*(0.80+0.20*dK), rs*0.94, sRot);
+    const LC=KIT? nbCol(KIT.loin||'#c8b494') : null;                                          // ⚔ in kit the seat is in the loincloth
+    if(LC) lit(seatFar, mixHex(LC[0],'#1a0e08',0.28), rgbA(LC[1],0.4), rgbA(LC[2],0.5)); else
     lit(seatFar, sSh, rgbA(skin,0.5), rgbA(sDeep,0.5));
     lit(legCap(LN,3.4+be*0.20), skin, rgbA(sLit,0.75), rgbA(sDeep,0.45)); foot(LN, skin);
     line([[LN.K[0]-0.8,LN.K[1]+0.6],[LN.K[0]+0.8,LN.K[1]+0.9]], rgbA(sDeep,0.4), 0.6);
+    if(KIT) nbKit(oc,K,Qf,KIT,'legNear');
     const trunk=smooth(TS2.map(t=>at(t,bwAt(t))).concat(TS2.map(t=>at(t,-fwAt(t))).reverse()));
     lit(trunk, skin, rgbA(sLit,0.85), rgbA(sDeep,0.45));
     if(bellyB>1.2){ const bc=at(0.25,-fwAt(0.25)*0.62), br=2.2+bellyB*0.9;                          // the curve of it, lit
@@ -26112,8 +26715,9 @@ function drawFemFig(bk, fr, F){
       gg.addColorStop(0,rgbA(mixHex(sLit,'#ffffff',0.2),0.75)); gg.addColorStop(1,rgbA(sLit,0)); oc.fillStyle=gg; oc.fillRect(bc[0]-br*2,bc[1]-br*2,br*4,br*4); oc.restore();
       if(PK>0.3){ const nv=at(0.19,-fwAt(0.19)+0.5); oc.fillStyle=rgbA(sDeep,0.55); oc.fill(ell(nv[0],nv[1],0.45,0.6,aB)); }
       line([at(0.36,-fwAt(0.36)+0.5), at(0.12,-fwAt(0.12)+0.5)], rgbA(sDeep,0.18+PK*0.12), 0.5); }
+    if(LC) lit(seatNear, LC[0], rgbA(LC[1],0.85), rgbA(LC[2],0.6), 1.3); else
     lit(seatNear, skin, rgbA(sLit,0.85), rgbA(sDeep,0.45), 1.3);
-    { const gx=SC[0]-rs*0.30+sd[0]*rs*0.18-g[0], gy=SC[1]-rs*0.42+sd[1]*rs*0.18;          // the gloss where the lamp finds it
+    if(!LC){ const gx=SC[0]-rs*0.30+sd[0]*rs*0.18-g[0], gy=SC[1]-rs*0.42+sd[1]*rs*0.18;          // the gloss where the lamp finds it
       oc.save(); oc.clip(seatNear); const gg=oc.createRadialGradient(gx,gy,0.2,gx,gy,rs*0.75);
       gg.addColorStop(0,rgbA(sLit,0.95)); gg.addColorStop(0.5,rgbA(sLit,0.35)); gg.addColorStop(1,rgbA(sLit,0));
       oc.fillStyle=gg; oc.fillRect(SC[0]-rs*2,SC[1]-rs*2,rs*4,rs*4);
@@ -26127,6 +26731,10 @@ function drawFemFig(bk, fr, F){
       const one=(off,dark)=>{
         const c0=[Bp[0]+hd[0]*rb*(0.78-up*0.30)+tB[0]*off+RK2*1.2, Bp[1]+hd[1]*rb*(0.78-up*0.30)+tB[1]*off-Math.abs(RK2)*0.4];
         const p=ell(c0[0],c0[1], rb*(0.98+0.26*hang-0.14*up), rb*(0.90+0.10*up), rot);
+        if(KIT){ const bc=nbCol(Qf.bandCol);                                                    // ⚔ in kit the bust is the band's cloth, and nothing under it
+          Qf.bustE.push({c:c0, rx:rb*(0.98+0.26*hang-0.14*up)+0.5, ry:rb*(0.90+0.10*up)+0.5, rot});
+          lit(ell(c0[0],c0[1], rb*(0.98+0.26*hang-0.14*up)+0.5, rb*(0.90+0.10*up)+0.5, rot), dark? mixHex(bc[0],'#1a0e08',0.3) : bc[0], rgbA(bc[1],dark? 0.4 : 0.85), rgbA(bc[2],0.6));
+          return c0; }
         lit(p, dark? sSh : skin, dark? rgbA(skin,0.5) : rgbA(sLit,0.9), rgbA(sDeep,dark? 0.6 : 0.42));
         if(!dark){ const gx=c0[0]-hd[0]*rb*0.30-g[0]*0.2+tB[0]*rb*0.25, gy=c0[1]-hd[1]*rb*0.30-rb*0.25+tB[1]*rb*0.25;
           oc.save(); oc.clip(p); const gg=oc.createRadialGradient(gx,gy,0.1,gx,gy,rb*0.85);
@@ -26231,8 +26839,10 @@ function drawFemFig(bk, fr, F){
       lit(rp, rc, rgbA(rHi,0.85), rgbA(rSh,0.8));
       for(let i=0;i<3;i++) line([at(0.9-i*0.25,bw[3]+0.8), at(0.7-i*0.25,bw[2]+1.8)], rgbA(rSh,0.6), 0.5);
       line([at(1.0,bw[4]+0.4), at(0.70,bw[3]*0.3), at(0.32,bw[1]*0.3)], mixHex(rc,'#e8c34a',0.5), 0.8); }             // the collar edge
+    if(KIT) nbKit(oc,K,Qf,KIT,'body');
     // ---- the neck, her hair falling, and her head ----
     lit(capsule([[Sh[0],Sh[1],1.6],[Nk[0],Nk[1],1.4]]), skin, rgbA(sLit,0.6), rgbA(sDeep,0.4));
+    if(HK!==1){ oc.save(); oc.translate(Nk[0],Nk[1]); oc.scale(HK,HK); oc.translate(-Nk[0],-Nk[1]); }
     { const fall=(long? 7+hq*0.9 : 2.5+hq*0.3), r0=Rp(-3.0,-0.6), sw=Math.sin((F.t||0)*0.08)*0.8+RK2*1.6;
       const gdir=[g[0]*0.85+(-cs)*0.15, g[1]*0.85+(-sn)*0.15], side=[gdir[1],-gdir[0]], wd=long? 4.2 : 2.8;
       const pts=[add(r0,[side[0]*wd*0.6, side[1]*wd*0.6]), add(r0,[-side[0]*wd*0.5, -side[1]*wd*0.5]),
@@ -26245,35 +26855,784 @@ function drawFemFig(bk, fr, F){
     { const face=smooth([[-4.0,-1.2],[-2.6,-4.5],[1.3,-4.7],[3.5,-2.3],[3.9,-0.4],[4.6,0.7],[3.9,1.3],[4.0,2.2],[3.6,2.6],[3.8,3.2],
                          [2.8,4.5],[1.6,4.7],[-0.6,4.4],[-3.2,2.6]].map(q=>Rp(q[0],q[1])));
       lit(face, skin, rgbA(sLit,0.85), rgbA(sDeep,0.42));
-      const EX = { flat:{lid:0.1,brow:0,smile:0,open:0}, flush:{lid:0.45,brow:0.3,smile:0.2,open:0.6}, bite:{lid:0.35,brow:0.2,smile:0,open:0,bite:1},
-                   brace:{lid:0,brow:0.9,smile:-0.1,open:1.0}, smug:{lid:0.5,brow:-0.2,smile:0.8,open:0}, pleased:{lid:0,brow:0.2,smile:1,open:0,shut:1},
-                   absorbed:{lid:0.2,brow:0.1,smile:0,open:0.3}, cross:{lid:0.3,brow:-1,smile:-0.8,open:0}, shut:{lid:0,brow:0.3,smile:0,open:0,shut:1},
-                   kiss:{lid:0.6,brow:0.2,smile:0,open:0,pucker:1}, oh:{lid:0.1,brow:0.7,smile:0,open:1.2}, asleep:{lid:0,brow:0,smile:0.1,open:0,shut:1} }[F.expr||'flat'] || {lid:0.1,brow:0,smile:0,open:0};
+      const EX = FACE_EX[F.expr||'flat'] || FACE_EX.flat;                                      // 😋 one table of faces for everyone
       if(!long) lit(ell(...Rp(-0.9,0.4), 1.0, 1.5, aN), mixHex(skin,sSh,0.4), rgbA(sLit,0.5), rgbA(sDeep,0.5));
       const E0=Rp(2.3,-0.6);
       if(EX.shut){ line([Rp(1.5,-0.5),Rp(2.4,-0.95),Rp(3.2,-0.5)], mixHex(hair,'#000000',0.3), 0.6); line([Rp(3.2,-0.5),Rp(3.8,-0.2)], '#1a0e08', 0.4); }
-      else { oc.fillStyle='#f4eee6'; oc.fill(ell(E0[0],E0[1],0.95,0.62,aN));
+      else { oc.fillStyle='#f4eee6'; oc.fill(ell(E0[0],E0[1],0.95*(EX.wide?1.3:1),0.62*(EX.wide?1.5:1),aN));
         oc.fillStyle='#2a1a10'; oc.fill(ell(...Rp(2.75,-0.55),0.5,0.58,aN));
         if(EX.lid>0.15){ oc.fillStyle=mixHex(skin,sSh,0.35); oc.fill(ell(...Rp(2.3,-1.05+EX.lid*0.25),1.1,0.35+EX.lid*0.35,aN)); }
         line([Rp(1.2,-1.1),Rp(2.4,-1.35),Rp(3.5,-1.0),Rp(3.9,-1.3)], '#1a0e08', 0.55); }
-      line([Rp(1.0,-2.3+(EX.brow<0? 0 : -EX.brow*0.4)),Rp(3.4,-2.1-EX.brow*0.35+(EX.brow<0? -EX.brow*0.55 : 0))], mixHex(hair,'#000000',0.2), 0.55);
+      line([Rp(1.0,-2.3+(EX.brow<0? 0 : -EX.brow*0.4)+(EX.sad?0.5:0)),Rp(3.4,-2.1-EX.brow*0.35+(EX.brow<0? -EX.brow*0.55 : 0)-(EX.sad?0.5:0))], mixHex(hair,'#000000',0.2), 0.55);
       { const m0=Rp(3.55,2.35), mc=Rp(2.6,2.4-EX.smile*0.55), lipC=mixHex(skin,'#b83a4a',0.55);
         if(EX.open>0.25){ oc.fillStyle='#4a1a1e'; oc.fill(ell(...Rp(3.2,2.4),0.55,0.35+EX.open*0.35,aN)); }
         if(!EX.pucker) line([m0, mc], lipC, 0.75);
         oc.fillStyle=lipC; oc.fill(ell(...Rp(3.55+(EX.pucker?0.4:0),2.0),0.45,0.32,aN)); oc.fill(ell(...Rp(3.45+(EX.pucker?0.4:0),2.85),0.5,0.34,aN));
         if(EX.bite){ const q=Rp(3.1,2.5); oc.fillStyle='#f4efe4'; oc.fillRect(q[0], q[1]-0.2, 0.9, 0.45); } }
       if(F.blush>0){ oc.fillStyle='rgba(236,88,116,'+(0.50*clamp(F.blush,0,1)).toFixed(2)+')'; oc.fill(ell(...Rp(1.5,1.2),1.5,0.9,aN)); }
+      faceFxProfile(oc, Rp, EX, F.t||0, true);                                                 // 😋 hearts, a tear, the reflection
       const hc=smooth([[-4.5,1.9],[-4.4,-2.8],[-1.6,-5.5],[1.6,-5.4],[3.7,-3.2],[2.4,-3.1],[0.4,-2.6],[-1.4,-1.0],[-1.8,1.4],[-2.6,3.6]].map(q=>Rp(q[0],q[1])));
       lit(hc, hair, rgbA(hHi,0.85), rgbA(hSh,0.8));
       line([Rp(-3.0,-3.8),Rp(-0.4,-5.0),Rp(1.8,-4.6)], rgbA(hHi,0.7), 0.5);
       if(cut==='bangs') lit(smooth([[0.8,-4.6],[3.6,-3.4],[3.9,-1.8],[2.2,-2.2],[0.6,-2.6]].map(q=>Rp(q[0],q[1]))), hair, rgbA(hHi,0.8), rgbA(hSh,0.7));
       if(cut==='tower'||cut==='bun') lit(ell(...Rp(-3.6,-4.6),2.3,2.0,aN), hair, rgbA(hHi,0.85), rgbA(hSh,0.8)); }
+    if(KIT){ oc.save(); oc.translate(HC[0],HC[1]); oc.rotate(aN); nbKit(oc,K,Qf,KIT,'head'); oc.restore(); }   // ⚔ the helmet, ON the head
+    if(HK!==1) oc.restore();
   };
+  if(HK!==1) out.head=[Nk[0]+(HC[0]-Nk[0])*HK, Nk[1]+(HC[1]-Nk[1])*HK];
   if(F.dry) return out;                                       // just where everything is
   if(!F.only || F.only==='far')  drawIn(bk,'far');
   if(!F.only || F.only==='main') drawIn(bk,'main');
   if(!F.only || F.only==='near') drawIn(fr,'near');
   return out;
+}
+/* =====================================================================
+   ⚔ THE BODY TEMPLATE — THE WOOHOO'S FIGURES, EVERYWHERE
+   ---------------------------------------------------------------------
+   "Get the bodies from the woohoos and put them everywhere." The two
+   posable figures the bedchamber was rebuilt on — drawMateFig and
+   drawFemFig: a real skeleton, IK legs and arms, a round lit trunk, a
+   profile head with its own cut and its own face — were the best-drawn
+   people in the game, and they only ever appeared behind a door. On the
+   sand, on the card and in the field the game still drew the old block
+   rig: forty rectangles and a face made of four pixels.
+
+   So the two figures get a KIT: whatever a person is actually wearing,
+   built over the body underneath it the way her gown already was —
+     · a loincloth and (for her) a breast-band that are ALWAYS on in kit
+       mode. This is a public arena; nothing under them is ever drawn —
+       the kit paints the seat and the bust in cloth instead of skin and
+       forces the groin covered, so no pose and no lean can uncover it;
+     · a belt, greaves on the shins, a segmented guard on the sword arm,
+       sleeves and trousers wherever the coat has them;
+     · twenty-nine harnesses shaped to the TRUNK — the band follows the
+       seat and the bust and the lean — instead of a rectangle pasted
+       over a rectangle;
+     · twenty-three helmets drawn in PROFILE, on the head, rather than a
+       flat mask staring at the camera from a body that faces sideways.
+   Everything is opt-in: a scene that passes no `kit` draws exactly what
+   it drew before, so the bedchamber is untouched.
+   ===================================================================== */
+const NB_MAT={
+  metal:  ['#b8c2cc','#eef4fa','#5a6572'], iron:  ['#6e737c','#aab0ba','#2c3036'],
+  bronze: ['#bb8a46','#ecc47a','#66441c'], gold:  ['#dcae38','#fff0b0','#86600e'],
+  lacquer:['#2a2a31','#5c5c6a','#0e0e12'], red:   ['#8a2a2a','#cc5c4c','#461010'],
+  felt:   ['#7a6a52','#aa9a7c','#463a2a'], hide:  ['#8a6a44','#bc9a6c','#46321c'],
+  bone:   ['#e2d8c0','#fffaec','#a0927a'], fur:   ['#d4c8b0','#fff6e2','#86765c'],
+  wood:   ['#8a6a44','#b48c5c','#44321e'], leather:['#6b4a2a','#946a3e','#36240f'],
+};
+function nbCol(c){ if(!c) return null; if(Array.isArray(c)) return c; if(NB_MAT[c]) return NB_MAT[c];
+  const h=hexOf(c); return [h, mixHex(h,'#ffffff',0.30), mixHex(h,'#100804',0.45)]; }
+function nbLit(K, p, c, k){ const C=nbCol(c); K.lit(p, C[0], rgbA(C[1],0.85), rgbA(C[2],0.8), k||1); }
+/* the hem of anything that comes down past the hips, read off BOTH legs —
+   f: 0 at the hip, 1 at the knee, 2 at the ankle */
+function nbHem(Q, f){
+  const pt=(Lg)=> f<=1? [Lg.hip[0]+(Lg.K[0]-Lg.hip[0])*f, Lg.hip[1]+(Lg.K[1]-Lg.hip[1])*f]
+                      : [Lg.K[0]+(Lg.ank[0]-Lg.K[0])*(f-1), Lg.K[1]+(Lg.ank[1]-Lg.K[1])*(f-1)];
+  const a=pt(Q.LN), b=pt(Q.LF), r=(f<=1? Q.legR*(1-0.32*f) : Q.legR*0.62)+0.9, y=Math.max(a[1],b[1]);
+  return {back:[Math.min(a[0],b[0])-r, y], front:[Math.max(a[0],b[0])+r, y], mid:[(a[0]+b[0])/2, y]};
+}
+/* one outline over the trunk from tTop down to the hips, and on down the
+   legs to hemF if the garment is long — pushed out by the seat and the bust */
+function nbTorsoPts(Q, tTop, tBot, hemF, pad){
+  const back=[], front=[], N=9;
+  for(let i=0;i<=N;i++){ const t=tTop-(tTop-tBot)*i/N;
+    back.push(Q.at(t, Q.bwAt(t)+Q.seatB(t)+pad)); front.push(Q.at(t, -(Q.fwAt(t)+Q.bustB(t)+pad))); }
+  if(hemF>0){ const h1=nbHem(Q,hemF*0.5), h=nbHem(Q,hemF); back.push(h1.back, h.back); front.push(h1.front, h.front); }
+  return back.concat(front.reverse());
+}
+function nbRow(Q, t, pad, fn){ const a=Q.at(t, Q.bwAt(t)+Q.seatB(t)+pad), b=Q.at(t, -(Q.fwAt(t)+Q.bustB(t)+pad)); fn(a,b); }
+const nbLerp=(a,b,t)=>[a[0]+(b[0]-a[0])*t, a[1]+(b[1]-a[1])*t];
+
+/* ---------------- THE HARNESSES, BY WHAT THEY ARE MADE OF ----------------
+   kind: what the silhouette and the surface are · top/bot: how far up and
+   down the trunk it runs (bot < 0 carries on down the legs, as a fraction
+   of the thigh) · sleeve / legs: what goes on the arms and legs.          */
+const NB_ARMOR={
+  galerus:     {kind:'galerus',  mat:'metal'},
+  subarmalis:  {kind:'quilt',    col:'#c8b088', top:0.98, bot:0.02, hem:0.28, sleeve:'short'},
+  manica:      {arm:'metal'},
+  ocrea:       {greave:'bronze'},
+  cardiophylax:{kind:'chestplate', mat:'bronze'},
+  hamata:      {kind:'mail',     mat:'iron',   top:1.0, bot:0.02, hem:0.40, sleeve:'short', slcol:'iron'},
+  squamata:    {kind:'scale',    mat:'bronze', top:1.0, bot:0.02, hem:0.40, sleeve:'short', slcol:'bronze'},
+  lorica:      {kind:'bands',    mat:'metal',  top:0.98, bot:0.12, pauldron:true, arm:'metal', belt:true},
+  musculata:   {kind:'muscle',   mat:'bronze', top:0.98, bot:0.10, pteruges:true, gild:true},
+  xuanjia:     {kind:'lamellar', mat:'iron',   lace:['#8a3a2e'], top:1.0, bot:0.02, hem:0.55, sleeve:'short', slcol:'iron'},
+  steppe_coat: {kind:'coat',     col:'#7a5a3a', top:1.0, bot:0.02, hem:0.62, sash:'#a83a3a', toggles:'#c8a24a', sleeve:'full', legs:'#4a3a2a'},
+  kataphraktos:{kind:'scale',    mat:'iron',   top:1.04, bot:0.02, hem:0.80, sleeve:'full', slcol:'iron', legs:'iron', gorget:true},
+  sealskin:    {kind:'parka',    col:'#6a6a5c', trim:'#34342c', seam:'#d8d0b0', top:1.04, bot:0.02, hem:0.62, sleeve:'full', legs:'#4a4438'},
+  traders_coat:{kind:'coat',     col:'#6a4a2e', strips:['#c8452a','#2f7a8a','#e8c34a'], pockets:true, top:1.0, bot:0.02, hem:0.66, sleeve:'full', legs:'#4a3624'},
+  sivra_apron: {kind:'apron',    col:'#5a3a22', top:0.84, hem:1.05},
+  smoke_leathers:{kind:'coat',   col:'#2c2622', sheen:true, top:1.0, bot:0.02, hem:0.55, sleeve:'full', legs:'#221c18'},
+  caribou_parka:{kind:'parka',   col:'#8a7050', trim:'#ece0c6', ruff:true, top:1.06, bot:0.02, hem:0.70, sleeve:'full', legs:'#6a5438'},
+  plate_parka: {kind:'rods',     col:'#7a6040', rod:'#e0d4b8', top:1.02, bot:0.02, hem:0.66, sleeve:'full', legs:'#5a4630'},
+  harra_robe:  {kind:'robe',     col:'#5a3a6a', tokens:true, top:1.02, bot:0.02, hem:1.55, sleeve:'full'},
+  clerk_wrap:  {kind:'wrap',     col:'#6a5a4a', panel:'#cabb9c', top:1.0, bot:0.02, hem:0.46, sleeve:'short'},
+  kan_sash:    {kind:'sash',     col:'#a82a4a'},
+  ten_mantle:  {kind:'mantle',   panels:['#c8452a','#e8c34a','#2f7a8a','#6a3a8a','#3a7a3a','#e8e0cc','#8a2a4a','#2a4a8a','#a86a2a','#1a1a1a']},
+  mawashi:     {kind:'mawashi',  col:'#2a2a4a'},
+  haramaki:    {kind:'lamellar', col:'#6a3a4a', lace:['#c8b088'], top:0.92, bot:0.02, skirt:'#5e3242'},
+  okegawa:     {kind:'bands',    mat:'iron',   top:1.0, bot:0.04, rivets:true, skirt:'iron'},
+  domaru:      {kind:'lamellar', mat:'lacquer', lace:['#c8452a','#2f5f9a'], top:1.0, bot:0.02, skirt:'lacquer', seam:true},
+  tosei:       {kind:'plate',    mat:'lacquer', gilt:true, top:1.02, bot:0.04, skirt:'lacquer'},
+  nanban_do:   {kind:'plate',    mat:'metal',  ridge:true, dent:true, top:1.02, bot:0.06, skirt:'metal'},
+  kavacha:     {kind:'quilt',    col:'#d8c8a8', brass:true, top:1.0, bot:0.02, hem:0.36, sleeve:'short'},
+};
+/* ---------------- THE HELMETS, IN PROFILE ----------------
+   Every one of these is drawn in the head's own frame: x toward the face,
+   y down, the centre of the skull at 0,0. The face under an open helmet
+   is the figure's own face, so an open helm leaves it showing.           */
+const NB_HELM={
+  galea_thraex:   {mat:'metal', brim:'wide', visor:'grille', crest:'griffin', crestCol:'gold'},
+  galea_murmillo: {mat:'metal', brim:'wide', visor:'grille', crest:'fin', plume:'#c52a2a'},
+  galea_secutor:  {mat:'metal', egg:true, crest:'lowfin'},
+  galea_hoplo:    {mat:'metal', brim:'wide', visor:'grille', crest:'plume', plume:'cloth'},
+  galea_prov:     {mat:'metal', brim:'narrow', visor:'roundeye', neck:'flare'},
+  celtic_helm:    {mat:'bronze', crest:'knob', cheek:true, neck:'short'},
+  persian_helm:   {mat:'iron', crest:'point', aventail:'#4a3a2a'},
+  galea_cornuta:  {mat:'bronze', brim:'narrow', crest:'horns', cheek:true},
+  galea_praetoria:{mat:'metal', attic:true, crest:'fan', plume:'#c52a2a', trim:'gold', cheek:true, neck:'flare'},
+  galea_aurea:    {mat:'gold', mask:'gold', crest:'curls'},
+  dou_mou:        {mat:'iron', rivets:true, curtain:'iron', crest:'plume_s', plume:'#c52a2a'},
+  bone_cap:       {mat:'hide', ribs:'bone'},
+  raven_mask:     {mat:'wood', mask:'raven'},
+  ten_circlet:    {circlet:true},
+  jingasa:        {mat:'lacquer', hat:'jingasa', mon:true},
+  zunari:         {mat:'iron', shikoro:'iron', seam:true},
+  suji_kabuto:    {mat:'iron', ribbed:true, shikoro:['#2a2a30','#8a2f3a'], fuki:true, crest:'crescent'},
+  menpo:          {mat:'iron', shikoro:'iron', mask:'menpo'},
+  kawari:         {mat:'lacquer', shikoro:['#1e1e24','#c0a02a'], fuki:'gold', crest:'antlers', disc:'#c8452a'},
+  steppe_cap:     {mat:'felt', band:'iron', flaps:true, crest:'tuft'},
+  kushan_helm:    {mat:'iron', crest:'point', crown:'gold', browband:'gold', aventail:'iron'},
+  sirastrana:     {mat:'cloth', band:'iron', cheek:'laced', crest:'boss'},
+};
+function nbHelmCol(spec, C){
+  const m=spec.mat||'metal';
+  if(m==='metal') return [C.metal, C.metalHi, C.metalSh];
+  if(m==='bronze') return [C.bronze, C.bronzeHi, C.bronzeSh];
+  if(m==='gold') return [C.gold, '#fff0b0', '#8a6414'];
+  if(m==='cloth') return NB_MAT.bone.map(c=>mixHex(c,'#c8a870',0.5));
+  return nbCol(m);
+}
+/* the helmet itself. o: {C (the fighter's palette), fem, hair, t} */
+function nbDrawHelm(oc, K, spec, o){
+  const C=o.C, M=nbHelmCol(spec,C), P=(pts)=>K.smooth(pts), L=(p,c)=>nbLit(K,p,c||M,0.7);
+  const dark='#0c0806';
+  const line=(pts,col,wd)=>K.line(pts,col,wd);
+  // ---- what hangs BEHIND and BELOW the bowl first ----
+  if(spec.aventail){ const ac=nbCol(spec.aventail);
+    const p=P([[-4.8,-0.6],[-1.0,-0.4],[2.6,-0.6],[3.0,2.4],[2.2,5.6],[-0.6,7.6],[-4.6,7.8],[-6.4,5.2],[-5.8,1.6]]);
+    L(p,ac); oc.save(); oc.clip(p); oc.fillStyle=rgbA(ac[2],0.8);
+    for(let y=0;y<8;y+=1.1) for(let x=-6.5;x<3.5;x+=1.1) oc.fillRect(x+((y*0.9|0)%2?0.55:0), y, 0.5, 0.5);
+    oc.restore(); }
+  if(spec.curtain){ const cc=nbCol(spec.curtain);
+    for(let r=0;r<3;r++){ const y=0.4+r*1.9, p=P([[-5.2-r*0.4,y],[1.6,y-0.2],[1.8,y+1.9],[-5.6-r*0.5,y+2.1]]); L(p,cc);
+      for(let x=-5;x<1.5;x+=1.2) line([[x,y+0.2],[x,y+1.8]], rgbA(cc[2],0.9), 0.35); } }
+  if(spec.shikoro){ const sc=Array.isArray(spec.shikoro)? spec.shikoro : [NB_MAT[spec.shikoro]? NB_MAT[spec.shikoro][0] : spec.shikoro];
+    for(let r=0;r<4;r++){ const y=-0.4+r*1.55, fl=r*1.0, c=nbCol(sc[r%sc.length]);
+      const p=P([[-5.0-fl,y],[-2,y-0.6],[1.8,y-0.3],[2.2,y+1.3],[-2,y+1.2],[-5.4-fl*1.15,y+1.8]]); L(p,c);
+      line([[-5.2-fl,y+0.2],[1.9,y+0.1]], rgbA(c[1],0.8), 0.4);
+      if(sc.length>1) line([[-5.0-fl,y+1.2],[1.8,y+1.0]], r%2? '#c8452a' : '#2f5f9a', 0.45); } }
+  if(spec.neck==='flare'){ L(P([[-4.8,-0.6],[-5.6,2.2],[-7.4,4.2],[-6.2,5.0],[-3.8,3.8],[-3.0,1.2]])); }
+  if(spec.neck==='short'){ L(P([[-4.8,-0.4],[-5.4,2.4],[-4.2,3.4],[-3.2,1.2]])); }
+  if(spec.hat==='jingasa'){
+    // the head-cloth under it, then the hat: a broad shallow cone, the crest painted on the front
+    L(P([[-4.4,-2.2],[-3.0,-4.6],[1.2,-4.8],[3.8,-2.6],[3.2,-1.6],[-4.2,-1.2]]), nbCol('#3a2618'));
+    const p=P([[-10.4,-1.4],[-3.0,-5.6],[0.2,-7.4],[3.4,-5.6],[10.8,-1.8],[10.6,-0.8],[0.2,-2.4],[-10.2,-0.4]]); L(p);
+    line([[-10.2,-0.9],[0.2,-2.6],[10.6,-1.2]], rgbA(M[1],0.8), 0.6);
+    if(spec.mon){ oc.fillStyle=C.gold; oc.fill(K.ell(3.4,-4.4,1.2,1.0,0.5)); }
+    line([[-2.6,-1.2],[-1.6,4.2]], '#2a1a10', 0.5); line([[2.2,-1.4],[2.6,4.4]], '#2a1a10', 0.5);   // the chin cords
+    return; }
+  if(spec.circlet){
+    const band='#8a6a3a'; line([[-4.8,-2.4],[0,-3.4],[4.4,-2.6]], band, 1.4); line([[-4.8,-2.8],[0,-3.8],[4.4,-3.0]], '#b08a50', 0.5);
+    for(let i=0;i<5;i++){ const x=-4+i*2.0, y=-3.2-Math.sin((i+0.5)/5*Math.PI)*0.6; oc.fillStyle=['#c8452a','#e8c34a','#2f7a8a','#e8e0cc','#6a3a8a'][i];
+      oc.fill(K.ell(x,y-1.0,0.8,1.0,0)); oc.fillStyle='#2a1a0e'; oc.fillRect(x+0.1,y-1.2,0.35,0.35); }
+    return; }
+  // ---- THE BOWL ----
+  let bowl;
+  if(spec.egg){                         // the secutor: one smooth egg over the whole head, two small eyes
+    bowl=P([[-5.0,2.6],[-5.4,-1.8],[-3.8,-5.6],[-0.4,-7.0],[3.2,-6.2],[5.6,-3.2],[6.3,0.4],[5.8,3.2],[4.2,5.4],[1.2,6.4],[-2.4,6.0],[-4.6,4.6]]);
+    L(bowl); oc.fillStyle=dark; oc.fill(K.ell(4.4,-0.9,0.75,0.75,0)); oc.fillStyle=rgbA(M[1],0.7); oc.fillRect(4.1,-1.4,0.4,0.3);
+    line([[-4.6,4.4],[1.2,6.2],[4.8,4.2]], rgbA(M[2],0.8), 0.5);
+  } else if(spec.mask==='raven'){       // carved, painted, and near-blind — the beak runs out past the face
+    bowl=P([[-5.0,2.2],[-5.2,-2.4],[-3.4,-5.6],[0.6,-6.4],[3.6,-4.8],[5.2,-2.4],[10.8,0.6],[5.4,2.2],[4.2,4.8],[0.6,5.8],[-3.2,4.8]]);
+    L(bowl, nbCol('#1a1414')); line([[5.2,-1.4],[10.4,0.6],[5.4,1.4]], '#c8452a', 0.7);
+    oc.fillStyle='#e8e0cc'; oc.fill(K.ell(3.0,-1.4,1.3,0.9,0)); oc.fillStyle=dark; oc.fill(K.ell(3.4,-1.4,0.55,0.55,0));
+    line([[-4,-3],[-1,-4.8],[2,-4.8]], '#e8e0cc', 0.5); line([[-4.2,1],[0,2.6],[3.6,2.2]], '#c8452a', 0.6);
+    return;
+  } else if(spec.hat===undefined){
+    const tall=(spec.crest==='point');
+    const base = spec.attic
+      ? [[-4.9,1.0],[-5.0,-2.8],[-3.4,-5.6],[-0.2,-6.8],[3.0,-6.2],[4.8,-4.0],[5.6,-2.4],[6.4,-1.8],[5.0,-1.4],[-4.9,0.0]]
+      : tall
+      ? [[-4.9,0.4],[-4.8,-3.2],[-2.6,-6.2],[0.4,-10.8],[1.6,-10.6],[3.4,-6.0],[4.8,-3.0],[5.0,-1.4],[-4.9,-0.6]]
+      : [[-4.9,1.0],[-5.0,-2.8],[-3.4,-5.6],[-0.2,-6.8],[3.0,-6.2],[4.8,-3.8],[5.2,-1.6],[5.0,-1.0],[-4.9,0.0]];
+    bowl=P(base); L(bowl);
+    if(spec.ribbed) for(let i=0;i<6;i++){ const a=-2.6+i*0.4; line([[Math.cos(a)*5.8,Math.sin(a)*6.4+0.2],[Math.cos(a)*1.6,Math.sin(a)*2.0-1.4]], rgbA(M[1],0.85), 0.45); }
+    if(spec.seam) line([[0,-6.8],[-0.4,-1.0]], rgbA(M[2],0.9), 0.5);
+    if(spec.rivets){ oc.fillStyle=rgbA(M[1],0.9); for(let i=0;i<5;i++){ const a=-2.8+i*0.5; oc.fillRect(Math.cos(a)*4.4-0.25, Math.sin(a)*5.0-1.2, 0.5, 0.5); } }
+    if(spec.ribs){ const rc=nbCol(spec.ribs); for(let i=0;i<4;i++){ const a=-2.7+i*0.55; line([[Math.cos(a)*5.2,Math.sin(a)*6.0-0.2],[Math.cos(a)*2.4,Math.sin(a)*2.6-1.4]], rc[0], 0.9);
+        line([[Math.cos(a)*5.2,Math.sin(a)*6.0-0.2],[Math.cos(a)*2.4,Math.sin(a)*2.6-1.4]], rgbA(rc[1],0.8), 0.3); }
+      line([[-4.8,-0.6],[4.6,-1.2]], '#5a3a1e', 0.6); }
+    if(spec.band){ const bc=nbCol(spec.band); line([[-4.9,-0.9],[0,-1.3],[5.0,-1.5]], bc[0], 1.3); line([[-4.9,-1.3],[0,-1.7],[5.0,-1.9]], rgbA(bc[1],0.8), 0.4); }
+    if(spec.browband){ line([[-4.9,-0.8],[0,-1.2],[5.0,-1.4]], C.gold, 1.1); }
+    if(spec.trim) line([[5.6,-2.4],[6.4,-1.8],[5.0,-1.4],[-4.8,-0.2]], C.gold, 0.6);
+  }
+  // ---- the brim ----
+  if(spec.brim==='wide'){ const p=P([[-7.8,0.8],[-5.0,-0.6],[5.2,-1.4],[8.2,-1.6],[8.3,-0.6],[5.2,-0.2],[-5.0,0.9],[-7.9,1.9]]); L(p);
+    line([[-7.6,1.3],[-5,0.2],[5.2,-0.6],[8.1,-1.0]], rgbA(M[1],0.9), 0.45); }
+  if(spec.brim==='narrow'){ const p=P([[-5.8,0.4],[-5.0,-0.4],[5.2,-1.4],[6.8,-1.4],[6.6,-0.6],[5.0,-0.4],[-5.0,0.9]]); L(p); }
+  // ---- what covers the face ----
+  if(spec.visor==='grille'){
+    const p=P([[1.6,-0.6],[5.6,-0.8],[6.2,1.4],[5.8,4.0],[3.8,5.6],[1.2,5.4],[0.8,2.0]]); L(p);
+    oc.fillStyle=dark; for(let y=-0.1;y<2.6;y+=1.05) for(let x=2.3;x<5.8;x+=1.05) oc.fillRect(x,y,0.62,0.62);
+    line([[1.4,5.2],[5.6,3.8]], rgbA(M[2],0.9), 0.5); }
+  if(spec.visor==='roundeye'){
+    const p=P([[1.4,-0.8],[5.4,-1.0],[6.0,1.6],[5.4,4.4],[3.4,5.6],[1.2,5.0],[0.8,1.8]]); L(p);
+    oc.fillStyle=dark; oc.fill(K.ell(3.9,0.4,1.25,1.25,0)); oc.strokeStyle=M[1]; oc.lineWidth=0.35; oc.beginPath(); oc.arc(3.9,0.4,1.25,0,7); oc.stroke();
+    oc.fillStyle=rgbA(M[1],0.9); oc.fillRect(3.4,0.2,1.0,0.3); oc.fillRect(3.8,-0.3,0.3,1.3); }
+  if(spec.cheek===true){ L(P([[-0.6,-0.8],[2.8,-1.0],[3.2,2.4],[2.2,5.0],[0.0,4.6],[-1.0,1.6]])); oc.fillStyle=rgbA(M[1],0.8); oc.fillRect(0.6,0.6,0.5,0.5); }
+  if(spec.cheek==='laced'){ const cc=nbCol('#c8a870'); L(P([[-0.8,-0.8],[2.4,-1.0],[2.6,3.0],[1.2,4.6],[-0.8,3.8]]), cc);
+    for(let y=0;y<4;y+=1) line([[-0.2,y],[1.8,y+0.3]], '#6a4a2a', 0.35); }
+  if(spec.flaps){ L(P([[-3.6,-1.0],[-0.4,-1.2],[0.2,3.4],[-1.4,4.8],[-3.4,3.8]])); }
+  if(spec.fuki){ const fc= spec.fuki==='gold'? nbCol(C.gold) : M; L(P([[2.0,-2.4],[4.4,-3.2],[4.8,-1.0],[3.0,0.2],[1.6,-0.4]]), fc); }
+  if(spec.mask==='gold'){ const G2=nbCol(C.gold);
+    const p=P([[1.0,-3.4],[4.4,-3.4],[5.2,-1.2],[5.8,0.8],[5.0,1.6],[5.2,2.8],[4.2,4.6],[1.8,5.2],[0.6,2.0]]); L(p,G2);
+    oc.fillStyle='#1a1206'; oc.fillRect(3.2,-0.9,1.6,0.4); line([[4.2,2.4],[5.0,2.6]], G2[2], 0.5); line([[5.2,-1.0],[5.9,0.8],[5.0,1.4]], rgbA(G2[2],0.9), 0.4); }
+  if(spec.mask==='menpo'){ const R=nbCol('#5a2028');
+    const p=P([[1.6,-0.6],[4.6,-0.8],[5.8,0.6],[5.2,1.6],[5.6,3.0],[4.4,4.8],[2.0,5.4],[1.0,2.6]]); L(p,R);
+    oc.fillStyle='#e8e0cc'; oc.fillRect(4.0,2.4,1.4,0.5); oc.fillStyle='#2a1a10';
+    oc.fill(K.ell(4.2,1.7,1.4,0.5,-0.2)); oc.fill(K.ell(3.6,4.9,1.0,0.7,0)); oc.fillStyle=dark; oc.fillRect(3.2,-0.3,1.4,0.5); }
+  // ---- and what stands on top ----
+  const cr=spec.crest;
+  if(cr==='fin'){ const p=P([[-4.2,-5.4],[-3.6,-9.6],[-0.4,-12.2],[3.4,-10.8],[4.4,-6.2],[2.6,-6.4]]); L(p);
+    for(let i=0;i<5;i++) line([[-3.4+i*1.6,-6.2],[-2.6+i*1.4,-10.6+Math.abs(i-2)*0.6]], rgbA(M[2],0.8), 0.4);
+    const pl=nbCol(spec.plume||'#c52a2a'); L(P([[-3.8,-9.8],[-0.6,-13.4],[3.8,-11.6],[3.2,-10.6],[-0.4,-12.0],[-3.0,-9.4]]), pl); }
+  if(cr==='lowfin'){ L(P([[-3.6,-6.2],[-1.8,-8.2],[2.4,-8.0],[3.6,-6.2]])); }
+  if(cr==='griffin'){ const gc=nbCol(spec.crestCol==='gold'? C.gold : M[0]);
+    L(P([[-3.6,-5.6],[-2.8,-8.4],[0.4,-10.8],[3.2,-11.8],[5.4,-11.0],[6.4,-9.4],[5.0,-9.4],[3.4,-9.6],[1.4,-8.2],[0.8,-6.0]]), gc);
+    oc.fillStyle=dark; oc.fillRect(4.4,-10.8,0.5,0.5); line([[6.2,-9.4],[7.2,-8.6]], gc[2], 0.6); }
+  if(cr==='plume'){ const pc=nbCol(spec.plume==='cloth'? C.cloth : spec.plume);
+    for(let i=0;i<3;i++){ const sw=Math.sin((o.t||0)*0.12+i)*0.6;
+      L(P([[-1.0+i*1.2,-6.4],[-2.6+i*1.4+sw,-11.8],[-1.6+i*1.4+sw,-14.4],[-0.4+i*1.2+sw,-12.0],[0.4+i*1.2,-6.6]]), pc); }
+    L(P([[-4.6,-3.6],[-7.4,-8.4],[-6.4,-9.0],[-4.0,-5.0]]), pc); }
+  if(cr==='plume_s'){ const pc=nbCol(spec.plume); L(P([[-0.8,-6.6],[-1.8,-10.0],[0.4,-10.8],[1.4,-6.8]]), pc); }
+  if(cr==='fan'){ const pc=nbCol(spec.plume||'#c52a2a');
+    const p=P([[-5.6,-5.6],[-5.4,-9.6],[-2.2,-12.6],[1.6,-12.8],[4.6,-10.4],[4.8,-6.4]]); L(p,pc);
+    for(let i=0;i<7;i++){ const a=Math.PI*(1.05+i*0.13); line([[-0.4,-5.6],[-0.4+Math.cos(a)*6.8,-5.6+Math.sin(a)*6.8]], rgbA(pc[2],0.7), 0.35); }
+    line([[-5.4,-5.8],[4.6,-6.2]], C.gold, 1.0); }
+  if(cr==='knob'){ line([[-0.4,-6.6],[-0.4,-7.8]], M[2], 0.9); L(K.ell(-0.4,-8.6,1.3,1.1,0)); }
+  if(cr==='point' && spec.crown){ L(K.ell(0.9,-11.0,1.0,0.9,0), nbCol(C.gold)); }
+  if(cr==='horns'){ const hc=nbCol('#efe4c8');
+    L(P([[1.2,-4.6],[3.2,-6.6],[6.0,-9.4],[8.4,-12.2],[8.8,-11.4],[7.0,-8.4],[4.4,-5.0],[2.4,-3.6]]), hc);
+    L(P([[-2.4,-5.4],[-2.4,-8.4],[-0.6,-11.6],[0.2,-11.0],[-0.8,-8.0],[-0.8,-5.4]]), hc.map(c=>mixHex(c,'#6a5a40',0.35))); }
+  if(cr==='antlers'){ const ac=nbCol(C.gold);
+    for(const s of [1,-0.6]){ line([[1.4*s,-5.8],[3.0*s,-10.2],[4.6*s,-13.8]], ac[0], 1.0); line([[3.0*s,-10.2],[6.4*s,-11.2]], ac[0], 0.9);
+      line([[4.0*s,-12.4],[2.2*s,-14.6]], ac[0], 0.8); line([[1.4*s,-5.8],[3.0*s,-10.2],[4.6*s,-13.8]], rgbA(ac[1],0.8), 0.35); } }
+  if(spec.disc){ L(K.ell(3.6,-6.4,1.6,1.6,0), nbCol(spec.disc)); }
+  if(cr==='crescent'){ const gc=nbCol(C.gold);
+    L(P([[3.4,-4.6],[2.0,-8.6],[0.6,-11.2],[1.4,-11.4],[3.4,-9.0],[4.6,-6.6],[6.4,-9.6],[7.6,-11.0],[8.0,-10.4],[6.8,-7.4],[4.8,-4.2]]), gc); }
+  if(cr==='curls'){ const gc=nbCol(C.gold); for(let i=0;i<5;i++) L(K.ell(-3.8+i*1.8,-5.4-Math.sin((i+0.5)/5*Math.PI)*1.2,1.1,0.95,0), gc); }
+  if(cr==='tuft'){ L(P([[-0.6,-6.4],[-0.8,-8.8],[0.8,-9.4],[1.0,-6.6]]), nbCol('#a83a3a')); }
+  if(cr==='boss'){ L(K.ell(0.2,-7.0,1.2,1.0,0), nbCol(C.gold)); }
+  // the glint on a bright bowl, where the lamp finds it
+  if(bowl && (spec.mat==='metal'||spec.mat==='gold'||spec.mat==='bronze')){ oc.fillStyle='rgba(255,255,255,.55)'; oc.fillRect(-1.6,-5.6,1.4,0.5); }
+}
+
+/* ---------------- THE KIT ITSELF, PART BY PART ----------------
+   Called from inside drawMateFig and drawFemFig at the right depth:
+   legFar / legNear straight after that leg, body after the trunk, head
+   after the face (in the head's own frame), armFar / armNear after that
+   arm. Q is the figure's own geometry.                                   */
+function nbKit(oc, K, Q, kit, part){
+  const A=kit.armor? NB_ARMOR[kit.armor] : null, C=kit.C;
+  const loin=nbCol(kit.loin||'#c8b494'), belt=nbCol(kit.belt||C.leather);
+  const legCap=(Lg,r0,f0,f1,pad)=>{ const p0=f0<=1? nbLerp(Lg.hip,Lg.K,f0) : nbLerp(Lg.K,Lg.ank,f0-1), p1=f1<=1? nbLerp(Lg.hip,Lg.K,f1) : nbLerp(Lg.K,Lg.ank,f1-1);
+    const rr=(f)=> f<=1? r0*(1-0.35*f) : r0*(0.62-0.26*(f-1)); const m=(f0+f1)/2, pm=m<=1? nbLerp(Lg.hip,Lg.K,m) : nbLerp(Lg.K,Lg.ank,m-1);
+    return K.capsule([[p0[0],p0[1],rr(f0)+pad],[pm[0],pm[1],rr(m)+pad],[p1[0],p1[1],rr(f1)+pad]]); };
+  const shade=(c,dk)=> dk? c.map(x=>mixHex(x,'#1a0e08',0.28)) : c;
+  if(part==='legFar' || part==='legNear'){
+    const Lg= part==='legFar'? Q.LF : Q.LN, dk=(part==='legFar');
+    // trousers where the coat has them, and the loincloth over the top of the thigh always
+    if(A && A.legs){ const lc=shade(nbCol(A.legs),dk); nbLit(K, legCap(Lg,Q.legR,0.02,1.96,0.45), lc);
+      if(A.legs==='iron'){ oc.save(); oc.clip(legCap(Lg,Q.legR,0.02,1.96,0.45)); oc.fillStyle=rgbA(lc[2],0.8);
+        for(let f=0.1;f<1.9;f+=0.16){ const p=f<=1? nbLerp(Lg.hip,Lg.K,f) : nbLerp(Lg.K,Lg.ank,f-1); oc.fillRect(p[0]-3,p[1],6,0.45); } oc.restore(); } }
+    nbLit(K, legCap(Lg,Q.legR,0.0,0.30,0.55), shade(loin,dk));
+    // greaves: bronze from below the knee to the ankle, a boss on the knee
+    const gv=kit.greave;
+    if(gv && (!dk || kit.greaveBoth)){ const gc=shade(nbCol(gv),dk);
+      const p=legCap(Lg,Q.legR,1.02,1.92,0.5); nbLit(K,p,gc);
+      K.line([nbLerp(Lg.K,Lg.ank,0.15), nbLerp(Lg.K,Lg.ank,0.85)].map(q=>[q[0]+1.4,q[1]]), rgbA(gc[1],0.9), 0.45);
+      nbLit(K, K.ell(Lg.K[0]+0.6, Lg.K[1]+0.2, 1.9, 1.7, 0), gc);
+      K.line([nbLerp(Lg.K,Lg.ank,0.9).map((v,i)=>v+(i?0:-2)), nbLerp(Lg.K,Lg.ank,0.9).map((v,i)=>v+(i?0:2.4))], gc[2], 0.6); }
+    return; }
+  if(part==='armFar' || part==='armNear'){
+    const dk=(part==='armFar'), sl=A && A.sleeve, arm=kit.manica || (A && A.arm);
+    if(!sl && !arm) return;
+    const from=dk? Q.shF : Q.shN, to=dk? Q.hF : Q.hN; if(!from||!to) return;
+    const E=ik2(from, to, Q.Lup, Q.Lfo, Q.elbow===undefined? 1 : Q.elbow), J=E.J, Wr=E.end;
+    const cap=(a,b,ra,rb,pad)=>K.capsule([[a[0],a[1],ra+pad],[(a[0]+b[0])/2,(a[1]+b[1])/2,(ra+rb)/2+pad],[b[0],b[1],rb+pad]]);
+    const R0=Q.armR||2.6;
+    if(sl){ const sc=shade(nbCol(A.slcol||A.col||'#6a4a2e'),dk);
+      nbLit(K, cap(from,J,R0,R0*0.78,0.45), sc);
+      if(sl==='full'){ nbLit(K, cap(J,Wr,R0*0.78,R0*0.56,0.45), sc);
+        if(A.kind==='parka' || A.ruff) K.line([nbLerp(J,Wr,0.92).map((v,i)=>v+(i?-1.2:0)), nbLerp(J,Wr,0.92).map((v,i)=>v+(i?1.2:0))], (A.trim||'#e8dcc2'), 1.2); } }
+    if(arm && !dk){ const mc=nbCol(arm), segs=[[from,J,R0,R0*0.8],[J,Wr,R0*0.8,R0*0.6]];
+      for(const [a,b,ra,rb] of segs){ nbLit(K, cap(a,b,ra,rb,0.5), mc);
+        for(let s=1;s<5;s++){ const q=nbLerp(a,b,s/5), d=[b[0]-a[0],b[1]-a[1]], m=Math.hypot(d[0],d[1])||1, n=[-d[1]/m,d[0]/m], r=ra+(rb-ra)*s/5+0.4;
+          K.line([[q[0]+n[0]*r,q[1]+n[1]*r],[q[0]-n[0]*r,q[1]-n[1]*r]], rgbA(mc[2],0.95), 0.45); } } }
+    return; }
+  if(part==='head'){ if(kit.helm && NB_HELM[kit.helm]) nbDrawHelm(oc, K, NB_HELM[kit.helm], {C, fem:Q.fem, hair:Q.hair, t:kit.t||0}); return; }
+  if(part!=='body') return;
+  // ================= THE BODY =================
+  const at=Q.at;
+  // ---- the loincloth: round the hips, over the seat, and a front flap ----
+  if(!(A && A.kind==='mawashi')){
+    const wrap=K.smooth(nbTorsoPts(Q, 0.20, 0.0, 0.26, 0.55)); nbLit(K, wrap, loin);
+    const hm=nbHem(Q,0.26);
+    const flap=K.smooth([at(0.12,-(Q.fwAt(0.12)+0.4)), at(0.12,-(Q.fwAt(0.12)*0.1)), [hm.front[0]-1.6, hm.front[1]+2.8], [hm.front[0]-0.6, hm.front[1]+3.2]]);
+    nbLit(K, flap, loin.map(c=>mixHex(c,'#000000',0.08)));
+    K.line([at(0.02,-(Q.fwAt(0.02)*0.2)), [hm.front[0]-1.2,hm.front[1]+2.4]], rgbA(loin[2],0.8), 0.45);
+  } else {
+    const mc=nbCol(A.col); const wrap=K.smooth(nbTorsoPts(Q, 0.26, 0.0, 0.22, 0.8)); nbLit(K, wrap, mc);
+    for(let i=0;i<3;i++){ nbRow(Q, 0.06+i*0.08, 0.8, (a,b)=>K.line([a,b], rgbA(mc[1],0.6), 0.45)); }
+    const hm=nbHem(Q,0.2); K.line([at(0.2,-(Q.fwAt(0.2)+0.6)),[hm.front[0]-0.4,hm.front[1]+1]], rgbA(mc[2],0.9), 1.0);
+  }
+  // ---- her breast-band: the bust is already cloth in kit mode; this is the band across the chest that holds it ----
+  if(Q.fem && Q.bandCol){ const bc=nbCol(Q.bandCol);
+    const band=K.smooth(nbTorsoPts(Q, 0.84, 0.58, 0, 0.5)); nbLit(K, band, bc);
+    nbRow(Q, 0.60, 0.5, (a,b)=>K.line([a,b], rgbA(bc[2],0.9), 0.5)); }
+  // ---- THE HARNESS ----
+  if(A && A.kind && A.kind!=='mawashi'){
+    const k=A.kind, col=nbCol(A.col||A.mat||'#8a6a44'), top=A.top===undefined? 1.0 : A.top, bot=A.bot===undefined? 0.02 : A.bot, hem=A.hem||0;
+    if(k==='galerus'){                                                                          // a raised plate standing up off the shoulder
+      const s=Q.S; nbLit(K, K.smooth([[s[0]-5.6,s[1]-0.6],[s[0]-5.2,s[1]-6.4],[s[0]-3.2,s[1]-7.4],[s[0]+1.0,s[1]-3.2],[s[0]+1.4,s[1]+0.6],[s[0]-2.6,s[1]+2.6]]), col);
+      K.line([[s[0]-4.8,s[1]-5.8],[s[0]+0.6,s[1]-1.8]], rgbA(col[1],0.9), 0.5); }
+    else if(k==='chestplate'){                                                                  // the provocator's small plate, on straps
+      nbRow(Q, 0.92, 0.3, (a,b)=>K.line([a,b], C.leather, 1.0)); nbRow(Q, 0.64, 0.3, (a,b)=>K.line([a,b], C.leather, 1.0));
+      const c0=at(0.76, -(Q.fwAt(0.76)+Q.bustB(0.76))*0.45), r=Math.max(3.6, (Q.fwAt(0.76)+Q.bustB(0.76))*0.75);
+      const p=K.smooth([[c0[0]-r*0.9,c0[1]-r],[c0[0]+r*1.1,c0[1]-r*1.05],[c0[0]+r*1.25,c0[1]+r*0.4],[c0[0]+r*0.6,c0[1]+r*1.05],[c0[0]-r*0.8,c0[1]+r*0.9]]);
+      nbLit(K,p,col); oc.fillStyle=rgbA(col[1],0.9); oc.fillRect(c0[0]-0.4,c0[1]-0.4,0.9,0.9); }
+    else if(k==='apron'){                                                                       // a hide board down the front, chest to knee
+      const hm=nbHem(Q,hem), p=K.smooth([at(top,-(Q.fwAt(top)+Q.bustB(top)+0.6)), at(top,-(Q.fwAt(top)*0.1)), at(0.3,Q.bwAt(0.3)*0.1), [hm.mid[0]-1,hm.mid[1]], [hm.front[0]+0.4,hm.front[1]], at(0.3,-(Q.fwAt(0.3)+0.8))]);
+      nbLit(K,p,col); for(let i=0;i<6;i++){ const q=nbLerp(at(0.7,-Q.fwAt(0.7)), [hm.front[0]-1,hm.front[1]], i/6); K.line([q,[q[0]+1.2,q[1]+0.8]], rgbA(col[2],0.9), 0.45); }
+      K.line([at(top,-Q.fwAt(top)*0.5), Q.S], C.leather, 0.8); nbRow(Q, 0.35, 0.6, (a,b)=>K.line([a,b], C.leather, 0.8)); }
+    else if(k==='sash'){                                                                        // crossed from the shoulder, knotted at the hip
+      const sc=col; K.line([at(0.98,Q.bwAt(0.98)*0.4), at(0.12,-(Q.fwAt(0.12)+0.4))], sc[0], 2.6); K.line([at(0.98,Q.bwAt(0.98)*0.4), at(0.12,-(Q.fwAt(0.12)+0.4))], rgbA(sc[1],0.8), 0.6);
+      nbRow(Q, 0.14, 0.7, (a,b)=>K.line([a,b], sc[0], 2.2)); const kn=at(0.12,-(Q.fwAt(0.12)+0.8)); nbLit(K, K.ell(kn[0],kn[1],1.6,1.3,0), sc);
+      K.line([kn,[kn[0]+1.2,kn[1]+5]], sc[0], 1.1); K.line([kn,[kn[0]-0.6,kn[1]+5.6]], sc[2], 1.1); }
+    else if(k==='mantle'){                                                                      // ten panels over the shoulders, down the back
+      const pts=[at(1.04,Q.bwAt(1)+0.8), at(0.98,-(Q.fwAt(0.98)*0.3)), at(0.72,Q.bwAt(0.72)*0.1), at(0.2,Q.bwAt(0.2)+2.6), at(0.4,Q.bwAt(0.4)+3.4), at(0.8,Q.bwAt(0.8)+2.4)];
+      const p=K.smooth(pts); nbLit(K,p,'#6a4a2e'); oc.save(); oc.clip(p);
+      A.panels.forEach((pc,i)=>{ const q=at(1.0-i*0.085, Q.bwAt(0.6)+1.2); oc.fillStyle=pc; oc.fillRect(q[0]-6,q[1]-1.2,12,1.1); }); oc.restore();
+      K.line([at(1.05,Q.bwAt(1)+1.0), at(0.99,-(Q.fwAt(0.99)*0.4))], '#e8dcc2', 1.2); }
+    else {
+      /* ---- EVERYTHING THAT IS SHAPED TO THE TRUNK ---- */
+      const pad=(k==='parka'||k==='robe'||k==='coat'||k==='wrap'||k==='rods')? 0.9 : 0.55;
+      const pts=nbTorsoPts(Q, top, bot, hem, pad), P=new Path2D();
+      P.addPath(K.smooth(pts));
+      /* and it goes OVER her bust and over the seat when it is long enough to, rather than stopping
+         short and letting the band or the loincloth show round its edge. Same winding as the outline,
+         so the union has no holes in it. */
+      { let ar=0; for(let i=0;i<pts.length;i++){ const a=pts[i], b=pts[(i+1)%pts.length]; ar+=a[0]*b[1]-b[0]*a[1]; }
+        const ccw=ar<0, addE=(e,pd)=>{ const rx=e.rx+pd, ry=e.ry+pd; P.moveTo(e.c[0]+Math.cos(e.rot)*rx, e.c[1]+Math.sin(e.rot)*rx); P.ellipse(e.c[0],e.c[1],rx,ry,e.rot,0,Math.PI*2,ccw); };
+        if(Q.bustE && top>=0.8) for(const e of Q.bustE) addE(e, pad*0.8);
+        if(Q.seatE && (hem>0.12 || A.skirt)) for(const e of Q.seatE) addE(e, pad*0.8); }
+      const base = (k==='muscle')? nbCol(C.bronze) : col;
+      nbLit(K, P, base);
+      oc.save(); oc.clip(P);
+      const rowsT=(step,fn)=>{ for(let t=bot; t<=top+0.001; t+=step) nbRow(Q, t, pad+0.2, fn); };
+      const legRows=(step,fn)=>{ if(hem<=0) return; for(let f=step; f<=hem+0.001; f+=step){ const h=nbHem(Q,f); fn(h.back,h.front); } };
+      if(k==='bands'){ const hi=rgbA(base[1],0.9), sh=rgbA(base[2],0.95);
+        rowsT(0.12,(a,b)=>{ K.line([a,b], sh, 0.7); K.line([[a[0],a[1]+0.7],[b[0],b[1]+0.7]], hi, 0.45); });
+        if(A.rivets) rowsT(0.12,(a,b)=>{ oc.fillStyle=hi; for(let u=0.2;u<0.9;u+=0.2){ const q=nbLerp(a,b,u); oc.fillRect(q[0]-0.2,q[1]+1.4,0.5,0.5); } });
+        K.line([at(top,-(Q.fwAt(top)*0.3)), at(bot,-(Q.fwAt(bot)*0.3))], sh, 0.5); }
+      else if(k==='scale'){ const s1=base[0], s2=mixHex(base[0],base[2],0.35), hi=rgbA(base[1],0.8);
+        let r=0; for(let t=top; t>=bot-0.3; t-=0.075, r++){ const pts2=[]; nbRow(Q, Math.max(bot,t), pad+0.6, (a,b)=>{ for(let u=(r%2)*0.1; u<=1; u+=0.2) pts2.push(nbLerp(a,b,u)); });
+          pts2.forEach((q,i)=>{ oc.fillStyle=(i+r)%2? s2 : s1; oc.fill(K.ell(q[0],q[1]+0.3,1.15,1.0,0)); oc.fillStyle=hi; oc.fillRect(q[0]-0.5,q[1]-0.4,0.9,0.3); }); }
+        legRows(0.12,(a,b)=>{ for(let u=0;u<=1;u+=0.2){ const q=nbLerp(a,b,u); oc.fillStyle=(u*5|0)%2? s2 : s1; oc.fill(K.ell(q[0],q[1],1.15,1.0,0)); } }); }
+      else if(k==='mail'){ oc.fillStyle=rgbA(base[1],0.55);
+        for(let t=bot-0.4; t<=top; t+=0.035) nbRow(Q, clamp(t,bot,top), pad, (a,b)=>{ const yy=t<bot? (bot-t)*20 : 0; for(let u=0;u<=1;u+=0.07){ const q=nbLerp(a,b,u); oc.fillRect(q[0]+((t*100|0)%2?0.4:0), q[1]+yy, 0.45, 0.45); } }); }
+      else if(k==='quilt'){ const ln=rgbA(base[2],0.7); rowsT(0.08,(a,b)=>K.line([a,b], ln, 0.45)); legRows(0.1,(a,b)=>K.line([a,b], ln, 0.45));
+        K.line([at(top,-(Q.fwAt(top)*0.35)), at(bot,-(Q.fwAt(bot)*0.35))], ln, 0.45);
+        if(A.brass){ const c0=at(0.78,-(Q.fwAt(0.78)+Q.bustB(0.78))*0.55); nbLit(K, K.ell(c0[0],c0[1],2.6,2.2,0), nbCol('#a8763a')); } }
+      else if(k==='lamellar'){ const laces=A.lace||['#8a3a2e'], dk=rgbA(base[2],0.9), hi=rgbA(base[1],0.7);
+        let r=0; for(let t=top; t>=bot; t-=0.09, r++) nbRow(Q, t, pad+0.3, (a,b)=>{ K.line([a,b], laces[r%laces.length], 0.55);
+          for(let u=0.08;u<1;u+=0.14){ const q=nbLerp(a,b,u); oc.fillStyle=dk; oc.fillRect(q[0],q[1]+0.3,0.35,1.8); oc.fillStyle=hi; oc.fillRect(q[0]-1.0,q[1]+0.35,0.9,0.3); } });
+        legRows(0.12,(a,b)=>K.line([a,b], laces[0], 0.5));
+        if(A.seam) K.line([at(top,-(Q.fwAt(top)*0.7)), at(bot,-(Q.fwAt(bot)*0.7))], '#7a5a2a', 0.5); }
+      else if(k==='muscle'){ const sh=rgbA(base[2],0.85), hi=rgbA(base[1],0.9);
+        const ch=at(0.72,-(Q.fwAt(0.72)+Q.bustB(0.72))); K.line([at(0.86,-(Q.fwAt(0.86)*0.2)), [ch[0]-0.6,ch[1]+0.8], at(0.62,-(Q.fwAt(0.62)*0.3))], sh, 0.6);
+        for(let i=0;i<3;i++){ const t=0.48-i*0.1; K.line([at(t,-(Q.fwAt(t)*0.95)), at(t,-(Q.fwAt(t)*0.45))], sh, 0.5); }
+        K.line([at(0.56,-(Q.fwAt(0.56)*0.7)), at(0.2,-(Q.fwAt(0.2)*0.7))], sh, 0.45);
+        oc.fillStyle=sh; const nv=at(0.22,-(Q.fwAt(0.22)*0.85)); oc.fillRect(nv[0]-0.3,nv[1]-0.3,0.6,0.6);
+        if(A.gild){ K.line([at(0.96,Q.bwAt(0.96)*0.4), at(0.96,-(Q.fwAt(0.96)*0.9))], '#fff0b0', 0.5); K.line([ch.map((v,i)=>v+(i?-2.2:0.6)), ch.map((v,i)=>v+(i?-1.0:-1.4))], hi, 0.55); } }
+      else if(k==='plate'){ const sh=rgbA(base[2],0.9), hi=rgbA(base[1],0.95);
+        if(A.ridge){ const r0=at(top,-(Q.fwAt(top)+Q.bustB(top))+0.4), r1=at(0.22,-(Q.fwAt(0.22))+0.3); K.line([r0,r1], hi, 0.7); K.line([[r0[0]-0.7,r0[1]],[r1[0]-0.7,r1[1]]], sh, 0.45); }
+        if(A.gilt){ oc.fillStyle=C.gold; for(let i=0;i<4;i++){ const q=at(0.26, -(Q.fwAt(0.26))*(1-i*0.3)+Q.bwAt(0.26)*i*0.1); oc.fillRect(q[0]-0.3,q[1]-0.3,0.7,0.7); }
+          const b0=at(0.74,-(Q.fwAt(0.74)+Q.bustB(0.74))*0.55); nbLit(K, K.ell(b0[0],b0[1],1.2,1.2,0), nbCol(C.gold)); }
+        if(A.dent){ const d0=at(0.66,-(Q.fwAt(0.66))*0.7); oc.fillStyle=sh; oc.fill(K.ell(d0[0],d0[1],0.8,0.8,0)); oc.fillStyle=hi; oc.fillRect(d0[0]-0.6,d0[1]-0.8,0.6,0.3); }
+        K.line([at(0.3,Q.bwAt(0.3)+pad), at(0.3,-(Q.fwAt(0.3)+pad))], sh, 0.5); }
+      else if(k==='coat' || k==='wrap' || k==='robe' || k==='parka' || k==='rods'){
+        const sh=rgbA(col[2],0.85), hi=rgbA(col[1],0.7);
+        // the front closure, crossing over, and the fold lines hanging from the hips
+        K.line([at(top,-(Q.fwAt(top)*0.2)), at(0.4,-(Q.fwAt(0.4)+Q.bustB(0.4)+pad)*0.9)], sh, 0.6);
+        legRows(Math.max(0.15,hem/3),(a,b)=>{ for(let u=0.2;u<0.95;u+=0.25){ const q=nbLerp(a,b,u); K.line([[q[0],q[1]-4],[q[0]+(u-0.5)*0.8,q[1]]], u>0.5? sh : hi, 0.45); } });
+        if(k==='rods'){ const rc=A.rod||'#e0d4b8'; for(let t=bot;t<top;t+=0.14) nbRow(Q, t+0.07, pad, (a,b)=>{ for(let u=0.06;u<1;u+=0.11){ const q=nbLerp(a,b,u); oc.fillStyle=rc; oc.fillRect(q[0]-0.3,q[1]-1.6,0.6,3.2); oc.fillStyle=sh; oc.fillRect(q[0]+0.3,q[1]-1.6,0.25,3.2); } });
+          legRows(0.2,(a,b)=>{ for(let u=0.06;u<1;u+=0.11){ const q=nbLerp(a,b,u); oc.fillStyle=rc; oc.fillRect(q[0]-0.3,q[1]-3,0.6,3); } }); }
+        if(A.strips) A.strips.forEach((sc2,i)=>{ const o2=-(Q.fwAt(0.6))*(0.25+i*0.18); K.line([at(top-0.04,o2), at(0.02,o2)], sc2, 0.8); });
+        if(A.pockets){ for(let i=0;i<2;i++){ const q=at(0.28+i*0.2, -(Q.fwAt(0.3))*0.55); oc.strokeStyle=sh; oc.lineWidth=0.45; oc.strokeRect(q[0]-1.3,q[1]-1,2.6,2); } }
+        if(A.panel){ const p0=at(0.86,-(Q.fwAt(0.86)+Q.bustB(0.86))*0.8), p1=at(0.34,-(Q.fwAt(0.34))*0.8); oc.fillStyle=A.panel; oc.fillRect(Math.min(p0[0],p1[0])-1.4, p0[1], 2.8, p1[1]-p0[1]);
+          for(let i=1;i<5;i++){ const q=nbLerp(p0,p1,i/5); K.line([[q[0]-1.2,q[1]],[q[0]+1.2,q[1]]], '#6a5a4a', 0.35); } }
+        if(A.sheen){ K.line([at(0.9,-(Q.fwAt(0.9))*0.6), at(0.3,-(Q.fwAt(0.3))*0.6)], 'rgba(160,150,140,.55)', 0.6); }
+        if(A.tokens){ for(let i=0;i<7;i++){ const q=at(0.9-i*0.11, -(Q.fwAt(0.9-i*0.11))*0.45); oc.fillStyle=['#e8c34a','#e8e0cc','#c8452a','#2f7a8a'][i%4]; oc.fill(K.ell(q[0],q[1]+0.6,0.6,0.8,0)); } }
+        if(A.seam) K.line([at(top,Q.bwAt(top)*0.2), at(bot,Q.bwAt(bot)*0.2)], A.seam, 0.4);
+        if(A.toggles){ oc.fillStyle=A.toggles; for(let i=0;i<4;i++){ const q=at(0.85-i*0.15, -(Q.fwAt(0.85-i*0.15)+Q.bustB(0.85-i*0.15))*0.35); oc.fillRect(q[0]-0.6,q[1]-0.2,1.2,0.5); } }
+        if(k==='parka' || A.trim){ const h=hem>0? nbHem(Q,hem) : null; if(h) K.line([h.back,h.front], A.trim||'#e8dcc2', 1.6); } }
+      oc.restore();
+      if(A.skirt){ const sc=nbCol(A.skirt);                         // the kusazuri: tassets hanging from the waist over the loin
+        for(let i=0;i<3;i++){ const h0=nbHem(Q,0.05), h1=nbHem(Q,0.46), u0=i/3, u1=(i+1)/3+0.04;
+          const p=K.smooth([nbLerp(h0.back,h0.front,u0).map((v,j)=>v-(j?1.2:0)), nbLerp(h0.back,h0.front,u1).map((v,j)=>v-(j?1.2:0)), nbLerp(h1.back,h1.front,u1), nbLerp(h1.back,h1.front,u0)]);
+          nbLit(K,p,sc); for(let r=1;r<4;r++){ const a=nbLerp(nbLerp(h0.back,h0.front,u0), nbLerp(h1.back,h1.front,u0), r/4), b=nbLerp(nbLerp(h0.back,h0.front,u1), nbLerp(h1.back,h1.front,u1), r/4);
+            K.line([a,b], r%2? '#c8452a' : rgbA(sc[1],0.8), 0.4); } } }
+      if(A.pteruges){ const lc=nbCol(C.leather);                   // the leather strips under a general's cuirass
+        for(let i=0;i<5;i++){ const h0=nbHem(Q,0.02), h1=nbHem(Q,0.34), u=(i+0.5)/5;
+          const a=nbLerp(h0.back,h0.front,u), b=nbLerp(h1.back,h1.front,u);
+          nbLit(K, K.capsule([[a[0],a[1]-1,1.0],[b[0],b[1],0.9],[b[0],b[1]+0.4,0.9]]), lc); oc.fillStyle=C.gold; oc.fillRect(b[0]-0.4,b[1]-0.3,0.8,0.5); } }
+      if(A.pauldron){ const s=Q.S;                                   // the segmentata's shoulder hoops
+        for(let i=0;i<3;i++){ const p=K.smooth([[s[0]-4.0+i*0.3,s[1]-1.8+i*1.6],[s[0]+0.2,s[1]-2.6+i*1.6],[s[0]+3.4-i*0.4,s[1]-1.0+i*1.6],[s[0]+3.0-i*0.4,s[1]+0.4+i*1.6],[s[0]-3.6+i*0.3,s[1]-0.4+i*1.6]]);
+          nbLit(K,p,base); } }
+      if(A.gorget){ const s=Q.S, n=Q.Nk; nbLit(K, K.capsule([[s[0],s[1]-0.6,2.6],[n[0],n[1]+0.6,2.4]]), base); }
+      if(A.ruff){ const n=Q.Nk; nbLit(K, K.smooth([[n[0]-4.6,n[1]+1.6],[n[0]-3.6,n[1]-2.4],[n[0]+0.4,n[1]-2.8],[n[0]+3.4,n[1]-0.4],[n[0]+2.6,n[1]+2.6],[n[0]-1.6,n[1]+3.4]]), nbCol(A.trim||'#ece0c6')); }
+      if(A.sash){ nbRow(Q, 0.16, pad+0.3, (a,b)=>{ K.line([a,b], A.sash, 1.8); K.line([a,b], rgbA(mixHex(A.sash,'#ffffff',0.3),0.6), 0.5); }); }
+      if(A.belt) nbRow(Q, 0.16, pad+0.3, (a,b)=>{ K.line([a,b], C.leather, 1.3); oc.fillStyle=C.gold; for(let u=0.15;u<1;u+=0.25){ const q=nbLerp(a,b,u); oc.fillRect(q[0]-0.3,q[1]-0.3,0.6,0.6); } });
+    }
+  }
+  // ---- the belt (balteus) over the loincloth, where nothing else covers the waist ----
+  const coverWaist = A && (A.kind==='coat'||A.kind==='parka'||A.kind==='robe'||A.kind==='rods'||A.kind==='wrap'||A.kind==='scale'||A.kind==='mail'||A.kind==='lamellar'||A.kind==='quilt'||A.kind==='bands'||A.kind==='plate'||A.kind==='muscle');
+  if(!coverWaist && !(A && A.kind==='mawashi')) nbRow(Q, 0.19, 0.8, (a,b)=>{ K.line([a,b], belt[0], 1.5); K.line([[a[0],a[1]-0.5],[b[0],b[1]-0.5]], rgbA(belt[1],0.8), 0.4);
+    oc.fillStyle=C.gold; for(let u=0.2;u<0.95;u+=0.25){ const q=nbLerp(a,b,u); oc.fillRect(q[0]-0.3,q[1]-0.3,0.6,0.6); } });
+  // ---- and the fight, on the body: blood where the blows landed ----
+  if(kit.blood>0){ oc.fillStyle='rgba(122,20,20,.85)';
+    const spots=[[0.72,0.4],[0.5,0.7],[0.34,0.3],[0.62,0.1],[0.22,0.55]];
+    for(let i=0;i<Math.min(spots.length, 1+kit.blood*2);i++){ const [t,u]=spots[i]; const q=at(t, -(Q.fwAt(t)+Q.bustB(t))*u);
+      oc.fill(K.ell(q[0],q[1],0.9,1.3,0.3)); oc.fillRect(q[0]-0.2,q[1],0.45,2.2+i*0.4); } }
+}
+/* =====================================================================
+   ⚔ THE FIGHTER, ON THE NEW BODY
+   ---------------------------------------------------------------------
+   The man on the sand is now the same figure as the man in the villa:
+   drawMateFig (or drawFemFig for a gladiatrix) in his kit, posed off the
+   fight every frame —
+     · the HOP tucks both feet up under him, the stance plants a lead foot
+       and a rear foot, and a step lifts the foot that is moving;
+     · the STANCE is in the body: high stands tall with the chin up, low
+       sinks the hips and leans in, and the head tilts with it — which is
+       the telegraph the old crest-tilt was supposed to be;
+     · the SWING turns the trunk through the cut, the THRUST drives the
+       hips forward and drops the stance, the ELBOW folds the arm with the
+       point of the elbow leading, the JAVELIN cocks the arm back over the
+       head and whips it through, and the MATCHLOCK comes up to the cheek
+       with both hands for all four of its beats;
+     · a HIT snaps the head back and flashes the whole figure, and the
+       blood goes on the body where it lands.
+   The weapons and shields are the same pixel pieces they always were,
+   because those are the history — they are simply held in a hand an arm
+   actually reaches now, at the IK end of the arm, instead of floating at
+   the end of a rotated rectangle.
+
+   Scale: one "sprite unit" is the old rig's unit (the rig was drawn at
+   1.35 game pixels each); the figure's own unit is NB_K of those.
+   ===================================================================== */
+const NB_K=0.62;
+const NB_BW=128, NB_BH=124, NB_OX=64, NB_OY=110;          // the per-fighter buffer: feet at (64,110)
+const NB_DRAWS={fighter:0, soldier:0, card:0, last:null};  // for the tests
+function nbOn(){ try{ return !(typeof SETTINGS!=='undefined' && SETTINGS && SETTINGS.classicBodies); }catch(e){ return true; } }
+const NB_TWO_HANDED=['hasta','fuscina','hasta_argentea','ji','qiang','kontos','ankusha','harpuun','herd_spear','torv_spear','reach_pole','weigh_rod',
+  'takeyari','take_naginata','kuwa','ono','konbo','bo','bian_dan','bidens','venabulum','yari','nagae_yari','naginata','odachi','nagamaki','kanabo','nu','steppe_bow','bipennis','sagaris'];
+const NB_HAIR=['#2a1a10','#3a2618','#1a120a','#5a3a1e','#6a4a26','#8a5a2e','#241408'];
+/* HIS OWN BODY — the player's rolled one, or the foe's off his build: an ox
+   is broad through the chest and the seat, a reed is long and narrow */
+function nbFighterLook(f){
+  if(f._nbLook) return f._nbLook;
+  let L;
+  if(f.isPlayer && typeof G!=='undefined' && G && typeof playerLook==='function'){ L=Object.assign({}, playerLook()); L.skin=f.skin||L.skin; }
+  else {
+    const s=f.scale||1, big=clamp((s-1)*4,-1,1);
+    let h=7; for(const ch of String(f.name||'foe')) h=(h*31+ch.charCodeAt(0))>>>0;
+    const r=(i)=>((h>>>(i*3))&7)/7;
+    L={ male:!f.female, skin:f.skin, hair:f.beardC||NB_HAIR[h%NB_HAIR.length], beard:(f.beard? 'full' : 'none'),
+        hairStyle:f.female? 'braid' : 'caesar',
+        body:{ legs:clamp(5+r(1)*3-big,3,9), bust:clamp((f.female?6:5)+big*2.4+r(2)*2,2,10), booty:clamp(5+big*2.2+r(3)*2,2,10),
+               waist:clamp(5+r(4)*3-big*2.2,2,10), face:6, hairq:6 } };
+  }
+  f._nbLook=L; return L;
+}
+function nbFighterPose(f, L){
+  const fem=!!f.female, B=L.body||{}, lg=(B.legs===undefined? 6 : B.legs);
+  const Lt=fem? 14+lg*0.2 : 15.6+lg*0.22, Ls=fem? 15+lg*0.2 : 16.2+lg*0.22, LL=Lt+Ls;
+  const air=!f.onGround, st=f.stance||'mid', stride=Math.sin(f.legPhase||0);
+  let crouch= st==='high'? 1.4 : st==='low'? 5.4 : 2.8, lunge=0, lean=0.08;
+  const p=f.atk? 1-(f.atkT/Math.max(1,f.atkDur)) : 0;
+  if(f.atk){
+    if(f.atkType==='thrust'){ lunge=Math.sin(Math.min(1,p*1.6)*Math.PI); lean+=0.24*lunge; crouch+=2.6*lunge; }
+    else if(f.atkType==='slash'){ const q=Math.min(1,p*1.5); lean+=-0.12+0.36*q; crouch+=1.6*Math.sin(q*Math.PI); }
+    else { lean+=0.20*Math.sin(Math.min(1,p*2)*Math.PI); lunge=0.35*Math.sin(Math.min(1,p*2)*Math.PI); } }
+  if(st==='low') lean+=0.10; if(st==='high') lean-=0.05;
+  if(f.hurt>0) lean-=0.18*Math.min(1,f.hurt/10);
+  if(f.charging>0) lean-=0.10;
+  if(f.netted>0) crouch+=3;
+  const hipX=lunge*5.2, hipY=-(LL*0.975+2.2)+crouch;
+  let aN, aF;
+  if(air){ const k=clamp((f.vy||0)/4,-1,1); aN=[hipX+4.4, hipY+LL*0.72+k*2]; aF=[hipX-5.6, hipY+LL*0.80-k*1.5]; }
+  else { const sp=(st==='low'? 8.8 : st==='high'? 6.2 : 7.4)+Math.abs(stride)*1.6+lunge*3;
+    aN=[hipX*0.55+sp*0.64+stride*1.4, -2.2]; aF=[hipX*0.1-sp*0.62-stride*1.4, -2.2];
+    if(Math.abs(f.vx||0)>0.25){ aN[1]-=Math.max(0,stride)*2.4; aF[1]-=Math.max(0,-stride)*2.4; } }
+  const headAng=(st==='high'? -0.16 : st==='low'? 0.13 : 0)+(f.hurt>0? -0.30*Math.min(1,f.hurt/8) : 0)+lean*0.35;
+  return {hip:[hipX,hipY], lean, ankles:{near:aN, far:aF}, headAng, lunge, fem, LL, air};
+}
+/* WHAT THE ARM IS DOING — the same decision tree the old arm routines made,
+   answered as numbers so the body can be posed before anything is drawn */
+function nbArmState(f){
+  const R={kind:'weapon', ang:0, reach:0.88};
+  const pBow=()=> (typeof G!=='undefined' && G && G.bow)? bowOf(G.bow) : null;
+  if(f.charging>0 || f.throwT>0){
+    const cp=f.charging>0? (1-f.charging/(f.chargeMax||12)) : 1, rel=f.throwT>0? (f.throwT/9) : 0;
+    const g=(f.chargeData && f.chargeData.bw) || (f.isPlayer? pBow() : (f.bwDrawn? f.bw : null));
+    if(g && g.gun && !(f.isPlayer && G.drawnBlade)) return nbGunState(f,g,cp);
+    R.kind='throw'; R.cp=cp; R.rel=rel; R.reach=0.94;
+    R.ang= f.charging>0? lerp(-0.7,-2.35,cp) : lerp(0.7,-0.15,rel);
+    R.item=(f.charging>0 || f.throwT>4)? ((f.chargeData && f.chargeData.bw) || (f.isPlayer? pBow() : null) || 'pilum') : null;
+    return R; }
+  const g=f.isPlayer? ((typeof G!=='undefined' && G && G.bow && !G.drawnBlade)? pBow() : null) : (f.bwDrawn? f.bw : null);
+  if(g && g.gun && !f.atk) return nbGunState(f,g,1);
+  if(f.atk){ const p=1-(f.atkT/f.atkDur);
+    if(f.atkType==='slash') R.ang=lerp(-1.5,1.0,Math.min(1,p*1.5));
+    else if(f.atkType==='thrust'){ R.ang=-0.05; const l=Math.sin(Math.min(1,p*1.6)*Math.PI); R.reach=0.88+0.11*l; }
+    else { R.kind='elbow'; R.ang=lerp(-0.7,0.45,Math.min(1,p*2)); } }
+  else R.ang= f.stance==='high'? -0.85 : f.stance==='low'? 0.55 : -0.12;
+  return R;
+}
+function nbGunState(f,bw,cp){
+  const GP=gunPhase(f,bw); let ang=0, ox=0, oy=0;
+  if(GP.ph==='recoil'){ const k=1-GP.t; ang=-0.34*k; ox=-5*k; oy=-2.0*k; }
+  else if(GP.ph==='ram'){ ang=-1.18; ox=-3; oy=1.5; }
+  else if(GP.ph==='prime'){ ang=-0.50; ox=-1; oy=1.0; }
+  else ang=lerp(0.16,-0.03,cp);
+  return {kind:'gun', ang, ox, oy, GP, bw, cp, reach:0.62};
+}
+function nbKitFor(f, C){
+  const a=f.gear.armor.id, h=f.gear.helmet.id;
+  return { C, loin:C.cloth, band:f.female? mixHex(C.cloth,'#e8dcc2',0.35) : null, belt:C.leather,
+           greave:(a==='ocrea')? C.bronze : null, manica:(a==='manica')? C.metal : null,
+           armor:(NB_ARMOR[a] && NB_ARMOR[a].kind)? a : (a==='lorica'? a : (NB_ARMOR[a]? a : null)),
+           helm:(h && h!=='none' && NB_HELM[h])? h : null,
+           blood: f.hp<f.maxHp*0.3? 2 : f.hp<f.maxHp*0.55? 1 : 0, t:(FT&&FT.time)||0 };
+}
+/* the buffer grows with the man: an ox is a quarter again as big, and a close-up is bigger still */
+function nbBuf(f){
+  const sf=Math.max(1, (f.scale||1)*1.02), bw=Math.ceil(NB_BW*sf), bh=Math.ceil(NB_BH*sf);
+  if(!f._nb || f._nb.w!==bw || f._nb.h!==bh){ const mk=()=>{ const k=document.createElement('canvas'); k.width=bw; k.height=bh; k.getContext('2d',{willReadFrequently:true}); return k; };
+    f._nb={bk:mk(), fr:mk(), sil:mk(), w:bw, h:bh, ox:Math.round(NB_OX*sf), oy:Math.round(NB_OY*sf)}; }
+  return f._nb;
+}
+/* where the shield sits, in sprite units, off the far hand */
+function nbShieldAt(f, farS, shS, hipS){
+  const id=f.gear.shield.id;
+  if(id==='sode') return [shS[0]-0.5, shS[1]+10.5];   // it hangs from the shoulder over the upper arm
+  if(id==='tate') return [hipS[0]+13, -15];
+  if(id==='rete') return [farS[0]-2, farS[1]+4];
+  return farS;
+}
+let NB_SHIELD_AT=null;                     // read by drawShield2 while a new-body fighter is being drawn
+function drawGladiatorNB(f){
+  const C=paletteFor(f), L=nbFighterLook(f), P=nbFighterPose(f, L), A=nbArmState(f);
+  const S=1.35*(f.scale||1), GP=S*NB_K;               // game px per sprite unit / per figure unit
+  const fem=P.fem, kit=nbKitFor(f, C);
+  const armLen= fem? 19.6 : 20.0;
+  // ---- where his shoulder is, before anything is drawn ----
+  const face = f.koTimer>0 || f.knock? HARD_FACES.lost : f.hurt>0? HARD_FACES.lost : (f.atk||f.charging>0)? HARD_FACES.intent : HARD_FACES.stoic;
+  const base={hip:P.hip, floor:0, lean:P.lean, ankles:P.ankles, kneeBend:-1, kneeBendFar:-1, headAng:P.headAng, look:L};
+  const dry= fem? drawFemFig(null, null, Object.assign({dry:true}, base)) : drawMateFig(null, null, Object.assign({dry:true, u:0, lenIn:0}, base));
+  const Sh=dry.shoulder, shN=fem? [Sh[0]-0.2, Sh[1]+1.6] : Sh;
+  const rot=(a,r)=>[Math.cos(a)*r, Math.sin(a)*r];
+  // ---- the hands ----
+  let near, far, elbowNear, itemAng=A.ang;
+  const two=NB_TWO_HANDED.indexOf(f.gear.weapon.id)>=0;
+  if(A.kind==='gun'){ const piv=[shN[0]+A.ox/NB_K, shN[1]+A.oy/NB_K]; near=[piv[0]+rot(A.ang,armLen*A.reach)[0], piv[1]+rot(A.ang,armLen*A.reach)[1]];
+    far=[near[0]+Math.cos(A.ang+(A.GP.ph==='ram'? 0.5 : 0.1))*9, near[1]+Math.sin(A.ang+(A.GP.ph==='ram'? 0.5 : 0.1))*9]; }
+  else if(A.kind==='elbow'){ near=[shN[0]+3.2+Math.cos(A.ang)*4, shN[1]+5.5+Math.sin(A.ang)*3]; elbowNear=-1; far=[shN[0]+7, shN[1]+5]; }
+  else { near=[shN[0]+rot(A.ang,armLen*A.reach)[0], shN[1]+rot(A.ang,armLen*A.reach)[1]]; }
+  if(!far){
+    if(A.kind==='throw') far=[Sh[0]+10, Sh[1]+7];
+    else if(two && A.kind==='weapon') far=[near[0]-Math.cos(A.ang)*7.5, near[1]-Math.sin(A.ang)*7.5];
+    else { const sid=f.gear.shield.id, stY=(f.stance==='high'? 3 : f.stance==='low'? 9 : 6);
+      far= sid==='none'? [Sh[0]+7.5, Sh[1]+4.5] : sid==='rete'? [Sh[0]-2.5, Sh[1]+13] : sid==='sode'? [Sh[0]+3.5, Sh[1]+11] : [Sh[0]+9.0, Sh[1]+stY+1]; } }
+  // ---- the body, into the buffer ----
+  const B=nbBuf(f), bk=B.bk.getContext('2d'), fr=B.fr.getContext('2d'), BW=B.w, BH=B.h, OX=B.ox, OY=B.oy;
+  for(const g of [bk,fr]){ g.setTransform(1,0,0,1,0,0); g.clearRect(0,0,BW,BH); g.setTransform(GP,0,0,GP,OX,OY); }
+  const F=Object.assign({}, base, {hands:{near, far}, kit, headK:1.16, elbowNear, t:kit.t});
+  let R;
+  if(fem){ F.expr= f.hurt>0? 'brace' : (f.atk||f.charging>0)? 'cross' : 'flat'; R=drawFemFig(bk, fr, F); }
+  else { Object.assign(F, {u:0, aro:0, bare:true, face, cloth:C.cloth, lenIn:0, diaIn:1, pxi:1, coast:false}); R=drawMateFig(bk, fr, F); }
+  for(const k of [B.bk,B.fr]){ const g=k.getContext('2d'); g.setTransform(1,0,0,1,0,0);
+    const im=g.getImageData(0,0,BW,BH), d=im.data; for(let i=3;i<d.length;i+=4) d[i]= d[i]>=110? 255 : 0; g.putImageData(im,0,0); }
+  { const g=B.sil.getContext('2d'); g.setTransform(1,0,0,1,0,0); g.globalCompositeOperation='source-over'; g.clearRect(0,0,BW,BH);
+    g.drawImage(B.bk,0,0); g.drawImage(B.fr,0,0); g.globalCompositeOperation='source-in'; g.fillStyle='#160e07'; g.fillRect(0,0,BW,BH); g.globalCompositeOperation='source-over'; }
+  // ---- and onto the sand ----
+  const nearS=[near[0]*NB_K, near[1]*NB_K], farS=[far[0]*NB_K, far[1]*NB_K], shS=[Sh[0]*NB_K, Sh[1]*NB_K], hipS=[P.hip[0]*NB_K, P.hip[1]*NB_K];
+  f._nbPiv=[shN[0]*NB_K, shN[1]*NB_K]; f._nbHand=nearS;
+  NB_SHIELD_AT=nbShieldAt(f, farS, shS, hipS);
+  const lean0=clamp((f.vx||0)*0.015,-0.2,0.2)+(f.rot||0);
+  ctx.save();
+  ctx.translate(Math.round(f.x), Math.round(f.y)); ctx.rotate(lean0);
+  const sprite=()=>{ ctx.save(); ctx.scale(f.facing*S, S); };
+  const held=()=>{ nbDrawHeld(f, C, A, nearS); };
+  // 1 · the dark outline of everything: the body's silhouette, then the pixel pieces'
+  ctx.save(); ctx.scale(f.facing,1); for(const [dx,dy] of [[-1,0],[1,0],[0,-1],[0,1]]) ctx.drawImage(B.sil, -OX+dx, -OY+dy); ctx.restore();
+  sprite(); OUTL=true; try{ drawSashimono(f,C); drawShield2(f,C); held(); }catch(e){} OUTL=false; ctx.restore();
+  // 2 · the flag on his back, the body, the shield, his near arm, and what is in his hand
+  sprite(); try{ drawSashimono(f,C); }catch(e){} ctx.restore();
+  const netBehind=(f.gear.shield.id==='rete');                  // the net trails in the off hand, behind him
+  if(netBehind){ sprite(); try{ drawShield2(f,C); }catch(e){} ctx.restore(); }
+  ctx.save(); ctx.scale(f.facing,1); ctx.drawImage(B.bk, -OX, -OY); ctx.restore();
+  sprite(); if(!netBehind){ try{ drawShield2(f,C); }catch(e){} }
+  if(f.blockFlash>0){ const sa=NB_SHIELD_AT||farS; ctx.globalAlpha=clamp(f.blockFlash/8,0,1); px(sa[0]-1,sa[1]-7,3,3,'#fff6d0'); px(sa[0]+2,sa[1]-4,2,2,'#ffe9a0'); ctx.globalAlpha=1; }
+  ctx.restore();
+  ctx.save(); ctx.scale(f.facing,1); ctx.drawImage(B.fr, -OX, -OY);
+  // a hit flashes the whole figure
+  if(f.hurt>0 && ((f.hurt|0)%4)<2){ ctx.globalCompositeOperation='lighter'; ctx.globalAlpha=0.42; ctx.drawImage(B.bk, -OX, -OY); ctx.drawImage(B.fr, -OX, -OY); ctx.globalAlpha=1; ctx.globalCompositeOperation='source-over'; }
+  ctx.restore();
+  sprite(); try{ held(); }catch(e){}
+  // the net, if the retiarius has thrown it over him
+  if(f.netted>0){ ctx.globalAlpha=0.85; for(let i=0;i<6;i++){ px(-9,-44+i*7,20,1,'#d8c89a'); } for(let i=0;i<6;i++){ px(-9+i*4,-44,1,38,'#d8c89a'); } ctx.globalAlpha=1; }
+  drawStuck(f); drawSlashFx(f,C);
+  ctx.restore();
+  ctx.restore();
+  NB_SHIELD_AT=null;
+  NB_DRAWS.fighter++; NB_DRAWS.last={fem, kit:{armor:kit.armor, helm:kit.helm, greave:!!kit.greave, manica:!!kit.manica}, arm:A.kind, hand:nearS, shoulder:f._nbPiv, head:R&&R.head};
+}
+/* what is in his hand, drawn at the hand — the same pixel pieces as ever */
+function nbDrawHeld(f, C, A, h){
+  if(A.kind==='elbow'){ ctx.save(); ctx.translate(h[0],h[1]); ctx.rotate(A.ang+2.2); drawWeapon2(f.gear.weapon.id, C); ctx.restore(); return; }
+  if(A.kind==='gun'){
+    ctx.save(); ctx.translate(h[0],h[1]); ctx.rotate(A.ang); ctx.translate(1.2,0); drawHeldGun(A.bw, A.GP.ph, A.GP.t); ctx.restore();
+    if(f.isPlayer && A.GP.ph!=='ready' && !OUTL){ const Lb= A.GP.ph==='recoil'? '' : A.GP.ph==='ram'? 'RAMMING' : 'PRIMING';
+      if(Lb){ ctx.save(); ctx.scale(f.facing,1); ctx.fillStyle='rgba(0,0,0,.55)'; ctx.fillRect(-16,-64,32,7);
+        ctx.fillStyle='#e8c34a'; ctx.font='bold 6px monospace'; ctx.textAlign='center'; ctx.fillText(Lb,0,-58); ctx.restore(); } }
+    return; }
+  if(A.kind==='throw'){
+    if(A.item){ ctx.save(); ctx.translate(h[0],h[1]); ctx.rotate(A.ang-0.15);
+      const bw=(A.item==='pilum')? null : A.item;
+      if(bw && bw.bomb) drawHeldBomb(bw); else if(bw && bw.gun) drawHeldGun(bw); else if(bw) drawHeldBow(bw); else drawHeldPilum(f.gear.weapon.gold);
+      ctx.restore(); }
+    if(f.charging>0 && A.cp>0.4 && !OUTL){ ctx.save(); ctx.translate(h[0],h[1]); ctx.rotate(A.ang-0.15); ctx.globalAlpha=A.cp; px(16,-1,2,2,'#fff'); px(17,-2,1,1,'#ffe9a0'); ctx.globalAlpha=1; ctx.restore(); }
+    return; }
+  ctx.save(); ctx.translate(h[0],h[1]); ctx.rotate(A.ang); ctx.translate(-0.6,0); drawWeapon2(f.gear.weapon.id, C); ctx.restore();
+}
+/* =====================================================================
+   ⚔ AND EVERYWHERE ELSE THE OLD RIG WAS STILL STANDING
+   ---------------------------------------------------------------------
+     · THE FIELD — every man in an army battle was a ten-pixel stack of
+       five rectangles. He is the template now, drawn once per army colour
+       and per step of his walk into a tiny cached sprite (a legion is
+       ninety of him, so he is drawn into a cache, not ninety times a
+       frame), in mail and a helmet with a spear and an oval shield, and
+       the ranks overlap the way a close formation does, far rank first.
+     · THE CARD — an armed career is shown on the enrolment card as the
+       fighter itself, full length, in the kit the career starts in.
+     · THE FALLEN — the men you put down in a skirmish lie where they
+       dropped, on the body, on their backs, the helmet rolled off.
+     · THE STANDS — your wife, watching, is her own figure in her own
+       colour, and she waves.
+   ===================================================================== */
+const NB_SOLDIER_CACHE=new Map();
+function nbSoldierSprite(tunic, shieldC, crest, frame, east){
+  const key=tunic+'|'+shieldC+'|'+crest+'|'+frame+'|'+(east?1:0);
+  let cv=NB_SOLDIER_CACHE.get(key); if(cv) return cv;
+  cv=document.createElement('canvas'); cv.width=30; cv.height=30;
+  const g=cv.getContext('2d',{willReadFrequently:true}); const k=0.27;
+  g.setTransform(k,0,0,k,14,28);
+  const C=Object.assign({}, paletteFor({skin:'#caa06a', tunic}));
+  const look={male:true, skin:['#caa06a','#b88a5a','#d8b088','#8a5a34'][frame%4], hair:'#2a1a10', beard:'none', body:{legs:6,bust:6,booty:6,waist:6}};
+  const kit={C, loin:tunic, belt:C.leather, armor: east? 'squamata' : 'hamata', helm: east? 'persian_helm' : 'galea_prov', blood:0, t:0};
+  const ph=frame*Math.PI/2;
+  try{
+    drawMateFig(g, g, {hip:[0,-34.6+Math.abs(Math.sin(ph))*0.8], floor:0, lean:0.06, u:0, aro:0, bare:true, look, face:HARD_FACES.intent,
+      cloth:tunic, lenIn:0, diaIn:1, pxi:1, walk:1, walkPh:ph, kit, headK:1.25,
+      hands:{near:[6,-40], far:[9,-44]}});
+    // the spear, upright in the near hand, and the oval shield on the far arm
+    g.strokeStyle='#8a6a44'; g.lineWidth=2.2; g.beginPath(); g.moveTo(7,-8); g.lineTo(7,-88); g.stroke();
+    g.fillStyle='#dfe6ee'; g.beginPath(); g.moveTo(7,-98); g.lineTo(9.4,-88); g.lineTo(4.6,-88); g.closePath(); g.fill();
+    g.fillStyle=shieldC; g.beginPath(); g.ellipse(9,-44,6.5,17,0,0,7); g.fill();
+    g.fillStyle=mixHex(shieldC,'#ffffff',0.3); g.beginPath(); g.ellipse(8,-50,4,8,0,0,7); g.fill();
+    g.fillStyle='#e8c34a'; g.beginPath(); g.arc(10,-44,3,0,7); g.fill();
+    g.fillStyle=crest; g.fillRect(-4,-83,10,5);
+  }catch(e){}
+  g.setTransform(1,0,0,1,0,0);
+  const im=g.getImageData(0,0,30,30), d=im.data; for(let i=3;i<d.length;i+=4) d[i]= d[i]>=100? 255 : 0; g.putImageData(im,0,0);
+  NB_SOLDIER_CACHE.set(key, cv); NB_DRAWS.soldier++;
+  return cv;
+}
+function drawBattleSoldierNB(sx,sy,facing,tunic,shieldC,crest,i){
+  const east=(typeof BT!=='undefined' && BT && BT.east) || false;
+  const frame=(((BT.t*0.12)+i*0.7)|0)%4;
+  const spr=nbSoldierSprite(tunic, shieldC, crest, frame, east && facing<0);
+  ctx.save(); ctx.translate(Math.round(sx+1), Math.round(sy+7)); if(facing<0) ctx.scale(-1,1);
+  ctx.drawImage(spr, -14, -28); ctx.restore();
+}
+/* ---- THE CARD: draw the fighter on the game canvas, lift the pixels off it, put the canvas back ---- */
+function nbCardFighter(cnv, A, fem){
+  const c=cnv.getContext('2d'), CW=cnv.width, CH=cnv.height;
+  const L=A.loadout||{};
+  const f=makeFighter({isPlayer:false, x:240, y:262, facing:1, skin:A.skin||'#caa06a', tunic:A.tunic||'#7a2f22', name:A.name||'card',
+    female:!!fem, beard:!fem && !!(A.name && A.name.length%2), beardC:'#2a1a10', stance:'mid', scale:(CH-10)/(74*NB_K*1.35),
+    gear:{ weapon:gearOf('weapon',L.weapon||'gladius'), shield:gearOf('shield',L.shield||'none'),
+           helmet:gearOf('helmet',L.helmet||'none'), armor:gearOf('armor',L.armor||'subarmalis') }});
+  const saved=ctx.getImageData(0,0,W,H);
+  ctx.save(); ctx.setTransform(1,0,0,1,0,0); ctx.clearRect(0,0,W,H);
+  let ok=true; try{ drawGladiatorNB(f); }catch(e){ ok=false; }
+  ctx.restore();
+  if(ok){ c.save(); c.setTransform(1,0,0,1,0,0); c.imageSmoothingEnabled=false; c.drawImage(cv, 240-CW/2+6, 262-CH+4, CW, CH, 0, 0, CW, CH); c.restore(); }
+  ctx.putImageData(saved,0,0);
+  NB_DRAWS.card++;
+  return ok;
+}
+/* ---- THE FALLEN: on his back where he dropped, drawn once and kept ---- */
+function drawFallenNB(cp){
+  if(!cp._img){
+    const cv2=document.createElement('canvas'); cv2.width=80; cv2.height=30; const g=cv2.getContext('2d',{willReadFrequently:true});
+    const k=0.62*1.35; g.setTransform(k,0,0,k,40,26);
+    const C=paletteFor({skin:cp.skin, tunic:cp.tunic});
+    const look={male:true, skin:cp.skin||'#caa06a', hair:'#2a1a10', beard:'none', body:{legs:6,bust:6,booty:6,waist:6}};
+    try{ drawMateFig(g, g, {hip:[6,-4.2], floor:0, lean:-1.50, headAng:-1.75, u:0, aro:0, bare:true, look, face:HARD_FACES.lost,
+      cloth:cp.tunic, lenIn:0, diaIn:1, pxi:1, ankles:{near:[34,-2.2], far:[31,-3.4]}, kneeBend:1, kneeBendFar:1,
+      hands:{near:[-6,-1.5], far:[4,2]}, kit:{C, loin:cp.tunic, belt:C.leather, armor:'subarmalis', blood:2, t:0}, headK:1.16}); }catch(e){}
+    g.setTransform(1,0,0,1,0,0);
+    const im=g.getImageData(0,0,80,30), d=im.data; for(let i=3;i<d.length;i+=4) d[i]= d[i]>=110? 255 : 0; g.putImageData(im,0,0);
+    cp._img=cv2;
+  }
+  ctx.globalAlpha=.45; px(cp.x-16,GROUND,32,3,'#5a1010'); ctx.globalAlpha=1;             // the blood under him
+  ctx.drawImage(cp._img, Math.round(cp.x-40), Math.round(GROUND-26));
+  px(cp.x-22,GROUND-5,6,3,'#9aa4ae'); px(cp.x-22,GROUND-5,6,1,'#dfe6ee');                 // his helm, rolled off
+  px(cp.x+17,GROUND-15,2,15,'#8a6a44'); px(cp.x+16,GROUND-17,4,3,'#b9c0c8');              // and his blade, planted beside him
+}
+/* ---- THE STANDS: your wife, in her colours, waving ---- */
+const NB_WIFE_WAVE=[null,null];
+function drawStandsWifeNB(x, y, frame){
+  const w=G.wife; if(!w) return false;
+  if(!NB_WIFE_WAVE[frame] || NB_WIFE_WAVE[frame]._w!==w){
+    const cv2=document.createElement('canvas'); cv2.width=24; cv2.height=30; const g=cv2.getContext('2d',{willReadFrequently:true});
+    const k=0.36; g.setTransform(k,0,0,k,12,29);
+    try{ drawFemFig(g, g, {look:w, hip:[0,-35], floor:0, lean:0.02, headAng:-0.05, expr:'pleased', t:0,
+      hands:{near: frame? [8,-78] : [11,-74], far:[-3,-50]}, dress:{col:w.dress||'#8a2f5a', cut:(typeof rkHere==='function' && rkHere())? 'ulvik' : 'stola', u:0}}); }catch(e){}
+    g.setTransform(1,0,0,1,0,0);
+    const im=g.getImageData(0,0,24,30), d=im.data; for(let i=3;i<d.length;i+=4) d[i]= d[i]>=100? 255 : 0; g.putImageData(im,0,0);
+    cv2._w=w; NB_WIFE_WAVE[frame]=cv2;
+  }
+  ctx.drawImage(NB_WIFE_WAVE[frame], Math.round(x-12), Math.round(y-18));
+  return true;
 }
 let PAIR_CV=null, PAIR_DRAWS=0, PAIR_LAST=null;       // the last two are for the tests: how often, and who
 function drawPair(c, o){
@@ -26367,10 +27726,11 @@ function villaRevealLine(v, fem, N){
 let MAN_CV=null;
 let MAN_DRAWS=0;                                        // for the tests: the standalone new-figure man
 function drawManProfile(c, x, fy, look, M, dir){
-  const BW=140, BH=110, FXb=70, FYb=106;
-  if(!MAN_CV) MAN_CV=[0,1].map(()=>{ const k=document.createElement('canvas'); k.width=BW; k.height=BH; return k; });
-  const [bk,fr]=MAN_CV; [bk,fr].forEach(k=>{ const g=k.getContext('2d'); g.setTransform(1,0,0,1,0,0); g.clearRect(0,0,BW,BH); });
-  M=M||{}; const lg=((look&&look.body)||{}).legs; const L0=(lg===undefined? 6 : lg);
+  M=M||{}; const KS=M.k||1;                                   // ✦ a scale, for rooms drawn bigger than the hall
+  const BW=Math.ceil(140*KS), BH=Math.ceil(110*KS), FXb=70, FYb=106;
+  if(!MAN_CV || MAN_CV[0].width!==BW || MAN_CV[0].height!==BH) MAN_CV=[0,1].map(()=>{ const k=document.createElement('canvas'); k.width=BW; k.height=BH; k.getContext('2d',{willReadFrequently:true}); return k; });
+  const [bk,fr]=MAN_CV; [bk,fr].forEach(k=>{ const g=k.getContext('2d'); g.setTransform(1,0,0,1,0,0); g.clearRect(0,0,BW,BH); g.setTransform(KS,0,0,KS,0,0); });
+  const lg=((look&&look.body)||{}).legs; const L0=(lg===undefined? 6 : lg);
   const hip=[FXb, FYb-2.2-(15.6+L0*0.22+16.2+L0*0.22)*0.975+(M.crouch||0)];
   const rel=(v)=> v? [hip[0]+v[0], hip[1]+v[1]] : null;
   const IN=(typeof lengthInches==='function')? lengthInches(look||{}, M.aro||0) : {now:6,dia:1.6};
@@ -26378,13 +27738,13 @@ function drawManProfile(c, x, fy, look, M, dir){
     hands:{near:rel(M.near), far:rel(M.far)}, face:M.face||HARD_FACES.stoic, look:look||{}, coast:!!M.coast,
     cloth:M.cloth||'#7a2f22', band:M.band, lenIn:IN.now, diaIn:IN.dia, pxi:1.0, walk:M.walk||0, walkPh:M.walkPh||0});
   MAN_DRAWS++;
-  for(const k of [bk,fr]){ const g=k.getContext('2d'), im=g.getImageData(0,0,BW,BH), d=im.data;
+  for(const k of [bk,fr]){ const g=k.getContext('2d'); g.setTransform(1,0,0,1,0,0); const im=g.getImageData(0,0,BW,BH), d=im.data;
     for(let i=3;i<d.length;i+=4) d[i]= d[i]>=110? 255 : 0; g.putImageData(im,0,0); }
   c.save(); if(dir<0){ c.translate(x,0); c.scale(-1,1); c.translate(-x,0); }
-  { c.save(); c.globalAlpha=0.24; c.fillStyle='#120b08'; c.beginPath(); c.ellipse(x, fy-1, 11, 2.8, 0,0,7); c.fill(); c.restore(); }   // his shadow
-  c.drawImage(bk, Math.round(x-FXb), Math.round(fy-FYb)); c.drawImage(fr, Math.round(x-FXb), Math.round(fy-FYb));
+  { c.save(); c.globalAlpha=0.24; c.fillStyle='#120b08'; c.beginPath(); c.ellipse(x, fy-1, 11*KS, 2.8*KS, 0,0,7); c.fill(); c.restore(); }   // his shadow
+  c.drawImage(bk, Math.round(x-FXb*KS), Math.round(fy-FYb*KS)); c.drawImage(fr, Math.round(x-FXb*KS), Math.round(fy-FYb*KS));
   c.restore();
-  const W2=(p)=>p? [x+(p[0]-FXb)*dir, fy+(p[1]-FYb)] : null;
+  const W2=(p)=>p? [x+(p[0]-FXb)*dir*KS, fy+(p[1]-FYb)*KS] : null;
   return {head:W2(R.head), hand:W2(R.hand), hip:W2(R.hip), root:W2(R.root)};
 }
 /* =====================================================================
@@ -26615,7 +27975,7 @@ function herFace(w, where){
 }
 /* the reaction a slap gets, as one of HER expressions — on her own face in
    profile, rather than a front-facing face stamped over the back of a head */
-function reactExpr(kind){ return ({sting:'brace', swoon:'flush', blush:'pleased', scowl:'cross', smirk:'smug'})[kind] || 'flush'; }
+function reactExpr(kind){ return ({sting:'hurt', swoon:'smitten', blush:'pleased', scowl:'sulk', smirk:'smug'})[kind] || 'flush'; }
 /* his look for the pair: whoever the man in this house is */
 function pairHimLook(){
   try{
@@ -27651,8 +29011,11 @@ function updateDomus(dt){
      silently replace it before it ever drew a single frame — the scene would
      thrash and whichever you actually meant to do would "not happen". Only one
      action may start per call now. ---- */
+  const nearHub=nearHubDoor();
   if(consume('space')){
     if(nearExit){ domusExit(); return; }
+    else if(nearHub){ if(tryHubDoor('fun') && !DM) return; }
+    else if(nearHubPlot()){ tryHubPlot(); }
     else if(nearWife && !nearPool && !nearWard && !nearDoor){ startSlapAnim(D.wifeX); return; }
     else if(nearPool){
       const po=roomOccupant('pool');
@@ -27678,7 +29041,8 @@ function updateDomus(dt){
     }
   }
   if(!D.scene && !D.slap && !D.rslap && !D.husb && consume('w')){
-    if(nearPool) tryPoolInvite();
+    if(nearHub){ tryHubDoor('heir'); if(!DM) return; }
+    else if(nearPool) tryPoolInvite();
     /* W IS THE SAME KEY FOR EVERYONE NOW. It used to route a woman away to
        beckonHusband, because startRomantic declined for a husband when there
        was no art for him — so she could never reach the scene at all, only
@@ -30727,6 +32091,7 @@ function tryArdor(){
 function ardorFav(){
   if(hasQuirk('shameless'))  return 'here';
   if(hasQuirk('insatiable')) return 'here';
+  if(typeof rkHubInHouse==='function' && rkHubInHouse() && ((G.day|0)%2===0)) return 'hub';   // ◆ the coast's warm room
   if(hasQuirk('devout'))     return 'bed';
   if(hasQuirk('tempest'))    return G.hasWardrobe? 'wardrobe' : 'here';
   if(hasQuirk('gossip'))     return G.hasWardrobe? 'wardrobe' : 'bed';
@@ -30754,6 +32119,8 @@ function ardorSpots(){
     block:taken('pool'), blockLong:takenLong('pool'), occ:!!occ.pool});
   if(G.hasWardrobe) out.push({id:'wardrobe',name:'THE WARDROBE',icon:'🚪', note:'Undignified. Quick. Hers.',
     block:taken('wardrobe'), blockLong:takenLong('wardrobe'), occ:!!occ.wardrobe});
+  /* ◆ and on the coast, the house's own tub room — if the house built one */
+  if(typeof rkHubInHouse==='function' && rkHubInHouse()) out.push({id:'hub', name:'THE HUB', icon:'◆', note:'Your own cedar, and warm.'});
   out.forEach(sp=>sp.fav=(sp.id===fav));
   return out;
 }
@@ -30835,7 +32202,7 @@ function ardorResolve(spot){
   }
   const place=spot.id;
   toast('🏛 “Not in the atrium. '
-    + ({bed:'Come to bed.', pool:'…the bath, then.', wardrobe:'In there. NOW.'}[place]||'Come on.')
+    + ({bed:'Come to bed.', pool:'…the bath, then.', wardrobe:'In there. NOW.', hub:'The hub. It is already warm.'}[place]||'Come on.')
     + '”'+tail, 3400);
   refreshStatbar();
   /* HE TAKES HER THERE. It used to cut straight to the scene, so the whole
@@ -32335,6 +33702,8 @@ function doSlap(where){
   G.wifeRel=clamp(G.wifeRel+v.bond,0,bondCeiling());
   G.wifePhys=clamp((G.wifePhys===undefined?45:G.wifePhys)+v.phys,0,100);
   if(v.k==='love') G.jealousy=clamp((G.jealousy||0)-3,0,100);
+  /* 😋 and it is on her face for a while afterwards */
+  setWifeMood(v.k==='love'? 'smitten' : (v.k==='bad'||v.k==='cold')? 'hurt' : v.k==='return'? 'wink' : v.bond>0? 'dreamy' : 'sulk', 6000);
   G.slapsAll=(G.slapsAll||0)+1;
   try{ sfx(v.k==='bad'||v.k==='cold'? 'thud' : 'giggle'); }catch(e){}
   refreshStatbar(); saveQuiet();
@@ -34745,6 +36114,8 @@ function drawDomus(){
      read as depth the house has grown into rather than furniture that
      has been shoved against a flat wall. */
   try{ drawHouseSections(FY, T); }catch(e){}
+  /* ◆ THE HUB'S DOOR — only in a coast house that built one */
+  try{ drawHubDoor(T); drawHubPlot(T); }catch(e){}
   // THE LAGOON (or the humble basin)
   if(G.hasPool){
     /* it used to start at y=196 with the floor at 214, so the lagoon hung
@@ -34906,6 +36277,7 @@ function drawDomus(){
         if(typeof rkPressOk!=='function' || !rkPressOk().ok) return '';
         return ' · ◆ J: CROSS THE HALL';
       }catch(e){ return ''; } })())
+    +((function(){ try{ return (rkHubInHouse()||rkHubPlotHere())? ' · ◆ HUB ◂' : ''; }catch(e){ return ''; } })())
     +((DM&&DM.kids&&DM.kids.length)? '  ·  '+DM.kids.length+' underfoot':'')
     +(G.ill? '  ·  🤒 '+G.ill.who+' is ill':''),W/2,8,'#c8b060',1);
   px(-4,H-14,W+8,18,'#0a0705');
@@ -35059,6 +36431,10 @@ function drawDomus(){
     else if(D.x>452) prompt='SPACE: LEAVE THE HALLS';
     /* an occupied door offers the ONE LOOK instead of its usual business —
        and says plainly that it is one, so spending it is a decision */
+    else if(nearHubDoor())
+      prompt = G.married? ('SPACE: ◆ THE HUB ('+bedLen.toUpperCase()+')  ·  W: ◆ THE HUB, FOR A CHILD') : 'SPACE: ◆ THE HUB (empty)';
+    else if(nearHubPlot())
+      prompt = 'SPACE: ◆ BUILD THE HUB HERE ('+RK_HUB_COST+'d)'+((G.coin|0)<RK_HUB_COST? ' — not enough yet' : '');
     else if(G.hasPool&&Math.abs(D.x-86)<36)
       prompt = roomOccupant('pool')
         ? (peekUsed('pool')? '🔒 the lagoon is taken — you have had your look'
@@ -35332,6 +36708,12 @@ function buildSettings(){
     ()=>{ SETTINGS.sound=!SETTINGS.sound; muted=!SETTINGS.sound; saveSettings(); buildSettings(); if(SETTINGS.sound){ try{ sfx('clap'); }catch(e){} } });
   mkRow('📳 Screen shake','Camera shake on heavy hits.', SETTINGS.shake?'ON':'OFF', SETTINGS.shake,
     ()=>{ SETTINGS.shake=!SETTINGS.shake; saveSettings(); buildSettings(); });
+  mkRow('⚔ Bodies',
+    'Fighters, soldiers and the enrolment cards are drawn on the same posable figures as the villa and the '
+    + 'bedchamber — a real skeleton, the kit built over it, helmets drawn in profile on the head. '
+    + 'CLASSIC puts the old block rig back.',
+    SETTINGS.classicBodies?'CLASSIC':'NEW', !SETTINGS.classicBodies,
+    ()=>{ SETTINGS.classicBodies=!SETTINGS.classicBodies; saveSettings(); buildSettings(); });
   mkRow('🧍 Real body chart',
     'The body map is drawn as an anatomical diagram of shaded masses. Turn this ON and it draws the '
     + 'ACTUAL figure the game uses everywhere else — the same sprite you see in the villa and the '
@@ -35462,6 +36844,13 @@ const WOOHOO_GUIDE=[
    p:'The bed chamber always works. The bath needs a pool and the wardrobe needs a wardrobe, '
     + 'and both are things you buy. The atrium — bending right where you stand — is the only '
     + 'one the household can walk in on.'},
+  {ic:'◆', h:'THE HUB AND THE BREEDING HOUSE — the Rkrai coast only', rk:true,
+   k:['SPACE at the hub door — the two of you','W at the hub door — for a child','PLACE ◆ THE HUB on the villa card'],
+   p:'On the coast a woohoo has two more places, and only there. The breeding house on the quay is '
+    + 'the public one — warm cedar tubs, hide screens, a tally-keeper at the door, '+RK_BREED_FEE+'d, +14% on a try '
+    + 'for a child. The hub is the house’s own: build it from the Place row on the villa card or the '
+    + 'renovations ('+RK_HUB_COST+'d), and it gets its own door on the walk through the house, a line in the '
+    + 'talk, and a card in GET HARD’s “where”. +18%, because it is yours. Off the coast none of it exists.'},
   {ic:'❤', h:'WHAT IT COSTS',
    k:[],
    p:'Three quick ones a day, two long, one night. Bathe first — under 25 hygiene the answer is '
@@ -35477,6 +36866,7 @@ function buildWoohooGuide(){
       + 'marriage, heirs and succession still play normally. The keys are the same either way.';
   b.appendChild(intro);
   WOOHOO_GUIDE.forEach(G2=>{
+    if(G2.rk && !(typeof rkBreedOn==='function' && rkBreedOn())) return;   // the coast's own card, on the coast
     const card=document.createElement('div');
     card.style.cssText='border:2px solid #000;border-radius:4px;padding:9px;text-align:left;'
       + 'background:linear-gradient(#251a10,#170f08);'
@@ -35689,6 +37079,8 @@ function drawCardPortrait(cnv,A,sex,rank){
   const rf   = rungFrac(rank);
   const TIER = rf<0.28? 0 : rf<0.66? 1 : 2;          // poor / holding / great house
   const armed= fem? womanBearsArms(A, rank) : true;
+  /* ⚔ AN ARMED CAREER IS SHOWN AS THE FIGHTER — full length, on the template, in the kit it starts in */
+  if(armed && nbOn()){ let ok=false; try{ ok=nbCardFighter(cnv, A, fem); }catch(e){ ok=false; } if(ok){ c.restore(); return; } }
   if(fem && !armed){
     /* =================================================================
        A WOMAN WHO IS NOT A FIGHTER, DRESSED BY HER RUNG AND HER PEOPLE
@@ -42776,8 +44168,8 @@ function openVilla(){
     const hb=document.createElement('button'); hb.className='btn sm'; hb.textContent='◆ BUILD A BREEDING HUB ('+RK_HUB_COST+'d)';
     hb.title='A warm cedar tub room inside the house, cut with your lineage. A house with a hub keeps its business at home and never queues at the quay — and the odds in it are better (+18%).';
     hb.disabled=G.coin<RK_HUB_COST;
-    hb.onclick=()=>{ if(G.coin<RK_HUB_COST) return; G.coin-=RK_HUB_COST; G.rkHub=true; G.pop=clamp((G.pop||0)+3,0,100); refreshStatbar(); saveQuiet();
-      toast('◆ The coopers and the carvers take a month. The hub stands warm in the middle of the house, your lineage cut round its rim — and the district, which counted every stave, approves. (+3 pop)',5200); openVilla(); };
+    hb.onclick=()=>{ const R=rkBuildHub(); if(!R.ok){ toast(R.why,2800); return; } refreshStatbar(); saveQuiet();
+      toast(R.line+' It is in the woohoo WHERE picker now, and it has its own door on the walk through the house.',6200); openVilla(); };
     rr.appendChild(hb);
   }
   if(!G.hasWardrobe){
@@ -42810,7 +44202,8 @@ function openVilla(){
         : poor
         ? 'Your house has no warm room of its own, so when you try for a child you go to the <b>breeding house</b> on the quay: cedar tubs, hide screens, a brazier under every one, and a tally-keeper at the door. Nobody thinks less of a house that shows up. <span style="color:#7ad48a">(+14% on a try, '+RK_BREED_FEE+'d at the door)</span>'
         : 'You can afford a <b>hub</b> of your own (see the renovations). Until then the <b>breeding house</b> on the quay is open to any house: <span style="color:#7ad48a">+14% on a try, '+RK_BREED_FEE+'d at the door</span>.'}</div>
-      <div class="small muted" style="margin-top:3px">Visits: ${G.rkBreedVisits|0} · nights in the hub: ${G.rkHubNights|0}</div>`;
+      <div class="small muted" style="margin-top:3px">Visits: ${G.rkBreedVisits|0} · nights in the hub: ${G.rkHubNights|0}</div>
+      <div class="small" style="margin-top:3px;color:#ffb0d8">◆ Both are places for it now: pick <b>◆ THE HUB</b> or <b>◆ BREEDING HOUSE</b> in the woohoo <i>Place</i> row on the marriage card${G.rkHub? ', or walk the villa to the hub’s own door' : ''}.</div>`;
     const row2=document.createElement('div'); row2.className='row gap6'; row2.style.marginTop='4px'; row2.style.flexWrap='wrap';
     const go=(pl)=>{ if(loveLeft(bedLen)<=0){ toast('Not today — you have spent the day’s allowance.',2600); return; }
       if(pl==='breed' && G.coin<RK_BREED_FEE){ toast('The fee at the door is '+RK_BREED_FEE+'.',2400); return; }
@@ -45296,7 +46689,7 @@ function drawEscortPair(x, FY, T, pose, dir, look, wife){
    THE WALK ITSELF. He crosses the hall with her to whichever door, and
    what happens when he gets there depends on whether it is free.
    --------------------------------------------------------------------- */
-const ROOM_DOOR_X={bed:414, pool:86, wardrobe:309};
+const ROOM_DOOR_X={bed:414, pool:86, wardrobe:309, hub:166};   // ◆ hub: the coast's own door (RK_HUB_DOOR.cx)
 /* THE UPPER STOREY IS A PLACE YOU CAN STAND. The gallery had a staircase
    drawn on it and no way to use it, which is worse than not drawing one.
    96 is the gallery's floor level; the flight runs up the left wall. */
@@ -49337,7 +50730,7 @@ function buildMarriageCard(b){
     if(ADULT){
     const lenRow=document.createElement('div'); lenRow.className='row gap6'; lenRow.style.marginTop='4px';
     const lh=document.createElement('span'); lh.className='small muted'; lh.textContent='Session:'; lenRow.appendChild(lh);
-    const lenOpts=[['quick','🕯 QUICK 10s'],['long','🌙 LONG 30s'],['night','🌌 ALL NIGHT 1m']];
+    const lenOpts=[['quick','🕯 QUICK 21s'],['long','🌙 LONG 32s'],['night','🌌 ALL NIGHT 1m']];
     if(vigilReady()) lenOpts.push(['vigil','💫 VIGIL OF VENUS 5m']);
     else if(bedLen==='vigil') bedLen='quick';
     lenOpts.forEach(([id,label])=>{
@@ -49357,8 +50750,13 @@ function buildMarriageCard(b){
     if(ADULT){
     const plRow=document.createElement('div'); plRow.className='row gap6'; plRow.style.marginTop='4px';
     const plh=document.createElement('span'); plh.className='small muted'; plh.textContent='Place:'; plRow.appendChild(plh);
+    sanitizeBedPlace();                          // a coast place is not carried off the coast
     const _places=[['bed','🛏 BEDCHAMBER',true],['wardrobe','🚪 WARDROBE',G.hasWardrobe],['pool','🏝 LAGOON',G.hasPool],['bath','🏛 BATHHOUSE',true]];
-    if(typeof rkBreedOn==='function' && rkBreedOn()){ _places.push(['breed','◆ BREEDING HOUSE',G.coin>=RK_BREED_FEE]); _places.push(['hub','◆ THE HUB',!!G.rkHub]); }
+    /* ◆ THE COAST'S TWO — and ONLY the coast's. The hub is always on the row
+       here, built or not: unbuilt, the button builds it on the spot. */
+    if(typeof rkBreedOn==='function' && rkBreedOn()){
+      _places.push(['hub', G.rkHub? '◆ THE HUB' : '◆ THE HUB — BUILD ('+RK_HUB_COST+'d)', G.rkHub || (G.hasVilla && G.coin>=RK_HUB_COST)]);
+      _places.push(['breed','◆ BREEDING HOUSE ('+RK_BREED_FEE+'d)',G.coin>=RK_BREED_FEE]); }
     _places.forEach(([id,label,ok])=>{
       const c3=document.createElement('button'); c3.className='btn sm'+(bedPlace===id?' gold':'');
       c3.textContent=label; c3.disabled=!ok;
@@ -49366,9 +50764,14 @@ function buildMarriageCard(b){
         id==='bed'?'The classic. The door does the censoring.': id==='wardrobe'?'Sturdy. VERY sturdy. Clothes will exit at speed.':
         id==='pool'?'Moonlight, steam, and a folding screen with opinions.':
         id==='breed'?'The breeding house on the quay: warm cedar tubs and hide screens. '+RK_BREED_FEE+'d at the door; better odds for a child (+14%).':
-        id==='hub'?(G.rkHub?'Your own hub. The tradition keeps it at home, and the odds are better again (+18%).':'Build a breeding hub first (renovations).'):
+        id==='hub'?(G.rkHub?'Your own hub. The tradition keeps it at home, and the odds are better again (+18%).'
+                           : (G.hasVilla? 'Build the hub here and now: a warm cedar tub room inside the house, cut with your lineage (+18% on a try for a child).' : 'A hub goes inside a house — buy the villa first.')):
         'The town baths after hours — marble, echo, scandal.';
-      c3.onclick=()=>{ bedPlace=id; openVilla(); };
+      if(id==='hub'||id==='breed'){ c3.style.borderColor='#ff9ad0'; if(bedPlace!==id) c3.style.color='#ffb0d8'; }
+      c3.onclick=()=>{
+        if(id==='hub' && !G.rkHub){ const R=rkBuildHub(); if(!R.ok){ toast(R.why,2800); return; }
+          refreshStatbar(); saveQuiet(); toast(R.line,5200); }
+        bedPlace=id; openVilla(); };
       plRow.appendChild(c3);
     });
     card.appendChild(plRow);
@@ -49404,6 +50807,8 @@ function buildMarriageCard(b){
     const q=(label,title,dis,fn)=>{ const bq=document.createElement('button'); bq.className='btn sm'; bq.textContent=label; bq.title=title||''; bq.disabled=!!dis; bq.onclick=fn; qrow.appendChild(bq); };
     // ---- FOUR KINDS OF CONVERSATION, each with its own reactions ----
     const talkDone=(txt,gain,ease)=>{ G.lastTalkDay=G.day;
+      /* 😋 and the talk shows on her: a laugh for a good one, hurt for a bad one */
+      setWifeMood(gain>=6? 'laugh' : gain>=3? 'dreamy' : gain<0? 'hurt' : 'flat', 7000);
       G.wifeRel=clamp(G.wifeRel+gain,0,100); if(ease) easeJealousy(ease);
       toast(txt+(gain>0?' (+'+gain+' ♥)':gain<0?' ('+gain+' ♥)':''),3200);
       refreshStatbar(); saveQuiet(); openVilla(); };
@@ -49503,7 +50908,7 @@ function buildMarriageCard(b){
       srow.appendChild(bt);
     });
     q('🎁 A gift from the forum (50d)','A silver comb, Tyrian ribbon, honeyed figs — 50 denarii of pure strategy.',G.coin<50,()=>{
-      G.coin-=50; G.wifeRel=clamp(G.wifeRel+8,0,100); easeJealousy(14);
+      G.coin-=50; G.wifeRel=clamp(G.wifeRel+8,0,100); easeJealousy(14); setWifeMood('smitten', 9000);
       toast('🎁 You present it with terrible ceremony. '+(w.male?'His':'Her')+' eyes shine. (+8 ♥)',2800);
       refreshStatbar(); saveQuiet(); openVilla();
     });
@@ -49513,6 +50918,20 @@ function buildMarriageCard(b){
       if(loveLeft(bedLen)<=0){ toast('😏 “AGAIN?! The lamps are out of oil, love.” (no '+bedLen+' sessions left today)',2800); return; }
       launch('fun');
     });
+    /* ◆ AND ON THE COAST, THE LINE HAS A PLACE IN IT */
+    if(ADULT && typeof rkBreedOn==='function' && rkBreedOn()){
+      const hubOn=!!G.rkHub;
+      q(hubOn? '◆🔥 “The hub. Now.”' : '◆🔥 “The breeding house — tonight.”',
+        hubOn? 'Your own cedar tub room. Better odds than a bed (+18%), and it is yours.'
+             : 'The public house on the quay: warm tubs, hide screens, a tally-keeper at the door. '+RK_BREED_FEE+'d, +14% on a try.',
+        !hubOn && G.coin<RK_BREED_FEE, ()=>{
+        if((G.hygiene|0)<30){ toast('◆ '+(w.male?'He':'She')+' points at the water barrel. “Not into a tub smelling of the arena.”',3200); return; }
+        if(!spouseWilling()){ toast('◆ “Not tonight — not even there.” Win the heart and ask again.',3000); return; }
+        if(loveLeft(bedLen)<=0){ toast('◆ “AGAIN?!” (no '+bedLen+' sessions left today)',2800); return; }
+        bedPlace = hubOn? 'hub' : 'breed';
+        launch(preg? 'fun' : 'heir');
+      });
+    }
     const bedH=document.createElement('button'); bedH.className='btn sm gold';
     const heirIcon=ADULT?'🍆🍑':'👶';
     const heirLabel=ADULT?'🍆🍑🔥 FOR AN HEIR':'👶 FOR AN HEIR';
@@ -56591,13 +58010,19 @@ window.__SS = {
   setBodyMapWalk:(v)=>{ bodyMapWalk=v; }, get bodyMapSubject(){return bodyMapSubject;},
   redrawBodyMap:()=>{ try{ drawBodyMap($('bodymap-cv'), bodyMapSubject, bodyMapView, bodyMapT); }catch(e){} },
   drawRealFig, realAnchors, drawLength, lengthPose, lengthDigits, girthDigits, ROUSED_NAMES, rousedName, restName, tierIdxOf,
-  drawBedPose, drawFemFig, femPregMonth, BED_UNDRESS, drawBreedPlace, rkBreedOn, rkPoorHouse, rkBreedKids, rkSendKidsToBreed, RK_BREED_FEE, RK_HUB_COST, RK_BREED_POSES, drawHubRoom, drawQuayHall, drawQuayExterior, BRD_DRAWS, drawSilhouette, drawPreludeRunner, get SIL_DRAWS(){return SIL_DRAWS;}, get BEDPOSE_DRAWS(){return BEDPOSE_DRAWS;}, get BEDPOSE_LAST(){return BEDPOSE_LAST;},
+  drawBedPose, drawFemFig, femPregMonth, BED_UNDRESS, drawBreedPlace, rkBreedOn, rkPoorHouse, rkBreedKids, rkSendKidsToBreed, RK_BREED_FEE, RK_HUB_COST,
+  makeFighter, paletteFor,
+  nbSoldierSprite, drawBattleSoldierNB, nbCardFighter, drawFallenNB, drawStandsWifeNB, drawCardPortrait, drawBattleSoldier,
+  nbOn, drawGladiatorNB, nbFighterLook, nbFighterPose, nbArmState, nbKitFor, NB_ARMOR, NB_HELM, nbKit, nbDrawHelm, NB_DRAWS, NB_K, nbCol,
+  RK_HUB_DOOR, rkHubInHouse, rkPlaceOk, rkHubPlotHere, nearHubPlot, tryHubPlot, drawHubPlot, drawHubMarker,
+  bedStage, BED_STAGES, bedSessionDur, BED_INTRO, BED_STEP, drawBedStageUI, bedRestPose, BED_FIG_K, sanitizeBedPlace, rkBuildHub, nearHubDoor, tryHubDoor, drawHubDoor, get bedPlace(){return bedPlace;}, RK_BREED_POSES, drawHubRoom, drawQuayHall, drawQuayExterior, BRD_DRAWS, drawSilhouette, drawPreludeRunner, get SIL_DRAWS(){return SIL_DRAWS;}, get BEDPOSE_DRAWS(){return BEDPOSE_DRAWS;}, get BEDPOSE_LAST(){return BEDPOSE_LAST;},
   get MAN_DRAWS(){return MAN_DRAWS;}, drawTemptFigures, temptHimPose, legacySet, LEGACY_RK, legacyWord, legacyAudience, migrate,
   BUILD_STAMP, reactExpr, realDressInfo, get bmDressed(){return bmDressed;}, set bmDressed(v){ bmDressed=!!v; }, drawBendFig, get BEND_OPT(){return BEND_OPT;}, set BEND_OPT(v){ BEND_OPT=v; }, realFigExtras, drawPair, drawMateFig, pairHimLook, ik2, herFace, herFaceWeights, get HER_ROLL(){return HER_ROLL;}, set HER_ROLL(v){ HER_ROLL=v; }, drawManProfile, drawPeekTableau, adultCouple, villaRevealLine, get PAIR_DRAWS(){return PAIR_DRAWS;}, get PAIR_LAST(){return PAIR_LAST;},
   LEN_INCH, LEN_GROW_BY, lenGrow, lengthInches, lenFrac, VILLAGE_NAMES, villageName, villageNameNews, get HUSB_SMILE(){return HUSB_SMILE;},
   VILLAGE_NAMES_F, VILLAGE_HOUSE, villageNameF, villageHouseName, villageStreet, villageRank, villageNameReaction, openVillageTalk, fmtLen,
   drawHusbandFigSmiling:(c2,w2,face)=>{ HUSB_SMILE=1; HUSB_FACE=face? HARD_FACES[face] : null; try{ drawHusbandFig(c2,0,0,70,null,null,w2,0,'idle'); } finally{ HUSB_SMILE=0; HUSB_FACE=null; } },
-  HARD_FACES, HARD_FACE_ORDER, hardFace, hardFaceWeights, get HARD_ROLL(){return HARD_ROLL;}, set HARD_ROLL(v){ HARD_ROLL=v; },
+  HARD_FACES, HARD_FACE_ORDER, hardFace, hardFaceWeights, FACE_EX, CHART_FACES, CHART_FACE_ORDER, chartFace, faceAsHard, drawEyeFx, drawFaceCaption, drawDiagFaceFx,
+  get CHART_FACE(){return CHART_FACE;}, set CHART_FACE(v){ CHART_FACE=v; }, setWifeMood, wifeMood, get HARD_ROLL(){return HARD_ROLL;}, set HARD_ROLL(v){ HARD_ROLL=v; },
   get HARD_FACE_FORCE(){return HARD_FACE_FORCE;}, set HARD_FACE_FORCE(v){ HARD_FACE_FORCE=v; },
   ARCHETYPES, ARCH_ORDER, BODY_PARTS, BODY_PARTS_M, IMPOSSIBLE_V,
   IMPOSSIBLE_CHANCE, SECRET_SELLERS, drawShadowPlayTest:drawShadowPlay, drawWifeFig, drawDomusPlayer,
