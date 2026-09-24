@@ -13195,7 +13195,7 @@ const SETTINGS_KEY='SANDSTEEL_SETTINGS';
 /* WHICH BUILD IS THIS. Printed on the title screen, in Settings and in the
    corner of the hall — because an old link to an old build looks exactly
    like a fix that did not work. */
-const BUILD_STAMP='V38 · new bodies everywhere';
+const BUILD_STAMP='V39 · undress, pregnancy, the hub';
 try{ document.addEventListener('DOMContentLoaded',()=>{ const e=document.getElementById('build-stamp'); if(e) e.textContent='build '+BUILD_STAMP; });
      const e0=document.getElementById('build-stamp'); if(e0) e0.textContent='build '+BUILD_STAMP; }catch(e){}
 const SETTINGS=(function(){ const d={sound:true,shake:true,difficulty:'normal',
@@ -22131,6 +22131,7 @@ function drawHall(gx,gy,gw,gh,T,MED,WALLA){
    which is the one place a flat shape is what you want.
    ===================================================================== */
 let BEDPOSE_DRAWS=0, BEDPOSE_LAST=null;
+const BED_UNDRESS=230;                            // ticks the clothes take to come off, before the first position
 function drawBedPose(vi, E){
   const c=E.c, T=E.T, s=E.s, cx0=E.cx0, base=E.base, HB=E.HB||(()=>{});
   if(!G) return false;
@@ -22188,6 +22189,39 @@ function drawBedPose(vi, E){
   const Lpos={};   // for the tests: where the two of them ended up
   const done=(HM,HR,kind)=>{ BEDPOSE_LAST={vi, kind, him:HM, her:HR}; return true; };
 
+  /* ================= THE CLOTHES COME OFF — before the first position =================
+     They stand facing, dressed. He goes to his belt and the tunic comes up
+     over his head (the coast's kilt goes down) and lands on the floor; her
+     clasps go and the gown slides down her and pools; they step together,
+     and then the running order starts. */
+  if(vi==='undress'){
+    const ut=E.ut||0;
+    const k1=clamp(ut/40,0,1), uH=clamp((ut-30)/90,0,1), uS=clamp((ut-70)/105,0,1), close=clamp((ut-178)/46,0,1);
+    const hx=cx0-17+k1*3+close*6, wx=cx0+13-close*5;
+    const clothH = coastB? mixHex((G&&G.tunic)||'#6a4a2e','#5a4028',0.35) : ((G&&G.tunic)||'#7a2f22');
+    const band=(typeof rkOfficeBand==='function')? rkOfficeBand(G&&G.wife) : '#8a6a3a';
+    const hip=[hx, base-36];
+    const hHand = uH<0.02? null : uH<0.28? [hip[0]+4.6, hip[1]-4.5] : uH<0.9? (coastB? [hip[0]+4.2, hip[1]+4+(uH-0.28)*30] : [hip[0]+3.5, hip[1]-40]) : (close>0? [wx-2, base-40] : null);
+    const hims={hip, lean:0.03+close*0.05, headAng:0.12, face:HF, u:uH, aro:0.08+Math.max(uH,close)*0.92, coast:coastB, cloth:clothH, band,
+                bare:false, noFloorCloth:false, hands:{near:hHand, far: (uH>0.28 && uH<0.9)? (coastB? [hip[0]+2, hip[1]+4+(uH-0.28)*30] : [hip[0]+1, hip[1]-41]) : null}};
+    const hipW=[wx, base-33];
+    // her hands: at the clasps on her shoulders, then pushing the gown down her hips, then to him
+    const push=clamp((uS-0.2)/0.6,0,1);
+    const herHands = uS<=0.02? {near:null, far:null}
+                   : uS<0.2? {near:[hipW[0]+2.5, hipW[1]-23], far:[hipW[0]-0.5, hipW[1]-24]}
+                   : uS<0.85? {near:[hipW[0]+4.2, hipW[1]-3+push*16], far:[hipW[0]-3.5, hipW[1]-3+push*16]}
+                   : {near:L(wx,[hx+3, base-52]), far:L(wx,[hx+1, base-46])};
+    const herF={hip:hipW, lean:0.02+close*0.06, headAng:-0.18-close*0.12, expr:(ut<100? 'smug' : 'flush'), blush:0.2+uS*0.5, rock:Math.sin(T*0.2)*0.2*uS,
+                ankles:{near:[wx+0.5, base-3.2], far:[wx+3, base-2.6]}, hands:herHands,
+                dress:{col:hexOf((her&&her.dress)||'#8a2f5a'), cut:(coastB? 'ulvik' : 'stola'), u:uS, band, noble:!!(her&&her.tier&&her.tier!=='common')}};
+    shadow(cx0, base-1, 24);
+    HIM(Object.assign({only:'far'}, hims)); MX(wx,()=>HER(Object.assign({only:'far'},herF)));
+    const HM=HIM(Object.assign({only:'main'}, hims)); const HR=MX(wx,()=>HER(Object.assign({only:'main'},herF)));
+    HIM(Object.assign({only:'near'}, hims)); MX(wx,()=>HER(Object.assign({only:'near'},herF)));
+    if(close>0.5) hearts(cx0, base-72, 10);
+    s.undressU={him:uH, her:uS};
+    return done(HM,HR,'undress');
+  }
   /* ================= 0 · THE EMBRACE — standing, pressed together ================= */
   if(vi===0 || vi===16){
     const b=bt(0.30), hx=cx0-9+b*2.2, wx=cx0+8;
@@ -22632,91 +22666,378 @@ function rkSendKidsToBreed(c){
   G.pop=clamp((G.pop||0)+1,0,100);
   return {ok:true, hit};
 }
-/* ---- THE ROOMS, DRAWN ---- */
+/* ---- THE ROOMS, DRAWN ----------------------------------------------------
+   The hub is the house's own tub room and it is meant to look like the most
+   expensive room in the house: a round cedar room, the rafters running up to
+   a smoke-hole with the night in it, the house's lineage carved and painted
+   on its posts, the crest woven into a blanket on the wall, stone lamps, a
+   brazier throwing sparks, furs on the bench, and one great hooped tub in the
+   middle of it. The breeding house on the quay is the public version of the
+   same thing, and it is LONG: a hall of screened booths going away from you,
+   a lamp on the peg of every one that is taken, the steam hanging under the
+   roof, and the tally-keeper at the far end notching the house names.
+   ------------------------------------------------------------------------- */
+const BRD_DRAWS={out:0, hub:0, hall:0};                  // for the tests: which room was drawn
+const BRD_H=(n)=>{ const x=Math.sin(n*127.1+311.7)*43758.5453; return x-Math.floor(x); };    // a steady noise, per index
+function brdGlow(x,y,r,col,a){ ctx.save(); ctx.globalCompositeOperation='lighter'; const g=ctx.createRadialGradient(x,y,0.5,x,y,r);
+  g.addColorStop(0,'rgba('+col+','+a+')'); g.addColorStop(0.45,'rgba('+col+','+(a*0.35)+')'); g.addColorStop(1,'rgba('+col+',0)');
+  ctx.fillStyle=g; ctx.fillRect(x-r,y-r,r*2,r*2); ctx.restore(); }
+function brdPlanks(x0,x1,y0,y1,warm,dark,T,curve){ let x=x0, i=0;
+  while(x<x1){ const w=13+Math.floor(BRD_H(i)*9), cx=(x+w/2-240)/260, fall=curve? clamp(1-cx*cx*0.85,0.15,1) : 1;
+    const base=mixHex(dark, warm, fall*(0.55+BRD_H(i+7)*0.25));
+    const g=ctx.createLinearGradient(x,0,x+w,0); g.addColorStop(0,mixHex(base,'#000000',0.28)); g.addColorStop(0.35,base); g.addColorStop(0.8,mixHex(base,'#ffe0b0',0.08)); g.addColorStop(1,mixHex(base,'#000000',0.35));
+    ctx.fillStyle=g; ctx.fillRect(x,y0,w-1,y1-y0);
+    ctx.strokeStyle='rgba(20,10,4,.16)'; ctx.lineWidth=0.6;
+    for(let k=0;k<3;k++){ const gx=x+2+BRD_H(i*3+k)*(w-4); ctx.beginPath(); ctx.moveTo(gx,y0); for(let yy=y0; yy<=y1; yy+=12) ctx.lineTo(gx+Math.sin(yy*0.05+k+i)*1.2, yy); ctx.stroke(); }
+    if(BRD_H(i+3)>0.72){ const ky=y0+BRD_H(i+5)*(y1-y0); ctx.fillStyle='rgba(30,14,4,.45)'; ctx.beginPath(); ctx.ellipse(x+w*0.5, ky, 1.6, 2.6, 0, 0, 7); ctx.fill(); }
+    ctx.fillStyle='rgba(0,0,0,.45)'; ctx.fillRect(x+w-1,y0,1,y1-y0); x+=w; i++; } }
+/* a carved house-post: the lineage, stacked, painted, lit from one side */
+function brdPost(x,y0,y1,w,T,lightSide){ const g=ctx.createLinearGradient(x,0,x+w,0);
+  const lo='#3a2410', mid='#7a4e28', hi='#b07a44';
+  if(lightSide>0){ g.addColorStop(0,lo); g.addColorStop(0.55,mid); g.addColorStop(1,hi); } else { g.addColorStop(0,hi); g.addColorStop(0.45,mid); g.addColorStop(1,lo); }
+  ctx.fillStyle=g; ctx.fillRect(x,y0,w,y1-y0);
+  const segs=3, sh=(y1-y0-14)/segs;
+  for(let k=0;k<segs;k++){ const sy=y0+8+k*sh, cx=x+w/2;
+    // a face: the brow, two great ovoid eyes, the mouth band
+    ctx.fillStyle='#1a120c'; ctx.beginPath(); ctx.ellipse(cx, sy+sh*0.22, w*0.44, sh*0.08, 0, Math.PI, 0); ctx.fill();          // the brow
+    for(const ex of [-1,1]){ ctx.fillStyle='#1a120c'; ctx.beginPath(); ctx.ellipse(cx+ex*w*0.22, sy+sh*0.34, w*0.17, sh*0.10, 0, 0, 7); ctx.fill();
+      ctx.fillStyle='#e8dcc2'; ctx.beginPath(); ctx.ellipse(cx+ex*w*0.22, sy+sh*0.34, w*0.10, sh*0.055, 0, 0, 7); ctx.fill();
+      ctx.fillStyle='#1a120c'; ctx.beginPath(); ctx.arc(cx+ex*w*0.22+ex*0.4, sy+sh*0.34, Math.max(0.8,w*0.045), 0, 7); ctx.fill(); }
+    ctx.fillStyle='#a8402a'; ctx.fillRect(x+w*0.18, sy+sh*0.52, w*0.64, sh*0.07);                                         // the red of the mouth
+    ctx.fillStyle='#1a120c'; for(let t=0;t<5;t++) ctx.fillRect(x+w*0.22+t*w*0.13, sy+sh*0.52, 0.8, sh*0.07);            // teeth
+    ctx.fillStyle='#3a7a6a'; ctx.beginPath(); ctx.ellipse(cx, sy+sh*0.74, w*0.36, sh*0.10, 0, 0, 7); ctx.fill();              // the wing below it, blue-green
+    ctx.fillStyle='#1a120c'; ctx.beginPath(); ctx.ellipse(cx, sy+sh*0.74, w*0.18, sh*0.05, 0, 0, 7); ctx.fill();
+    ctx.fillStyle='rgba(255,220,170,.10)'; ctx.fillRect(lightSide>0? x+w-2 : x, sy, 2, sh);                                 // the carved edge catches the lamp
+    ctx.fillStyle='rgba(0,0,0,.35)'; ctx.fillRect(x, sy+sh-1.2, w, 1.2); }
+  ctx.fillStyle='#b08a52'; ctx.beginPath(); ctx.ellipse(x+w/2, y0+2, w*0.6, 5, 0, 0, 7); ctx.fill(); }                // the cap
+/* the house's crest, woven: stepped diamonds and an eye, with a fringe that moves in the heat */
+function brdCrest(x,y,w,h,T){ ctx.fillStyle='#3a2410'; ctx.fillRect(x-6,y-3,w+12,3.5); ctx.fillStyle='#8a5a30'; ctx.fillRect(x-7,y-4,3,5.5); ctx.fillRect(x+w+4,y-4,3,5.5);
+  const g=ctx.createLinearGradient(0,y,0,y+h); g.addColorStop(0,'#e8dcb8'); g.addColorStop(1,'#c8b890'); ctx.fillStyle=g; ctx.fillRect(x,y,w,h);
+  ctx.strokeStyle='#1a120c'; ctx.lineWidth=2.2; ctx.strokeRect(x+2,y+2,w-4,h-4);
+  ctx.fillStyle='#e0b23a'; ctx.fillRect(x+4,y+4,w-8,3); ctx.fillRect(x+4,y+h-7,w-8,3);
+  const cx=x+w/2, cy=y+h/2;
+  for(const [r,col] of [[h*0.40,'#1a120c'],[h*0.32,'#a8402a'],[h*0.24,'#e8dcb8'],[h*0.16,'#3a7a6a']]){ ctx.fillStyle=col; ctx.beginPath(); ctx.moveTo(cx,cy-r); ctx.lineTo(cx+r*1.3,cy); ctx.lineTo(cx,cy+r); ctx.lineTo(cx-r*1.3,cy); ctx.closePath(); ctx.fill(); }
+  ctx.fillStyle='#1a120c'; ctx.beginPath(); ctx.ellipse(cx,cy,h*0.10,h*0.06,0,0,7); ctx.fill(); ctx.fillStyle='#e8dcb8'; ctx.beginPath(); ctx.arc(cx,cy,h*0.03,0,7); ctx.fill();
+  for(const sx of [-1,1]) for(let k=0;k<3;k++){ ctx.fillStyle=k%2? '#a8402a' : '#1a120c'; const bx=cx+sx*(w*0.30+k*5); ctx.beginPath(); ctx.moveTo(bx,cy-7+k); ctx.lineTo(bx+sx*4,cy); ctx.lineTo(bx,cy+7-k); ctx.lineTo(bx-sx*4,cy); ctx.closePath(); ctx.fill(); }
+  for(let k=0;k<Math.floor(w/3);k++){ const fx=x+1.5+k*3, sw=Math.sin(T*0.05+k*0.7)*1.2; ctx.strokeStyle=k%2? '#1a120c' : '#c8b890'; ctx.lineWidth=0.9; ctx.beginPath(); ctx.moveTo(fx,y+h); ctx.lineTo(fx+sw,y+h+7+BRD_H(k)*3); ctx.stroke(); } }
+function brdLamp(x,y,T,big){ ctx.fillStyle='#5a5a52'; ctx.beginPath(); ctx.ellipse(x,y,big? 8 : 6,2.6,0,0,Math.PI); ctx.fill(); ctx.fillStyle='#8a8a80'; ctx.fillRect(x-(big?8:6),y-0.6,(big?16:12),1.2);
+  const fl=Math.sin(T*0.37+x)*0.8+Math.sin(T*0.91+x)*0.5;
+  ctx.fillStyle='#ffb43a'; ctx.beginPath(); ctx.ellipse(x+fl*0.3,y-3.2,1.6,3.2+fl*0.5,0,0,7); ctx.fill();
+  ctx.fillStyle='#fff2c0'; ctx.beginPath(); ctx.ellipse(x+fl*0.3,y-2.6,0.7,1.6,0,0,7); ctx.fill();
+  brdGlow(x,y-3,big? 70 : 46,'255,176,90',0.30+fl*0.04); }
+/* steam: soft puffs that rise, widen and thin out — each a radial glow, not a disc */
+function brdSteam(x,y,w,T,n,a,rise,size){ rise=rise||60; size=size||1;
+  ctx.save(); ctx.globalCompositeOperation='screen';
+  for(let k=0;k<n;k++){ const ph=((T*0.30+k*37)%120)/120, ry=ph*rise, al=(a||0.16)*Math.sin(Math.PI*ph)*0.8;
+    const px2=x+(BRD_H(k)-0.5)*w+Math.sin(T*0.03+k)*5*size, py2=y-ry, r=(5+ph*14)*size;
+    const g=ctx.createRadialGradient(px2,py2,0.2,px2,py2,r); g.addColorStop(0,'rgba(246,240,232,'+al.toFixed(3)+')'); g.addColorStop(0.6,'rgba(246,240,232,'+(al*0.4).toFixed(3)+')'); g.addColorStop(1,'rgba(246,240,232,0)');
+    ctx.fillStyle=g; ctx.beginPath(); ctx.ellipse(px2,py2,r,r*0.55,0,0,7); ctx.fill(); }
+  ctx.restore(); }
+function brdVignette(a){ const g=ctx.createRadialGradient(W/2,H*0.55,H*0.35,W/2,H*0.55,W*0.62); g.addColorStop(0,'rgba(0,0,0,0)'); g.addColorStop(1,'rgba(4,2,1,'+a+')'); ctx.fillStyle=g; ctx.fillRect(0,0,W,H); }
+
+/* ================= THE HUB — the house's own tub room ================= */
+function drawHubRoom(T){
+  ctx.fillStyle='#120a05'; ctx.fillRect(0,0,W,H);
+  brdPlanks(0,W,34,206,'#8a5a30','#1e1208',T,true);                                         // the round cedar wall
+  // the roof: rafters running up to the smoke-hole
+  { const top=ctx.createLinearGradient(0,0,0,48); top.addColorStop(0,'#0c0704'); top.addColorStop(1,'#2a1a0e'); ctx.fillStyle=top; ctx.fillRect(0,0,W,48);
+    for(let k=-7;k<=7;k++){ const bx=W/2+k*40; ctx.strokeStyle='#3a2412'; ctx.lineWidth=4.5; ctx.beginPath(); ctx.moveTo(W/2+k*4,-2); ctx.lineTo(bx,48); ctx.stroke();
+      ctx.strokeStyle='rgba(200,140,80,.25)'; ctx.lineWidth=0.8; ctx.beginPath(); ctx.moveTo(W/2+k*4+1.8,-2); ctx.lineTo(bx+2,48); ctx.stroke(); }
+    const bm=ctx.createLinearGradient(0,40,0,50); bm.addColorStop(0,'#6a4222'); bm.addColorStop(1,'#2a1a0e'); ctx.fillStyle=bm; ctx.fillRect(0,40,W,9);   // the ring beam
+    for(let k=0;k<24;k++){ ctx.fillStyle=k%2? '#a8402a' : '#1a120c'; ctx.fillRect(k*20+6,43,8,2.4); } }
+  // the smoke-hole, and the night in it
+  { ctx.fillStyle='#0a1428'; ctx.beginPath(); ctx.moveTo(W/2-18,0); ctx.lineTo(W/2+18,0); ctx.lineTo(W/2+12,9); ctx.lineTo(W/2-12,9); ctx.closePath(); ctx.fill();
+    ctx.fillStyle='#e8f0ff'; for(const [sx,sy] of [[-9,2],[4,4],[10,1.5]]){ ctx.fillRect(W/2+sx,sy,1,1); } }
+  // the beam that comes down through it, through the steam, with the dust in it
+  { ctx.save(); ctx.globalCompositeOperation='lighter';
+    const g=ctx.createLinearGradient(0,0,0,210); g.addColorStop(0,'rgba(150,180,230,.22)'); g.addColorStop(1,'rgba(150,180,230,0)'); ctx.fillStyle=g;
+    ctx.beginPath(); ctx.moveTo(W/2-12,6); ctx.lineTo(W/2+12,6); ctx.lineTo(W/2+70,210); ctx.lineTo(W/2-40,210); ctx.closePath(); ctx.fill();
+    for(let k=0;k<22;k++){ const t=((T*0.12+k*23)%200)/200, mx=W/2-10+BRD_H(k)*60+t*20+Math.sin(T*0.02+k)*4, my=12+t*190;
+      ctx.fillStyle='rgba(220,230,255,'+(0.35*Math.sin(Math.PI*t)).toFixed(2)+')'; ctx.fillRect(mx,my,1,1); }
+    ctx.restore(); }
+  // the lineage posts
+  brdPost(22,46,210,24,T,1); brdPost(W-46,46,210,24,T,-1);
+  // the crest on the back wall
+  brdCrest(W/2-44,58,88,50,T);
+  // the shelf of oils, and the herbs hung under it
+  { ctx.fillStyle='#4a2e16'; ctx.fillRect(64,104,84,4); ctx.fillStyle='rgba(255,220,170,.2)'; ctx.fillRect(64,104,84,1);
+    const jars=[[72,'#8a5a3a',7],[86,'#6a7a5a',5.5],[99,'#a87a4a',6.5],[112,'#5a4a6a',5],[126,'#8a6a3a',7.5],[140,'#6a4a2a',5]];
+    for(const [jx,jc,jr] of jars){ const jg=ctx.createRadialGradient(jx-jr*0.4,103-jr*1.1,0.5,jx,103-jr*0.8,jr*1.4); jg.addColorStop(0,mixHex(jc,'#ffffff',0.35)); jg.addColorStop(1,mixHex(jc,'#000000',0.35));
+      ctx.fillStyle=jg; ctx.beginPath(); ctx.ellipse(jx,103-jr*0.8,jr*0.7,jr*0.85,0,0,7); ctx.fill(); ctx.fillStyle=mixHex(jc,'#000000',0.3); ctx.fillRect(jx-1.5,103-jr*1.7,3,2); }
+    for(let k=0;k<5;k++){ const hx=70+k*17, sw=Math.sin(T*0.03+k)*0.8; ctx.strokeStyle='#6a5a2a'; ctx.lineWidth=0.8; ctx.beginPath(); ctx.moveTo(hx,108); ctx.lineTo(hx+sw,114); ctx.stroke();
+      ctx.fillStyle=k%2? '#5a6a2a' : '#7a6a3a'; ctx.beginPath(); ctx.moveTo(hx-3+sw,114); ctx.lineTo(hx+3+sw,114); ctx.lineTo(hx+1.5+sw*1.4,126); ctx.lineTo(hx-1.5+sw*1.4,126); ctx.closePath(); ctx.fill(); } }
+  // the lamps
+  brdLamp(96,140,T,false); brdLamp(W-96,140,T,false);
+  { ctx.fillStyle='#3a2412'; ctx.fillRect(88,140,16,3); ctx.fillRect(W-104,140,16,3); }
+  // the floor: boards, and a woven mat
+  { const fg=ctx.createLinearGradient(0,204,0,H); fg.addColorStop(0,'#3a2412'); fg.addColorStop(1,'#140a04'); ctx.fillStyle=fg; ctx.fillRect(0,204,W,H-204);
+    for(let k=0;k<7;k++){ const yy=206+k*k*1.4; ctx.fillStyle='rgba(0,0,0,.35)'; ctx.fillRect(0,yy,W,1); }
+    ctx.fillStyle='rgba(255,210,150,.10)'; ctx.fillRect(0,204,W,1.5);
+    for(let k=0;k<9;k++){ ctx.fillStyle=k%2? '#7a2a1a' : '#1a120c'; ctx.beginPath(); ctx.moveTo(150+k*4,262); ctx.lineTo(330-k*2,262); ctx.lineTo(320-k*2,258); ctx.lineTo(160+k*4,258); ctx.closePath(); ctx.globalAlpha=0.55; ctx.fill(); ctx.globalAlpha=1; } }
+  // the bench, the furs on it, the folded linen
+  { ctx.fillStyle='#4a2e16'; ctx.fillRect(50,200,92,6); ctx.fillStyle='#2a1a0c'; ctx.fillRect(54,206,5,14); ctx.fillRect(132,206,5,14);
+    for(let k=0;k<12;k++){ const fx=54+k*7.2, fy=198-Math.sin(k*1.2)*1.5; const fg=ctx.createRadialGradient(fx-1,fy-2,0.5,fx,fy,6);
+      fg.addColorStop(0,'#e0cca0'); fg.addColorStop(1,'#7a6038'); ctx.fillStyle=fg; ctx.beginPath(); ctx.ellipse(fx,fy,5.2,3.6,Math.sin(k)*0.3,0,7); ctx.fill(); }
+    for(let k=0;k<3;k++){ ctx.fillStyle=k%2? '#e8e0cc' : '#f4ecdc'; ctx.fillRect(112,188-k*4,24,4); ctx.fillStyle='rgba(120,100,70,.4)'; ctx.fillRect(112,191-k*4,24,1); } }
+  // the brazier, the kettle on it, and the sparks
+  { const bx=W-112, by=196;
+    ctx.strokeStyle='#1a1410'; ctx.lineWidth=2; for(const lx of [-9,0,9]){ ctx.beginPath(); ctx.moveTo(bx+lx*0.6,by); ctx.lineTo(bx+lx,by+20); ctx.stroke(); }
+    const bg=ctx.createLinearGradient(bx-14,0,bx+14,0); bg.addColorStop(0,'#1a1410'); bg.addColorStop(0.5,'#4a3a2a'); bg.addColorStop(1,'#1a1410');
+    ctx.fillStyle=bg; ctx.beginPath(); ctx.ellipse(bx,by,14,6,0,0,Math.PI); ctx.fill();
+    const cg=ctx.createRadialGradient(bx,by-1,0.5,bx,by,13); cg.addColorStop(0,'#fff0a0'); cg.addColorStop(0.35,'#ff8a2a'); cg.addColorStop(1,'#6a1a0a'); ctx.fillStyle=cg;
+    ctx.beginPath(); ctx.ellipse(bx,by-0.6,12.5,3.2,0,0,7); ctx.fill();
+    for(let k=0;k<6;k++){ const fx=bx-9+k*3.6, fl=Math.sin(T*0.33+k*1.9)*2+Math.sin(T*0.81+k)*1.2;
+      ctx.fillStyle=k%2? 'rgba(255,190,70,.9)' : 'rgba(255,120,40,.85)'; ctx.beginPath(); ctx.moveTo(fx-2,by-1); ctx.quadraticCurveTo(fx+fl*0.4,by-9-fl,fx+0.5,by-13-fl*1.5); ctx.quadraticCurveTo(fx+1.5,by-6,fx+2,by-1); ctx.closePath(); ctx.fill(); }
+    for(let k=0;k<14;k++){ const t=((T*0.9+k*29)%90)/90, sx=bx-6+BRD_H(k)*12+Math.sin(T*0.05+k)*6*t, sy=by-4-t*70;
+      ctx.fillStyle='rgba(255,200,110,'+(0.9*(1-t)).toFixed(2)+')'; ctx.fillRect(sx,sy,1,1); }
+    // the kettle on its hook
+    ctx.strokeStyle='#2a2018'; ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(bx-12,by-40); ctx.lineTo(bx,by-48); ctx.lineTo(bx+12,by-40); ctx.moveTo(bx,by-48); ctx.lineTo(bx,by-30); ctx.stroke();
+    const kg=ctx.createRadialGradient(bx-3,by-27,0.5,bx,by-24,9); kg.addColorStop(0,'#f0b070'); kg.addColorStop(0.5,'#b06a2a'); kg.addColorStop(1,'#4a2410');
+    ctx.fillStyle=kg; ctx.beginPath(); ctx.ellipse(bx,by-23,8,6.5,0,0,7); ctx.fill(); ctx.fillStyle='#4a2410'; ctx.fillRect(bx+6,by-26,5,1.6);
+    brdSteam(bx+10,by-28,6,T,4,0.20);
+    brdGlow(bx,by-6,110,'255,140,60',0.34+Math.sin(T*0.21)*0.04); }
+}
+
+/* ================= THE BREEDING HOUSE — the hall on the quay, in depth ================= */
+function drawQuayHall(T){
+  const VX=W/2, VY=118;
+  ctx.fillStyle='#0e0804'; ctx.fillRect(0,0,W,H);
+  const S=(k)=>1/(1+k*0.42);
+  // the far end: the door onto the night, and the tally-keeper at her desk in front of it
+  { const s=S(9), dw=34*s*3, dh=60*s*3;
+    ctx.fillStyle='#0a1426'; ctx.fillRect(VX-dw/2, VY+18*s*3-dh, dw, dh);
+    for(let k=0;k<10;k++){ const t=((T*0.2+k*13)%40)/40; ctx.fillStyle='rgba(230,240,255,.7)'; ctx.fillRect(VX-dw/2+BRD_H(k)*dw, VY+18*s*3-dh+t*dh, 0.8, 0.8); }
+    brdGlow(VX, VY+6, 26, '255,190,110', 0.4);
+    ctx.fillStyle='#2a1a0e'; ctx.fillRect(VX-9, VY+2, 18, 6);                                                   // her desk
+    ctx.fillStyle='#120a06'; ctx.beginPath(); ctx.ellipse(VX+3, VY-1.5+Math.sin(T*0.05)*0.3, 3.2, 4.2, 0.2, 0, 7); ctx.fill();       // the tally-keeper, bent over the board
+    ctx.beginPath(); ctx.arc(VX+4.8, VY-6+Math.sin(T*0.05)*0.4, 2.1, 0, 7); ctx.fill();
+    ctx.fillStyle='#ffcf6a'; ctx.fillRect(VX-6,VY-1,2,2); }
+  // the roof, the posts and the booths, from the far end forward
+  for(let k=8;k>=0;k--){ const s0=S(k+1), s1=S(k);
+    const yT0=VY-120*s0, yT1=VY-120*s1, yF0=VY+110*s0, yF1=VY+110*s1, xL0=VX-235*s0, xL1=VX-235*s1, xR0=VX+235*s0, xR1=VX+235*s1;
+    const fog=clamp(1-s1*1.4,0,0.85);
+    // ceiling panel
+    ctx.fillStyle=mixHex('#3a2412','#1a100a',fog); ctx.beginPath(); ctx.moveTo(xL0,yT0); ctx.lineTo(xR0,yT0); ctx.lineTo(xR1,yT1); ctx.lineTo(xL1,yT1); ctx.closePath(); ctx.fill();
+    ctx.fillStyle=mixHex('#6a4222','#2a1a0e',fog); ctx.fillRect(xL1, yT1-3*s1*2, xR1-xL1, 4*s1*2);                                 // the cross-beam
+    // the smoke-hole in every other bay, and its shaft of light
+    if(k%2===0){ const hx=VX, hy=(yT0+yT1)/2, hw=18*s1; ctx.fillStyle='#0a1428'; ctx.fillRect(hx-hw/2, hy-2*s1, hw, 4*s1*2);
+      ctx.save(); ctx.globalCompositeOperation='lighter'; const g=ctx.createLinearGradient(0,hy,0,yF1); g.addColorStop(0,'rgba(150,180,230,'+(0.16*(1-fog)).toFixed(2)+')'); g.addColorStop(1,'rgba(150,180,230,0)');
+      ctx.fillStyle=g; ctx.beginPath(); ctx.moveTo(hx-hw/2,hy); ctx.lineTo(hx+hw/2,hy); ctx.lineTo(hx+hw*2.2,yF1); ctx.lineTo(hx-hw*0.8,yF1); ctx.closePath(); ctx.fill(); ctx.restore(); }
+    // the floor bay: the boards, and the runner down the aisle
+    ctx.fillStyle=mixHex('#2e1c0e','#140a04',fog); ctx.beginPath(); ctx.moveTo(xL0,yF0); ctx.lineTo(xR0,yF0); ctx.lineTo(xR1,yF1); ctx.lineTo(xL1,yF1); ctx.closePath(); ctx.fill();
+    ctx.fillStyle=mixHex(k%2? '#7a2a1a' : '#5a1e12','#1a0c06',fog); ctx.beginPath(); ctx.moveTo(VX-18*s0,yF0); ctx.lineTo(VX+18*s0,yF0); ctx.lineTo(VX+18*s1,yF1); ctx.lineTo(VX-18*s1,yF1); ctx.closePath(); ctx.fill();
+    // the booths either side: a post, a hide screen lit from inside, the lamp on the peg if it is taken
+    for(const sd of [-1,1]){ const xa=sd<0? xL0 : xR0, xb=sd<0? xL1 : xR1, xin0=VX+sd*120*s0, xin1=VX+sd*120*s1;
+      // the side wall between
+      ctx.fillStyle=mixHex('#4a2e16','#1a100a',fog); ctx.beginPath(); ctx.moveTo(xa,yT0); ctx.lineTo(xb,yT1); ctx.lineTo(xb,yF1); ctx.lineTo(xa,yF0); ctx.closePath(); ctx.fill();
+      // the screen, pulled across the front of the booth
+      const taken=BRD_H(k*2+(sd>0?1:0))>0.25, sT0=VY-40*s0, sT1=VY-40*s1;
+      const hg=ctx.createLinearGradient(0,sT1,0,yF1); hg.addColorStop(0, taken? mixHex('#c8945a','#2a1a0e',fog) : mixHex('#8a6a44','#2a1a0e',fog)); hg.addColorStop(1, mixHex('#6a4a2a','#140a06',fog));
+      ctx.fillStyle=hg; ctx.beginPath(); ctx.moveTo(xin0,sT0); ctx.lineTo(xin1,sT1); ctx.lineTo(xin1,yF1-2*s1); ctx.lineTo(xin0,yF0-2*s0); ctx.closePath(); ctx.fill();
+      ctx.strokeStyle='rgba(40,24,12,.5)'; ctx.lineWidth=0.7*s1*2; for(let f=1;f<4;f++){ const fx0=xin0+(xin1-xin0)*f/4; ctx.beginPath(); ctx.moveTo(fx0, sT0+(sT1-sT0)*f/4); ctx.lineTo(fx0+Math.sin(T*0.04+f+k)*0.8, yF0+(yF1-yF0)*f/4-2); ctx.stroke(); }
+      ctx.fillStyle=mixHex('#6a4222','#1a100a',fog); ctx.fillRect(xin1-1.5*s1*2, sT1-4*s1, 3*s1*2, yF1-sT1+4*s1);                  // the post
+      if(taken){ const lx=xin1+sd*4*s1, ly=sT1+6*s1; ctx.fillStyle='#ffcf6a'; ctx.fillRect(lx-1*s1*2, ly, 2*s1*2, 2.5*s1*2); brdGlow(lx, ly+1, 30*s1*2, '255,180,90', 0.28*(1-fog*0.6)); }
+      brdSteam(xin1-sd*20*s1, sT1-2, 30*s1, T+k*40, 2, 0.10*(1-fog)); }
+  }
+  // the haze under the roof, thicker the further away
+  { const g=ctx.createRadialGradient(VX,VY,4,VX,VY,200); g.addColorStop(0,'rgba(210,170,120,.26)'); g.addColorStop(1,'rgba(210,170,120,0)'); ctx.fillStyle=g; ctx.fillRect(0,0,W,H); }
+  // somebody from the house carrying water down the aisle, now and then
+  { const ph=(T%520)/520; if(ph<0.6){ const t=ph/0.6, k=1+t*6, s=S(k), ax=VX+(-40+t*80)*s, ay=VY+110*s;
+      ctx.globalAlpha=0.8; ctx.fillStyle='#2a1a10'; ctx.beginPath(); ctx.ellipse(ax, ay-14*s*3, 3*s*3, 8*s*3, 0, 0, 7); ctx.fill(); ctx.beginPath(); ctx.arc(ax, ay-24*s*3, 2.4*s*3, 0, 7); ctx.fill(); ctx.globalAlpha=1;
+      ctx.fillStyle='#4a3420'; for(const bxs of [-1,1]){ ctx.fillRect(ax+bxs*5*s*3-1.5*s*3, ay-9*s*3, 3*s*3, 4*s*3); } } }
+  // OUR booth, in front: its posts, the screen pulled back and tied, the stool and the ladle
+  { ctx.fillStyle='#4a2e16'; ctx.fillRect(18,20,12,200); ctx.fillRect(W-30,20,12,200);
+    ctx.fillStyle='rgba(255,210,150,.14)'; ctx.fillRect(28,20,2,200); ctx.fillStyle='#2a1a0c'; ctx.fillRect(10,16,W-20,8);
+    const cg=ctx.createLinearGradient(30,0,70,0); cg.addColorStop(0,'#6a4a2a'); cg.addColorStop(1,'#b08a5a');
+    ctx.fillStyle=cg; ctx.beginPath(); ctx.moveTo(30,24); ctx.quadraticCurveTo(58,40,52,110); ctx.quadraticCurveTo(46,170,34,212); ctx.lineTo(30,212); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle='#8a2a1a'; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(30,110); ctx.lineTo(50,108); ctx.stroke();                        // tied back
+    ctx.fillStyle='#5a3a1e'; ctx.fillRect(W-86,206,20,5); ctx.fillStyle='#3a2410'; ctx.fillRect(W-84,211,3,10); ctx.fillRect(W-71,211,3,10);
+    ctx.fillStyle='#f0e8d4'; ctx.fillRect(W-85,201,18,5); ctx.fillStyle='#6a4a2a'; ctx.beginPath(); ctx.ellipse(W-58,214,7,4,0,0,7); ctx.fill();
+    ctx.strokeStyle='#8a6a3a'; ctx.lineWidth=1.2; ctx.beginPath(); ctx.moveTo(W-58,212); ctx.lineTo(W-50,196); ctx.stroke(); }
+  brdLamp(52,96,T,false); brdLamp(W-52,96,T,false);
+  // the tally board by our booth, the house's own name notched on it tonight
+  { ctx.fillStyle='#5a3a1e'; ctx.fillRect(W-58,40,22,46); ctx.fillStyle='#7a5230'; ctx.fillRect(W-58,40,22,2);
+    for(let r=0;r<6;r++){ ctx.fillStyle='rgba(30,18,8,.85)'; for(let k=0;k<((r*3+5)%6)+2;k++) ctx.fillRect(W-55+k*2.8,45+r*7,1.1,4.5); }
+    ctx.fillStyle='rgba(255,207,106,.9)'; ctx.fillRect(W-55,45+6*7,1.1,4.5); }
+}
+
+/* ================= OUTSIDE: the quay at night, and the two of them going in ================= */
+function drawQuayExterior(T){
+  const sky=ctx.createLinearGradient(0,0,0,H); sky.addColorStop(0,'#030814'); sky.addColorStop(0.55,'#0e1c34'); sky.addColorStop(1,'#16263a'); ctx.fillStyle=sky; ctx.fillRect(0,0,W,H);
+  for(let k=0;k<70;k++){ const tw=0.5+0.5*Math.sin(T*0.05+k*2.3); ctx.fillStyle='rgba(230,236,255,'+(0.35+tw*0.5).toFixed(2)+')'; ctx.fillRect(BRD_H(k)*W, BRD_H(k+99)*120, 1, 1); }
+  // the aurora: three ribbons, breathing
+  ctx.save(); ctx.globalCompositeOperation='lighter';
+  for(let r=0;r<3;r++){ const col=r===1? '120,255,190' : r===2? '140,190,255' : '90,230,160';
+    ctx.beginPath(); for(let x=0;x<=W;x+=8){ const y=38+r*14+Math.sin(x*0.018+T*0.012+r)*14+Math.sin(x*0.05+T*0.02)*4; if(x===0) ctx.moveTo(x,y); else ctx.lineTo(x,y); }
+    for(let x=W;x>=0;x-=8){ const y=38+r*14+Math.sin(x*0.018+T*0.012+r)*14+Math.sin(x*0.05+T*0.02)*4+26+Math.sin(x*0.03+T*0.03)*8; ctx.lineTo(x,y); }
+    ctx.closePath(); const g=ctx.createLinearGradient(0,20,0,110); g.addColorStop(0,'rgba('+col+',0)'); g.addColorStop(0.5,'rgba('+col+',0.16)'); g.addColorStop(1,'rgba('+col+',0)'); ctx.fillStyle=g; ctx.fill(); }
+  ctx.restore();
+  // the mountains, and the snow on them
+  { const ridge=(x)=>116+Math.sin(x*0.021)*16+Math.sin(x*0.063)*7;
+    const mg=ctx.createLinearGradient(0,96,0,152); mg.addColorStop(0,'#24324e'); mg.addColorStop(1,'#0c1424');
+    ctx.fillStyle=mg; ctx.beginPath(); ctx.moveTo(0,152); for(let x=0;x<=W;x+=6) ctx.lineTo(x, ridge(x)); ctx.lineTo(W,152); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle='rgba(190,215,240,.35)'; ctx.lineWidth=0.8; ctx.beginPath(); for(let x=0;x<=W;x+=6){ const y=ridge(x); if(x===0) ctx.moveTo(x,y); else ctx.lineTo(x,y); } ctx.stroke();   // the moon on the ridge
+    ctx.fillStyle='rgba(225,236,250,.55)';                                                     // snow, on the peaks and not floating over them
+    for(let x=6;x<W;x+=6){ const y=ridge(x); if(y<ridge(x-6) && y<ridge(x+6) && y<112){ ctx.beginPath(); ctx.moveTo(x,y); ctx.lineTo(x+7,y+6); ctx.lineTo(x+2,y+5); ctx.lineTo(x-2,y+7); ctx.lineTo(x-7,y+6); ctx.closePath(); ctx.fill(); } } }
+  // the sea, with the sky in it
+  { const sg=ctx.createLinearGradient(0,150,0,212); sg.addColorStop(0,'#10223a'); sg.addColorStop(1,'#060e1a'); ctx.fillStyle=sg; ctx.fillRect(0,150,W,62);
+    for(let k=0;k<40;k++){ const yy=154+k*1.4, xx=(BRD_H(k)*W+T*0.2*(k%3+1))%W; ctx.fillStyle=k%4? 'rgba(120,220,180,.12)' : 'rgba(200,220,255,.18)'; ctx.fillRect(xx,yy,10+BRD_H(k+5)*16,0.8); } }
+  // the boats drawn up
+  for(const [bx,bs] of [[34,1],[88,0.8]]){ ctx.fillStyle='#1a120a'; ctx.beginPath(); ctx.moveTo(bx-22*bs,200); ctx.quadraticCurveTo(bx,212*bs+200-212*bs+10,bx+22*bs,200); ctx.lineTo(bx+18*bs,196); ctx.lineTo(bx-18*bs,196); ctx.closePath(); ctx.fill();
+    ctx.fillStyle='rgba(230,236,245,.5)'; ctx.fillRect(bx-16*bs,195,32*bs,1.2); }
+  // the breeding house: a long cedar house, snow on the roof, the door lit, the steam going up through the roof
+  { const x0=170, x1=462, yR=112, yE=150, yB=214;
+    ctx.fillStyle='#2a1a0e'; ctx.fillRect(x0,yE,x1-x0,yB-yE);
+    for(let x=x0;x<x1;x+=11){ ctx.fillStyle=((x/11)|0)%2? '#3a2412' : '#321f10'; ctx.fillRect(x,yE,10,yB-yE); ctx.fillStyle='rgba(0,0,0,.35)'; ctx.fillRect(x+10,yE,1,yB-yE); }
+    ctx.fillStyle='#1a100a'; ctx.beginPath(); ctx.moveTo(x0-10,yE+2); ctx.lineTo((x0+x1)/2,yR); ctx.lineTo(x1+10,yE+2); ctx.closePath(); ctx.fill();
+    ctx.fillStyle='#dfe8f2'; ctx.beginPath(); ctx.moveTo(x0-10,yE); ctx.lineTo((x0+x1)/2,yR-3); ctx.lineTo(x1+10,yE); ctx.lineTo(x1+4,yE+3); ctx.lineTo((x0+x1)/2,yR+3); ctx.lineTo(x0-4,yE+3); ctx.closePath(); ctx.fill();
+    for(const vx of [238,300,372,430]){ const mid=(x0+x1)/2, half=mid-(x0-10), vy=yR+(Math.abs(vx-mid)/half)*(yE+2-yR)-5;   // on the slope of the roof
+      ctx.fillStyle='#120a06'; ctx.fillRect(vx-3,vy,6,5); ctx.fillStyle='#dfe8f2'; ctx.fillRect(vx-4,vy-1,8,1.5);
+      brdSteam(vx,vy-2,4,T+vx,5,0.20,46,0.7); }
+    // the slit windows, lit
+    for(let k=0;k<6;k++){ const wx=248+k*34; ctx.fillStyle='#ffb45a'; ctx.fillRect(wx,176,10,3); brdGlow(wx+5,177,16,'255,170,80',0.35); }
+    // the door and its posts
+    const dx=196; ctx.fillStyle='#ff9a3a'; ctx.fillRect(dx-11,168,22,46); brdGlow(dx,196,70,'255,160,70',0.55);
+    ctx.fillStyle='rgba(255,220,160,.8)'; ctx.fillRect(dx-11,168,22,2);
+    brdPost(dx-26,138,214,12,T,1); brdPost(dx+14,138,214,12,T,-1);
+    ctx.fillStyle='#a8402a'; ctx.beginPath(); ctx.ellipse(dx,160,10,4,0,0,7); ctx.fill(); ctx.fillStyle='#1a120c'; ctx.beginPath(); ctx.ellipse(dx-4,160,2.5,1.8,0,0,7); ctx.ellipse(dx+4,160,2.5,1.8,0,0,7); ctx.fill();   // Kan's mark over the door
+    ctx.fillStyle='rgba(255,154,58,.18)'; ctx.beginPath(); ctx.moveTo(dx-11,214); ctx.lineTo(dx+11,214); ctx.lineTo(dx+40,240); ctx.lineTo(dx-40,240); ctx.closePath(); ctx.fill(); }
+  // the quay boards
+  { const qg=ctx.createLinearGradient(0,212,0,H); qg.addColorStop(0,'#2a1c10'); qg.addColorStop(1,'#0e0804'); ctx.fillStyle=qg; ctx.fillRect(0,212,W,H-212);
+    for(let k=0;k<30;k++){ ctx.fillStyle='rgba(0,0,0,.35)'; ctx.fillRect(k*17,212,1,H-212); }
+    ctx.fillStyle='rgba(230,236,245,.45)'; for(let k=0;k<60;k++) ctx.fillRect(BRD_H(k)*W, 214+BRD_H(k+7)*50, 2+BRD_H(k+3)*4, 1); }
+  // the two of them, going in, hand in hand
+  { const t=clamp((T-10)/120,0,1), x=40+t*(196-40), fade=clamp((140-T)/12,0,1);
+    ctx.globalAlpha=fade;
+    silHim(ctx, x-6, 222, 1, '#0a0608', (ox,oy)=>({walk:1, walkPh:T*0.35, lean:0.04, cloak:'#3a2a1a', hands:{near:[ox+8, oy-38], far:null}}));
+    silHer(ctx, x+8, 222, 1, '#0a0608', (ox,oy)=>Object.assign(silWalkHer(T*0.35+1.5)(ox,oy), {wrap:'#3a2a1a', hands:{near:[ox-6, oy-36], far:null}}));
+    ctx.globalAlpha=1; }
+  // and it is snowing
+  for(let k=0;k<90;k++){ const fx=(BRD_H(k)*W+Math.sin(T*0.02+k)*10+T*0.15)%W, fy=(BRD_H(k+50)*H+T*(0.35+BRD_H(k+9)*0.4))%H;
+    ctx.fillStyle='rgba(236,242,252,'+(0.4+BRD_H(k+2)*0.5).toFixed(2)+')'; ctx.fillRect(fx,fy,BRD_H(k+4)>0.8? 2 : 1,BRD_H(k+4)>0.8? 2 : 1); }
+  brdVignette(0.6);
+}
+
+/* ================= THE TUB — its back half, the water, and (after them) its front ================= */
+function drawTubBack(TX,rimY,TW,hub,T,base){
+  const woodIn = hub? ['#3a1e0c','#6a3a1a'] : ['#2e1a0a','#553418'];
+  // the inside of the far wall, above the water: staves in shadow, and the light off the water moving on them
+  const g=ctx.createLinearGradient(0,rimY-16,0,rimY+2); g.addColorStop(0,woodIn[1]); g.addColorStop(1,woodIn[0]);
+  ctx.fillStyle=g; ctx.beginPath(); ctx.ellipse(TX, rimY, TW, 9.5, 0, Math.PI, 0); ctx.lineTo(TX+TW-2.6, rimY+1); ctx.ellipse(TX, rimY+1, TW-2.6, 7.2, 0, 0, Math.PI, true); ctx.closePath(); ctx.fill();
+  for(let k=0;k<22;k++){ const a=Math.PI+(k+0.5)*Math.PI/22, sx=TX+Math.cos(a)*TW*0.97, sy=rimY+Math.sin(a)*9;
+    ctx.fillStyle='rgba(0,0,0,.28)'; ctx.fillRect(sx, sy, 0.5, 5); }
+  ctx.save(); ctx.globalCompositeOperation='lighter';
+  for(let k=0;k<7;k++){ const a=Math.PI+(0.2+k*0.1)*Math.PI, sx=TX+Math.cos(a)*TW*0.9; ctx.strokeStyle='rgba(160,220,230,.10)'; ctx.lineWidth=0.7;
+    ctx.beginPath(); ctx.moveTo(sx, rimY-5); for(let q=0;q<4;q++) ctx.lineTo(sx+Math.sin(T*0.07+k+q)*1.5, rimY-5+q*1.5); ctx.stroke(); }
+  ctx.restore();
+  // the water
+  const wg=ctx.createRadialGradient(TX-TW*0.2, rimY-1, 2, TX, rimY+1, TW); wg.addColorStop(0, hub? '#3a8a98' : '#2e7a8a'); wg.addColorStop(0.6,'#1c5a6a'); wg.addColorStop(1,'#0e3240');
+  ctx.fillStyle=wg; ctx.beginPath(); ctx.ellipse(TX, rimY+1.2, TW-3, 7, 0, 0, 7); ctx.fill();
+}
+function drawTubWaterTop(TX,rimY,TW,T,lampX){
+  // the lamp in the water, broken up by the ripples, and the rings going out from where they are
+  ctx.save(); ctx.beginPath(); ctx.ellipse(TX, rimY+1.2, TW-3, 7, 0, 0, 7); ctx.clip();
+  ctx.globalCompositeOperation='lighter';
+  for(let k=0;k<9;k++){ const lx=(lampX===undefined? TX+TW*0.45 : lampX)+Math.sin(T*0.09+k)*1.6, ly=rimY-3+k*1.1; ctx.fillStyle='rgba(255,210,150,'+(0.30-k*0.028).toFixed(2)+')';
+    ctx.fillRect(lx-3+Math.sin(T*0.13+k*1.7)*1.8, ly, 6-k*0.4, 0.8); }
+  for(let r=0;r<3;r++){ const rr=((T*0.35+r*30)%90)/90; ctx.strokeStyle='rgba(200,240,250,'+(0.22*(1-rr)).toFixed(2)+')'; ctx.lineWidth=0.6;
+    ctx.beginPath(); ctx.ellipse(TX-4, rimY+1, 6+rr*TW*0.8, 1.2+rr*5, 0, 0, 7); ctx.stroke(); }
+  ctx.restore();
+}
+/* what is under the water is under it: tinted, and wavered, in screen space */
+function brdRefract(sx0,sy0,sw,sh,T){
+  const cv=ctx.canvas; if(!cv) return;
+  ctx.save(); ctx.setTransform(1,0,0,1,0,0);
+  const x0=Math.max(0,Math.floor(sx0)), y0=Math.max(0,Math.floor(sy0)), w=Math.min(W-x0,Math.ceil(sw)), h=Math.min(H-y0,Math.ceil(sh));
+  if(w>2 && h>1){ for(let yy=0; yy<h; yy++){ const dx=Math.sin((y0+yy)*0.9+T*0.12)*1.2;
+      try{ ctx.drawImage(cv, x0, y0+yy, w, 1, x0+dx, y0+yy, w, 1); }catch(e){} }
+    const g=ctx.createLinearGradient(0,y0,0,y0+h); g.addColorStop(0,'rgba(40,110,140,.30)'); g.addColorStop(1,'rgba(20,70,100,.55)');
+    ctx.fillStyle=g; ctx.fillRect(x0,y0,w,h); }
+  ctx.restore();
+}
+function drawTubFront(TX,rimY,TW,hub,T,base){
+  const wood = hub? ['#5a2e12','#a8683a','#d08a50'] : ['#4a2a10','#8a5a30','#b07a44'];
+  // the staves, each one its own board
+  ctx.save(); ctx.beginPath(); ctx.moveTo(TX-TW, rimY+3); ctx.ellipse(TX, rimY+3, TW, 9.5, 0, Math.PI, 0, true); ctx.lineTo(TX+TW, base+1); ctx.ellipse(TX, base+1, TW, 6, 0, 0, Math.PI); ctx.closePath(); ctx.clip();
+  const N=18; for(let k=0;k<N;k++){ const a0=Math.PI-(k/N)*Math.PI, a1=Math.PI-((k+1)/N)*Math.PI, xa=TX+Math.cos(a0)*TW, xb=TX+Math.cos(a1)*TW;
+    const lit=clamp(0.35+0.65*Math.sin((k+0.5)/N*Math.PI)*(hub? 1 : 0.9)+(k>N*0.55? 0.12 : 0),0,1);
+    const g=ctx.createLinearGradient(xa,0,xb,0); g.addColorStop(0,mixHex(wood[0],wood[1],lit*0.8)); g.addColorStop(0.5,mixHex(wood[1],wood[2],lit*0.6)); g.addColorStop(1,mixHex(wood[0],wood[1],lit*0.7));
+    ctx.fillStyle=g; ctx.fillRect(Math.min(xa,xb), rimY-8, Math.abs(xb-xa)+0.6, base-rimY+18);
+    ctx.fillStyle='rgba(20,8,2,.45)'; ctx.fillRect(xb, rimY-8, 0.6, base-rimY+18);
+    ctx.strokeStyle='rgba(30,12,4,.18)'; ctx.lineWidth=0.4; const gx=(xa+xb)/2; ctx.beginPath(); ctx.moveTo(gx, rimY); for(let yy=rimY; yy<base+8; yy+=4) ctx.lineTo(gx+Math.sin(yy*0.4+k)*0.6, yy); ctx.stroke(); }
+  // the hoops: copper in the hub, iron at the quay — with their rivets and the lamp along them
+  for(const hy of [rimY+13, rimY+(base-rimY)*0.55+5, base-3]){ const ry=9.5-(hy-rimY)*0.12;
+    const hg=ctx.createLinearGradient(0,hy-1.6,0,hy+1.6);
+    if(hub){ hg.addColorStop(0,'#6a3a18'); hg.addColorStop(0.45,'#f0a860'); hg.addColorStop(1,'#5a2a10'); } else { hg.addColorStop(0,'#2a2a2a'); hg.addColorStop(0.45,'#8a8a88'); hg.addColorStop(1,'#1a1a1a'); }
+    ctx.strokeStyle=hg; ctx.lineWidth=2.4; ctx.beginPath(); ctx.ellipse(TX, hy, TW+0.4, Math.max(4,ry), 0, 0.02, Math.PI-0.02); ctx.stroke();
+    ctx.fillStyle= hub? '#ffd8a0' : '#c8c8c0'; for(let k=0;k<9;k++){ const a=(k+0.5)/9*Math.PI; ctx.fillRect(TX+Math.cos(a)*TW-0.5, hy+Math.sin(a)*Math.max(4,ry)-0.5, 1, 1); } }
+  if(hub){ for(let k=0;k<7;k++){ const a=(k+0.5)/7*Math.PI, gx=TX+Math.cos(a)*TW*0.92, gy=rimY+20+Math.sin(a)*6;                    // the lineage, cut round it and gilded
+      ctx.fillStyle='rgba(232,195,74,.75)'; ctx.beginPath(); ctx.ellipse(gx,gy,2.2,1.4,0,0,7); ctx.fill(); ctx.fillStyle='rgba(40,20,6,.8)'; ctx.fillRect(gx-0.6,gy-0.4,1.2,0.8); } }
+  ctx.restore();
+  // the rim: a thick edge, lit along the top, with the water standing just under it
+  ctx.strokeStyle= hub? '#c88a4a' : '#9a6a3a'; ctx.lineWidth=3; ctx.beginPath(); ctx.ellipse(TX, rimY+1.5, TW-1.5, 8.6, 0, 0, Math.PI); ctx.stroke();
+  ctx.strokeStyle='rgba(255,226,180,.55)'; ctx.lineWidth=0.8; ctx.beginPath(); ctx.ellipse(TX, rimY+0.2, TW-1.5, 8.6, 0, 0.1, Math.PI-0.1); ctx.stroke();
+  ctx.strokeStyle='rgba(0,0,0,.35)'; ctx.lineWidth=1; ctx.beginPath(); ctx.ellipse(TX, rimY+3.2, TW-1.5, 8.6, 0, 0.05, Math.PI-0.05); ctx.stroke();
+  // and what runs down the outside of it
+  for(let k=0;k<4;k++){ const dx=TX-TW*0.6+k*TW*0.4, dy=rimY+9+((T*0.4+k*17)%24); ctx.fillStyle='rgba(180,220,240,.35)'; ctx.fillRect(dx, dy, 0.8, 2.2); }
+}
+
 function drawBreedPlace(s,T,place){
   const hub=(place==='hub'), CX=W/2;
-  // ---- the hall around the tub, in screen space ----
-  { const wall = hub? ['#3a2412','#5a3a1e'] : ['#2a1e14','#44321e'];
-    const g=ctx.createLinearGradient(0,0,0,H); g.addColorStop(0,wall[0]); g.addColorStop(1,wall[1]); ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
-    // the planks, and the smoke-hole's light coming down through the steam
-    let x=0, i=0; while(x<W){ const bw=14+((i*7)%9); ctx.fillStyle= i%3? 'rgba(0,0,0,.10)' : 'rgba(255,220,170,.04)'; ctx.fillRect(x,0,bw-1,H); ctx.fillStyle='rgba(255,210,150,.07)'; ctx.fillRect(x,0,1,H); x+=bw; i++; }
-    const sh=ctx.createLinearGradient(CX-40,0,CX+60,H); sh.addColorStop(0,'rgba(255,226,170,.16)'); sh.addColorStop(1,'rgba(255,226,170,0)');
-    ctx.fillStyle=sh; ctx.beginPath(); ctx.moveTo(CX-30,0); ctx.lineTo(CX+10,0); ctx.lineTo(CX+90,H); ctx.lineTo(CX-10,H); ctx.closePath(); ctx.fill();
-    ctx.fillStyle= hub? '#2a1a0c' : '#1a120a'; ctx.fillRect(0,H-46,W,46);                                     // the floor boards
-    for(let fx=0;fx<W;fx+=18){ ctx.fillStyle='rgba(0,0,0,.25)'; ctx.fillRect(fx,H-46,1,46); }
-    ctx.fillStyle='rgba(255,200,140,.10)'; ctx.fillRect(0,H-46,W,1.5);
-  }
-  if(!hub){
-    /* THE PUBLIC HALL: other tubs down both sides, screened, each with its
-       lamp on the peg that means OCCUPIED, and the tally board by the door */
-    const tubs=[[44,'on'],[110,'on'],[370,'off'],[436,'on']];
-    for(const [tx,st] of tubs){ const ty=H-58;
-      const tg=ctx.createLinearGradient(tx-22,0,tx+22,0); tg.addColorStop(0,'#4a2e16'); tg.addColorStop(0.5,'#7a5230'); tg.addColorStop(1,'#3a2210');
-      ctx.fillStyle=tg; ctx.beginPath(); ctx.ellipse(tx, ty+14, 24, 10, 0, 0, Math.PI); ctx.lineTo(tx-24, ty); ctx.ellipse(tx, ty, 24, 6, 0, Math.PI, 0, true); ctx.closePath(); ctx.fill();
-      ctx.fillStyle='rgba(160,120,70,.9)'; ctx.fillRect(tx-24, ty+3, 48, 1.4); ctx.fillRect(tx-23, ty+10, 46, 1.4);         // the hoops
-      if(st==='on'){ // the screen is drawn: hide on a pole, and the lamp is lit
-        ctx.fillStyle='#6a4a2a'; ctx.fillRect(tx-27, ty-58, 2, 58); ctx.fillRect(tx+25, ty-58, 2, 58); ctx.fillRect(tx-27, ty-58, 54, 2);
-        const hg=ctx.createLinearGradient(0,ty-56,0,ty+2); hg.addColorStop(0,'#b08a5a'); hg.addColorStop(1,'#8a6a42'); ctx.fillStyle=hg;
-        ctx.beginPath(); ctx.moveTo(tx-25, ty-56); for(let k=0;k<=8;k++) ctx.lineTo(tx-25+k*6.25, ty-56+Math.sin(k*1.3+T*0.03)*0.8); ctx.lineTo(tx+25, ty+2); ctx.lineTo(tx-25, ty+2); ctx.closePath(); ctx.fill();
-        ctx.strokeStyle='rgba(60,40,20,.5)'; ctx.lineWidth=0.7; for(let k=1;k<5;k++){ ctx.beginPath(); ctx.moveTo(tx-25+k*10, ty-54); ctx.lineTo(tx-25+k*10+Math.sin(T*0.04+k), ty); ctx.stroke(); }
-        ctx.fillStyle='#ffcf6a'; ctx.fillRect(tx+26, ty-50, 3, 4); const lg=ctx.createRadialGradient(tx+27,ty-48,1,tx+27,ty-48,14); lg.addColorStop(0,'rgba(255,200,110,.35)'); lg.addColorStop(1,'rgba(255,200,110,0)'); ctx.fillStyle=lg; ctx.fillRect(tx+13,ty-62,28,28);
-      }
-      for(let k=0;k<4;k++){ const ry=(T*0.35+k*14+tx)%44; ctx.globalAlpha=0.12*clamp(1-ry/44,0,1); ctx.fillStyle='#f4efe6'; ctx.beginPath(); ctx.ellipse(tx+Math.sin(T*0.04+k)*6, ty-4-ry, 9, 3.4, 0, 0, 7); ctx.fill(); }
-      ctx.globalAlpha=1;
-    }
-    // the tally board by the door, and the house names notched on it
-    ctx.fillStyle='#5a3a1e'; ctx.fillRect(W-40, 40, 26, 58); ctx.fillStyle='#7a5230'; ctx.fillRect(W-40, 40, 26, 2);
-    for(let r=0;r<7;r++){ ctx.fillStyle='rgba(30,18,8,.8)'; for(let k=0;k<((r*3+5)%6)+2;k++) ctx.fillRect(W-37+k*3, 46+r*7, 1.2, 4); }
-  } else {
-    /* THE HUB: one room, the house's own. Carved posts with the lineage cut
-       into them, furs on the bench, a copper-hooped cedar tub and a brazier */
-    for(const px2 of [34, W-44]){ const pg=ctx.createLinearGradient(px2,0,px2+12,0); pg.addColorStop(0,'#5a3a1e'); pg.addColorStop(0.5,'#9a6a3a'); pg.addColorStop(1,'#4a2e14');
-      ctx.fillStyle=pg; ctx.fillRect(px2, 20, 12, H-66);
-      for(let k=0;k<8;k++){ ctx.fillStyle='rgba(40,22,8,.8)'; ctx.fillRect(px2+2, 40+k*18, 8, 1.6); ctx.fillStyle='rgba(232,195,74,.5)'; ctx.fillRect(px2+4, 44+k*18, 4, 1); }
-      ctx.fillStyle='#b08a52'; ctx.beginPath(); ctx.ellipse(px2+6, 18, 8, 9, 0, 0, 7); ctx.fill(); ctx.fillStyle='#2a1a0e'; ctx.fillRect(px2+2, 16, 2.4, 1.6); ctx.fillRect(px2+7.6, 16, 2.4, 1.6); }
-    ctx.fillStyle='#6a5238'; ctx.fillRect(58, H-66, 70, 8); ctx.fillStyle='#b8a078'; for(let k=0;k<10;k++){ ctx.beginPath(); ctx.ellipse(62+k*7, H-67, 4.2, 2.4, 0, 0, 7); ctx.fill(); }   // furs on the bench
-    // the brazier
-    ctx.fillStyle='#3a2a1a'; ctx.fillRect(W-110, H-70, 22, 18); ctx.fillStyle='#8a5a2a'; ctx.fillRect(W-112, H-72, 26, 3);
-    for(let k=0;k<5;k++){ const fl=Math.sin(T*0.3+k*1.7)*2; ctx.fillStyle=k%2? '#ffb43a' : '#ff7a2a'; ctx.beginPath(); ctx.ellipse(W-106+k*4, H-76-fl, 2.2, 4+fl*0.5, 0, 0, 7); ctx.fill(); }
-    const bg=ctx.createRadialGradient(W-99,H-78,2,W-99,H-78,80); bg.addColorStop(0,'rgba(255,170,90,.26)'); bg.addColorStop(1,'rgba(255,170,90,0)'); ctx.fillStyle=bg; ctx.fillRect(W-180,H-160,160,160);
-  }
-  // ---- THE TUB, AND THE TWO OF THEM IN IT — in the same stage space as the bedchamber ----
-  const Z=2.15, SX0=190, SY0=166, cx0=190, base=166;                    // closer in than the bedchamber: the tub is the whole room
-  const SET=RK_BREED_POSES[place]||RK_BREED_POSES.breed;
-  const step=((T-40)/230)|0, vi=(s.forcePose!==undefined)? s.forcePose : SET[((step%SET.length)+SET.length)%SET.length];
-  const vt=((T-40)%230+230)%230;
-  s.poseName = (RK_BREED_NAMES[vi]||'')+(hub? ' — in the house’s own hub' : ' — at the breeding house');
-  s.poseFade = clamp((vt-14)/24,0,1)*clamp((222-vt)/22,0,1);
-  ctx.save(); ctx.translate(CX,172); ctx.scale(Z,Z); ctx.translate(-SX0,-SY0+22);
+  // the running order: outside (the quay only), the clothes, then the tub
+  const forced=(s.forcePose!==undefined);
+  const OUT_T = (hub || forced)? 0 : 150, UND_T = forced? 0 : 230;
+  BRD_DRAWS[hub? 'hub' : 'hall']=(BRD_DRAWS[hub? 'hub' : 'hall']|0);
+  if(!forced && T<OUT_T){ drawQuayExterior(T); s.scenePart='outside'; BRD_DRAWS.out++;
+    ctx.textAlign='center'; const a=clamp(T/24,0,1)*clamp((OUT_T-T)/20,0,1); ctx.globalAlpha=a;
+    pixelText('◆ THE BREEDING HOUSE, ON THE QUAY', W/2, 22, '#ffb0d0', 1.1);
+    if(s.breedLine) pixelText(s.breedLine, W/2, 36, 'rgba(255,224,200,.85)', 0.7);
+    ctx.globalAlpha=1; ctx.textAlign='left'; s.poseName=''; return; }
+  const TT=T-OUT_T;
+  if(hub){ drawHubRoom(T); BRD_DRAWS.hub++; } else { drawQuayHall(T); BRD_DRAWS.hall++; }
+  const Z=2.15, SX0=190, SY0=166, cx0=190, base=166;
+  const toS=(x,y)=>[CX+(x-SX0)*Z, 172+(y-SY0+22)*Z];
   const TX=cx0+2, TW=hub? 52 : 48, rimY=base-21;
-  // the back of the tub, and the water's far edge
-  { const wood = hub? ['#6a3a1a','#b07a44','#4a2410'] : ['#5a3818','#8a5a30','#3a200c'];
-    const tg=ctx.createLinearGradient(TX-TW,0,TX+TW,0); tg.addColorStop(0,wood[2]); tg.addColorStop(0.5,wood[1]); tg.addColorStop(1,wood[2]);
-    ctx.fillStyle=tg; ctx.beginPath(); ctx.ellipse(TX, rimY, TW, 9, 0, Math.PI, 0); ctx.lineTo(TX+TW, base); ctx.lineTo(TX-TW, base); ctx.closePath(); ctx.fill();
-    ctx.fillStyle='rgba(40,90,120,.70)'; ctx.beginPath(); ctx.ellipse(TX, rimY+1.5, TW-3, 7, 0, 0, 7); ctx.fill(); }
-  const HB=(x,y,c)=>{ const iv=Math.max(4,c||14); if((T|0)%iv<2) s.hearts.push({x:CX+(x-SX0)*Z, y:172+(y-SY0+22)*Z, vy:0.6, life:46, c:'#ff8ad0'}); };
-  try{ drawBedPose(vi, {c:ctx, s, T, vt, cx0, base, place, HB, tub:{x:TX, w:TW, rim:rimY}}); }catch(e){}
-  // the front of the tub over them: they are IN it, to the waist
-  { const wood = hub? ['#7a4420','#c08a50','#4a2410'] : ['#6a4420','#9a6a3a','#3a200c'];
-    ctx.fillStyle='rgba(46,110,150,.40)'; ctx.fillRect(TX-TW+2, rimY+2, TW*2-4, base-rimY-2);
-    ctx.fillStyle='rgba(190,232,248,.55)'; for(let k=0;k<9;k++){ const wx=TX-TW+8+k*((TW*2-16)/8)+Math.sin(T*0.08+k)*1.5; ctx.fillRect(wx, rimY+2+Math.sin(T*0.1+k*1.3)*0.7, 5, 0.8); }
-    const tg=ctx.createLinearGradient(TX-TW,0,TX+TW,0); tg.addColorStop(0,wood[2]); tg.addColorStop(0.45,wood[1]); tg.addColorStop(1,wood[2]);
-    ctx.fillStyle=tg; ctx.beginPath(); ctx.moveTo(TX-TW, rimY+4); ctx.ellipse(TX, rimY+4, TW, 9, 0, Math.PI, 0, true); ctx.lineTo(TX+TW, base+2); ctx.ellipse(TX, base+2, TW, 6, 0, 0, Math.PI); ctx.closePath(); ctx.fill();
-    for(let k=1;k<12;k++){ const sx=TX-TW+k*(TW*2/12); ctx.fillStyle='rgba(30,16,6,.35)'; ctx.fillRect(sx, rimY+10, 0.7, base-rimY-6); }                 // the staves
-    ctx.fillStyle= hub? '#c07a3a' : '#8a7a5a'; ctx.fillRect(TX-TW, rimY+12, TW*2, 2); ctx.fillRect(TX-TW, base-6, TW*2, 2);          // the hoops — copper in the hub
-    ctx.fillStyle='rgba(255,230,190,.35)'; ctx.fillRect(TX-TW, rimY+4, TW*2, 0.8);
-    if(hub){ for(let k=0;k<6;k++){ ctx.fillStyle='rgba(232,195,74,.55)'; ctx.fillRect(TX-TW+10+k*((TW*2-20)/5), rimY+16, 2, 5); } }   // the lineage, cut round the rim
-    for(let k=0;k<7;k++){ const ry=(T*0.45+k*11)%46; ctx.globalAlpha=0.16*clamp(1-ry/46,0,1); ctx.fillStyle='#f6f0e6'; ctx.beginPath(); ctx.ellipse(TX-30+k*10+Math.sin(T*0.05+k)*5, rimY-2-ry, 10, 4, 0, 0, 7); ctx.fill(); }
-    ctx.globalAlpha=1; }
-  ctx.restore();
+  const undressing=(!forced && TT<UND_T) || s.forceUndress!==undefined;
+  const SET=RK_BREED_POSES[place]||RK_BREED_POSES.breed;
+  const TP=TT-UND_T, step=Math.floor(TP/230), vi=forced? s.forcePose : SET[((step%SET.length)+SET.length)%SET.length];
+  const vt=((TP%230)+230)%230;
+  const HB=(x,y,c)=>{ const iv=Math.max(4,c||14); if((T|0)%iv<2){ const p=toS(x,y); s.hearts.push({x:p[0], y:p[1], vy:0.6, life:46, c:'#ff8ad0'}); } };
+  ctx.save(); ctx.translate(CX,172); ctx.scale(Z,Z); ctx.translate(-SX0,-SY0+22);
+  drawTubBack(TX,rimY,TW,hub,T,base);
+  if(undressing){
+    drawTubWaterTop(TX,rimY,TW,T, hub? TX+TW*0.5 : TX-TW*0.3);
+    drawTubFront(TX,rimY,TW,hub,T,base);
+    brdSteam(TX, rimY-4, TW*1.4, T, 6, 0.14);
+    // on the boards in front of it, the clothes come off first
+    try{ drawBedPose('undress', {c:ctx, s, T, vt:0, cx0, base:base+9, place, HB, ut:(s.forceUndress!==undefined? s.forceUndress : TT)}); }catch(e){}
+    ctx.restore();
+    s.scenePart='undress';
+    s.poseName='the clothes come off'+(hub? ' — in the house’s own hub' : ' — at the breeding house');
+    s.poseFade=clamp(TT/30,0,1)*clamp((UND_T-TT)/30,0,1);
+  } else {
+    try{ drawBedPose(vi, {c:ctx, s, T, vt, cx0, base, place, HB, tub:{x:TX, w:TW, rim:rimY}}); }catch(e){}
+    ctx.restore();
+    // what is under the water is under it
+    { const a=toS(TX-TW+3, rimY+1.2), b=toS(TX+TW-3, rimY+9); brdRefract(a[0], a[1], b[0]-a[0], b[1]-a[1], T); }
+    ctx.save(); ctx.translate(CX,172); ctx.scale(Z,Z); ctx.translate(-SX0,-SY0+22);
+    drawTubWaterTop(TX,rimY,TW,T, hub? TX+TW*0.5 : TX-TW*0.3);
+    drawTubFront(TX,rimY,TW,hub,T,base);
+    brdSteam(TX, rimY-4, TW*1.4, T, 8, 0.16);
+    ctx.restore();
+    s.scenePart='tub';
+    s.poseName = (RK_BREED_NAMES[vi]||'')+(hub? ' — in the house’s own hub' : ' — at the breeding house');
+    s.poseFade = clamp((vt-14)/24,0,1)*clamp((222-vt)/22,0,1);
+  }
+  brdVignette(hub? 0.55 : 0.62);
   // ---- the words ----
   ctx.textAlign='center';
-  if(T<200){ const a=clamp(T/30,0,1)*clamp((200-T)/30,0,1); ctx.globalAlpha=a;
-    pixelText(hub? '◆ THE HUB — THE HOUSE’S OWN' : '◆ THE BREEDING HOUSE, ON THE QUAY', W/2, 24, hub? '#ffd08a' : '#ffb0d0', 1.1);
-    if(s.breedLine) pixelText(s.breedLine, W/2, 38, 'rgba(255,224,200,.85)', 0.7);
+  if(TT<200){ const a=clamp(TT/30,0,1)*clamp((200-TT)/30,0,1); ctx.globalAlpha=a;
+    pixelText(hub? '◆ THE HUB — THE HOUSE’S OWN' : '◆ INSIDE — THIRD BOOTH ON THE LEFT', W/2, 22, hub? '#ffd08a' : '#ffb0d0', 1.1);
+    if(hub && s.breedLine) pixelText(s.breedLine, W/2, 36, 'rgba(255,224,200,.85)', 0.7);
     ctx.globalAlpha=1; }
-  if(s.poseName && s.poseFade>0.02){ ctx.globalAlpha=s.poseFade; pixelText('· '+s.poseName.toUpperCase()+' ·', W/2, H-22, hub? '#ffd08a' : '#ffb0d0', 0.9); ctx.globalAlpha=1; }
-  if(T>220 && T<(s.dur||700)-120) pixelText('[SPACE] slip away to morning', W-72, 26, 'rgba(200,176,96,.55)', 1);
+  if(s.poseName && s.poseFade>0.02){ ctx.globalAlpha=s.poseFade; pixelText('· '+s.poseName.toUpperCase()+' ·', W/2, H-14, hub? '#ffd08a' : '#ffb0d0', 0.9); ctx.globalAlpha=1; }
+  if(T>220 && T<(s.dur||700)-120) pixelText('[SPACE] slip away to morning', W-72, 12, 'rgba(200,176,96,.55)', 1);
   ctx.textAlign='left';
   for(const h of s.hearts){ ctx.globalAlpha=clamp(h.life/40,0,1); pixelText('♥', h.x, h.y, h.c||'#e26a8a', 1); } ctx.globalAlpha=1;
 }
@@ -23103,13 +23424,17 @@ function drawShadowPlay(s,T){
             : (place==='bed' && _LORE.order)? _LORE.order
             : (PLACE_SET[place] || PLACE_SET.bed);
   const cut = s.len==='quick'? Math.max(3,SET.length-2) : SET.length;
-  const step=(((T-520)/160)|0);
+  /* ✦ AND FIRST THE CLOTHES COME OFF, on the new bodies — a beat of its own
+     before the running order (not for her gift, which is its own thing) */
+  const UND = (RIG && !s.kanvekOnly && s.forcePose===undefined)? BED_UNDRESS : 0;
+  const _T0 = 520+UND;
+  const step=(((T-_T0)/160)|0);
   /* ✧ AND THE PICTURE HOLDS while he is deciding. The running order is
      still the running order; this is one pose pinned for one beat. */
   const vi = (s.forcePose!==undefined)? s.forcePose                       // the tests (and the gallery) can pin one
              : (s.rkFinPose!==undefined && SET.indexOf(s.rkFinPose)>=0)
              ? s.rkFinPose : SET[ ((step%cut)+cut)%cut ];
-  const vt=(T-520)%160;
+  const vt=((T-_T0)%160+160)%160;
   const POSE_NAMES=['the embrace','the kiss','from behind','the ride','the lift','the sundial','the tangle','at rest',
                     'on the pool rim','the ledge','afloat',
                     'on the warm marble','the bench','under the spout',
@@ -23250,7 +23575,11 @@ function drawShadowPlay(s,T){
 
   /* THE NEW BODIES take every position when the bodies are shown at all (MEDIUM); the block rig below is
      kept for HEAVY, where a flat silhouette is the whole point */
-  if(RIG && typeof drawBedPose==='function' && drawBedPose(vi, {c:ctx, s, T, vt, cx0, base, place, HB})){ /* drawn */ }
+  if(RIG && typeof drawBedPose==='function' && ((UND && T<_T0) || s.forceUndress!==undefined)){
+    const ut=(s.forceUndress!==undefined)? s.forceUndress : T-520;
+    drawBedPose('undress', {c:ctx, s, T, vt, cx0, base, place, HB, ut});
+    s.poseName='the clothes come off'; s.poseFade=clamp(ut/30,0,1)*clamp((BED_UNDRESS-ut)/30,0,1); }
+  else if(RIG && typeof drawBedPose==='function' && drawBedPose(vi, {c:ctx, s, T, vt, cx0, base, place, HB})){ /* drawn */ }
   else if(vi===0){ // THE EMBRACE — he grinds against her in a real, hungry rhythm; the tease reads in the gap
     const beat=Math.max(0,Math.sin(T*0.30)), sw=beat*3;                 // fast, insistent — not a tap
     const hx=cx0-16+beat*7, wx=cx0+13;                                  // he presses in (7px) then eases back, again and again
@@ -25308,6 +25637,16 @@ function drawBendFig(c, x, y, w, k, Q){
     lit(seatNear, skin, rgbA(sLit,0.85), rgbA(sDeep,0.45), 1.3); seatShape(sLit, sDeep);   // and the seat, over it
     oc.strokeStyle=rgbA(sDeep,0.55); oc.lineWidth=0.6; oc.beginPath();              // the cleft between them
     oc.moveTo(SC[0]-sd[0]*rs*0.9, SC[1]-sd[1]*rs*0.9); oc.lineTo(SC[0]+sd[0]*rs*0.6+tB[0]*0.5, SC[1]+sd[1]*rs*0.6+tB[1]*0.5); oc.stroke(); }
+  /* ❦ AND IF SHE IS CARRYING, it hangs under her when she folds over — under
+     the dress while she has it on, and her when she does not */
+  { const PMb=femPregMonth(w);
+    if(PMb>=2){ const PKb=clamp((PMb-1)/8,0,1), bb=1.0+Math.pow(PKb,0.85)*8.0;
+      const bc=[at(0.24,-fw[1])[0]+nF[0]*bb*0.42, at(0.24,-fw[1])[1]+nF[1]*bb*0.42+bb*0.30];
+      const pB=ell(bc[0], bc[1], bb*1.05, bb*0.86, Math.atan2(nF[1],nF[0]));
+      const bare = bareAll || (opt.top && RKS);
+      lit(pB, bare? skin : GARM, rgbA(bare? sLit : GHi,0.85), rgbA(bare? sDeep : GSh,0.6));
+      oc.save(); oc.clip(pB); const gg=oc.createRadialGradient(bc[0]-bb*0.3, bc[1]-bb*0.4, 0.2, bc[0], bc[1], bb*1.2);
+      gg.addColorStop(0,rgbA(bare? sLit : GHi,0.7)); gg.addColorStop(1,rgbA(bare? sLit : GHi,0)); oc.fillStyle=gg; oc.fillRect(bc[0]-bb*2,bc[1]-bb*2,bb*4,bb*4); oc.restore(); } }
   // ---- 6. the bust, hanging — the new model, round, and on the coast half skin ----
   if(bu>=3){
     const rb=1.4+bu*0.46, Bp=at(0.72,-fw[3]*0.55);
@@ -25681,6 +26020,13 @@ function drawMateFig(bk, fr, M){
      F.only 'far' | 'main' | 'near'   (so two bodies can interleave)
      F.expr F.blush F.rock F.wrap (a cloak colour) F.robe (an open robe)
    ===================================================================== */
+/* whose pregnancy is on this body: the wife's, or yours if you are her */
+function femPregMonth(w){
+  try{ if(!G || !G.pregnant || !w) return 0;
+    if(G.wife && w===G.wife) return wifePregMonth();
+    if(w.self && G.isFemale) return selfPregMonth(); }catch(e){}
+  return 0;
+}
 function drawFemFig(bk, fr, F){
   const w=F.look||{}, B=w.body||{}, gv=(k,d)=>B[k]===undefined? d : B[k];
   const bu=gv('bust',6), be=gv('booty',6), wa=gv('waist',6), lg=gv('legs',6), hq=gv('hairq',6);
@@ -25710,6 +26056,22 @@ function drawFemFig(bk, fr, F){
   const fw=[3.2+be*0.12, 2.5+(10-wa)*0.16, 2.3+(10-wa)*0.12, 2.9+bu*0.10, 2.4];
   const ts=[0.02,0.30,0.50,0.76,1.0];
   const g=[0,1];
+  /* ❦ HER PREGNANCY, MONTH BY MONTH. The belly stands off her front a little
+     more each month and her bust fills with it; it is hers on every pose,
+     under her clothes too. */
+  const PM=(F.preg!==undefined)? F.preg : femPregMonth(w), PK=clamp((PM-1)/8,0,1);
+  const bellyB = PM>=2? (1.0+Math.pow(PK,0.85)*9.2) : 0;
+  const bellyAt=(t)=> bellyB*Math.exp(-Math.pow((t-0.22)/(0.16+PK*0.05),2));
+  const linA=(arr,t)=>{ if(t<=ts[0]) return arr[0]; for(let i=1;i<ts.length;i++){ if(t<=ts[i]){ const f=(t-ts[i-1])/(ts[i]-ts[i-1]); return arr[i-1]+(arr[i]-arr[i-1])*f; } } return arr[arr.length-1]; };
+  const bwAt=(t)=>linA(bw,t), fwAt=(t)=>linA(fw,t)+bellyAt(t);
+  const TS2=[0.02,0.10,0.18,0.26,0.34,0.44,0.56,0.66,0.76,0.88,1.0];
+  // the bust's geometry, worked out once — the gown has to know where it is
+  const BG=(bu<3)? null : (()=>{ const rb=(1.4+bu*0.46)*(1+PK*0.12), Bp=at(0.72,-fw[3]*0.55);
+    const up=Math.max(0,-(nF[0]*g[0]+nF[1]*g[1]));
+    const hd=nrm([nF[0]*0.62+g[0]*0.70*(1-up*0.55), nF[1]*0.62+g[1]*0.70*(1-up*0.55)]);
+    const rot=Math.atan2(hd[1],hd[0]), hang=Math.max(0,hd[0]*g[0]+hd[1]*g[1]);
+    const c0n=[Bp[0]+hd[0]*rb*(0.78-up*0.30)+RK2*1.2, Bp[1]+hd[1]*rb*(0.78-up*0.30)-Math.abs(RK2)*0.4];
+    return {rb,Bp,up,hd,rot,hang,c0n}; })();
   // the head: tilted with the neck, or where the pose puts it
   const aN=(F.headAng!==undefined)? F.headAng : aB*0.62;
   const Nk=add(Sh,[Math.sin(aN)*2.8, -Math.cos(aN)*2.8]), HC=add(Nk,[Math.sin(aN)*4.6, -Math.cos(aN)*4.6]);
@@ -25718,7 +26080,7 @@ function drawFemFig(bk, fr, F){
   const handDef=(sh,k)=>[sh[0]+nF[0]*2.2*k-tB[0]*(Lup+Lfo-1.5), sh[1]+nF[1]*2.2*k-tB[1]*(Lup+Lfo-1.5)];
   const hN=(F.hands&&F.hands.near)||handDef(shN,1), hF=(F.hands&&F.hands.far)||handDef(shF,0.6);
   const cut=(w.hairStyle||w.cut||'loose'), long=(cut==='loose'||cut==='braid'||cut==='bangs'||cut==='tower'||cut==='veil'||cut==='long');
-  const out={hip:H, seat:SC, rs, head:HC, neck:Nk, shoulder:Sh, knee:LN.K, ankle:LN.ank, mouth:Rp(4.1,2.5), chest:at(0.74,-fw[3]),
+  const out={hip:H, seat:SC, rs, head:HC, neck:Nk, shoulder:Sh, knee:LN.K, ankle:LN.ank, mouth:Rp(4.1,2.5), chest:at(0.74,-fw[3]), preg:PM, belly:bellyB,
              crotch:add(H,[thighDir[0]*2.2+nF[0]*fw[0]*0.55, thighDir[1]*2.2+nF[1]*fw[0]*0.55]),
              join:add(SC,[thighDir[0]*rs*0.72+sd[0]*rs*0.30, thighDir[1]*rs*0.72+sd[1]*rs*0.30]), waist:at(0.30,0)};
   const drawIn=(oc, part)=>{
@@ -25743,8 +26105,13 @@ function drawFemFig(bk, fr, F){
     lit(seatFar, sSh, rgbA(skin,0.5), rgbA(sDeep,0.5));
     lit(legCap(LN,3.4+be*0.20), skin, rgbA(sLit,0.75), rgbA(sDeep,0.45)); foot(LN, skin);
     line([[LN.K[0]-0.8,LN.K[1]+0.6],[LN.K[0]+0.8,LN.K[1]+0.9]], rgbA(sDeep,0.4), 0.6);
-    const trunk=smooth(ts.map((t,i)=>at(t,bw[i])).concat(ts.map((t,i)=>at(t,-fw[i])).reverse()));
+    const trunk=smooth(TS2.map(t=>at(t,bwAt(t))).concat(TS2.map(t=>at(t,-fwAt(t))).reverse()));
     lit(trunk, skin, rgbA(sLit,0.85), rgbA(sDeep,0.45));
+    if(bellyB>1.2){ const bc=at(0.25,-fwAt(0.25)*0.62), br=2.2+bellyB*0.9;                          // the curve of it, lit
+      oc.save(); oc.clip(trunk); const gg=oc.createRadialGradient(bc[0]-tB[0]*1.2+nF[0]*0.8, bc[1]-tB[1]*1.2+nF[1]*0.8, 0.2, bc[0], bc[1], br);
+      gg.addColorStop(0,rgbA(mixHex(sLit,'#ffffff',0.2),0.75)); gg.addColorStop(1,rgbA(sLit,0)); oc.fillStyle=gg; oc.fillRect(bc[0]-br*2,bc[1]-br*2,br*4,br*4); oc.restore();
+      if(PK>0.3){ const nv=at(0.19,-fwAt(0.19)+0.5); oc.fillStyle=rgbA(sDeep,0.55); oc.fill(ell(nv[0],nv[1],0.45,0.6,aB)); }
+      line([at(0.36,-fwAt(0.36)+0.5), at(0.12,-fwAt(0.12)+0.5)], rgbA(sDeep,0.18+PK*0.12), 0.5); }
     lit(seatNear, skin, rgbA(sLit,0.85), rgbA(sDeep,0.45), 1.3);
     { const gx=SC[0]-rs*0.30+sd[0]*rs*0.18-g[0], gy=SC[1]-rs*0.42+sd[1]*rs*0.18;          // the gloss where the lamp finds it
       oc.save(); oc.clip(seatNear); const gg=oc.createRadialGradient(gx,gy,0.2,gx,gy,rs*0.75);
@@ -25755,11 +26122,8 @@ function drawFemFig(bk, fr, F){
       oc.restore(); }
     line([at(0.08,-fw[0]*0.7), at(0.26,-fw[1]*0.4)], rgbA(sDeep,0.30), 0.5);                   // the line of her hip
     // ---- her bust, and gravity decides where it goes ----
-    if(bu>=3){
-      const rb=1.4+bu*0.46, Bp=at(0.72,-fw[3]*0.55);
-      const up=Math.max(0,-(nF[0]*g[0]+nF[1]*g[1]));            // how far her front faces up (lying back)
-      let hd=nrm([nF[0]*0.62+g[0]*0.70*(1-up*0.55), nF[1]*0.62+g[1]*0.70*(1-up*0.55)]);
-      const rot=Math.atan2(hd[1],hd[0]), hang=Math.max(0,hd[0]*g[0]+hd[1]*g[1]);
+    if(BG){
+      const {rb, Bp, up, hd, rot, hang}=BG;                    // (how far her front faces up, and where it hangs)
       const one=(off,dark)=>{
         const c0=[Bp[0]+hd[0]*rb*(0.78-up*0.30)+tB[0]*off+RK2*1.2, Bp[1]+hd[1]*rb*(0.78-up*0.30)+tB[1]*off-Math.abs(RK2)*0.4];
         const p=ell(c0[0],c0[1], rb*(0.98+0.26*hang-0.14*up), rb*(0.90+0.10*up), rot);
@@ -25774,6 +26138,81 @@ function drawFemFig(bk, fr, F){
         return c0; };
       out.bustFar=one(1.9,true); out.bust=one(0,false);
       line([add(Bp,[hd[0]*0.6,hd[1]*0.6]), add(Bp,[hd[0]*rb*1.5+tB[0]*0.9, hd[1]*rb*1.5+tB[1]*0.9])], rgbA(sDeep,0.30), 0.5);
+    }
+    // ---- HER CLOTHES, AND HOW THEY COME OFF ----
+    /* One outline, built over the body underneath it — the seat, the bust
+       and the belly push it out, the legs decide where the skirt falls — and
+       it comes off the way it does: the stola slides down her in one piece
+       and pools at her feet; the coast's ulvik unlaces at the bodice first
+       and then the short skirt goes. F.dress = {col, cut:'stola'|'ulvik', u, band, noble}. */
+    if(F.dress && Math.abs(aB)<0.7){
+      const DR=F.dress, col=hexOf(DR.col||'#e0d8c4'), cHi=mixHex(col,'#ffffff',0.28), cSh=mixHex(col,'#140c06',0.42);
+      const u=clamp(DR.u||0,0,1), ulvik=(DR.cut==='ulvik');
+      const ease=(x)=>x*x*(3-2*x);
+      const sRx=rs*(0.80+0.20*dK), sRy=rs*0.94;
+      const seatExtB=(y)=>{ const dy=y-SC[1]; return Math.abs(dy)<sRy? SC[0]-Math.sqrt(Math.max(0,1-(dy/sRy)**2))*sRx : Infinity; };
+      const zs=((SC[0]-H[0])*tB[0]+(SC[1]-H[1])*tB[1])/Lb, sDepth=((SC[0]-H[0])*nB[0]+(SC[1]-H[1])*nB[1])+sRx;
+      const seatB=(z)=> Math.max(0, sDepth-bwAt(zs))*Math.exp(-Math.pow((z-zs)/(rs*0.95/Lb),2));
+      let bustB=()=>0, bustZ=0.72;
+      if(BG){ const c0=BG.c0n; bustZ=((c0[0]-H[0])*tB[0]+(c0[1]-H[1])*tB[1])/Lb;
+        const ext=((c0[0]-H[0])*nF[0]+(c0[1]-H[1])*nF[1])+BG.rb*1.02, dep=Math.max(0, ext-fwAt(bustZ));
+        bustB=(z)=>dep*Math.exp(-Math.pow((z-bustZ)/(BG.rb*1.15/Lb),2)); }
+      const legX=(Lg,y)=>{ const seg=(a,b)=>((y-a[1])*(y-b[1])<=0 && a[1]!==b[1])? a[0]+(b[0]-a[0])*(y-a[1])/(b[1]-a[1]) : null;
+        const v=seg(Lg.hip,Lg.K); return v!==null? v : seg(Lg.K,Lg.ank); };
+      const zY=(z)=>H[1]+(-z)*(fl-2.2-H[1]);
+      const outline=(zA,zB,flareK)=>{ const back=[], front=[], N=Math.max(4, Math.ceil((zB-zA)/0.045));
+        for(let i=0;i<=N;i++){ const z=zB-(zB-zA)*i/N;
+          if(z>=0){ back.push(at(z, bwAt(z)+seatB(z)+0.8)); front.push(at(z, -(fwAt(z)+bustB(z)+0.8))); }
+          else { const y=zY(z), xs=[legX(LN,y), legX(LF,y)].filter(v=>v!==null), fl2=(-z)*flareK;
+            const xb=Math.min(seatExtB(y)-0.8, H[0]-bwAt(0.02)*0.9, ...xs.map(v=>v-2.8))-fl2;
+            const xf=Math.max(H[0]+fwAt(0.02)*0.9, ...xs.map(v=>v+2.8))+fl2;
+            back.push([xb,y]); front.push([xf,y]); } }
+        const bb=back[back.length-1], fb=front[front.length-1];
+        return {pts:back.concat(front.slice().reverse()), bb, fb, tb:back[0], tf:front[0]}; };
+      const piece=(zA,zB,flareK,alpha)=>{
+        if(zB-zA<0.04) return null;
+        const O=outline(zA,zB,flareK), P=smooth(O.pts);
+        oc.save(); oc.globalAlpha=alpha===undefined? 1 : alpha;
+        lit(P, col, rgbA(cHi,0.9), rgbA(cSh,0.85));
+        oc.save(); oc.clip(P);
+        if(BG && zA<bustZ && zB>bustZ){ const c0=BG.c0n, gg=oc.createRadialGradient(c0[0]-1, c0[1]-BG.rb*0.5, 0.2, c0[0], c0[1], BG.rb*1.4);   // the cloth over her bust takes the light
+          gg.addColorStop(0,rgbA(mixHex(cHi,'#ffffff',0.3),0.8)); gg.addColorStop(1,rgbA(cHi,0)); oc.fillStyle=gg; oc.fillRect(c0[0]-8,c0[1]-8,16,16); }
+        if(bellyB>1.2 && zA<0.24 && zB>0.24){ const bc=at(0.25,-fwAt(0.25)); const gg=oc.createRadialGradient(bc[0],bc[1]-1,0.2,bc[0],bc[1],3+bellyB);
+          gg.addColorStop(0,rgbA(cHi,0.6)); gg.addColorStop(1,rgbA(cHi,0)); oc.fillStyle=gg; oc.fillRect(bc[0]-10,bc[1]-10,20,20); }
+        const zf=Math.min(zB,0.1);                                                              // the folds hang from the hips to the hem
+        if(zA<zf-0.1) for(let k=0;k<4;k++){ const f=(k+0.5)/4, top=zf>=0? lerp(at(zf,bwAt(zf)), at(zf,-fwAt(zf)), f) : lerp(O.tb,O.tf,f), bot=lerp(O.bb,O.fb,f);
+          line([top, [bot[0]+(f-0.5)*1.5, bot[1]]], rgbA(k%2? cSh : cHi, 0.5), 0.55); }
+        oc.restore(); oc.restore();
+        return O; };
+      const pool=(amt)=>{ if(amt<=0.02) return; const cx=(LN.ank[0]+LF.ank[0])/2, cy=fl-1.6, rx=5+amt*8, ry=1.3+amt*1.9;
+        const P=smooth([[cx-rx,cy+0.6],[cx-rx*0.7,cy-ry],[cx-rx*0.1,cy-ry*1.2],[cx+rx*0.6,cy-ry*0.9],[cx+rx,cy+0.5],[cx,cy+ry*0.5]]);
+        lit(P, col, rgbA(cHi,0.9), rgbA(cSh,0.85));
+        for(let k=0;k<3;k++) line([[cx-rx*0.6+k*rx*0.5, cy-ry*0.8],[cx-rx*0.5+k*rx*0.55, cy+0.4]], rgbA(cSh,0.6), 0.5); };
+      if(!ulvik){
+        const d=ease(clamp((u-0.20)/0.80,0,1)), top0=1.02-clamp(u/0.2,0,1)*0.30;      // the clasps go, and it comes off the shoulders
+        const shift=-2.1*d, zA=Math.max(-1,-0.93+shift), zB=top0+shift;
+        const O=piece(zA, zB, 2.6);
+        if(O && zB<0.9 && zB>-0.95){ const P=smooth([add(O.tb,[-0.8,-1.2]), lerp(O.tb,O.tf,0.5).map((v,i)=>v+(i? -2.0 : 0)), add(O.tf,[0.8,-1.2]), add(O.tf,[0.6,1.4]), add(O.tb,[-0.6,1.4])]);
+          lit(P, col, rgbA(cHi,0.95), rgbA(cSh,0.85)); line([add(O.tb,[0,0.2]), add(O.tf,[0,0.2])], rgbA(cSh,0.7), 0.5); }        // bunched where she is pushing it down
+        if(O){ if(zA>-0.995) line([O.bb,O.fb], DR.noble? '#e8c34a' : rgbA(cSh,0.95), 1.0);           // the hem
+          if(zA<0.63 && zB>0.66){ const c1=mixHex(col,'#e8c34a',0.55); line([at(0.64,bwAt(0.64)+0.9), at(0.64,-(fwAt(0.64)+bustB(0.64)+0.9))], c1, 1.3); }   // the cord under her bust
+          if(zB<1.0 && zB>0.6) line([O.tb,O.tf], rgbA(cHi,0.9), 0.8); }                          // the edge, coming down her
+        pool(clamp((-1-(-0.93+shift))/1.95,0,1));
+      } else {
+        const ds=ease(clamp((u-0.35)/0.65,0,1)), sshift=-2.0*ds, zA=Math.max(-1,-0.42+sshift), zB=0.32+sshift;
+        const O=piece(zA, zB, 1.3);
+        if(O){ if(zA>-0.995) for(let k=0;k<=8;k++){ const q=lerp(O.bb,O.fb,k/8); line([q,[q[0],q[1]+1.8]], rgbA(k%2? cSh : col,0.95), 0.6); }   // the fringe
+          if(zB>0.2){ const bc=hexOf(DR.band||'#8a6a3a'); line([O.tb,O.tf], bc, 1.5); line([O.tb,O.tf], mixHex(bc,'#ffffff',0.3), 0.5); } }   // the band at her waist
+        pool(clamp((-1-(-0.42+sshift))/0.74,0,1)*0.8);
+        // the bodice: it is unlaced first, and it is gone before the skirt moves
+        const bu2=clamp(u/0.35,0,1);
+        if(bu2<1){ const bsh=-0.28*bu2, Ob=piece(0.46+bsh, 0.70+bsh, 0, 1-bu2);
+          if(Ob){ oc.save(); oc.globalAlpha=1-bu2; const lace=mixHex(cHi,'#ffffff',0.4);
+            for(let k=0;k<5;k++){ const a=lerp(Ob.tf,Ob.tb,k/5), b=lerp(Ob.tf,Ob.tb,(k+1)/5), m=[(a[0]+b[0])/2+tB[0]*0.6, (a[1]+b[1])/2+tB[1]*0.6];
+              oc.strokeStyle=lace; oc.lineWidth=0.55; oc.beginPath(); oc.moveTo(a[0],a[1]); oc.quadraticCurveTo(m[0],m[1],b[0],b[1]); oc.stroke(); }
+            line([Ob.tf, add(Sh,[nF[0]*1.2,nF[1]*1.2])], rgbA(cSh,0.9), 0.6);                        // the strap
+            oc.restore(); } }
+      }
     }
     // ---- a wrap over her shoulders (the coast's cold) or an open robe (the Wa row) ----
     if(F.wrap){ const kc=hexOf(F.wrap), kHi=mixHex(kc,'#ffffff',0.24), kSh=mixHex(kc,'#000000',0.42);
@@ -56152,7 +56591,7 @@ window.__SS = {
   setBodyMapWalk:(v)=>{ bodyMapWalk=v; }, get bodyMapSubject(){return bodyMapSubject;},
   redrawBodyMap:()=>{ try{ drawBodyMap($('bodymap-cv'), bodyMapSubject, bodyMapView, bodyMapT); }catch(e){} },
   drawRealFig, realAnchors, drawLength, lengthPose, lengthDigits, girthDigits, ROUSED_NAMES, rousedName, restName, tierIdxOf,
-  drawBedPose, drawFemFig, drawBreedPlace, rkBreedOn, rkPoorHouse, rkBreedKids, rkSendKidsToBreed, RK_BREED_FEE, RK_HUB_COST, RK_BREED_POSES, drawSilhouette, drawPreludeRunner, get SIL_DRAWS(){return SIL_DRAWS;}, get BEDPOSE_DRAWS(){return BEDPOSE_DRAWS;}, get BEDPOSE_LAST(){return BEDPOSE_LAST;},
+  drawBedPose, drawFemFig, femPregMonth, BED_UNDRESS, drawBreedPlace, rkBreedOn, rkPoorHouse, rkBreedKids, rkSendKidsToBreed, RK_BREED_FEE, RK_HUB_COST, RK_BREED_POSES, drawHubRoom, drawQuayHall, drawQuayExterior, BRD_DRAWS, drawSilhouette, drawPreludeRunner, get SIL_DRAWS(){return SIL_DRAWS;}, get BEDPOSE_DRAWS(){return BEDPOSE_DRAWS;}, get BEDPOSE_LAST(){return BEDPOSE_LAST;},
   get MAN_DRAWS(){return MAN_DRAWS;}, drawTemptFigures, temptHimPose, legacySet, LEGACY_RK, legacyWord, legacyAudience, migrate,
   BUILD_STAMP, reactExpr, realDressInfo, get bmDressed(){return bmDressed;}, set bmDressed(v){ bmDressed=!!v; }, drawBendFig, get BEND_OPT(){return BEND_OPT;}, set BEND_OPT(v){ BEND_OPT=v; }, realFigExtras, drawPair, drawMateFig, pairHimLook, ik2, herFace, herFaceWeights, get HER_ROLL(){return HER_ROLL;}, set HER_ROLL(v){ HER_ROLL=v; }, drawManProfile, drawPeekTableau, adultCouple, villaRevealLine, get PAIR_DRAWS(){return PAIR_DRAWS;}, get PAIR_LAST(){return PAIR_LAST;},
   LEN_INCH, LEN_GROW_BY, lenGrow, lengthInches, lenFrac, VILLAGE_NAMES, villageName, villageNameNews, get HUSB_SMILE(){return HUSB_SMILE;},

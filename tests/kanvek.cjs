@@ -55,7 +55,7 @@ const ok=(name,cond,note)=>{ if(cond){pass++; console.log('  PASS  '+name+(note?
     /* ---- and now the pixels ---- */
     S.setWH('done'); S.startBedScene('long','love','bed');
     const cv=document.getElementById('game'), gc=cv.getContext('2d');
-    const T=520+out.i*160+60;
+    const T=520+(S.BED_UNDRESS||0)+out.i*160+60;       // the running order starts after the clothes come off
     S.setBCT(T);
     gc.save(); gc.setTransform(1,0,0,1,0,0);
     gc.fillStyle='#000000'; gc.fillRect(0,0,cv.width,cv.height); gc.restore();
