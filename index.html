@@ -12842,9 +12842,27 @@ const LEGACY_WA={
   'Tanegashima':{w:1,s:true,note:'where the guns landed, and very little else'},
   'Ezo':{w:1,s:false,note:'not Japan. One toehold on a cape, trading iron for furs.'},
 };
+/* THE COAST HAS ITS OWN SEATS. It fell through to the Roman list, sorted
+   richest first — so a Rkrai house on the Alaska shore was offered, and
+   defaulted to, "Asia Minor", and told "All Rome takes note". */
+const LEGACY_RK={
+  'Leokanis':      {w:5, s:true,  note:'the capital, and the ledger — every load on the coast is weighed here, and a house seated here is weighed with it'},
+  'Taqruna':       {w:4, s:true,  note:'the outer coast and the second harbour: the weather first, and the boats first'},
+  'Nalkut River':  {w:4, s:true,  note:'the smoke-houses — whoever holds the river holds the winter'},
+  'Uvrak Plateau': {w:4, s:false, note:'the herds are owned, not hunted; a plateau house counts its standing in ear-marks'},
+  'Kraunivik':     {w:3, s:true,  note:'the inland market where the plateau, the river and the forest barter without being weighed'},
+  'Sivra Forest':  {w:3, s:false, note:'the poorest by stored food and the one nobody can do without — every plank on the coast'},
+  'Kraiq-Harra':   {w:1, s:false, note:'four longhouses where the plateau breaks, and the strictest rank ladder on the coast'},
+};
 function legacySet(){
   const w=(typeof playerWorld==='function')? playerWorld() : 'west';
-  return w==='wa'? LEGACY_WA : w==='east'? LEGACY_EAST : LEGACY_INFO;
+  return w==='wa'? LEGACY_WA : w==='east'? LEGACY_EAST : w==='rk'? LEGACY_RK : LEGACY_INFO;
+}
+/* who takes note when the seat rises, in this world's own terms */
+function legacyAudience(){
+  const w=(typeof playerWorld==='function')? playerWorld() : 'west';
+  return w==='rk'? 'The whole coast writes it in the tally.' : w==='wa'? 'Every house in the province notes the crest.'
+       : w==='east'? 'The registers of the commandery record it.' : 'All Rome takes note.';
 }
 /* AND THE THREE BUILDS ARE NAMED IN THE LOCAL IDIOM, taken straight off
    that people's own house ladder — you do not "build a fine domus" in Kai. */
@@ -12869,6 +12887,10 @@ function legacyWord(){
                        blurb:'A house is seated where the registers are kept and the roads are measured from. A capital buys '
                         +'you the bureau and the examinations; a port buys you foreign gold; the grass buys you horses and '
                         +'the standing problem of everyone else wanting them.'}
+       : w==='rk'   ? {head:'\u25c6 THE HOUSE-SEAT', verb:'RAISE', where:'Province',
+                       blurb:'A Rkrai house is seated where its name is tallied. The capital weighs you with its cargo; the '
+                        +'coast and the river own the boats and the winter; the plateau owns the herds; the far village owns '
+                        +'nothing and keeps the strictest ranks on the shore.'}
        : {head:'\ud83c\udfdb THE LEGACY HOUSE', verb:'BUILD', where:'Province',
           blurb:'Plant a dynastic seat in a province and move the family into it. WHERE decides everything.'};
 }
@@ -12881,7 +12903,7 @@ function legacyHomeProvince(w){
   const H={egyptian:'Aegyptus',greek:'Achaea',persian:'Persis',celt:'Gallia',germanic:'Germania Magna',
     numidian:'Africa Proconsularis',roman:'Italia',
     han:'Luoyang', steppe:'Xianbei Steppe', kushan:'Gandhara', tamil:'Chola Country', korean:'Baekje',
-    wa:'Yamashiro', nanban:'Hizen', ming:'Hizen'};
+    wa:'Yamashiro', nanban:'Hizen', ming:'Hizen', rkrai:'Leokanis'};
   const id=H[w&&w.eth];
   return (id && legacySet()[id])? id : Object.keys(legacySet())[0];
 }
@@ -13147,6 +13169,11 @@ function migrate(g){ const d={world:null,socialSet:null,eastAxis:{},crossedToWa:
   if(!g.provinces) g.provinces={};
   if(!g.complaints) g.complaints=[];
   if(!g.titlesWorn) g.titlesWorn=[];
+  // a coast house-seat that was planted in a Roman province by the old fall-through: move it home, same wealth band
+  if(g.world==='rk' && g.legacy && g.legacy.prov && !LEGACY_RK[g.legacy.prov]){
+    const w0=(LEGACY_INFO[g.legacy.prov]||{w:3}).w;
+    const best=Object.keys(LEGACY_RK).sort((a,b)=>Math.abs(LEGACY_RK[a].w-w0)-Math.abs(LEGACY_RK[b].w-w0))[0];
+    g.legacy.prov=best; }
   return g; }
 function saveGame(){ try{ localStorage.setItem(slotKey(saveSlot), JSON.stringify(G)); toast('Saved to slot '+saveSlot+'.'); }catch(e){ toast('⚠ Could not save — browser storage is blocked or full.',3200); } }
 function hasSave(n){ try{ return !!localStorage.getItem(slotKey(n||saveSlot)); }catch(e){ return false; } }
@@ -13168,7 +13195,7 @@ const SETTINGS_KEY='SANDSTEEL_SETTINGS';
 /* WHICH BUILD IS THIS. Printed on the title screen, in Settings and in the
    corner of the hall — because an old link to an old build looks exactly
    like a fix that did not work. */
-const BUILD_STAMP='V37 · profile pair';
+const BUILD_STAMP='V38 · new bodies everywhere';
 try{ document.addEventListener('DOMContentLoaded',()=>{ const e=document.getElementById('build-stamp'); if(e) e.textContent='build '+BUILD_STAMP; });
      const e0=document.getElementById('build-stamp'); if(e0) e0.textContent='build '+BUILD_STAMP; }catch(e){}
 const SETTINGS=(function(){ const d={sound:true,shake:true,difficulty:'normal',
@@ -19878,6 +19905,14 @@ let BC=null, BEDSPR=null, WH=null;
 let KANVEK_ONLY=false;
 function startBedScene(mode,len,place){
   len=len||'quick'; place=place||'bed';
+  /* ◆ THE COAST'S SECOND PAGE. A house with no warm room of its own that is
+     trying for a CHILD goes to the breeding house on the quay; a house with
+     a hub keeps it at home. */
+  if(place==='hub' && !(G&&G.rkHub)) place='bed';
+  if((place==='breed'||place==='hub') && !rkBreedOn()) place='bed';
+  if(mode==='heir' && place==='bed' && rkBreedOn() && rkPoorHouse() && !(G&&G.rkHub) && !KANVEK_ONLY){
+    place='breed';
+    if(WH!=='done') setTimeout(()=>toast('◆ A house without a warm room of its own goes to the breeding house to try for a child. That is simply what is done on this coast.',4200),300); }
   // FIRST: your domina lights up — a wide, happy, blushing smile before anything else
   // (plays in both modes; skipped when the spouse is a lord or you are the domina yourself)
   if(WH!=='done' && G.wife && !G.wife.male && !G.isFemale){
@@ -19899,11 +19934,14 @@ function startBedScene(mode,len,place){
     drawBridePortrait(cv,G.wife,true); BEDSPR=cv; } else BEDSPR=null;
   if(place==='pool'&&!G.hasPool) place='bed';
   if(place==='wardrobe'&&!G.hasWardrobe) place='bed';
+  let _breedLine=null;
+  if(place==='breed'){ G.coin=Math.max(0,(G.coin||0)-RK_BREED_FEE); G.rkBreedVisits=(G.rkBreedVisits|0)+1; _breedLine=rkBreedLine('breed'); try{ refreshStatbar(); }catch(e){} }
+  if(place==='hub'){ G.rkHubNights=(G.rkHubNights|0)+1; _breedLine=rkBreedLine('hub'); }
   /* ✧ HER GIFT IS ITS OWN SCENE. One position, not a running order, and
      short — it is not a night and the house should not book it as one. */
   const KAN=!!KANVEK_ONLY; KANVEK_ONLY=false;
   BC={t:0, props:[], hearts:[], splash:[], mode:mode||'heir', len, place,
-      kanvekOnly:KAN,
+      kanvekOnly:KAN, breedLine:_breedLine,
       dur: KAN? 860 : (len==='vigil'?18000 : len==='night'?3600 : len==='long'?1800 : 700),
       line:pick(['“Veni…”','“Te amo.”','“Nunc, mi gladiator…”','“Tarde venis…”'])};
   G.lastLoveDay=G.day;
@@ -21077,7 +21115,8 @@ function finishBed(){
       : '🌙 A quiet evening together. The bond deepens. (+'+emoF+' ♥, +'+phys+' 🔥)',3400);
     return;
   }
-  const base= len==='night'?0.55 : len==='long'?0.42 : 0.32;        // the gods favour the thorough
+  const _warm = BC.place==='hub'? 0.18 : BC.place==='breed'? 0.14 : 0;   // ◆ the tubs, and the district believes the warmth is the point
+  const base= (len==='night'?0.55 : len==='long'?0.42 : 0.32) + _warm;        // the gods favour the thorough
   /* ✧ AND KAN'S BOOK, IF IT WAS TURNED OVER. Armed on an earlier night and
      spent here, held to or not — the same arrangement the criers on the
      crossing have with the truth. */
@@ -21088,8 +21127,13 @@ function finishBed(){
   const hit = BC.finKept? false : (Math.random()<chance);
   if(hit && !G.pregnant) G.pregnant={due:G.day+27};
   G.wifeRel=clamp(G.wifeRel+(len==='night'?4:len==='long'?3:2),0,bondCeiling());
+  const _place=BC.place;
   saveQuiet();
   BC=null; state='menu'; openVilla();
+  if(_place==='breed') setTimeout(()=>toast(hit? '◆ The tally-keeper was right. She says it to everybody, and this time she gets to be right in front of the whole quay.'
+                                             : '◆ The tally-keeper notches the house again. “Children are close,” she says, which she says to everyone. (+'+Math.round(_warm*100)+'% for the warm tubs)', 5200), 1400);
+  if(_place==='hub') setTimeout(()=>toast(hit? '◆ The hub earned its cedar. The district, which kept count, is insufferable about it.'
+                                           : '◆ The hub is warm and it is yours, and the odds were better for it (+'+Math.round(_warm*100)+'%). Not tonight.', 5200), 1400);
   toast(hit
     ? (G.isFemale?'🌙 …weeks later you are certain: YOU ARE WITH CHILD! Nine months now. '+(ADULT?'(+🔥, +♥)':'(+♥)')
                  :'🌙 …weeks later the word comes: SHE IS WITH CHILD! Nine months now. '+(ADULT?'(+🔥, +♥)':'(+♥)'))
@@ -21118,11 +21162,62 @@ function drawJiggleSprite(spr,x,y,ph,alpha){
 function drawBed(){
   const s=BC, T=s.t, place=s.place||'bed';
   const dx=346, dw=76;
+  if(place==='breed'||place==='hub'){ drawBreedPlace(s,T,place); return; }
   if(place==='pool'||place==='bath'){ drawPoolPlace(s,T,dx,dw,place); }
   else { drawRoomPlace(s,T,dx,dw,place); }
   // flung clothes arc across the room and settle — full garments, not scraps
   for(const p of s.props) drawFlungProp(p);
   drawBedAfterProps(s,T,dx,dw);
+}
+/* =====================================================================
+   THE DOORWAY, ON THE NEW BODIES — the prelude before the lamps go down
+   ---------------------------------------------------------------------
+   The bedchamber (and the lagoon, and the baths) open on a gag played in
+   a lit doorway or behind a screen: she runs for it, her undressed shadow
+   beckons, he answers, and the sundial corrects itself. It was drawn in
+   pixel rectangles and one old running sprite. The shadows are cut from
+   the SAME two figures the rest of the house uses now — drawn offscreen
+   and filled with the shadow's colour — so the silhouette in the door is
+   her silhouette, and the sundial is his, rising for real.
+   ===================================================================== */
+let SIL_CV=null, SIL_DRAWS=0;
+function drawSilhouette(c, x, fy, dir, col, fn){
+  if(!SIL_CV){ SIL_CV=document.createElement('canvas'); SIL_CV.width=180; SIL_CV.height=128; }
+  const g=SIL_CV.getContext('2d'); g.setTransform(1,0,0,1,0,0); g.globalCompositeOperation='source-over'; g.clearRect(0,0,180,128);
+  try{ fn(g, 90, 124); }catch(e){}
+  g.globalCompositeOperation='source-in'; g.fillStyle=col; g.fillRect(0,0,180,128); g.globalCompositeOperation='source-over';
+  c.save(); if(dir<0){ c.translate(x,0); c.scale(-1,1); c.translate(-x,0); }
+  c.drawImage(SIL_CV, Math.round(x-90), Math.round(fy-124)); c.restore();
+  SIL_DRAWS++;
+}
+function silHer(c, x, fy, dir, col, P){                 // her shadow, posed
+  const her=(G&&G.isFemale)? playerLook() : ((G&&G.wife)||{});
+  drawSilhouette(c, x, fy, dir, col, (g,ox,oy)=>drawFemFig(g, g, Object.assign({look:her, floor:oy, hip:[ox, oy-33]}, P(ox,oy))));
+}
+function silHim(c, x, fy, dir, col, P){                 // his, posed — and nothing about him is hidden by a shadow
+  const him=(typeof pairHimLook==='function')? pairHimLook() : playerLook();
+  drawSilhouette(c, x, fy, dir, col, (g,ox,oy)=>{ const M=Object.assign({look:him, floor:oy, hip:[ox, oy-36], bare:true, noFloorCloth:true, pxi:1.0, aro:0}, P(ox,oy));
+    const IN=lengthInches(him, M.aro||0); M.lenIn=IN.now; M.diaIn=IN.dia; drawMateFig(g, g, M); });
+}
+const silWalkHer=(ph)=>(ox,oy)=>({lean:0.06, ankles:{near:[ox+Math.sin(ph)*6, oy-2.2-Math.max(0,Math.cos(ph))*3], far:[ox+Math.sin(ph+Math.PI)*6, oy-2.2-Math.max(0,Math.cos(ph+Math.PI))*3]}});
+function silDoorway(c, x, fy, T, female){                // the undressed shadow, beckoning after T 260
+  const bk=T>260? Math.sin(T*0.25) : 0;
+  if(female) silHer(c, x, fy, -1, '#1c130c', (ox,oy)=>({lean:-0.04, headAng:-0.1, rock:Math.sin(T*0.1)*0.3,
+      hands: T>260? {near:[ox+13+bk*3, oy-58+bk*2], far:[ox-4, oy-30]} : {near:[ox+3, oy-40], far:[ox-5, oy-38]}}));
+  else silHim(c, x, fy, -1, '#1c130c', (ox,oy)=>({lean:0.02, aro:0.35+Math.sin(T*0.05)*0.1, hands:{near: T>260? [ox+14+bk*3, oy-60+bk*2] : null, far:null}}));
+}
+/* her, RUNNING for the door in her robe — the new body, not the old sprite (him, if you are her) */
+function drawPreludeRunner(c, x, fy, T){
+  const her=(G&&G.isFemale)? null : ((G&&G.wife)||{});
+  if(!her){ const me=(typeof pairHimLook==='function')? pairHimLook() : playerLook(); drawManProfile(c, x, fy, me, {u:0, aro:0.3, walk:1, walkPh:T*0.6, lean:0.12, face:HARD_FACES.grin,
+      cloth:(G&&G.tunic)||'#7a2f22'}, 1); return; }
+  const ph=T*0.55, bob=Math.abs(Math.sin(ph))*1.6, hip=[x, fy-33-bob];
+  const st=(o)=>[hip[0]+Math.sin(ph+o)*8.5, fy-2.2-Math.max(0,Math.cos(ph+o))*5];
+  c.save(); c.globalAlpha=0.28; c.fillStyle='#120b08'; c.beginPath(); c.ellipse(x, fy-1, 11, 2.6, 0,0,7); c.fill(); c.restore();
+  drawFemFig(c, c, {look:her, floor:fy, hip, lean:0.20, headAng:0.05, expr:'pleased', blush:0.6, t:T, rock:Math.sin(ph*2)*0.8,
+    ankles:{near:st(0), far:st(Math.PI)}, kneeBend:-1,
+    hands:{near:[hip[0]-Math.sin(ph)*7+3, hip[1]-8], far:[hip[0]+Math.sin(ph)*7+3, hip[1]-9]},
+    robe:hexOf((her&&her.dress)||'#e8dcc2')});
 }
 function drawRoomPlace(s,T,dx,dw,place){
   const ward=place==='wardrobe';
@@ -21172,14 +21267,9 @@ function drawRoomPlace(s,T,dx,dw,place){
       if(!G.isFemale){
         // she SITS on the bed's edge, patting the covers — an invitation nobody misreads
         const pat=((T*0.15)|0)%2;
-        px(dx+26,157,7,4,S2);                                                                  // hair piled high
-        px(dx+27,160,8,9,S2); px(dx+33,163,3,5,S2);                                            // head + a loose lock
-        px(dx+29,169,3,3,S2);                                                                  // neck
-        px(dx+26,172,9,11,S2); px(dx+34,174+jr,4,6,S2);                                        // torso upright, bust toward the door
-        px(dx+24,183,13,8,S2);                                                                 // seated hips settle into the covers
-        px(dx+33,190,4,11,S2); px(dx+29,190,4,9,S2);                                           // legs over the bedside
-        px(dx+32,201,6,2,S2); px(dx+28,199,6,2,S2);                                            // bare feet, dangling
-        px(dx+34,176,6,3,S2); px(dx+38,183+pat*2,4,3,S2);                                      // arm out — pat, pat
+        silHer(ctx, dx+30, 216, -1, S2, (ox,oy)=>({hip:[ox, oy-26+jr*0.2], lean:-0.06, headAng:-0.05, rock:jr*0.4,
+          ankles:{near:[ox+9, oy-2.2], far:[ox+11, oy-3]}, kneeBend:-1,
+          hands:{near:[ox-9, oy-25+pat*2], far:[ox-6, oy-27]}}));
       } else {
         px(dx+5,182,10,4,'#e8dcc2'); px(dx+18,186,14,3,'#9a4a66');                             // covers turned down, a rose left waiting
         px(dx+20,184,4,2,'#c03a4a'); px(dx+23,185,4,1,'#4a6a34');
@@ -21187,16 +21277,10 @@ function drawRoomPlace(s,T,dx,dw,place){
       // HIS standing profile — a full head taller than her, and the silhouette hides nothing
       if(T>400 && T<474){
         const lean=T>458? Math.min(6,(T-458)*0.5):0, gx=dx+60-lean, S3='#1c130c';
-        px(gx-4,126,10,12,S3); px(gx-2,124,8,3,S3);                                            // head, up near the lintel
-        px(gx-1,138,4,3,S3);                                                                   // neck
-        px(gx-9,141,18,6,S3); px(gx-6,147,13,22,S3);                                           // broad shoulders → torso
-        px(gx-5,169,5,25,S3); px(gx+1,169,5,25,S3); px(gx-6,194,7,2,S3); px(gx+1,194,7,2,S3);  // long legs
         // ...the famous silhouette: humbled at first — then the sundial corrects itself
         const rise = T<430?0 : T>440?1 : (T-430)/10;
-        if(rise<=0){      px(gx-10,172,5,3,S3); px(gx-13,175,5,4,S3); px(gx-15,179,3,3,S3); }  // slanted DOWN — it was a long day
-        else if(rise>=1){ px(gx-10,168,5,3,S3); px(gx-13,164,5,4,S3); px(gx-15,160,3,3,S3);    // she pats the bed — UP it swings
-                          px(gx-15,159,3,1,'rgba(255,176,80,.55)'); px(gx-16,161,1,3,'rgba(255,176,80,.4)'); }
-        else {            px(gx-12,170,7,4,S3); px(gx-16,169,4,5,S3); }                        // ...rising
+        silHim(ctx, gx, 196, -1, S3, (ox,oy)=>({lean:0.03+lean*0.02, headAng:0.18, aro:0.02+rise*0.98, hands:{near:null, far:null}}));
+        if(rise>=1){ px(gx-17,158,2,1,'rgba(255,176,80,.55)'); px(gx-18,160,1,3,'rgba(255,176,80,.4)'); }
         if(rise>=1 && (T|0)%20<1.5) s.hearts.push({x:gx-8,y:146,vy:0.7,life:40,c:'#e26a8a'});
       }
       if(T>444 && T<478){ pixelText(G.isFemale?'“Veni, domina mea…”':s.line,dx+dw/2,120,'#f0c8d4',1); }
@@ -21221,23 +21305,17 @@ function drawRoomPlace(s,T,dx,dw,place){
   if(T<130){
     // the eager one RUNS for the door
     const wx= 40 + Math.min(1,T/112)*(dx-66-40);
-    if(!G.isFemale && spr) drawJiggleSprite(spr, wx, 122-Math.abs(Math.sin(T*0.4))*2, T*0.55, 1);   // she runs, everything bouncing
-    else { ctx.save(); ctx.translate(wx+8,214-Math.abs(Math.sin(T*0.4))*2); ctx.scale(1.15,1.15); drawHusbandFig(ctx,0,0,G.wifeRel|0); ctx.restore(); } // he runs
+    drawPreludeRunner(ctx, wx+8, 216, T);                                    // she runs (he does, if you are her) — the new body
     if((T|0)%8===0) px(wx+10,218,3,1,'#5a4630');                              // dust at their heels
   } else if(T<340){
     // the shadow-show: clothes OFF — an undressed silhouette in the doorway
-    if(!G.isFemale){
-      drawShadowFigure(dx+30+Math.sin(T*0.08)*1.2, 216, T*0.3, T>260, open);
-    } else {
-      drawShadowMale(dx+34+Math.sin(T*0.08)*1.2, 214, Math.sin(T*0.05)*0.4);
-      if(T>260){ const bk=Math.sin(T*0.25)*3; px(dx+16+bk,150,12,3,'#1c130c'); px(dx+13+bk,147,5,5,'#1c130c'); } // his beckoning arm
-    }
+    silDoorway(ctx, dx+(G.isFemale? 34 : 30)+Math.sin(T*0.08)*1.2, 216, T, !G.isFemale);
     if(T>260 && (T|0)%28<1.5) s.hearts.push({x:dx-4,y:140,vy:0.6,life:52,c:'#e26a8a'});
   }
   // the other answers the call — FULL height, striding to the door
   if(T>280 && T<352){ const mx=90+Math.min(1,(T-280)/64)*(dx+16-90);
-    if(!G.isFemale) drawShadowMale(mx, 216, T*0.35);
-    else drawShadowWalkerF(mx, 216, T*0.35);
+    if(!G.isFemale) silHim(ctx, mx, 216, 1, '#1c130c', (ox,oy)=>({walk:1, walkPh:T*0.35, lean:0.06, aro:0.2}));
+    else silHer(ctx, mx, 216, 1, '#1c130c', silWalkHer(T*0.35));
   }
   // a small invader makes for the shaking wardrobe — and is scooped up by a slave
   if(ward && T>560 && T<700 && G.children.some(c=>!c.wed && (G.day-c.born)<40)){
@@ -22032,6 +22110,616 @@ function drawHall(gx,gy,gw,gh,T,MED,WALLA){
   }
   ctx.globalAlpha=1; ctx.restore();
 }
+/* =====================================================================
+   🛏 THE BEDCHAMBER ON THE NEW BODIES — EVERY POSITION, REBUILT
+   ---------------------------------------------------------------------
+   "Rework ALL the woohoos with the better bodies." Every position in the
+   bedchamber, the lagoon, the bath and the wardrobe — and the Kanvek —
+   was drawn with the block rig: a front-facing body stacked out of pixel
+   rectangles with the old square head on it, posed by angles. The villa
+   has had proper figures for a while; the bedroom never got them.
+
+   Every position is drawn here with the SAME two bodies the villa uses:
+   drawMateFig for him and drawFemFig for her — lit, round, measured off
+   the body map, his real length at his real inches, her own cut and her
+   own face — posed off a skeleton so they can kneel, ride, lie back, be
+   lifted, sit on a rim or brace on a post, and animated: every position
+   has a rhythm, and they move on it together. Each one keeps the room it
+   happens in and what the culture calls it.
+
+   The old block rig is still there for HEAVY (the silhouette setting),
+   which is the one place a flat shape is what you want.
+   ===================================================================== */
+let BEDPOSE_DRAWS=0, BEDPOSE_LAST=null;
+function drawBedPose(vi, E){
+  const c=E.c, T=E.T, s=E.s, cx0=E.cx0, base=E.base, HB=E.HB||(()=>{});
+  if(!G) return false;
+  const her = G.isFemale? playerLook() : (G.wife||{});
+  const him = (typeof pairHimLook==='function')? pairHimLook() : playerLook();
+  if(!him || !her) return false;
+  if(!s.nf || s.nf.vi!==vi){ s.nf={ vi, hf:hardFace(him,'act'), he:herFace(her,'act'), hr:herFace(her,'reveal') }; }
+  const coastB=(typeof rkHere==='function') && rkHere();
+  const HF=s.nf.hf, HE=s.nf.he==='cross'? 'flush' : s.nf.he;
+  const shut=Object.assign({}, HF, {shut:1, open:0});
+  const IN1=lengthInches(him,1);
+  const HIM=(M)=>{ const a=(M.aro===undefined)? 1 : M.aro, IN=lengthInches(him,a);
+    return drawMateFig(c, c, Object.assign({look:him, bare:true, noFloorCloth:true, face:HF, lenIn:IN.now, diaIn:IN.dia, pxi:1.0, floor:base, aro:a}, M)); };
+  const HER=(F)=>drawFemFig(c, c, Object.assign({look:her, floor:base, t:T, expr:HE}, F));
+  // mirror: draw about x, and bring the points it returns back into the room
+  const MX=(x0,fn)=>{ c.save(); c.translate(x0,0); c.scale(-1,1); c.translate(-x0,0); let r=null; try{ r=fn(); }finally{ c.restore(); }
+    if(r){ const o={}; for(const k in r){ const v=r[k]; o[k]=(Array.isArray(v) && v.length===2 && typeof v[0]==='number')? [2*x0-v[0], v[1]] : v; } return o; } return r; };
+  const L=(x0,p)=> p? [2*x0-p[0], p[1]] : p;               // a room point into a mirrored figure's own frame
+  const bt=(k,ph)=>Math.max(0,Math.sin(T*k+(ph||0)));
+  const sn=(k,ph)=>Math.sin(T*k+(ph||0));
+  const K=vecKit(c);
+  const shadow=(x,y,rx)=>{ c.save(); c.globalAlpha=0.28; c.fillStyle='#120b08'; c.beginPath(); c.ellipse(x,y,rx,2.6,0,0,7); c.fill(); c.restore(); };
+  const grad=(x0,y0,x1,y1,stops)=>{ const g=c.createLinearGradient(x0,y0,x1,y1); stops.forEach(([o,col])=>g.addColorStop(o,col)); return g; };
+  const box=(x,y,w,h,col,hi,lo)=>{ c.fillStyle=col; c.fillRect(x,y,w,h); if(hi){ c.fillStyle=hi; c.fillRect(x,y,w,1.2); } if(lo){ c.fillStyle=lo; c.fillRect(x,y+h-1.2,w,1.2); } };
+  const glowAt=(x,y,r,col,a)=>{ const g=c.createRadialGradient(x,y,1,x,y,r); g.addColorStop(0,'rgba('+col+','+a+')'); g.addColorStop(1,'rgba('+col+',0)'); c.fillStyle=g; c.fillRect(x-r,y-r,r*2,r*2); };
+  // ---- furniture, drawn to the same standard as the bodies ----
+  const BED=(x,w,top,sheet)=>{
+    const wood='#5a3820', woodHi='#7a5230', woodSh='#2e1c10';
+    box(x-4, top-24, 5, base-top+24, wood, woodHi, null);                    // the head post
+    c.fillStyle=grad(x, top-20, x, top, [[0,'#6a4424'],[1,'#4a2e18']]); c.fillRect(x-2, top-20, 20, 18);   // the headboard
+    box(x, top+6, w, 5, wood, woodHi, woodSh);                               // the rail
+    box(x+2, top+11, 3, base-top-11, woodSh); box(x+w-5, top+11, 3, base-top-11, woodSh);
+    box(x+w-3, top-8, 4, base-top+8, wood, woodHi, null);                    // the foot post
+    c.fillStyle=grad(x, top-1, x, top+7, [[0,sheet||'#efe6d2'],[1,mixHex(sheet||'#efe6d2','#6a5a44',0.35)]]);
+    c.beginPath(); c.moveTo(x, top+6.5);
+    for(let i=0;i<=10;i++){ const u=i/10; c.lineTo(x+u*w, top-0.6*Math.sin(u*9+1.3)-0.4); }
+    c.lineTo(x+w, top+6.5); c.closePath(); c.fill();
+    c.fillStyle='rgba(120,100,80,.35)'; for(let i=1;i<5;i++) c.fillRect(x+w*i/5, top+1, 0.7, 5);
+    // the pillow
+    c.fillStyle=grad(x+2, top-6, x+2, top, [[0,'#fffaf0'],[1,'#d8ccb4']]); c.beginPath(); c.ellipse(x+11, top-2.4, 9, 3.4, 0, 0, 7); c.fill();
+  };
+  const BENCH=(x,w,top,col)=>{ col=col||'#d8ccb4'; box(x, top, w, 5, col, mixHex(col,'#ffffff',0.35), mixHex(col,'#000000',0.3));
+    box(x+2, top+5, 4, base-top-5, mixHex(col,'#000000',0.18)); box(x+w-6, top+5, 4, base-top-5, mixHex(col,'#000000',0.18)); };
+  const WALLBOARDS=(col, col2)=>{ let x2=cx0-60, i=0; while(x2<cx0+60){ const bw2=9+((i*7)%6);
+      c.fillStyle=(i%3? col : col2); c.fillRect(x2, base-104, bw2-1, 104); c.fillStyle=mixHex(col,'#ffffff',0.18); c.fillRect(x2, base-104, 1, 104); x2+=bw2; i++; }
+    c.fillStyle=grad(0,base-10,0,base,[[0,'rgba(0,0,0,0)'],[1,'rgba(0,0,0,.35)']]); c.fillRect(cx0-60,base-10,120,10); };
+  const WATER=(top,deep,tint)=>{ tint=tint||'46,110,150';
+    c.fillStyle='rgba('+tint+',0.62)'; c.fillRect(cx0-70, top, 140, deep);
+    c.fillStyle='rgba(180,228,246,0.55)'; for(let i=0;i<14;i++){ const x2=cx0-66+i*10+Math.sin(T*0.07+i)*2; c.fillRect(x2, top+Math.sin(T*0.09+i*1.7)*0.8, 6, 0.9); }
+    c.fillStyle='rgba(200,236,250,0.35)'; c.fillRect(cx0-70, top-0.6, 140, 1.2); };
+  const STEAM=(x,y,n)=>{ for(let i=0;i<(n||6);i++){ const ry=(T*0.4+i*13)%40; c.globalAlpha=0.10*clamp(1-ry/40,0,1); c.fillStyle='#f4efe6';
+      c.beginPath(); c.ellipse(x+Math.sin(T*0.05+i)*8+(i-3)*6, y-ry, 7, 3, 0, 0, 7); c.fill(); } c.globalAlpha=1; };
+  const hearts=(x,y,n)=>{ HB(x,y,n||12); };
+  BEDPOSE_DRAWS++;
+  const Lpos={};   // for the tests: where the two of them ended up
+  const done=(HM,HR,kind)=>{ BEDPOSE_LAST={vi, kind, him:HM, her:HR}; return true; };
+
+  /* ================= 0 · THE EMBRACE — standing, pressed together ================= */
+  if(vi===0 || vi===16){
+    const b=bt(0.30), hx=cx0-9+b*2.2, wx=cx0+8;
+    if(vi===16){ c.fillStyle=grad(0,base-100,0,base,[[0,'#3a2716'],[1,'#5a3f26']]); c.fillRect(cx0-60,base-100,120,100); c.fillStyle='#8a6640'; c.fillRect(cx0-58,base-98,116,3); }
+    shadow(cx0, base-1, 22);
+    const HRd=MX(wx,()=>HER({dry:true, hip:[wx-b*0.8, base-33], lean:0.10}));
+    const nk=HRd.neck, hd=HRd.head;
+    const hims={hip:[hx, base-36], lean:0.07+b*0.05, headAng:0.22, hands:{near:[wx+4, base-42], far:[hd[0]+1, hd[1]-2]}};
+    const herF={hip:[wx-b*0.8, base-33], lean:0.10, headAng:-0.28-b*0.08, expr:(b>0.6? 'flush' : HE), blush:0.3+b*0.4, rock:b*0.5,
+                hands:{near:L(wx,[hx-3, base-60]), far:L(wx,[hx-6, base-48])}, ankles:{near:[wx+1, base-3.2], far:[wx+3.4, base-2.6]}};
+    HIM(Object.assign({only:'far'}, hims)); MX(wx,()=>HER(Object.assign({only:'far'},herF)));
+    const HM=HIM(Object.assign({only:'main'}, hims)); const HR=MX(wx,()=>HER(Object.assign({only:'main'},herF)));
+    HIM(Object.assign({only:'near'}, hims)); MX(wx,()=>HER(Object.assign({only:'near'},herF)));
+    if(vi===16){ // the gowns hang IN FRONT of them — half buried
+      const cols=['#7a2d9a','#eae4d6','#8a2f5a','#4a6a8a','#c8a03a','#6a4a2c'];
+      for(let i=0;i<6;i++){ const gx2=cx0-44+i*16+Math.sin(T*0.05+i)*1.5, len=48+((i*13)%26);
+        if(i===2||i===3) continue;
+        c.fillStyle=grad(gx2,0,gx2+12,0,[[0,mixHex(cols[i],'#000000',0.35)],[0.4,cols[i]],[1,mixHex(cols[i],'#000000',0.25)]]);
+        c.beginPath(); c.moveTo(gx2, base-98); c.lineTo(gx2+11, base-98); c.lineTo(gx2+13+Math.sin(T*0.06+i), base-98+len); c.lineTo(gx2-2, base-98+len); c.closePath(); c.fill(); } }
+    hearts(cx0, base-72, 14);
+    return done(HM,HR,'stand');
+  }
+  /* ================= 1 · THE KISS ================= */
+  if(vi===1){
+    const k=0.5+0.5*sn(0.05), hx=cx0-10+k*1.6, wx=cx0+9-k*0.8;
+    shadow(cx0, base-1, 22);
+    const hims={hip:[hx, base-36], lean:0.10+k*0.04, headAng:0.42+k*0.06, face:Object.assign({},shut,{smile:0.1}),
+                hands:{near:[wx+2, base-44], far:[wx+1, base-58]}};
+    const herF={hip:[wx, base-33], lean:0.06, headAng:-0.42-k*0.08, expr:'kiss', blush:0.5,
+                hands:{near:L(wx,[hx+3, base-50]), far:L(wx,[hx-1, base-60])}, ankles:{near:[wx+0.5, base-3.4], far:[wx+3, base-2.6]}};
+    HIM(Object.assign({only:'far'}, hims)); MX(wx,()=>HER(Object.assign({only:'far'},herF)));
+    const HM=HIM(Object.assign({only:'main', aro:0.7}, hims)); const HR=MX(wx,()=>HER(Object.assign({only:'main'},herF)));
+    HIM(Object.assign({only:'near', aro:0.7}, hims)); MX(wx,()=>HER(Object.assign({only:'near'},herF)));
+    if((T|0)%40<20) hearts((HM.head[0]+HR.head[0])/2, base-74, 8);
+    return done(HM,HR,'kiss');
+  }
+  /* ================= 2 · FROM BEHIND — on all fours on the bed; 13 under the spout; 14 against the doors;
+                        21 the seat, braced on her house-post; 24 the reach, one foot on the bench ================= */
+  if(vi===2 || vi===21 || vi===13 || vi===14 || vi===24 || vi===25){
+    const standing=(vi!==2 && vi!==25), d=bt(vi===24? 0.60 : 0.36), rk=sn(vi===24? 0.60 : 0.36);
+    let top=base, herF, hims;
+    if(vi===25){ // in the tub: knelt on its floor, leaning on the rim, the water to her waist
+      const TB2=E.tub||{x:cx0+2, w:58, rim:base-30};
+      top=base-3;
+      const hip=[cx0-6+d*1.2, top-15];
+      herF={hip, lean:1.05, headAng:0.30-d*0.2, rock:rk*0.7, ankles:{near:[hip[0]-15, top-1], far:[hip[0]-13, top-1.5]},
+            hands:{near:[TB2.x+TB2.w-10, TB2.rim+1], far:[TB2.x+TB2.w-13, TB2.rim]}, expr:(d>0.55? 'oh' : HE), blush:0.6, floor:top};
+    } else if(vi===2){
+      top=base-18; BED(cx0-66, 120, top);
+      const hip=[cx0-4+d*1.2, top-15];
+      herF={hip, lean:1.42, headAng:0.62-d*0.25, rock:rk*0.7, ankles:{near:[hip[0]-16, top-1], far:[hip[0]-14, top-1.5]},
+            hands:{near:[hip[0]+26, top-0.5], far:[hip[0]+23.5, top-1]}, expr:(d>0.55? 'oh' : HE), blush:0.5, floor:top};
+    } else {
+      if(vi===21){ WALLBOARDS('#5a4630','#4e3c28');
+        // her house-post, her lineage cut into it, Rhauna carved at the top looking down
+        const px2=cx0+34; c.fillStyle=grad(px2,0,px2+10,0,[[0,'#7a5a34'],[0.5,'#a07a48'],[1,'#5a3e22']]); c.fillRect(px2, base-100, 10, 100);
+        for(let i=0;i<6;i++){ c.fillStyle='#4a3018'; c.fillRect(px2+2, base-40-i*9, 6, 1.2); }
+        c.fillStyle='#b08a52'; c.beginPath(); c.ellipse(px2+5, base-104, 6, 7, 0, 0, 7); c.fill();
+        c.fillStyle='#2a1a0e'; c.fillRect(px2+2, base-106, 2, 1.4); c.fillRect(px2+6, base-106, 2, 1.4);           // and she is looking down
+        c.fillStyle='rgba(255,200,120,.25)'; c.fillRect(px2+2, base-99, 6, 1); }
+      if(vi===13){ c.fillStyle=grad(0,base-100,0,base,[[0,'#2a2620'],[1,'#3a342a']]); c.fillRect(cx0-60,base-100,120,100);
+        for(let x2=cx0-52;x2<cx0+60;x2+=22){ c.fillStyle='rgba(90,80,64,.5)'; c.fillRect(x2, base-100, 1.5, 100); }
+        box(cx0+40, base-92, 9, 16, '#b8ac94', '#e0d6c0', '#7a7060'); }
+      if(vi===14){ c.fillStyle=grad(0,base-100,0,base,[[0,'#4a3320'],[1,'#5e4028']]); c.fillRect(cx0-40,base-100,80,100);
+        c.fillStyle='#3a2718'; c.fillRect(cx0+30, base-100, 2, 100); c.fillStyle='#7a5a38'; c.fillRect(cx0-40, base-100, 80, 3);
+        for(let i=0;i<4;i++){ c.fillStyle='rgba(40,26,14,.6)'; c.fillRect(cx0-36+i*18, base-98, 1, 96); } }
+      if(vi===24){ WALLBOARDS('#5a4a36','#4e4030'); BENCH(cx0+22, 30, base-24, '#6a5238');
+        c.fillStyle='#7a5a3c'; c.fillRect(cx0-50, base-70, 12, 14); c.fillStyle='#3a2e20'; c.fillRect(cx0-46, base-78, 2, 9); }        // her pack on its hook
+      const lean = vi===21? 1.22 : vi===24? 0.62 : vi===14? 0.34 : 0.42;
+      const hip=[cx0+2+d*1.4, base-33+(vi===21? 1 : 0)];
+      const post=cx0+34;
+      herF={hip, lean:lean+rk*0.02, headAng:(vi===21? 0.35 : vi===24? 0.2 : 0.05)-d*0.18, rock:rk*0.55, expr:(d>0.6? 'oh' : HE), blush:0.45,
+            ankles: vi===24? {near:[cx0+28, base-26.5], far:[hip[0]+1.5, base-2.6]} : {near:[hip[0]+0.5, base-2.8], far:[hip[0]+3.5, base-2.4]},
+            kneeBend: -1,
+            hands: vi===21? {near:[post, base-44], far:[post+1, base-49]} : vi===24? {near:[cx0+33, base-30], far:[cx0+30, base-29]}
+                   : {near:[cx0+34, base-62], far:[cx0+33, base-66]}};
+    }
+    const HRd=HER(Object.assign({dry:true}, herF));
+    const J=HRd.join, drive=d;
+    // HIM, behind her, kneeling on the bed or standing, his hips at her seat
+    const hipH= standing? [J[0]-6.2-(1-drive)*3.2, Math.min(J[1]+1.0, base-31.5)] : [J[0]-5.4-(1-drive)*3.2, J[1]+1.0];
+    hims = standing? {hip:hipH, lean:0.08+drive*0.10, headAng:0.18, face:HF, aim:J, aimK:1, clip:true,
+                      hands:{near:[HRd.hip[0]+1, HRd.hip[1]-2.5], far:[HRd.hip[0]+2, HRd.hip[1]-4]}}
+                   : {hip:hipH, lean:0.06+drive*0.12, headAng:0.2, face:HF, aim:J, aimK:1, clip:true, floor:top,
+                      ankles:{near:[hipH[0]-17, top-1], far:[hipH[0]-15, top-1.5]},
+                      hands:{near:[HRd.hip[0]+1, HRd.hip[1]-3], far:[HRd.hip[0]+2.5, HRd.hip[1]-4]}};
+    if(standing) shadow(cx0, base-1, 26);
+    HIM(Object.assign({only:'far'}, hims)); HER(Object.assign({only:'far'}, herF));
+    const HM=HIM(Object.assign({only:'main'}, hims)); const HR=HER(Object.assign({only:'main'}, herF));
+    HER(Object.assign({only:'near'}, herF)); HIM(Object.assign({only:'near'}, hims));
+    if(vi===13){ for(let i=0;i<16;i++){ const fy=(T*1.7+i*7)%80; c.globalAlpha=0.45; c.fillStyle='#bfe6f6'; c.fillRect(cx0+42+((i*3)%7)-(fy>30? (fy-30)*0.5 : 0), base-76+fy, 1.2, 4); } c.globalAlpha=1; STEAM(cx0, base-40, 8); }
+    if(vi===24){ // her boots are still on
+      c.fillStyle='#3a2a1c'; c.beginPath(); c.ellipse(cx0+29.5, base-25.5, 3.8, 2.2, 0, 0, 7); c.fill(); c.beginPath(); c.ellipse(HR.hip[0]+3, base-2, 3.8, 2.1, 0, 0, 7); c.fill(); }
+    glowAt(J[0], J[1], 8+d*4, '255,214,190', (0.10+d*0.14).toFixed(2));
+    hearts(J[0], J[1]-30, 12);
+    return done(HM,HR,'behind');
+  }
+  /* ================= 3 · THE RIDE — he is on his back, she is astride; 18 the papyrus is its own ================= */
+  if(vi===3 || vi===12 || vi===17 || vi===20 || vi===9 || vi===26){
+    const seated=(vi!==3), b=bt(vi===17? 0.22 : vi===20? 0.36 : 0.40), rk=sn(vi===17? 0.22 : 0.40);
+    let HMd, hims, top;
+    if(vi===3){
+      top=base-14; BED(cx0-70, 130, top);
+      // HIM on his back, head to the right: drawn head-left and mirrored
+      const hx=cx0+2;
+      hims={hip:[hx, top-5], lean:-1.5708, headAng:-1.25, ankles:{near:[hx+31, top-3], far:[hx+29, top-4.5]}, face:HF,
+            hands:{near:null, far:null}};
+      HMd=MX(hx,()=>HIM(Object.assign({dry:true}, hims)));
+      const root=HMd.root;
+      // her astride, facing his head (to the right), knees down either side of him
+      const hipY=root[1]-10-b*3.6, hip=[root[0]+1.5, hipY];
+      const herF={hip, lean:-0.12+rk*0.05, headAng:-0.28+b*0.14, rock:rk, expr:(b>0.6? 'oh' : HE), blush:0.3+b*0.4,
+                  ankles:{near:[hip[0]-13, top-1.5], far:[hip[0]-11, top-2.2]}, floor:top,
+                  hands:{near:[hip[0]+10, hip[1]+5], far:[hip[0]-3, hip[1]-8]}};
+      hims.hands={near:L(hx,[hip[0]-1, hip[1]-3]), far:L(hx,[hip[0]+1, hip[1]-4])};
+      HER(Object.assign({only:'far'}, herF));
+      const HM=MX(hx,()=>HIM(Object.assign({}, hims, {only:'far'})));
+      MX(hx,()=>HIM(Object.assign({}, hims, {only:'main'})));
+      const HR=HER(Object.assign({only:'main'}, herF));
+      HER(Object.assign({only:'near'}, herF)); MX(hx,()=>HIM(Object.assign({}, hims, {only:'near'})));
+      glowAt(root[0], root[1]-4, 10, '255,214,190', (0.10+b*0.12).toFixed(2));
+      hearts(hip[0], hip[1]-40, 12);
+      return done(MX(hx,()=>HIM(Object.assign({dry:true},hims))), HR, 'ride');
+    }
+    // SEATED: 12 the bath bench, 17 the lacquered couch, 20 the charpai, 9 the submerged step — him sat, her astride, facing
+    const seatTop = vi===26? base-5 : vi===9? (E.tub? base-14 : base-22) : vi===20? base-40+6 : base-26;
+    if(vi===12){ BENCH(cx0-34, 56, seatTop, '#e0d6c0'); STEAM(cx0, base-60, 6); }
+    if(vi===17){ // the lacquered couch and a folding screen behind it
+      for(let i=0;i<4;i++){ const sx=cx0-56+i*28; c.fillStyle=grad(sx,0,sx+27,0,[[0,'#6a1a14'],[0.5,'#8a2a1e'],[1,'#5a1410']]); c.fillRect(sx, base-100, 27, 76);
+        c.fillStyle='rgba(232,195,74,.55)'; c.fillRect(sx+2, base-98, 23, 1); c.fillRect(sx+2, base-26, 23, 1);
+        c.strokeStyle='rgba(232,195,74,.35)'; c.lineWidth=0.7; c.beginPath(); c.arc(sx+13.5, base-66, 7, 0, 7); c.stroke(); }
+      BENCH(cx0-40, 70, seatTop, '#3a0e0a'); c.fillStyle='rgba(232,195,74,.7)'; c.fillRect(cx0-40, seatTop, 70, 0.8); }
+    if(vi===20){ // the charpai and a hanging lamp
+      box(cx0-40, seatTop, 76, 6, '#7a5634', '#a07a4a', '#4a3018'); for(let i=0;i<9;i++){ c.fillStyle='#5a4028'; c.fillRect(cx0-38+i*9, seatTop+6, 2, base-seatTop-6); }
+      c.fillStyle='rgba(220,200,150,.25)'; for(let i=0;i<5;i++) c.fillRect(cx0-38, seatTop+1+i, 72, 0.5);
+      c.fillStyle='#5a4a2a'; c.fillRect(cx0+2, base-112, 1.5, 22); c.fillStyle='#c8a34a'; c.beginPath(); c.ellipse(cx0+3, base-86, 6, 4, 0, 0, 7); c.fill();
+      glowAt(cx0+3, base-84, 30, '255,200,120', (0.20+0.05*sn(0.2)).toFixed(2)); }
+    const hx=cx0-10;
+    hims={hip:[hx, seatTop-3.5], lean:(vi===26? -0.92 : -0.14)+(vi===20? 0 : rk*0.03), headAng:(vi===26? -0.35 : 0.12), face:(vi===17? shut : HF),
+          ankles: vi===26? {near:[hx+30, base-3], far:[hx+28, base-4]} : {near:[hx+15, base-2.4], far:[hx+17, base-3]}, hands:{near:null, far:null}};
+    HMd=HIM(Object.assign({dry:true}, hims));
+    const root=HMd.root;
+    const wx=root[0]+5, hipY=root[1]-8-b*(vi===17? 1.6 : 3.2);
+    const herF={hip:[wx, hipY], lean:-0.12, headAng:-0.20+b*0.18, rock:rk, expr:(b>0.6 && vi!==17? 'oh' : (vi===17? 'shut' : HE)), blush:0.35+b*0.4,
+                ankles:{near:L(wx,[hx-4, seatTop-1.6]), far:L(wx,[hx-2, seatTop-2.4])}, floor:seatTop,
+                hands:{near:L(wx,[HMd.head[0]+2, HMd.head[1]+9]), far:L(wx,[HMd.head[0]-2, HMd.head[1]+6])}};
+    // his hands: at her waist — or, for the prahanana, the striking, on her seat
+    const hit=(vi===20)? ((T%84)<10? 1-((T%84)/10) : 0) : 0;
+    hims.hands={near: vi===20? (hit>0? [wx-6+hit*2, hipY+1] : [wx-9, hipY-14]) : [wx-3, hipY-6], far:[wx-2, hipY-9]};
+    MX(wx,()=>HER(Object.assign({only:'far'}, herF)));
+    const HM=HIM(Object.assign({only:'far'}, hims)); HIM(Object.assign({only:'main'}, hims));
+    const HR=MX(wx,()=>HER(Object.assign({only:'main'}, herF)));
+    HIM(Object.assign({only:'near'}, hims)); MX(wx,()=>HER(Object.assign({only:'near'}, herF)));
+    if(hit>0.6){ c.strokeStyle='rgba(255,220,200,'+(hit*0.8).toFixed(2)+')'; c.lineWidth=0.8; for(let i=0;i<4;i++){ const a=-0.6+i*0.4; c.beginPath(); c.moveTo(wx-7+Math.cos(a)*5, hipY+Math.sin(a)*5); c.lineTo(wx-7+Math.cos(a)*9, hipY+Math.sin(a)*9); c.stroke(); } }
+    if(vi===9 && !E.tub){ WATER(base-24, 26); STEAM(cx0, base-30, 5); }
+    hearts(wx, hipY-44, vi===17? 20 : 12);
+    return done(HMd,HR,'astride');
+  }
+  /* ================= 4 · THE LIFT, and 15 pinned to the cedar ================= */
+  if(vi===4 || vi===15){
+    const b=bt(0.40), wallX=cx0+26;
+    if(vi===4){ c.fillStyle=grad(wallX,0,wallX+30,0,[[0,'#5a3a26'],[1,'#3a2418']]); c.fillRect(wallX, base-104, 34, 104); c.fillStyle='rgba(255,210,150,.18)'; c.fillRect(wallX, base-104, 1.5, 104); }
+    else { c.fillStyle=grad(0,base-100,0,base,[[0,'#4a3320'],[1,'#5e4028']]); c.fillRect(cx0-40,base-100,80,100); for(let i=0;i<5;i++){ c.fillStyle='rgba(40,26,14,.6)'; c.fillRect(cx0-36+i*17, base-98, 1, 96); } }
+    const hx=cx0-4+b*1.6;
+    const hims={hip:[hx, base-36], lean:0.02+b*0.05, headAng:0.05, face:HF, hands:{near:null, far:null}};
+    shadow(cx0, base-1, 18);
+    const lifted=(vi===4);
+    const wx=wallX-6, hipY= lifted? base-44-b*2.8 : base-34;
+    const herF= lifted? {hip:[wx, hipY], lean:-0.16, headAng:-0.35+b*0.1, rock:sn(0.4)*0.8, expr:(b>0.6? 'oh' : HE), blush:0.5,
+                         ankles:{near:L(wx,[hx-12, hipY+8]), far:L(wx,[hx-10, hipY+6])}, kneeBend:-1,
+                         hands:{near:L(wx,[hx+1, base-62]), far:L(wx,[hx-3, base-60])}}
+                      : {hip:[wx, hipY], lean:-0.10, headAng:-0.30+b*0.1, rock:sn(0.4)*0.6, expr:(b>0.6? 'oh' : HE), blush:0.5,
+                         ankles:{near:L(wx,[hx-12, hipY+6]), far:[wx+0.5, base-2.6]}, kneeBend:-1, kneeBendFar:-1,
+                         hands:{near:L(wx,[hx+1, base-62]), far:[wx+4, base-60]}};
+    const HRd=MX(wx,()=>HER(Object.assign({dry:true},herF)));
+    hims.hip=[hx, Math.max(base-38, HRd.crotch[1]+2)];
+    hims.hands={near: lifted? [HRd.seat[0]-1, HRd.seat[1]+1] : [HRd.hip[0]-2, HRd.hip[1]-2], far:[HRd.seat[0]+1, HRd.seat[1]-1]};
+    MX(wx,()=>HER(Object.assign({only:'far'},herF)));
+    HIM(Object.assign({only:'far'}, hims)); const HM=HIM(Object.assign({only:'main'}, hims));
+    const HR=MX(wx,()=>HER(Object.assign({only:'main'},herF)));
+    HIM(Object.assign({only:'near'}, hims)); MX(wx,()=>HER(Object.assign({only:'near'},herF)));
+    hearts(cx0+4, base-80, 12);
+    return done(HM,HR,'lift');
+  }
+  /* ================= 5 · THE SUNDIAL, 22 THE KANVEK, 18 THE TURIN PAPYRUS — he is up, she is down ================= */
+  if(vi===5 || vi===22 || vi===18){
+    const FIN=(vi===22 && s.fin && (s.fin.ph==='in'||s.fin.ph==='out'))? s.fin : null;
+    const SWAL=(FIN && FIN.ph==='in')? FIN.t : -1;
+    const gv=(vi===5)? 0 : (SWAL>=0? 0 : bt(vi===18? 0.50 : 0.34));
+    const back=(SWAL<0)? 0 : Math.min(6.5, SWAL*0.20);
+    const vt=E.vt||0;
+    let hx=cx0-22, hims, seated=(vi===18);
+    if(vi===22){ WALLBOARDS('#6a5238','#5e4830');
+      // his post, his rank cut into it
+      c.fillStyle=grad(cx0-52,0,cx0-42,0,[[0,'#604a2c'],[0.4,'#96744a'],[1,'#3a2a1a']]); c.fillRect(cx0-52, base-104, 9, 104);
+      for(let k=0;k<3;k++){ c.fillStyle='#a8402a'; c.fillRect(cx0-53, base-80+k*13, 11, 2.4); }
+      // the hide under her knees, somebody put it down before she knelt
+      c.fillStyle=grad(0,base-6,0,base,[[0,'#9a7a54'],[1,'#6a4a2c']]); c.beginPath(); c.ellipse(cx0+4, base-2.5, 30, 3.6, 0, 0, 7); c.fill();
+      c.fillStyle='rgba(140,110,76,.8)'; for(let k=0;k<12;k++) c.fillRect(cx0-24+k*4.6, base-6+Math.sin(k)*0.6, 1.2, 1.6);
+      // and the lamp, which is on HER
+      box(cx0+40, base-16, 11, 5, '#6a6a62', '#93938a', null); c.fillStyle='#ffb43a'; c.fillRect(cx0+42.5, base-19.5, 4, 3.5);
+      glowAt(cx0+8, base-28, 52, '255,192,112', '0.22');
+      const sg=c.createLinearGradient(cx0-60,0,cx0-10,0); sg.addColorStop(0,'rgba(10,5,12,.46)'); sg.addColorStop(1,'rgba(10,5,12,0)'); c.fillStyle=sg; c.fillRect(cx0-60, base-104, 50, 104); }
+    if(vi===5){ c.fillStyle='rgba(0,0,0,.18)'; c.fillRect(cx0-60, base-4, 120, 4);
+      // the sundial's own joke: a dial on the floor, and the gnomon is him
+      c.strokeStyle='rgba(232,195,74,.45)'; c.lineWidth=0.8; c.beginPath(); c.ellipse(cx0-8, base-1.2, 26, 3, 0, 0, 7); c.stroke();
+      for(let i=0;i<9;i++){ const a=Math.PI+i*Math.PI/8; c.beginPath(); c.moveTo(cx0-8+Math.cos(a)*22, base-1.2+Math.sin(a)*2.5); c.lineTo(cx0-8+Math.cos(a)*26, base-1.2+Math.sin(a)*3); c.stroke(); } }
+    if(vi===18){ // a reed mat, a lotus column, the wine jar, the lyre put down, and the couch he sits on
+      for(let i=0;i<9;i++){ c.fillStyle=i%2?'#a8843e':'#c09a52'; c.fillRect(cx0-50+i*12, base-5, 11, 5); }
+      c.fillStyle=grad(cx0-58,0,cx0-50,0,[[0,'#b89c6a'],[0.5,'#e2cc9a'],[1,'#a88c5a']]); c.fillRect(cx0-58, base-100, 8, 95);
+      c.fillStyle='#8aa86a'; c.beginPath(); c.ellipse(cx0-54, base-102, 9, 5, 0, 0, 7); c.fill();
+      c.fillStyle='#8a5a3a'; c.beginPath(); c.ellipse(cx0+46, base-10, 5, 8, 0, 0, 7); c.fill(); c.fillStyle='#6a3a24'; c.fillRect(cx0+44, base-20, 4, 4);
+      c.strokeStyle='#b8912f'; c.lineWidth=1.2; c.beginPath(); c.moveTo(cx0+28, base-4); c.quadraticCurveTo(cx0+30, base-18, cx0+36, base-20); c.moveTo(cx0+40, base-4); c.quadraticCurveTo(cx0+42, base-18, cx0+36, base-20); c.stroke();
+      c.strokeStyle='rgba(232,220,194,.7)'; c.lineWidth=0.4; for(let i=0;i<4;i++){ c.beginPath(); c.moveTo(cx0+30+i*2.5, base-6); c.lineTo(cx0+31+i*2, base-17); c.stroke(); }
+      BENCH(cx0-44, 34, base-24, '#8a5a3a'); }
+    if(seated){ hx=cx0-30;
+      hims={hip:[hx, base-27.5], lean:-0.34, headAng:-0.05, face:shut, ankles:{near:[hx+16, base-2.4], far:[hx+18, base-3]},
+            hands:{near:null, far:[hx-12, base-24]}}; }
+    else hims={hip:[hx, base-36], lean:(vi===22? 0.17 : -0.02), headAng:(vi===22? 0.55 : 0.30), face:(vi===22? Object.assign({},HARD_FACES.sheepish,{blush:0.6}) : HF), cloak:(vi===22? '#5a4a34' : null),
+               hands:{near:null, far: vi===22? [cx0-43, base-56] : [hx-5, base-38]}};
+    // his rise, in four stages, for the sundial — the gnomon comes round
+    if(vi===5){ const st=Math.min(3, Math.floor(vt/40)), sub=clamp((vt%40)/12,0,1); hims.aro=[0.05,0.38,0.70,1.0][st]*(0.7+0.3*sub); hims.aimK=0; }
+    const HMd=HIM(Object.assign({dry:true}, hims));
+    const root=HMd.root, plen=(IN1.now||6)*1.0;
+    // HER, knelt: for the kanvek and the papyrus her mouth goes to the end of him; for the sundial she waits
+    const wx = (vi===5)? cx0+16 : root[0]+plen+13+back*0.8-gv*1.2;
+    const kneelUp = (vi!==5);
+    const hipY = kneelUp? base-19-(vi===18? 0 : 0) : base-12;
+    const herF = kneelUp? {hip:[wx, hipY], lean:0.92-gv*0.08-back*0.03, headAng:-0.08+back*0.04, rock:gv*0.4,
+                           expr:(SWAL>=0? 'shut' : (vi===18? 'shut' : 'kiss')), blush:0.4,
+                           ankles:{near:L(wx,[wx+12, base-2.4]), far:L(wx,[wx+10.5, base-3])}, kneeBend:-1,
+                           hands:{near:L(wx,[root[0]+1, root[1]-8]), far:L(wx,[wx-3, hipY+6])}, wrap:(vi===22? mixHex(hexOf((her&&her.dress)||'#2f5f6a'),'#3a2a1c',0.45) : null)}
+                        : {hip:[wx, hipY], lean:0.02, headAng:-0.42, expr:'absorbed', blush:0.3,
+                           ankles:{near:L(wx,[wx+4, base-2.4]), far:L(wx,[wx+2.5, base-3])}, kneeBend:-1,
+                           hands:{near:null, far:L(wx,[wx-7, hipY+4])}};
+    if(!kneelUp){ const hd=MX(wx,()=>HER(Object.assign({dry:true},herF))); herF.hands.near=L(wx,[hd.mouth[0]+1, hd.mouth[1]+0.6]); }
+    // where her mouth lands, and he aims there
+    let HRd=MX(wx,()=>HER(Object.assign({dry:true},herF)));
+    if(kneelUp){ const dx=(root[0]+plen+0.4)-HRd.mouth[0], dy=(root[1]-1.5)-HRd.mouth[1];
+      herF.hip=[wx+dx, hipY+dy*0.45]; herF.lean=clamp(herF.lean - dy*0.018, 0.55, 1.25);
+      herF.ankles={near:L(herF.hip[0],[herF.hip[0]+12, base-2.4]), far:L(herF.hip[0],[herF.hip[0]+10.5, base-3])};
+      herF.hands={near:L(herF.hip[0],[root[0]+1, root[1]-8]), far:L(herF.hip[0],[herF.hip[0]-3, herF.hip[1]+6])};
+      HRd=MX(herF.hip[0],()=>HER(Object.assign({dry:true},herF)));
+      hims.aim=[HRd.mouth[0]-0.8, HRd.mouth[1]]; hims.aimK=1; hims.clip=true; }
+    const hxW=herF.hip[0];
+    if(vi===22 || vi===18) hims.hands.near=[HRd.head[0]-0.5, HRd.head[1]-4.5];                       // his hand on her head — she put it there
+    if(!seated) shadow(cx0-8, base-1, 30);
+    MX(hxW,()=>HER(Object.assign({only:'far'},herF)));
+    HIM(Object.assign({only:'far'}, hims)); const HM=HIM(Object.assign({only:'main'}, hims));
+    const HR=MX(hxW,()=>HER(Object.assign({only:'main'},herF)));
+    MX(hxW,()=>HER(Object.assign({only:'near'},herF))); const HN=HIM(Object.assign({only:'near'}, hims)); if(HM && HN) HM.hand=HN.hand;
+    if(vi===22){
+      // THE SWALLOW: three of them, travelling the line of her throat
+      if(SWAL>=0){ const gi=Math.floor(SWAL/26), gp=(SWAL%26)/26;
+        if(gi<3 && gp<0.74){ const t2=gp/0.74, m=HR.mouth, nkp=HR.neck, gx=m[0]+(nkp[0]-m[0])*t2, gy=m[1]+2+(nkp[1]-m[1]-2)*t2;
+          c.fillStyle=rgbA(mixHex(hexOf(her.skin||'#e6bd94'),'#fff6e4',0.35),0.8); c.beginPath(); c.ellipse(gx, gy, 1.4, 0.9, 0, 0, 7); c.fill(); }
+        if(gi<3 && (SWAL%26)<3) hearts(HR.head[0], HR.head[1]-6, 4); }
+      try{ const _M=c.getTransform(), AX=HR.mouth[0], AY=HR.mouth[1];
+        s.finAt={ x:_M.a*AX + _M.c*AY + _M.e, y:_M.b*AX + _M.d*AY + _M.f, z:_M.a }; }catch(e){}
+      if(gv>0.86 && (T|0)%9<2){ c.fillStyle='#ffb0d0'; c.fillRect(HR.head[0]-2+rnd(-3,3), HR.head[1]-12, 1.6, 1.6); } }
+    hearts(cx0-2, base-70, vi===22? 10 : 14);
+    return done(HM,HR,'kneel');
+  }
+  /* ================= 6 · THE TANGLE, 7 AT REST, 11 THE WARM MARBLE, 19 SHUNGA, 10 AFLOAT ================= */
+  if(vi===6 || vi===7 || vi===11 || vi===19 || vi===10){
+    if(vi===10){ // afloat: both at the surface, turning slowly
+      c.save(); const dr=sn(0.05)*6, tw=sn(0.09)*0.06; c.translate(cx0+dr, base-24); c.rotate(tw); c.translate(-cx0, -(base-24));
+      const hx=cx0-6, bob=sn(0.3)*1.2;
+      const hims={hip:[hx, base-26+bob], lean:-1.5708, headAng:-1.25, ankles:{near:[hx+31, base-25+bob], far:[hx+29, base-26.5+bob]}, face:shut, hands:{near:null,far:null}, floor:base-20};
+      const HMd=HIM(Object.assign({dry:true},hims));
+      const herF={hip:[HMd.root[0]+2, HMd.root[1]-4], lean:1.5708-0.05, headAng:1.2, expr:'shut', blush:0.3,
+                  ankles:{near:[HMd.root[0]+31, base-30+bob], far:[HMd.root[0]+29, base-31+bob]}, kneeBend:1,
+                  hands:{near:[HMd.head[0]+3, HMd.head[1]-1], far:[HMd.head[0]+1, HMd.head[1]-2]}, floor:base-20};
+      // her lying on him face down, head to the left: drawn head-right and mirrored about her hip
+      const hxW=herF.hip[0];
+      const herM=Object.assign({},herF,{lean:1.5708-0.05, headAng:1.3, ankles:{near:L(hxW,herF.ankles.near), far:L(hxW,herF.ankles.far)}, hands:{near:L(hxW,herF.hands.near), far:L(hxW,herF.hands.far)}});
+      HIM(Object.assign({only:'far'},hims)); const HM=HIM(Object.assign({only:'main'},hims));
+      const HR=MX(hxW,()=>HER(Object.assign({},herM)));
+      HIM(Object.assign({only:'near'},hims));
+      c.restore();
+      WATER(base-24, 30);
+      return done(HM,HR,'afloat');
+    }
+    const top = vi===11? base-16 : vi===19? base-6 : base-14;
+    if(vi===11){ box(cx0-56, top, 112, 10, '#e0d6c0', '#f6efdc', '#b8ac94'); STEAM(cx0, top-10, 6); }
+    else if(vi===19){ // tatami, and a byōbu screen knocked half over
+      for(let i=0;i<4;i++){ c.fillStyle=grad(0,top,0,base,[[0,'#c8b878'],[1,'#a89858']]); c.fillRect(cx0-64+i*32, top, 31, base-top); c.fillStyle='#1a1410'; c.fillRect(cx0-64+i*32, top, 31, 1); }
+      for(let i=0;i<4;i++){ const sx=cx0-10+i*16; c.save(); c.translate(sx, top); c.rotate(-0.12*(i%2? 1 : -1)); c.fillStyle=grad(0,-60,0,0,[[0,'#d8c89a'],[1,'#b8a878']]); c.fillRect(0, -62, 15, 60);
+        c.strokeStyle='rgba(60,40,20,.5)'; c.lineWidth=0.6; c.beginPath(); c.moveTo(2,-40); c.quadraticCurveTo(8,-50,13,-38); c.stroke(); c.restore(); } }
+    else BED(cx0-70, 130, top, vi===6? '#e8dcc6' : null);
+    if(vi===7){ // the side table and the bowl, and the reach that goes badly
+      box(cx0+58, base-26, 16, 3, '#6a4a2c', '#8a6a3a', null); c.fillStyle='#4a3018'; c.fillRect(cx0+64, base-23, 3, 23); }
+    const lie=(x,y,look,male)=>0;
+    if(vi===6){ // four feet skyward, hers dancing, his content
+      const d1=sn(0.45), d2=sn(0.45,1.3);
+      const herF={hip:[cx0+2, top-4], lean:-1.5708, headAng:-1.10, expr:'pleased', blush:0.5, floor:top,
+                  ankles:{near:[cx0+16+d1*3, top-38-d2*2], far:[cx0+20-d2*3, top-40+d1*2]}, kneeBend:-1};
+      const hims={hip:[cx0+5, top-5], lean:-1.5708, headAng:-1.15, face:HARD_FACES.grin, floor:top,
+                  ankles:{near:[cx0+26+sn(0.2)*1.5, top-34], far:[cx0+24, top-35]}, hands:{near:[cx0-6, top-8], far:null}};
+      HIM(Object.assign({only:'far'},hims)); const HM=HIM(Object.assign({only:'main'},hims));
+      const HR=HER(Object.assign({},herF));
+      // the covers over the two of them, and only feet out of them
+      c.fillStyle=grad(0,top-22,0,top+4,[[0,'#f4ecdc'],[1,'#b8a888']]);
+      c.beginPath(); c.moveTo(cx0-40, top+4); c.quadraticCurveTo(cx0-40, top-8, cx0-20, top-9); c.quadraticCurveTo(cx0+4, top-26, cx0+14, top-24);
+      c.quadraticCurveTo(cx0+26, top-20, cx0+40, top-6); c.lineTo(cx0+56, top+4); c.closePath(); c.fill();
+      c.strokeStyle='rgba(120,100,80,.4)'; c.lineWidth=0.8; for(let i=0;i<4;i++){ c.beginPath(); c.moveTo(cx0-14+i*12, top-12-i*2); c.quadraticCurveTo(cx0-10+i*12, top-4, cx0-12+i*12, top+3); c.stroke(); }
+      hearts(cx0+18, top-50, 10);
+      return done(HM,HR,'tangle');
+    }
+    if(vi===7){ // at rest: side by side, her a little behind him, his arm under her, and the reach for the bowl
+      const reach=clamp(((E.vt||0)-60)/50,0,1), fall=clamp(((E.vt||0)-104)/20,0,1), br=sn(0.06)*0.6;
+      const herF={hip:[cx0+6, top-6.5], lean:-1.5708, headAng:-1.05, expr:(fall>0.5? 'oh' : 'pleased'), blush:0.3, floor:top,
+                  ankles:{near:[cx0+36, top-6], far:[cx0+34, top-7]}, kneeBend:-1,
+                  hands:{near:[cx0+6+reach*56, top-12-reach*9], far:[cx0-6, top-9]}};
+      const hims={hip:[cx0+2, top-4+br*0.2], lean:-1.5708, headAng:-1.25, face:Object.assign({},HARD_FACES.grin,{shut:1}), floor:top,
+                  ankles:{near:[cx0+34, top-3], far:[cx0+32, top-4.5]}, hands:{near:[cx0-2, top-6], far:[cx0-20, top-11]}};
+      const HR=HER(Object.assign({only:'far'},herF)); HER(Object.assign({only:'main'},herF));
+      HIM(Object.assign({only:'far'},hims)); const HM=HIM(Object.assign({only:'main'},hims));
+      c.fillStyle=grad(0,top-12,0,top+4,[[0,'#f4ecdc'],[1,'#c0b090']]);                    // the sheet up to their waists
+      c.beginPath(); c.moveTo(cx0+4, top+4); c.quadraticCurveTo(cx0+4, top-11, cx0+16, top-12); c.quadraticCurveTo(cx0+34, top-11, cx0+44, top-6); c.lineTo(cx0+58, top+4); c.closePath(); c.fill();
+      c.strokeStyle='rgba(120,100,80,.35)'; c.lineWidth=0.8; for(let i=0;i<3;i++){ c.beginPath(); c.moveTo(cx0+16+i*10, top-11); c.quadraticCurveTo(cx0+18+i*10, top-3, cx0+16+i*10, top+3); c.stroke(); }
+      HIM(Object.assign({only:'near'},hims)); HER(Object.assign({only:'near'},herF));
+      const bx=cx0+66, by=base-26;
+      if(fall<1){ c.save(); c.translate(bx, by); c.rotate(fall*1.2); c.fillStyle='#b88a4a'; c.beginPath(); c.ellipse(0,-2,6,3,0,0,Math.PI); c.fill();
+        for(let i=0;i<4;i++){ c.fillStyle='#c01830'; c.beginPath(); c.arc(-3+i*2,-3.4,1.3,0,7); c.fill(); } c.restore(); }
+      else { const t2=clamp(((E.vt||0)-124)/20,0,1); for(let i=0;i<5;i++){ c.fillStyle='#c01830'; c.beginPath(); c.arc(bx-6+i*4, by+Math.min(24, t2*26+i*2), 1.3, 0, 7); c.fill(); } }
+      return done(HM,HR,'rest');
+    }
+    // 11 THE WARM MARBLE and 19 SHUNGA: she is on her back, knees up; he kneels between them
+    const b=bt(vi===19? 0.30 : 0.36), rk=sn(vi===19? 0.30 : 0.36);
+    const herF={hip:[cx0-4, top-5], lean:-1.5708+0.12, headAng:-1.05, expr:(b>0.6? 'oh' : HE), blush:0.4+b*0.3, rock:rk*0.6, floor:top,
+                ankles:{near:[cx0+10, top-2], far:[cx0+12, top-2.6]}, kneeBend:-1, robe:(vi===19? ((her&&her.dress)||'#8a2f5a') : null),
+                hands:{near:[cx0-24, top-2], far:[cx0-26, top-3]}};
+    const HRd=HER(Object.assign({dry:true},herF));
+    const J=HRd.crotch;
+    const hxM=J[0]+6+(1-b)*2.6;
+    // HIM kneeling upright, facing her (to the left): drawn facing right and mirrored
+    const hims={hip:[hxM, J[1]-2], lean:0.18+b*0.08, headAng:0.35, face:HF, floor:top,
+                ankles:{near:L(hxM,[hxM+15, top-1]), far:L(hxM,[hxM+13, top-1.6])}, cloak:(vi===19? '#1a2a4a' : null),
+                hands:{near:L(hxM,[HRd.knee[0]+1, HRd.knee[1]+1]), far:L(hxM,[HRd.knee[0]+2, HRd.knee[1]])},
+                aim:L(hxM,J), aimK:1, clip:true};
+    HER(Object.assign({only:'far'},herF));
+    const HM=MX(hxM,()=>HIM(Object.assign({only:'far'},hims))); MX(hxM,()=>HIM(Object.assign({only:'main'},hims)));
+    const HR=HER(Object.assign({only:'main'},herF)); HER(Object.assign({only:'near'},herF));
+    MX(hxM,()=>HIM(Object.assign({only:'near'},hims)));
+    glowAt(J[0], J[1]-2, 10, '255,214,190', (0.08+b*0.12).toFixed(2));
+    hearts(cx0, top-40, 12);
+    return done(HM,HR,'onback');
+  }
+  /* ================= 8 · ON THE POOL RIM, and 23 THE STOREHOUSE — she is sat up on an edge, he stands ================= */
+  if(vi===8 || vi===23){
+    const b=bt(vi===23? 0.52 : 0.40), rk=sn(0.4);
+    const edge = vi===8? base-26 : base-32;
+    if(vi===8){ box(cx0-4, edge, 64, 5, '#cec0a2', '#eee2c6', '#8a7e66'); c.fillStyle='#b0a288'; c.fillRect(cx0-4, edge+5, 64, base-edge-5); }
+    else { WALLBOARDS('#5e4a30','#54422a');
+      for(let r=0;r<3;r++){ const ry=base-94+r*17; c.fillStyle='#7a6244'; c.fillRect(cx0-50, ry, 100, 2);
+        for(let k=0;k<12;k++){ c.fillStyle=k%2?'#a8663a':'#96562e'; c.beginPath(); c.ellipse(cx0-46+k*8.4, ry+7, 2.4, 5, 0, 0, 7); c.fill(); } }
+      box(cx0+2, edge, 58, 5, '#6a5238', '#8a6e48', '#3a2a18'); c.fillStyle='#4e3c26'; c.fillRect(cx0+6, edge+5, 4, base-edge-5); c.fillRect(cx0+52, edge+5, 4, base-edge-5); }
+    const wx=cx0+14;
+    const herF={hip:[wx, edge-3.5], lean:-0.30+rk*0.03, headAng:-0.30+b*0.12, rock:rk*0.7, expr:(b>0.6? 'oh' : HE), blush:0.4+b*0.3,
+                ankles:{near:L(wx,[wx-26, edge+6]), far:L(wx,[wx-23, edge+9])}, kneeBend:-1, floor:edge,
+                hands:{near:L(wx,[wx+12, edge-1]), far: vi===23? L(wx,[wx+4, edge-24]) : L(wx,[wx+11, edge-1.5])}};
+    const HRd=MX(wx,()=>HER(Object.assign({dry:true},herF)));
+    const J=HRd.crotch, hx=J[0]-5.2-(1-b)*2.8;
+    const hims={hip:[hx, J[1]+1.5], lean:0.06+b*0.08, headAng:0.15, face:HF, aim:J, aimK:1, clip:true,
+                hands:{near:[HRd.waist[0]+1, HRd.waist[1]+1], far:[HRd.waist[0]+2, HRd.waist[1]-1]}};
+    const HRf=MX(wx,()=>HER(Object.assign({only:'far'},herF)));
+    HIM(Object.assign({only:'far'},hims)); const HM=HIM(Object.assign({only:'main'},hims));
+    const HR=MX(wx,()=>HER(Object.assign({only:'main'},herF)));
+    HIM(Object.assign({only:'near'},hims)); MX(wx,()=>HER(Object.assign({only:'near'},herF)));
+    if(vi===23){ // her tally still in her other hand
+      const th=(HRf&&HRf.handFar)||[wx+4, edge-24]; c.fillStyle='#c8a86a'; c.save(); c.translate(th[0], th[1]); c.rotate(-0.4); c.fillRect(-0.8,-7,1.8,10);
+      c.fillStyle='#5a3a1a'; for(let i=0;i<4;i++) c.fillRect(-0.8,-5+i*2,1.8,0.5); c.restore(); }
+    if(vi===8){ WATER(edge+4, base-edge); STEAM(cx0-10, edge-6, 5); }
+    hearts(J[0], J[1]-36, 12);
+    return done(HM,HR,'edge');
+  }
+  return false;
+}
+/* =====================================================================
+   ◆ THE BREEDING HOUSE, AND THE HUB — KAN'S SECOND PAGE, WITH A ROOF ON IT
+   ---------------------------------------------------------------------
+   The Mastery of Kan keeps two pages: who may for PLEASURE, and who is
+   OBLIGED to for CHILDREN. The coast is cold and the country is small,
+   and the second page has a building. On the quay at the end of every
+   town is the BREEDING HOUSE: a long timber hall of warm cedar tubs,
+   hide screens between them, a brazier under every one, and a tally-
+   keeper at the door who notches the house's name on the way in. A house
+   that has no warm room of its own goes there to try for a child — that
+   is simply what a poor house on this coast does, and nobody thinks less
+   of it; the district thinks rather MORE of a house that shows up.
+
+   A house that can afford it builds its own: THE HUB, a tub room inside
+   the villa, cut with the house's own lineage, and the tradition is that
+   a house with a hub keeps its business at home. The grown children of
+   the house — married, and eighteen or over, the same gate as every
+   other door in this game — are sent to the breeding house by their
+   elders with a certain amount of ceremony and no discretion whatever.
+
+   Both rooms are warmer than a bedchamber and the district believes the
+   warmth is the point: a try in the tubs is better odds than a try in a
+   bed, and the hub is better odds again, because it is YOURS.
+   ===================================================================== */
+const RK_BREED_FEE=12, RK_HUB_COST=1600;
+const RK_BREED_POSES={
+  breed:[9, 25, 26],
+  hub:  [26, 9, 25],
+};
+const RK_BREED_NAMES={
+  9:'the step, and the water to the waist',
+  25:'at the rim, and the steam',
+  26:'lying back, and the tally can wait',
+};
+function rkBreedOn(){
+  try{ return !!(ADULT && G && ((typeof rkHere==='function' && rkHere()) || G.world==='rk')); }catch(e){ return false; }
+}
+/* a POOR house on this coast is one with no villa of its own, or the bottom
+   rungs of the ladder — and a poor house trying for a child goes to the quay */
+function rkPoorHouse(){
+  try{ if(!G.hasVilla) return true; const t=(typeof houseTier==='function')? houseTier() : null; return !!(t && t.i<=1); }catch(e){ return !G.hasVilla; }
+}
+function rkBreedLine(place){
+  return place==='hub'
+    ? pick(['The hub is warm before you are through the door. Somebody banked the brazier an hour ago and did not say why.',
+            'Your own cedar, your own lineage cut round the rim. The district would call this showing off, and would be right.',
+            'A house with a hub keeps its business at home. That is the tradition, and tonight it is keeping it.'])
+    : pick(['The tally-keeper notches the house name on the board by the door without looking up. Third tub on the left is warm.',
+            'Steam, cedar, hide screens, and the low noise of four other houses doing exactly this. Nobody here is embarrassed. It is a public building.',
+            'The fee is twelve, the tub is hot, and the old woman at the door says “children are close” to everyone, on principle.']);
+}
+/* the grown children of the house, sent to the quay — adults only, the same gate as every door */
+function rkBreedKids(){
+  try{ return (G.children||[]).filter(c=>!c.dead && c.wed && c.spouse && (typeof adultCouple==='function') && adultCouple(c)); }catch(e){ return []; }
+}
+function rkSendKidsToBreed(c){
+  if(!c || !adultCouple(c)) return {ok:false, why:'Not until they are both grown.'};
+  if(G.coin<RK_BREED_FEE) return {ok:false, why:'The fee is '+RK_BREED_FEE+'.'};
+  if(c.breedDay!==undefined && (G.day-c.breedDay)<30) return {ok:false, why:'They went this month already.'};
+  G.coin-=RK_BREED_FEE; c.breedDay=G.day; c.breedTries=(c.breedTries|0)+1;
+  const hit=Math.random() < 0.38 + Math.min(0.12, (c.breedTries|0)*0.03);
+  if(hit){ c.kids=(c.kids|0)+1; c.rel=clamp((c.rel===undefined?55:c.rel)+4,0,100); }
+  G.pop=clamp((G.pop||0)+1,0,100);
+  return {ok:true, hit};
+}
+/* ---- THE ROOMS, DRAWN ---- */
+function drawBreedPlace(s,T,place){
+  const hub=(place==='hub'), CX=W/2;
+  // ---- the hall around the tub, in screen space ----
+  { const wall = hub? ['#3a2412','#5a3a1e'] : ['#2a1e14','#44321e'];
+    const g=ctx.createLinearGradient(0,0,0,H); g.addColorStop(0,wall[0]); g.addColorStop(1,wall[1]); ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+    // the planks, and the smoke-hole's light coming down through the steam
+    let x=0, i=0; while(x<W){ const bw=14+((i*7)%9); ctx.fillStyle= i%3? 'rgba(0,0,0,.10)' : 'rgba(255,220,170,.04)'; ctx.fillRect(x,0,bw-1,H); ctx.fillStyle='rgba(255,210,150,.07)'; ctx.fillRect(x,0,1,H); x+=bw; i++; }
+    const sh=ctx.createLinearGradient(CX-40,0,CX+60,H); sh.addColorStop(0,'rgba(255,226,170,.16)'); sh.addColorStop(1,'rgba(255,226,170,0)');
+    ctx.fillStyle=sh; ctx.beginPath(); ctx.moveTo(CX-30,0); ctx.lineTo(CX+10,0); ctx.lineTo(CX+90,H); ctx.lineTo(CX-10,H); ctx.closePath(); ctx.fill();
+    ctx.fillStyle= hub? '#2a1a0c' : '#1a120a'; ctx.fillRect(0,H-46,W,46);                                     // the floor boards
+    for(let fx=0;fx<W;fx+=18){ ctx.fillStyle='rgba(0,0,0,.25)'; ctx.fillRect(fx,H-46,1,46); }
+    ctx.fillStyle='rgba(255,200,140,.10)'; ctx.fillRect(0,H-46,W,1.5);
+  }
+  if(!hub){
+    /* THE PUBLIC HALL: other tubs down both sides, screened, each with its
+       lamp on the peg that means OCCUPIED, and the tally board by the door */
+    const tubs=[[44,'on'],[110,'on'],[370,'off'],[436,'on']];
+    for(const [tx,st] of tubs){ const ty=H-58;
+      const tg=ctx.createLinearGradient(tx-22,0,tx+22,0); tg.addColorStop(0,'#4a2e16'); tg.addColorStop(0.5,'#7a5230'); tg.addColorStop(1,'#3a2210');
+      ctx.fillStyle=tg; ctx.beginPath(); ctx.ellipse(tx, ty+14, 24, 10, 0, 0, Math.PI); ctx.lineTo(tx-24, ty); ctx.ellipse(tx, ty, 24, 6, 0, Math.PI, 0, true); ctx.closePath(); ctx.fill();
+      ctx.fillStyle='rgba(160,120,70,.9)'; ctx.fillRect(tx-24, ty+3, 48, 1.4); ctx.fillRect(tx-23, ty+10, 46, 1.4);         // the hoops
+      if(st==='on'){ // the screen is drawn: hide on a pole, and the lamp is lit
+        ctx.fillStyle='#6a4a2a'; ctx.fillRect(tx-27, ty-58, 2, 58); ctx.fillRect(tx+25, ty-58, 2, 58); ctx.fillRect(tx-27, ty-58, 54, 2);
+        const hg=ctx.createLinearGradient(0,ty-56,0,ty+2); hg.addColorStop(0,'#b08a5a'); hg.addColorStop(1,'#8a6a42'); ctx.fillStyle=hg;
+        ctx.beginPath(); ctx.moveTo(tx-25, ty-56); for(let k=0;k<=8;k++) ctx.lineTo(tx-25+k*6.25, ty-56+Math.sin(k*1.3+T*0.03)*0.8); ctx.lineTo(tx+25, ty+2); ctx.lineTo(tx-25, ty+2); ctx.closePath(); ctx.fill();
+        ctx.strokeStyle='rgba(60,40,20,.5)'; ctx.lineWidth=0.7; for(let k=1;k<5;k++){ ctx.beginPath(); ctx.moveTo(tx-25+k*10, ty-54); ctx.lineTo(tx-25+k*10+Math.sin(T*0.04+k), ty); ctx.stroke(); }
+        ctx.fillStyle='#ffcf6a'; ctx.fillRect(tx+26, ty-50, 3, 4); const lg=ctx.createRadialGradient(tx+27,ty-48,1,tx+27,ty-48,14); lg.addColorStop(0,'rgba(255,200,110,.35)'); lg.addColorStop(1,'rgba(255,200,110,0)'); ctx.fillStyle=lg; ctx.fillRect(tx+13,ty-62,28,28);
+      }
+      for(let k=0;k<4;k++){ const ry=(T*0.35+k*14+tx)%44; ctx.globalAlpha=0.12*clamp(1-ry/44,0,1); ctx.fillStyle='#f4efe6'; ctx.beginPath(); ctx.ellipse(tx+Math.sin(T*0.04+k)*6, ty-4-ry, 9, 3.4, 0, 0, 7); ctx.fill(); }
+      ctx.globalAlpha=1;
+    }
+    // the tally board by the door, and the house names notched on it
+    ctx.fillStyle='#5a3a1e'; ctx.fillRect(W-40, 40, 26, 58); ctx.fillStyle='#7a5230'; ctx.fillRect(W-40, 40, 26, 2);
+    for(let r=0;r<7;r++){ ctx.fillStyle='rgba(30,18,8,.8)'; for(let k=0;k<((r*3+5)%6)+2;k++) ctx.fillRect(W-37+k*3, 46+r*7, 1.2, 4); }
+  } else {
+    /* THE HUB: one room, the house's own. Carved posts with the lineage cut
+       into them, furs on the bench, a copper-hooped cedar tub and a brazier */
+    for(const px2 of [34, W-44]){ const pg=ctx.createLinearGradient(px2,0,px2+12,0); pg.addColorStop(0,'#5a3a1e'); pg.addColorStop(0.5,'#9a6a3a'); pg.addColorStop(1,'#4a2e14');
+      ctx.fillStyle=pg; ctx.fillRect(px2, 20, 12, H-66);
+      for(let k=0;k<8;k++){ ctx.fillStyle='rgba(40,22,8,.8)'; ctx.fillRect(px2+2, 40+k*18, 8, 1.6); ctx.fillStyle='rgba(232,195,74,.5)'; ctx.fillRect(px2+4, 44+k*18, 4, 1); }
+      ctx.fillStyle='#b08a52'; ctx.beginPath(); ctx.ellipse(px2+6, 18, 8, 9, 0, 0, 7); ctx.fill(); ctx.fillStyle='#2a1a0e'; ctx.fillRect(px2+2, 16, 2.4, 1.6); ctx.fillRect(px2+7.6, 16, 2.4, 1.6); }
+    ctx.fillStyle='#6a5238'; ctx.fillRect(58, H-66, 70, 8); ctx.fillStyle='#b8a078'; for(let k=0;k<10;k++){ ctx.beginPath(); ctx.ellipse(62+k*7, H-67, 4.2, 2.4, 0, 0, 7); ctx.fill(); }   // furs on the bench
+    // the brazier
+    ctx.fillStyle='#3a2a1a'; ctx.fillRect(W-110, H-70, 22, 18); ctx.fillStyle='#8a5a2a'; ctx.fillRect(W-112, H-72, 26, 3);
+    for(let k=0;k<5;k++){ const fl=Math.sin(T*0.3+k*1.7)*2; ctx.fillStyle=k%2? '#ffb43a' : '#ff7a2a'; ctx.beginPath(); ctx.ellipse(W-106+k*4, H-76-fl, 2.2, 4+fl*0.5, 0, 0, 7); ctx.fill(); }
+    const bg=ctx.createRadialGradient(W-99,H-78,2,W-99,H-78,80); bg.addColorStop(0,'rgba(255,170,90,.26)'); bg.addColorStop(1,'rgba(255,170,90,0)'); ctx.fillStyle=bg; ctx.fillRect(W-180,H-160,160,160);
+  }
+  // ---- THE TUB, AND THE TWO OF THEM IN IT — in the same stage space as the bedchamber ----
+  const Z=2.15, SX0=190, SY0=166, cx0=190, base=166;                    // closer in than the bedchamber: the tub is the whole room
+  const SET=RK_BREED_POSES[place]||RK_BREED_POSES.breed;
+  const step=((T-40)/230)|0, vi=(s.forcePose!==undefined)? s.forcePose : SET[((step%SET.length)+SET.length)%SET.length];
+  const vt=((T-40)%230+230)%230;
+  s.poseName = (RK_BREED_NAMES[vi]||'')+(hub? ' — in the house’s own hub' : ' — at the breeding house');
+  s.poseFade = clamp((vt-14)/24,0,1)*clamp((222-vt)/22,0,1);
+  ctx.save(); ctx.translate(CX,172); ctx.scale(Z,Z); ctx.translate(-SX0,-SY0+22);
+  const TX=cx0+2, TW=hub? 52 : 48, rimY=base-21;
+  // the back of the tub, and the water's far edge
+  { const wood = hub? ['#6a3a1a','#b07a44','#4a2410'] : ['#5a3818','#8a5a30','#3a200c'];
+    const tg=ctx.createLinearGradient(TX-TW,0,TX+TW,0); tg.addColorStop(0,wood[2]); tg.addColorStop(0.5,wood[1]); tg.addColorStop(1,wood[2]);
+    ctx.fillStyle=tg; ctx.beginPath(); ctx.ellipse(TX, rimY, TW, 9, 0, Math.PI, 0); ctx.lineTo(TX+TW, base); ctx.lineTo(TX-TW, base); ctx.closePath(); ctx.fill();
+    ctx.fillStyle='rgba(40,90,120,.70)'; ctx.beginPath(); ctx.ellipse(TX, rimY+1.5, TW-3, 7, 0, 0, 7); ctx.fill(); }
+  const HB=(x,y,c)=>{ const iv=Math.max(4,c||14); if((T|0)%iv<2) s.hearts.push({x:CX+(x-SX0)*Z, y:172+(y-SY0+22)*Z, vy:0.6, life:46, c:'#ff8ad0'}); };
+  try{ drawBedPose(vi, {c:ctx, s, T, vt, cx0, base, place, HB, tub:{x:TX, w:TW, rim:rimY}}); }catch(e){}
+  // the front of the tub over them: they are IN it, to the waist
+  { const wood = hub? ['#7a4420','#c08a50','#4a2410'] : ['#6a4420','#9a6a3a','#3a200c'];
+    ctx.fillStyle='rgba(46,110,150,.40)'; ctx.fillRect(TX-TW+2, rimY+2, TW*2-4, base-rimY-2);
+    ctx.fillStyle='rgba(190,232,248,.55)'; for(let k=0;k<9;k++){ const wx=TX-TW+8+k*((TW*2-16)/8)+Math.sin(T*0.08+k)*1.5; ctx.fillRect(wx, rimY+2+Math.sin(T*0.1+k*1.3)*0.7, 5, 0.8); }
+    const tg=ctx.createLinearGradient(TX-TW,0,TX+TW,0); tg.addColorStop(0,wood[2]); tg.addColorStop(0.45,wood[1]); tg.addColorStop(1,wood[2]);
+    ctx.fillStyle=tg; ctx.beginPath(); ctx.moveTo(TX-TW, rimY+4); ctx.ellipse(TX, rimY+4, TW, 9, 0, Math.PI, 0, true); ctx.lineTo(TX+TW, base+2); ctx.ellipse(TX, base+2, TW, 6, 0, 0, Math.PI); ctx.closePath(); ctx.fill();
+    for(let k=1;k<12;k++){ const sx=TX-TW+k*(TW*2/12); ctx.fillStyle='rgba(30,16,6,.35)'; ctx.fillRect(sx, rimY+10, 0.7, base-rimY-6); }                 // the staves
+    ctx.fillStyle= hub? '#c07a3a' : '#8a7a5a'; ctx.fillRect(TX-TW, rimY+12, TW*2, 2); ctx.fillRect(TX-TW, base-6, TW*2, 2);          // the hoops — copper in the hub
+    ctx.fillStyle='rgba(255,230,190,.35)'; ctx.fillRect(TX-TW, rimY+4, TW*2, 0.8);
+    if(hub){ for(let k=0;k<6;k++){ ctx.fillStyle='rgba(232,195,74,.55)'; ctx.fillRect(TX-TW+10+k*((TW*2-20)/5), rimY+16, 2, 5); } }   // the lineage, cut round the rim
+    for(let k=0;k<7;k++){ const ry=(T*0.45+k*11)%46; ctx.globalAlpha=0.16*clamp(1-ry/46,0,1); ctx.fillStyle='#f6f0e6'; ctx.beginPath(); ctx.ellipse(TX-30+k*10+Math.sin(T*0.05+k)*5, rimY-2-ry, 10, 4, 0, 0, 7); ctx.fill(); }
+    ctx.globalAlpha=1; }
+  ctx.restore();
+  // ---- the words ----
+  ctx.textAlign='center';
+  if(T<200){ const a=clamp(T/30,0,1)*clamp((200-T)/30,0,1); ctx.globalAlpha=a;
+    pixelText(hub? '◆ THE HUB — THE HOUSE’S OWN' : '◆ THE BREEDING HOUSE, ON THE QUAY', W/2, 24, hub? '#ffd08a' : '#ffb0d0', 1.1);
+    if(s.breedLine) pixelText(s.breedLine, W/2, 38, 'rgba(255,224,200,.85)', 0.7);
+    ctx.globalAlpha=1; }
+  if(s.poseName && s.poseFade>0.02){ ctx.globalAlpha=s.poseFade; pixelText('· '+s.poseName.toUpperCase()+' ·', W/2, H-22, hub? '#ffd08a' : '#ffb0d0', 0.9); ctx.globalAlpha=1; }
+  if(T>220 && T<(s.dur||700)-120) pixelText('[SPACE] slip away to morning', W-72, 26, 'rgba(200,176,96,.55)', 1);
+  ctx.textAlign='left';
+  for(const h of s.hearts){ ctx.globalAlpha=clamp(h.life/40,0,1); pixelText('♥', h.x, h.y, h.c||'#e26a8a', 1); } ctx.globalAlpha=1;
+}
 function drawShadowPlay(s,T){
   const place=s.place||'bed';
   const style = place==='pool'?'water' : place==='bath'?'marble' : 'wall';
@@ -22418,7 +23106,8 @@ function drawShadowPlay(s,T){
   const step=(((T-520)/160)|0);
   /* ✧ AND THE PICTURE HOLDS while he is deciding. The running order is
      still the running order; this is one pose pinned for one beat. */
-  const vi = (s.rkFinPose!==undefined && SET.indexOf(s.rkFinPose)>=0)
+  const vi = (s.forcePose!==undefined)? s.forcePose                       // the tests (and the gallery) can pin one
+             : (s.rkFinPose!==undefined && SET.indexOf(s.rkFinPose)>=0)
              ? s.rkFinPose : SET[ ((step%cut)+cut)%cut ];
   const vt=(T-520)%160;
   const POSE_NAMES=['the embrace','the kiss','from behind','the ride','the lift','the sundial','the tangle','at rest',
@@ -22559,7 +23248,10 @@ function drawShadowPlay(s,T){
   s.poseFade = clamp((vt-18)/26,0,1)*clamp((150-vt)/24,0,1);
   s.poseCol  = STG.col||'#e8c34a';
 
-  if(vi===0){ // THE EMBRACE — he grinds against her in a real, hungry rhythm; the tease reads in the gap
+  /* THE NEW BODIES take every position when the bodies are shown at all (MEDIUM); the block rig below is
+     kept for HEAVY, where a flat silhouette is the whole point */
+  if(RIG && typeof drawBedPose==='function' && drawBedPose(vi, {c:ctx, s, T, vt, cx0, base, place, HB})){ /* drawn */ }
+  else if(vi===0){ // THE EMBRACE — he grinds against her in a real, hungry rhythm; the tease reads in the gap
     const beat=Math.max(0,Math.sin(T*0.30)), sw=beat*3;                 // fast, insistent — not a tap
     const hx=cx0-16+beat*7, wx=cx0+13;                                  // he presses in (7px) then eases back, again and again
     if(RIG){
@@ -23860,22 +24552,19 @@ function drawPoolPlace(s,T,dx,dw,kind){
   const spr=BEDSPR;
   if(T<130){
     const wx= 40 + Math.min(1,T/112)*(dx-66-40);
-    if(!G.isFemale && spr) drawJiggleSprite(spr, wx, 122-Math.abs(Math.sin(T*0.4))*2, T*0.55, 1);
-    else { ctx.save(); ctx.translate(wx+8,214-Math.abs(Math.sin(T*0.4))*2); ctx.scale(1.15,1.15); drawHusbandFig(ctx,0,0,G.wifeRel|0); ctx.restore(); }
+    drawPreludeRunner(ctx, wx+8, 216, T);                                    // she runs (he does, if you are her) — the new body
   } else if(T<340){
     // undressing BEHIND the screen — the lamp betrays every curve
-    if(!G.isFemale) drawShadowFigure(dx+30+Math.sin(T*0.08)*1.2, 216, T*0.3, T>260, 1);
-    else { drawShadowMale(dx+34+Math.sin(T*0.08)*1.2, 214, Math.sin(T*0.05)*0.4);
-      if(T>260){ const bk=Math.sin(T*0.25)*3; px(dx+16+bk,150,12,3,'#1c130c'); px(dx+13+bk,147,5,5,'#1c130c'); } }
+    silDoorway(ctx, dx+(G.isFemale? 34 : 30)+Math.sin(T*0.08)*1.2, 216, T, !G.isFemale);
     if(T>260 && (T|0)%28<1.5) s.hearts.push({x:dx-4,y:140,vy:0.6,life:52,c:'#e26a8a'});
   }
   if(T>280 && T<352){ const mx=90+Math.min(1,(T-280)/64)*(dx+16-90);
-    if(!G.isFemale) drawShadowMale(mx, 216, T*0.35);
-    else drawShadowWalkerF(mx, 216, T*0.35);
+    if(!G.isFemale) silHim(ctx, mx, 216, 1, '#1c130c', (ox,oy)=>({walk:1, walkPh:T*0.35, lean:0.06, aro:0.2}));
+    else silHer(ctx, mx, 216, 1, '#1c130c', silWalkHer(T*0.35));
   }
   // the first one crosses from the screen to the water — a silhouette, nothing more
   if(T>352 && T<400){ const cxw=dx+10-((T-352)/48)*(dx+10-(px0+pw2-24));
-    if(!G.isFemale) drawShadowFigure(cxw,216,T*0.3,false,1); else drawShadowMale(cxw,214,T*0.35);
+    if(!G.isFemale) silHer(ctx, cxw, 216, -1, '#1c130c', silWalkHer(T*0.3)); else silHim(ctx, cxw, 216, -1, '#1c130c', (ox,oy)=>({walk:1, walkPh:T*0.35, aro:0.3}));
   }
   if(T>400&&T<430){ const sp2=(T-400)/30;                                       // SPLASH one
     for(let i=0;i<7;i++){ const a2=i/7*Math.PI; px(px0+pw2-24+Math.cos(a2)*16*sp2, wy-4-Math.sin(a2)*14*sp2,2,2,'#8ac4e0'); } }
@@ -24545,13 +25234,53 @@ function drawBendFig(c, x, y, w, k, Q){
       return [px0+nx*(r0+0.7)*side, py0+ny*(r0+0.7)*side]; };
     const seatPts=[]; for(let i=0;i<=8;i++){ const an=sRot-1.9+i*(3.4/8);
       seatPts.push([SC[0]+Math.cos(an)*(rs+0.6), SC[1]+Math.sin(an)*(rs*0.94+0.6)]); }
-    const sk=[ at(0.30, bw[1]+0.5) ].concat(seatPts.reverse(),
+    /* THE COAST'S CUT IS SHORT. Bent over, it rides up and its hem runs
+       ACROSS her seat: the top of it is under cloth, the lower curve of it
+       and the backs of her thighs are her. It used to be drawn like the
+       Roman gown — the whole seat inside one cloth oval — which is exactly
+       the "ovals with some skin" it looked like. */
+    const rv = (RKD && !RKS)? clamp((0.34 + ((RKC&&RKC.back!==undefined)? RKC.back : 0.4)*0.40)*kk, 0, 0.70) : 0;
+    let sk, chordA=null, chordB=null, hemFrontC=hemFront;
+    if(rv>0.06){
+      const off=(rs+0.6)*(1-2*rv), pp=[-thighDir[1], thighDir[0]], hw2=Math.sqrt(Math.max(0.5,(rs+0.6)*(rs+0.6)-off*off));
+      const c0=[SC[0]+thighDir[0]*off, SC[1]+thighDir[1]*off];
+      const e1=[c0[0]+pp[0]*hw2, c0[1]+pp[1]*hw2], e2=[c0[0]-pp[0]*hw2, c0[1]-pp[1]*hw2];
+      const dot=(q)=>(q[0]-SC[0])*thighDir[0]+(q[1]-SC[1])*thighDir[1];
+      const arc=seatPts.slice().reverse().filter(q=>dot(q)<=off);
+      // the chord's two ends: the outer one (away from her body) first, after the arc
+      const outer = (e1[0]-H[0])*sd[0]+(e1[1]-H[1])*sd[1] > (e2[0]-H[0])*sd[0]+(e2[1]-H[1])*sd[1] ? e1 : e2, inner = outer===e1? e2 : e1;
+      chordA=outer; chordB=inner; hemFrontC=Math.min(hemFront, 2.2+(1-rv)*4);
+      sk=[ at(0.30, bw[1]+0.5) ].concat(arc, [outer, inner, legAt(Math.max(hemFrontC,1),-1), at(0.08,-fw[0]-0.4), at(0.30,-fw[1]-0.4)]);
+    } else sk=[ at(0.30, bw[1]+0.5) ].concat(seatPts.reverse(),
       hemBack>1? [legAt(hemBack*0.5,1)] : [],
       [legAt(Math.max(hemBack,0.5),1), legAt(Math.max(hemFront,1),-1),
        legAt(Math.max(hemFront,1)*0.5,-1), at(0.08,-fw[0]-0.4), at(0.30,-fw[1]-0.4)]);
     const skirt=smooth(sk);
     if(RKS){ lit(skirt, LEAF, rgbA(LEAFHI,0.8), rgbA(LEAFSH,0.8));
       for(let i=1;i<4;i++){ const d=hemBack*(i/4); line([legAt(d,1), legAt(d+2,-1)], rgbA(LEAFSH,0.9), 0.7); } }
+    else if(chordA){
+      /* the short cut: cloth on the top of the seat only, taut, lit — and
+         where it stops, a fringed hem and the soft shadow it throws on her */
+      { const w0=at(0.30,bw[1]*0.5), hm=[(chordA[0]+chordB[0])/2,(chordA[1]+chordB[1])/2];
+        const g=oc.createLinearGradient(w0[0],w0[1],hm[0],hm[1]);
+        g.addColorStop(0,GSh); g.addColorStop(0.35,GARM); g.addColorStop(0.75,mixHex(GARM,GHi,0.55)); g.addColorStop(1,GARM);
+        oc.fillStyle=g; oc.fill(skirt);
+        oc.save(); oc.clip(skirt);                                            // one soft gloss where it is pulled over the curve
+        const gx=SC[0]+sd[0]*rs*0.45-thighDir[0]*rs*0.2, gy=SC[1]+sd[1]*rs*0.45-thighDir[1]*rs*0.2;
+        const g2=oc.createRadialGradient(gx,gy,0.2,gx,gy,rs*0.7); g2.addColorStop(0,rgbA(mixHex(GHi,'#ffffff',0.3),0.75)); g2.addColorStop(1,rgbA(GHi,0));
+        oc.fillStyle=g2; oc.fillRect(SC[0]-rs*2,SC[1]-rs*2,rs*4,rs*4); oc.restore(); }
+      oc.save(); oc.clip(seatNear);                                          // the hem's shadow on the curve under it
+      line([add(chordA,[thighDir[0]*1.0,thighDir[1]*1.0]), add(chordB,[thighDir[0]*1.0,thighDir[1]*1.0])], rgbA(sDeep,0.32), 1.3);
+      oc.restore();
+      const hemEnd=legAt(Math.max(hemFrontC,1),-1);
+      line([chordA, chordB, hemEnd], rgbA(GSh,0.95), 1.0);                    // the hem
+      line([add(chordA,[-thighDir[0]*0.5,-thighDir[1]*0.5]), add(chordB,[-thighDir[0]*0.5,-thighDir[1]*0.5])], rgbA(GHi,0.7), 0.45);
+      for(let i=0;i<=6;i++){ const f=i/6, q=f<0.6? [chordA[0]+(chordB[0]-chordA[0])*(f/0.6), chordA[1]+(chordB[1]-chordA[1])*(f/0.6)]
+                                                   : [chordB[0]+(hemEnd[0]-chordB[0])*((f-0.6)/0.4), chordB[1]+(hemEnd[1]-chordB[1])*((f-0.6)/0.4)];
+        line([q, add(q,[thighDir[0]*1.7, thighDir[1]*1.7])], rgbA(i%2? GSh : GARM,0.95), 0.6); }                 // the fringe
+      // the lower curve of her, now it is out: the gloss on it and the crease under it
+      oc.save(); const bare=P2(); bare.rect(-200,-200,400,400); bare.addPath(skirt); oc.clip(bare,'evenodd');
+      seatShape(sLit, sDeep); oc.restore(); }
     else {
       lit(skirt, GARM, rgbA(GHi,0.95), rgbA(GSh,0.85), 1.2);
       seatShape(mixHex(GHi,'#ffffff',0.25), GSh);                   // taut over it, so it takes the light
@@ -24587,7 +25316,36 @@ function drawBendFig(c, x, y, w, k, Q){
     const one=(off,dark)=>{
       const c0=[Bp[0]+hd[0]*rb*0.78+tB[0]*off+BX*0.4+RK2*1.3, Bp[1]+hd[1]*rb*0.78+tB[1]*off-RK2*0.5];
       const p=ell(c0[0],c0[1], rb*(1.02+0.22*kk), rb*0.90, rot);                       // longer as it hangs
-      const bareP = (RKS||opt.top)? 1 : !RKD? 0 : (RKC&&RKC.neck==='lace')? 0.62 : 0.42;   // how much of it is skin
+      const bareP = (RKS||opt.top)? 1 : !RKD? 0 : (RKC&&RKC.neck==='lace')? 0.72 : 0.60;   // how much of it is skin
+      if(RKD && bareP>0 && bareP<1){
+        /* THE COAST CUP. A small cup holds the hanging tip; above it she is
+           skin, lit, with a gloss where the lamp finds the curve; the cup's
+           edge is lace, scalloped, and the cloth gathers into it. The far
+           one is the same, in shade. */
+        const sk0=dark? sSh : skin, skHi=dark? rgbA(skin,0.5) : rgbA(sLit,0.9), skLo=rgbA(sDeep,dark? 0.6 : 0.42);
+        lit(p, sk0, skHi, skLo);
+        if(!dark){ const gx=c0[0]-hd[0]*rb*0.35-Math.sin(rot)*rb*0.30, gy=c0[1]-hd[1]*rb*0.35+Math.cos(rot)*rb*0.30;
+          oc.save(); oc.clip(p); const g=oc.createRadialGradient(gx,gy,0.1,gx,gy,rb*0.8);
+          g.addColorStop(0,rgbA(mixHex(sLit,'#ffffff',0.25),0.85)); g.addColorStop(1,rgbA(sLit,0));
+          oc.fillStyle=g; oc.fillRect(c0[0]-rb*3,c0[1]-rb*3,rb*6,rb*6); oc.restore(); }
+        const cutD=rb*(1.0-2.0*(1-bareP)), cx2=c0[0]+hd[0]*cutD, cy2=c0[1]+hd[1]*cutD;          // where the cup starts
+        oc.save(); oc.clip(p);
+        const cup=P2(); cup.rect(-200,-200,400,400);
+        const keep=P2(); keep.moveTo(cx2-Math.sin(rot)*rb*3, cy2+Math.cos(rot)*rb*3); keep.lineTo(cx2+Math.sin(rot)*rb*3, cy2-Math.cos(rot)*rb*3);
+        keep.lineTo(cx2+Math.sin(rot)*rb*3+hd[0]*rb*4, cy2-Math.cos(rot)*rb*3+hd[1]*rb*4); keep.lineTo(cx2-Math.sin(rot)*rb*3+hd[0]*rb*4, cy2+Math.cos(rot)*rb*3+hd[1]*rb*4); keep.closePath();
+        oc.clip(keep);
+        oc.fillStyle= dark? GSh : GARM; oc.fillRect(c0[0]-rb*4,c0[1]-rb*4,rb*8,rb*8);
+        crescent(p, 1.0, 1.2, rgbA(dark? GARM : GHi,0.8)); crescent(p, -0.9, -1.1, rgbA(GSh,0.8));
+        for(let j=-1;j<=1;j++) line([[cx2+Math.sin(rot)*j*rb*0.45, cy2-Math.cos(rot)*j*rb*0.45],
+                                      [c0[0]+hd[0]*rb*0.95+Math.sin(rot)*j*rb*0.18, c0[1]+hd[1]*rb*0.95-Math.cos(rot)*j*rb*0.18]], rgbA(GSh,0.75), 0.45);   // gathered into it
+        oc.restore();
+        // the lace: a scalloped edge along the top of the cup
+        { const n2=5, laceC=dark? rgbA(GHi,0.55) : mixHex(GHi,'#ffffff',0.35);
+          for(let j=0;j<n2;j++){ const f0=-0.95+j*(1.9/n2), f1=f0+1.9/n2, fm=(f0+f1)/2;
+            const q0=[cx2+Math.sin(rot)*f0*rb, cy2-Math.cos(rot)*f0*rb], q1=[cx2+Math.sin(rot)*f1*rb, cy2-Math.cos(rot)*f1*rb];
+            const qm=[cx2+Math.sin(rot)*fm*rb-hd[0]*0.8, cy2-Math.cos(rot)*fm*rb-hd[1]*0.8];
+            oc.save(); oc.clip(p); oc.strokeStyle=laceC; oc.lineWidth=0.55; oc.beginPath(); oc.moveTo(q0[0],q0[1]); oc.quadraticCurveTo(qm[0],qm[1],q1[0],q1[1]); oc.stroke(); oc.restore(); } }
+        return; }
       lit(p, dark? GSh : (bareP>=1? skin : GARM), dark? rgbA(GARM,0.6) : rgbA(bareP>=1? sLit : GHi,0.9), rgbA(dark? sDeep : GSh,0.7));
       if(bareP>0 && bareP<1 && !dark){
         /* the scoop: the half nearest her chest is skin, the cloth cups the rest,
@@ -24617,15 +25375,44 @@ function drawBendFig(c, x, y, w, k, Q){
     if(cut==='braid') for(let i=1;i<5;i++) line([[r0[0]-1.2, r0[1]+fall*i/5],[r0[0]+1.4, r0[1]+fall*i/5+0.8]], rgbA(hSh,0.9), 0.6); }
   // the near arm, reaching down — drawn over the bust and the hair
   armFrom(add(Sh,[-0.6,0.4]), false);
-  // ---- 8. the face and the cut, by the same hand that draws her standing ----
-  { const hx=Math.round(HC[0]-4), hy=Math.round(HC[1]-4.5);
-    const PP=(a,b2,ww,h,c2)=>{ oc.fillStyle=c2; oc.fillRect(Math.round(hx+a),Math.round(hy+b2),Math.round(ww),Math.round(h)); };
-    const hp=ell(HC[0],HC[1]+0.3,4.3,4.9,0); lit(hp, skin, rgbA(sLit,0.8), rgbA(sDeep,0.4));
-    try{ drawWifeFace(PP, 6, 4, skin, opt.expr||Q.expr||'flat'); }catch(e){}
-    PP(8, 3, 1, 3, sSh);                                            // the ear side, in shade
-    if(opt.blush>0){ oc.fillStyle='rgba(236,88,116,'+(0.55*clamp(opt.blush,0,1)).toFixed(2)+')';   // she has gone red
-      oc.fillRect(Math.round(hx+5),Math.round(hy+5),3,2); oc.fillRect(Math.round(hx+8),Math.round(hy+3),1,3); }
-    try{ const HP=(a,b2,ww,h,c2)=>PP(4+a, 10+b2, ww, h, c2); drawHairSmall(HP, cut, false, hair, 8, 9, skin); }catch(e){} }
+  // ---- 8. HER HEAD, IN PROFILE — the same way his is drawn, not a box ----
+  /* It was the standing sprite's pixel face and pixel hair pasted onto a
+     vector body: a square of skin with a slab of side-hair over the front
+     of it. Now it is a lit profile — brow, nose, lips, chin — tilted with
+     her neck, under a lit cap of her own cut, with her expression. */
+  { const aH=aN*0.55, cs=Math.cos(aH), sn=Math.sin(aH);
+    const Rp=(dx,dy)=>[HC[0]+dx*cs-dy*sn, HC[1]+dx*sn+dy*cs];
+    const face=smooth([[-4.0,-1.2],[-2.6,-4.5],[1.3,-4.7],[3.5,-2.3],[3.9,-0.4],[4.6,0.7],[3.9,1.3],[4.0,2.2],[3.6,2.6],[3.8,3.2],
+                       [2.8,4.5],[1.6,4.7],[-0.6,4.4],[-3.2,2.6]].map(q=>Rp(q[0],q[1])));
+    lit(face, skin, rgbA(sLit,0.85), rgbA(sDeep,0.42));
+    const EX = { flat:{lid:0.1,brow:0,smile:0,open:0}, flush:{lid:0.45,brow:0.3,smile:0.2,open:0.6}, bite:{lid:0.35,brow:0.2,smile:0,open:0,bite:1},
+                 brace:{lid:0,brow:0.9,smile:-0.1,open:1.0}, smug:{lid:0.5,brow:-0.2,smile:0.8,open:0}, pleased:{lid:0,brow:0.2,smile:1,open:0,shut:1},
+                 absorbed:{lid:0.2,brow:0.1,smile:0,open:0.3}, cross:{lid:0.3,brow:-1,smile:-0.8,open:0} }[opt.expr||Q.expr||'flat'] || {lid:0.1,brow:0,smile:0,open:0};
+    // the ear, if the cut leaves it out
+    if(!long) lit(ell(...Rp(-0.9,0.4), 1.0, 1.5, aH), mixHex(skin,sSh,0.4), rgbA(sLit,0.5), rgbA(sDeep,0.5));
+    // the eye: white, iris, a lash line, the lid by the expression
+    const E0=Rp(2.3,-0.6);
+    if(EX.shut){ line([Rp(1.5,-0.5),Rp(2.4,-1.1),Rp(3.2,-0.5)], mixHex(hair,'#000000',0.3), 0.6); }
+    else { oc.fillStyle='#f4eee6'; oc.fill(ell(E0[0],E0[1],0.95,0.62,aH));
+      oc.fillStyle='#2a1a10'; oc.fill(ell(...Rp(2.75,-0.55),0.5,0.58,aH));
+      if(EX.lid>0.15){ oc.fillStyle=mixHex(skin,sSh,0.35); oc.fill(ell(...Rp(2.3,-1.05+EX.lid*0.25),1.1,0.35+EX.lid*0.35,aH)); }
+      line([Rp(1.2,-1.1),Rp(2.4,-1.35),Rp(3.5,-1.0),Rp(3.9,-1.3)], '#1a0e08', 0.55); }          // lashes, flicked
+    line([Rp(1.0,-2.3+(EX.brow<0? 0 : -EX.brow*0.4)),Rp(3.4,-2.1-EX.brow*0.35+(EX.brow<0? -EX.brow*0.55 : 0))], mixHex(hair,'#000000',0.2), 0.55);   // the brow
+    // the mouth: lips, parted, bitten, smiling, down
+    { const m0=Rp(3.55,2.35), mc=Rp(2.6,2.4-EX.smile*0.55), lipC=mixHex(skin,'#b83a4a',0.55);
+      if(EX.open>0.25){ oc.fillStyle='#4a1a1e'; oc.fill(ell(...Rp(3.2,2.4),0.55,0.35+EX.open*0.35,aH)); }
+      line([m0, mc], lipC, 0.75);
+      oc.fillStyle=lipC; oc.fill(ell(...Rp(3.55,2.0),0.45,0.32,aH)); oc.fill(ell(...Rp(3.45,2.85),0.5,0.34,aH));   // upper and lower lip
+      if(EX.bite){ oc.fillStyle='#f4efe4'; oc.fillRect(Rp(3.1,2.5)[0], Rp(3.1,2.5)[1]-0.2, 0.9, 0.45); } }
+    if(opt.blush>0){ oc.fillStyle='rgba(236,88,116,'+(0.50*clamp(opt.blush,0,1)).toFixed(2)+')'; oc.fill(ell(...Rp(1.5,1.2),1.5,0.9,aH)); }
+    // HER CUT: a lit cap over the crown and the back of the head, the fringe if she wears one, the knot if she pins it
+    const hc=smooth([[-4.5,1.9],[-4.4,-2.8],[-1.6,-5.5],[1.6,-5.4],[3.7,-3.2],[2.4,-3.1],[0.4,-2.6],[-1.4,-1.0],[-1.8,1.4],[-2.6,3.6]].map(q=>Rp(q[0],q[1])));
+    lit(hc, hair, rgbA(hHi,0.85), rgbA(hSh,0.8));
+    line([Rp(-3.0,-3.8),Rp(-0.4,-5.0),Rp(1.8,-4.6)], rgbA(hHi,0.7), 0.5);                   // the shine along the crown
+    if(cut==='bangs') lit(smooth([[0.8,-4.6],[3.6,-3.4],[3.9,-1.8],[2.2,-2.2],[0.6,-2.6]].map(q=>Rp(q[0],q[1]))), hair, rgbA(hHi,0.8), rgbA(hSh,0.7));
+    if(cut==='tower'||cut==='bun') lit(ell(...Rp(-3.6,-4.6),2.3,2.0,aH), hair, rgbA(hHi,0.85), rgbA(hSh,0.8));
+    if(cut==='veil'){ const vc=hexOf(Q.dress||'#c8b8a0'); lit(smooth([[-4.9,3.2],[-4.8,-3.2],[-1.8,-6.0],[1.8,-5.8],[3.2,-4.0],[0.4,-3.6],[-2.2,-1.0],[-2.8,4.4]].map(q=>Rp(q[0],q[1]))), vc, rgbA(mixHex(vc,'#ffffff',0.3),0.8), rgbA(mixHex(vc,'#000000',0.4),0.7)); }
+  }
   oc.restore();
   // ---- 9. SNAP TO PIXELS: a crisp silhouette, like every other sprite in the room ----
   { const im=oc.getImageData(0,0,128,104), d=im.data;
@@ -24717,38 +25504,56 @@ function drawMateFig(bk, fr, M){
   const Lt=15.6+lg*0.22, Ls=16.2+lg*0.22, Ltor=24.5, Lup=10.2, Lfo=9.8;
   const add=(p,v)=>[p[0]+v[0], p[1]+v[1]], lerp=(a,b,t)=>[a[0]+(b[0]-a[0])*t, a[1]+(b[1]-a[1])*t];
   // ---- the hips go where the scene says, unless his legs cannot reach: then he stands as tall as he can
-  const A=[M.hip[0]-3.2, M.floor-2.2];
-  let Hp=[M.hip[0], M.hip[1]];
-  { const dx=Hp[0]-A[0], lim=(Lt+Ls)*0.985; if(Math.hypot(dx, Hp[1]-A[1])>lim) Hp[1]=A[1]-Math.sqrt(Math.max(1,lim*lim-dx*dx)); }
+  /* WALKING. M.walk (0..1) and M.walkPh: each foot swings forward and lifts
+     on its own half of the cycle, the other plants; the hips drop a little
+     at the double-support and the arms swing against the legs. */
+  const wk=clamp(M.walk||0,0,1), wph=M.walkPh||0, strd=5.2*wk;
+  const nOff=[Math.sin(wph)*strd, -Math.max(0,Math.cos(wph))*2.4*wk], fOff=[Math.sin(wph+Math.PI)*strd, -Math.max(0,Math.cos(wph+Math.PI))*2.4*wk];
+  const ANK=M.ankles||null;                                   // explicit feet: kneeling, seated, lying
+  const A= (ANK&&ANK.near)? ANK.near.slice() : [M.hip[0]-3.2+nOff[0], M.floor-2.2+nOff[1]];
+  let Hp=[M.hip[0], M.hip[1]+Math.abs(Math.sin(wph))*0.9*wk];
+  if(!ANK){ const dx=Hp[0]-A[0], lim=(Lt+Ls)*0.985; if(Math.hypot(dx, Hp[1]-A[1])>lim) Hp[1]=A[1]-Math.sqrt(Math.max(1,lim*lim-dx*dx)); }
   const aT=M.lean||0, tB=[Math.sin(aT), -Math.cos(aT)], nB=[-Math.cos(aT), -Math.sin(aT)];
   const at=(t,off)=>[Hp[0]+tB[0]*Ltor*t+nB[0]*off, Hp[1]+tB[1]*Ltor*t+nB[1]*off];
   const bw=[4.9+shd*0.12, 3.9, 4.1, 4.9+ch*0.07, 4.2], fw=[3.8+(10-wa)*0.12, 3.4+(10-wa)*0.16, 3.8, 4.8+ch*0.15, 3.6];
-  const S0=at(0.92,0.3), Nk=add(at(1.0,-0.4), [Math.sin(aT*0.4)*2.6, -Math.cos(aT*0.4)*2.6]);
-  const HC=add(Nk,[1.1+Math.sin(aT*0.2)*1.2, -4.6]);
-  const legs=(hip, ank)=>{ const K=ik2(hip, ank, Lt, Ls, -1).J; return {hip, K, ank}; };
-  const LN=legs(Hp, A), LF=legs(add(Hp,[1.2,0.3]), add(A,[2.4,0]));
+  const HA=(M.headAng!==undefined && M.headAng!==null)? M.headAng : null;     // a head that follows the body round
+  const S0=at(0.92,0.3), Nk= HA===null? add(at(1.0,-0.4), [Math.sin(aT*0.4)*2.6, -Math.cos(aT*0.4)*2.6])
+                                      : add(at(1.0,-0.4), [Math.sin(HA)*2.6, -Math.cos(HA)*2.6]);
+  const HC= HA===null? add(Nk,[1.1+Math.sin(aT*0.2)*1.2, -4.6]) : add(Nk,[Math.sin(HA)*4.6+Math.cos(HA)*0.9, -Math.cos(HA)*4.6+Math.sin(HA)*0.9]);
+  const kbN=(M.kneeBend===undefined)? -1 : M.kneeBend, kbF=(M.kneeBendFar===undefined)? kbN : M.kneeBendFar;
+  const legs=(hip, ank, kb)=>{ const S=ik2(hip, ank, Lt, Ls, kb); return {hip, K:S.J, ank:S.end}; };
+  const LN=legs(Hp, A, kbN), LF=legs(add(Hp,[1.2,0.3]), (ANK&&ANK.far)? ANK.far.slice() : [M.hip[0]-3.2+2.4+fOff[0], M.floor-2.2+fOff[1]], kbF);
   // where the garment is on him, for everything that has to know (Rome: s is the hem, −0.55 on the thigh up to +0.85 at the chest; coast: the kilt's top, down the legs)
   const sHem = -0.55 + clamp((u-0.28)/0.42,0,1)*1.40;
   const kTop = RK? (u<0.28? -0.16 : -0.16 + clamp((u-0.28)/0.60,0,1)*1.00) : 0;   // it stops bunched at his shins
   const groinCovered = RK? (kTop<0.10 && u<0.95) : (sHem<0.04 && u<0.72);
   const legPt=(Lg,f)=> f<=0.5? lerp(Lg.hip, Lg.K, f/0.5) : lerp(Lg.K, Lg.ank, (f-0.5)/0.5);
   const handsOf=(which)=>{ const h=M.hands&&M.hands[which]; if(h) return h;
-    return add(S0,[1.8+(which==='far'?1:0), Lup+Lfo-1.2]); };
+    const sw=Math.sin(wph+(which==='far'? 0 : Math.PI))*3.4*wk;                    // the arm swings against its leg
+    const dn=[-tB[0], -tB[1]], fwd=[-nB[0], -nB[1]], r=Lup+Lfo-1.2-Math.abs(sw)*0.25, f2=1.8+(which==='far'?1:0)+sw;   // down his side, whichever way he is lying
+    return add(S0,[dn[0]*r+fwd[0]*f2, dn[1]*r+fwd[1]*f2]); };
+  if(M.dry) return {hip:Hp, head:HC, shoulder:S0, knee:LN.K, ankle:LN.ank, neck:Nk, root:add(at(0.0,-(3.8+(10-wa)*0.12)+0.3),[0,1.3])};
   // ---- one pass per layer ----
   const drawIn=(oc, layer)=>{
     const K=vecKit(oc), {smooth,capsule,ell,lit,line}=K;
     const legCap=(Lg)=>capsule([[Lg.hip[0],Lg.hip[1],3.9+shd*0.10],[ (Lg.hip[0]+Lg.K[0])/2,(Lg.hip[1]+Lg.K[1])/2,3.3],
       [Lg.K[0],Lg.K[1],2.3],[Lg.K[0]+(Lg.ank[0]-Lg.K[0])*0.32-0.7,Lg.K[1]+(Lg.ank[1]-Lg.K[1])*0.32,2.7],[Lg.ank[0],Lg.ank[1],1.4]]);
-    const foot=(Lg,col)=>{ oc.fillStyle=col; oc.fill(ell(Lg.ank[0]+2.2, M.floor-1.1, 3.2, 1.2, 0)); };
+    const foot=(Lg,col)=>{ oc.fillStyle=col;
+      if(!ANK){ oc.fill(ell(Lg.ank[0]+2.2, Math.min(M.floor-1.1, Lg.ank[1]+1.1), 3.2, 1.2, 0)); return; }
+      let d=[Lg.ank[0]-Lg.K[0], Lg.ank[1]-Lg.K[1]]; const m=Math.hypot(d[0],d[1])||1; d=[d[0]/m,d[1]/m];
+      const f=[d[1], -d[0]], fa=Math.atan2(f[1],f[0]);                                  // the foot, off the end of the shin
+      oc.fill(ell(Lg.ank[0]+f[0]*2.0+d[0]*0.6, Lg.ank[1]+f[1]*2.0+d[1]*0.6, 3.1, 1.25, fa)); };
     const arm=(from, to, dark)=>{ const E=ik2(from, to, Lup, Lfo, 1), Wr=E.end;
       const p=capsule([[from[0],from[1],2.7],[E.J[0],E.J[1],2.0],[Wr[0],Wr[1],1.45]]);
       lit(p, dark? sSh : skin, dark? rgbA(skin,0.4) : rgbA(sLit,0.7), rgbA(sDeep,0.45));
       oc.fillStyle= dark? sSh : skin; oc.fill(ell(Wr[0]+0.6, Wr[1]+0.4, 1.7, 1.45, 0));
       return Wr; };
-    if(layer==='front'){ M._hand=arm(S0, handsOf('near'), false); return; }
+    if(layer==='front'){ if(!M.only || M.only==='near') M._hand=arm(S0, handsOf('near'), false); return; }
     // ---- far leg, far arm ----
-    { lit(legCap(LF), sSh, rgbA(skin,0.45), rgbA(sDeep,0.5)); foot(LF, sSh); }
-    arm(add(S0,[1.2,-0.5]), add(handsOf('far'),[1.4,-0.8]), true);
+    if(!M.only || M.only==='far' || M.only==='back'){
+      { lit(legCap(LF), sSh, rgbA(skin,0.45), rgbA(sDeep,0.5)); foot(LF, sSh); }
+      arm(add(S0,[1.2,-0.5]), add(handsOf('far'),[1.4,-0.8]), true); }
+    if(M.only==='far' || M.only==='near') return;
     // ---- near leg ----
     { lit(legCap(LN), skin, rgbA(sLit,0.75), rgbA(sDeep,0.45)); foot(LN, skin);
       line([[LN.K[0]-1.0,LN.K[1]+0.7],[LN.K[0]+0.4,LN.K[1]+1.0]], rgbA(sDeep,0.4), 0.6); }
@@ -24763,7 +25568,7 @@ function drawMateFig(bk, fr, M){
     // ---- HIS LENGTH, at his inches, when there is nothing over it ----
     const R=add(at(0.0,-fw[0]+0.3),[0,1.3]);
     const lp=lengthPose(Math.min(aro,1));
-    let ang=(Math.PI/2-0.28) + ((-0.14)-(Math.PI/2-0.28))*lp.lift;
+    let ang=(Math.PI/2-0.28) + ((-0.14)-(Math.PI/2-0.28))*lp.lift + (ANK? aT : 0);
     if(M.aim && (M.aimK||0)>0){ const aa=Math.atan2(M.aim[1]-R[1], M.aim[0]-R[0]); ang=ang+(aa-ang)*clamp(M.aimK,0,1); }
     if(M.lenAng!==undefined && M.lenAng!==null) ang=M.lenAng;                // the scene is swinging it
     const lenPx=Math.max(3, M.lenIn*(M.pxi||1)), dia=Math.max(1.8, (M.diaIn||1.6)*(M.pxi||1)*(1+0.25*lp.swell));
@@ -24782,7 +25587,8 @@ function drawMateFig(bk, fr, M){
       M._tip=add(R,[dir[0]*lenPx, dir[1]*lenPx]); }
     M._root=R;
     // ---- WHAT HE IS WEARING, and how it comes off ----
-    if(!RK){
+    if(M.bare){ /* nothing: the bedchamber */ }
+    else if(!RK){
       if(u<0.72){
         /* shoulders to hem: the stations top-down on his back, the hem, then
            back up his front — and the hem is on his thigh (s<0) or, as it
@@ -24804,7 +25610,7 @@ function drawMateFig(bk, fr, M){
           lit(smooth([t0, tip, t1]), cloth, rgbA(cHi,0.85), rgbA(cSh,0.7)); }
       } else if(u<0.95){                                                                               // up over his head, arms in it
         lit(ell(HC[0]-0.5, HC[1]-5.5, 6.2, 3.4, -0.2), cloth, rgbA(cHi,0.8), rgbA(cSh,0.8)); }
-      if(u>=0.95) lit(smooth([[A[0]-14,M.floor],[A[0]-11,M.floor-3.2],[A[0]-6,M.floor-2.4],[A[0]-4,M.floor]]), cloth, rgbA(cHi,0.7), rgbA(cSh,0.7));   // on the floor where it landed
+      if(u>=0.95 && !M.noFloorCloth) lit(smooth([[A[0]-14,M.floor],[A[0]-11,M.floor-3.2],[A[0]-6,M.floor-2.4],[A[0]-4,M.floor]]), cloth, rgbA(cHi,0.7), rgbA(cSh,0.7));   // on the floor where it landed
     } else {
       /* the coast's kilt: hooked at the hip, and when it goes it goes DOWN,
          to his ankles, and stays there bunched while he gets on with it */
@@ -24824,6 +25630,7 @@ function drawMateFig(bk, fr, M){
     }
     // ---- neck, head, hair, beard, and his face ----
     lit(capsule([[S0[0]+0.6,S0[1]-0.5,2.2],[Nk[0],Nk[1],1.9]]), skin, rgbA(sLit,0.6), rgbA(sDeep,0.4));
+    if(HA!==null){ oc.save(); oc.translate(HC[0],HC[1]); oc.rotate(HA); oc.translate(-HC[0],-HC[1]); }
     const hp=smooth([[HC[0]-4.3,HC[1]-1.0],[HC[0]-2.8,HC[1]-4.8],[HC[0]+1.5,HC[1]-5.0],[HC[0]+4.0,HC[1]-2.2],
                      [HC[0]+4.6,HC[1]+0.2],[HC[0]+5.2,HC[1]+1.2],[HC[0]+4.2,HC[1]+1.9],[HC[0]+4.0,HC[1]+3.4],
                      [HC[0]+2.4,HC[1]+5.2],[HC[0]-0.6,HC[1]+5.0],[HC[0]-3.4,HC[1]+3.0]]);
@@ -24846,9 +25653,188 @@ function drawMateFig(bk, fr, M){
       line([[mx+0.7,my],[mx-0.6,my+0.1],[mx-1.4,cy]], mixHex(skin,'#5a2018',0.6), 0.6);
       if(F.teeth) { oc.fillStyle='#f4efe4'; oc.fillRect(mx-0.5, my-0.3, 1.0, 0.45); }
       if(F.blush>0.2){ oc.fillStyle='rgba(232,90,100,'+(0.45*F.blush).toFixed(2)+')'; oc.fillRect(HC[0]+0.6, HC[1]+0.8, 2.2, 1.1); } }
+    if(F.shut){ oc.fillStyle=mixHex(skin,sSh,0.3); oc.fillRect(ex-0.8, ey-0.7, 2.1, 1.3); line([[ex-0.8,ey+0.2],[ex+1.2,ey+0.1]], hSh, 0.5); }   // eyes shut
+    if(HA!==null) oc.restore();
+    /* a fur cloak over his shoulders — nobody undresses all the way in a longhouse in winter */
+    if(M.cloak){ const kc=hexOf(M.cloak), kHi=mixHex(kc,'#ffffff',0.22), kSh=mixHex(kc,'#000000',0.4);
+      const cp=smooth([at(1.02,bw[4]+1.4), at(0.98,-fw[4]*0.2), at(0.78,bw[3]*0.2), at(0.40,bw[2]+2.2), at(0.30,bw[1]+2.4), at(0.60,bw[3]+2.8), at(0.95,bw[4]+2.4)]);
+      lit(cp, kc, rgbA(kHi,0.8), rgbA(kSh,0.8));
+      line([at(1.03,bw[4]+1.8), at(1.0,-fw[4]*0.4)], mixHex(kc,'#e8dcc2',0.4), 1.4); }                           // the fur at the collar
   };
   drawIn(bk,'back'); drawIn(fr,'front');
-  return {hip:Hp, head:HC, shoulder:S0, hand:M._hand, root:M._root, tip:M._tip};
+  return {hip:Hp, head:HC, shoulder:S0, hand:M._hand, root:M._root, tip:M._tip, knee:LN.K, ankle:LN.ank, neck:Nk,
+          chest:at(0.78,-fw[3]), belly:at(0.35,-fw[1]), back:at(0.6,bw[2])};
+}
+/* =====================================================================
+   👩 HER, POSABLE — THE SAME BODY AS THE BEND, IN ANY POSITION
+   ---------------------------------------------------------------------
+   drawBendFig can only bend: every joint in it hangs off one number. The
+   bedchamber needs her kneeling, astride, on her back, lifted, sat on a
+   rim — so this is the same body (the same measurements, the same round
+   bust and seat with their gloss, the same profile head and her own cut)
+   built off a skeleton instead: hips anywhere, the trunk at any angle,
+   legs and arms solved to where the pose puts her feet and hands, and
+   gravity deciding which way her bust and her hair fall.
+     F.hip [x,y]   F.lean trunk angle (0 up, + toward her face)
+     F.ankles {near,far}   F.kneeBend −1 knee toward her front, +1 back
+     F.hands {near,far}    F.headAng absolute head tilt
+     F.only 'far' | 'main' | 'near'   (so two bodies can interleave)
+     F.expr F.blush F.rock F.wrap (a cloak colour) F.robe (an open robe)
+   ===================================================================== */
+function drawFemFig(bk, fr, F){
+  const w=F.look||{}, B=w.body||{}, gv=(k,d)=>B[k]===undefined? d : B[k];
+  const bu=gv('bust',6), be=gv('booty',6), wa=gv('waist',6), lg=gv('legs',6), hq=gv('hairq',6);
+  const skin=hexOf(w.skin||'#e6bd94'), sLit=mixHex(skin,'#fff2e6',0.30), sSh=mixHex(skin,'#2a1408',0.30), sDeep=mixHex(skin,'#1a0a06',0.55);
+  const hair=hexOf(w.hair||'#3a2618'), hHi=mixHex(hair,'#ffffff',0.24), hSh=mixHex(hair,'#000000',0.35);
+  const Lt=14+lg*0.2, Ls=15+lg*0.2, Lb=24, Lup=10.4, Lfo=9.2;
+  const add=(p,v)=>[p[0]+v[0],p[1]+v[1]], nrm=(v)=>{ const m=Math.hypot(v[0],v[1])||1; return [v[0]/m,v[1]/m]; };
+  const lerp=(a,b,t)=>[a[0]+(b[0]-a[0])*t, a[1]+(b[1]-a[1])*t];
+  const H=[F.hip[0],F.hip[1]], aB=F.lean||0, RK2=clamp(F.rock||0,-1,1);
+  const tB=[Math.sin(aB), -Math.cos(aB)], nB=[-Math.cos(aB), -Math.sin(aB)], nF=[-nB[0],-nB[1]];
+  const at=(t,off)=>[H[0]+tB[0]*Lb*t+nB[0]*off, H[1]+tB[1]*Lb*t+nB[1]*off];
+  const Sh=at(1,0);
+  const fl=(F.floor!==undefined)? F.floor : H[1]+Lt+Ls;
+  const ANK=F.ankles||{};
+  const kbN=(F.kneeBend===undefined)? -1 : F.kneeBend, kbF=(F.kneeBendFar===undefined)? kbN : F.kneeBendFar;
+  const HF=add(H,[nF[0]*0.8+tB[0]*0.4, nF[1]*0.8+tB[1]*0.4]);
+  const ankN=ANK.near? ANK.near.slice() : [H[0]-1.2, fl-2.0], ankF=ANK.far? ANK.far.slice() : add(ankN,[2.4,0]);
+  const legOf=(hip,ank,kb)=>{ const S=ik2(hip,ank,Lt,Ls,kb); return {hip, K:S.J, ank:S.end}; };
+  const LN=legOf(H, ankN, kbN), LF=legOf(HF, ankF, kbF);
+  const thighDir=nrm([LN.K[0]-H[0], LN.K[1]-H[1]]);
+  let sd=nrm([-(tB[0]+thighDir[0])+nB[0]*0.35, -(tB[1]+thighDir[1])+nB[1]*0.35]);
+  const bent=clamp(1-Math.abs(tB[0]*(-thighDir[0])+tB[1]*(-thighDir[1])),0,1);        // 0 straight up and down, 1 folded square
+  const rs=(3.0+be*0.55)*(0.86+0.14*bent), dK=0.72+0.28*bent;
+  const SC=add(H,[sd[0]*rs*0.55*dK+tB[0]*rs*0.18*(1-bent), sd[1]*rs*0.55*dK+tB[1]*rs*0.18*(1-bent)]), sRot=Math.atan2(sd[1],sd[0]);
+  const arch=0.8;
+  const bw=[3.9+be*0.25, 2.6-arch*0.6, 2.4+(10-wa)*0.10, 3.0+bu*0.06, 2.8];
+  const fw=[3.2+be*0.12, 2.5+(10-wa)*0.16, 2.3+(10-wa)*0.12, 2.9+bu*0.10, 2.4];
+  const ts=[0.02,0.30,0.50,0.76,1.0];
+  const g=[0,1];
+  // the head: tilted with the neck, or where the pose puts it
+  const aN=(F.headAng!==undefined)? F.headAng : aB*0.62;
+  const Nk=add(Sh,[Math.sin(aN)*2.8, -Math.cos(aN)*2.8]), HC=add(Nk,[Math.sin(aN)*4.6, -Math.cos(aN)*4.6]);
+  const cs=Math.cos(aN), sn=Math.sin(aN), Rp=(dx,dy)=>[HC[0]+dx*cs-dy*sn, HC[1]+dx*sn+dy*cs];
+  const shN=add(Sh,[nF[0]*0.4-tB[0]*1.6, nF[1]*0.4-tB[1]*1.6]), shF=add(Sh,[nB[0]*0.9-tB[0]*1.2, nB[1]*0.9-tB[1]*1.2]);
+  const handDef=(sh,k)=>[sh[0]+nF[0]*2.2*k-tB[0]*(Lup+Lfo-1.5), sh[1]+nF[1]*2.2*k-tB[1]*(Lup+Lfo-1.5)];
+  const hN=(F.hands&&F.hands.near)||handDef(shN,1), hF=(F.hands&&F.hands.far)||handDef(shF,0.6);
+  const cut=(w.hairStyle||w.cut||'loose'), long=(cut==='loose'||cut==='braid'||cut==='bangs'||cut==='tower'||cut==='veil'||cut==='long');
+  const out={hip:H, seat:SC, rs, head:HC, neck:Nk, shoulder:Sh, knee:LN.K, ankle:LN.ank, mouth:Rp(4.1,2.5), chest:at(0.74,-fw[3]),
+             crotch:add(H,[thighDir[0]*2.2+nF[0]*fw[0]*0.55, thighDir[1]*2.2+nF[1]*fw[0]*0.55]),
+             join:add(SC,[thighDir[0]*rs*0.72+sd[0]*rs*0.30, thighDir[1]*rs*0.72+sd[1]*rs*0.30]), waist:at(0.30,0)};
+  const drawIn=(oc, part)=>{
+    const K=vecKit(oc), {smooth,capsule,ell,crescent,lit,line}=K;
+    const legCap=(Lg,hr)=>{ const mid=lerp(Lg.hip,Lg.K,0.5), calf=[Lg.K[0]+(Lg.ank[0]-Lg.K[0])*0.32, Lg.K[1]+(Lg.ank[1]-Lg.K[1])*0.32];
+      return capsule([[Lg.hip[0],Lg.hip[1],hr],[mid[0],mid[1],2.9+be*0.10],[Lg.K[0],Lg.K[1],2.0],[calf[0],calf[1],2.3],[Lg.ank[0],Lg.ank[1],1.2]]); };
+    const foot=(Lg,col)=>{ let d=nrm([Lg.ank[0]-Lg.K[0], Lg.ank[1]-Lg.K[1]]); const f=[d[1],-d[0]];
+      const standing = Math.abs(d[1])>0.85 && d[1]>0 && Math.abs(Lg.ank[1]-(fl-2.0))<2.5;
+      oc.fillStyle=col;
+      if(standing) oc.fill(ell(Lg.ank[0]+2.0, Math.min(fl-1.0, Lg.ank[1]+1.0), 2.9, 1.15, 0));
+      else oc.fill(ell(Lg.ank[0]+f[0]*1.8+d[0]*0.5, Lg.ank[1]+f[1]*1.8+d[1]*0.5, 2.8, 1.1, Math.atan2(f[1],f[0]))); };
+    const arm=(from,to,dark)=>{ const E=ik2(from,to,Lup,Lfo,F.elbow===undefined? 1 : F.elbow), Wr=E.end;
+      const p=capsule([[from[0],from[1],1.9],[E.J[0],E.J[1],1.35],[Wr[0],Wr[1],1.0]]);
+      lit(p, dark? sSh : skin, dark? rgbA(skin,0.4) : rgbA(sLit,0.7), rgbA(sDeep,0.45));
+      oc.fillStyle=dark? sSh : skin; oc.fill(ell(Wr[0]+(to[0]-E.J[0])*0.08, Wr[1]+(to[1]-E.J[1])*0.08, 1.45, 1.75, Math.atan2(to[1]-E.J[1],to[0]-E.J[0])+1.57));
+      return Wr; };
+    if(part==='near'){ out.hand=arm(shN, hN, false); return; }
+    if(part==='far'){ lit(legCap(LF,3.3+be*0.18), sSh, rgbA(skin,0.5), rgbA(sDeep,0.5)); foot(LF, sSh);
+      out.handFar=arm(shF, hF, true); return; }
+    // ---- MAIN: the seat behind, the near leg, the trunk, the bust, the head ----
+    const seatFar=ell(SC[0]+tB[0]*1.4, SC[1]+tB[1]*1.4, rs*0.92*dK, rs*0.86, sRot), seatNear=ell(SC[0],SC[1], rs*(0.80+0.20*dK), rs*0.94, sRot);
+    lit(seatFar, sSh, rgbA(skin,0.5), rgbA(sDeep,0.5));
+    lit(legCap(LN,3.4+be*0.20), skin, rgbA(sLit,0.75), rgbA(sDeep,0.45)); foot(LN, skin);
+    line([[LN.K[0]-0.8,LN.K[1]+0.6],[LN.K[0]+0.8,LN.K[1]+0.9]], rgbA(sDeep,0.4), 0.6);
+    const trunk=smooth(ts.map((t,i)=>at(t,bw[i])).concat(ts.map((t,i)=>at(t,-fw[i])).reverse()));
+    lit(trunk, skin, rgbA(sLit,0.85), rgbA(sDeep,0.45));
+    lit(seatNear, skin, rgbA(sLit,0.85), rgbA(sDeep,0.45), 1.3);
+    { const gx=SC[0]-rs*0.30+sd[0]*rs*0.18-g[0], gy=SC[1]-rs*0.42+sd[1]*rs*0.18;          // the gloss where the lamp finds it
+      oc.save(); oc.clip(seatNear); const gg=oc.createRadialGradient(gx,gy,0.2,gx,gy,rs*0.75);
+      gg.addColorStop(0,rgbA(sLit,0.95)); gg.addColorStop(0.5,rgbA(sLit,0.35)); gg.addColorStop(1,rgbA(sLit,0));
+      oc.fillStyle=gg; oc.fillRect(SC[0]-rs*2,SC[1]-rs*2,rs*4,rs*4);
+      const u=[SC[0]+thighDir[0]*rs*0.95, SC[1]+thighDir[1]*rs*0.95], g2=oc.createRadialGradient(u[0],u[1],0.2,u[0],u[1],rs*0.9);
+      g2.addColorStop(0,rgbA(sDeep,0.7)); g2.addColorStop(1,rgbA(sDeep,0)); oc.fillStyle=g2; oc.fillRect(SC[0]-rs*2,SC[1]-rs*2,rs*4,rs*4);
+      oc.restore(); }
+    line([at(0.08,-fw[0]*0.7), at(0.26,-fw[1]*0.4)], rgbA(sDeep,0.30), 0.5);                   // the line of her hip
+    // ---- her bust, and gravity decides where it goes ----
+    if(bu>=3){
+      const rb=1.4+bu*0.46, Bp=at(0.72,-fw[3]*0.55);
+      const up=Math.max(0,-(nF[0]*g[0]+nF[1]*g[1]));            // how far her front faces up (lying back)
+      let hd=nrm([nF[0]*0.62+g[0]*0.70*(1-up*0.55), nF[1]*0.62+g[1]*0.70*(1-up*0.55)]);
+      const rot=Math.atan2(hd[1],hd[0]), hang=Math.max(0,hd[0]*g[0]+hd[1]*g[1]);
+      const one=(off,dark)=>{
+        const c0=[Bp[0]+hd[0]*rb*(0.78-up*0.30)+tB[0]*off+RK2*1.2, Bp[1]+hd[1]*rb*(0.78-up*0.30)+tB[1]*off-Math.abs(RK2)*0.4];
+        const p=ell(c0[0],c0[1], rb*(0.98+0.26*hang-0.14*up), rb*(0.90+0.10*up), rot);
+        lit(p, dark? sSh : skin, dark? rgbA(skin,0.5) : rgbA(sLit,0.9), rgbA(sDeep,dark? 0.6 : 0.42));
+        if(!dark){ const gx=c0[0]-hd[0]*rb*0.30-g[0]*0.2+tB[0]*rb*0.25, gy=c0[1]-hd[1]*rb*0.30-rb*0.25+tB[1]*rb*0.25;
+          oc.save(); oc.clip(p); const gg=oc.createRadialGradient(gx,gy,0.1,gx,gy,rb*0.85);
+          gg.addColorStop(0,rgbA(mixHex(sLit,'#ffffff',0.25),0.85)); gg.addColorStop(1,rgbA(sLit,0));
+          oc.fillStyle=gg; oc.fillRect(c0[0]-rb*3,c0[1]-rb*3,rb*6,rb*6);
+          const tip=[c0[0]+hd[0]*rb*0.78, c0[1]+hd[1]*rb*0.78];                                   // the tip of it, and its colour
+          oc.fillStyle=rgbA(mixHex(skin,'#b0605a',0.45),0.9); oc.fill(ell(tip[0],tip[1], rb*0.24, rb*0.22, rot));
+          oc.restore(); }
+        return c0; };
+      out.bustFar=one(1.9,true); out.bust=one(0,false);
+      line([add(Bp,[hd[0]*0.6,hd[1]*0.6]), add(Bp,[hd[0]*rb*1.5+tB[0]*0.9, hd[1]*rb*1.5+tB[1]*0.9])], rgbA(sDeep,0.30), 0.5);
+    }
+    // ---- a wrap over her shoulders (the coast's cold) or an open robe (the Wa row) ----
+    if(F.wrap){ const kc=hexOf(F.wrap), kHi=mixHex(kc,'#ffffff',0.24), kSh=mixHex(kc,'#000000',0.42);
+      /* a cloak over her shoulders: it sits on them and then HANGS, so its
+         hem follows gravity whichever way she is folded */
+      const hang=(p,k)=>[p[0]+g[0]*k, p[1]+g[1]*k];
+      const cp=smooth([at(1.04,bw[4]+0.9), at(0.97,-fw[4]*0.55), hang(at(0.84,-fw[3]*0.15),2.2), hang(at(0.86,bw[3]+2.0),5.0),
+                       hang(at(0.66,bw[3]+2.2),5.6), hang(at(0.48,bw[2]+1.8),4.4), at(0.44,bw[2]+1.2), at(0.70,bw[3]+1.4), at(0.96,bw[4]+1.4)]);
+      lit(cp, kc, rgbA(kHi,0.8), rgbA(kSh,0.8));
+      for(let i=0;i<3;i++){ const t=0.55+i*0.14; line([at(t,bw[2]+1.6), hang(at(t,bw[2]+2.0),4.6)], rgbA(kSh,0.55), 0.5); }   // where it folds
+      line([at(1.05,bw[4]+1.2), at(0.98,-fw[4]*0.65)], mixHex(kc,'#e8dcc2',0.55), 1.6);                                    // the fur at the collar
+      for(let i=0;i<5;i++){ const q=hang(at(0.48+i*0.1,bw[2]+1.9+i*0.1), 4.6+Math.sin(i*1.3)*0.8); oc.fillStyle=mixHex(kc,'#e8dcc2',0.4); oc.fill(ell(q[0],q[1],1.0,0.7,0)); } }
+    if(F.robe){ const rc=hexOf(F.robe), rHi=mixHex(rc,'#ffffff',0.26), rSh=mixHex(rc,'#000000',0.42);
+      const rp=smooth([at(1.02,bw[4]+1.0), at(0.80,bw[3]+1.8), at(0.40,bw[2]+2.0), at(0.02,bw[0]+2.6), add(SC,[sd[0]*rs*1.25+thighDir[0]*4, sd[1]*rs*1.25+thighDir[1]*4]),
+                       add(LN.K,[sd[0]*2.5, sd[1]*2.5]), add(H,[thighDir[0]*6, thighDir[1]*6]), at(0.30,bw[1]*0.2), at(0.85,bw[3]*0.3)]);
+      lit(rp, rc, rgbA(rHi,0.85), rgbA(rSh,0.8));
+      for(let i=0;i<3;i++) line([at(0.9-i*0.25,bw[3]+0.8), at(0.7-i*0.25,bw[2]+1.8)], rgbA(rSh,0.6), 0.5);
+      line([at(1.0,bw[4]+0.4), at(0.70,bw[3]*0.3), at(0.32,bw[1]*0.3)], mixHex(rc,'#e8c34a',0.5), 0.8); }             // the collar edge
+    // ---- the neck, her hair falling, and her head ----
+    lit(capsule([[Sh[0],Sh[1],1.6],[Nk[0],Nk[1],1.4]]), skin, rgbA(sLit,0.6), rgbA(sDeep,0.4));
+    { const fall=(long? 7+hq*0.9 : 2.5+hq*0.3), r0=Rp(-3.0,-0.6), sw=Math.sin((F.t||0)*0.08)*0.8+RK2*1.6;
+      const gdir=[g[0]*0.85+(-cs)*0.15, g[1]*0.85+(-sn)*0.15], side=[gdir[1],-gdir[0]], wd=long? 4.2 : 2.8;
+      const pts=[add(r0,[side[0]*wd*0.6, side[1]*wd*0.6]), add(r0,[-side[0]*wd*0.5, -side[1]*wd*0.5]),
+                 add(r0,[gdir[0]*fall*0.7-side[0]*wd*0.4+sw*0.4, gdir[1]*fall*0.7-side[1]*wd*0.4]),
+                 add(r0,[gdir[0]*fall+sw, gdir[1]*fall]),
+                 add(r0,[gdir[0]*fall*0.8+side[0]*wd*0.5+sw*0.6, gdir[1]*fall*0.8+side[1]*wd*0.5])];
+      lit(smooth(pts), hair, rgbA(hHi,0.8), rgbA(hSh,0.8));
+      for(let i=0;i<3;i++) line([add(r0,[side[0]*(i-1)*1.2, side[1]*(i-1)*1.2]), add(r0,[gdir[0]*fall*0.85+side[0]*(i-1)*1.1+sw*0.5, gdir[1]*fall*0.85+side[1]*(i-1)*1.1])], rgbA(hHi,0.5), 0.45);
+      if(cut==='braid') for(let i=1;i<5;i++){ const q=add(r0,[gdir[0]*fall*i/5, gdir[1]*fall*i/5]); line([add(q,[side[0]*1.2,side[1]*1.2]), add(q,[-side[0]*1.2+gdir[0]*0.8,-side[1]*1.2+gdir[1]*0.8])], rgbA(hSh,0.9), 0.6); } }
+    { const face=smooth([[-4.0,-1.2],[-2.6,-4.5],[1.3,-4.7],[3.5,-2.3],[3.9,-0.4],[4.6,0.7],[3.9,1.3],[4.0,2.2],[3.6,2.6],[3.8,3.2],
+                         [2.8,4.5],[1.6,4.7],[-0.6,4.4],[-3.2,2.6]].map(q=>Rp(q[0],q[1])));
+      lit(face, skin, rgbA(sLit,0.85), rgbA(sDeep,0.42));
+      const EX = { flat:{lid:0.1,brow:0,smile:0,open:0}, flush:{lid:0.45,brow:0.3,smile:0.2,open:0.6}, bite:{lid:0.35,brow:0.2,smile:0,open:0,bite:1},
+                   brace:{lid:0,brow:0.9,smile:-0.1,open:1.0}, smug:{lid:0.5,brow:-0.2,smile:0.8,open:0}, pleased:{lid:0,brow:0.2,smile:1,open:0,shut:1},
+                   absorbed:{lid:0.2,brow:0.1,smile:0,open:0.3}, cross:{lid:0.3,brow:-1,smile:-0.8,open:0}, shut:{lid:0,brow:0.3,smile:0,open:0,shut:1},
+                   kiss:{lid:0.6,brow:0.2,smile:0,open:0,pucker:1}, oh:{lid:0.1,brow:0.7,smile:0,open:1.2}, asleep:{lid:0,brow:0,smile:0.1,open:0,shut:1} }[F.expr||'flat'] || {lid:0.1,brow:0,smile:0,open:0};
+      if(!long) lit(ell(...Rp(-0.9,0.4), 1.0, 1.5, aN), mixHex(skin,sSh,0.4), rgbA(sLit,0.5), rgbA(sDeep,0.5));
+      const E0=Rp(2.3,-0.6);
+      if(EX.shut){ line([Rp(1.5,-0.5),Rp(2.4,-0.95),Rp(3.2,-0.5)], mixHex(hair,'#000000',0.3), 0.6); line([Rp(3.2,-0.5),Rp(3.8,-0.2)], '#1a0e08', 0.4); }
+      else { oc.fillStyle='#f4eee6'; oc.fill(ell(E0[0],E0[1],0.95,0.62,aN));
+        oc.fillStyle='#2a1a10'; oc.fill(ell(...Rp(2.75,-0.55),0.5,0.58,aN));
+        if(EX.lid>0.15){ oc.fillStyle=mixHex(skin,sSh,0.35); oc.fill(ell(...Rp(2.3,-1.05+EX.lid*0.25),1.1,0.35+EX.lid*0.35,aN)); }
+        line([Rp(1.2,-1.1),Rp(2.4,-1.35),Rp(3.5,-1.0),Rp(3.9,-1.3)], '#1a0e08', 0.55); }
+      line([Rp(1.0,-2.3+(EX.brow<0? 0 : -EX.brow*0.4)),Rp(3.4,-2.1-EX.brow*0.35+(EX.brow<0? -EX.brow*0.55 : 0))], mixHex(hair,'#000000',0.2), 0.55);
+      { const m0=Rp(3.55,2.35), mc=Rp(2.6,2.4-EX.smile*0.55), lipC=mixHex(skin,'#b83a4a',0.55);
+        if(EX.open>0.25){ oc.fillStyle='#4a1a1e'; oc.fill(ell(...Rp(3.2,2.4),0.55,0.35+EX.open*0.35,aN)); }
+        if(!EX.pucker) line([m0, mc], lipC, 0.75);
+        oc.fillStyle=lipC; oc.fill(ell(...Rp(3.55+(EX.pucker?0.4:0),2.0),0.45,0.32,aN)); oc.fill(ell(...Rp(3.45+(EX.pucker?0.4:0),2.85),0.5,0.34,aN));
+        if(EX.bite){ const q=Rp(3.1,2.5); oc.fillStyle='#f4efe4'; oc.fillRect(q[0], q[1]-0.2, 0.9, 0.45); } }
+      if(F.blush>0){ oc.fillStyle='rgba(236,88,116,'+(0.50*clamp(F.blush,0,1)).toFixed(2)+')'; oc.fill(ell(...Rp(1.5,1.2),1.5,0.9,aN)); }
+      const hc=smooth([[-4.5,1.9],[-4.4,-2.8],[-1.6,-5.5],[1.6,-5.4],[3.7,-3.2],[2.4,-3.1],[0.4,-2.6],[-1.4,-1.0],[-1.8,1.4],[-2.6,3.6]].map(q=>Rp(q[0],q[1])));
+      lit(hc, hair, rgbA(hHi,0.85), rgbA(hSh,0.8));
+      line([Rp(-3.0,-3.8),Rp(-0.4,-5.0),Rp(1.8,-4.6)], rgbA(hHi,0.7), 0.5);
+      if(cut==='bangs') lit(smooth([[0.8,-4.6],[3.6,-3.4],[3.9,-1.8],[2.2,-2.2],[0.6,-2.6]].map(q=>Rp(q[0],q[1]))), hair, rgbA(hHi,0.8), rgbA(hSh,0.7));
+      if(cut==='tower'||cut==='bun') lit(ell(...Rp(-3.6,-4.6),2.3,2.0,aN), hair, rgbA(hHi,0.85), rgbA(hSh,0.8)); }
+  };
+  if(F.dry) return out;                                       // just where everything is
+  if(!F.only || F.only==='far')  drawIn(bk,'far');
+  if(!F.only || F.only==='main') drawIn(bk,'main');
+  if(!F.only || F.only==='near') drawIn(fr,'near');
+  return out;
 }
 let PAIR_CV=null, PAIR_DRAWS=0, PAIR_LAST=null;       // the last two are for the tests: how often, and who
 function drawPair(c, o){
@@ -24876,9 +25862,13 @@ function drawPair(c, o){
       gapPx=Math.max(3, J[0]+0.4+lp-back) + (E.gap||0); }
     /* he only comes DOWN to her height once he is at her — standing back he
        stands at his own, which is a good deal taller than a bent-over wife */
+    /* or put him exactly where he IS in the room (the player's x) — so a scene
+       can hand him over from walking to standing at her without a jump */
+    if(E.atX!==undefined){ gapPx = J[0]-3.6 - (FXb + (E.atX - o.x)*dir); }
+    out.gapPx=gapPx;
     const look0=E.look||{}, lg0=((look0.body||{}).legs===undefined? 6 : look0.body.legs);
     const standY=FYb-2.2-(15.6+lg0*0.22+16.2+lg0*0.22)*0.975;
-    const standK=(E.stand!==undefined)? clamp(E.stand,0,1) : clamp(((E.gap||0)-2)/8,0,1);
+    const standK=(E.stand!==undefined)? clamp(E.stand,0,1) : clamp((((E.atX!==undefined)? gapPx : (E.gap||0))-2)/8,0,1);
     const hip=[J[0]-3.6-gapPx, (J[1]+0.4)+(standY-(J[1]+0.4))*standK];
     const tgt=(h)=> h==='hips'? [out.hip[0]-1.2, out.hip[1]-1.6]
                : h==='waist'? [out.waist[0]-0.5, out.waist[1]]
@@ -24889,13 +25879,14 @@ function drawPair(c, o){
                : h==='belt'? [hip[0]+4.6, hip[1]-4.5]
                : h==='hem'? [hip[0]+4.2, hip[1]+4]
                : h==='up'? [hip[0]+3.5, hip[1]-40]
+               : h==='eyes'? [hip[0]+4.8, hip[1]-32]
                : null;
     let near=tgt(E.hands||'side'), far=tgt(E.farHands||E.hands||'side');
     if(E.handK!==undefined && E.handFrom){ const a=tgt(E.handFrom), b=tgt(E.hands); if(a&&b){ near=[a[0]+(b[0]-a[0])*E.handK, a[1]+(b[1]-a[1])*E.handK - Math.sin(E.handK*Math.PI)*6]; } }
     const look=E.look||{};
     const IN=(typeof lengthInches==='function')? lengthInches(look, E.aro||0) : {now:6,dia:1.6};
     const MR=drawMateFig(X(pk), X(pf), {hip, floor:FYb, lean:E.lean||0, u:E.u||0, aro:E.aro||0,
-      hands:{near, far}, face:E.face||HARD_FACES.stoic, aim:J, aimK:E.aimK||0, clip:(E.aimK||0)>0.5, lenAng:E.lenAng,
+      hands:{near, far}, face:E.face||HARD_FACES.stoic, aim:J, aimK:E.aimK||0, clip:(E.aimK||0)>0.5, lenAng:E.lenAng, walk:E.walk||0, walkPh:E.walkPh||0,
       look, coast:!!E.coast, cloth:E.cloth, band:E.band, lenIn:IN.now, diaIn:IN.dia, pxi:E.pxi||1.0});
     const W2b=(p)=>p? [o.x+(p[0]-FXb)*dir, FY+(p[1]-FYb)] : null;
     out.hisHead=MR.head; out.hisHand=MR.hand; out.hisShoulder=MR.shoulder; out.hisHip=MR.hip; out.hisTip=MR.tip; out.hisRoot=MR.root;
@@ -24935,6 +25926,7 @@ function villaRevealLine(v, fem, N){
    for scenes that need a man and not a pair. dir +1 faces right. Hands
    are given relative to his hips. Returns where his head and hand are. */
 let MAN_CV=null;
+let MAN_DRAWS=0;                                        // for the tests: the standalone new-figure man
 function drawManProfile(c, x, fy, look, M, dir){
   const BW=140, BH=110, FXb=70, FYb=106;
   if(!MAN_CV) MAN_CV=[0,1].map(()=>{ const k=document.createElement('canvas'); k.width=BW; k.height=BH; return k; });
@@ -24945,10 +25937,12 @@ function drawManProfile(c, x, fy, look, M, dir){
   const IN=(typeof lengthInches==='function')? lengthInches(look||{}, M.aro||0) : {now:6,dia:1.6};
   const R=drawMateFig(bk.getContext('2d'), fr.getContext('2d'), {hip, floor:FYb, lean:M.lean||0.02, u:M.u||0, aro:M.aro||0,
     hands:{near:rel(M.near), far:rel(M.far)}, face:M.face||HARD_FACES.stoic, look:look||{}, coast:!!M.coast,
-    cloth:M.cloth||'#7a2f22', band:M.band, lenIn:IN.now, diaIn:IN.dia, pxi:1.0});
+    cloth:M.cloth||'#7a2f22', band:M.band, lenIn:IN.now, diaIn:IN.dia, pxi:1.0, walk:M.walk||0, walkPh:M.walkPh||0});
+  MAN_DRAWS++;
   for(const k of [bk,fr]){ const g=k.getContext('2d'), im=g.getImageData(0,0,BW,BH), d=im.data;
     for(let i=3;i<d.length;i+=4) d[i]= d[i]>=110? 255 : 0; g.putImageData(im,0,0); }
   c.save(); if(dir<0){ c.translate(x,0); c.scale(-1,1); c.translate(-x,0); }
+  { c.save(); c.globalAlpha=0.24; c.fillStyle='#120b08'; c.beginPath(); c.ellipse(x, fy-1, 11, 2.8, 0,0,7); c.fill(); c.restore(); }   // his shadow
   c.drawImage(bk, Math.round(x-FXb), Math.round(fy-FYb)); c.drawImage(fr, Math.round(x-FXb), Math.round(fy-FYb));
   c.restore();
   const W2=(p)=>p? [x+(p[0]-FXb)*dir, fy+(p[1]-FYb)] : null;
@@ -29417,16 +30411,17 @@ function drawArdor(){
   const D=DM, X=D.ardor; if(!X) return; const FY=214, T=D.t, me=playerLook();
   const dir=(D.wifeX>=D.x)? 1 : -1;                 // he is looking at her the whole time
   const mv=(X.ph==='ready') && (held.a||held.d);
-  ctx.save(); ctx.translate(D.x,FY); if(dir<0) ctx.scale(-1,1);
-  HUSB_SMILE = (X.ph==='wind')? clamp(X.heat/100,0,1) : (X.ph==='fizz'? 0 : 1);     // and his face shows it — whichever face it is
-  HUSB_FACE = hardFace(villageMan()||{name:(G&&G.name)||'self', self:true, body:G&&G.body}, 'hall');
-  drawHusbandFig(ctx,0,0,G.wifeRel|0,null,null,me, mv? T*0.35:0, mv?'walk':'idle');
-  HUSB_SMILE=0;
-  ctx.restore();
+  /* ON THE NEW BODY. The old walking sprite with a bump painted over its
+     tunic; now it is his own figure, and the tunic tents on him as the heat
+     climbs — the same figure that walks up behind her in the tempt. */
+  const heat=(X.ph==='wind')? clamp(X.heat/100,0,1) : (X.ph==='fizz'? 0.05 : 1);
+  const coastA=(typeof rkHere==='function') && rkHere();
+  const faceA=(X.ph==='fizz')? HARD_FACES.lost : hardFace(villageMan()||{name:(G&&G.name)||'self', self:true, body:G&&G.body}, 'hall');
+  drawManProfile(ctx, D.x, FY, me, { u:0, aro:0.10+heat*0.95, lean:0.02, face:faceA, coast:coastA,
+    cloth: coastA? mixHex((G&&G.tunic)||'#6a4a2e','#5a4028',0.35) : ((G&&G.tunic)||'#7a2f22'),
+    band:(typeof rkOfficeBand==='function')? rkOfficeBand(G&&G.wife) : '#8a6a3a',
+    near: X.ph==='wind'? [4.6,-4.5] : null, walk: mv? 1 : 0, walkPh: T*0.35 }, dir);
   const decent=houseIsWatching();
-  /* the stage as a NUMBER — heat, not the five-step ladder — so the tent
-     grows while the bar fills instead of jumping at four fixed points */
-  drawTunicBump(D.x, FY, me, X.ph==='wind'? clamp(X.heat/100,0,1)*(RISE_STAGES-1) : RISE_STAGES-1, T, dir, decent);
   if(X.ph==='wind'){
     const bx=W/2-70, by=H-40, bw=140, bh=10;
     px(bx-2,by-2,bw+4,bh+4,'#120c08');
@@ -29982,9 +30977,10 @@ function startVillaLove(atX, invited, force){
   if(!force && !spouseWilling()){ openTemptAftermath(); return; }   // she decides whether this happens at all
   spendLove('quick');
   const keepProp=(D.tempt&&D.tempt.prop)||TEMPT_PROPS[0];         // read BEFORE the tempt is cleared, not after
+  const gap0=(D.tempt&&D.tempt.lastGap!==undefined)? Math.max(0, D.tempt.lastGap-3.6) : null;   // where he was standing behind her
   D.tempt=null; D.wifePause=99999;
   try{ HARD_ROLL++; HER_ROLL++; }catch(e){}                        // a new rise, a new face — his and hers
-  D.scene={kind:'villalove', t:0, x:clamp(atX,150,400), invited:!!invited, prop:keepProp,
+  D.scene={kind:'villalove', t:0, x:clamp(atX,150,400), invited:!!invited, prop:keepProp, gap0,
            fromTook:!invited,                    // explicit: only a FAILED hold owes her an explanation
            choice:null, burst:[], asked:false,
            /* 2 · WHO MIGHT WALK IN. A big house swallows witnesses; a small
@@ -32353,7 +33349,8 @@ function drawVillaLove(){
   const uV    = cool>0.55? 1-clamp((cool-0.55)/0.40,0,1) : clamp((T-50)/110,0,1);
   const aroV  = cool>0.25? Math.max(0,1-(cool-0.25)*1.6) : clamp((T-100)/90,0,1);
   const inK   = clamp((T-READY+10)/40,0,1)*(1-clamp(cool*2.4,0,1));
-  const gapV  = (1-walkK)*26 + (1-inK)*12*walkK + cool*14;
+  const gap0V = (sc.gap0!==null && sc.gap0!==undefined)? clamp(sc.gap0,0,60) : 26;      // from where the tempt left him
+  const gapV  = (1-walkK)*gap0V + (1-inK)*12*walkK + cool*14;
   const handsV= inK>0.35? 'hips' : (uV>0.28 && uV<0.9)? (coastV? 'hem' : 'up') : (T>28 && uV<=0.28)? 'belt' : 'side';
   /* played as a woman, SHE is the one bent over the shelf and her husband
      is the man — the scene used to draw him bending and her behind him */
@@ -32414,6 +33411,74 @@ function drawVillaLove(){
   }
   ctx.textAlign='left';
 }
+/* =====================================================================
+   🍑 THE TEMPT, ON THE NEW FIGURES — THE WHOLE WAY THROUGH
+   ---------------------------------------------------------------------
+   She was on the new bend and HE was still the hall's old walking sprite
+   — across the room, walking up behind her, losing the argument with a
+   few pixels painted on his tunic — right up until the woohoo began and
+   the pair took over. He is the new figure from the moment she bends:
+   walking with a real stride, standing behind her at his own height,
+   his tunic tenting as the hold drains and riding up when it goes, a hand
+   over his eyes for the look-away, his hands at his belt when he gives
+   in — and it hands straight over to the woohoo from exactly where he
+   is standing.
+   ===================================================================== */
+function temptHimPose(X){
+  const lose = X.ph==='resist'? clamp(1-X.hold/100,0,1) : 0;
+  const P={ hands:'side', far:null, face:HARD_FACES.stoic, aro:0, u:0, lean:0.02, from:null, k:undefined };
+  if(X.ph==='bend'){ P.face = X.shook? HARD_FACES.lost : HARD_FACES.stoic; P.aro = X.shook? 0.18 : 0; }
+  else if(X.ph==='approach'){ P.face=HARD_FACES.lost; P.aro=0.20+0.25*clamp(X.t/150,0,1); }
+  else if(X.ph==='resist'){
+    P.face = lose>0.72? X.face : (lose>0.35? HARD_FACES.sheepish : HARD_FACES.stoic);
+    P.aro  = 0.22 + lose*0.9;
+    P.u    = lose>0.72? 0.30+(lose-0.72)/0.28*0.24 : 0;                  // the tunic stops containing it
+    P.hands= lose>0.45? 'eyes' : 'side'; P.lean = 0.02-lose*0.06;        // leaning back from it
+  }
+  else if(X.ph==='look'){ P.face=HARD_FACES.stoic; P.aro=0.55; P.hands='eyes'; P.lean=-0.03; }
+  else if(X.ph==='took'){ P.face=X.face; P.aro=1; P.from='side'; P.hands='belt'; P.k=clamp((X.t-40)/60,0,1); P.lean=0.05; }
+  else if(X.ph==='invited'){ P.face=HARD_FACES.smirk; P.aro=clamp(X.t/100,0,1); P.from='side'; P.hands='belt'; P.k=clamp((X.t-90)/60,0,1); P.lean=0.04; }
+  else if(X.ph==='held'){ P.face=HARD_FACES.stoic; P.aro=0.3*(1-clamp(X.t/80,0,1)); }
+  return P;
+}
+function drawTemptFigures(X, FY, w){
+  const D=DM, fd=X.fdir||1, him=pairHimLook();
+  const coastT=(typeof rkHere==='function') && rkHere();
+  const cloth = coastT? mixHex((G&&G.tunic)||'#6a4a2e','#5a4028',0.35) : ((G&&G.tunic)||'#7a2f22');
+  const band  = (typeof rkOfficeBand==='function')? rkOfficeBand(G&&G.wife) : '#8a6a3a';
+  if(!X.face) X.face=hardFace(him,'act');
+  const P=temptHimPose(X);
+  const moving = (!X.locks && typeof held!=='undefined' && (held.a||held.d)) || (X.ph==='approach' && Math.abs(D.x-(X.x-fd*24))>=2);
+  const run = moving && !X.locks && typeof held!=='undefined' && held.s;
+  const walk = moving? 1 : 0, walkPh = D.t*(run? 0.6 : 0.35);
+  const k = X.ph==='bend'? X.k : 1;
+  /* her face, now that there is someone behind her to pull one for */
+  const her = { lifted:(X.ph==='took'||X.ph==='invited'),
+                headUp: X.ph==='invited'? 0.45 : (X.ph==='resist'||X.ph==='look')? 0.18 : 0,
+                expr: X.ph==='invited'? 'smug' : X.ph==='took'? (X.herF||(X.herF=herFace(w,'reveal'))) : (X.ph==='held'? 'cross' : null),
+                blush: X.ph==='took'? 0.5 : X.ph==='invited'? 0.3 : 0 };
+  const behind = (X.x-D.x)*fd > 8 && (D.face===fd) && X.ph!=='held';
+  const heE = { atX:D.x, u:P.u, aro:P.aro, hands:P.hands, farHands:P.far||'side', handFrom:P.from||undefined, handK:P.k,
+                lean:P.lean, face:P.face, look:him, coast:coastT, cloth, band, walk, walkPh };
+  let drew=false;
+  if(behind){
+    if((X.x-D.x)*fd < 140){                                          // he is in the frame of the pair: one picture, depth-sorted
+      const PR=drawPair(ctx, {x:X.x, FY, dir:fd, w, k, her, he:heE});
+      if(PR){ X.lastGap=PR.gapPx; X.himHead=PR.hisHead||null; X.paired=true; }
+      drew=true; }
+  }
+  if(!drew){
+    /* across the room, or in front of her: two figures, drawn apart */
+    X.paired=false;
+    ctx.save(); if(fd<0){ ctx.translate(X.x,0); ctx.scale(-1,1); ctx.translate(-X.x,0); }
+    BEND_OPT=her; try{ drawWifeFig(ctx, X.x, FY, w, k, 'bend'); }catch(e){} BEND_OPT=null;
+    ctx.restore();
+    const face = X.ph==='held'? -fd : (D.face||1);                         // held: he turns his back on the shelf
+    const Mh=drawManProfile(ctx, D.x, FY, him, { u:P.u, aro:P.aro, lean:P.lean, face:P.face, coast:coastT, cloth, band,
+      near: P.hands==='eyes'? [4.8,-32] : null, walk, walkPh }, face);
+    X.himHead = Mh && Mh.head;
+  }
+}
 function drawTempt(){
   const D=DM, X=D.tempt; if(!X) return; const FY=214, w=G.wife;
   /* whatever it was she wanted, on the floor where she is reaching — and
@@ -32423,12 +33488,7 @@ function drawTempt(){
   if(X.ph==='bend' && X.t>40 && X.t<150){ ctx.textAlign='center';
     pixelText(X.beatLine || (X.prop||TEMPT_PROPS[0]).line, W/2, 30,
       X.beat? 'rgba(255,190,214,.92)' : 'rgba(255,222,200,.85)', 1.02); ctx.textAlign='left'; }
-  /* she faces her shelf — the new bend, mirrored when the shelf is on her left */
-  { const fd=X.fdir||1; ctx.save(); if(fd<0){ ctx.translate(X.x,0); ctx.scale(-1,1); ctx.translate(-X.x,0); }
-    if(X.ph==='bend'||X.ph==='approach'||X.ph==='resist'||X.ph==='look'||X.ph==='invited'){
-      drawWifeFig(ctx, X.x, FY, w, X.ph==='bend'? X.k : 1, 'bend');
-    } else drawWifeFig(ctx, X.x, FY, w, 1, 'bend');
-    ctx.restore(); }
+  drawTemptFigures(X, FY, w);
   if(X.ph==='bend' && X.k>0.45 && !X.shook){ ctx.textAlign='center';
     pixelText('…', X.x, FY-46, 'rgba(255,214,190,.7)', 1); ctx.textAlign='left'; }
   if(X.ph==='bend'||X.ph==='approach'){ ctx.textAlign='center';
@@ -32476,29 +33536,12 @@ function drawTempt(){
       ctx.globalAlpha=clamp(1-hy/40,0,1)*0.8; pixelText('♥', X.x-10+i*5, FY-52-hy, '#e26a8a', 1); }
     ctx.globalAlpha=1; ctx.textAlign='left'; }
   if(X.ph==='resist'){
-    /* WHAT YOU ARE ACTUALLY WATCHING. The bar told you he was losing; nothing
-       on him showed it. As the hold drains it rises — a bump under the tunic
-       first, then the tunic gives up on containing it — and it is HIS length
-       score that says how much there is to contain. */
+    /* WHAT YOU ARE ACTUALLY WATCHING — on him now, not painted over a
+       sprite: drawTemptFigures tents his tunic as the hold drains and the
+       hem rides up off it past the last fifth. Just the '!' stays here. */
     { const lose=clamp(1-X.hold/100,0,1);
-      const B=(G.body)||{}, len=(B.secret===undefined?5:B.secret);
-      const skin=G.skin||'#caa06a', tun=G.tunic||'#7a2f22';
-      const lg=(B.legs===undefined?6:B.legs), legLen=Math.round(15+lg*0.62);
-      const hipY=FY-18-legLen, dirx=(D.face>0?1:-1);
-      const rise=lose*(2.5+len*0.62), th=Math.max(2,Math.round(1.4+len*0.16));
-      if(lose>0.10){
-        // under the cloth: the tunic tents, and the tent grows
-        const pl=Math.round(rise);
-        for(let i=0;i<pl;i++){ const t2=i/Math.max(1,pl-1);
-          px(D.x+dirx*(2+i), hipY-2-Math.round(t2*rise*0.55), 1, th, lose>0.72? skin : tun);
-          px(D.x+dirx*(2+i), hipY-2-Math.round(t2*rise*0.55), 1, 1, lose>0.72? shade(skin,20):shade(tun,20)); }
-        if(lose>0.72){ px(D.x+dirx*(2+pl), hipY-2-Math.round(rise*0.55), th, th, mixHex(skin,'#c07a68',0.34));
-          px(D.x+dirx*1, hipY+1, th+1, th+1, mixHex(skin,'#2a150a',0.16)); }
-        else if(lose>0.40) px(D.x+dirx*(2+pl), hipY-2-Math.round(rise*0.5), th, 2, shade(tun,-18));
-      }
-      if(lose>0.72 && (D.t|0)%12<6){ ctx.textAlign='center';
-        pixelText('!', D.x+dirx*10, hipY-14, '#ffd0a0', 1.1); ctx.textAlign='left'; }
-    }
+      if(lose>0.72 && (D.t|0)%12<6 && X.himHead){ ctx.textAlign='center';
+        pixelText('!', X.himHead[0], X.himHead[1]-12, '#ffd0a0', 1.1); ctx.textAlign='left'; } }
     // THE HOLD — a bar that drains, and a count that has to get there first
     const bw=180, bx=W/2-bw/2, by=34;
     px(bx-2,by-2,bw+4,16,'#140c10'); px(bx,by,bw,12,'#3a1a24');
@@ -33521,7 +34564,7 @@ function drawDomus(){
        standing in the middle of somebody else's bedchamber at full
        brightness, which is exactly the "leftover model" it looked like. */
     if(D.climb) drawClimb();                            // he is on the flight, between storeys
-    else if(!D.peek && !D.rslap && !D.press && !D.curio && !D.clam && !D.husb && !D.ardor && !D.escort && !(D.slap && D.slap.pair) && !(D.rise && D.rise.ph!=='build')
+    else if(!D.peek && !D.rslap && !D.press && !D.curio && !D.clam && !D.husb && !D.ardor && !D.escort && !(D.slap && D.slap.pair) && !D.tempt && !(D.rise && D.rise.ph!=='build')
        && !(D.drop && D.drop.ph!=='fall')){ const mv=(held.a||held.d), run=mv&&held.s, turning=(D.turn||0)>0;
       const pfy=domusFloorY();                          // the gallery is a floor too
       drawDomusPlayer(D.x,pfy,
@@ -41290,6 +42333,14 @@ function openVilla(){
       toast('🏝 Masons and steam-fitters labour a week. Your lagoon glitters like Baiae. (bathe on your villa walks)',3200); openVilla(); };
     rr.appendChild(pb);
   }
+  if(typeof rkBreedOn==='function' && rkBreedOn() && G.hasVilla && !G.rkHub){
+    const hb=document.createElement('button'); hb.className='btn sm'; hb.textContent='◆ BUILD A BREEDING HUB ('+RK_HUB_COST+'d)';
+    hb.title='A warm cedar tub room inside the house, cut with your lineage. A house with a hub keeps its business at home and never queues at the quay — and the odds in it are better (+18%).';
+    hb.disabled=G.coin<RK_HUB_COST;
+    hb.onclick=()=>{ if(G.coin<RK_HUB_COST) return; G.coin-=RK_HUB_COST; G.rkHub=true; G.pop=clamp((G.pop||0)+3,0,100); refreshStatbar(); saveQuiet();
+      toast('◆ The coopers and the carvers take a month. The hub stands warm in the middle of the house, your lineage cut round its rim — and the district, which counted every stave, approves. (+3 pop)',5200); openVilla(); };
+    rr.appendChild(hb);
+  }
   if(!G.hasWardrobe){
     const wb=document.createElement('button'); wb.className='btn sm'; wb.textContent='🚪 GRAND CEDAR WARDROBE (250d)';
     wb.title='A wardrobe you could hold games in. Sturdy. Very sturdy. You will test this.';
@@ -41309,6 +42360,47 @@ function openVilla(){
     rr.appendChild(wsh);
   }
   rrow.appendChild(rr); b.appendChild(rrow);
+  /* ◆ THE BREEDING HOUSE — the coast only, adults only */
+  if(typeof rkBreedOn==='function' && rkBreedOn() && G.married){
+    const bh=document.createElement('div'); bh.className='small'; bh.style.color='#ff9ad0'; bh.style.marginTop='6px';
+    bh.textContent='◆ KAN’S SECOND PAGE — THE BREEDING HOUSE AND THE HUB'; b.appendChild(bh);
+    const bc=document.createElement('div'); bc.className='shopcard'; bc.style.borderColor='#ff9ad0';
+    const poor=rkPoorHouse(), barred=(typeof jealousyLevel==='function' && jealousyLevel()>=3);
+    bc.innerHTML=`<div class="small">${G.rkHub
+        ? 'Your house has its own <b>hub</b>. A house with a hub keeps its business at home — the tradition is plain about it. <span style="color:#7ad48a">(+18% on a try for a child)</span>'
+        : poor
+        ? 'Your house has no warm room of its own, so when you try for a child you go to the <b>breeding house</b> on the quay: cedar tubs, hide screens, a brazier under every one, and a tally-keeper at the door. Nobody thinks less of a house that shows up. <span style="color:#7ad48a">(+14% on a try, '+RK_BREED_FEE+'d at the door)</span>'
+        : 'You can afford a <b>hub</b> of your own (see the renovations). Until then the <b>breeding house</b> on the quay is open to any house: <span style="color:#7ad48a">+14% on a try, '+RK_BREED_FEE+'d at the door</span>.'}</div>
+      <div class="small muted" style="margin-top:3px">Visits: ${G.rkBreedVisits|0} · nights in the hub: ${G.rkHubNights|0}</div>`;
+    const row2=document.createElement('div'); row2.className='row gap6'; row2.style.marginTop='4px'; row2.style.flexWrap='wrap';
+    const go=(pl)=>{ if(loveLeft(bedLen)<=0){ toast('Not today — you have spent the day’s allowance.',2600); return; }
+      if(pl==='breed' && G.coin<RK_BREED_FEE){ toast('The fee at the door is '+RK_BREED_FEE+'.',2400); return; }
+      spendLove(bedLen); saveQuiet(); startBedScene('heir', bedLen, pl); };
+    const b1=document.createElement('button'); b1.className='btn sm'; b1.style.borderColor='#ff9ad0'; b1.style.color='#ff9ad0';
+    b1.textContent='◆ TO THE BREEDING HOUSE ('+RK_BREED_FEE+'d)'; b1.disabled=G.coin<RK_BREED_FEE || barred;
+    b1.onclick=()=>go('breed'); row2.appendChild(b1);
+    if(G.rkHub){ const b2=document.createElement('button'); b2.className='btn sm gold'; b2.textContent='◆ THE HUB'; b2.disabled=barred;
+      b2.onclick=()=>go('hub'); row2.appendChild(b2); }
+    bc.appendChild(row2);
+    /* and the grown children of the house — married, both eighteen or over */
+    const kids=rkBreedKids();
+    if(kids.length){
+      const kh=document.createElement('div'); kh.className='small'; kh.style.marginTop='6px';
+      kh.innerHTML='<b>The grown children.</b> <span class="muted">On this coast the elders send a married couple of the house to the quay, with ceremony and no discretion whatever.</span>';
+      bc.appendChild(kh);
+      kids.forEach(c=>{ const sb=document.createElement('button'); sb.className='btn sm'; sb.style.marginTop='3px';
+        const wait=(c.breedDay!==undefined && (G.day-c.breedDay)<30), sp=String(c.spouse.name||'').split(' ')[0];
+        sb.textContent='◆ SEND '+kidName(c).toUpperCase()+' & '+sp.toUpperCase()+(wait? ' (went this month)' : ' ('+RK_BREED_FEE+'d)')+(c.kids? ' · '+c.kids+' grandchild'+(c.kids>1?'ren':'') : '');
+        sb.disabled=wait || G.coin<RK_BREED_FEE;
+        sb.onclick=()=>{ const R=rkSendKidsToBreed(c); if(!R.ok){ toast(R.why,2400); return; }
+          refreshStatbar(); saveQuiet();
+          toast(R.hit? '◆ '+kidName(c)+' and '+sp+' come back from the quay not looking at anybody — and by the thaw there is a GRANDCHILD on the way. The district is unbearable about it.'
+                     : '◆ '+kidName(c)+' and '+sp+' go to the quay, come back, and refuse to discuss it. The tally-keeper says children are close. (not this month)', 5600);
+          openVilla(); };
+        bc.appendChild(sb); });
+    }
+    b.appendChild(bc);
+  }
   // ---- YOUR SHELF: what the herbarius sold you, at a glance ----
   { const wh=document.createElement('div'); wh.className='small'; wh.style.color='var(--gold)'; wh.style.marginTop='6px';
     wh.textContent='🌿 THE SHELF'; b.appendChild(wh);
@@ -41528,7 +42620,7 @@ function buildLegacyCard(b){
         G.legacy={prov, level:i+1, day:G.day}; const stat=inf2.w*(i+1);
         G.approval=clamp(G.approval+Math.round(stat*0.8),0,100); G.honor=clamp(G.honor+inf2.w,0,100); G.pop=clamp(G.pop+inf2.w,0,100);
         refreshStatbar(); saveQuiet();
-        toast('🏛 Your legacy house rises in '+prov+' — '+(inf2.w>=4?'a seat worthy of a dynasty. All Rome takes note.':inf2.w<=1?'far from everything, but it is YOURS.':'a solid foundation for the family.'),4000);
+        toast((playerWorld()==='rk'?'◆ Your house-seat rises in ':'🏛 Your legacy house rises in ')+prov+' — '+(inf2.w>=4?'a seat worthy of a dynasty. '+legacyAudience():inf2.w<=1?'far from everything, but it is YOURS.':'a solid foundation for the family.'),4000);
         openVilla(); };
       row.appendChild(bt); });
     card.appendChild(row);
@@ -47826,12 +48918,17 @@ function buildMarriageCard(b){
     if(ADULT){
     const plRow=document.createElement('div'); plRow.className='row gap6'; plRow.style.marginTop='4px';
     const plh=document.createElement('span'); plh.className='small muted'; plh.textContent='Place:'; plRow.appendChild(plh);
-    [['bed','🛏 BEDCHAMBER',true],['wardrobe','🚪 WARDROBE',G.hasWardrobe],['pool','🏝 LAGOON',G.hasPool],['bath','🏛 BATHHOUSE',true]].forEach(([id,label,ok])=>{
+    const _places=[['bed','🛏 BEDCHAMBER',true],['wardrobe','🚪 WARDROBE',G.hasWardrobe],['pool','🏝 LAGOON',G.hasPool],['bath','🏛 BATHHOUSE',true]];
+    if(typeof rkBreedOn==='function' && rkBreedOn()){ _places.push(['breed','◆ BREEDING HOUSE',G.coin>=RK_BREED_FEE]); _places.push(['hub','◆ THE HUB',!!G.rkHub]); }
+    _places.forEach(([id,label,ok])=>{
       const c3=document.createElement('button'); c3.className='btn sm'+(bedPlace===id?' gold':'');
       c3.textContent=label; c3.disabled=!ok;
       c3.title= id==='wardrobe'&&!ok?'Build the grand cedar wardrobe first.': id==='pool'&&!ok?'Build the garden lagoon first.':
         id==='bed'?'The classic. The door does the censoring.': id==='wardrobe'?'Sturdy. VERY sturdy. Clothes will exit at speed.':
-        id==='pool'?'Moonlight, steam, and a folding screen with opinions.':'The town baths after hours — marble, echo, scandal.';
+        id==='pool'?'Moonlight, steam, and a folding screen with opinions.':
+        id==='breed'?'The breeding house on the quay: warm cedar tubs and hide screens. '+RK_BREED_FEE+'d at the door; better odds for a child (+14%).':
+        id==='hub'?(G.rkHub?'Your own hub. The tradition keeps it at home, and the odds are better again (+18%).':'Build a breeding hub first (renovations).'):
+        'The town baths after hours — marble, echo, scandal.';
       c3.onclick=()=>{ bedPlace=id; openVilla(); };
       plRow.appendChild(c3);
     });
@@ -55055,6 +56152,8 @@ window.__SS = {
   setBodyMapWalk:(v)=>{ bodyMapWalk=v; }, get bodyMapSubject(){return bodyMapSubject;},
   redrawBodyMap:()=>{ try{ drawBodyMap($('bodymap-cv'), bodyMapSubject, bodyMapView, bodyMapT); }catch(e){} },
   drawRealFig, realAnchors, drawLength, lengthPose, lengthDigits, girthDigits, ROUSED_NAMES, rousedName, restName, tierIdxOf,
+  drawBedPose, drawFemFig, drawBreedPlace, rkBreedOn, rkPoorHouse, rkBreedKids, rkSendKidsToBreed, RK_BREED_FEE, RK_HUB_COST, RK_BREED_POSES, drawSilhouette, drawPreludeRunner, get SIL_DRAWS(){return SIL_DRAWS;}, get BEDPOSE_DRAWS(){return BEDPOSE_DRAWS;}, get BEDPOSE_LAST(){return BEDPOSE_LAST;},
+  get MAN_DRAWS(){return MAN_DRAWS;}, drawTemptFigures, temptHimPose, legacySet, LEGACY_RK, legacyWord, legacyAudience, migrate,
   BUILD_STAMP, reactExpr, realDressInfo, get bmDressed(){return bmDressed;}, set bmDressed(v){ bmDressed=!!v; }, drawBendFig, get BEND_OPT(){return BEND_OPT;}, set BEND_OPT(v){ BEND_OPT=v; }, realFigExtras, drawPair, drawMateFig, pairHimLook, ik2, herFace, herFaceWeights, get HER_ROLL(){return HER_ROLL;}, set HER_ROLL(v){ HER_ROLL=v; }, drawManProfile, drawPeekTableau, adultCouple, villaRevealLine, get PAIR_DRAWS(){return PAIR_DRAWS;}, get PAIR_LAST(){return PAIR_LAST;},
   LEN_INCH, LEN_GROW_BY, lenGrow, lengthInches, lenFrac, VILLAGE_NAMES, villageName, villageNameNews, get HUSB_SMILE(){return HUSB_SMILE;},
   VILLAGE_NAMES_F, VILLAGE_HOUSE, villageNameF, villageHouseName, villageStreet, villageRank, villageNameReaction, openVillageTalk, fmtLen,
