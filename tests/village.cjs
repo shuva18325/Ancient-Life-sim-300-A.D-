@@ -183,10 +183,13 @@ const ok=(name,cond,note)=>{ if(cond){pass++; console.log('  PASS  '+name+(note?
   R=await T(()=>{
     const S=window.__SS, G=S.G; G.world='rk'; G.rkRank=S.RK_RANKS[0].id;
     const mk=(eth,bust,extra)=>{ const w=S.makeBride(eth,false,9,{male:true}); w.male=false; w.eth=eth; w.traits=[]; w.quirks=[]; w.flaws=[];
-      w.skin='#e6bd94'; w.dress='#e8c04a'; w.age=22; w.body=Object.assign(w.body||{},{face:8,hairq:7,bust,waist:8,booty:6,legs:8}); return Object.assign(w,extra||{}); };
+      w.skin='#e6bd94'; w.dress='#e8c04a'; w.age=22; w.body=Object.assign(w.body||{},{face:8,hairq:7,bust,waist:8,booty:6,legs:8});
+      w._pose='hang';   /* V47: portraits are posed now, and folded arms would be measured as her chest — stand her at ease */
+      return Object.assign(w,extra||{}); };
     const chest=(w)=>{ const cv=document.createElement('canvas'); cv.width=148; cv.height=148; S.drawBridePortrait(cv,w,false,0);
-      /* the bust itself: below the collar, above the belt, clear of her face and of the arm on her hip */
-      const d=cv.getContext('2d').getImageData(62,47,24,22).data; let skin=0, nip=0;
+      /* the bust itself: the band from the collarbone to under the bust, across both sides, clear of her face
+         (V47: the portrait is the new body, framed crown to thigh, so the band is where that figure's bust is) */
+      const d=cv.getContext('2d').getImageData(44,56,60,26).data; let skin=0, nip=0;
       for(let i=0;i<d.length;i+=4){ const r=d[i],g=d[i+1],b=d[i+2];
         if(Math.abs(r-230)+Math.abs(g-189)+Math.abs(b-148)<46) skin++;
         if(Math.abs(r-175)+Math.abs(g-110)+Math.abs(b-93)<26) nip++; }

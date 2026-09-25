@@ -9,7 +9,26 @@ grounds produce nine distinct pictures" is.
 
 ---
 
-## 0 — NEXT, PROPOSED AFTER V46 (in the order they would help most)
+## 0 — NEXT, PROPOSED AFTER V47 (in the order they would help most)
+
+V47 took the new bodies into the portraits and the courtship, made the jungle suit a choice,
+slowed the walk to the door and gave the player a look of their own. New since then:
+
+- **The sivrak, round two.** Build it together as a scene (an afternoon of leaf and cord, the
+  pieces going on one at a time), let it wilt over the evening, and let a Shameless spouse ask
+  YOU to wear one.
+- **The look, round two.** Looking back: when they catch you and are bold, they look at the front
+  of YOUR tunic in turn; a Jealous spouse minds you looking at the servants.
+- **Portrait poses you pick.** A POSE row on the marriage card (and the ledger) so the player can
+  choose how their spouse stands for the painter, plus a few seated and leaning poses.
+- **The commissions on the new body.** The coast's carved and painted commissions and the hide
+  sketch still crop the old full-length plate (their frames were measured on it); re-measure the
+  frames on the new figure and move them over, with the sivrak as a front-view garment.
+- **The wardrobe in the villa.** The portraits now know seven peoples' garments; the villa walkers
+  still wear the stola or the ulvik — give the profile figure the same wardrobe.
+
+And the list from after V46, still open:
+
 
 1. **Stamina, round two.** A night's worth of it from the kitchen — oysters, garum and honeyed
    wine in Rome, seal fat and kelp on the coast — a TRAIN TOGETHER beat in the villa that raises
@@ -42,6 +61,24 @@ grounds produce nine distinct pictures" is.
 14. **Creation-card portraits on the template** — the first body a player sees.
 15. **Performance pass.** Cache fighter frames per pose; the bedchamber's painted room could be
     rendered once per session to an offscreen canvas and only its lamp and stars redrawn.
+
+### ~~0.3 The new bodies everywhere: portraits, courtship, the sivrak, the walk, the look~~ — DONE (V47)
+**Result:** `tests/v47.cjs` (40 checks; 34 of them fail on V46). Bride and groom portraits are the
+body-map figure in each culture's room, framed crown to thigh, in seven poses for her and six for
+him, each person keeping their own pose and face, and dressed in their people's garment — seven new
+front-view garments with sleeves (kimono, hanfu, hanbok, sari, gown, kaftan, parka) beside the stola,
+tunic, ulvik and kilt — with nothing showing through at bust 10, and dressed with mature content off
+too. The family portrait stands the house full length on the new bodies. The coast's commissions and
+the hide sketch, which crop a full-length plate, keep the plate; the classic switch still gives the
+old figure everywhere.
+The courtship scene stands two new-body figures in the street and hands back the faces it borrows.
+In the bedchamber the walk to the door is under a pixel a frame (it was over two), with feet set by
+the floor covered, for either of you, in the room and the bath, and the one who answers the call
+walks too. On the coast the tablet offers the sivrak — wear one, ask them (a no stands for the
+day), take either off and back on — drawn as her leaf gown and his leaf kilt. G looks at the front
+of his tunic, her front, or their seat; the tunic reacts, they notice and turn, and warm, middling
+and cold spouses take it differently. The G key was printed on the help bar and never bound; it is
+bound now.
 
 ### ~~0.4 Stamina, their faces, greedy eyes, his bend, his escalators, a bedchamber worth the name~~ — DONE (V46)
 **Result:** `tests/v46.cjs` (38 checks). Stamina is a stat — 3 to start, trained at the ludus to

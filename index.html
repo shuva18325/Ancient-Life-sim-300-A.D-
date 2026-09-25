@@ -9334,6 +9334,7 @@ function drawRealFig(c, w, view, ph, opt){
   const jB = walking&&!male? Math.sin(P0*2+0.9)*(0.18+bu*0.05) : 0;
   const jG = walking&&!male? Math.sin(P0*2+0.15)*(0.15+be*0.04) : 0;
   const clothed = (opt.clothed==='public') || !ADULT;
+  const under = clothed && !(opt.portrait && opt.dressed);  // 📸 a portrait's garment covers it all; the linen under it only pokes out at the sides
   const LEN = !!opt.showLen && male && ADULT && !clothed;
   const aro = LEN? clamp(opt.aro===undefined? secretAroLv : opt.aro, 0, 1.06) : 0;
   const lw=0.30;                                        // a hairline, in figure units
@@ -9532,14 +9533,42 @@ function drawRealFig(c, w, view, ph, opt){
       }
     }
     // ---- ARMS, hanging clear of the hips and swinging against the legs ----
+    let SLEEVE=null;                                   // 📸 set by a sleeved garment: the arms drawn over it wear the sleeve
+    /* a sleeve: fitted down the arm to the wrist; a kimono's or a hanfu's hangs in a drape from the
+       forearm; a gown's puffs at the shoulder; a choli's stops short; a parka's is thick with a fur cuff */
+    const sleeveOn=(S, s, sh, up, el, ha, r0, r1, r2)=>{
+      const L2=(a,b,t)=>[a[0]+(b[0]-a[0])*t, a[1]+(b[1]-a[1])*t];
+      const hi=mixHex(S.cl,'#ffffff',0.24), lo=mixHex(S.cl,'#120a06',0.40);
+      const fillC=(pts,col)=>{ const xs=pts.map(p=>p[0]); const g=c.createLinearGradient(Math.min(...xs),0,Math.max(...xs),0);
+        g.addColorStop(0, s>0? hi : lo); g.addColorStop(0.5, col); g.addColorStop(1, s>0? lo : hi); fillPts(pts,g); edge(pts,0.32); };
+      const k=S.kind, fat=(k==='fur')? 1.32 : (k==='puff')? 1.08 : 1.14;
+      if(k==='cap'){ const O=limbPts([[sh[0],sh[1],r0*1.16],[up[0],up[1],r0*1.08],[L2(up,el,0.35)[0],L2(up,el,0.35)[1],r1*1.25]]); fillC(O,S.cl);
+        const e2=L2(up,el,0.35); c.strokeStyle=S.cuff||lo; c.lineWidth=0.7; c.beginPath(); c.moveTo(e2[0]-r1*1.2,e2[1]); c.lineTo(e2[0]+r1*1.2,e2[1]); c.stroke(); return; }
+      const wr=L2(el,ha,0.84);
+      if(k==='wide'){                                    // the hanging sleeve: from the upper arm to below the wrist
+        const drop=S.drop||9, lowY=Math.max(wr[1], up[1])+drop;
+        const D=[[up[0],up[1]-0.4],[wr[0]+s*0.6,wr[1]-0.6],[wr[0]+s*1.4,Math.max(wr[1]+1.5,lowY-1.2)],[ (up[0]+wr[0])/2+s*1.8, lowY],[up[0]+s*0.4, lowY-drop*0.35]];
+        fillC(D, mixHex(S.cl,'#120a06',0.12));
+        c.strokeStyle=rgbA(lo,0.7); c.lineWidth=0.35; c.beginPath(); c.moveTo((up[0]+wr[0])/2, (up[1]+wr[1])/2+1); c.quadraticCurveTo((up[0]+wr[0])/2+s*1.2, lowY-2, (up[0]+wr[0])/2+s*1.6, lowY-0.4); c.stroke(); }
+      const O=limbPts([[sh[0],sh[1],r0*fat*1.02],[up[0],up[1],r0*fat*0.95],[el[0],el[1],r1*fat*1.10],[wr[0],wr[1],r2*fat*(k==='wide'? 1.45 : 1.12)]]);
+      fillC(O, S.cl);
+      if(k==='puff') ball(sh[0]+s*0.3, sh[1]+1.6, r0*1.55, r0*1.35, S.cl);            // the puff at the shoulder
+      const d=[wr[0]-el[0], wr[1]-el[1]], m=Math.hypot(d[0],d[1])||1, pp=[-d[1]/m, d[0]/m], rw=r2*fat*(k==='wide'? 1.5 : 1.2);
+      c.strokeStyle=S.cuff||lo; c.lineWidth=(k==='fur')? 1.3 : 0.8; c.lineCap='round';
+      c.beginPath(); c.moveTo(wr[0]+pp[0]*rw, wr[1]+pp[1]*rw); c.lineTo(wr[0]-pp[0]*rw, wr[1]-pp[1]*rw); c.stroke(); c.lineCap='butt';
+    };
     const armFB=(s)=>{
       const sw = walking? Math.sin(P0 + (s>0?Math.PI:0)) : 0;
-      const ex = s*Math.max(WW+2.1, SW*0.90), eyy = wy-0.4;
-      const hx = s*Math.max(HW*0.92+1.5, SW*0.92), hyy = hy+2.0-Math.abs(sw)*0.5;
+      let ex = s*Math.max(WW+2.1, SW*0.90), eyy = wy-0.4;
+      let hx = s*Math.max(HW*0.92+1.5, SW*0.92), hyy = hy+2.0-Math.abs(sw)*0.5;
+      /* 📸 A PORTRAIT'S POSE: where the elbow and the hand go, side by side */
+      const PA=(!back && opt.pose)? portraitArm(opt.pose, s, {SW, WW, HW, sy, cy, wy, hy, ny, HH, male, t:opt.t||0}) : null;
+      if(PA){ ex=PA.ex; eyy=PA.ey; hx=PA.hx; hyy=PA.hy; }
       const r0=(male?2.10:1.60)+lg*0.04, r1=(male?1.55:1.22), r2=(male?1.22:0.98), r3=(male?0.92:0.74);
       limb([[s*(SW-0.8), sy+0.8, r0],[s*(SW*0.98+0.25), sy+4.6, r0*0.90],[ex, eyy, r1],[(ex+hx)/2+s*0.2, (eyy+hyy)/2, r2],[hx, hyy+sw*0.3, r3]], back? 0.06 : 0);
       soft(s*(SW-0.4), sy+1.6, r0*1.1, sLit, 0.26);                                 // the round of the shoulder
       crease(ex-r1*0.7, eyy+0.2, ex, eyy+0.7, ex+r1*0.7, eyy+0.2, 0.20);
+      if(SLEEVE && !back) sleeveOn(SLEEVE, s, [s*(SW-0.8), sy+0.8], [s*(SW*0.98+0.25), sy+4.6], [ex, eyy], [hx, hyy+sw*0.3], r0, r1, r2);
       // the hand: a palm, a thumb, fingers suggested
       const hX=hx+s*0.05, hY=hyy+sw*0.3+1.9;
       c.beginPath(); smoothPath(c,[[hX-r3*1.15,hY-1.5],[hX+r3*1.15,hY-1.5],[hX+r3*1.25,hY+0.6],[hX+r3*0.6,hY+1.9],[hX-r3*0.6,hY+1.9],[hX-r3*1.25,hY+0.6]],true);
@@ -9563,7 +9592,7 @@ function drawRealFig(c, w, view, ph, opt){
           c.fillStyle=mixHex(skin,'#8a4a44',0.40); c.beginPath(); c.ellipse(ax,ay,r*0.22+0.2,(r*0.22+0.2)*0.92,0,0,7); c.fill();
           c.fillStyle=mixHex(skin,'#6a3030',0.52); c.beginPath(); c.arc(ax,ay,r*0.07+0.14,0,7); c.fill();
           c.fillStyle='rgba(255,255,255,.35)'; c.beginPath(); c.arc(ax-0.1,ay-0.12,0.1+r*0.02,0,7); c.fill(); } });
-      if(clothed){                                                                   // the strophium
+      if(under){                                                                     // the strophium
         const top2=by2-r*0.35, bot=by2+r*0.95;
         const P=[[-bx(1)-r*0.90,top2+0.3],[0,top2+r*0.25],[bx(1)+r*0.90,top2+0.3],[bx(1)+r*0.84,bot-0.4],[0,bot],[-bx(1)-r*0.84,bot-0.4]];
         const g=c.createLinearGradient(-r*2,0,r*2,0); g.addColorStop(0,linHi); g.addColorStop(0.45,linen); g.addColorStop(1,linSh);
@@ -9572,7 +9601,7 @@ function drawRealFig(c, w, view, ph, opt){
         for(let q=-2;q<=2;q++){ c.beginPath(); c.moveTo(q*r*0.4,top2+r*0.3); c.lineTo(q*r*0.45,bot-0.2); c.stroke(); } }
     }
     // ---- A SUBLIGACULUM, in public (and with the mature switch off) ----
-    if(clothed){
+    if(under){
       const P = back
         ? [[-HW*1.0,hy-3.4],[HW*1.0,hy-3.4],[HW*0.98,hy-0.8],[HW*0.55,hy+2.6],[0,hy+2.2],[-HW*0.55,hy+2.6],[-HW*0.98,hy-0.8]]
         : [[-HW*1.0,hy-3.4],[HW*1.0,hy-3.4],[HW*0.96,hy-1.6],[HW*0.40,hy+1.0],[0,hy+3.8],[-HW*0.40,hy+1.0],[-HW*0.96,hy-1.6]];
@@ -9590,7 +9619,7 @@ function drawRealFig(c, w, view, ph, opt){
                leg:[-HW*0.62, hy+4, HW*0.50, Math.max(2,(-hy)*0.40)] };
     if(!back) drawScars(FZ, ['torso','arm','leg']);
     /* ---- 👗 DRESSED: the garment, over the body, following it ---- */
-    if(opt.dressed && ADULT){
+    if(opt.dressed && (ADULT || opt.portrait)){
       const DI=opt.dressInfo||{}, cl=hexOf(DI.cloth||(male?'#7a2f22':'#8a2f5a'));
       const cHi=mixHex(cl,'#ffffff',0.26), cSh=mixHex(cl,'#120a06',0.42), L=-hy;
       const sym=(R)=>R.concat(R.slice().reverse().map(p=>[-p[0],p[1]]));
@@ -9599,6 +9628,95 @@ function drawRealFig(c, w, view, ph, opt){
       const fold=(x0,y0,x1,y1)=>crease(x0,y0,(x0+x1)/2+0.2,(y0+y1)/2,x1,y1,0.35,lw*1.1);
       /* a belt is only as wide as she is where it is tied */
       const band=(y,col,h,hw)=>{ hw=hw||HW*1.08; c.fillStyle=col; c.beginPath(); smoothPath(c,[[-hw,y],[hw,y],[hw*0.98,y+(h||1.2)],[-hw*0.98,y+(h||1.2)]],true); c.fill(); };
+      /* 📸 THE PORTRAIT'S WARDROBE. The old plates dressed every people in its own garment — the
+         kimono, the hanfu, the hanbok, the sari, the gown, the kaftan, the parka — and the new
+         figure has to as well, or a bride from Wa stands for her portrait in a Roman stola. */
+      const GK=(!back && DI.garment && FRONT_GARMENTS[DI.garment])? DI.garment : null;
+      if(GK){
+        const clothC=(pts,col)=>{ const hi=mixHex(col,'#ffffff',0.26), lo=mixHex(col,'#120a06',0.42); const g=c.createLinearGradient(-SW-3,0,SW+3,0);
+          g.addColorStop(0,hi); g.addColorStop(0.42,col); g.addColorStop(1,lo); fillPts(pts,g); edge(pts,0.35); };
+        const strip=(x0,y0,x1,y1,w8,col)=>{ const dx=x1-x0, dy=y1-y0, n=Math.hypot(dx,dy)||1, qx=-dy/n*w8, qy=dx/n*w8;
+          c.fillStyle=col; c.beginPath(); c.moveTo(x0,y0); c.lineTo(x1,y1); c.lineTo(x1+qx,y1+qy); c.lineTo(x0+qx,y0+qy); c.closePath(); c.fill(); };
+        const r=0.95+bu*0.60, by2=cy+2.8+r*0.10, bxx=r*0.78+0.55;
+        const bustCover=(k,col)=>{ if(male) return; [1,-1].forEach(q=>ball(q*bxx, by2, r*0.98*k, r*0.92*k, col)); };
+        const bump=(col)=>{ if(PK<0.15) return; const gk=Math.pow(PK,1.35), top=cy+5.5, bot=hy-0.5;
+          const brx=WW*0.50+(HW*0.80-WW*0.50)*gk, bry=Math.min(brx*1.05,(bot-top)/2+gk*1.2), bcy=(top+bot)/2+gk*0.6; ball(-0.2, bcy, brx*1.06, bry*1.04, col); };
+        const bandC = DI.noble? '#c8a040' : mixHex(cl,'#1a0e06',0.55), light='#f4eee0';
+        if(GK==='kimono'){
+          const hem=-1.4, obiT=male? wy+1.4 : wy-2.8, obiB=male? wy+3.6 : wy+2.8;
+          cloth(sym([[NW*1.6,sy-0.8],[SW*1.00,sy+0.2],[SW*1.02,sy+4.4],[CW*1.04,cy+1.2],[WW*1.16+0.6,wy],[HW*1.06,hy],[HW*1.00+0.6,hy+L*0.5],[HW*0.94+0.8,hem]]));
+          bustCover(0.90, cl); bump(cl);
+          c.strokeStyle=rgbA(cSh,0.9); c.lineWidth=lw*1.3; c.beginPath(); c.moveTo(-NW*0.3, cy+2.8); c.quadraticCurveTo(WW*0.25, wy+2, HW*0.36, hem); c.stroke();   // left over right
+          strip(-NW*1.5, sy-1.0, 0.3, cy+2.6, 1.0, light); strip(NW*1.5, sy-1.0, -0.3, cy+3.0, -1.0, light);                   // the white under-collar
+          strip(NW*1.5+0.9, sy-0.7, -0.3+0.5, cy+3.9, -0.9, cSh);                                                              // and the kimono's own
+          const obiC = DI.noble? '#c8a040' : (male? mixHex(cl,'#1a0e06',0.6) : mixHex(cl,'#f0d8a8',0.55));
+          band(obiT, obiC, obiB-obiT, male? HW*1.04 : WW*1.26+0.6);
+          c.strokeStyle=rgbA(mixHex(obiC,'#120a06',0.45),0.9); c.lineWidth=lw*1.4; c.beginPath(); c.moveTo(-WW*1.2,(obiT+obiB)/2); c.lineTo(WW*1.2,(obiT+obiB)/2); c.stroke();
+          if(!male){ c.fillStyle='#b0283a'; c.fillRect(-0.7,(obiT+obiB)/2-0.5,1.4,1.0); }                                    // the obijime's knot
+          for(const q of [-1,1]){ fold(q*HW*0.50,hy+1,q*HW*0.58,hem-1); }
+          SLEEVE={kind:'wide', drop: male? 6.5 : 10, cl, cuff:light};
+        } else if(GK==='hanfu'){
+          const hem=-1.4, fl=male? 1.4 : 3.4;
+          cloth(sym([[NW*1.7,sy-0.8],[SW*1.02,sy+0.2],[SW*1.04,sy+4.4],[CW*1.06,cy+1.2],[WW*1.18+0.8,wy],[HW*1.10+0.6,hy],[HW*1.12+fl*0.6,hy+L*0.5],[HW*1.14+fl,hem]]));
+          bustCover(0.96, cl); bump(cl);
+          c.strokeStyle=rgbA(cSh,0.9); c.lineWidth=lw*1.3; c.beginPath(); c.moveTo(-WW*0.55, wy-0.4); c.quadraticCurveTo(-HW*0.2, hy, -HW*0.3, hem); c.stroke();
+          strip(-NW*1.6, sy-0.9, 0.4, cy+2.4, 1.2, bandC); strip(NW*1.6, sy-0.9, -WW*0.55, wy-0.4, -1.3, bandC);                // the crossed collar
+          const sashY = male? wy+0.2 : by2+r*0.95, sashC = DI.noble? '#c8a040' : mixHex(cl,'#f4e8d0',0.45);
+          band(sashY, sashC, 1.5, male? WW*1.22 : Math.max(WW*1.24, CW*1.02));
+          strip(-0.3, sashY+1.2, -0.9, hy+L*0.34, 0.8, sashC); strip(0.5, sashY+1.2, 1.2, hy+L*0.30, 0.8, sashC);             // the ties
+          for(let i=-2;i<=2;i++) fold(i*HW*0.34,hy+1,i*(HW*0.42+fl*0.2),hem-1);
+          SLEEVE={kind:'wide', drop: male? 8 : 12, cl, cuff:bandC};
+        } else if(GK==='hanbok'){
+          const jackC=mixHex(cl,'#fff6e8',0.62), trim=mixHex(cl,'#1a0e06',0.30), top=cy+0.6;
+          clothC(sym([[CW*0.94,top],[bxx+r*1.04,by2],[WW*1.50+1.0,wy],[HW*1.50+1.6,hy],[HW*1.62+3.4,hy+L*0.55],[HW*1.68+4.6,-1.4]]), cl);   // the chima, tied over the bust
+          bustCover(1.02, cl); bump(cl);
+          for(let i=-3;i<=3;i++) fold(i*1.3,by2+r*1.1,i*3.0,-2.2);
+          const jb=top+1.1, J=sym([[NW*1.6,sy-0.9],[SW*1.04,sy+0.2],[SW*1.06,sy+3.2],[CW*1.02,jb]]); J.splice(J.length/2,0,[0,jb+0.7]);
+          clothC(J, jackC);                                                                                                  // the jeogori
+          strip(-NW*1.5, sy-1.0, 0.6, jb, 1.0, '#ffffff'); strip(NW*1.5, sy-1.0, -0.4, jb+0.3, -0.9, trim);
+          strip(0.4, jb, 1.4, wy+6.5, 0.9, '#b0283a'); strip(0.1, jb, -0.8, wy+5.2, 0.9, '#b0283a');                          // the goreum, tied in a bow
+          ball(0.3, jb+0.2, 0.9, 0.7, '#b0283a');
+          SLEEVE={kind:'fitted', cl:jackC, cuff:trim};
+        } else if(GK==='sari'){
+          const choliC = DI.noble? '#c8a040' : mixHex(cl,'#1a0e06',0.34), border='#d8b040';
+          clothC(sym([[HW*0.98,hy-3.0],[HW*1.08,hy],[HW*1.10+0.6,hy+L*0.5],[HW*1.12+1.2,-1.4]]), cl);                       // the skirt, from the hip
+          c.strokeStyle=rgbA(cSh,0.85); c.lineWidth=lw; for(let i=-2;i<=2;i++){ c.beginPath(); c.moveTo(0.4+i*0.8, hy-2.4); c.lineTo(0.5+i*1.25, -1.8); c.stroke(); }   // the pleats
+          band(-2.8, border, 1.1, HW*1.12+1.2);
+          const Ch=sym([[NW*1.6,sy-0.6],[SW*0.98,sy+0.3],[CW*1.02,cy+1.4],[bxx+r*0.98,by2+r*0.3],[bxx+r*0.6,by2+r*1.0]]); Ch.splice(Ch.length/2,0,[0,by2+r*0.95]);
+          clothC(Ch, choliC); bustCover(1.0, choliC);                                                                       // the choli, and the midriff bare
+          crease(-NW*1.5, sy-0.2, 0, sy+2.2, NW*1.5, sy-0.2, 0.35);
+          const pl=[[SW*0.50,sy-0.9],[SW*1.04,sy+0.5],[SW*0.30+0.6,wy-1.2],[-HW*0.50,hy-1.4],[-HW*0.98,hy-3.2],[-WW*0.55,wy-2.6],[SW*0.05,cy+1.2],[SW*0.18,sy-0.3]];
+          clothC(pl, cl);                                                                                                    // the pallu, over the shoulder
+          c.strokeStyle=border; c.lineWidth=0.7; c.beginPath(); c.moveTo(SW*1.04,sy+0.5); c.lineTo(SW*0.30+0.6,wy-1.2); c.lineTo(-HW*0.50,hy-1.4); c.stroke();
+          SLEEVE={kind:'cap', cl:choliC, cuff:border};
+        } else if(GK==='gown'){
+          const neckY = ADULT? by2-r*0.62 : cy-0.2, lace='#f4eee0', gold='#d8b040';
+          clothC(sym([[WW*1.10,wy+0.4],[HW*1.34+1.2,hy],[HW*1.50+2.6,hy+L*0.55],[HW*1.56+3.6,-1.4]]), cl);                    // the skirt, full
+          for(let i=-3;i<=3;i++) fold(i*HW*0.30,hy+1.5,i*(HW*0.46+0.9),-2.2);
+          const B=sym([[bxx*0.95,neckY],[SW*0.62,sy+0.1],[SW*0.98,sy+1.0],[CW*1.04,cy+1.2],[bxx+r*0.98,by2+r*0.25],[WW*1.10,wy],[WW*0.55,wy+1.9]]); B.splice(B.length/2,0,[0,wy+3.4]);
+          clothC(B, cl);                                                                                                     // the bodice, square at the top, pointed at the waist
+          if(!male){ c.save(); c.beginPath(); c.rect(-SW*2, neckY, SW*4, 60); c.clip(); [1,-1].forEach(q=>ball(q*bxx, by2, r*1.0, r*0.94, cl)); c.restore(); }
+          bump(cl);
+          c.strokeStyle=lace; c.lineWidth=0.8; c.beginPath(); c.moveTo(-bxx*0.95-r*0.9, neckY+0.2); c.lineTo(bxx*0.95+r*0.9, neckY+0.2); c.stroke();
+          c.strokeStyle=gold; c.lineWidth=0.4; for(let i=0;i<4;i++){ const y=neckY+2+i*((wy+2-neckY-2)/4); c.beginPath(); c.moveTo(-0.8,y); c.lineTo(0.8,y+1.2); c.moveTo(0.8,y); c.lineTo(-0.8,y+1.2); c.stroke(); }
+          SLEEVE={kind:'puff', cl, cuff:lace};
+        } else if(GK==='kaftan'){
+          const hem=hy+L*0.72, trim=DI.noble? '#c8a040' : '#c8a878';
+          const K=sym([[NW*1.7,sy-0.9],[SW*1.04,sy+0.2],[SW*1.06,sy+4.4],[CW*1.06,cy+1.2],[WW*1.14+0.6,wy],[HW*1.10+0.6,hy],[HW*1.16+1.2,hy+L*0.40],[HW*1.22+1.8,hem]]);
+          cloth(K); bustCover(0.98, cl); bump(cl);
+          strip(NW*1.3, sy-0.7, -CW*0.45, cy+4.2, 1.0, trim); strip(-CW*0.45, cy+4.2, -HW*0.40, hem, 1.0, trim);              // the closure, edged
+          band(hem-1.1, trim, 1.3, HW*1.22+1.8); band(sy-1.8, trim, 1.2, NW*1.7);
+          band(wy-0.3, '#3a2a1a', 1.7, WW*1.20+0.6); c.fillStyle='#d8b040'; c.fillRect(-0.9, wy-0.1, 1.8, 1.3);             // the belt and its buckle
+          SLEEVE={kind:'fitted', cl, cuff:trim};
+        } else if(GK==='parka'){
+          const hem=hy+L*0.36, fur='#e8dcc4';
+          cloth(sym([[NW*1.9,sy-1.0],[SW*1.08,sy+0.2],[SW*1.10,sy+4.4],[CW*1.10+0.4,cy+1.2],[WW*1.26+1.0,wy],[HW*1.14+1.0,hy],[HW*1.20+1.4,hem]]));
+          bustCover(0.9, cl); bump(cl);
+          band(cy+4.2, mixHex(cl,'#1a0e06',0.5), 0.9, CW*1.12+0.4); band(hem-1.4, fur, 1.8, HW*1.20+1.4);
+          for(let i=-4;i<=4;i++) ball(i*NW*0.46, sy-0.8+Math.abs(i)*0.12, 1.0, 0.8, fur);                                   // the ruff
+          SLEEVE={kind:'fur', cl, cuff:fur};
+        }
+      } else
       if(male && !DI.coast){                                        // the TUNIC: shoulders to mid-thigh, sleeves capped
         const P=sym([[NW*1.7,sy-1.0],[SW*1.02,sy+0.1],[SW*1.10+1.3,sy+4.6],[SW*0.84,sy+5.0],[CW*1.03,cy+1],[WW*1.14+0.4,wy],[HW*1.08,hy-1],[HW*1.04+0.6,hy+L*0.30]]);
         if(!back) P.splice(P.length/2,0,[0,hy+L*0.31]);
@@ -9639,6 +9757,8 @@ function drawRealFig(c, w, view, ph, opt){
         if(K.neck==='sash'){ for(let i=0;i<3;i++) band(wy-2+i*1.2, i%2? hexOf(DI.band||'#6a7a8a') : mixHex(hexOf(DI.band||'#6a7a8a'),'#ffffff',0.25), 1.0, WW*1.2); }
       }
     }
+    /* 📸 a posed portrait's arms go OVER the garment — folded arms, clasped hands, a hand on the hip are in front of it */
+    if(opt.pose && opt.dressed && (ADULT || opt.portrait)){ armFB(-1); armFB(1); }
     // ---- THE HEAD ----
     const face=[[0,ny-HH],[HR*0.74,ny-HH*0.93],[HR*0.99,ny-HH*0.70],[HR*0.96,ny-HH*0.44],
                 [HR*(male?0.86:0.74),ny-HH*0.20],[HR*0.40,ny-HH*0.02],[0,ny+0.18],
@@ -13023,6 +13143,23 @@ function drawCourtScene(cnv){
   const gap = 68 - warm*22;                      // you close the distance as it goes well
   const meX = W2/2 - gap, themX = W2/2 + gap;
   const me = playerLook(), Z=1.30;
+  const band0 = CT.lastMsg? CT.lastMsg.band : 'cool';
+  if(portraitsNew()){
+    /* 🌹 ON THE NEW BODIES — the same figures as the villa. They stand turned
+       away while they are unconvinced and face you once you have them; their
+       face is how it is going, and yours brightens as theirs does. */
+    const themFace = band0==='glow'? (warm>0.7? 'smitten' : 'pleased') : band0==='ok'? 'pleased' : band0==='bad'? 'sulk' : band0==='cool'? (warm<0.25? 'flat' : 'dreamy') : 'cross';
+    const meFace = warm>0.66? 'smitten' : warm>0.33? 'pleased' : 'flat';
+    const f0=NB_HALL; NB_HALL=true;
+    try{
+      c.save(); c.translate(meX, FLOOR); c.scale(Z,Z); HALL_EXPR=meFace;
+      withFace(1, null, ()=>{ if(G.isFemale) drawHallFem(c,0,0,me,T*0.02,'idle'); else drawHallMan(c,0,0,0,null,null,me,0,'idle'); });
+      c.restore();
+      c.save(); c.translate(themX, FLOOR); c.scale(Z,Z); HALL_EXPR=themFace;
+      withFace(warm<0.22? 1 : -1, null, ()=>{ if(CT.who.male) drawHallMan(c,0,0,0,null,null,CT.who,0,'idle'); else drawHallFem(c,0,0,CT.who,T*0.02,'idle'); });
+      c.restore();
+    } finally { NB_HALL=f0; HALL_EXPR=null; }
+  } else {
   // YOU, on the left
   c.save(); c.translate(meX, FLOOR); c.scale(Z,Z);
   if(G.isFemale) drawWifeFig(c,0,0,me,0,'idle');
@@ -13035,7 +13172,7 @@ function drawCourtScene(cnv){
     c.scale(turn,1); }
   if(CT.who.male) drawHusbandFig(c,0,0,0,CT.who.skin,CT.who.dress,CT.who,0,'idle');
   else drawWifeFig(c,0,0,CT.who,0,'idle');
-  c.restore();
+  c.restore(); }
   // the mood, over their head
   const band = CT.lastMsg? CT.lastMsg.band : 'cool';
   const glyph = band==='glow'?'♥' : band==='ok'?'✦' : band==='cool'?'·' : band==='bad'?'✗' : '✖';
@@ -13670,7 +13807,7 @@ const SETTINGS_KEY='SANDSTEEL_SETTINGS';
 /* WHICH BUILD IS THIS. Printed on the title screen, in Settings and in the
    corner of the hall — because an old link to an old build looks exactly
    like a fix that did not work. */
-const BUILD_STAMP='V46 · stamina, and their faces';
+const BUILD_STAMP='V47 · the new bodies, everywhere';
 try{ document.addEventListener('DOMContentLoaded',()=>{ const e=document.getElementById('build-stamp'); if(e) e.textContent='build '+BUILD_STAMP; });
      const e0=document.getElementById('build-stamp'); if(e0) e0.textContent='build '+BUILD_STAMP; }catch(e){}
 const SETTINGS=(function(){ const d={sound:true,shake:true,difficulty:'normal',
@@ -19055,6 +19192,7 @@ window.addEventListener('keydown',e=>{
   else if(k==='o'){ setEdge('o'); }                 // ◇ the urvaak — letting it out, which is a weather question
   else if(k==='x'){ setEdge('x'); }                 // 🍑 the quick decline — skip the bend outright
   else if(k==='t'){ setEdge('t'); }                 // ⌘ the action tablet, in the hall
+  else if(k==='g'){ setEdge('g'); }                 // 👀 and look at them — the front of the tunic, or wherever
   else if(k==='j'){ setEdge('j');                   // ◆ and the press, which is how a standing is answered
     /* A KEY THAT DOES NOTHING OUTSIDE ONE SCREEN IS A KEY THE PLAYER
        DECIDES IS BROKEN. J is only meaningful in the hall, so pressed
@@ -20572,6 +20710,25 @@ function drawKidFig(c,x,y,sex,age){
   if(kha>=8 && !boy){ P(-6,-h+1,2,10,hairC); P(5,-h+1,2,10,hairC); }             // her mother's hair
   if(kha<=2 && boy){ P(-3,-h-1,7,1,skin); }                                       // a thin crop
 }
+/* 📸 THE FAMILY, ON THE NEW BODIES: the domina in the middle, her lord beside her, the grown
+   children as the adults they are — full length, facing the painter, each in their own pose and
+   their own people's garment. The little ones are still the little ones. */
+function familyPortraitNew(c, bond, spouseMale){
+  try{
+    const face=bond>=70? 'smitten' : bond>=40? 'pleased' : 'flat';
+    if(G.wife && !spouseMale) drawStandingFigure(c, 246, 221, 104, G.wife, {preg:wifePregMonth(), face});
+    else if(G.isFemale){ const me=Object.assign(playerLook(), {rank:'noble', jewel:true}); drawStandingFigure(c, 246, 221, 104, me, {preg:selfPregMonth(), face}); }
+    if(spouseMale) drawStandingFigure(c, 322, 222, 112, G.wife, {face});
+    else if(!G.isFemale) drawStandingFigure(c, 322, 222, 112, playerLook(), {face:'pleased'});
+    G.children.slice(0,6).forEach((k,i)=>{ const days=G.day-k.born; c.save();
+      if(kGrownDraw(k,days)){
+        const subj={body:k.body, skin:k.skin||G.skin, dress:(k.sex==='m'? (G.tunic||'#eae4d6') : ((G.wife&&G.wife.dress)||'#8a2f5a')),
+                    hair:k.hair||'#3a2618', male:k.sex==='m', name:k.name, eth:(G.wife&&G.wife.eth)||'roman', age:Math.max(16, kidAgeYears(k)|0)};
+        c.restore(); drawStandingFigure(c, 176-i*30, 222, 94, subj, {face:'pleased'}); return; }
+      c.translate(168-i*34,222); c.scale(1.45,1.45); drawKidFig(c,0,0,k.sex,days,k); c.restore(); });
+    return true;
+  }catch(e){ return false; }
+}
 function openPortrait(){
   state='menu'; show('scr-portrait');
   const cv=$('portrait-cv'), c=cv.getContext('2d'); c.imageSmoothingEnabled=false;
@@ -20583,6 +20740,8 @@ function openPortrait(){
   c.fillStyle='#3a2c1e'; c.fillRect(0,222,480,28); for(let fx=0;fx<480;fx+=24){c.fillStyle='#2c2014';c.fillRect(fx,222,1,28);}
   // the family, gathered
   const bond=G.wifeRel|0, spouseMale=!!(G.wife&&G.wife.male);
+  if(portraitsNew() && familyPortraitNew(c, bond, spouseMale)){}
+  else {
   if(G.wife && !spouseMale){ const wc=document.createElement('canvas'); wc.width=wc.height=148; drawBridePortrait(wc,G.wife,true,wifePregMonth());
     c.drawImage(wc, 186,106, 148*0.78,148*0.78); }                                                       // the domina
   else if(G.isFemale){ // the head of the house is herself the domina — paint HER at the center, on HER OWN scores
@@ -20606,6 +20765,7 @@ function openPortrait(){
       else drawWifeFig(c,0,0,subj,0,'idle');
     } else { c.scale(1.45,1.45); drawKidFig(c,0,0,k.sex,days,k); }
     c.restore(); });
+  }
   if(bond>=90){ c.fillStyle='#e26a8a'; c.font='14px monospace'; c.fillText('♥', 272, 96); }            // devoted
   if(G.familyMan){ c.fillStyle='#e8c34a'; c.font='bold 10px Georgia,serif'; c.textAlign='center';
     c.fillText('· FAMILY MAN OF THE HOUSE ·', 240, 20); }                                                // the earned title, in gold
@@ -21959,21 +22119,37 @@ function silDoorway(c, x, fy, T, female){                // the undressed shadow
       hands: T>260? {near:[ox+13+bk*3, oy-58+bk*2], far:[ox-4, oy-30]} : {near:[ox+3, oy-40], far:[ox-5, oy-38]}}), BED_FIG_K);
   else silHim(c, x, fy, -1, '#1c130c', (ox,oy)=>({lean:0.02, aro:0.35+Math.sin(T*0.05)*0.1, hands:{near: T>260? [ox+14+bk*3, oy-60+bk*2] : null, far:null}}), BED_FIG_K);
 }
-/* her, RUNNING for the door in her robe — the new body, not the old sprite (him, if you are her) */
-function drawPreludeRunner(c, x, fy, T){
+/* her, WALKING to the door in her robe — the new body, not the old sprite (him, if you are her).
+   "She walks too fast to the scene." She ran: a quarter of the room in a
+   couple of seconds, legs going like a sprinter's whatever the floor did.
+   It is a walk now, with the hips in it, and the feet are set by the
+   distance she has covered — each step lands where the last one said it
+   would — so the stride and the speed are one thing. */
+const PRELUDE_STEP=7;                                // her stride, in her own units (the ankle swing is the stride, so the feet stay put)
+const PRELUDE_STEP_HIM=5.2;                          // his — drawMateFig walks on a fixed 5.2
+function drawPreludeRunner(c, x, fy, T, dist){
   const her=(G&&G.isFemale)? null : ((G&&G.wife)||{});
-  if(!her){ const me=(typeof pairHimLook==='function')? pairHimLook() : playerLook(); drawManProfile(c, x, fy, me, {u:0, aro:0.3, walk:1, walkPh:T*0.6, lean:0.12, face:HARD_FACES.grin,
+  const d=(dist===undefined? x : dist)/BED_FIG_K, ph=d*Math.PI/(2*(her? PRELUDE_STEP : PRELUDE_STEP_HIM));
+  if(!her){ const me=(typeof pairHimLook==='function')? pairHimLook() : playerLook(); drawManProfile(c, x, fy, me, {u:0, aro:0.3, walk:1, walkPh:ph, lean:0.05, face:HARD_FACES.grin,
       cloth:(G&&G.tunic)||'#7a2f22', k:BED_FIG_K}, 1); return; }
   c.save(); c.translate(x,fy); c.scale(BED_FIG_K,BED_FIG_K); c.translate(-x,-fy);      // ✦ at the room's scale, not a doll's
-  const ph=T*0.55, bob=Math.abs(Math.sin(ph))*1.6, hip=[x, fy-33-bob];
-  const st=(o)=>[hip[0]+Math.sin(ph+o)*8.5, fy-2.2-Math.max(0,Math.cos(ph+o))*5];
+  const bob=Math.abs(Math.sin(ph))*0.7, sway=Math.sin(ph)*0.9, hip=[x+sway*0.3, fy-33.6-bob];
+  const st=(o)=>[x+Math.sin(ph+o)*PRELUDE_STEP, fy-2.2-Math.max(0,Math.cos(ph+o))*2.4];
   c.save(); c.globalAlpha=0.28; c.fillStyle='#120b08'; c.beginPath(); c.ellipse(x, fy-1, 11, 2.6, 0,0,7); c.fill(); c.restore();
-  drawFemFig(c, c, {look:her, floor:fy, hip, lean:0.20, headAng:0.05, expr:'pleased', blush:0.6, t:T, rock:Math.sin(ph*2)*0.8,
+  drawFemFig(c, c, {look:her, floor:fy, hip, lean:0.06, headAng:0.02, expr:'pleased', blush:0.55, t:T, rock:sway,
     ankles:{near:st(0), far:st(Math.PI)}, kneeBend:-1,
-    hands:{near:[hip[0]-Math.sin(ph)*7+3, hip[1]-8], far:[hip[0]+Math.sin(ph)*7+3, hip[1]-9]},
+    hands:{near:[hip[0]-Math.sin(ph)*3.5+2, hip[1]-7], far:[hip[0]+Math.sin(ph)*3.5+2, hip[1]-8]},
     robe:hexOf((her&&her.dress)||'#e8dcc2')});
   c.restore();
 }
+/* where the walker is, and how visible, through the first beat of the prelude */
+/* ~0.75px a frame for her long stride, ~0.55 for his shorter one: a couple of
+   steps a second either way, which is a walk (it was 2px a frame — a sprint) */
+function preludeWalkSpan(){ return (G && G.isFemale)? 70 : 96; }
+function preludeWalkX(T, dx){ const x1=dx-66, x0=x1-preludeWalkSpan(); return x0 + clamp(T/124,0,1)*(x1-x0); }
+/* the other one, answering the call: from T 236, the last stretch to the door */
+function preludeOtherX(T, dx){ return (dx-56) + clamp((T-236)/110,0,1)*72; }
+function preludeWalkA(T){ return clamp(T/14,0,1); }
 function drawRoomPlace(s,T,dx,dw,place){
   const ward=place==='wardrobe';
   // the chamber (or the atrium, if the wardrobe is tonight's arena)
@@ -22069,19 +22245,22 @@ function drawRoomPlace(s,T,dx,dw,place){
   }
   const spr=BEDSPR;
   if(T<130){
-    // the eager one RUNS for the door
-    const wx= 40 + Math.min(1,T/112)*(dx-66-40);
-    drawPreludeRunner(ctx, wx+8, 216, T);                                    // she runs (he does, if you are her) — the new body
-    if((T|0)%8===0) px(wx+10,218,3,1,'#5a4630');                              // dust at their heels
+    // the eager one WALKS to the door — a walk, and not a sprint across the room
+    const wx=preludeWalkX(T, dx);
+    ctx.save(); ctx.globalAlpha=preludeWalkA(T);
+    drawPreludeRunner(ctx, wx+8, 216, T, wx);                                // she walks (he does, if you are her) — the new body
+    ctx.restore();
   } else if(T<340){
     // the shadow-show: clothes OFF — an undressed silhouette in the doorway
     silDoorway(ctx, dx+(G.isFemale? 34 : 30)+Math.sin(T*0.08)*1.2, 216, T, !G.isFemale);
     if(T>260 && (T|0)%28<1.5) s.hearts.push({x:dx-4,y:140,vy:0.6,life:52,c:'#e26a8a'});
   }
   // the other answers the call — FULL height, striding to the door
-  if(T>280 && T<352){ const mx=90+Math.min(1,(T-280)/64)*(dx+16-90);
-    if(!G.isFemale) silHim(ctx, mx, 216, 1, '#1c130c', (ox,oy)=>({walk:1, walkPh:T*0.35, lean:0.06, aro:0.2}), BED_FIG_K);
-    else silHer(ctx, mx, 216, 1, '#1c130c', silWalkHer(T*0.35), BED_FIG_K);
+  if(T>236 && T<352){ const mx=preludeOtherX(T, dx), wph=(mx/BED_FIG_K)*Math.PI/(2*(G.isFemale? 6 : PRELUDE_STEP_HIM));   // a walk, feet set by the floor covered
+    ctx.save(); ctx.globalAlpha=clamp((T-236)/14,0,1);
+    if(!G.isFemale) silHim(ctx, mx, 216, 1, '#1c130c', (ox,oy)=>({walk:1, walkPh:wph, lean:0.04, aro:0.2}), BED_FIG_K);
+    else silHer(ctx, mx, 216, 1, '#1c130c', silWalkHer(wph), BED_FIG_K);
+    ctx.restore();
   }
   // a small invader makes for the shaking wardrobe — and is scooped up by a slave
   if(ward && T>560 && T<700 && G.children.some(c=>!c.wed && (G.day-c.born)<40)){
@@ -26093,16 +26272,20 @@ function drawPoolPlace(s,T,dx,dw,kind){
   // phases: run — shadow on the screen — cross to the water — the long soak
   const spr=BEDSPR;
   if(T<130){
-    const wx= 40 + Math.min(1,T/112)*(dx-66-40);
-    drawPreludeRunner(ctx, wx+8, 216, T);                                    // she runs (he does, if you are her) — the new body
+    const wx=preludeWalkX(T, dx);
+    ctx.save(); ctx.globalAlpha=preludeWalkA(T);
+    drawPreludeRunner(ctx, wx+8, 216, T, wx);                                // she walks (he does, if you are her) — the new body
+    ctx.restore();
   } else if(T<340){
     // undressing BEHIND the screen — the lamp betrays every curve
     silDoorway(ctx, dx+(G.isFemale? 34 : 30)+Math.sin(T*0.08)*1.2, 216, T, !G.isFemale);
     if(T>260 && (T|0)%28<1.5) s.hearts.push({x:dx-4,y:140,vy:0.6,life:52,c:'#e26a8a'});
   }
-  if(T>280 && T<352){ const mx=90+Math.min(1,(T-280)/64)*(dx+16-90);
-    if(!G.isFemale) silHim(ctx, mx, 216, 1, '#1c130c', (ox,oy)=>({walk:1, walkPh:T*0.35, lean:0.06, aro:0.2}), BED_FIG_K);
-    else silHer(ctx, mx, 216, 1, '#1c130c', silWalkHer(T*0.35), BED_FIG_K);
+  if(T>236 && T<352){ const mx=preludeOtherX(T, dx), wph=(mx/BED_FIG_K)*Math.PI/(2*(G.isFemale? 6 : PRELUDE_STEP_HIM));   // a walk, feet set by the floor covered
+    ctx.save(); ctx.globalAlpha=clamp((T-236)/14,0,1);
+    if(!G.isFemale) silHim(ctx, mx, 216, 1, '#1c130c', (ox,oy)=>({walk:1, walkPh:wph, lean:0.04, aro:0.2}), BED_FIG_K);
+    else silHer(ctx, mx, 216, 1, '#1c130c', silWalkHer(wph), BED_FIG_K);
+    ctx.restore();
   }
   // the first one crosses from the screen to the water — a silhouette, nothing more
   if(T>352 && T<400){ const cxw=dx+10-((T-352)/48)*(dx+10-(px0+pw2-24));
@@ -27270,6 +27453,13 @@ function drawMateFig(bk, fr, M){
         return add(p,[side>0? -r : r+0.6, 0]); };
       const pts=[edge(top,1), edge((top+bot)/2,1), edge(bot,1), edge(bot,-1), edge((top+bot)/2,-1), edge(top,-1)];
       const kp=smooth(pts); lit(kp, cloth, rgbA(cHi,0.85), rgbA(cSh,0.8));
+      if(M.leaf){                                                                                        // ❦ the sivrak: broad leaf in overlapping courses
+        const LEAF=['#4a7a34','#3e6a2c','#5a8a3e'];
+        for(let r=0;r<3;r++){ const f=top+(bot-top)*(0.18+r*0.34); const a0=edge(f,1), a1=edge(f,-1);
+          for(let k=0;k<4;k++){ const q=(k+0.5)/4, p=lerp(a0,a1,q), col=LEAF[(r+k)%3];
+            lit(smooth([[p[0],p[1]-1.6],[p[0]+1.8,p[1]+0.6],[p[0],p[1]+3.6],[p[0]-1.8,p[1]+0.6]]), col, rgbA(mixHex(col,'#ffffff',0.3),0.8), rgbA(mixHex(col,'#0a1a06',0.5),0.8));
+            line([[p[0],p[1]-1.0],[p[0],p[1]+3.0]], rgbA('#22401a',0.7), 0.35); } }
+      } else
       for(let i=0;i<4;i++){ const f=bot-0.01; const a0=edge(f,1), a1=edge(f,-1); const q=(i+0.5)/4;
         line([lerp(a0,a1,q), add(lerp(a0,a1,q),[0,1.6])], cSh, 0.6); }                                 // the fringe
       if(top<0.05) line([edge(top+0.01,1), edge(top+0.01,-1)], hexOf(M.band||'#8a6a3a'), 1.3);        // the belt it hooks to
@@ -27543,6 +27733,12 @@ function drawFemFig(bk, fr, F){
       } else {
         const ds=ease(clamp((u-0.35)/0.65,0,1)), sshift=-2.0*ds, zA=Math.max(-1,-0.42+sshift), zB=0.32+sshift;
         const O=piece(zA, zB, 1.3);
+        if(O && DR.leaf){                                                                              // ❦ the sivrak: leaf laid in courses over the skirt
+          const LEAF=['#4a7a34','#3e6a2c','#5a8a3e'];
+          for(let r=0;r<3;r++){ const t0=0.15+r*0.33, a0=lerp(O.tb,O.bb,t0), a1=lerp(O.tf,O.fb,t0);
+            for(let k=0;k<5;k++){ const q=(k+0.5)/5, pp=lerp(a0,a1,q), col=LEAF[(r+k)%3];
+              lit(smooth([[pp[0],pp[1]-1.5],[pp[0]+1.6,pp[1]+0.5],[pp[0],pp[1]+3.4],[pp[0]-1.6,pp[1]+0.5]]), col, rgbA(mixHex(col,'#ffffff',0.3),0.8), rgbA(mixHex(col,'#0a1a06',0.5),0.8));
+              line([[pp[0],pp[1]-0.9],[pp[0],pp[1]+2.8]], rgbA('#22401a',0.7), 0.35); } } }
         if(O){ if(zA>-0.995) for(let k=0;k<=8;k++){ const q=lerp(O.bb,O.fb,k/8); line([q,[q[0],q[1]+1.8]], rgbA(k%2? cSh : col,0.95), 0.6); }   // the fringe
           if(zB>0.2){ const bc=hexOf(DR.band||'#8a6a3a'); line([O.tb,O.tf], bc, 1.5); line([O.tb,O.tf], mixHex(bc,'#ffffff',0.3), 0.5); } }   // the band at her waist
         pool(clamp((-1-(-0.42+sshift))/0.74,0,1)*0.8);
@@ -28533,7 +28729,7 @@ function drawManProfile(c, x, fy, look, M, dir){
   const hip=[FXb, FYb-2.2-(15.6+L0*0.22+16.2+L0*0.22)*0.975+(M.crouch||0)];
   const rel=(v)=> v? [hip[0]+v[0], hip[1]+v[1]] : null;
   const IN=(typeof lengthInches==='function')? lengthInches(look||{}, M.aro||0) : {now:6,dia:1.6};
-  const R=drawMateFig(bk.getContext('2d'), fr.getContext('2d'), {hip, floor:FYb, lean:M.lean||0.02, u:M.u||0, aro:M.aro||0, headAng:M.headAng,
+  const R=drawMateFig(bk.getContext('2d'), fr.getContext('2d'), {hip, floor:FYb, lean:M.lean||0.02, u:M.u||0, aro:M.aro||0, headAng:M.headAng, leaf:!!M.leaf,
     hands:{near:rel(M.near), far:rel(M.far)}, face:M.face||HARD_FACES.stoic, look:look||{}, coast:!!M.coast,
     cloth:M.cloth||'#7a2f22', band:M.band, lenIn:IN.now, diaIn:IN.dia, pxi:1.0, walk:M.walk||0, walkPh:M.walkPh||0});
   MAN_DRAWS++;
@@ -28654,6 +28850,7 @@ function drawHallFem(c, x, y, w, ph, mode, preg){
   if(mode==='turn'){ const k=-Math.cos(Math.PI*clamp(ph||0,0,1)); sx=Math.max(0.14,Math.abs(k)); if(k<0) dir=-dir; }
   let expr='flat';
   try{ if(G && (w===G.wife || (w.self && G.isFemale))) expr=wifeExpr(w)||'flat'; }catch(e){}
+  if(HALL_EXPR && FACE_EX[HALL_EXPR]) expr=HALL_EXPR;                 // 🌹 a scene that is not the hall says what face
   if(!FACE_EX[expr]) expr='flat';
   const inLit=!!(_LITB && c===_LITB.fig.g);
   const gz=(DM && DM.gaze && !DM.gaze.caught && G && w===G.wife)? (DM.gaze.kind==='seat'? 0.36 : 0.22) : undefined;
@@ -28663,8 +28860,10 @@ function drawHallFem(c, x, y, w, ph, mode, preg){
 /* and his */
 const HALL_MAN_FACE={pleased:'smirk', smug:'smirk', flush:'sheepish', cross:'intent', sulk:'intent', brace:'intent', bite:'smirk', absorbed:'stoic'};
 function hallManLook(w){ return w || ((G && G.isFemale && G.wife && G.wife.male)? G.wife : (G? playerLook() : {})); }
+let HALL_EXPR=null;                                  // 🌹 set by a scene outside the hall (the courtship) to put a face on its figures
 function hallManFace(look, bond){
   const asHard=(id)=> HARD_FACES[id] || (FACE_EX[id]? faceAsHard(id) : null) || HARD_FACES[HALL_MAN_FACE[id]] || null;
+  if(HALL_EXPR && asHard(HALL_EXPR)) return asHard(HALL_EXPR);
   try{ if(look && look.self){ const SM=selfMood(); if(SM && asHard(SM)) return asHard(SM); } }catch(e){}
   try{ if(typeof HUSB_FACE!=='undefined' && HUSB_FACE) return HUSB_FACE; }catch(e){}
   try{ if(typeof HUSB_SMILE!=='undefined' && HUSB_SMILE>0.5) return HARD_FACES.grin; }catch(e){}
@@ -28679,7 +28878,10 @@ function drawHallMan(c, x, y, bond, skinOv, tunOv, w, ph, mode){
   const coast=(typeof rkHere==='function' && rkHere()) && (look.self? (G&&G.world==='rk') : look.eth==='rkrai');
   let cloth=hexOf(tunOv || look.dress || (look.self && G && G.tunic) || '#7a2f22');
   if(coast) cloth=mixHex(cloth,'#5a4028',0.35);
-  const band=coast? ((typeof rkOfficeBand==='function')? rkOfficeBand(G&&G.wife) : '#8a6a3a') : undefined;
+  let band=coast? ((typeof rkOfficeBand==='function')? rkOfficeBand(G&&G.wife) : '#8a6a3a') : undefined;
+  /* ❦ and on the evening it is built and worn, the sivrak — leaf, not hide */
+  const leaf=!!(coast && look.male && ADULT && (typeof rkSivrakOn==='function') && rkSivrakOn(look.self? 'self' : 'wife'));
+  if(leaf){ cloth='#4a7a34'; band='#6a5a2a'; }
   const run=(mode==='run'), walking=(mode==='walk'||run);
   const S= run? 9 : 5.2, dist=(NB_DIST!==null && NB_DIST!==undefined)? NB_DIST*NB_FACE : null;
   const walkPh= walking? (dist!==null? dist*Math.PI/(2*S) : (ph||0)*0.62) : 0;
@@ -28690,7 +28892,7 @@ function drawHallMan(c, x, y, bond, skinOv, tunOv, w, ph, mode){
   let R=null;
   try{ R=drawManProfile(c, x, y, look, {u:0, aro:0, walk: walking? 1 : 0, walkPh,
     lean: run? 0.13 : walking? 0.045 : 0.02+Math.sin(t*0.04)*0.006,
-    face:hallManFace(look,bond), coast, cloth, band, noShadow:inLit,
+    face:hallManFace(look,bond), coast, cloth, band, noShadow:inLit, leaf,
     headAng:(DM && DM.gaze && !DM.gaze.caught && G && look===G.wife)? (DM.gaze.kind==='seat'? 0.36 : 0.22) : undefined}, dir); }catch(e){ R=null; }
   c.restore();
   return R;
@@ -30520,6 +30722,8 @@ function updateDomus(dt){
   if(D.gaze){ updateGaze(dt); }                        // 👀 where their eyes went (it does not stop you walking)
   else if(gazeDue()) startGaze();
   if(!D.drop && !D.gaze && playerBendOk() && !hallBusy() && consume('f')) startPlayerBend(false);   // 🍑 F: bend over for him
+  if(D.plook) updatePlayerLook(dt);                                                            // 👀 and yours, at them
+  else if(consume('g')){ if(G.married && G.wife && ADULT) startPlayerLook(); }                    // (and says why, if the hall is busy)
   if(D.drop){ updateDrop(dt); if(D.drop && D.drop.locks) return; }
   else if(dropDue()) startDrop();
   else if(husbandMoveDue()) startHusbandMove();
@@ -30837,7 +31041,7 @@ const DROP_LOOKS=3;          // and the looks you have to buy yourself time with
    ===================================================================== */
 const HALL_BEATS=['scene','slap','rslap','tempt','peek','climb','rise','escort',
                   'kidWalk','gripe','ardor','press','curio','clam','praise',
-                  'seatAsk','reward','letout','tablet','husb','bendAsk','drop','gaze'];
+                  'seatAsk','reward','letout','tablet','husb','bendAsk','drop','gaze','plook'];
 /* '' when the hall is free, otherwise the key of whatever is holding it.
    `mine` is the caller's own slot, for a caller that has to ask the question
    while its own beat is still on screen. */
@@ -30865,6 +31069,7 @@ const HALL_BEAT_NAMES={
   husb:'him, already crossing',        bendAsk:'him, waiting on an answer',
   drop:'the floor, and her hands full of it',
   gaze:'somebody looking at you',
+  plook:'you, looking',
   nowhere:'nowhere to do it',
 };
 function hallBusyWhy(mine){
@@ -30949,6 +31154,7 @@ function drawGaze(){
     const r=2+Math.abs(Math.sin(T*0.2))*2; ctx.globalAlpha=0.6*a; ctx.strokeStyle='#ffc0e0'; ctx.lineWidth=1; ctx.beginPath(); ctx.ellipse(tx,ty,r+2,r,0,0,7); ctx.stroke();
     ctx.globalAlpha=1;
   }
+  if(!X.caught && X.kind==='front' && !G.isFemale){ const st=Math.min(RISE_STAGES-1, X.t/40); drawTunicBump(D.x, FY, playerLook(), st, T, D.face||1, houseIsWatching()); }   // and your tunic answers her
   ctx.textAlign='center'; ctx.globalAlpha=a;
   pixelText(X.caught? '😳' : '👀', sx, FY-80-Math.abs(Math.sin(T*0.12))*2, '#ffffff', 1.0);
   const cap = X.caught? (X.kind==='seat'? (X.greedy? (X.male? '😏 Caught — and he does not look away.' : '😏 Caught — and she does not look away.')
@@ -30958,6 +31164,65 @@ function drawGaze(){
   pixelText(cap, W/2, 30, 'rgba(255,200,226,.95)', 0.9);
   if(!X.caught) pixelText('turn round to catch '+(X.male? 'him' : 'her')+((X.kind==='seat' && playerBendOk())? '  ·  F: give him something to look at' : ''), W/2, 40, 'rgba(232,195,74,.65)', 0.6);
   ctx.globalAlpha=1; ctx.textAlign='left';
+}
+/* 👀 AND YOU CAN LOOK TOO. G looks at them — the front of his tunic, her
+   front, or their seat if their back is to you — with the same line from
+   your eyes to it. It reacts: a tunic under a look does what tunics do, and
+   a moment later they notice, and what they make of it depends on who they
+   are. (And a greedy wife looking at the front of YOUR tunic has the same
+   effect on it.) */
+function plookKind(){
+  const D=DM, toYou=Math.sign((D.x||0)-(D.wifeX||0))||1, theyFaceYou=((D.wifeDir||1)===toYou);
+  if(!theyFaceYou) return 'seat';
+  return G.wife.male? 'tunic' : 'front';
+}
+function startPlayerLook(){
+  const D=DM; if(!D || !G || !G.married || !G.wife || !ADULT) return false;
+  if(hallBusy()){ toast('✗ Not with '+hallBusyWhy()+' going on.', 2400); return false; }
+  const kind=plookKind();
+  D.plook={t:0, kind, dur:200, noticed:false, noticeAt:ri(56,96), react:null};
+  G.looksGiven=(G.looksGiven|0)+1;
+  return true;
+}
+function plookTarget(kind){
+  const D=DM, FY=214, sd=Math.sign((D.x||0)-(D.wifeX||0))||1, dirS=D.wifeDir||1;
+  if(kind==='tunic') return [D.wifeX + dirS*3, FY-28];
+  if(kind==='front') return [D.wifeX + dirS*4, FY-46];
+  return [D.wifeX - dirS*5, FY-31];
+}
+function updatePlayerLook(dt){
+  const D=DM, X=D.plook; if(!X) return; X.t+=dt;
+  if(Math.abs((D.x||0)-(D.wifeX||0))>120){ D.plook=null; return; }                // you walked off
+  D.wifePause=Math.max(D.wifePause||0, 20);
+  if(!X.noticed && X.t>=X.noticeAt){
+    X.noticed=true; X.nT=X.t;
+    const K=gazeKindsOf(G.wife), bold=K.greedy || (G.wifeRel||0)>=70 || hasQuirk('shameless');
+    X.react = bold? 'bold' : ((G.wifeRel||0)<30? 'cold' : 'shy');
+    D.wifeDir=Math.sign((D.x||0)-(D.wifeX||0))||1;                               // they turn to you
+    setWifeMood(X.react==='bold'? (G.wife.male? 'smug' : 'wink') : X.react==='cold'? 'cross' : 'flush', 3600);
+    if(X.react==='bold' && Math.random()<0.3){ X.follow=true; }
+  }
+  if(X.t>=X.dur){
+    const follow=X.follow; D.plook=null;
+    if(follow){ if(G.wife.male && typeof startHusbandMove==='function'){ startHusbandMove(); toast('😏 He saw you looking. He is coming over about it.', 3200); }
+                else if(!G.wife.male && typeof startTempt==='function'){ startTempt(); toast('😏 She saw you looking. Something on the low shelf needs reaching for.', 3200); } }
+  }
+}
+function drawPlayerLook(){
+  const D=DM, X=D.plook; if(!X) return;
+  const FY=214, T=D.t||0, a=clamp(X.t/12,0,1)*clamp((X.dur-X.t)/20,0,1);
+  const ex=D.x+(D.face||1)*2, ey=FY-(G.isFemale? 58 : 62), [tx,ty]=plookTarget(X.kind);
+  const n=Math.max(4, Math.round(Math.hypot(tx-ex,ty-ey)/4)), off=((T*0.25)%1);
+  ctx.globalAlpha=0.75*a; for(let i=0;i<n;i++){ const u=(i+off)/n; if(u>1) continue; px(Math.round(ex+(tx-ex)*u), Math.round(ey+(ty-ey)*u), 2, 1, '#9ad4ff'); }
+  const r=2+Math.abs(Math.sin(T*0.2))*2; ctx.strokeStyle='#c8e8ff'; ctx.lineWidth=1; ctx.beginPath(); ctx.ellipse(tx,ty,r+2,r,0,0,7); ctx.stroke(); ctx.globalAlpha=1;
+  /* the front of his tunic, looked at, does what it does */
+  if(X.kind==='tunic' && G.wife.male){ const st=Math.min(RISE_STAGES-1, X.t/42); drawTunicBump(D.wifeX, FY, G.wife, st, T, D.wifeDir||1, houseIsWatching()); }
+  const him=G.wife.male, who=him? 'his' : 'her';
+  const line = !X.noticed ? (X.kind==='tunic'? '👀 You are looking at the front of his tunic.' + (X.t>60? ' It is looking back.' : '') : X.kind==='front'? '👀 You are looking at her front.' : '👀 You are looking at '+who+' seat.')
+             : X.react==='bold'? (him? '😏 He noticed — and he is not shy about it.' : '😉 She noticed — and she winked.')
+             : X.react==='cold'? (him? '😒 He noticed, and he is not in the mood to be looked at.' : '😒 She noticed, and she is not in the mood to be looked at.')
+             : (him? '😳 He noticed. He has gone red to the ears.' : '😳 She noticed. She has gone pink.');
+  ctx.textAlign='center'; ctx.globalAlpha=a; pixelText(line, W/2, 30, 'rgba(200,230,255,.95)', 0.9); ctx.globalAlpha=1; ctx.textAlign='left';
 }
 /* 🍑 AND THE BEND, ON DEMAND, WHEN YOU ARE THE WIFE. The drop could only
    happen when you dropped something; now F bends you over whenever the hall
@@ -32612,7 +32877,14 @@ function tabletMenu(){
         !!sp, 'There is nobody in this house to make a face at you.');
     add('myface', '☺ MAKE YOUR FACE…', 'The same list, on your own face.', true);
     add('gaze', sp&&him? '👀 HIS EYES WANDER' : '👀 HER EYES WANDER', 'Walk past, and watch where the eyes go.', !!sp && ADULT, 'Mature content is off.');
-    if(G.isFemale) add('bend', '🍑 BEND OVER FOR HIM', 'Give him something to look at, and see what he does about it.', playerBendOk(), 'You need a husband in the house for that.'); }
+    if(G.isFemale) add('bend', '🍑 BEND OVER FOR HIM', 'Give him something to look at, and see what he does about it.', playerBendOk(), 'You need a husband in the house for that.');
+    add('plook', sp&&him? '👀 LOOK AT HIM' : '👀 LOOK AT HER', (sp&&him? 'The front of his tunic, or his seat — and he will notice.' : 'Her front, or her seat — and she will notice.'), !!sp && ADULT, 'Mature content is off.');
+    if(typeof rkHere==='function' && rkHere()){
+      const C=rkSivrakCan(), meOn=rkSivrakOn('self'), meHas=rkSivrakHas('self'), themOn=rkSivrakOn('wife'), themHas=rkSivrakHas('wife');
+      add('svk_me', meHas? (meOn? '❦ TAKE YOUR SIVRAK OFF' : '❦ PUT YOUR SIVRAK BACK ON') : '❦ WEAR THE SIVRAK — the jungle suit',
+          'Broad southern leaf on a cord, built round the best thing about you. Indoors, tonight; dead by morning.', C.ok, C.why);
+      add('svk_them', themHas? (themOn? (him? '❦ HAVE HIM TAKE HIS OFF' : '❦ HAVE HER TAKE HERS OFF') : (him? '❦ HIS BACK ON' : '❦ HERS BACK ON')) : (him? '❦ ASK HIM TO WEAR ONE' : '❦ ASK HER TO WEAR ONE'),
+          'The same brief, built round the best thing about them — and they can say no.', C.ok, C.why); } }
   return out;
 }
 function tabletFire(id){
@@ -32625,6 +32897,9 @@ function tabletFire(id){
     if(id==='praise'){if(typeof startPraise==='function')startPraise();return; }
     if(id==='press'){ if(typeof tryRkPress==='function') tryRkPress(); return; }
     if(id==='gaze'){ startGaze(); return; }
+    if(id==='plook'){ startPlayerLook(); return; }
+    if(id==='svk_me'){ sivrakSelf(); return; }
+    if(id==='svk_them'){ sivrakSpouse(); return; }
     if(id==='bend'){ startPlayerBend(false); return; }
     if(id==='face'||id==='myface'){ D.tablet={ t:20, sel:0, locks:true, faces:(id==='face'? 'spouse' : 'self'), fsel:0 }; return; }
     if(id==='look'){
@@ -38555,6 +38830,7 @@ function drawDomusInner(){
   { ctx.textAlign='right'; pixelText(BUILD_STAMP, W-3, H-3, 'rgba(232,195,74,.34)', 0.42); ctx.textAlign='left'; }   // which build this is, always
   px(-4,-4,W+8,16,'#0a0705'); ctx.textAlign='center'; pixelText(HALLNAME+' · A/D walk · S run · SPACE act · ⌘ T: TABLET'
     +((typeof playerBendOk==='function' && playerBendOk())? ' · F: BEND OVER' : '')
+    +((G && G.married && G.wife && ADULT)? ' · G: LOOK' : '')
     +((typeof ardorReady==='function' && ardorReady())? ' · L: GET HARD':'')
     /* AND THE COAST'S OWN TWO. They only exist here, so they are only
        offered here, and the second only once there is something to answer. */
@@ -38653,6 +38929,7 @@ function drawDomusInner(){
     if(D.bendAsk) drawBendAsk();                        // and this is him asking
     if(D.drop) drawDrop();                              // the floor, her, and him crossing to it
     if(D.gaze) drawGaze();                              // 👀 and where their eyes went
+    if(D.plook) drawPlayerLook();                       // 👀 and where yours went
     /* ---- and what the hall said about the walk ---- */
     if(D.walkQuip && !D.scene && !D.press && !D.curio && !D.clam){
       const q=D.walkQuip, a=clamp(Math.min(q.t/20,(150-q.t)/40),0,1)*0.80;
@@ -40385,6 +40662,95 @@ function drawBrideCut(P, cut, o){
 }
 // FULL-BODY portrait of a prospective wife — contrapposto pose, figure on show
 // pass bare=true for a transparent figure sprite (cutscenes)
+/* =====================================================================
+   📸 THE PORTRAITS, ON THE NEW BODIES
+   ---------------------------------------------------------------------
+   "Make the portrait replace the old bodies — the wife choosing and the
+   husband choosing — with different poses." Every portrait in the game
+   (the marriage market, the courting card, the ledger, the bedroom's
+   sprite) painted a blocky front-on figure of its own. They stand in the
+   same rooms now — the alcove, the plank house, the shōji — but the person
+   in them is the body map's figure: her own measurements, her face, her
+   hair and her gown, framed from the crown to the thigh, and posed. Each
+   person has a pose of their own (kept, so the same bride stands the same
+   way every time you see her) and a face to go with it.
+   ===================================================================== */
+const FRONT_GARMENTS={kimono:1, hanfu:1, hanbok:1, sari:1, gown:1, kaftan:1, parka:1};
+const PORTRAIT_GARMENT_F={wa:'kimono', han:'hanfu', ming:'hanfu', korean:'hanbok', kushan:'sari', tamil:'sari', nanban:'gown', steppe:'kaftan'};
+const PORTRAIT_GARMENT_M={wa:'kimono', han:'hanfu', ming:'hanfu', korean:'hanfu', steppe:'kaftan'};
+/* what a portrait dresses them in: their people's garment, the coast's ulvik indoors — and, with
+   mature content off, a coast woman in her parka rather than a cut that shows her */
+function portraitDressInfo(w){
+  w=w||{};
+  const D=realDressInfo(w), cf=w._cutForce;
+  if(cf && FRONT_GARMENTS[cf]){ D.garment=cf; return D; }                     // a caller that says what she is wearing
+  if(cf==='ulvik' && !w.male){ D.coast=true; if(!D.cut){ try{ D.cut=rkCut(w); }catch(e){} } }
+  if(D.coast){ if(!w.male && !ADULT) D.garment='parka'; return D; }
+  D.garment=(w.male? PORTRAIT_GARMENT_M : PORTRAIT_GARMENT_F)[w.eth]||null;
+  return D;
+}
+const PORTRAIT_POSES_F=['hips','hip','cross','hair','clasp','wave','hang'];
+const PORTRAIT_POSES_M=['hips','cross','clasp','belt','wave','hang'];
+const PORTRAIT_POSE_NAMES={hips:'hands on her hips', hip:'a hand on one hip', cross:'arms folded', hair:'a hand in her hair', clasp:'hands clasped', wave:'a wave', hang:'at ease', belt:'thumbs in the belt'};
+function portraitPoseOf(w){
+  if(!w) return 'hang';
+  if(w._pose) return w._pose;
+  const L=w.male? PORTRAIT_POSES_M : PORTRAIT_POSES_F;
+  const h=(typeof kinHash==='function')? kinHash(String(w.name||w.id||'x')+'·pose') : 0;
+  return L[h%L.length];
+}
+/* the face a portrait wears: what the caller asked for (_expr), or one of her own */
+const PORTRAIT_EXPR={love:'smitten', smile:'pleased', laugh:'laugh', cross:'sulk', smoulder:'smug', proud:'smug', away:'dreamy'};
+function portraitFaceOf(w, expr){
+  if(expr && PORTRAIT_EXPR[expr]) return PORTRAIT_EXPR[expr];
+  if(expr && FACE_EX[expr]) return expr;
+  const L= w&&w.male? ['flat','smug','pleased','flat'] : ['flat','pleased','smug','dreamy','wink','flat'];
+  const h=(typeof kinHash==='function')? kinHash(String((w&&w.name)||'x')+'·face') : 0;
+  return L[h%L.length];
+}
+/* where a posed arm goes, in the front figure's own units (s: which side) */
+function portraitArm(pose, s, g){
+  const {SW, WW, sy, cy, wy, hy, ny, HH, male}=g;
+  switch(pose){
+    case 'hips':  return {ex:s*(SW+4.6), ey:wy-3.2, hx:s*(WW+0.7), hy:wy+0.9};
+    case 'hip':   return s>0? {ex:s*(SW+4.6), ey:wy-3.2, hx:s*(WW+0.7), hy:wy+0.9} : null;
+    case 'belt':  return {ex:s*(SW+2.9), ey:wy-1.8, hx:s*(WW+0.1), hy:wy+2.2};
+    case 'cross': return {ex:s*(SW+1.1), ey:wy-2.6, hx:-s*(SW*0.46), hy:cy+(male? 3.4 : 4.8)};
+    case 'clasp': return {ex:s*(WW+2.3), ey:wy-0.4, hx:s*0.9, hy:hy+0.4};
+    case 'hair':  return s>0? {ex:s*(SW+4.0), ey:sy-6.2, hx:s*(SW*0.30), hy:ny-HH*0.62} : null;
+    case 'wave':  { if(s<0) return null; const w8=Math.sin((g.t||0)*0.2)*1.2; return {ex:s*(SW+4.6), ey:sy-1.4, hx:s*(SW+5.2)+w8, hy:sy-9.4}; }
+  }
+  return null;
+}
+/* one figure, framed for a portrait: crown to mid-thigh, centred, posed */
+function drawPortraitFigure(c, CW, CH, w, opt){
+  opt=opt||{};
+  const M=chartLandmarks(w), top=M.headY-M.headH-(w.male? 3.5 : 5.0);
+  const shownTo=-17.5, k=(CH-8)/(shownTo-top);
+  const pose=opt.pose||portraitPoseOf(w), face=opt.face||portraitFaceOf(w, opt.expr);
+  const f0=CHART_FACE; CHART_FACE=(face==='flat'? 'auto' : face);
+  c.save(); c.imageSmoothingEnabled=true;
+  c.translate(CW/2 + (opt.dx||0), 5 - top*k); c.scale(k,k);
+  try{
+    drawRealFig(c, w, 'front', undefined, {dressed:true, dressInfo:portraitDressInfo(w), portrait:true, aro:0, pose, preg:opt.preg, t:opt.t||0});
+  }catch(e){ c.restore(); CHART_FACE=f0; return false; }
+  c.restore(); CHART_FACE=f0;
+  /* a soft light from the lamp side, so it sits in the room rather than on it */
+  if(!opt.bare){ const g=c.createRadialGradient(CW*0.30, CH*0.25, 4, CW*0.30, CH*0.25, CW*0.9); g.addColorStop(0,'rgba(255,220,170,.10)'); g.addColorStop(1,'rgba(0,0,0,.14)'); c.fillStyle=g; c.fillRect(0,0,CW,CH); }
+  return true;
+}
+/* the same person full length, feet on a floor — for a group (the family portrait) */
+function drawStandingFigure(c, x, floorY, tall, w, opt){
+  opt=opt||{};
+  const M=chartLandmarks(w), top=M.headY-M.headH-(w.male? 3.5 : 5.0), k=tall/(0-top);
+  const pose=opt.pose||portraitPoseOf(w), face=opt.face||portraitFaceOf(w, opt.expr);
+  const f0=CHART_FACE; CHART_FACE=(face==='flat'? 'auto' : face);
+  c.save(); c.imageSmoothingEnabled=true; c.translate(x, floorY); c.scale(k,k);
+  try{ drawRealFig(c, w, 'front', undefined, {dressed:true, dressInfo:portraitDressInfo(w), portrait:true, aro:0, pose, preg:opt.preg, t:opt.t||0}); }
+  catch(e){ c.restore(); CHART_FACE=f0; return false; }
+  c.restore(); CHART_FACE=f0; return true;
+}
+function portraitsNew(){ try{ return !(typeof SETTINGS!=='undefined' && SETTINGS.classicBodies); }catch(e){ return true; } }
 function drawBridePortrait(cnv,b,bare,preg){
   if(!ADULT) bare=false;   // never render the unclothed variant with mature content off
   preg=preg||0;
@@ -40457,6 +40823,19 @@ function drawBridePortrait(cnv,b,bare,preg){
     for(let i=0;i<6;i++) P(-32,-64+i*11,64,1,'#4a3822');
     P(20,-52,11,15,'#6a5030'); P(21,-50,9,4,'#8a6a40'); P(21,-44,9,4,'#8a6a40');                                // window
     P(-34,-2,70,3,'#5a4428'); for(let i=0;i<9;i++)P(-32+i*8,-1,3,1,'#3e2e18');                                  // dirt floor
+  }
+  /* 📸 AND IN IT, THE NEW BODY — the old painted figure below stays for the classic switch, and for
+     the callers that dress her themselves and crop a full-length plate (the coast's commissions,
+     the hide sketch) or want the transparent full-length sprite */
+  if(portraitsNew() && !bare && !b._skinBody && !b._plate && (b._cutForce===undefined || FRONT_GARMENTS[b._cutForce] || b._cutForce==='ulvik')){
+    if(b.rank==='warrior'){ P(-22,-68,1,66,'#6a4a2c'); P(-22,-68,1,1,'#8a6a44'); P(-23,-72,3,5,'#c8c0b0'); P(-22,-75,1,4,'#e8e0d0'); }   // her spear, planted
+    c.restore();
+    const ok=drawPortraitFigure(c, CW, CH, b, {preg, expr:b._expr});
+    if(ok){
+      if(b.jewel){ c.fillStyle='#e8c34a'; c.fillRect(CW-14,CH-16,5,5); c.fillStyle='#fff0b0'; c.fillRect(CW-13,CH-15,2,2); }
+      c.strokeStyle=b.jewel?'#8a6f35':'#4a3a26'; c.lineWidth=2; c.strokeRect(1,1,CW-2,CH-2);
+      return; }
+    c.save(); c.translate(CW/2,CH-3); c.scale(s,s);                 // (and if it could not be drawn, the old figure)
   }
   /* ---- THE YEARS. A woman of forty is not drawn as a woman of eighteen: the
      hair greys, the jaw softens, and the lines come in around the eyes. ---- */
@@ -42283,8 +42662,8 @@ function selvskarFigure(w){
   /* an offscreen of just her, no backdrop, no garment, no culture's cloth */
   const N=300;
   const off=document.createElement('canvas'); off.width=off.height=N;
-  const keep={cov:w._cov, dress:w.dress, skin:w._skinBody, cut:w._cutForce, ex:w._expr};
-  w._cov=0; w.dress=w.skin||'#e6bd94'; w._skinBody=true; w._cutForce=null;
+  const keep={cov:w._cov, dress:w.dress, skin:w._skinBody, cut:w._cutForce, ex:w._expr, plate:w._plate};
+  w._cov=0; w.dress=w.skin||'#e6bd94'; w._skinBody=true; w._cutForce=null; w._plate=true;   // 📸 the full-length plate: this crops it
   w._expr=(G.selv&&G.selv.expr)||'smug';
   try{ drawBridePortrait(off, w, true, 0); }catch(e){}
   if(keep.cov===undefined) delete w._cov; else w._cov=keep.cov;
@@ -42292,6 +42671,7 @@ function selvskarFigure(w){
   if(keep.skin===undefined) delete w._skinBody; else w._skinBody=keep.skin;
   if(keep.cut===undefined) delete w._cutForce; else w._cutForce=keep.cut;
   if(keep.ex===undefined) delete w._expr; else w._expr=keep.ex;
+  if(keep.plate===undefined) delete w._plate; else w._plate=keep.plate;
   return off;
 }
 function drawSelvskar(cv, t){
@@ -44064,7 +44444,8 @@ function raunskarRender(cv, p){
     const R=RK_ART_DRESS.find(r=>r.id===p.dress)||RK_ART_DRESS[0];
     const b=w.body||{}, keep=b[p.subj];
     b[p.subj]=p.read;                       // the piece shows the READ, not the truth
-    const ex=w._expr, cf=w._cutForce, cv0=w._cov, dr0=w.dress;
+    const ex=w._expr, cf=w._cutForce, cv0=w._cov, dr0=w.dress, pl0=w._plate;
+    w._plate=true;                          // 📸 the full-length plate, because the frame below crops it
     w._expr=p.expr||null;                   // and the face you asked for
     w._cutForce=R.cut;                      // and it is wearing what you paid for
     /* SKIN GARMENTS. The plate paints the body tiers in the DRESS colour and
@@ -44095,6 +44476,7 @@ function raunskarRender(cv, p){
       if(keep===undefined) delete b[p.subj]; else b[p.subj]=keep;
       if(ex===undefined) delete w._expr; else w._expr=ex;
       if(cf===undefined) delete w._cutForce; else w._cutForce=cf;
+      if(pl0===undefined) delete w._plate; else w._plate=pl0;
       if(cv0===undefined) delete w._cov; else w._cov=cv0;
       delete w._skinBody;
       w.dress=dr0;
@@ -52841,10 +53223,11 @@ function drawGroomPortrait(cnv,b){
   if(b.rank==='warrior'){ P(-24,-66,1,64,'#6a4a2c'); P(-24,-66,1,1,'#8a6a44');
     P(-25,-70,3,5,'#c8c0b0'); P(-24,-73,1,4,'#e8e0d0'); }
   c.restore();
-  // THE MAN HIMSELF, on his own measurements
-  c.save(); c.translate(W/2, H-8); c.scale(1.62,1.62);
-  drawHusbandFig(c,0,0,0,b.skin,b.dress,b,0,'idle');
-  c.restore();
+  // THE MAN HIMSELF, on his own measurements — the new body, posed (the old sprite for the classic switch)
+  if(!(portraitsNew() && drawPortraitFigure(c, W, H, b, {expr:b._expr}))){
+    c.save(); c.translate(W/2, H-8); c.scale(1.62,1.62);
+    drawHusbandFig(c,0,0,0,b.skin,b.dress,b,0,'idle');
+    c.restore(); }
   // a gold ring for a noble match, as her plate gets a jewel
   if(b.jewel){ c.fillStyle='#e8c34a'; c.fillRect(W-14,H-16,5,5); c.fillStyle='#fff0b0'; c.fillRect(W-13,H-15,2,2); }
   c.strokeStyle=b.jewel?'#8a6f35':'#4a3a26'; c.lineWidth=2; c.strokeRect(1,1,W-2,H-2);
@@ -56092,6 +56475,8 @@ function rkSivrakOn(who){
     const S=G&&G.rkSivrak;
     if(!S || S.day!==G.day) return false;
     if(S.off) return false;                    // built, and currently not on
+    if(who==='self' && S.offSelf) return false; // (and each of you can take yours off on your own)
+    if(who==='wife' && S.offWife) return false;
     return who==='both'? true : (S.who==='both' || S.who===who);
   }catch(e){ return false; }
 }
@@ -56159,6 +56544,61 @@ function rkSivrakWear(who){
     G.rkSivraksWorn=(G.rkSivraksWorn||0)+1;
     return true;
   }catch(e){ return false; }
+}
+/* =====================================================================
+   ❦ THE JUNGLE SUIT, CHOSEN — "in the Rkrai give the option to wear it."
+   It only existed as a question on the Ten's titles page, once a day, which
+   she could refuse, and it always dressed both of you. Now the tablet asks
+   plainly: wear one yourself (your house builds it with you — it is still a
+   married thing), ask them to wear one (and they can still say no), and
+   take either off and put it back on as the evening goes.
+   ===================================================================== */
+function rkSivrakCan(){
+  if(!(typeof rkHere==='function' && rkHere())) return {ok:false, why:'Only on the coast — it is the coast’s own garment.'};
+  if(!ADULT) return {ok:false, why:'Not with mature content off.'};
+  if(!(G && G.married && G.wife)) return {ok:false, why:'It is a married thing: it takes two people an afternoon.'};
+  return {ok:true};
+}
+function rkSivrakToday(){ const S=G&&G.rkSivrak; return (S && S.day===G.day)? S : null; }
+function rkSivrakHas(who){ const S=rkSivrakToday(); return !!(S && (S.who==='both' || S.who===who)); }
+/* add one to tonight's (or start tonight's) */
+function rkSivrakAdd(who){
+  let S=rkSivrakToday();
+  if(!S){ rkSivrakWear(who); S=rkSivrakToday(); }
+  else if(!(S.who==='both' || S.who===who)){ S.who='both'; G.rkSivraksWorn=(G.rkSivraksWorn||0)+1; }
+  if(S){ S.off=false; if(who==='self') S.offSelf=false; else S.offWife=false; }
+  try{ refreshStatbar(); saveQuiet(); }catch(e){}
+}
+/* would they — the same reckoning as the Ten's page, without its once-a-day rule for adding a second */
+function rkSivrakWill(){
+  let p = 0.20 + clamp((G.wifeRel||50)/100,0,1)*0.52;
+  if(hasQuirk('shameless')) p+=0.18; if(hasQuirk('devout')) p-=0.16;
+  if((G.wifePhys||45)<25) p-=0.20;
+  if(rkSivrakHas('self')) p+=0.15;                                  // you are already in one — it is easier to say yes to
+  return clamp(p,0.05,0.95);
+}
+function sivrakSelf(){
+  const C=rkSivrakCan(); if(!C.ok){ toast('✗ '+C.why, 3200); return false; }
+  if(rkSivrakHas('self')){ const S=rkSivrakToday(); S.offSelf=!S.offSelf; if(!S.offSelf) S.off=false; try{ saveQuiet(); }catch(e){}
+    toast(S.offSelf? '◈ Yours comes off, and goes over the post. It will go back on.' : '❦ Yours goes back on — green, and holding together.', 3400); return true; }
+  rkSivrakAdd('self');
+  const F=rkSivrakFrame(G.isFemale? Object.assign({},playerLook(),{body:G.body||{}}) : {self:true, male:true, body:(G&&G.body)||{}});
+  toast('❦ An afternoon of southern leaf, and your house helps you into it — built round '+String(F.part).toUpperCase()+'. '+F.line, 5600);
+  return true;
+}
+function sivrakSpouse(){
+  const C=rkSivrakCan(); if(!C.ok){ toast('✗ '+C.why, 3200); return false; }
+  const w=G.wife, They=w.male? 'He' : 'She';
+  if(rkSivrakHas('wife')){ const S=rkSivrakToday(); S.offWife=!S.offWife; if(!S.offWife) S.off=false; try{ saveQuiet(); }catch(e){}
+    toast(S.offWife? '◈ '+They+' takes it off and folds it over the post.' : '❦ '+They+' puts it back on.', 3400); return true; }
+  if(G.rkSivrakAskDay===G.day && G.rkSivrakAskNo){ toast('❦ You asked today, and the answer was no. The leaves came off a ship, not a hedge.', 3600); return false; }
+  G.rkSivrakAskDay=G.day;
+  const yes=Math.random()<rkSivrakWill();
+  if(!yes){ G.rkSivrakAskNo=true; toast('❦ '+pick(['“Not tonight. The green ones came in wet.”','“Ask me when the store is counted.”','“No. And the answer was allowed to be no.”']), 4200); return false; }
+  G.rkSivrakAskNo=false; rkSivrakAdd('wife'); setWifeMood('smug', 5000);
+  const F=rkSivrakFrame(w);
+  toast('❦ '+pick(['“Bring the moss as well.”','“An afternoon. And you are helping.”','“Get the good leaves.”'])+'  —  built round '+String(F.part).toUpperCase()+'. '+F.line, 5600);
+  return true;
 }
 /* ---- ONE LEAF. Everything else is this, many times. ---- */
 function sivrakLeaf(P, x, y, lw, lh, col, hi, sh, dir){
@@ -60818,6 +61258,12 @@ window.__SS = {
   staminaLine, staminaCost, drawStaminaIcon, TABLET_FACES, tabletFaceName, tabletFaceApply, drawFacePreview, selfMood, setSelfMood,
   gazeKindsOf, gazeReady, gazeDue, startGaze, updateGaze, drawGaze, gazeTarget, GAZE_LINES, playerBendOk, startPlayerBend, bendReaction, ESC_HUSB,
   drawCubiculum, drawCubiculumFloor, drawLonghouseDressing, drawLonghouseFloor, drawRoomPlace,
+  /* V47 — the portraits, the courtship, the walk, the jungle suit, the look */
+  PORTRAIT_POSES_F, PORTRAIT_POSES_M, portraitPoseOf, portraitFaceOf, portraitArm, drawPortraitFigure, portraitsNew,
+  get CT(){return CT;}, set CT(v){ CT=v; }, get HALL_EXPR(){return HALL_EXPR;}, preludeWalkX, preludeWalkSpan, preludeOtherX, PRELUDE_STEP, PRELUDE_STEP_HIM,
+  rkSivrakCan, rkSivrakHas, rkSivrakAdd, rkSivrakWill, sivrakSelf, sivrakSpouse,
+  FRONT_GARMENTS, PORTRAIT_GARMENT_F, PORTRAIT_GARMENT_M, portraitDressInfo, drawStandingFigure, familyPortraitNew,
+  startPlayerLook, updatePlayerLook, drawPlayerLook, plookKind, plookTarget,
 
   get TITLE_EMOJI_LIVE(){return TITLE_EMOJI_LIVE;}, get TITLE_EMOJI_T(){return TITLE_EMOJI_T;},
   domusExit,

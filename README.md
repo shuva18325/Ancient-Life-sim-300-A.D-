@@ -49,6 +49,27 @@ publicly, leaving it off keeps the game safe for a general audience.
 ---
 
 ## Feature highlights
+- **The new bodies, everywhere (V47)** — every spouse portrait (TAKE A WIFE / TAKE A HUSBAND,
+  the courting card, the ledger, the bedroom's sprite) now stands the body-map figure in its
+  culture's room — her own measurements, face, hair and gown — framed crown to thigh and
+  **posed**: hands on hips, a hand on one hip, arms folded, a hand in her hair, hands clasped, a
+  wave, at ease (thumbs in the belt for him). Each person keeps their pose and a face of their
+  own, and wears their people's garment on the new figure — kimono and obi, hanfu, hanbok, sari,
+  a laced gown, a kaftan, the coast's ulvik (a parka with mature content off), the stola — with
+  proper sleeves. The family portrait stands the whole house full length on the new bodies, and
+  the courtship scene stands two new-body figures in the street, faces moving with the
+  conversation. (Settings → CLASSIC BODIES still brings back the old ones.)
+- **The jungle suit, chosen (V47, mature content)** — on the coast the villa tablet offers the
+  sivrak plainly: wear one yourself, ask your spouse to (they can say no, and a no stands for the
+  day), and take either off and put it back on as the evening goes. Drawn on the new bodies —
+  a leaf gown for her, a leaf kilt for him.
+- **You can look too (V47, mature content)** — G (or the tablet) looks at them: the front of his
+  tunic, her front, or their seat if their back is turned, with a line from your eyes to it. The
+  tunic does what tunics do; a moment later they notice and turn — bold, pink, or not in the mood,
+  depending on who they are — and a bold one may come over about it.
+- **The walk to the door (V47)** — in the bedchamber she no longer sprints to the scene: she
+  walks, feet planted by the floor covered, at under a pixel a frame (it was over two), and the one
+  who answers the call walks too.
 - **Stamina (V46, mature content)** — a bedroom stat you train at the ludus (3 → 10), and your
   spouse has one too. His size and his stamina push against hers: a small one on an ordinary
   wife and she wants more; an ordinary pair is a good match; a big one — or any one, with a man
