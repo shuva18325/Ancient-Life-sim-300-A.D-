@@ -9,7 +9,7 @@ grounds produce nine distinct pictures" is.
 
 ---
 
-## 0 — NEXT, PROPOSED AFTER V42 (in the order they would help most)
+## 0 — NEXT, PROPOSED AFTER V43 (in the order they would help most)
 
 1. ~~**The villa walkers onto the template.**~~ — DONE (V42), see 0.8 below.
 2. **Faces in the arena.** The face library is shared — a fighter could grit his teeth on a
@@ -30,6 +30,16 @@ grounds produce nine distinct pictures" is.
    figure; the card is the first body a player sees and it should be the one they get.
 10. **More escalation scenes.** Each escalator has one running order; a second per escalator
     (the stair, the impluvium's rim, the tablinum desk) would stop the third one feeling familiar.
+
+11. **Names on the street.** The five households on the street have their own village names in
+    the ledger; walking past a neighbour's door could show theirs, with its emoji, the same way.
+
+### ~~0.7 The names, near her~~ — DONE (V43)
+**Result:** `tests/v43.cjs` (15 checks). The village title only shows within reach of the
+spouse and fades with distance, never while anything else is happening in the hall; both
+titles show, parted at the midpoint so they never overlap and lifted clear of the ardor charm;
+22 animated pixel emojis cover every name but the plain ones; the house's name comes up when
+the two of you stand together; the spouse says your name once a visit.
 
 ### ~~0.8 The hall on the new bodies, the creation table, the kit, the escalators~~ — DONE (V42)
 **Result:** `tests/v42.cjs` (31 checks). The villa walkers, the escort, a husband's move and

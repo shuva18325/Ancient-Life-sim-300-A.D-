@@ -49,6 +49,13 @@ publicly, leaving it off keeps the game safe for a general audience.
 ---
 
 ## Feature highlights
+- **The names, near her (V43, mature content)** — what the village calls you no longer hangs
+  over your head for the first seconds of every visit; it comes up only when you walk over to
+  your spouse, and fades when you walk off. Yours goes over you and theirs over them, each with
+  its own **animated pixel emoji** — the Booty Destroyer's length going into a booty, the Booty
+  Queen's crowned peach, the Satisfier's heartbeat, the boinging post, the measuring rod, the
+  scallop shell, the cold bed's snowflake and more. Stand right beside each other and the
+  **house's** name comes up between you; and the first time each visit, they say yours aloud.
 - **The hall walks on the woohoo bodies (V42)** — the spouse pacing the atrium, you, a grown
   child, a husband crossing the room and the walks to the pool and the wardrobe are the same
   posable figures the scenes use, in profile, facing the way they walk, their feet planted by the
