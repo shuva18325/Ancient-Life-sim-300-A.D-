@@ -49,6 +49,34 @@ publicly, leaving it off keeps the game safe for a general audience.
 ---
 
 ## Feature highlights
+- **The hall walks on the woohoo bodies (V42)** — the spouse pacing the atrium, you, a grown
+  child, a husband crossing the room and the walks to the pool and the wardrobe are the same
+  posable figures the scenes use, in profile, facing the way they walk, their feet planted by the
+  distance covered and turning round through an edge. The escort's five holds are the figures'
+  own hands (joined, or her wrist in his), and the two carries lift her off her feet properly.
+- **How he holds out (V42)** — when she bends, the resist is a man, not a bar: **the Looker**
+  (glances, a hand over the eyes, fingers apart, staring), **the Preparer** (shoulders, belt,
+  wiping his palms, the step), **Quick to Rise**, **the Pacer**, **the Devout** and **the
+  Whistler** — six traits, five tells each, and a husband has his own while *you* bait him.
+- **Escalators (V42, mature content)** — spouse traits that take a slap further, for a wife or a
+  husband: **Big** (a slap that lands well goes straight into it), **Medium** (the romantic one,
+  and now they want it), **Slow Burn** (the third of the day), **Turns the Tables** (their lead),
+  **the Spark** (the low shelf, a while later) and the **De-escalator** (they want to talk about
+  it). Each escalation is its own woohoo **in the villa itself** — against one of the hall's own
+  columns or on the tiles on her gown — with an intro, a lead, the undress, two or three
+  positions and the love-or-heir finish.
+- **The creation table, fixed (V42)** — the body map works before there is a career; the whole
+  panel scrolls so every card in every world can be reached (it collapsed to a few pixels on the
+  eastern sheet, in Japan and on the Rkrai shore); the horse-archer, the Tamil champion and the
+  Kushan cataphract can be chosen; and **the card's kit is the kit you get** — horses, the
+  gunner's matchlock, the ikki man's clay bomb, the rōnin's second sword, the water-hand's skin
+  boat, the men a rung promises — with mounts and boats named for the country.
+- **33 more pieces of gear (V42)** — clava, arbelas, contus, lancea; jian, ge, vel; tessen,
+  ōtsuchi; tusk club, ice chisel; clipeus, pelta, dun, rib shield; the legionary galea, the
+  cavalry mask-helm, the pheasant cap, the pagri, the hachigane, the eboshi kabuto, slit goggles,
+  tusk and storm hoods; plumata, linothorax, pijia, rider's lamellar, tatami-dō, kusari; and the
+  plumbatae, the repeating crossbow and the throwing-board — each on the new body, on the shelf,
+  and stocked in its own world.
 - **One body template, everywhere (V40)** — the posable figures the villa and bedchamber were
   rebuilt on (a real skeleton, IK arms and legs, a round lit trunk, a profile head with its own
   face) now draw the **fighters**, the **enrolment cards** of every armed career, the **armies**

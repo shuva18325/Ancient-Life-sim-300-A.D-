@@ -9,11 +9,9 @@ grounds produce nine distinct pictures" is.
 
 ---
 
-## 0 — NEXT, PROPOSED AFTER V41 (in the order they would help most)
+## 0 — NEXT, PROPOSED AFTER V42 (in the order they would help most)
 
-1. **The villa walkers onto the template.** The hall still walks the old lit sprites
-   (`litWife` / `litHusband`); the bend and the scenes are already the new figures, so the
-   walk is the last place the two of them change body mid-room.
+1. ~~**The villa walkers onto the template.**~~ — DONE (V42), see 0.8 below.
 2. **Faces in the arena.** The face library is shared — a fighter could grit his teeth on a
    swing, go HURT on a hit, SHOCKED on a knockdown and grin on a win, instead of four states.
 3. **Wear on the kit.** Dents in the bronze, torn cloth and a shield that loses planks as the
@@ -27,6 +25,19 @@ grounds produce nine distinct pictures" is.
    toggle between the comic and the realistic ladder would let either taste play.
 8. **Performance pass.** The fighter body is re-drawn and pixel-snapped every frame; caching
    frames per pose would halve the cost on slow phones.
+
+9. **Creation-card portraits on the template.** The champion cards still paint the old block
+   figure; the card is the first body a player sees and it should be the one they get.
+10. **More escalation scenes.** Each escalator has one running order; a second per escalator
+    (the stair, the impluvium's rim, the tablinum desk) would stop the third one feeling familiar.
+
+### ~~0.8 The hall on the new bodies, the creation table, the kit, the escalators~~ — DONE (V42)
+**Result:** `tests/v42.cjs` (31 checks). The villa walkers, the escort, a husband's move and
+the drop's husband are the template figures; the resist has six styles with five tells each;
+five escalators and a de-escalator trigger off the slaps and play their own woohoos in the hall
+against its real columns; the creation body map needs no career; every card is reachable; the
+eastern ladders carry the rank across; one `startKitFor` feeds both the card and the oath;
+33 new pieces of gear.
 
 ### ~~0.9 Hungry for both, and too big on purpose~~ — DONE (V41)
 **Result:** `tests/bodies.cjs` (30 checks). Hungry resolves by who is hungry — a bouncing length

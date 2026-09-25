@@ -7264,10 +7264,39 @@ const WIFE_TRAITS=[
      He is not thinking about gardens. */
   {id:'priapic',  name:'Priapic',    icon:'🏛', min:5, male:true,
    desc:'Priapus was a god of gardens. He is not thinking about gardens.'},
+  /* ---- V42 · HOW HE HOLDS OUT. When she bends there is a bar to mash, and a
+     man is not a bar: each of these is the way one particular man loses (or
+     wins) that argument, and it is drawn on him while he does. ---- */
+  {id:'rs_looker', name:'The Looker',   icon:'👀', min:2, male:true, adult:true,
+   desc:'When she bends, he LOOKS. At the frieze, at the floor, through his fingers, and then not through anything at all.'},
+  {id:'rs_prep',   name:'The Preparer', icon:'🧤', min:2, male:true, adult:true,
+   desc:'He is holding out, and he is also rolling his shoulders, loosening his belt and wiping his palms. Both are true.'},
+  {id:'rs_hard',   name:'Quick to Rise', icon:'⤴', min:2, male:true, adult:true,
+   desc:'It is not a decision. It happens before he has an opinion about it, and then he has to stand there with it.'},
+  {id:'rs_pacer',  name:'The Pacer',    icon:'🚶', min:2, male:true, adult:true,
+   desc:'He walks it off. Up the hall, back down the hall, a little closer to the low shelf every time he turns.'},
+  {id:'rs_prayer', name:'The Devout',   icon:'🙏', min:3, male:true, adult:true,
+   desc:'Hands together, eyes on the ceiling, a god named out loud. One eye opens. Then the other one.'},
+  {id:'rs_whistler',name:'The Whistler',icon:'🎵', min:2, male:true, adult:true,
+   desc:'Hands behind his back, rocking on his heels, whistling something with no tune in it, and sweating.'},
+  /* ---- V42 · THE ESCALATORS. A slap is a beat and a beat ends — unless the
+     person on the other end of it decides it has only begun. His or hers. ---- */
+  {id:'esc_big',   name:'Big Escalator',    icon:'🔺', min:3, adult:true, esc:'big',
+   desc:'A slap is never just a slap. Land one and it goes straight to the obvious place — right there, in the hall, now.'},
+  {id:'esc_mid',   name:'Medium Escalator', icon:'🔸', min:3, adult:true, esc:'mid',
+   desc:'The romantic one tips it over. Afterwards they WANT it, and they come and get it.'},
+  {id:'esc_slow',  name:'Slow Burn',        icon:'🕯', min:3, adult:true, esc:'slow',
+   desc:'Every slap banks a coal. Two are nothing. The third one of the day, and the whole thing catches.'},
+  {id:'esc_turn',  name:'Turns the Tables', icon:'🔄', min:4, adult:true, esc:'turn',
+   desc:'Slap them and they escalate — on YOU. They take the lead, and the scene is theirs from the first touch.'},
+  {id:'esc_spark', name:'The Spark',        icon:'✨', min:2, adult:true, esc:'spark',
+   desc:'A slap earns a look back, and a while later something is on the low shelf that was not there before.'},
 ];
 // ---- FLAWS. Every house has them. Red where the gifts are green. ----
 const WIFE_FLAWS=[
   {id:'dim',      name:'Dim-witted',  icon:'🪨', max:5, desc:'Not a thought behind the eyes. Her children inherit it.'},
+  {id:'esc_cool', name:'De-escalator', icon:'🧊', max:8, adult:true, esc:'cool',
+   desc:'A hand on them and they want to TALK about it. Nothing escalates in this house the same day as a slap.'},
   {id:'jealous',  name:'Jealous',     icon:'💢', max:7, desc:'She counts every hour you are away, and holds it against you.'},
   {id:'spendthrift',name:'Spendthrift',icon:'💸',max:7, desc:'Silk, pearls, and a bill you did not agree to.'},
   {id:'sickly',   name:'Sickly',      icon:'🤒', max:5, desc:'A weak constitution — hard on her, hard on the cradle.'},
@@ -7719,7 +7748,7 @@ function traitsDetailHtml(w){
 function hasFlaw(id){ return !!(G.wife && G.wife.flaws && G.wife.flaws.includes(id)); }
 // low quality breeds flaws; even a fine match can carry one
 function rollFlaws(quality){
-  const out=[], pool=WIFE_FLAWS.filter(t=>quality<=t.max);
+  const out=[], pool=WIFE_FLAWS.filter(t=>quality<=t.max && !(t.adult && !ADULT));
   const n = quality<=2?3 : quality<=4?2 : quality<=6?1 : (Math.random()<0.25?1:0);
   const sh=[...pool].sort(()=>Math.random()-0.5);
   for(let i=0;i<n && i<sh.length;i++) out.push(sh[i].id);
@@ -7788,7 +7817,8 @@ function rollTraits(quality, male, eth){
      the idea of being looked at. */
   const pool=WIFE_TRAITS.filter(t=>quality>=t.min
     && !(t.male && !male) && !(t.female && male)
-    && !(t.eth && t.eth!==eth));
+    && !(t.eth && t.eth!==eth)
+    && !(t.adult && !ADULT));
   const n = quality>=9?3 : quality>=7?2 : quality>=5?1 : (Math.random()<0.35?1:0);
   const shuffled=[...pool].sort(()=>Math.random()-0.5);
   for(let i=0;i<n && i<shuffled.length;i++) out.push(shuffled[i].id);
@@ -7801,7 +7831,7 @@ function inheritDNA(male){
   const w=G.wife||{}, mine={looks:G.looks===undefined?5:G.looks, smarts:G.smarts===undefined?5:G.smarts, traits:G.traits||[]};
   const wl=w.looks===undefined?5:w.looks, ws=w.smarts===undefined?5:w.smarts, wt=w.traits||[];
   const mix=(a,b)=>clamp(Math.round((a+b)/2 + rnd(-1.4,1.6)),1,10);   // averages, drifts a little either way
-  const pool=[...new Set([...mine.traits, ...wt])];
+  const pool=[...new Set([...mine.traits, ...wt])].filter(t=>!/^(esc_|rs_)/.test(t));   // how a grown-up escalates is not inherited
   const traits=[];
   for(const t of pool){                                              // each parent trait has a good chance to carry
     const both = mine.traits.includes(t) && wt.includes(t);
@@ -7814,7 +7844,7 @@ function inheritDNA(male){
     if(own.length) traits.push(pick(own).id);                                   // a trait of its own
   }
   // flaws run in families too
-  const fpool=[...new Set([...(G.flaws||[]), ...(w.flaws||[])])], flaws=[];
+  const fpool=[...new Set([...(G.flaws||[]), ...(w.flaws||[])])].filter(f=>!/^esc_/.test(f)), flaws=[];
   for(const f of fpool){ const both=(G.flaws||[]).includes(f) && (w.flaws||[]).includes(f);
     if(Math.random() < (both?0.85:0.42)) flaws.push(f); }
   /* ---- AND A BODY, ROLLED FROM BOTH PARENTS. A house of plain people does
@@ -13505,7 +13535,7 @@ function elevateWife(rank){
   refreshStatbar(); saveQuiet(); openVilla();
 }
 // fill in any fields missing from older saves
-function migrate(g){ const d={world:null,socialSet:null,eastAxis:{},crossedToWa:false,waEra:0,purseMix:null,nanban:{},powder:0,waHouse:null,blade:null,drawnBlade:false,ventDone:{},ventRuns:0,ventLost:0,ventNet:0,silkRuns:0,silkLost:0,silkNet:0,silkDone:{},honor:50,food:4,mount:0,slaves:0,hasVilla:false,boat:false,favor:0,soldiers:0,hidden:[],plotTier:0,emperor:false,approval:50,legions:0,rivals:0,retired:false,detachments:[],day:0,titles:{},clears:{},socialClass:'gladiator',army:{},armyGear:0,armyTrain:0,hasOrganizer:false,generals:[],wife:null,married:false,marryPrompted:false,children:[],pregnant:null,lastLoveDay:-9,injury:null,lastDebateDay:-9,office:0,path:null,parthia:50,parthiaPact:false,wifeRel:50,lastTalkDay:-9,isFemale:false,lineage:[],hygiene:70,wifePhys:45,hasPool:false,hasWardrobe:false,legacy:null,lastFeastDay:-9,loveDay:-1,loveQuick:0,loveLong:0,loveNight:0,loveVigil:0,venusUntil:-1,lastWashDay:-9,lastPoolDay:-9,lastWardrobeDay:-9,lastKidsDay:-9,lastBathDay:-9,pila:0,bow:null,bowsOwned:[],nemesis:null,rivalsList:[],trophies:[],nemesisCount:0,pendingDeath:false,ageBase:0,wonProvinceByFight:false,familyMan:false,infamy:0,gladiatrixStage:0,pardoned:false,lastNoteDay:-9,lastNoteReply:'',regalia:[],marryRolls:0,hasBodyMap:false,hasSecretMap:false,jealousy:0,lastJealousDay:-9,traits:[],flaws:[],looks:5,smarts:5,advocate:false,tutorialDone:false,patrons:[],rivalAdv:null,landmarks:[],faction:null,oratory:1,casesWon:0,casesLost:0,renown:0,senate:false,royal:false,lastCaseDay:-9,skills:{footwork:0,guard:0,blade:0,wind:0,throwing:0},scars:[],fatigue:0,lastTrainDay:-9,tribune:false,rank:0,campaigns:0,legionRep:0,lastCampaignDay:-9,units:{legionary:0,auxilia:0,cavalry:0,archers:0,engineers:0},supply:0,sieges:0,body:null,family:null,provinces:{},complaints:[],leniency:50,lastCalloutDay:-9,lastGiftDay:-9,giftsTaken:0,calloutWins:0,crownWorn:false,court:null,lastCoupDay:-99,herbs:{},herbLore:0,ill:null,midwife:false,titlesWorn:[],warExhaust:0,lastExhaustWhy:'',titleRites:[],tombs:[],inheritedFrom:null,hairStyle:null,hairCol:null,beardStyle:null,outfit:null,courtLog:{},lastAskDay:-9,retirePromise:null,promiseBreaks:0,promiseFights:0,tutor:false,freedmen:0,askLog:{},temptHeld:0,temptTook:0,rkSeats:null,rkSeatsTaken:0,rkMyTitleW:null,rkProv:{},rkProvTaken:0,rkSivrak:null,rkSivrakDay:-9,rkSivraksWorn:0,rkSnubs:0,rkStand:null,rkStandsRaised:0,rkTaqrunKept:0,rkTaqrunLapses:0,rkPublicMad:0,rkPressed:0,rkPressDay:-9,rkPressToday:0,rkSeatAsk:{},rkSeatAsks:0,rkSeatsYielded:0,curioSeen:0,curioWoohoo:0,curioDay:-9,curioToday:0,bmFelt:0,bmFeltOf:{},slapDay:-9,slapCount:0,slapsAll:0,doorShut:0,caughtByHouse:0,romanticAll:0,clearedHall:0,lastFamilyDay:-9,namedHeir:null,willSplit:false,purpleWatch:0,kidHouses:[],weddings:0,woohooAll:0,marriedDay:0,osImpurum:0,lastAct:null,
+function migrate(g){ const d={escCoolDay:-1,escSlowDay:-1,escSlow:0,escalations:0,world:null,socialSet:null,eastAxis:{},crossedToWa:false,waEra:0,purseMix:null,nanban:{},powder:0,waHouse:null,blade:null,drawnBlade:false,ventDone:{},ventRuns:0,ventLost:0,ventNet:0,silkRuns:0,silkLost:0,silkNet:0,silkDone:{},honor:50,food:4,mount:0,slaves:0,hasVilla:false,boat:false,favor:0,soldiers:0,hidden:[],plotTier:0,emperor:false,approval:50,legions:0,rivals:0,retired:false,detachments:[],day:0,titles:{},clears:{},socialClass:'gladiator',army:{},armyGear:0,armyTrain:0,hasOrganizer:false,generals:[],wife:null,married:false,marryPrompted:false,children:[],pregnant:null,lastLoveDay:-9,injury:null,lastDebateDay:-9,office:0,path:null,parthia:50,parthiaPact:false,wifeRel:50,lastTalkDay:-9,isFemale:false,lineage:[],hygiene:70,wifePhys:45,hasPool:false,hasWardrobe:false,legacy:null,lastFeastDay:-9,loveDay:-1,loveQuick:0,loveLong:0,loveNight:0,loveVigil:0,venusUntil:-1,lastWashDay:-9,lastPoolDay:-9,lastWardrobeDay:-9,lastKidsDay:-9,lastBathDay:-9,pila:0,bow:null,bowsOwned:[],nemesis:null,rivalsList:[],trophies:[],nemesisCount:0,pendingDeath:false,ageBase:0,wonProvinceByFight:false,familyMan:false,infamy:0,gladiatrixStage:0,pardoned:false,lastNoteDay:-9,lastNoteReply:'',regalia:[],marryRolls:0,hasBodyMap:false,hasSecretMap:false,jealousy:0,lastJealousDay:-9,traits:[],flaws:[],looks:5,smarts:5,advocate:false,tutorialDone:false,patrons:[],rivalAdv:null,landmarks:[],faction:null,oratory:1,casesWon:0,casesLost:0,renown:0,senate:false,royal:false,lastCaseDay:-9,skills:{footwork:0,guard:0,blade:0,wind:0,throwing:0},scars:[],fatigue:0,lastTrainDay:-9,tribune:false,rank:0,campaigns:0,legionRep:0,lastCampaignDay:-9,units:{legionary:0,auxilia:0,cavalry:0,archers:0,engineers:0},supply:0,sieges:0,body:null,family:null,provinces:{},complaints:[],leniency:50,lastCalloutDay:-9,lastGiftDay:-9,giftsTaken:0,calloutWins:0,crownWorn:false,court:null,lastCoupDay:-99,herbs:{},herbLore:0,ill:null,midwife:false,titlesWorn:[],warExhaust:0,lastExhaustWhy:'',titleRites:[],tombs:[],inheritedFrom:null,hairStyle:null,hairCol:null,beardStyle:null,outfit:null,courtLog:{},lastAskDay:-9,retirePromise:null,promiseBreaks:0,promiseFights:0,tutor:false,freedmen:0,askLog:{},temptHeld:0,temptTook:0,rkSeats:null,rkSeatsTaken:0,rkMyTitleW:null,rkProv:{},rkProvTaken:0,rkSivrak:null,rkSivrakDay:-9,rkSivraksWorn:0,rkSnubs:0,rkStand:null,rkStandsRaised:0,rkTaqrunKept:0,rkTaqrunLapses:0,rkPublicMad:0,rkPressed:0,rkPressDay:-9,rkPressToday:0,rkSeatAsk:{},rkSeatAsks:0,rkSeatsYielded:0,curioSeen:0,curioWoohoo:0,curioDay:-9,curioToday:0,bmFelt:0,bmFeltOf:{},slapDay:-9,slapCount:0,slapsAll:0,doorShut:0,caughtByHouse:0,romanticAll:0,clearedHall:0,lastFamilyDay:-9,namedHeir:null,willSplit:false,purpleWatch:0,kidHouses:[],weddings:0,woohooAll:0,marriedDay:0,osImpurum:0,lastAct:null,
     feuds:[],grandkids:0,annivYears:0,morningAfter:null,peeked:{},gravitas:60,peeksTaken:0,parthianSide:false,
     offType:false,bendToldFor:null,bendYes:0,bendNo:0,
     bodySkills:{bone:0,hide:0,thews:0},
@@ -13576,7 +13606,7 @@ const SETTINGS_KEY='SANDSTEEL_SETTINGS';
 /* WHICH BUILD IS THIS. Printed on the title screen, in Settings and in the
    corner of the hall — because an old link to an old build looks exactly
    like a fix that did not work. */
-const BUILD_STAMP='V41 · hungry for both, too big on purpose';
+const BUILD_STAMP='V42 · the hall walks, the escalators';
 try{ document.addEventListener('DOMContentLoaded',()=>{ const e=document.getElementById('build-stamp'); if(e) e.textContent='build '+BUILD_STAMP; });
      const e0=document.getElementById('build-stamp'); if(e0) e0.textContent='build '+BUILD_STAMP; }catch(e){}
 const SETTINGS=(function(){ const d={sound:true,shake:true,difficulty:'normal',
@@ -22911,6 +22941,11 @@ function drawBedPose(vi, E){
   const STEAM=(x,y,n)=>{ for(let i=0;i<(n||6);i++){ const ry=(T*0.4+i*13)%40; c.globalAlpha=0.10*clamp(1-ry/40,0,1); c.fillStyle='#f4efe6';
       c.beginPath(); c.ellipse(x+Math.sin(T*0.05+i)*8+(i-3)*6, y-ry, 7, 3, 0, 0, 7); c.fill(); } c.globalAlpha=1; };
   const hearts=(x,y,n)=>{ HB(x,y,n||12); };
+  /* 🔺 her gown on the tiles, which is what the floor of a hall has to offer */
+  const HALLRUG=(x,w)=>{ const gc=hexOf((her&&her.dress)||'#8a2f5a');
+    c.fillStyle=mixHex(gc,'#000000',0.35); c.beginPath(); c.ellipse(x+w/2, base-1.2, w/2+2, 3.2, 0, 0, 7); c.fill();
+    c.fillStyle=gc; c.beginPath(); c.ellipse(x+w/2, base-2.0, w/2, 2.6, 0, 0, 7); c.fill();
+    c.fillStyle=mixHex(gc,'#ffffff',0.25); for(let i=0;i<5;i++) c.fillRect(x+6+i*w/5, base-3.4+(i%2), w/9, 0.8); };
   BEDPOSE_DRAWS++;
   const Lpos={};   // for the tests: where the two of them ended up
   const done=(HM,HR,kind)=>{ BEDPOSE_LAST={vi, kind, him:HM, her:HR}; return true; };
@@ -22996,7 +23031,8 @@ function drawBedPose(vi, E){
       herF={hip, lean:1.05, headAng:0.30-d*0.2, rock:rk*0.7, ankles:{near:[hip[0]-15, top-1], far:[hip[0]-13, top-1.5]},
             hands:{near:[TB2.x+TB2.w-10, TB2.rim+1], far:[TB2.x+TB2.w-13, TB2.rim]}, expr:(d>0.55? OH : HE), blush:0.6, floor:top};
     } else if(vi===2){
-      top=base-18; BED(cx0-66, 120, top);
+      if(E.hall){ top=base-2; HALLRUG(cx0-52, 108); }           // 🔺 in the hall: on the tiles, on her own gown
+      else { top=base-18; BED(cx0-66, 120, top); }
       const hip=[cx0-4+d*1.2, top-15];
       herF={hip, lean:1.42, headAng:0.62-d*0.25, rock:rk*0.7, ankles:{near:[hip[0]-16, top-1], far:[hip[0]-14, top-1.5]},
             hands:{near:[hip[0]+26, top-0.5], far:[hip[0]+23.5, top-1]}, expr:(d>0.55? OH : HE), blush:0.5, floor:top};
@@ -23011,7 +23047,7 @@ function drawBedPose(vi, E){
       if(vi===13){ c.fillStyle=grad(0,base-100,0,base,[[0,'#2a2620'],[1,'#3a342a']]); c.fillRect(cx0-60,base-100,120,100);
         for(let x2=cx0-52;x2<cx0+60;x2+=22){ c.fillStyle='rgba(90,80,64,.5)'; c.fillRect(x2, base-100, 1.5, 100); }
         box(cx0+40, base-92, 9, 16, '#b8ac94', '#e0d6c0', '#7a7060'); }
-      if(vi===14){ c.fillStyle=grad(0,base-100,0,base,[[0,'#4a3320'],[1,'#5e4028']]); c.fillRect(cx0-40,base-100,80,100);
+      if(vi===14 && !E.hall){ c.fillStyle=grad(0,base-100,0,base,[[0,'#4a3320'],[1,'#5e4028']]); c.fillRect(cx0-40,base-100,80,100);
         c.fillStyle='#3a2718'; c.fillRect(cx0+30, base-100, 2, 100); c.fillStyle='#7a5a38'; c.fillRect(cx0-40, base-100, 80, 3);
         for(let i=0;i<4;i++){ c.fillStyle='rgba(40,26,14,.6)'; c.fillRect(cx0-36+i*18, base-98, 1, 96); } }
       if(vi===24){ WALLBOARDS('#5a4a36','#4e4030'); BENCH(cx0+22, 30, base-24, '#6a5238');
@@ -23050,7 +23086,8 @@ function drawBedPose(vi, E){
     const seated=(vi!==3), b=bt(vi===17? 0.22 : vi===20? 0.36 : 0.40), rk=sn(vi===17? 0.22 : 0.40);
     let HMd, hims, top;
     if(vi===3){
-      top=base-14; BED(cx0-70, 130, top);
+      if(E.hall){ top=base-2; HALLRUG(cx0-54, 112); }
+      else { top=base-14; BED(cx0-70, 130, top); }
       // HIM on his back, head to the right: drawn head-left and mirrored
       const hx=cx0+2;
       hims={hip:[hx, top-5], lean:-1.5708, headAng:-1.25, ankles:{near:[hx+31, top-3], far:[hx+29, top-4.5]}, face:HF,
@@ -23109,7 +23146,8 @@ function drawBedPose(vi, E){
   /* ================= 4 · THE LIFT, and 15 pinned to the cedar ================= */
   if(vi===4 || vi===15){
     const b=bt(0.40), wallX=cx0+26;
-    if(vi===4){ c.fillStyle=grad(wallX,0,wallX+30,0,[[0,'#5a3a26'],[1,'#3a2418']]); c.fillRect(wallX, base-104, 34, 104); c.fillStyle='rgba(255,210,150,.18)'; c.fillRect(wallX, base-104, 1.5, 104); }
+    if(E.hall){ /* 🔺 the hall's own column is the wall */ }
+    else if(vi===4){ c.fillStyle=grad(wallX,0,wallX+30,0,[[0,'#5a3a26'],[1,'#3a2418']]); c.fillRect(wallX, base-104, 34, 104); c.fillStyle='rgba(255,210,150,.18)'; c.fillRect(wallX, base-104, 1.5, 104); }
     else { c.fillStyle=grad(0,base-100,0,base,[[0,'#4a3320'],[1,'#5e4028']]); c.fillRect(cx0-40,base-100,80,100); for(let i=0;i<5;i++){ c.fillStyle='rgba(40,26,14,.6)'; c.fillRect(cx0-36+i*17, base-98, 1, 96); } }
     const hx=cx0-4+b*1.6;
     const hims={hip:[hx, base-36], lean:0.02+b*0.05, headAng:0.05, face:HF, hands:{near:null, far:null}};
@@ -28111,13 +28149,18 @@ function drawPair(c, o){
                : h==='hem'? [hip[0]+4.2, hip[1]+4]
                : h==='up'? [hip[0]+3.5, hip[1]-40]
                : h==='eyes'? [hip[0]+4.8, hip[1]-32]
+               : h==='peek'? [hip[0]+5.6, hip[1]-29]
+               : h==='cover'? [hip[0]+5.2, hip[1]+2.6]
+               : h==='pray'? [hip[0]+5.4, hip[1]-17]
+               : h==='back'? [hip[0]-3.8, hip[1]-2.5]
+               : h==='hipwipe'? [hip[0]+1.6, hip[1]+3.2]
                : null;
     let near=tgt(E.hands||'side'), far=tgt(E.farHands||E.hands||'side');
     if(E.handK!==undefined && E.handFrom){ const a=tgt(E.handFrom), b=tgt(E.hands); if(a&&b){ near=[a[0]+(b[0]-a[0])*E.handK, a[1]+(b[1]-a[1])*E.handK - Math.sin(E.handK*Math.PI)*6]; } }
     const look=E.look||{};
     const IN=(typeof lengthInches==='function')? lengthInches(look, E.aro||0) : {now:6,dia:1.6};
     const MR=drawMateFig(X(pk), X(pf), {hip, floor:FYb, lean:E.lean||0, u:E.u||0, aro:E.aro||0,
-      hands:{near, far}, face:E.face||HARD_FACES.stoic, aim:J, aimK:E.aimK||0, clip:(E.aimK||0)>0.5, lenAng:E.lenAng, walk:E.walk||0, walkPh:E.walkPh||0,
+      hands:{near, far}, face:E.face||HARD_FACES.stoic, aim:J, aimK:E.aimK||0, clip:(E.aimK||0)>0.5, lenAng:E.lenAng, walk:E.walk||0, walkPh:E.walkPh||0, headAng:E.headAng,
       look, coast:!!E.coast, cloth:E.cloth, band:E.band, lenIn:IN.now, diaIn:IN.dia, pxi:E.pxi||1.0});
     const W2b=(p)=>p? [o.x+(p[0]-FXb)*dir, FY+(p[1]-FYb)] : null;
     out.hisHead=MR.head; out.hisHand=MR.hand; out.hisShoulder=MR.shoulder; out.hisHip=MR.hip; out.hisTip=MR.tip; out.hisRoot=MR.root;
@@ -28167,7 +28210,7 @@ function drawManProfile(c, x, fy, look, M, dir){
   const hip=[FXb, FYb-2.2-(15.6+L0*0.22+16.2+L0*0.22)*0.975+(M.crouch||0)];
   const rel=(v)=> v? [hip[0]+v[0], hip[1]+v[1]] : null;
   const IN=(typeof lengthInches==='function')? lengthInches(look||{}, M.aro||0) : {now:6,dia:1.6};
-  const R=drawMateFig(bk.getContext('2d'), fr.getContext('2d'), {hip, floor:FYb, lean:M.lean||0.02, u:M.u||0, aro:M.aro||0,
+  const R=drawMateFig(bk.getContext('2d'), fr.getContext('2d'), {hip, floor:FYb, lean:M.lean||0.02, u:M.u||0, aro:M.aro||0, headAng:M.headAng,
     hands:{near:rel(M.near), far:rel(M.far)}, face:M.face||HARD_FACES.stoic, look:look||{}, coast:!!M.coast,
     cloth:M.cloth||'#7a2f22', band:M.band, lenIn:IN.now, diaIn:IN.dia, pxi:1.0, walk:M.walk||0, walkPh:M.walkPh||0});
   MAN_DRAWS++;
@@ -29516,6 +29559,7 @@ function updateDomus(dt){
   if(D.drop){ updateDrop(dt); if(D.drop && D.drop.locks) return; }
   else if(dropDue()) startDrop();
   else if(husbandMoveDue()) startHusbandMove();
+  if(D.escSpark && (D.t||0)>=D.escSpark.at && !hallBusy()){ const S2=D.escSpark; D.escSpark=null; escSparkFire(S2); }   // ✨
   const sp2=(held.s? 3.0 : 1.5)*dt;        // hold S to RUN
   const face0=D.face;
   if(held.a||held.d){
@@ -29697,6 +29741,7 @@ const WALK_QUIP={
 function updateDomusScene(dt){
   const D=DM, sc=D.scene; sc.t+=dt; const T=sc.t;
   if(sc.kind==='villalove'){ updateVillaLove(dt); return; }
+  if(sc.kind==='escalate'){ updateEscalate(dt); return; }
   if(sc.kind==='bath'){
     if(T>10 && (T|0)%6<1) D.steam.push({x:44+Math.random()*84,y:204,vy:0.35+Math.random()*0.25,life:56+Math.random()*30});
     if(T>16&&T<18){ sfx('thud'); for(let i=0;i<8;i++) D.splash.push({x:86+rnd(-8,8),y:202,vx:rnd(-1.2,1.2),vy:rnd(-2.4,-0.8),life:26}); }
@@ -29912,6 +29957,7 @@ function updateDrop(dt){
     // his own appetite decides the bar he has to clear
     const pull = X.noticed + (G.wifePhys||45)*0.35 + (hasQuirk('insatiable')?45:0)
                + (hasQuirk('devout')?-30:0) + (G.wifeRel||0)*0.10;
+    X.pull=pull;                                             // 🧊 and he is visibly losing it — drawDrop reads this
     if(pull>92){ X.ph='taken'; X.t=0; X.husbX=D.wifeX; }        // he is coming, and he chose to
     else if(X.t>300){ X.ph='ignored'; X.t=0; }                  // he genuinely did not look up
   } else if(X.ph==='taken'){
@@ -30213,6 +30259,7 @@ function updateHusbandMove(dt){
     toast((H.kind==='romantic'? '💞 ':'👋 ')+'HE decided. '+(v.t||'')
       +'  ('+((v.bond||0)>=0?'+':'')+(v.bond||0)+' 💞)',5000);
     D.husb=null; D.wifePause=0;
+    escAfterSlap(v, H.kind==='romantic'? 'romantic' : 'slap', 'self', D.x);   // 🔺 and whether YOU take it further
   }
 }
 /* 🚶 HIS MOVE ON THE NEW FIGURES: he walks over as himself, and the strike is the pair — his own
@@ -33047,7 +33094,31 @@ function drawDrop(){
       W/2, 30, '#ffd0a0', 1.05);
     ctx.textAlign='left';
   }
-  if(['stoop','caught','bait','taken','ignored','resist'].includes(X.ph)){
+  /* 🧊 HIM, HOLDING OUT. While she shakes it he is the one with a bar, and he has a way of
+     losing it, the same styles and tells the other side of the house gets. */
+  if(X.ph==='bait' && nbHallOn() && ADULT){
+    const sty=X.style||(X.style=resistStyleOf(w)), lose=clamp((X.pull||0)/92,0,1), R=resistTells(sty, lose, X.t);
+    const hx=X.husbX, fdH=(D.x>=hx)? 1 : -1;
+    const OFF={eyes:[4.8,-32], peek:[5.6,-29], cover:[5.2,2.6], pray:[5.4,-17], back:[-3.8,-2.5], hipwipe:[1.6,3.2], belt:[4.6,-4.5]};
+    const reading = R.stage<=1 && !R.hands;                                          // he is still pretending to read
+    const faceH = R.faceId? HARD_FACES[R.faceId] : lose>0.6? HARD_FACES.sheepish : HARD_FACES.stoic;
+    const coastH=(typeof rkHere==='function' && rkHere()) && w.eth==='rkrai';
+    const Mh=drawManProfile(ctx, hx+(R.pace||0)*(-fdH)+(R.step||0)*fdH, FY, w, { u:R.u||0, aro:Math.min(1.06,0.1+lose*0.8+(R.aroAdd||0)),
+      lean:(R.lean!==undefined? R.lean : 0.02), face:faceH, headAng:(R.headAng!==undefined? R.headAng : (reading? 0.25 : undefined)),
+      coast:coastH, cloth:coastH? mixHex(hexOf(w.dress||'#6a4a2e'),'#5a4028',0.35) : hexOf(w.dress||'#7a2f22'),
+      near: reading? [5.5,-20] : (OFF[R.hands]||null), far: reading? [4.8,-21] : (OFF[R.farHands]||null),
+      walk:R.walk||0, walkPh:R.walkPh||0 }, fdH);
+    if(reading && Mh && Mh.hand){ px(Mh.hand[0]-4,Mh.hand[1]-5,9,6,'#e6dcc2'); px(Mh.hand[0]-4,Mh.hand[1]-5,9,1,'#f6efdc'); }   // the scroll, in his actual hands
+    const RS=RESIST_STYLES[sty];
+    if(RS){ ctx.textAlign='center';
+      pixelText(RS.icon+' '+RS.name+' · '+RS.tells[R.stage], W/2, H-54, 'rgba(210,230,255,.88)', 0.86);
+      const hh=Mh&&Mh.head;
+      if(hh && R.notes){ for(let i=0;i<2;i++){ const q=(((X.t|0)+i*23)%46)/46; ctx.globalAlpha=clamp(1-q,0,1)*0.9;
+          pixelText(i? '♫' : '♪', hh[0]+6*fdH+q*8*fdH, hh[1]-6-q*14, '#e8e0ff', 0.9); } ctx.globalAlpha=1; }
+      if(hh && R.sweat){ const q=(((X.t|0)*1.3)%30)/30; ctx.globalAlpha=0.85; px(hh[0]-3*fdH, hh[1]+2+q*8, 1, 2, '#9ad4ff'); ctx.globalAlpha=1; }
+      ctx.textAlign='left'; }
+  }
+  else if(['stoop','caught','bait','taken','ignored','resist'].includes(X.ph)){
     const frozen = X.lookT>0 || X.backT>0;
     const away   = (X.ph==='bait'||X.ph==='ignored');
     const hx = away? (X.husbX + (X.ph==='ignored'? 0 : 0)) : X.husbX;
@@ -33271,7 +33342,8 @@ function updateTempt(dt){
        less so the twenty still matter. */
     /* and it drains faster when she MEANT it — there is no frieze to look at
        and no crate to point to, and he knows both of those things. */
-    X.hold -= (0.44 + (X.beat==='shake'? 0.15 : 0))*dt;   // it goes faster than it did
+    { const sty=X.style||(X.style=resistStyleOf(resistMan())), RS=RESIST_STYLES[sty]||{drain:1};
+      X.hold -= (0.44 + (X.beat==='shake'? 0.15 : 0))*(RS.drain||1)*dt; }   // it goes faster than it did — and faster still for some men
     if(consume('space')||consume('attack')||consume('w')){ X.hits++; X.hold=Math.min(100,X.hold+2.15); }
     if(X.hits>=TEMPT_NEED){                                  // holding out is only HALF of it
       X.ph='look'; X.t=0; X.round=0;
@@ -33350,6 +33422,255 @@ function updateTempt(dt){
    so, and Venus does the rest.
    ===================================================================== */
 const VILLALOVE_LEN=900;                 // 900 ticks at 60fps ≈ fifteen seconds
+/* =====================================================================
+   🔺 THE ESCALATORS — AND IT HAPPENS IN THE HALL
+   ---------------------------------------------------------------------
+   "If your wife has the Big Escalator trait and you slap her, she goes down
+   and a woohoo happens. A medium one: a romantic slap and now she wants it.
+   Same for a husband. And make custom in-villa woohoos for them."
+     🔺 BIG             a slap that lands well → straight into it, right here
+     🔸 MEDIUM          the romantic one → they WANT it, take your hand and lead
+                        you to it; an ordinary slap only earns you the look
+     🕯 SLOW BURN       nothing, nothing — and the third of the day catches
+     🔄 TURNS THE TABLES a slap and they escalate ON you: their lead, their scene
+     ✨ THE SPARK       a look back, and a while later the low shelf (or he comes
+                        across the room) when nobody asked
+     🧊 DE-ESCALATOR    they want to TALK about it, and nothing escalates today
+   Every escalation plays in the villa itself — against a column, on the tiles
+   on her own gown — as its own scene with its own running order, not a door
+   and a cut to the bedchamber. It is whoever escalates who leads.
+   ===================================================================== */
+const ESC_IDS=['big','turn','mid','slow','spark'];
+const ESC_NAME={big:'🔺 THE ESCALATION', turn:'🔄 THE TABLES TURN', mid:'🔸 THEY WANT IT', slow:'🕯 THE SLOW BURN CATCHES'};
+const ESC_LINES={
+  big:{ f:{intro:'“…oh. It is THAT kind of day.”', lead:'~ the gown is already coming off ~', p1:'~ against the column, right here in the hall ~', p2:'~ and up off her feet ~'},
+        m:{intro:'“…right. That is how it is, then.”', lead:'~ he sweeps her up and does not look for a door ~', p1:'~ up against the column ~', p2:'~ turned round, and braced ~'} },
+  turn:{ f:{intro:'She catches your wrist.', lead:'~ she walks you backwards into the hall ~', p1:'~ she is on top, and it is hers ~', p2:'~ and she decides when it is over ~'},
+         m:{intro:'He catches your wrist.', lead:'~ over his shoulder, and he is not asking ~', p1:'~ on the tiles, at his pace ~', p2:'~ and up against the column ~'} },
+  mid:{ f:{intro:'“Again. But not like that.”', lead:'~ she takes your hand, and she knows where she is going ~', kiss:'~ first this ~', p1:'~ then this ~', p2:'~ and she is the one on top ~'},
+        m:{intro:'“…come here.”', lead:'~ he takes your hand ~', kiss:'~ first this ~', p1:'~ then closer ~', p2:'~ and up off your feet ~'} },
+  slow:{ f:{intro:'“That is three.”', lead:'~ she has been counting all day ~', p1:'~ down on the tiles, on her own gown ~', p2:'~ and she finishes it on top ~'},
+         m:{intro:'“Three.”', lead:'~ he has been counting too ~', p1:'~ down on the tiles ~', p2:'~ and against the column ~'} },
+};
+const ESC_DONE={big:'🔺 It escalated. It always does with this one.', turn:'🔄 The tables turned, and stayed turned.',
+                mid:'🔸 They wanted it, and they came and got it.', slow:'🕯 Three slaps, one fire.'};
+function escTraitsOf(who){
+  const P = who==='self'? {traits:(G&&G.traits)||[], flaws:(G&&G.flaws)||[]} : ((G&&G.wife)||{traits:[],flaws:[]});
+  const tr=P.traits||[], fl=P.flaws||[];
+  const out=ESC_IDS.filter(k=>tr.indexOf('esc_'+k)>=0);
+  if(fl.indexOf('esc_cool')>=0) out.unshift('cool');
+  return out;
+}
+function escWhoMale(who){ return who==='self'? !(G&&G.isFemale) : !!(G&&G.wife&&G.wife.male); }
+/* the line said about them — or to you, when it is you who escalates */
+function escSay(line, who){
+  if(who!=='self') return line;
+  return String(line).replace(/\bShe\b|\bHe\b/g,'You').replace(/\bshe\b|\bhe\b/g,'you').replace(/\bher own\b|\bhis own\b/g,'your own')
+    .replace(/\bher feet\b/g,'your feet').replace(/\bhis pace\b/g,'your pace').replace(/\bis\b(?= the one)/g,'are').replace(/\bdecides\b/g,'decide').replace(/\bknows\b/g,'know').replace(/\bhas\b/g,'have');
+}
+/* ONE CALL, after any slap lands: does the one it landed on take it further? */
+function escAfterSlap(v, kind, who, atX){
+  try{
+    if(!ADULT || !G || !G.married || !G.wife || !DM) return false;
+    who=who||'spouse';
+    const E=escTraitsOf(who); if(!E.length) return false;
+    const D=DM, male=escWhoMale(who), They=(who==='self')? 'You' : (male? 'He' : 'She');
+    if(E.indexOf('cool')>=0){ G.escCoolDay=G.day; if(who!=='self') setWifeMood('pout', 7000);
+      toast('🧊 '+(who==='self'? 'You want to talk about that.' : They+' wants to talk about that — not do it, talk about it.')+' Nothing escalates in this house today.', 4600);
+      return false; }
+    if(G.escCoolDay===G.day) return false;
+    if(v && (v.k==='bad'||v.k==='cold'||v.k==='enough')) return false;       // a slap that landed badly escalates nothing
+    let esc=null;
+    if(E.indexOf('big')>=0) esc='big';
+    else if(E.indexOf('turn')>=0 && kind==='slap') esc='turn';
+    else if(E.indexOf('mid')>=0 && kind==='romantic') esc='mid';
+    else if(E.indexOf('slow')>=0){
+      if(G.escSlowDay!==G.day){ G.escSlowDay=G.day; G.escSlow=0; }
+      G.escSlow=(G.escSlow||0)+1;
+      if(G.escSlow>=3){ esc='slow'; G.escSlow=0; }
+      else toast('🕯 '+(G.escSlow===1? 'One coal. Nothing happens.' : 'Two. '+They+(who==='self'? ' are' : ' is')+' counting too.'), 2800);
+    }
+    if(!esc && E.indexOf('mid')>=0 && kind==='slap'){ if(who!=='self') setWifeMood('hungry', 8000);
+      toast('🔸 That look. Not this kind of slap — the other kind.', 3400); }
+    if(!esc && E.indexOf('spark')>=0){ D.escSpark={at:(D.t||0)+ri(360,780), who};
+      toast('✨ '+(who==='self'? 'You look back over your shoulder.' : They+' looks back over '+(male?'his':'her')+' shoulder.')+' That was not the end of it.', 3600);
+      return false; }
+    if(!esc) return false;
+    if(loveLeft('quick')<=0){ toast('🔺 '+They+(who==='self'? ' would' : ' would')+' — and there is nothing left in either of you today.',3200); return false; }
+    if(privacyNeeded('romantic')){ toast(privacyRefusal('romantic'),3400); return false; }
+    startEscalation(esc, who, (atX===undefined? D.wifeX : atX));
+    return true;
+  }catch(e){ return false; }
+}
+/* ✨ the spark, going off when the hall is free */
+function escSparkFire(S2){
+  const D=DM; if(!D || !G || !G.married || !G.wife || !ADULT) return;
+  if(S2.who==='self') return;
+  if(G.wife.male){ if(typeof startHusbandMove==='function'){ startHusbandMove(); toast('✨ He did not forget. He is coming across the room.', 3200); } return; }
+  startTempt(); if(D.tempt){ D.tempt.invited=true; D.tempt.beatLine='“I am not reaching for anything. You know that.”'; D.tempt.spark=true; }
+}
+/* the column they end up against: a real one where the hall has them, their own post where it does not */
+function hallBraceNear(x){
+  const hs=(typeof hallStyle==='function')? hallStyle() : 'atrium';
+  const cols= hs==='atrium'? [150,236,322] : hs==='pillared'? [104,208,312,404] : null, w= hs==='pillared'? 16 : 12;
+  if(!cols){ const face=clamp(x+30, 140, 420); return {face, dir:1, own:true, w:10}; }
+  let best=cols[0]; for(const c of cols) if(Math.abs(c+w/2-x)<Math.abs(best+w/2-x)) best=c;
+  const dir=(x<=best+w/2)? 1 : -1;
+  return {face: dir>0? best : best+w, dir, own:false, w};
+}
+function escPlan(esc, leaderMale){
+  const L=[], T=ESC_LINES[esc][leaderMale? 'm' : 'f'];
+  L.push({k:'intro', dur:120, line:T.intro});
+  if(esc==='big'){
+    if(leaderMale){ L.push({k:'lead', pose:'bridal', dur:130, to:'brace', line:T.lead}); L.push({k:'undress', dur:230});
+      L.push({k:'pose', vi:4, at:'brace', dur:330, line:T.p1}); L.push({k:'pose', vi:14, at:'brace', dur:380, line:T.p2}); }
+    else { L.push({k:'lead', pose:'hand', herLeads:true, dur:110, to:'brace'}); L.push({k:'undress', dur:230, line:T.lead});
+      L.push({k:'pose', vi:14, at:'brace', dur:360, line:T.p1}); L.push({k:'pose', vi:4, at:'brace', dur:360, line:T.p2}); }
+  } else if(esc==='turn'){
+    if(leaderMale){ L.push({k:'lead', pose:'shoulder', dur:130, to:'open', line:T.lead}); L.push({k:'undress', dur:230});
+      L.push({k:'pose', vi:2, at:'floor', dur:360, line:T.p1}); L.push({k:'pose', vi:4, at:'brace', dur:340, line:T.p2}); }
+    else { L.push({k:'lead', pose:'lead', herLeads:true, dur:120, to:'open', line:T.lead}); L.push({k:'undress', dur:230});
+      L.push({k:'pose', vi:3, at:'floor', dur:400, line:T.p1}); L.push({k:'pose', vi:0, at:'here', dur:300, line:T.p2}); }
+  } else if(esc==='mid'){
+    L.push({k:'lead', pose:'hand', herLeads:!leaderMale, dur:150, to:'open', line:T.lead});
+    L.push({k:'pose', vi:1, at:'here', dur:180, line:T.kiss});
+    L.push({k:'undress', dur:230});
+    L.push({k:'pose', vi:0, at:'here', dur:240, line:T.p1});
+    if(leaderMale) L.push({k:'pose', vi:4, at:'brace', dur:380, line:T.p2});
+    else L.push({k:'pose', vi:3, at:'floor', dur:400, line:T.p2});
+  } else if(esc==='slow'){
+    L.push({k:'undress', dur:240, line:T.lead});
+    L.push({k:'pose', vi:2, at:'floor', dur:360, line:T.p1});
+    if(leaderMale) L.push({k:'pose', vi:14, at:'brace', dur:360, line:T.p2});
+    else L.push({k:'pose', vi:3, at:'floor', dur:400, line:T.p2});
+  }
+  return L;
+}
+function startEscalation(esc, who, atX){
+  const D=DM; if(!D) return;
+  spendLove('quick');
+  D.tempt=null; D.rslap=null; D.slap=null; D.husb=null;
+  D.wifePause=99999;
+  try{ HARD_ROLL++; HER_ROLL++; }catch(e){}
+  const leaderMale=escWhoMale(who), x=clamp(atX===undefined? D.wifeX : atX, 110, 400);
+  D.scene={kind:'escalate', esc, who, leaderMale, t:0, x, x0:x, tx:x, plan:escPlan(esc, leaderMale), si:0, st:0,
+           brace:hallBraceNear(x), choice:null, burst:[], asked:false, walkIn:rollWalkIn(),
+           bigV:(typeof bedBigV==='function')? bedBigV() : 0};
+  G.escalations=(G.escalations||0)+1;
+  if(who!=='self' && !leaderMale) setWifeMood('hungry', 4000);
+  try{ sfx('kiss'); }catch(e){}
+}
+/* where the next beat stands them */
+function escSpotFor(sc, stg){
+  const B=sc.brace||hallBraceNear(sc.x);
+  if(!stg) return sc.x;
+  if(stg.to==='brace' || stg.at==='brace') return B.face - B.dir*28;
+  if(stg.to==='open') return clamp(sc.x + (sc.x<240? 26 : -26), 120, 400);
+  return sc.x;
+}
+function escFinish(mode){
+  const D=DM, sc=D&&D.scene; if(!sc || sc.choice) return;
+  sc.choice=mode; sc.chooseT=sc.t;
+  const L=(typeof BEDPOSE_LAST!=='undefined' && BEDPOSE_LAST && BEDPOSE_LAST.her && BEDPOSE_LAST.her.seat)? BEDPOSE_LAST.her.seat : [sc.x, 214-30];
+  const jx=L[0], jy=L[1];
+  if(mode==='love'){ for(let i=0;i<64;i++) sc.burst.push({x:jx+rnd(-3,3), y:jy+rnd(-3,3), vx:rnd(-3.4,3.4), vy:rnd(-3.6,0.6), life:rnd(30,74), r:rnd(1,2.4), drip:false});
+    try{ sfx('giggle'); }catch(e){} }
+  else { for(let i=0;i<14;i++) sc.burst.push({x:jx+rnd(-3,3), y:jy+rnd(-2,2), vx:rnd(-0.16,0.16), vy:rnd(0.05,0.30), life:rnd(70,140), r:rnd(1,2), drip:true}); }
+}
+function updateEscalate(dt){
+  const D=DM, sc=D.scene, T=sc.t;
+  sc.st+=dt;
+  for(const b of sc.burst){ b.x+=b.vx*dt; b.y+=b.vy*dt; b.vy += (b.drip? 0.012 : 0.13)*dt; if(b.drip) b.vy=Math.min(b.vy,0.55); b.life-=dt;
+    if(b.y>212){ b.y=212; b.vx*=0.55; b.vy=0; if(b.drip) b.life=Math.min(b.life,26); } }
+  sc.burst=sc.burst.filter(b=>b.life>0);
+  if((T|0)%8<1) D.hearts.push({x:sc.x+rnd(-14,14), y:180, vy:0.5, life:46});
+  if(sc.walkIn && !sc.walkIn.fired && T>240) fireWalkIn(sc);
+  const stg=sc.plan[sc.si], last=(sc.si>=sc.plan.length-1);
+  if(stg && !last && sc.st>=stg.dur){
+    if(stg.k==='lead') sc.x=sc.tx;
+    sc.si++; sc.st=0;
+    const nx=sc.plan[sc.si];
+    if(nx.k==='lead'){ sc.x0=sc.x; sc.tx=escSpotFor(sc, nx); }
+    else if(nx.at==='brace'){ sc.x=escSpotFor(sc, nx); }
+    try{ sfx(nx.k==='undress'? 'cloth' : 'kiss'); }catch(e){}
+  }
+  if(last && stg && sc.st>stg.dur*0.55 && !sc.choice){
+    sc.asked=true;
+    if(consume('space')||consume('attack')) escFinish('love');
+    else if(consume('w')) escFinish('heir');
+    if(sc.st>stg.dur+170) escFinish('love');                 // say nothing and nature decides
+  }
+  if(sc.choice && sc.t-sc.chooseT>300){
+    const mode=sc.choice;
+    D.scene=null; D.wifePause=0;
+    G.wifeRel=clamp(G.wifeRel+(mode==='love'?10:7),0,bondCeiling());
+    G.wifePhys=clamp((G.wifePhys||45)+(mode==='love'?14:10),0,100);
+    G.hygiene=clamp((G.hygiene|0)-6,0,100);
+    G.lastLoveDay=G.day; G.woohooAll=(G.woohooAll||0)+1;
+    let got=false;
+    if(mode==='heir'){ G.villaHeirTry=(G.villaHeirTry||0)+1; got=villaConceive(); }
+    refreshStatbar(); saveQuiet();
+    toast(ESC_DONE[sc.esc]+(mode==='love'? '  +10 💞, +14 🔥.' : (got? '  🌾 Held — and it took. +7 💞, +10 🔥.' : '  🌾 Held. +7 💞, +10 🔥 — Venus was not listening today.')), 5400);
+  }
+  if(T>7000){ D.scene=null; D.wifePause=0; }                 // a hard floor, so it can never wedge
+}
+function drawEscalate(){
+  const D=DM, sc=D.scene, FY=214, T=sc.t;
+  const stg=sc.plan[Math.min(sc.si, sc.plan.length-1)];
+  const heat=clamp(T/1200,0,1);
+  ctx.globalAlpha=0.30+heat*0.24; px(-4,-4,W+8,H+8,'#160b12'); ctx.globalAlpha=1;
+  { const g=ctx.createRadialGradient(sc.x,FY-34,6,sc.x,FY-34,90+heat*22);
+    g.addColorStop(0,'rgba(255,206,150,'+(0.26+heat*0.14)+')'); g.addColorStop(1,'rgba(0,0,0,0)'); ctx.fillStyle=g; ctx.fillRect(0,60,W,H-60); }
+  const B=sc.brace;
+  const man=pairHimLook(), wom=(G.isFemale? playerLook() : G.wife)||{};
+  const HB=(x,y,n)=>{ if((T|0)%(n||12)<1) D.hearts.push({x:x+rnd(-6,6), y, vy:0.5, life:44}); };
+  /* the post, where this hall has no column of its own */
+  const needBrace = stg && (stg.at==='brace' || stg.to==='brace');
+  if(B && B.own && (needBrace || sc.si>0)){ const bx=B.dir>0? B.face : B.face-B.w;
+    px(bx, FY-104, B.w, 104, '#6a4a2c'); px(bx+1, FY-104, 2, 104, '#8a6a44'); px(bx+B.w-2, FY-104, 2, 104, '#4a3018'); }
+  const pose=(vi, atBrace)=>{
+    let cx0=sc.x, mir=false;
+    if(atBrace && B){ cx0 = B.face - (vi===14? 34 : 26); mir=(B.dir<0); }
+    const E={c:ctx, T, s:sc, cx0, base:FY, HB, hall:true, ut:sc.st};
+    if(mir){ ctx.save(); ctx.translate(B.face,0); ctx.scale(-1,1); ctx.translate(-B.face,0); }
+    try{ drawBedPose(vi, E); }catch(e){}
+    if(mir) ctx.restore();
+  };
+  if(stg.k==='intro'){
+    /* the two of them, facing, and it is on the escalator's face */
+    const lead=sc.leaderMale, want=wantFaceFor(lead? ((wom.body||{}).booty||6) : hisSecretV());
+    withFace(1, sc.x-12, ()=>drawHallMan(ctx, sc.x-12, FY, G.wifeRel|0, null, null, man, 0, 'idle'));
+    withFace(-1, sc.x+12, ()=>drawHallFem(ctx, sc.x+12, FY, wom, 0, 'idle'));
+    drawMoodBubble(lead? sc.x-12 : sc.x+12, FY-80, want, lead, T);
+  } else if(stg.k==='lead'){
+    const k=clamp(sc.st/stg.dur,0,1), e=k*k*(3-2*k), x=sc.x0+(sc.tx-sc.x0)*e;
+    const dir=(sc.tx>=sc.x0)? 1 : -1;
+    drawEscortPairNB(x, FY, T, {id:stg.pose, speed:1}, dir, man, wom, {herLeads:!!stg.herLeads});
+  } else if(stg.k==='undress'){ pose('undress', false); }
+  else { pose(stg.vi, stg.at==='brace'); }
+  // ---- the finish ----
+  ctx.textAlign='center';
+  if(sc.choice==='love'){
+    for(const b of sc.burst){ ctx.globalAlpha=clamp(b.life/40,0,1); px(b.x,b.y,Math.round(b.r*1.6),Math.round(b.r*1.4),'#f6f2ea'); px(b.x,b.y,Math.round(b.r),1,'#ffffff'); }
+    ctx.globalAlpha=1;
+    const fl=clamp(1-(T-sc.chooseT)/26,0,1); if(fl>0){ ctx.globalAlpha=fl*0.6; px(-4,-4,W+8,H+8,'#fff6ea'); ctx.globalAlpha=1; }
+    pixelText('~ and nobody in the house could pretend they missed that ~', W/2, 46, '#fff0dc', 1.0);
+  } else if(sc.choice==='heir'){
+    for(const b of sc.burst){ ctx.globalAlpha=clamp(b.life/50,0,1)*0.9; px(b.x,b.y,1,Math.round(1+b.r),'#f2ece0'); px(b.x,b.y,1,1,'#ffffff'); }
+    ctx.globalAlpha=1;
+    const fl=clamp(1-(T-sc.chooseT)/50,0,1); if(fl>0){ ctx.globalAlpha=fl*0.24; px(-4,-4,W+8,H+8,'#e0a060'); ctx.globalAlpha=1; }
+    pixelText('~ held. every drop of it. Venus decides ~', W/2, 46, '#ffd9a0', 1.0);
+  } else if(sc.asked){
+    const left=clamp(1-(sc.st-stg.dur*0.55)/(stg.dur*0.45+170),0,1);
+    px(W/2-60, 30, 120, 4, '#2a1620'); px(W/2-60, 30, Math.round(120*left), 4, '#e8c34a');
+    pixelText('SPACE — FOR LOVE            W — FOR AN HEIR', W/2, 24, '#ffd0da', 1.05);
+  } else if(stg.line){
+    pixelText(escSay(stg.line, sc.who), W/2, 44, 'rgba(255,214,190,.9)', 1.0);
+  }
+  pixelText(ESC_NAME[sc.esc]||'', W/2, 16, 'rgba(255,150,196,.9)', 0.9);
+  ctx.textAlign='left';
+}
+
 /* =====================================================================
    2 · CAUGHT
    ---------------------------------------------------------------------
@@ -34815,7 +35136,8 @@ function updateRomantic(dt){
   if(S.t>floor && (!shimmyLive() || S.t>ceil)){ const v=S.v;
     toast((v.k==='love'?'💞 ':v.k==='return'?'🔥 ':v.k==='ok'?'💞 ':'💢 ')+v.t
       +'  ('+(v.bond>=0?'+':'')+v.bond+' 💞, '+(v.phys>=0?'+':'')+v.phys+' 🔥)', 5200);
-    D.rslap=null; D.wifePause=0; }
+    D.rslap=null; D.wifePause=0;
+    escAfterSlap(v, 'romantic', S.bender==='self'? 'self' : 'spouse', S.x); }   // 🔸 and whether they want it now
 }
 /* =====================================================================
    HER SPRITE FOR THIS ONE
@@ -35415,7 +35737,8 @@ function updateSlap(dt){
   if(S.t>SLAP_T.end){ toast((S.v.k==='love'?'👋💞 ':S.v.k==='bad'||S.v.k==='cold'?'👋💢 ':'👋 ')
       + S.v.t + '  ('+(S.v.bond>=0?'+':'')+S.v.bond+' 💞'
       + (S.v.phys? ', '+(S.v.phys>0?'+':'')+S.v.phys+' 🔥':'')+')', 4600);
-    D.slap=null; }
+    D.slap=null;
+    escAfterSlap(S.v, 'slap', 'spouse', S.x); }                  // 🔺 and whether it ends here
 }
 /* ---- THE HAND ITSELF. Four fingers, a thumb and a wrist, drawn along the
    arm's own angle instead of as three axis-aligned blocks that never turned
@@ -35860,6 +36183,80 @@ function drawVillaLove(){
    in — and it hands straight over to the woohoo from exactly where he
    is standing.
    ===================================================================== */
+/* =====================================================================
+   🧊 HOW HE HOLDS OUT — and it is not a bar, it is a man
+   ---------------------------------------------------------------------
+   "Add the resisting animation for when she bends — one is looking, one is
+   preparing, one is getting hard." The hold used to be one picture: a hand
+   over the eyes past halfway and the tunic tenting at the end. Now it is HIM,
+   in five tells that get worse as the bar drains, and which tells depends on
+   which man: the one who looks, the one who is already getting ready, the
+   one it simply happens to, the one who paces, the one who prays and the one
+   who whistles. Each carries its own trait; a man with none of them still
+   has a way he loses, read off his name, so it is the same way every time.
+   ===================================================================== */
+const RESIST_STYLES={
+  looker:  {name:'THE LOOKER',   icon:'👀', trait:'rs_looker', drain:1.08,
+    tells:['a look at the frieze','a look that is not at the frieze','a hand over the eyes','the fingers part','he has stopped pretending to look anywhere else']},
+  prep:    {name:'THE PREPARER', icon:'🧤', trait:'rs_prep', drain:1.00,
+    tells:['he rolls his shoulders','a thumb in the belt','he wipes his palms on his tunic','the belt comes a notch looser','he is already taking the step']},
+  hard:    {name:'QUICK TO RISE',icon:'⤴', trait:'rs_hard', drain:1.12,
+    tells:['a shift of the weight','hands folded in front of him, casually','the tunic has formed an opinion','both hands, and it is not helping','there is nothing left to hide it behind']},
+  pacer:   {name:'THE PACER',    icon:'🚶', trait:'rs_pacer', drain:0.95,
+    tells:['a turn up the hall','a turn back down it','a shorter turn','a turn that ends nearer her','he has stopped turning']},
+  prayer:  {name:'THE DEVOUT',   icon:'🙏', trait:'rs_prayer', drain:0.86,
+    tells:['hands together','a god, named out loud','one eye opens','the other one opens','the god has been dismissed']},
+  whistler:{name:'THE WHISTLER', icon:'🎵', trait:'rs_whistler', drain:1.00,
+    tells:['a tune','a louder tune','a tune, and a bead of sweat','no tune at all, only the sweat','he has forgotten how whistling works']},
+};
+const RESIST_ORDER=['looker','prep','hard','pacer','prayer','whistler'];
+/* which man: yours, when you are the one holding out; his, when he is */
+function resistMan(){ return (G && G.isFemale && G.wife && G.wife.male)? G.wife : {self:true, name:G&&G.name, traits:(G&&G.traits)||[], male:true}; }
+function resistStyleOf(man){
+  const tr=((man&&man.traits)||[]).map(String);
+  for(const k of RESIST_ORDER) if(tr.indexOf(RESIST_STYLES[k].trait)>=0) return k;
+  if(tr.indexOf('priapic')>=0) return 'hard';
+  try{ if(man && man.self? false : (man && man.quirks||[]).indexOf('devout')>=0) return 'prayer'; }catch(e){}
+  /* no trait for it: the three you named, read off his name so it is the same man each time */
+  const nm=String((man&&man.name)||'x'); let h=0; for(let i=0;i<nm.length;i++) h=(h*31+nm.charCodeAt(i))>>>0;
+  return ['looker','prep','hard'][h%3];
+}
+/* his five tells, as a pose, at `lose` (0 holding … 1 gone) and time T */
+function resistTells(style, lose, T){
+  const st=Math.min(4, Math.floor(lose*5)), P={stage:st};
+  if(style==='looker'){
+    const glance=Math.sin(T*0.055)>0.62;                                          // the glance, on a timer he does not control
+    P.headAng = st===0? (glance? 0.22 : -0.10) : st===1? (glance? 0.30 : 0.10) : st>=4? 0.26 : 0.18;
+    if(st===2) P.hands='eyes';
+    if(st===3){ P.hands='peek'; P.eyes='want'; }
+    if(st>=4){ P.hands='side'; P.faceId='hypnotized'; P.lean=0.05; }
+  } else if(style==='prep'){
+    P.lean=0.02+Math.sin(T*0.13)*(st===0? 0.05 : 0.02);                          // the shoulders, rolled
+    if(st===1){ P.hands='belt'; }
+    if(st===2){ P.hands=(Math.sin(T*0.20)>0)? 'hipwipe' : 'belt'; P.farHands='hipwipe'; }
+    if(st===3){ P.hands='belt'; P.u=0.14; }
+    if(st>=4){ P.hands='belt'; P.u=0.18; P.step=Math.min(6,(lose-0.8)*30); }
+  } else if(style==='hard'){
+    P.aroAdd=0.18+lose*0.25;                                                     // it happens first, and faster
+    if(st===1){ P.hands='cover'; }
+    if(st===2||st===3){ P.hands='cover'; P.farHands='cover'; P.lean=-0.03; }
+    if(st>=4){ P.hands='side'; P.u=0.30; }
+  } else if(style==='pacer'){
+    const A=16*(1-lose)+3;
+    P.pace=A*(0.5+0.5*Math.sin(T*0.05)); P.walk=(st<4)? 1 : 0; P.walkPh=T*0.30;  // up the hall and back, nearer each time
+    if(st>=4){ P.pace=0; P.faceId='starving'; }
+  } else if(style==='prayer'){
+    P.hands='pray'; P.farHands='pray';
+    P.headAng = st<=1? -0.34 : st===2? (Math.sin(T*0.07)>0.3? 0.12 : -0.30) : st===3? 0.10 : 0.20;
+    if(st>=4){ P.hands='side'; P.farHands='side'; P.faceId='hungry'; }
+  } else if(style==='whistler'){
+    P.hands='back'; P.farHands='back'; P.headAng=-0.20+Math.sin(T*0.08)*0.05;
+    P.lean=0.02+Math.sin(T*0.09)*0.03;                                           // rocking on his heels
+    P.notes=(st<=2); P.sweat=(st>=2);
+    if(st>=4){ P.hands='side'; P.farHands='side'; P.headAng=0.18; P.faceId='thirsty'; }
+  }
+  return P;
+}
 function temptHimPose(X){
   const lose = X.ph==='resist'? clamp(1-X.hold/100,0,1) : 0;
   const P={ hands:'side', far:null, face:HARD_FACES.stoic, aro:0, u:0, lean:0.02, from:null, k:undefined };
@@ -35871,7 +36268,17 @@ function temptHimPose(X){
     P.face = lose>0.72? X.face : (lose>0.35? HARD_FACES.sheepish : HARD_FACES.stoic);
     P.aro  = 0.22 + lose*0.9;
     P.u    = lose>0.72? 0.30+(lose-0.72)/0.28*0.24 : 0;                  // the tunic stops containing it
-    P.hands= lose>0.45? 'eyes' : 'side'; P.lean = 0.02-lose*0.06;        // leaning back from it
+    P.hands= 'side'; P.lean = 0.02-lose*0.06;                            // leaning back from it
+    /* 🧊 and the man himself: his style's five tells */
+    const sty=X.style||(X.style=resistStyleOf(resistMan())), R=resistTells(sty, lose, X.t);
+    if(R.hands) P.hands=R.hands; if(R.farHands) P.far=R.farHands;
+    if(R.lean!==undefined) P.lean=R.lean;
+    if(R.u!==undefined) P.u=Math.max(P.u, R.u);
+    if(R.aroAdd) P.aro=Math.min(1.06, P.aro+R.aroAdd);
+    if(R.faceId && HARD_FACES[R.faceId]) P.face=HARD_FACES[R.faceId];
+    if(R.headAng!==undefined) P.headAng=R.headAng;
+    P.pace=R.pace||0; P.walk=R.walk||0; P.walkPh=R.walkPh||0; P.step=R.step||0;
+    P.tells=R; P.style=sty;
   }
   else if(X.ph==='look'){ P.face=HARD_FACES.stoic; P.aro=0.55; P.hands='eyes'; P.lean=-0.03; }
   else if(X.ph==='took'){ P.face=X.face; P.aro=1; P.from='side'; P.hands='belt'; P.k=clamp((X.t-40)/60,0,1); P.lean=0.05; }
@@ -35896,8 +36303,11 @@ function drawTemptFigures(X, FY, w){
                 expr: X.ph==='invited'? 'smug' : X.ph==='took'? (X.herF||(X.herF=herFace(w,'reveal'))) : (X.ph==='held'? 'cross' : null),
                 blush: X.ph==='took'? 0.5 : X.ph==='invited'? 0.3 : 0 };
   const behind = (X.x-D.x)*fd > 8 && (D.face===fd) && X.ph!=='held';
-  const heE = { atX:D.x, u:P.u, aro:P.aro, hands:P.hands, farHands:P.far||'side', handFrom:P.from||undefined, handK:P.k,
-                lean:P.lean, face:P.face, look:him, coast:coastT, cloth, band, walk, walkPh };
+  /* 🧊 pacing is his, not the player's: it moves where he is DRAWN, never where D.x is */
+  const paceX = (P.pace||0)*(-fd) + (P.step||0)*fd;
+  const heE = { atX:D.x+paceX, u:P.u, aro:P.aro, hands:P.hands, farHands:P.far||'side', handFrom:P.from||undefined, handK:P.k,
+                lean:P.lean, face:P.face, look:him, coast:coastT, cloth, band, headAng:P.headAng,
+                walk: P.walk? 1 : walk, walkPh: P.walk? P.walkPh : walkPh };
   let drew=false;
   if(behind){
     if((X.x-D.x)*fd < 140){                                          // he is in the frame of the pair: one picture, depth-sorted
@@ -35912,8 +36322,9 @@ function drawTemptFigures(X, FY, w){
     BEND_OPT=her; try{ drawWifeFig(ctx, X.x, FY, w, k, 'bend'); }catch(e){} BEND_OPT=null;
     ctx.restore();
     const face = X.ph==='held'? -fd : (D.face||1);                         // held: he turns his back on the shelf
-    const Mh=drawManProfile(ctx, D.x, FY, him, { u:P.u, aro:P.aro, lean:P.lean, face:P.face, coast:coastT, cloth, band,
-      near: P.hands==='eyes'? [4.8,-32] : null, walk, walkPh }, face);
+    const OFF={eyes:[4.8,-32], peek:[5.6,-29], cover:[5.2,2.6], pray:[5.4,-17], back:[-3.8,-2.5], hipwipe:[1.6,3.2], belt:[4.6,-4.5]};
+    const Mh=drawManProfile(ctx, D.x+paceX, FY, him, { u:P.u, aro:P.aro, lean:P.lean, face:P.face, coast:coastT, cloth, band, headAng:P.headAng,
+      near: OFF[P.hands]||null, far: OFF[P.far]||null, walk: P.walk? 1 : walk, walkPh: P.walk? P.walkPh : walkPh }, face);
     X.himHead = Mh && Mh.head;
   }
 }
@@ -35997,6 +36408,17 @@ function drawTempt(){
       for(let i=0;i<5;i++) px(bx5+i*10, 40, 7, 3, i<=st5? (i>=3?'#e0705b':'#e8c34a') : '#4a3826'); }
     if(f<0.62) pixelText(f<0.3? '— it is getting away from you —' : '— you are losing this —',
       W/2, by+22, 'rgba(255,190,170,.85)', 1);
+    /* 🧊 WHO is losing it, and how — the style and the tell he is on now */
+    { const sty=X.style||(X.style=resistStyleOf(resistMan())), RS=RESIST_STYLES[sty];
+      if(RS){ const st5=Math.min(4,Math.floor((1-f)*5));
+        pixelText(RS.icon+' '+RS.name+' · '+RS.tells[st5], W/2, by+34, 'rgba(210,230,255,.88)', 0.86);
+        const hh=X.himHead;
+        const T0=X.t|0, tl=resistTells(sty, 1-f, X.t);
+        if(hh && tl.notes){ for(let i=0;i<2;i++){ const q=((T0+i*23)%46)/46; ctx.globalAlpha=clamp(1-q,0,1)*0.9;
+            pixelText(i? '♫' : '♪', hh[0]-6-q*10*(X.fdir||1), hh[1]-6-q*14, '#e8e0ff', 0.9); } ctx.globalAlpha=1; }
+        if(hh && tl.sweat){ const q=((T0*1.3)%30)/30; ctx.globalAlpha=0.85; px(hh[0]+3, hh[1]+2+q*8, 1, 2, '#9ad4ff'); ctx.globalAlpha=1; }
+        if(hh && sty==='prayer' && st5===1 && (T0%60)<40) pixelText('“Vesta…”', hh[0], hh[1]-14, 'rgba(220,210,255,.8)', 0.7);
+      } }
     pixelText(X.hits+' / '+TEMPT_NEED, W/2, by+10, '#120c08', 1.15);
     ctx.textAlign='left';
     // he is visibly losing it
@@ -36919,6 +37341,7 @@ function drawDomusInner(){
   // actors
   const sc=D.scene, w=G.wife;
   if(sc && sc.kind==='villalove'){ drawVillaLove(); drawWalkIn(sc); }
+  else if(sc && sc.kind==='escalate'){ drawEscalate(); drawWalkIn(sc); }
   else if(!sc){
     if(G.married && w){
       const turning = (D.wifeTurn||0)>0, tp = turning? 1-(D.wifeTurn/16) : 0;
@@ -47309,7 +47732,8 @@ function drawArmSwat(x, FY, wife, t){
    hands are the two figures' own hands meeting, not a bar of skin drawn between two sprites — and
    the two carries: over the shoulder, and cradled. Off her feet she wears her gown as the body
    template's robe, because a stola only knows how to hang from a woman who is standing up. */
-function drawEscortPairNB(x, FY, T, pose, dir, look, wife){
+function drawEscortPairNB(x, FY, T, pose, dir, look, wife, opt){
+  opt=opt||{};
   let him=look, her=wife;
   if(him && !him.male && her && her.male){ const t0=him; him=her; her=t0; }        // she is the one walking you there
   him=him||{}; her=her||{};
@@ -47329,6 +47753,19 @@ function drawEscortPairNB(x, FY, T, pose, dir, look, wife){
   /* a walking pose for her, with one hand sent to a point in the room */
   const walkWith=(atX, handTo, mode)=>(FXb,FYb)=>{ const P=femWalkPose(her, {mode:mode||'walk', ph:(atX*dir)*Math.PI/(2*(mode==='run'? 10 : 4.6)), t:T}, FXb, FYb);
     if(handTo) P.hands.near=[FXb+(handTo[0]-atX)*dir, FYb+(handTo[1]-FY)]; return P; };
+  /* 🔸 AND SHE CAN LEAD. The same two holds the other way round: she is in front, her hand back to
+     his, and he is the one being brought along — an escalator leads whoever the escalator is. */
+  if(opt.herLeads && (pose.id==='hand' || pose.id==='lead')){
+    const lead=(pose.id==='lead'), J=[S2(lead? -10 : -8.5), FY-(lead? 43 : 42)];
+    const L0=((him.body||{}).legs===undefined? 6 : him.body.legs), hipH=FY-2.2-(15.6+L0*0.22+16.2+L0*0.22)*0.975, hx=S2(lead? -19 : -17);
+    drawManProfile(ctx, hx, FY, him, {u:0, aro:0, walk:1, walkPh:(hx*dir)*Math.PI/(2*5.2), lean:0.05,
+      face:lead? HARD_FACES.sheepish : HARD_FACES.grin, coast:coast && (him.self? (G&&G.world==='rk') : him.eth==='rkrai'), cloth, band,
+      near:[(J[0]-hx)*dir, J[1]-hipH]}, dir);
+    HER(S2(0), (FXb,FYb)=>{ const P=femWalkPose(her, {mode:lead? 'run' : 'walk', ph:(x*dir)*Math.PI/(2*(lead? 10 : 4.6)), t:T}, FXb, FYb);
+      P.hands.near=[FXb+(J[0]-S2(0))*dir, FYb+(J[1]-FY)]; P.headAng=-0.35; return P; },               // looking back at him
+      {expr: lead? 'hungry' : 'smitten', dress:hallDressOf(her), blush:0.4});
+    return;
+  }
   if(pose.id==='stiff'){
     HER(S2(-22), walkWith(S2(-22), null), {expr:'flat', dress:hallDressOf(her)});
     HIM(null);
@@ -59112,6 +59549,11 @@ window.__SS = {
   nbHallOn, withFace, hallDressOf, hallGownKit, femWalkPose, drawFemProfile, drawHallFem, drawHallMan, hallManFace, hallManLook,
   get FEM_DRAWS(){return FEM_DRAWS;}, get NB_HALL(){return NB_HALL;}, set NB_HALL(v){ NB_HALL=!!v; }, get NB_FACE(){return NB_FACE;},
   drawWifeFig, drawHusbandFig, litWife, litHusband, drawDomus, drawDomusPlayer, figHeadBox, drawEscortPair, drawChildFigure,
+  drawEscortPairNB, drawHusbandMove, drawHusbandMoveNB, drawDrop, drawTempt, startTempt, updateTempt, temptHimPose,
+  RESIST_STYLES, RESIST_ORDER, resistStyleOf, resistTells, resistMan,
+  ESC_IDS, ESC_NAME, ESC_LINES, escTraitsOf, escAfterSlap, startEscalation, escPlan, escSpotFor, hallBraceNear, updateEscalate, drawEscalate, escFinish, escSparkFire, escSay,
+  updateSlap, updateRomantic, updateHusbandMove, startSlapAnim, startRomantic, traitById, flawById, WIFE_FLAWS,
+  get BEDPOSE_LAST(){return BEDPOSE_LAST;},
 };
 })();
 </script>
