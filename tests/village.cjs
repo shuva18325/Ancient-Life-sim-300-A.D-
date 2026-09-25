@@ -2,7 +2,7 @@
    ---------------------------------------------------------------------
    Everything a player sent back from the last round, as checks:
      · "impossible should be like 10-13 inches", and then "still too short" —
-       his length is sized in real inches, per man, and IMPOSSIBLE is a comically-too-big 26–34;
+       his length is sized in real inches, per man, and IMPOSSIBLE is a comic 22–26 (a step past IMMENSE);
      · the front view shrank him to a stub when he got hard;
      · "he might be smiling because he is hard";
      · "wife satisfiers … booty destroyer" — the village names him, and now
@@ -53,7 +53,7 @@ const ok=(name,cond,note)=>{ if(cond){pass++; console.log('  PASS  '+name+(note?
     o.differ=new Set(['Aqal','Torvak','Kraun','Leok'].map(n=>S.lengthInches(man(n,8),1).hard.toFixed(2))).size>1;
     o.rest=S.lengthInches(man('Aqal',11),0).now < S.lengthInches(man('Aqal',11),1).now;
     return o; });
-  ok('IMPOSSIBLE is a comically-too-big 26–34 inches hard, for every man', !R.err && R.imp.every(x=>x>=26 && x<=34), R.err||R.imp.map(x=>x.toFixed(1)).join(' '));
+  ok('IMPOSSIBLE is a comic 22–26 inches hard, for every man — a step past IMMENSE, not TOO large', !R.err && R.imp.every(x=>x>=22 && x<=26), R.err||R.imp.map(x=>x.toFixed(1)).join(' '));
   ok('an ordinary rank-5 man is an ordinary 5.9–6.4 in', !R.err && R.five>=5.9 && R.five<=6.4, R.err||R.five.toFixed(2));
   ok('the same man measures the same every time', R.same===true);
   ok('and two men of one rank are not identical', R.differ===true);

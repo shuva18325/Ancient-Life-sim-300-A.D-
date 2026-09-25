@@ -159,7 +159,7 @@ const ok=(name,cond,note)=>{ if(cond){pass++; console.log('  PASS  '+name+(note?
     S.setBCT(1100); S.BC.stage=S.bedStage(S.BC); S.BC.tT=1100; S.drawBed(); out.he=S.BC.nf&&S.BC.nf.he;
     G.body.secret=6; S.setWH('done'); S.startBedScene('fun','long','bed'); out.midSlow=S.BC.bigSlow;
     return out; }, src);
-  ok('an Immense man is 14–21in and an Impossible one 26–34in on a 70in frame; the middle of the ladder is untouched', !R.err && R.imm>=14 && R.imp>=26 && R.avg<7.3 && R.long<10.1, R.err||JSON.stringify(R));
+  ok('an Immense man is 14–21in and an Impossible one 22–26in on a 70in frame; the middle of the ladder is untouched', !R.err && R.imm>=14 && R.imp>=22 && R.imp<=26 && R.avg<7.3 && R.long<10.1, R.err||JSON.stringify(R));
   ok('when she takes a big one it goes slower, and her tongue is out a little', !R.err && R.bigV===11 && R.slow<1 && R.midSlow===1 && R.he==='overwhelmed', R.err||JSON.stringify(R));
 
   console.log('\n=== 😋 THE FACES COME UP IN THE VILLA ON THEIR OWN ===');

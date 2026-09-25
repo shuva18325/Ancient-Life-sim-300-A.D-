@@ -9,30 +9,54 @@ grounds produce nine distinct pictures" is.
 
 ---
 
-## 0 — NEXT, PROPOSED AFTER V45 (in the order they would help most)
+## 0 — NEXT, PROPOSED AFTER V46 (in the order they would help most)
 
-1. ~~**The villa walkers onto the template.**~~ — DONE (V42), see 0.8 below.
-2. **Faces in the arena.** The face library is shared — a fighter could grit his teeth on a
+1. **Stamina, round two.** A night's worth of it from the kitchen — oysters, garum and honeyed
+   wine in Rome, seal fat and kelp on the coast — a TRAIN TOGETHER beat in the villa that raises
+   both of yours, and a rhythm duel in the bedchamber: tap in time to keep her in the HOT zone,
+   or push it and watch it tip into TOO MUCH.
+2. **Pick the night's faces.** The tablet's face grid, offered at the bedchamber door: the face
+   she (or he) wears for the whole session, yours too, or SURPRISE ME.
+3. **Greedy, round two.** The hands follow the eyes: a grab beat when a Greedy one catches you
+   bent over, a slap back when you catch them, and the village's own word for it on the board
+   ("THE WANDERING EYE"). A Greedy spouse with Jealous looks at the servants too — and minds.
+4. **Every culture's bedchamber painted.** The cubiculum and the longhouse got the full pass;
+   Japan (tatami, andon, a byōbu screen), Han and Ming (silk hangings, a lacquer bed), Persia
+   (glazed niches, a brazier), the steppe (a ger's felt and lattice) and India should too.
+5. **More escalation scenes.** A second running order per escalator, his and hers — the stair,
+   the impluvium's rim, the tablinum desk — so the third one does not feel familiar.
+6. **The wife's bend, round two.** Bend at the low shelf, the pool's edge or the stairs; his
+   resist styles against it; and "he gets it out" leading straight into the sundial.
+7. **Faces in the arena.** The face library is shared — a fighter could grit his teeth on a
    swing, go HURT on a hit, SHOCKED on a knockdown and grin on a win, instead of four states.
-3. **Wear on the kit.** Dents in the bronze, torn cloth and a shield that loses planks as the
+8. **Wear on the kit.** Dents in the bronze, torn cloth and a shield that loses planks as the
    bout goes on, read off HP — the kit already knows where every piece sits.
-4. **Beasts in the same hand.** The venatio lion, bear, bull and leopard are still block
-   pixel quadrupeds; a vector body with IK legs would match the men they fight.
-5. **Scars on the new body.** `drawScarsOn` marks the old sprite; the template body carries
-   none of the scars the ledger records.
-6. **The crowd and the charioteers** as cached template sprites, the way the soldiers are.
-7. **A comic-size switch.** Immense and Impossible are too big on purpose now; a Settings
-   toggle between the comic and the realistic ladder would let either taste play.
-8. **Performance pass.** The fighter body is re-drawn and pixel-snapped every frame; caching
-   frames per pose would halve the cost on slow phones.
+9. **Beasts in the same hand.** The venatio lion, bear, bull and leopard are still block pixel
+   quadrupeds; a vector body with IK legs would match the men they fight.
+10. **Scars on the new body.** The template body carries none of the scars the ledger records.
+11. **A size switch in Settings.** IMPOSSIBLE is a step past IMMENSE now (22–26in); a toggle
+    between that and V41's comic 26–34 would let either taste play.
+12. **Names on the street.** Walking past a neighbour's door could show their village name and
+    its moving picture, the way yours shows near your spouse.
+13. **The crowd and the charioteers** as cached template sprites, the way the soldiers are.
+14. **Creation-card portraits on the template** — the first body a player sees.
+15. **Performance pass.** Cache fighter frames per pose; the bedchamber's painted room could be
+    rendered once per session to an offscreen canvas and only its lamp and stars redrawn.
 
-9. **Creation-card portraits on the template.** The champion cards still paint the old block
-   figure; the card is the first body a player sees and it should be the one they get.
-10. **More escalation scenes.** Each escalator has one running order; a second per escalator
-    (the stair, the impluvium's rim, the tablinum desk) would stop the third one feeling familiar.
-
-11. **Names on the street.** The five households on the street have their own village names in
-    the ledger; walking past a neighbour's door could show theirs, with its emoji, the same way.
+### ~~0.4 Stamina, their faces, greedy eyes, his bend, his escalators, a bedchamber worth the name~~ — DONE (V46)
+**Result:** `tests/v46.cjs` (38 checks). Stamina is a stat — 3 to start, trained at the ludus to
+10 — and a spouse has one too, rolled at the wedding and grown by practice; in the bedchamber his
+size and his stamina push against hers into four tiers (wants more / a good match / tongue out and
+hot / too much, and spent before the end), shown on a draining bar, on her face in every
+position, in how long the session runs and on her face as she walks back into the hall. IMPOSSIBLE
+is 22–26in. The tablet makes their face (or yours) from eighteen, with a live front-on preview,
+for a wife or a husband. Greedy, Seat-Struck and Front-Struck spouses look — at your seat or your
+front, with an eye-line — and can be caught, or followed up. Playing the wife, F bends you over on
+demand and he slaps, gets it out where he stands, or stares; with an escalator he takes it further
+into his own scene. All four escalators have his own three-position running orders. The Roman
+bedchamber is a painted cubiculum (frieze and garland, Fourth-Style panels, a night window with a
+moonbeam, the curtain, the candelabrum, a mosaic) and the coast's is a finished longhouse — behind
+the positions and at the door.
 
 ### ~~0.5 Every title moves~~ — DONE (V45)
 **Result:** `tests/v43.cjs` (33 checks, 9 of them new). Each of the 43 pictures names one of 13

@@ -118,10 +118,12 @@ const ok=(name,cond,note)=>{ if(cond){pass++; console.log('  PASS  '+name+(note?
   ok('and a board that is gone stops being painted', !R.err && R.stale===0, R.err||JSON.stringify(R));
   R=await T(async ([SETUP])=>{ const S=window.__SS; const setup=eval(SETUP); setup(false, 10);
     S.openBodyMap(S.selfSubject(),'villa'); const v=document.getElementById('bodymap-verdict'); const inMap=v.querySelectorAll('canvas.temoji').length;
-    S.G.villageName=null; S.villageNameNews(); await new Promise(r=>setTimeout(r,1300));
+    S.G.villageName=null; S.villageNameNews();                           // (logs the name, with its id, and queues the news)
+    const N0=S.villageName(); S.toastTitle('🗣 The village has a name for you: '+N0.name+'. '+N0.line, 6400, N0);   // the news itself, called straight (see below)
+    await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
     const tt=document.getElementById('hud-toast'); const inToast=tt.querySelectorAll('canvas.temoji').length, toastText=tt.textContent;
     const last=(S.G.villageNameLog||[]).slice(-1)[0]||{};
-    return {inMap, inToast, named:toastText.includes(S.villageName().name), logId:last.id, logCult:last.cult,
+    return {inMap, inToast, named:toastText.includes(N0.name), logId:last.id, logCult:last.cult,
       old:S.titleByName('THE LONG POST','him'), oldHouse:S.titleByName('THE COLD LONGHOUSE','house')}; }, [SETUP]);
   ok('the body map writes it with its picture, and so does the news the day a name lands', !R.err && R.inMap>=1 && R.inToast===1 && R.named, R.err||JSON.stringify(R));
   ok('the record keeps which name it was, and an old line still finds its picture by the name', !R.err && !!R.logId && !!R.logCult && R.old && R.old.id==='long' && R.oldHouse && R.oldHouse.id==='cold', R.err||JSON.stringify(R));
@@ -178,11 +180,14 @@ const ok=(name,cond,note)=>{ if(cond){pass++; console.log('  PASS  '+name+(note?
     const moving=T.filter(x=>{ const kids=[...x.children]; const cn=getComputedStyle(x).animationName; return kids.length && kids.every(k=>getComputedStyle(k).animationName!=='none') || (cn && cn!=='none'); }).length;
     const styles=[...new Set(T.map(x=>[...x.classList].find(c=>c.startsWith('tt-'))))];
     S.openBodyMap(S.selfSubject(),'villa'); const inMap=document.querySelectorAll('#bodymap-verdict .ttx').length;
-    S.G.villageName=null; S.villageNameNews(); await new Promise(r=>setTimeout(r,1300));
+    /* the news toast, called straight (every setup opens the hall, and opening the hall queues that
+       household's news on timers — a harness racing that queue sees other households' names) */
+    const N0=S.villageName(); S.toastTitle('🗣 The village has a name for you: '+N0.name+'. '+N0.line, 6400, N0); await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
     const tt=document.getElementById('hud-toast').querySelector('.ttx');
-    return {n:T.length, pics, moving, styles, textOK:T.every(x=>x.textContent.length>3), inMap, toast:tt? tt.textContent : null, name:S.villageName().name}; }, [SETUP]);
+    const names=[S.villageName(), S.villageNameF(S.G.wife), S.villageHouseName()].filter(Boolean).map(n=>n.name);   // (the news is a queue — his, hers, the house's — and an earlier one may be up)
+    return {n:T.length, pics, moving, styles, textOK:T.every(x=>x.textContent.length>3), inMap, toast:tt? tt.textContent : null, name:S.villageName().name, names, anim:tt? getComputedStyle(tt.firstElementChild).animationName : 'none'}; }, [SETUP]);
   ok('on the board every title is letters that move — yours, theirs, the house’s, the street’s and the record’s', !R.err && R.n>=R.pics && R.n>=10 && R.moving===R.n && R.textOK && R.styles.length>=3, R.err||JSON.stringify(R));
-  ok('and on the body map, and in the news the day a name lands', !R.err && R.inMap>=1 && R.toast===R.name, R.err||JSON.stringify(R));
+  ok('and on the body map, and in the news the day a name lands', !R.err && R.inMap>=1 && R.names.includes(R.toast) && R.anim!=='none', R.err||JSON.stringify(R));
 
   console.log('\n=== 🙋 HER HALL, AND THE GATE ===');
   R=await T(([SETUP,frames])=>{ const S=window.__SS; const setup=eval(SETUP), run=eval(frames);

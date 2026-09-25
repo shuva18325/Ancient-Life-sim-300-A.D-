@@ -49,6 +49,26 @@ publicly, leaving it off keeps the game safe for a general audience.
 ---
 
 ## Feature highlights
+- **Stamina (V46, mature content)** — a bedroom stat you train at the ludus (3 → 10), and your
+  spouse has one too. His size and his stamina push against hers: a small one on an ordinary
+  wife and she wants more; an ordinary pair is a good match; a big one — or any one, with a man
+  who trained for it — gets her tongue out and hot; more than she has is too much, and she is
+  spent before the end. A bar drains in the corner, her face follows it through every position,
+  a trained man lasts positions longer, and practice builds hers.
+- **Make their face (V46)** — the villa tablet (T) picks a face for your spouse or yourself from
+  eighteen — hungry, starving, smitten, thirsty, smug, dreamy, laughing, pouting, spent… — with a
+  live front-on preview; HUNGRY works on a husband as well as a wife.
+- **Greedy eyes (V46, mature content)** — Greedy, Seat-Struck and Front-Struck spouses stop,
+  turn and look at your seat or your front, with a line from their eyes to it; turn round and
+  you have caught them, and a Greedy one may cross the room about it.
+- **The wife's bend (V46, mature content)** — playing the wife, F bends you over whenever the
+  hall is free; he slaps, gets it out where he stands, or stares — and with an escalator he
+  takes it further, into one of his own four escalation scenes (he pins, lifts, sets her down on
+  her knees and gets it out, and takes her from behind on the tiles).
+- **A bedchamber worth the name (V46)** — the Roman room is a painted cubiculum (garland frieze,
+  Fourth-Style panels with Eros and doves, a night window with a moonbeam, a breathing curtain,
+  a flickering candelabrum, a mosaic floor); the coast's is a finished longhouse. IMPOSSIBLE is
+  back down to a comic step past IMMENSE (22–26in).
 - **The names, near her (V43, mature content)** — what the village calls you no longer hangs
   over your head for the first seconds of every visit; it comes up only when you walk over to
   your spouse, and fades when you walk off. Yours goes over you and theirs over them, each with
