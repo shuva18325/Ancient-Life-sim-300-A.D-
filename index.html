@@ -58,6 +58,16 @@
     padding:2px 7px;border:1px solid #6b4e2a;border-radius:3px;box-shadow:0 1px 2px rgba(0,0,0,.5);}
   .stat b{color:var(--gold);}
   .scrollbox{overflow:auto;scrollbar-width:thin;scrollbar-color:var(--gold) #000;}
+  /* a CENTRED panel that scrolls (the body map) centred its overflow too, half of it
+     above the top where no scrollbar reaches — the title and the village's name were
+     cut off on any screen shorter than the chart. Auto margins centre it while it
+     fits and fall to zero when it does not, so the top is always reachable. */
+  .scrollbox.center{justify-content:flex-start;}
+  /* and nothing in it is squeezed to fit: the chart's two rows of view buttons were
+     crushed to one line's height, the second line sliding in under the next row */
+  .scrollbox.center > *{flex-shrink:0;}
+  .scrollbox.center > :first-child{margin-top:auto;}
+  .scrollbox.center > :last-child{margin-bottom:auto;}
   /* a wax tablet (tabula) — the ancient text message */
   .tabula{background:linear-gradient(#c9a866,#a8874a);border:4px solid #6b4a26;border-radius:2px;
     box-shadow:inset 0 0 0 2px #eaceA0,inset 0 2px 12px rgba(0,0,0,.35),0 3px 6px rgba(0,0,0,.5);
@@ -148,6 +158,8 @@
     box-shadow:inset 0 0 0 1px rgba(232,195,74,.14), 0 2px 6px rgba(0,0,0,.45);}
   .shopcard.eq{border-color:var(--gold);box-shadow:inset 0 0 0 1px rgba(232,195,74,.3),0 0 0 2px var(--gold);}
   .toast{border-radius:4px;box-shadow:0 4px 18px rgba(0,0,0,.7);}
+  /* a name's little picture on a page: NOT the full-screen canvas rule above */
+  canvas.temoji{position:static;inset:auto;display:inline-block;image-rendering:crisp-edges;image-rendering:pixelated;vertical-align:middle;margin-right:4px}
   .pill{border-radius:3px;}
   .grid{display:grid;gap:8px;}
   .blink{animation:bl 1s steps(2) infinite;}
@@ -7840,7 +7852,8 @@ function inheritDNA(male){
   if(!traits.length && Math.random()<0.25){
     const _e=(G&&G.wife&&G.wife.eth)||'roman';
     const own=WIFE_TRAITS.filter(t=>!(t.male&&!male) && !(t.female&&male)
-      && !(t.eth && t.eth!==_e));
+      && !(t.eth && t.eth!==_e)
+      && !/^(esc_|rs_)/.test(t.id) && !(t.adult && !ADULT));        // a child's own is never how a grown-up escalates or holds out
     if(own.length) traits.push(pick(own).id);                                   // a trait of its own
   }
   // flaws run in families too
@@ -8785,24 +8798,24 @@ function villageNameNews(){
   try{
     if(!G) return;
     const news=[];
-    const log=(who,name)=>{ G.villageNameLog=(G.villageNameLog||[]).concat([{day:G.day||0, who, name}]).slice(-16); };
+    const log=(who,name,N)=>{ G.villageNameLog=(G.villageNameLog||[]).concat([{day:G.day||0, who, name, id:N&&N.id, cult:N&&N.cult}]).slice(-16); };
     const N=villageName();
     if(N && G.villageName!==N.name){
-      const first=!G.villageName; G.villageName=N.name; log('him',N.name);
+      const first=!G.villageName; G.villageName=N.name; log('him',N.name,N);
       const whose = G.isFemale? 'your husband' : 'you';
-      news.push('🗣 '+(first? 'The village has a name for '+whose+': ' : 'The village calls '+whose+' something new now: ')
-        +N.name+'. '+N.line+' '+villageNameReaction(N));
+      news.push({N, t:'🗣 '+(first? 'The village has a name for '+whose+': ' : 'The village calls '+whose+' something new now: ')
+        +N.name+'. '+N.line+' '+villageNameReaction(N)});
     }
     const Fn=villageNameF();
     if(Fn && G.villageNameF!==Fn.name){
-      const first=!G.villageNameF; G.villageNameF=Fn.name; log('her',Fn.name);
+      const first=!G.villageNameF; G.villageNameF=Fn.name; log('her',Fn.name,Fn);
       const whose = G.isFemale? 'you' : 'your wife';
-      news.push('🗣 '+(first? 'And the village has one for '+whose+': ' : 'The village has a new one for '+whose+': ')+Fn.name+'. '+Fn.line);
+      news.push({N:Fn, t:'🗣 '+(first? 'And the village has one for '+whose+': ' : 'The village has a new one for '+whose+': ')+Fn.name+'. '+Fn.line});
     }
     const H=villageHouseName();
-    if(H && G.villageHouse!==H.name){ G.villageHouse=H.name; log('house',H.name);
-      news.push('🏠 And the house itself has a name now: '+H.name+'. '+H.line); }
-    news.forEach((t,i)=>setTimeout(()=>{ try{ toast(t, 6400); }catch(e){} }, 900+i*6600));
+    if(H && G.villageHouse!==H.name){ G.villageHouse=H.name; log('house',H.name,H);
+      news.push({N:H, house:true, t:'🏠 And the house itself has a name now: '+H.name+'. '+H.line}); }
+    news.forEach((n,i)=>setTimeout(()=>{ try{ toastTitle(n.t, 6400, n.N, n.house); }catch(e){} }, 900+i*6600));
   }catch(e){}
 }
 /* THE BOARD — everything the village is saying, on one page */
@@ -8819,30 +8832,31 @@ function openVillageTalk(back){
   const M=villageName(), Fn=villageNameF(), H=villageHouseName(), RK=villageRank();
   const wom=villageWoman();
   if(M) card('#c05aa0', `<div class="small muted">${G.isFemale? 'YOUR HUSBAND' : 'YOU'}</div>
-      <b style="color:#ff9ad0;letter-spacing:1px;font-size:15px">${M.name}</b>
+      <b style="color:#ff9ad0;letter-spacing:1px;font-size:15px">${titleEmojiTag(M)}${M.name}</b>
       <span class="small muted">· ${fmtLen(M.inches)}, hard${RK? ' · <b style="color:#ffd27a">'+['','1st','2nd','3rd','4th','5th','6th'][RK.place]+' of '+RK.of+' on the street</b>' : ''}</span>
       <div class="small muted" style="margin-top:3px;font-style:italic">${M.line}</div>`);
   if(Fn && wom) card('#b07ad0', `<div class="small muted">${G.isFemale? 'YOU' : 'YOUR WIFE'} — ${String(wom.name||'').split(' ')[0]}</div>
-      <b style="color:#e0b0ff;letter-spacing:1px;font-size:15px">${Fn.name}</b>
+      <b style="color:#e0b0ff;letter-spacing:1px;font-size:15px">${titleEmojiTag(Fn)}${Fn.name}</b>
       <div class="small muted" style="margin-top:3px;font-style:italic">${Fn.line}</div>`);
   if(H) card('#e8c34a', `<div class="small muted">THE HOUSE</div>
-      <b style="color:var(--gold);letter-spacing:1px;font-size:15px">🏠 ${H.name}</b>
+      <b style="color:var(--gold);letter-spacing:1px;font-size:15px">${titleEmojiTag(H,true) || '🏠 '}${H.name}</b>
       <div class="small muted" style="margin-top:3px;font-style:italic">${H.line}</div>`);
   const L=(G.villageNameLog||[]);
   if(L.length){
     const who={him: G.isFemale? 'him' : 'you', her: G.isFemale? 'you' : 'her', house:'the house'};
     card('#6a5a7a', `<div class="small muted">THE RECORD — every name, the day it landed, newest first</div>`
-      + L.slice().reverse().map(e=>`<div class="small">day ${e.day} · <span class="muted">${who[e.who]||e.who}</span> — <b>${e.name}</b></div>`).join(''));
+      + L.slice().reverse().map(e=>`<div class="small">day ${e.day} · <span class="muted">${who[e.who]||e.who}</span> — <b>${titleEmojiTag(titleByName(e.name, e.who, e.id, e.cult), e.who==='house', 1)}${e.name}</b></div>`).join(''));
   }
   const S=villageStreet();
   if(S.length){
     card('#5a86b0', `<div class="small muted">THE STREET — ${rk? 'the longhouses either side of yours' : 'your neighbours on the hill'}</div>`
       + S.map(h=>`<div style="margin-top:5px;padding-top:4px;border-top:1px solid #ffffff18">
-          <div class="small"><b>${h.him.name}</b> <span class="muted">·</span> <b style="color:#ff9ad0">${h.him.vn? h.him.vn.name : '—'}</b>
+          <div class="small"><b>${h.him.name}</b> <span class="muted">·</span> <b style="color:#ff9ad0">${h.him.vn? titleEmojiTag(Object.assign({cult}, h.him.vn), false, 1)+h.him.vn.name : '—'}</b>
             <span class="muted">· ${fmtLen(h.him.inches)}</span></div>
-          <div class="small">and <b>${h.her.name}</b> <span class="muted">·</span> <b style="color:#e0b0ff">${h.her.vn? h.her.vn.name : '—'}</b></div>
-          ${h.house? `<div class="small" style="color:var(--gold)">🏠 ${h.house.name}</div>` : ''}</div>`).join(''));
+          <div class="small">and <b>${h.her.name}</b> <span class="muted">·</span> <b style="color:#e0b0ff">${h.her.vn? titleEmojiTag(Object.assign({cult}, h.her.vn), false, 1)+h.her.vn.name : '—'}</b></div>
+          ${h.house? `<div class="small" style="color:var(--gold)">${titleEmojiTag(Object.assign({cult}, h.house), true, 1) || '🏠 '}${h.house.name}</div>` : ''}</div>`).join(''));
   }
+  titleEmojiMount(b);                                   // 🖼 and every name on the board moves
   $('btn-villa-back').onclick=()=>{
     const mine=(($('villa-h2')||{}).textContent===TITLE);
     $('btn-villa-back').onclick=()=>enterMap();
@@ -11972,13 +11986,13 @@ function openBodyMap(w,back){
     <div class="small" style="margin-top:3px">${bodyTierLine(w)}</div>
     ${VN? `<div class="small" style="margin-top:4px;padding:4px 6px;border:1px solid #c05aa0;border-radius:3px;background:#1e0c1a">
         🗣 <span class="muted">${w.self? 'The village calls you' : 'The village calls him'}</span>
-        <b style="color:#ff9ad0;letter-spacing:1px">${VN.name}</b>
+        <b style="color:#ff9ad0;letter-spacing:1px">${titleEmojiTag(VN,false,1)}${VN.name}</b>
         <span class="muted">· ${fmtLen(VN.inches)}, hard</span>
         <div class="muted" style="margin-top:2px;font-style:italic">${VN.line}</div>
         ${ourHouse? '<button class="btn sm" data-vtalk="1" style="margin-top:4px;border-color:#c05aa0;color:#ff9ad0">🗣 THE WHOLE STREET</button>' : ''}</div>` : ''}
     ${VF? `<div class="small" style="margin-top:4px;padding:4px 6px;border:1px solid #9a6ac0;border-radius:3px;background:#160c1e">
         🗣 <span class="muted">${w.self? 'The village calls you' : 'The village calls her'}</span>
-        <b style="color:#e0b0ff;letter-spacing:1px">${VF.name}</b>
+        <b style="color:#e0b0ff;letter-spacing:1px">${titleEmojiTag(VF,false,1)}${VF.name}</b>
         <div class="muted" style="margin-top:2px;font-style:italic">${VF.line}</div>
         ${ourHouse? '<button class="btn sm" data-vtalk="1" style="margin-top:4px;border-color:#9a6ac0;color:#e0b0ff">🗣 THE WHOLE STREET</button>' : ''}</div>` : ''}
     ${(!w.self && rkHere())? (()=>{
@@ -12019,6 +12033,7 @@ function openBodyMap(w,back){
         : 'past thirty the scores drift DOWN — upkeep '+up+'/100 '+(up>=60?'is holding most of it back'
             : up>=35? 'is slowing it' : 'is not slowing it. Bathe, build the lagoon, keep coin in the box.')}</div>`;
     })()}`;
+  titleEmojiMount($('bodymap-verdict'));
   $('bodymap-verdict').querySelectorAll('[data-vtalk]').forEach(el=>{
     el.onclick=()=>{ const bk=bodyMapBack; openVillageTalk(()=>openBodyMap(w, bk)); }; });
   // ---- WHOSE chart: yourself, or the person you married ----
@@ -13606,7 +13621,7 @@ const SETTINGS_KEY='SANDSTEEL_SETTINGS';
 /* WHICH BUILD IS THIS. Printed on the title screen, in Settings and in the
    corner of the hall — because an old link to an old build looks exactly
    like a fix that did not work. */
-const BUILD_STAMP='V43 · the names, near her';
+const BUILD_STAMP='V44 · every name, animated';
 try{ document.addEventListener('DOMContentLoaded',()=>{ const e=document.getElementById('build-stamp'); if(e) e.textContent='build '+BUILD_STAMP; });
      const e0=document.getElementById('build-stamp'); if(e0) e0.textContent='build '+BUILD_STAMP; }catch(e){}
 const SETTINGS=(function(){ const d={sound:true,shake:true,difficulty:'normal',
@@ -28194,7 +28209,7 @@ function villaRevealLine(v, fem, N){
               : v>=7 ? ['~ '+who+' and grin'+(fem? '' : 's')+' ~', null]
               : v>=4 ? ['~ '+who+' and smile'+(fem? '' : 's')+' ~', null]
               :        ['~ '+who+'. '+(fem? 'You are' : 'She is')+' very kind about it. ~', null];
-  return {lines, expr: v>=9? 'bite' : v>=7? 'pleased' : 'smug', brace: v>=10};
+  return {lines, expr: v>=9? 'bite' : v>=7? 'pleased' : 'smug', brace: v>=10, N: (v>=9 && N)? N : null};
 }
 /* HIM ON HIS OWN, standing, in profile — the same figure the pair uses,
    for scenes that need a man and not a pair. dir +1 faces right. Hands
@@ -29490,83 +29505,427 @@ function drawDomusPlayer(x,y,ph,mode,plain,dir){
    person in the house who says it to your face is the one you married —
    so it comes up NEAR HER, and goes when you walk off.
      · your name over you, and theirs over them, each with its own animated
-       pixel emoji (a length going into a booty for the Destroyer, a crowned
-       peach for the Booty Queen, a heart for the Satisfier, a boinging post,
-       a ruler, a scallop shell, a snowflake for the cold bed…);
+       pixel emoji;
      · stand right next to each other and the HOUSE's name comes up between
-       you, with its own (the house that shakes, a key in its lock);
+       you, with its own;
      · and the first time each visit, they say yours out loud.
+   "Do ALL animated": every name the village has — his, hers and the
+   house's, in Rome and on the coast, the plain ones included — has its
+   OWN moving picture, no two alike, and the pictures move wherever the
+   name is written: the hall, the village board, the street, the body map,
+   the news of a new name, and the look over her shoulder.
    ===================================================================== */
 const TITLE_EMOJI={
-  priapus:'crown', satisfier:'hearts', baths:'steam', diligent:'hearts', restless:'spring', senator:'tiny', modest:'shrug',
-  destroyer2:'destroyer', destroyer:'destroyer', post:'spring', long:'ruler', blessed:'sun', small:'tiny',
-  venus:'shell', forum:'fruit', hills:'hills', curule:'crownpeach', kept:'notes', detour:'steps', longway:'legs', patient:'snow',
-  kan:'shell', larder:'fruit', queen:'crownpeach', stores:'hills', posted:'notes', rowpast:'boat', stride:'legs', coldbed:'snow',
-  destroyed:'destroyer', beams:'shake', racks:'shake', loud:'waves', quiet:'snow', cold:'snow', fits:'key'
+  /* the men — Rome */
+  'rome:priapus':'fascinum',  'rome:satisfier':'hearts', 'rome:baths':'steam',   'rome:diligent':'tally',
+  'rome:restless':'updown',   'rome:senator':'senator',  'rome:modest':'shrug',  'rome:common':'mull',
+  /* the men — the coast */
+  'rk:destroyer2':'obliterate', 'rk:destroyer':'destroyer', 'rk:satisfier':'stamp', 'rk:post':'spring',
+  'rk:long':'ruler',            'rk:blessed':'sun',         'rk:small':'tiny',      'rk:plain':'gullpost',
+  /* the women — Rome */
+  'rome:venus':'shell',   'rome:forum':'fruit',   'rome:hills':'hills',     'rome:curule':'curule', 'rome:kept':'notes',
+  'rome:detour':'steps',  'rome:longway':'legs',  'rome:patient':'hourglass', 'rome:matron':'distaff',
+  /* the women — the coast */
+  'rk:kan':'kanheart',    'rk:larder':'larder',   'rk:queen':'crownpeach',  'rk:stores':'stores', 'rk:posted':'shout',
+  'rk:rowpast':'boat',    'rk:stride':'stride',   'rk:coldbed':'icebed',    'rk:hand':'wave',
 };
-/* the house's venus is the pair of hearts, not the shell */
-function titleEmojiKind(N, house){ if(!N) return null; if(house && N.id==='venus') return 'twohearts'; return TITLE_EMOJI[N.id]||null; }
-function drawTitleEmoji(kind, x, y, t, big){
+const TITLE_EMOJI_HOUSE={
+  'rome:beams':'shake', 'rome:venus':'twohearts', 'rome:loud':'waves', 'rome:quiet':'quiet',
+  'rk:destroyed':'destroyed', 'rk:racks':'racks', 'rk:fits':'key', 'rk:loud':'seals', 'rk:cold':'coldhouse',
+};
+/* a name's picture: by its coast first (the Satisfier is a heart in Rome and
+   a stamp on the Ten's record up north), then whichever table has the id */
+function titleEmojiKind(N, house){
+  if(!N || !N.id) return null;
+  const T=house? TITLE_EMOJI_HOUSE : TITLE_EMOJI;
+  return (N.cult && T[N.cult+':'+N.id]) || T['rome:'+N.id] || T['rk:'+N.id] || null;
+}
+/* one picture, centred on (x,y), at frame t — on the game canvas, or on any
+   2D context passed as g (the small canvases on the HTML pages). It keeps
+   whatever alpha the caller set, so a fading label fades its picture too. */
+function drawTitleEmoji(kind, x, y, t, g){
   if(!kind) return;
-  x=Math.round(x); y=Math.round(y);
-  const P=(dx,dy,w,h,col)=>px(x+dx, y+dy, w, h, col);
+  const C=(g && g.fillRect)? g : ctx;
+  x=Math.round(x); y=Math.round(y); t=t||0;
+  const A0=C.globalAlpha;
+  const al=(a)=>{ C.globalAlpha=A0*clamp(a,0,1); };
+  const P=(dx,dy,w,h,col)=>{ C.fillStyle=col; C.fillRect(Math.round(x+dx), Math.round(y+dy), Math.round(w), Math.round(h)); };
+  /* a little sprite from rows of characters ('.' is clear), a run at a time */
+  const spr=(rows,dx,dy,pal)=>{ for(let r=0;r<rows.length;r++){ const row=rows[r]; let i=0;
+      while(i<row.length){ const ch=row[i]; let j=i+1; while(j<row.length && row[j]===ch) j++;
+        const col=pal[ch]; if(col) P(dx+i, dy+r, j-i, 1, col); i=j; } } };
+  const seg=(x0,y0,x1,y1,col,th)=>{ th=th||1; const n=Math.max(Math.abs(x1-x0), Math.abs(y1-y0), 1);
+    for(let i=0;i<=n;i++) P(Math.round(x0+(x1-x0)*i/n), Math.round(y0+(y1-y0)*i/n), th, th, col); };
   const heart=(dx,dy,c1,c2)=>{ P(dx+1,dy,2,1,c1); P(dx+4,dy,2,1,c1); P(dx,dy+1,7,2,c1); P(dx+1,dy+3,5,1,c1); P(dx+2,dy+4,3,1,c1); P(dx+3,dy+5,1,1,c1); P(dx+1,dy+1,1,1,c2); };
+  const heart3=(dx,dy,c)=>{ P(dx,dy,1,1,c); P(dx+2,dy,1,1,c); P(dx,dy+1,3,1,c); P(dx+1,dy+2,1,1,c); };
   const peach=(dx,dy,wig)=>{ P(dx-1-wig,dy-4,5+wig,9,'#f4a88a'); P(dx+3,dy-4,5+wig,9,'#ee9676'); P(dx+3,dy-3,1,7,'#b8604a');
     P(dx,dy-3,2,2,'#ffdccc'); P(dx+5,dy-3,1,1,'#ffd0c0'); P(dx-wig,dy+5,3,1,'#c86c54'); P(dx+4,dy+5,3+wig,1,'#b85c44'); };
-  if(kind==='destroyer'){
-    /* the length, going in, and the booty taking it */
+  const house=(dx,dy,wall,roof)=>{ P(dx-5,dy-2,10,7,wall); P(dx-6,dy-4,12,2,roof); P(dx-4,dy-6,8,2,roof); P(dx-1,dy+1,2,4,'#3a2414'); };
+  const zed=(dx,dy,col)=>{ P(dx,dy,3,1,col); P(dx+1,dy+1,1,1,col); P(dx,dy+2,3,1,col); };
+  const bang=(dx,dy,col)=>{ P(dx,dy,1,3,col); P(dx,dy+4,1,1,col); };
+  const flake=(dx,dy,col,big)=>{ P(dx-1,dy,3,1,col); P(dx,dy-1,1,3,col);
+    if(big){ P(dx-2,dy-2,1,1,col); P(dx+2,dy-2,1,1,col); P(dx-2,dy+2,1,1,col); P(dx+2,dy+2,1,1,col); } };
+  try{ switch(kind){
+  /* ---------------- the men ---------------- */
+  case 'destroyer': {            // THE BOOTY DESTROYER — the length, going in, and the booty taking it
     const j=Math.max(0,Math.sin(t*0.22)), hit=j>0.82, tip=-1+Math.round(j*4);
-    P(tip-10,-1,10,3,'#d8966e'); P(tip-10,-1,10,1,'#f2c29a'); P(tip-10,1,10,1,'#a86a4c');      // the shaft
-    P(tip,-1,2,3,'#c2745c'); P(tip,-1,1,1,'#e89a80');                                          // the tip
-    P(tip-12,-2,3,5,'#c8866a');                                                                // and the root of it
+    P(tip-10,-1,10,3,'#d8966e'); P(tip-10,-1,10,1,'#f2c29a'); P(tip-10,1,10,1,'#a86a4c');
+    P(tip,-1,2,3,'#c2745c'); P(tip,-1,1,1,'#e89a80'); P(tip-12,-2,3,5,'#c8866a');
     peach(3,0,hit?1:0);
     if(hit){ P(9,-8,1,1,'#ffffff'); P(12,-6,1,1,'#ffd0ea'); P(2,-8,1,1,'#ffe0f0'); P(13,-2,1,1,'#ffffff'); }
-    if(big){ const a=0.5+0.5*Math.sin(t*0.3); ctx.globalAlpha=a; P(5,-11,1,3,'#ff7ae0'); P(4,-10,3,1,'#ff7ae0'); ctx.globalAlpha=1; }
-    return; }
-  if(kind==='crownpeach'){ const b=Math.round(Math.sin(t*0.18)); peach(-3,1+b,Math.abs(Math.sin(t*0.36))>0.8?1:0);
-    P(-2,-6+b,7,2,'#e8c34a'); P(-2,-8+b,1,2,'#e8c34a'); P(1,-9+b,1,3,'#e8c34a'); P(4,-8+b,1,2,'#e8c34a'); P(1,-9+b,1,1,'#ff7ae0'); return; }
-  if(kind==='hearts'){ const s=Math.sin(t*0.2)>0.3; heart(-3,-3,s? '#ff5a8a':'#e8446e','#ffc0d4');
-    const q=((t*0.8)%30)/30; ctx.globalAlpha=1-q; heart(3,-6-Math.round(q*8),'#ff9ad0','#fff'); ctx.globalAlpha=1; return; }
-  if(kind==='twohearts'){ const k=Math.round(2+2*Math.sin(t*0.12)); heart(-7+k,-3,'#ff5a8a','#ffc0d4'); heart(1-k,-3,'#ff7ab0','#ffd0e0'); return; }
-  if(kind==='steam'){ P(-6,1,13,4,'#b8c8d4'); P(-6,1,13,1,'#e8f0f4'); P(-5,5,11,1,'#7a8a98');
-    for(let i=0;i<3;i++){ const q=((t*0.5+i*10)%30)/30; ctx.globalAlpha=0.8*(1-q); P(-4+i*4+Math.round(Math.sin(t*0.1+i)), -1-Math.round(q*9), 2, 2, '#f2eee6'); } ctx.globalAlpha=1;
-    P(4,-9,5,4,'#ffffff'); P(6,-8,1,2,'#c8452a'); return; }                                     // and the "!" of the talk
-  if(kind==='spring'){ const h=Math.round(3+3*Math.abs(Math.sin(t*0.25)));
+    break; }
+  case 'obliterate': {           // …and the one the Ten measured twice: longer, harder, and the booty shaking with it
+    const j=Math.max(0,Math.sin(t*0.26)), hit=j>0.78, tip=-1+Math.round(j*5), sx=hit? (((t|0)%2)? 1 : -1) : 0;
+    P(tip-10,-2,10,4,'#d8966e'); P(tip-10,-2,10,1,'#f2c29a'); P(tip-10,1,10,1,'#a86a4c');
+    P(tip,-2,2,4,'#c2745c'); P(tip,-2,1,1,'#e89a80'); P(tip-13,-3,3,6,'#c8866a');
+    peach(4+sx,0,hit?2:0);
+    if(hit){ bang(11,-12,'#ffffff'); bang(13,-12,'#ffffff'); P(2,-9,1,1,'#ffe0f0'); P(13,-4,1,1,'#ffffff'); P(12,6,1,1,'#ffd0ea'); }
+    P(-13,8,24,1,'#e8d8a8'); for(let i=0;i<24;i+=3) P(-13+i,7,1,1,'#6a5a3a');          // the tape that ran out of marks
+    break; }
+  case 'fascinum': {             // PRIAPUS WALKING — the garden god's charm on a farmer's gate, and not the god's face on it
+    const sw=Math.sin(t*0.09)*0.4, flap=Math.sin(t*0.45)>0, cx=Math.round(Math.sin(sw)*6), cy=-3;
+    P(-12,-12,2,20,'#6a4a2a'); P(10,-12,2,20,'#6a4a2a'); P(-10,5,20,1,'#8a6a44'); P(-10,-12,20,1,'#6a4a2a'); P(0,-13,1,1,'#9a9a9a');
+    for(let i=0;i<8;i++) P(Math.round(Math.sin(sw)*i), -11+i, 1, 1, '#a89878');           // the cord
+    P(cx-4,cy,9,3,'#c8933a'); P(cx-4,cy,9,1,'#f0d484'); P(cx-4,cy+2,9,1,'#8a5c22');        // the charm, in bronze: the length —
+    P(cx+5,cy,3,3,'#d8a84a'); P(cx+5,cy,2,1,'#fff0b0'); P(cx+7,cy+1,1,1,'#8a5c22');       // its tip —
+    P(cx-7,cy+1,3,3,'#b07a2a'); P(cx-7,cy+1,3,1,'#d8a84a'); P(cx-5,cy+3,1,1,'#8a5c22');  // what hangs behind it —
+    if(flap){ P(cx-4,cy-3,1,3,'#fff0b0'); P(cx-3,cy-4,1,4,'#f0d484'); P(cx-2,cy-3,1,3,'#e8c34a'); P(cx-1,cy-2,1,2,'#e8c34a'); }   // and its little wings
+    else    { P(cx-5,cy-1,5,1,'#f0d484'); P(cx-6,cy,1,1,'#e8c34a'); }
+    if(Math.sin(t*0.3)>0.75){ P(cx+1,cy+1,1,1,'#ffffff'); P(cx+8,cy-3,1,1,'#fff0b0'); }
+    break; }
+  case 'hearts': {               // THE WIFE SATISFIER (Rome) — a heart that beats, and one that floats off it
+    const b=Math.sin(t*0.2)>0.3; heart(-3,-3,b? '#ff5a8a':'#e8446e','#ffc0d4');
+    const q=((t*0.8)%30)/30; al(1-q); heart(3,-6-Math.round(q*8),'#ff9ad0','#fff'); al(1);
+    break; }
+  case 'steam': {                // THE TALK OF THE BATHS — the tub, the steam, and the "!" of what the attendants know
+    P(-6,1,13,4,'#b8c8d4'); P(-6,1,13,1,'#e8f0f4'); P(-5,5,11,1,'#7a8a98');
+    for(let i=0;i<3;i++){ const q=((t*0.5+i*10)%30)/30; al(0.8*(1-q)); P(-4+i*4+Math.round(Math.sin(t*0.1+i)), -1-Math.round(q*9), 2, 2, '#f2eee6'); } al(1);
+    P(4,-9,5,4,'#ffffff'); P(6,-8,1,2,'#c8452a');
+    break; }
+  case 'tally': {                // THE WIFE SATISFIER, by diligence — the ledger's count, and the house louder than the ledger
+    const cyc=Math.floor(t*0.07)%9, n=Math.min(cyc,5);
+    P(-10,-6,18,13,'#8a6a44'); P(-9,-5,16,11,'#3a2a1a'); P(-9,-5,16,1,'#4a3a2a');
+    for(let i=0;i<Math.min(n,4);i++) P(-7+i*3,-3,1,7,'#e8d8a8');
+    if(n>=5) seg(-8,3,3,-3,'#f0e0b0');
+    P(8,-10+(cyc%2),1,6,'#c8a878'); P(8,-4+(cyc%2),1,1,'#6a5a3a');
+    if(cyc>=6){ const q=(cyc-6)/3; al(1-q*0.5); heart(3,-12-Math.round(q*2),'#ff5a8a','#ffc0d4'); al(1); bang(12,-12,'#ffd0ea'); }
+    break; }
+  case 'updown': {               // THE RESTLESS ONE — up and down more often than a Senate vote
+    const ph=t*0.16, up=0.5+0.5*Math.sin(ph), a=-Math.PI/2+(1-up)*Math.PI*0.6;
+    P(-4,5,9,2,'#6a4a2a'); P(-4,5,9,1,'#8a6a44');
+    const ex=Math.round(Math.cos(a)*9), ey=4+Math.round(Math.sin(a)*9);
+    seg(0,4,ex,ey,'#d8966e',2); P(ex-1,ey-1,3,3,'#c2745c'); P(ex-1,ey-1,1,1,'#e89a80');
+    const rising=Math.cos(ph)>0, col=rising? '#9ad4ff' : '#ffb07a';
+    if(rising){ P(-10,-9,1,1,col); P(-11,-8,3,1,col); P(-12,-7,5,1,col); P(-10,-6,1,4,col); }
+    else      { P(9,-9,1,4,col); P(7,-5,5,1,col); P(8,-4,3,1,col); P(9,-3,1,1,col); }
+    const k=Math.floor(ph/Math.PI)%6; for(let i=0;i<k;i++) P(-12+i*2,8,1,2,'#e8d8a8');   // the votes it beat
+    break; }
+  case 'senator': {              // THE LITTLE SENATOR — the honourable member, on his plinth, in his laurels; said kindly
+    const bow=Math.sin(t*0.1)>0.55? 1 : 0;
+    P(-5,5,11,2,'#e8e0c8'); P(-5,5,11,1,'#fffaf0'); P(-4,7,9,1,'#c8b890');
+    P(-1+bow,0+bow,3,5-bow,'#d8966e'); P(-1+bow,0+bow,3,1,'#f2c29a'); P(1+bow,1+bow,1,3,'#a86a4c');
+    P(-1+bow,3,3,1,'#8a3aa8');
+    P(-3+bow,-1+bow,2,1,'#5aa04a'); P(2+bow,-1+bow,2,1,'#5aa04a'); P(-3+bow,-2+bow,1,1,'#6ab85a'); P(3+bow,-2+bow,1,1,'#6ab85a');
+    const q=((t*0.5)%40)/40; al(1-q); heart3(5,-4-Math.round(q*7),'#ff9ad0'); al(1);
+    if(bow){ P(-7,-6,1,1,'#fff0b0'); P(7,1,1,1,'#fff0b0'); }
+    break; }
+  case 'shrug': {                // THE MODEST HUSBAND — the village, being polite about it
+    const u=Math.sin(t*0.14)>0? 1 : 0;
+    P(-3,-3,6,6,'#e0b888'); P(-2,-1,1,1,'#2a1a10'); P(1,-1,1,1,'#2a1a10'); P(-1,1,2,1,'#8a4a3a'); P(-3,0,1,1,'#f0a0a0'); P(2,0,1,1,'#f0a0a0');
+    P(-8,-2-u,3,1,'#e0b888'); P(5,-2-u,3,1,'#e0b888'); P(-9,-3-u,1,1,'#e0b888'); P(8,-3-u,1,1,'#e0b888');
+    break; }
+  case 'mull': {                 // A MAN OF THE COMMON RUN — the village, still thinking of a name for him
+    const k=Math.floor(t*0.06)%5, bob=Math.round(Math.sin(t*0.08));
+    P(-8,-8+bob,16,10,'#f2eee6'); P(-9,-7+bob,1,8,'#f2eee6'); P(8,-7+bob,1,8,'#f2eee6');
+    P(-5,2+bob,3,2,'#f2eee6'); P(-6,4+bob,2,1,'#f2eee6');
+    if(k<4){ for(let i=0;i<Math.min(k,3);i++) P(-5+i*4,-4+bob,2,2,'#5a4a3a'); }
+    else { P(-1,-7+bob,3,1,'#c8452a'); P(2,-6+bob,1,2,'#c8452a'); P(0,-4+bob,2,1,'#c8452a'); P(0,-3+bob,1,1,'#c8452a'); P(0,-1+bob,1,1,'#c8452a'); }
+    P(4,3,3,3,'#e0b888'); P(3,6,5,4,'#9a8a74'); P(5,4,1,1,'#2a1a10');                      // and him, under it
+    break; }
+  case 'stamp': {                // THE WIFE SATISFIER (the coast) — Kan's word for it, and the Ten wrote it down
+    const c=(t%90)/90, yo=c<0.35? -5+Math.round(c/0.35*5) : c<0.47? 0 : c<0.62? -Math.round((c-0.47)/0.15*5) : -5;
+    P(-11,1,22,8,'#e0c89a'); P(-11,1,22,1,'#f4e2b8'); P(-11,8,22,1,'#a88a5a');
+    P(4,3,6,1,'#8a6a44'); P(4,5,5,1,'#8a6a44');
+    if(c>=0.45){ al(c>0.9? (1-c)/0.1 : 1); heart(-6,2,'#e8446e','#ff9ad0'); al(1); }
+    P(-7,-3+yo,8,4,'#8a5a3a'); P(-7,-3+yo,8,1,'#a87a4a'); P(-4,-7+yo,2,4,'#6a4a2a'); P(-5,-8+yo,4,1,'#6a4a2a');
+    if(c>=0.35 && c<0.47){ P(-9,0,1,1,'#ffffff'); P(2,0,1,1,'#ffffff'); }
+    break; }
+  case 'spring': {               // THE STANDING POST — up again, on a spring
+    const h=Math.round(3+3*Math.abs(Math.sin(t*0.25)));
     P(-1,4-h-6,3,6,'#c8906a'); P(-1,4-h-6,3,1,'#f0c098'); P(-1,4-h-7,3,1,'#b87a5c');
-    for(let i=0;i<h;i+=2) P(-2,3-i,5,1,'#b8c0c8'); P(-4,4,9,2,'#6a4a2a'); return; }
-  if(kind==='tiny'){ const w=Math.round(Math.sin(t*0.3)); P(-6,3,13,2,'#e8d8a8'); for(let i=0;i<13;i+=3) P(-6+i,2,1,1,'#6a5a3a');
-    P(-1+w,-1,2,3,'#c8906a'); P(-1+w,-1,2,1,'#f0c098'); P(4,-6,4,4,'#9ad4ff'); P(5,-5,2,2,'#e8f8ff'); P(7,-2,2,1,'#6a4a2a'); return; }
-  if(kind==='ruler'){ const L=Math.round(8+5*(0.5+0.5*Math.sin(t*0.12)));
-    P(-8,0,L+2,3,'#e8d8a8'); P(-8,0,L+2,1,'#fff4d0'); for(let i=0;i<L;i+=2) P(-7+i,1,1,(i%4?1:2),'#6a5a3a'); P(-8+L,0,3,3,'#c8a24a'); return; }
-  if(kind==='sun'){ const a=t*0.05; for(let i=0;i<8;i++){ const th=a+i*Math.PI/4; P(Math.round(Math.cos(th)*6)-1, Math.round(Math.sin(th)*6)-1, 2, 2, '#ffd86a'); }
-    P(-3,-3,6,6,'#ffc83a'); P(-2,-2,2,2,'#fff4c0'); return; }
-  if(kind==='shrug'){ const u=Math.sin(t*0.14)>0? 1 : 0; P(-3,-3,6,6,'#e0b888'); P(-2,-1,1,1,'#2a1a10'); P(1,-1,1,1,'#2a1a10'); P(-1,1,2,1,'#8a4a3a');
-    P(-8,-2-u,3,1,'#e0b888'); P(5,-2-u,3,1,'#e0b888'); P(-9,-3-u,1,1,'#e0b888'); P(8,-3-u,1,1,'#e0b888'); return; }
-  if(kind==='shell'){ const sp=Math.sin(t*0.2)>0.6; for(let i=0;i<5;i++){ P(-5+i*2,-3+Math.abs(2-i),2,7-Math.abs(2-i),i%2? '#ffd0e0':'#f4b0c8'); }
-    P(-2,4,5,2,'#e890b0'); if(sp){ P(6,-6,1,3,'#ffffff'); P(5,-5,3,1,'#ffffff'); } return; }
-  if(kind==='fruit'){ const b=Math.round(Math.sin(t*0.22)*1.2), b2=Math.round(Math.sin(t*0.22+0.9)*1.2);
+    for(let i=0;i<h;i+=2) P(-2,3-i,5,1,'#b8c0c8'); P(-4,4,9,2,'#6a4a2a');
+    break; }
+  case 'ruler': {                // THE LONG POST — a plain measurement, still going
+    const L=Math.round(8+5*(0.5+0.5*Math.sin(t*0.12)));
+    P(-8,0,L+2,3,'#e8d8a8'); P(-8,0,L+2,1,'#fff4d0'); for(let i=0;i<L;i+=2) P(-7+i,1,1,(i%4?1:2),'#6a5a3a'); P(-8+L,0,3,3,'#c8a24a');
+    break; }
+  case 'sun': {                  // KAN-BLESSED — her sun, going round
+    const a=t*0.05; for(let i=0;i<8;i++){ const th=a+i*Math.PI/4; P(Math.round(Math.cos(th)*6)-1, Math.round(Math.sin(th)*6)-1, 2, 2, '#ffd86a'); }
+    P(-3,-3,6,6,'#ffc83a'); P(-2,-2,2,2,'#fff4c0');
+    break; }
+  case 'tiny': {                 // THE SMALL MEASURE — the rule, the lens, and a very little wobble
+    const w=Math.round(Math.sin(t*0.3)); P(-6,3,13,2,'#e8d8a8'); for(let i=0;i<13;i+=3) P(-6+i,2,1,1,'#6a5a3a');
+    P(-1+w,-1,2,3,'#c8906a'); P(-1+w,-1,2,1,'#f0c098'); P(4,-6,4,4,'#9ad4ff'); P(5,-5,2,2,'#e8f8ff'); P(7,-2,2,1,'#6a4a2a');
+    break; }
+  case 'gullpost': {             // A PLAIN POST — nothing written by his name yet; a gull comes and sits on it
+    const cy=t%200; let gx=0, gy=-3, fly=false, sd=-1, a=1;
+    if(cy<45){ const q=cy/45; gx=Math.round(10-10*q); gy=Math.round(-7+4*q); fly=true; a=clamp(q/0.25,0,1); }
+    else if(cy<160){ sd=(((cy/40)|0)%2)? 1 : -1; gy=-3-(((cy%40)>34)? 1 : 0); }
+    else { const q=(cy-160)/40; gx=Math.round(-q*10); gy=Math.round(-3-q*4); fly=true; a=clamp((1-q)/0.25,0,1); }
+    P(-10,8,20,1,'#5a9ec4'); P(-8,9,6,1,'#3a7ea4'); P(3,9,5,1,'#3a7ea4');
+    P(-2,-2,4,10,'#8a6a44'); P(-2,-2,4,1,'#a8885a'); P(-1,0,1,8,'#6a4a2a');
+    al(a);
+    const Q=(dx,dy,w,h,c)=> sd>0? P(gx+dx,gy+dy,w,h,c) : P(gx-dx-w+1,gy+dy,w,h,c);
+    Q(-2,-3,5,3,'#f4f4f0'); Q(2,-5,3,3,'#f4f4f0'); Q(3,-4,1,1,'#2a1a10'); Q(5,-4,2,1,'#e8a040'); Q(-4,-3,2,2,'#c8ccd0');
+    if(fly){ if(Math.sin(t*0.5)>0){ Q(-3,-7,4,1,'#9aa4ac'); Q(-1,-6,2,3,'#9aa4ac'); } else { Q(-3,-1,4,1,'#9aa4ac'); Q(-1,-2,2,2,'#9aa4ac'); } }
+    else { Q(-2,-3,4,1,'#9aa4ac'); Q(0,0,1,1,'#e8a040'); Q(2,0,1,1,'#e8a040'); }
+    al(1);
+    break; }
+  /* ---------------- the women ---------------- */
+  case 'shell': {                // VENUS COME DOWN — the scallop she came in on, and the light coming down on it
+    for(let i=0;i<3;i++){ const q=((t*0.3+i*9)%27)/27; al(1-q); P(-4+i*4, -13+Math.round(q*9), 1, 1, i===1? '#ffffff' : '#fff0b0'); } al(1);   // and the light, coming down
+    const sp=Math.sin(t*0.2)>0.6; for(let i=0;i<5;i++){ P(-5+i*2,-3+Math.abs(2-i),2,7-Math.abs(2-i),i%2? '#ffd0e0':'#f4b0c8'); }
+    P(-2,4,5,2,'#e890b0'); if(sp){ P(6,-6,1,3,'#ffffff'); P(5,-5,3,1,'#ffffff'); }
+    break; }
+  case 'fruit': {                // THE WHOLE FORUM — everything a man walks into the city to look at
+    const b=Math.round(Math.sin(t*0.22)*1.2), b2=Math.round(Math.sin(t*0.22+0.9)*1.2);
     P(-7,-4+b,4,4,'#f0b0a0'); P(-3,-4+b,4,4,'#e8a090'); P(-6,-3+b,1,1,'#fff0e8'); P(-2,-3+b,1,1,'#fff0e8');
-    peach(3,1+b2,0); return; }
-  if(kind==='hills'){ const b=Math.round(Math.sin(t*0.2)*1.3), b2=Math.round(Math.sin(t*0.2+0.6)*1.3);
+    peach(3,1+b2,0);
+    break; }
+  case 'hills': {                // THE EIGHTH AND NINTH HILLS — Rome was built on seven
+    const b=Math.round(Math.sin(t*0.2)*1.3), b2=Math.round(Math.sin(t*0.2+0.6)*1.3);
     P(-7,-2+b,6,5,'#f0b89a'); P(-6,-3+b,4,1,'#f0b89a'); P(0,-2+b2,6,5,'#e8a88a'); P(1,-3+b2,4,1,'#e8a88a');
-    P(-5,-2+b,1,1,'#fff0e8'); P(2,-2+b2,1,1,'#fff0e8'); P(-8,3,15,1,'#8a6a44'); return; }
-  if(kind==='notes'){ P(-4,-2,6,6,'#e6bd94'); P(-3,0,1,1,'#2a1a10'); P(0,0,1,1,'#2a1a10'); P(-2,2,3,1,'#c8506a'); P(-4,1,1,1,'#f07a9a'); P(1,1,1,1,'#f07a9a');
-    for(let i=0;i<2;i++){ const q=((t*0.6+i*15)%30)/30; ctx.globalAlpha=1-q; const nx=4+Math.round(q*6), ny=-3-Math.round(q*7);
-      P(nx,ny,1,4,'#e8e0ff'); P(nx-1,ny+3,2,2,'#e8e0ff'); P(nx+1,ny,2,1,'#e8e0ff'); } ctx.globalAlpha=1; return; }
-  if(kind==='steps'){ const n=Math.floor(t*0.08)%5; for(let i=0;i<=n;i++){ P(-8+i*4, (i%2? 1 : -2), 2, 3, '#c8a878'); P(-8+i*4, (i%2? 0 : -3), 2, 1, '#e8c898'); } return; }
-  if(kind==='legs'){ const s=Math.round(Math.sin(t*0.2)*3); P(-1,-6,3,3,'#e0b888'); P(-1-s,-3,2,9,'#e0b888'); P(1+s,-3,2,9,'#d0a878'); P(-2-s,6,3,1,'#6a4a2a'); P(1+s,6,3,1,'#6a4a2a'); return; }
-  if(kind==='snow'){ const a=t*0.04; for(let i=0;i<6;i++){ const th=a+i*Math.PI/3; for(let r=1;r<6;r++) P(Math.round(Math.cos(th)*r), Math.round(Math.sin(th)*r), 1, 1, r===5? '#ffffff':'#bfe6f6'); }
-    P(0,0,1,1,'#ffffff'); return; }
-  if(kind==='boat'){ const r=Math.sin(t*0.12); P(-8,0+Math.round(r),16,2,'#8a6a44'); P(-9,-1+Math.round(r*1.5),2,2,'#8a6a44'); P(7,-1-Math.round(r*1.5),2,2,'#8a6a44');
-    P(-1,-4,2,4,'#e0b888'); P(-6+Math.round(Math.sin(t*0.2)*2),-3,12,1,'#c8a878'); P(-9,3,18,1,'#5a9ec4'); return; }
-  if(kind==='shake'){ const j=Math.round(Math.sin(t*0.7)); P(-5+j,-2,10,7,'#a87a4a'); P(-6+j,-4,12,2,'#7a2f22'); P(-4+j,-6,8,2,'#7a2f22'); P(-1+j,1,2,4,'#3a2414');
-    ctx.globalAlpha=0.7; P(-9,-3,1,4,'#fff0dc'); P(8,-3,1,4,'#fff0dc'); P(-10,1,1,3,'#fff0dc'); P(9,1,1,3,'#fff0dc'); ctx.globalAlpha=1; return; }
-  if(kind==='waves'){ P(-3,-2,6,6,'#a87a4a'); P(-4,-4,8,2,'#7a2f22'); for(let i=0;i<3;i++){ const q=((t*0.3+i*10)%30)/30; ctx.globalAlpha=1-q; const r=4+Math.round(q*6);
-      P(r,-2,1,4,'#ffd0a0'); P(-r-1,-2,1,4,'#ffd0a0'); } ctx.globalAlpha=1; return; }
-  if(kind==='key'){ const k=Math.round(2*Math.max(0,Math.sin(t*0.15))); P(1,-4,6,8,'#c8a24a'); P(3,-1,2,3,'#3a2414');
-    P(-8+k,-1,9,2,'#e8c34a'); P(-9+k,-3,3,6,'#e8c34a'); P(-8+k,-2,1,4,'#8a6a2a'); return; }
-  if(kind==='crown'){ const b=Math.round(Math.sin(t*0.15)); P(-5,-1+b,11,2,'#e8c34a'); P(-5,-4+b,2,3,'#e8c34a'); P(-1,-5+b,2,4,'#e8c34a'); P(4,-4+b,2,3,'#e8c34a');
-    P(-1,-6+b,2,1,'#fff0b0'); if(Math.sin(t*0.3)>0.5){ P(7,-7,1,1,'#ffffff'); P(-7,-6,1,1,'#ffffff'); } return; }
+    P(-5,-2+b,1,1,'#fff0e8'); P(2,-2+b2,1,1,'#fff0e8'); P(-8,3,15,1,'#8a6a44');
+    break; }
+  case 'curule': {               // THE CURULE SEAT — the magistrate's chair, and what the street thinks should sit in it
+    const bq=Math.abs(Math.sin(t*0.13)), h=Math.round(bq*4), sq=h===0;
+    seg(-6,3,5,8,'#c8b890'); seg(5,3,-6,8,'#c8b890'); P(-7,8,3,1,'#a89870'); P(4,8,3,1,'#a89870');
+    P(-8,1,16,2,'#e8e0c8'); P(-8,1,16,1,'#fffaf0'); P(-8,3,16,1,'#8a3aa8');
+    peach(-4,-5-h+(sq?1:0),sq?1:0);
+    if(sq){ P(-9,-1,1,1,'#ffffff'); P(8,-1,1,1,'#ffffff'); }
+    break; }
+  case 'notes': {                // THE WELL-KEPT WIFE — she hums at the fountain
+    P(-4,-2,6,6,'#e6bd94'); P(-3,0,1,1,'#2a1a10'); P(0,0,1,1,'#2a1a10'); P(-2,2,3,1,'#c8506a'); P(-4,1,1,1,'#f07a9a'); P(1,1,1,1,'#f07a9a');
+    for(let i=0;i<2;i++){ const q=((t*0.6+i*15)%30)/30; al(1-q); const nx=4+Math.round(q*6), ny=-3-Math.round(q*7);
+      P(nx,ny,1,4,'#e8e0ff'); P(nx-1,ny+3,2,2,'#e8e0ff'); P(nx+1,ny,2,1,'#e8e0ff'); } al(1);
+    break; }
+  case 'steps': {                // THE REASON FOR THE DETOUR — the long way round, to go past her door
+    const n=Math.floor(t*0.08)%7;
+    P(-1,1,3,5,'#7a2f22'); P(-2,0,5,1,'#a8885a'); P(1,3,1,1,'#e8c34a');
+    for(let i=0;i<=Math.min(n,5);i++){ const a=Math.PI*(1-i/5), fx=Math.round(Math.cos(a)*9), fy=Math.round(-Math.sin(a)*6)+3;
+      P(fx-1+(i%2),fy,2,2,'#c8a878'); P(fx-1+(i%2),fy,2,1,'#e8c898'); }
+    if(n>=5) heart3(-1,-8,'#ff7ab0');
+    break; }
+  case 'legs': {                 // THE LONG WAY HOME — her legs, watched all the way to the end of the street
+    const ph=t*0.14, sp=Math.sin(ph), f1=Math.round(sp*4), f2=-f1;
+    P(1,-12,9,4,'#8a3aa8'); P(1,-9,9,1,'#f2eee6');                                          // the hem of her stola
+    seg(4,-8,4+f2,6,'#d8a878',2); seg(7,-8,7+f1,6,'#e8bc8c',2);                             // and the legs under it, all of them
+    P(3+f2,7,4,1,'#6a4a2a'); P(6+f1,7,4,1,'#7a5a3a');                                       // sandals
+    P(-13,8,26,1,'#8a7a64');
+    const look=Math.round(sp*1);                                                            // 👀 — and the man by the wall, watching
+    P(-12,-4,4,3,'#ffffff'); P(-7,-4,4,3,'#ffffff'); P(-11+look+1,-3,2,2,'#2a1a10'); P(-6+look+1,-3,2,2,'#2a1a10');
+    if(Math.sin(t*0.05)>0.85){ P(-12,-4,4,1,'#e0b888'); P(-7,-4,4,1,'#e0b888'); }           // (he blinks, once, and is sorry he did)
+    break; }
+  case 'hourglass': {            // THE PATIENT WIFE — the sand running, and turned over, and running again
+    const cyc=t%170;
+    if(cyc<150){ const q=cyc/150;
+      P(-6,-9,13,2,'#8a6a44'); P(-6,7,13,2,'#8a6a44'); P(-6,-9,13,1,'#a8885a'); P(-5,-7,1,14,'#6a4a2a'); P(5,-7,1,14,'#6a4a2a');
+      const TOP=[[-7,4],[-6,3],[-5,3],[-4,2],[-3,1],[-2,0]], BOT=[[0,0],[1,1],[2,2],[3,3],[4,3],[5,4]];
+      al(0.4); for(const [yy,hw] of TOP) P(-hw,yy,hw*2+1,1,'#d8eef8'); for(const [yy,hw] of BOT) P(-hw,yy,hw*2+1,1,'#d8eef8'); P(0,-1,1,1,'#d8eef8'); al(1);
+      const topN=Math.round((1-q)*5), botN=Math.round(q*5);
+      for(let i=0;i<topN;i++){ const [yy,hw]=TOP[5-i]; P(-hw,yy,hw*2+1,1,'#e8c890'); }
+      for(let i=0;i<botN;i++){ const [yy,hw]=BOT[5-i]; P(-hw,yy,hw*2+1,1,'#d8b070'); }
+      if(q<0.98 && ((t|0)%4)<3) P(0,-1,1,6-botN,'#e8c890');
+    } else { const k=(cyc-150)/20, w=Math.max(1,Math.round(Math.abs(Math.cos(k*Math.PI))*6));
+      P(-w,-9,w*2+1,2,'#8a6a44'); P(-w,7,w*2+1,2,'#8a6a44'); P(-w,-7,1,14,'#6a4a2a'); P(w,-7,1,14,'#6a4a2a'); }
+    break; }
+  case 'distaff': {              // A MATRON OF GOOD REPUTE — she kept the house, she worked the wool
+    const ph=Math.floor(t*0.35)%4, ww=[7,5,3,5][ph], dip=Math.round(Math.sin(t*0.05));
+    P(-7,-8,2,17,'#8a6a44');
+    P(-10,-12,8,5,'#f2eee6'); P(-9,-13,6,1,'#f2eee6'); P(-11,-11,1,3,'#f2eee6'); P(-2,-11,1,3,'#f2eee6'); P(-9,-11,2,1,'#ffffff');
+    seg(-3,-9,3,-2+dip,'#e8e0d0');
+    P(3,-2+dip,1,11,'#a87a4a'); P(2,0+dip,3,3,'#f2eee6');
+    P(3-(ww>>1),5+dip,ww,2,'#c8933a'); P(3-(ww>>1),5+dip,ww,1,'#f0d484');
+    if(ph===0) P(8,2+dip,1,1,'#fff0b0');
+    break; }
+  case 'kanheart': {             // KAN WALKING — the love-office's own goddess, on two legs
+    const sw=Math.sin(t*0.25), bob=Math.abs(sw)>0.5? 1 : 0;
+    const a0=t*0.04; for(let i=0;i<5;i++){ const th=a0+i*Math.PI*2/5; al(0.5+0.5*Math.sin(t*0.2+i)); P(Math.round(Math.cos(th)*10), -4+Math.round(Math.sin(th)*6), 1,1,'#ffd0f0'); } al(1);
+    spr(['.XXX.XXX.','XXoXXXXXX','XoXXXXXXX','XXXXXXXXX','.XXXXXXX.','..XXXXX..','...XXX...','....X....'], -4, -10-bob, {X:'#ff5aa0', o:'#ffd0e0'});
+    const L=sw>0? 2 : 0, R=sw>0? 0 : 2;
+    P(-2,-2-bob,1,5-L,'#f0c8a0'); P(2,-2-bob,1,5-R,'#f0c8a0'); P(-3,3-bob-L,2,1,'#c85a8a'); P(2,3-bob-R,2,1,'#c85a8a');
+    break; }
+  case 'larder': {               // THE WHOLE LARDER — two stores in front and a seat behind
+    const b1=Math.round(Math.abs(Math.sin(t*0.18))*2), b2=Math.round(Math.abs(Math.sin(t*0.18+1.1))*2), b3=Math.round(Math.abs(Math.sin(t*0.18+2.2))*1.5);
+    P(-12,4,24,2,'#8a6a44'); P(-12,4,24,1,'#a8885a'); P(-11,6,1,4,'#6a4a2a'); P(10,6,1,4,'#6a4a2a');
+    const POT=['.rrr.','XXXXX','XoXXX','XXXXX','.XXX.'], pal={X:'#c87a4a', o:'#f0b080', r:'#8a4a2a'};
+    spr(POT,-11,-1-b1,pal); spr(POT,-5,-1-b2,pal);
+    peach(3,-2-b3,0);
+    P(-8,-12,1,4,'#c8b890'); P(-9,-8,3,4,'#9ab0bc'); P(-9,-8,3,1,'#c8d8e0'); P(-10,-4,5,1,'#8898a4');   // a fish for the winter
+    break; }
+  case 'crownpeach': {           // THE BOOTY QUEEN — Rhauna's own, with her crown on
+    const b=Math.round(Math.sin(t*0.18)); peach(-3,1+b,Math.abs(Math.sin(t*0.36))>0.8?1:0);
+    P(-2,-6+b,7,2,'#e8c34a'); P(-2,-8+b,1,2,'#e8c34a'); P(1,-9+b,1,3,'#e8c34a'); P(4,-8+b,1,2,'#e8c34a'); P(1,-9+b,1,1,'#ff7ae0');
+    break; }
+  case 'stores': {               // TWO WINTERS' STORE — two full stores, carried in front, and the snow they would see off
+    const b1=Math.round(Math.sin(t*0.2)*1.4), b2=Math.round(Math.sin(t*0.2+0.8)*1.4);
+    const SACK=['...r...','..XXX..','.XXXXX.','XXoXXXX','XXXXXXX','XXXXXXX','.XXXXX.'], pal={X:'#b89a74', o:'#ecd8b4', r:'#5a3a1a'};
+    spr(SACK,-10,-2+b1,pal); spr(SACK,2,-2+b2,pal); P(-12,6,24,1,'#8a7a64');
+    for(let i=0;i<2;i++){ const q=((t*0.35+i*9)%18)/18; al(1-q); flake(-1+i*2, -12+Math.round(q*14), '#e8f8ff', false); } al(1);
+    const tw=Math.sin(t*0.12); if(tw>0.6) flake(-7,-7,'#ffffff',true); else if(tw<-0.6) flake(5,-7,'#ffffff',true);
+    break; }
+  case 'shout': {                // THE WELL-POSTED WIFE — she answered, loudly, at the racks
+    const pu=Math.sin(t*0.22)>0, b=pu? -1 : 0;
+    spr(['..XXXXX..','.XXXXXXX.','XXeXXXeXX','XeXeXeXeX','XcXXXXXcX','XXmmmmmXX','XXmtttmXX','.XXmmmXX.','..XXXXX..'], -4, -6+b,
+        {X:'#e6bd94', e:'#2a1a10', c:'#f07a9a', m:'#6a1a1a', t:'#e87a8a'});
+    if(pu){ P(-8,-8,1,1,'#ffffff'); P(-9,-9,1,1,'#ffffff'); P(8,-8,1,1,'#ffffff'); P(9,-9,1,1,'#ffffff'); P(-10,0,2,1,'#ffffff'); P(8,0,2,1,'#ffffff');
+      bang(10,-12,'#ffd0ea'); bang(12,-12,'#ffd0ea'); }
+    break; }
+  case 'boat': {                 // THE ONE THEY ROW PAST — the kayak, come the long way round the point
+    const r=Math.sin(t*0.12); P(-8,0+Math.round(r),16,2,'#8a6a44'); P(-9,-1+Math.round(r*1.5),2,2,'#8a6a44'); P(7,-1-Math.round(r*1.5),2,2,'#8a6a44');
+    P(-1,-4,2,4,'#e0b888'); P(-6+Math.round(Math.sin(t*0.2)*2),-3,12,1,'#c8a878'); P(-9,3,18,1,'#5a9ec4');
+    if(Math.sin(t*0.1)>0.7) heart3(3,-9,'#ff7ab0');
+    break; }
+  case 'stride': {               // THE LONG STRIDE — half the coast would follow her there on foot
+    const ph=t*0.15, sp=Math.sin(ph);
+    const fx1=Math.round(sp*9), fx2=-fx1, fy1=6-Math.round(Math.max(0,Math.cos(ph))*2), fy2=6-Math.round(Math.max(0,-Math.cos(ph))*2);
+    P(-3,-11,7,4,'#6a5a4a'); P(-3,-11,7,1,'#8a7a6a'); P(-3,-8,7,1,'#e8e0d0');
+    seg(-1,-7,fx2,fy2-2,'#e0b888',2); seg(1,-7,fx1,fy1-2,'#e8c498',2);
+    P(fx2-1,fy2-1,4,2,'#6a4a2a'); P(fx2-1,fy2-2,4,1,'#e8e0d0'); P(fx1-1,fy1-1,4,2,'#7a5a3a'); P(fx1-1,fy1-2,4,1,'#f0e8d8');
+    if(Math.abs(sp)>0.93){ al(0.8); P(fx1+3,7,2,1,'#ffffff'); P(fx1-3,7,2,1,'#ffffff'); al(1); }
+    P(-13,8,26,1,'#d8e8f0');
+    break; }
+  case 'icebed': {               // THE COLD BED — frost on the furs, and her shivering under them
+    const sh=((t|0)%8)<4? 1 : 0;
+    P(-12,2,24,3,'#6a4a2a'); P(-12,2,24,1,'#8a6a44'); P(-11,5,1,3,'#4a3420'); P(10,5,1,3,'#4a3420');
+    P(-10+sh,-2,19,4,'#bfe6f6'); P(-10+sh,-2,19,1,'#e8f8ff'); P(-9+sh,-4,6,2,'#bfe6f6'); P(-8+sh,-4,4,1,'#e8f8ff');
+    P(-8,5,1,2,'#e8f8ff'); P(-4,5,1,3,'#e8f8ff'); P(1,5,1,2,'#e8f8ff'); P(5,5,1,3,'#e8f8ff');
+    const d=(t*0.25)%10; al(1-d/10); P(-4,8+Math.round(d*0.25),1,1,'#bfe6f6'); al(1);
+    if(sh){ P(-12,-5,1,2,'#e8f8ff'); P(-13,-3,1,1,'#e8f8ff'); }
+    if(Math.floor(t*0.06)%2) flake(6,-8,'#ffffff',true); else { P(4,-8,5,1,'#ffffff'); P(6,-10,1,5,'#ffffff'); }
+    break; }
+  case 'wave': {                 // A GOOD HAND ON THE SHORE — a hand, waving from the shingle
+    const w=Math.sin(t*0.2), off=Math.round(w*2);
+    spr(['.X.X.X.X.','.X.X.X.X.','.XXXXXXX.','.XXXXXXXX','.XXXXXXXX','.XXXXXXX.','..XXXXX..','..XXXXX..','..ooooo..'], -4+off, -8, {X:'#e0b888', o:'#5a86b0'});
+    al(0.7); if(w>0.4){ P(-8,-7,1,3,'#ffffff'); P(-9,-5,1,2,'#ffffff'); } else if(w<-0.4){ P(8,-7,1,3,'#ffffff'); P(9,-5,1,2,'#ffffff'); } al(1);
+    P(-12,4,24,1,'#5a9ec4'); P(-12,5,24,2,'#c8b898'); P(-9,5,3,1,'#e8d8b8'); P(4,6,2,1,'#e8d8b8');
+    break; }
+  /* ---------------- the houses ---------------- */
+  case 'shake': {                // THE HOUSE THAT SHAKES THE BEAMS
+    const j=Math.round(Math.sin(t*0.7)); P(-5+j,-2,10,7,'#a87a4a'); P(-6+j,-4,12,2,'#7a2f22'); P(-4+j,-6,8,2,'#7a2f22'); P(-1+j,1,2,4,'#3a2414');
+    al(0.7); P(-9,-3,1,4,'#fff0dc'); P(8,-3,1,4,'#fff0dc'); P(-10,1,1,3,'#fff0dc'); P(9,1,1,3,'#fff0dc'); al(1);
+    break; }
+  case 'twohearts': {            // A MATCH MADE BY VENUS
+    const k=Math.round(2+2*Math.sin(t*0.12)); heart(-7+k,-3,'#ff5a8a','#ffc0d4'); heart(1-k,-3,'#ff7ab0','#ffd0e0');
+    break; }
+  case 'waves': {                // THE LOUDEST HOUSE ON THE HILL
+    P(-3,-2,6,6,'#a87a4a'); P(-4,-4,8,2,'#7a2f22');
+    for(let i=0;i<3;i++){ const q=((t*0.3+i*10)%30)/30; al(1-q); const r=4+Math.round(q*6); P(r,-2,1,4,'#ffd0a0'); P(-r-1,-2,1,4,'#ffd0a0'); } al(1);
+    break; }
+  case 'quiet': {                // THE QUIET HOUSE — not a sound out of it at night
+    al(0.6+0.4*Math.sin(t*0.05)); spr(['.XXX','XX..','X...','XX..','.XXX'], -12, -12, {X:'#fff0b0'}); al(1);
+    house(-1,2,'#a87a4a','#5a2a22'); P(1,1,2,2,'#1a1410');
+    for(let i=0;i<2;i++){ const q=((t*0.2+i*25)%50)/50; al(1-q); zed(3+Math.round(q*4), -6-Math.round(q*6), '#c8d8f0'); } al(1);
+    if(Math.sin(t*0.07)>0.8) P(10,-4,1,1,'#ffffff');
+    break; }
+  case 'destroyed': {            // THE DESTROYER AND THE DESTROYED — both present, both visibly pleased with it
+    const j=Math.max(0,Math.sin(t*0.2)), hit=j>0.82, tip=-1+Math.round(j*4);
+    P(tip-10,-1,10,3,'#d8966e'); P(tip-10,-1,10,1,'#f2c29a'); P(tip-10,1,10,1,'#a86a4c'); P(tip,-1,2,3,'#c2745c'); P(tip-12,-2,3,5,'#c8866a');
+    peach(3,1,hit?1:0);
+    for(let i=0;i<3;i++){ const th=t*0.12+i*Math.PI*2/3; P(6+Math.round(Math.cos(th)*5), -8+Math.round(Math.sin(th)*1.5), 1,1, i? '#ffe08a' : '#ffffff'); }
+    if(hit) heart3(-3,-7,'#ff5a8a');
+    P(tip-12,-5,3,1,'#e8c34a'); P(tip-12,-6,1,1,'#e8c34a'); P(tip-10,-6,1,1,'#e8c34a');   // a crown each —
+    P(5,-4,3,1,'#e8c34a'); P(5,-5,1,1,'#e8c34a'); P(7,-5,1,1,'#e8c34a');                   // because it is both of them
+    break; }
+  case 'racks': {                // THE HOUSE THAT SHAKES THE RACKS — and one comes down
+    const j=Math.round(Math.sin(t*0.7)), cyc=t%140;
+    P(-10+j,-8,1,16,'#6a4a2a'); P(9+j,-8,1,16,'#6a4a2a'); P(-11+j,-9,22,2,'#8a6a44'); P(-11+j,-9,22,1,'#a8885a');
+    P(-12,8,24,1,'#8a7a64');
+    for(let i=0;i<3;i++){ const fx=-6+i*6+j; let fy=-5, sw=Math.round(Math.sin(t*0.5+i*1.3)*1.5);
+      if(i===2 && cyc>=90){ if(cyc<108){ fy=-5+Math.round(Math.pow((cyc-90)/18,2)*10); sw=0; }
+        else { P(fx-3,6,7,2,'#a8b8c4'); P(fx-3,6,7,1,'#d0dce4'); P(fx+3,5,1,4,'#8898a4'); continue; } }
+      else P(fx,-7,1,2,'#c8b890');
+      P(fx-1+sw,fy,3,6,'#a8b8c4'); P(fx-1+sw,fy,1,6,'#d0dce4'); P(fx-2+sw,fy+6,5,1,'#8898a4'); P(fx+sw,fy+1,1,1,'#2a2a2a'); }
+    if(Math.abs(Math.sin(t*0.7))>0.9){ al(0.7); P(-13,-4,1,3,'#fff0dc'); P(12,-4,1,3,'#fff0dc'); al(1); }
+    break; }
+  case 'key': {                  // A POST AND ITS SEAT — it fits
+    const k=Math.round(2*Math.max(0,Math.sin(t*0.15))); P(1,-4,6,8,'#c8a24a'); P(3,-1,2,3,'#3a2414');
+    P(-8+k,-1,9,2,'#e8c34a'); P(-9+k,-3,3,6,'#e8c34a'); P(-8+k,-2,1,4,'#8a6a2a');
+    if(k===2) { P(8,-6,1,1,'#ffffff'); P(9,-4,1,1,'#fff0b0'); }
+    break; }
+  case 'seals': {                // THE LOUDEST HOUSE ON THE SHORE — the seals have moved further up the coast
+    P(-12,-1,11,6,'#8a6a44'); P(-13,-3,13,2,'#5a4a3a'); P(-11,-4,9,1,'#5a4a3a'); P(-8,1,2,4,'#3a2414');
+    for(let i=0;i<3;i++){ const q=((t*0.35+i*10)%30)/30; al(1-q); P(1+Math.round(q*6),-4+(i%2),1,4,'#ffd0a0'); } al(1);
+    P(-13,6,26,1,'#9a8a74'); P(-13,7,26,1,'#5a9ec4');
+    const q=(t%110)/110, sx=1+Math.round(q*4), hop=Math.round(Math.abs(Math.sin(t*0.3))*2);
+    al(q<0.1? q/0.1 : q>0.8? (1-q)/0.2 : 1);
+    P(sx,3-hop,6,3,'#6a7078'); P(sx+5,1-hop,3,3,'#6a7078'); P(sx+6,2-hop,1,1,'#101010'); P(sx-1,5-hop,2,1,'#50565c'); P(sx-2,4-hop,2,1,'#50565c');
+    if(q<0.45) bang(sx+4,-6-hop,'#ffffff');
+    al(1);
+    break; }
+  case 'coldhouse': {            // THE COLD LONGHOUSE — snow on the roof, and no smoke from the smoke-hole
+    P(-10,-1,20,7,'#7a6a5a'); P(-11,-4,22,3,'#5a4a3a'); P(-11,-5,22,1,'#ffffff'); P(-10,-6,20,1,'#e8f8ff'); P(-2,2,3,4,'#2a2018');
+    for(let i=-9;i<=9;i+=4) P(i,-1,1,1+((i+((t/20)|0))&1),'#d8f0fa');
+    for(let i=0;i<4;i++){ const q=((t*0.2+i*7)%28)/28; al(1-q*0.6); P(-10+i*6+Math.round(Math.sin(t*0.05+i)*2), -12+Math.round(q*18), 1,1,'#ffffff'); } al(1);
+    P(4,-8,1,2, Math.sin(t*0.1)>0? '#9aa4ac' : '#7a848c');
+    break; }
+  } }finally{ C.globalAlpha=A0; }
+}
+/* =====================================================================
+   🖼 AND THE SAME PICTURES OFF THE CANVAS — on the village board, the street,
+   the body map and the news of a new name: a small pixel canvas each, all
+   turned by one animation loop that stops itself when none is left.
+   ===================================================================== */
+const TITLE_EMOJI_LIVE=new Set(); let TITLE_EMOJI_RAF=0, TITLE_EMOJI_T=0;
+function titleEmojiTag(N, house, scale){
+  const k=titleEmojiKind(N, house); if(!k) return '';
+  const sc=scale||2;
+  return `<canvas class="temoji" data-tk="${k}" width="30" height="24" style="width:${30*sc}px;height:${24*sc}px" aria-hidden="true"></canvas>`;
+}
+function titleEmojiPaint(c){
+  const g=c.getContext('2d'); g.setTransform(1,0,0,1,0,0); g.globalAlpha=1; g.clearRect(0,0,c.width,c.height);
+  drawTitleEmoji(c.dataset.tk, 15, 13, TITLE_EMOJI_T, g);
+}
+function titleEmojiTick(){
+  TITLE_EMOJI_RAF=0; TITLE_EMOJI_T++;
+  for(const c of TITLE_EMOJI_LIVE){
+    if(!c.isConnected){ TITLE_EMOJI_LIVE.delete(c); continue; }
+    if(c.offsetParent===null) continue;                        // on a page that is not showing
+    try{ titleEmojiPaint(c); }catch(e){ TITLE_EMOJI_LIVE.delete(c); }
+  }
+  if(TITLE_EMOJI_LIVE.size) TITLE_EMOJI_RAF=requestAnimationFrame(titleEmojiTick);
+}
+function titleEmojiMount(root){
+  if(!root) return 0; let n=0;
+  root.querySelectorAll('canvas.temoji').forEach(c=>{ if(!TITLE_EMOJI_LIVE.has(c)){ TITLE_EMOJI_LIVE.add(c); n++; } try{ titleEmojiPaint(c); }catch(e){} });
+  if(TITLE_EMOJI_LIVE.size && !TITLE_EMOJI_RAF) TITLE_EMOJI_RAF=requestAnimationFrame(titleEmojiTick);
+  return n;
+}
+/* a line in the record only kept the name it was — find which name that was */
+function titleByName(name, who, id, cult){
+  if(id) return {id, cult: cult||villageCult()};
+  const here=villageCult(), cults=[here, here==='rk'? 'rome' : 'rk'];
+  for(const cu of cults){
+    const lists = who==='house'? [VILLAGE_HOUSE[cu]] : [VILLAGE_NAMES[cu], VILLAGE_NAMES_F[cu]];
+    for(const L of lists){ const hit=(L||[]).find(n=>n.name===name); if(hit) return {id:hit.id, cult:cu}; } }
+  return null;
+}
+/* the news of a new name, with its picture at the front */
+function toastTitle(msg, ms, N, house){
+  toast(msg, ms);
+  try{ const tag=titleEmojiTag(N, house, 1); if(!tag) return; const el=$('hud-toast'); el.insertAdjacentHTML('afterbegin', tag+' '); titleEmojiMount(el); }catch(e){}
+}
+/* a picture FADING in or out is drawn whole off-screen first and laid down at
+   the fade in one piece — drawn straight at 30% its overlapping parts stack
+   and come out darker than the rest */
+let TITLE_EMOJI_CV=null;
+function drawTitleEmojiFaded(kind, x, y, t, alpha){
+  if(!kind || !(alpha>0)) return;
+  if(alpha>=0.999){ drawTitleEmoji(kind, x, y, t); return; }
+  if(!TITLE_EMOJI_CV){ TITLE_EMOJI_CV=document.createElement('canvas'); TITLE_EMOJI_CV.width=30; TITLE_EMOJI_CV.height=24; }
+  const g=TITLE_EMOJI_CV.getContext('2d'); g.setTransform(1,0,0,1,0,0); g.globalAlpha=1; g.clearRect(0,0,30,24);
+  drawTitleEmoji(kind, 15, 13, t, g);
+  const a0=ctx.globalAlpha; ctx.globalAlpha=a0*alpha; ctx.drawImage(TITLE_EMOJI_CV, Math.round(x)-15, Math.round(y)-13); ctx.globalAlpha=a0;
 }
 /* what the one you married says, the first time each visit you come near — your name, out loud */
 function titleTease(N, byMale){
@@ -29597,7 +29956,7 @@ function titleTextW(t, scale){
    above, and the whole thing clears the ardor charm (which hangs over you,
    with its GET HARD label, once you are at her side). */
 function hallTitleLayout(px1, px2, N1, N2, withHouse, charm){
-  const S=0.60, y=214-(charm? 120 : 80), E=22, GAP=8;
+  const S=0.60, y=214-(charm? 120 : 80), E=28, GAP=8;
   const w1=N1? titleTextW('“'+N1.name+'”',S) : 0, w2=N2? titleTextW('“'+N2.name+'”',S) : 0;
   const leftIs1 = px1<=px2;
   const clash = !!(N1 && N2) && Math.abs(px1-px2) < (w1+w2)/2 + E + GAP;
@@ -29631,7 +29990,7 @@ function drawHallTitles(pfy){
   const row=(N, r, colText, alpha)=>{
     if(!N) return;
     const k=titleEmojiKind(N);
-    ctx.globalAlpha=alpha; if(k) drawTitleEmoji(k, r.x + r.side*(r.w/2+11), r.y, T, N.id==='destroyer2'); ctx.globalAlpha=1;
+    if(k) drawTitleEmojiFaded(k, r.x + r.side*(r.w/2+14), r.y, T, alpha);
     ctx.textAlign='center'; ctx.globalAlpha=alpha;
     pixelText('“'+N.name+'”', Math.round(r.x), Math.round(r.y-Math.sin(T*0.05)), colText, L.S*pop);
     ctx.globalAlpha=1; ctx.textAlign='left'; };
@@ -29640,7 +29999,7 @@ function drawHallTitles(pfy){
   row(sp,   L.r2, rk(sp)?   'rgba(210,190,255,.96)' : 'rgba(220,200,255,.96)', a);
   /* 🏠 and standing right next to each other, what the street calls the HOUSE */
   if(H && L.house){ const ha=clamp(((D.titleNear||0)-40)/30,0,1)*a, hw=titleTextW(H.name,0.64);
-    ctx.globalAlpha=ha; drawTitleEmoji(titleEmojiKind(H,true), L.house.x-hw/2-12, L.house.y, T, false); ctx.globalAlpha=1;
+    drawTitleEmojiFaded(titleEmojiKind(H,true), L.house.x-hw/2-15, L.house.y, T, ha);
     ctx.textAlign='center'; ctx.globalAlpha=ha; pixelText(H.name, Math.round(L.house.x), L.house.y, 'rgba(255,226,140,.98)', 0.64); ctx.globalAlpha=1; ctx.textAlign='left'; }
   D._titleDbg={near, close, a, mine:mine&&mine.id, sp:sp&&sp.id, house:H&&H.id, L};
 }
@@ -36295,7 +36654,8 @@ function drawVillaLove(){
               : '~ and there is all of him ~';
     pixelText(say, W/2, 58, 'rgba(255,214,190,.78)', 0.9);
     if(uV>=0.95 && RV){ pixelText(RV.lines[0], W/2, 70, 'rgba(255,200,220,.86)', 0.9);
-      if(RV.lines[1] && T>READY-20) pixelText(RV.lines[1], W/2, 82, 'rgba(255,180,210,.92)', 0.95); }
+      if(RV.lines[1] && T>READY-20){ pixelText(RV.lines[1], W/2, 82, 'rgba(255,180,210,.92)', 0.95);
+        if(RV.N) drawTitleEmoji(titleEmojiKind(RV.N), W/2 - titleTextW(RV.lines[1],0.95)/2 - 16, 82, T); } }
     ctx.textAlign='left'; }
   ctx.textAlign='center';
   // ---- THE FINISH ----
@@ -59713,6 +60073,8 @@ window.__SS = {
   get BEDPOSE_LAST(){return BEDPOSE_LAST;},
   /* V43 — the names, near her, with their little pictures */
   TITLE_EMOJI, titleEmojiKind, drawTitleEmoji, titleTease, drawHallTitles, hallTitleLayout, titleTextW,
+  TITLE_EMOJI_HOUSE, titleEmojiTag, titleEmojiMount, titleEmojiPaint, titleByName, toastTitle, drawTitleEmojiFaded,
+  get TITLE_EMOJI_LIVE(){return TITLE_EMOJI_LIVE;}, get TITLE_EMOJI_T(){return TITLE_EMOJI_T;},
   domusExit,
 };
 })();

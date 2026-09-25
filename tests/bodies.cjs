@@ -121,7 +121,7 @@ const ok=(name,cond,note)=>{ if(cond){pass++; console.log('  PASS  '+name+(note?
     const flat=shot('flat'); out.hurt=dif(flat,shot('hurt')); out.hungry=dif(flat,shot('hungry'));
     // the body map, with HUNGRY picked
     G.hasBodyMap=true; S.SETTINGS.bluntBody=true; S.CHART_FACE='auto'; S.openBodyMap(w,'villa');
-    const bm=document.querySelector('#scr-bodymap canvas'); const a0=bm.getContext('2d').getImageData(0,0,bm.width,80).data;
+    const bm=document.getElementById('bodymap-cv'); /* the chart itself — the name's little picture is a canvas too now */ const a0=bm.getContext('2d').getImageData(0,0,bm.width,80).data;
     S.CHART_FACE='hungry'; S.openBodyMap(w,'villa'); const a1=bm.getContext('2d').getImageData(0,0,bm.width,80).data;
     out.caption=dif(a0,a1); out.btn=[...document.querySelectorAll('#scr-bodymap button')].some(b=>/HUNGRY/.test(b.textContent));
     out.cap=S.CHART_FACES.hungry.caption; S.CHART_FACE='auto'; S.SETTINGS.bluntBody=false;

@@ -54,8 +54,17 @@ publicly, leaving it off keeps the game safe for a general audience.
   your spouse, and fades when you walk off. Yours goes over you and theirs over them, each with
   its own **animated pixel emoji** — the Booty Destroyer's length going into a booty, the Booty
   Queen's crowned peach, the Satisfier's heartbeat, the boinging post, the measuring rod, the
-  scallop shell, the cold bed's snowflake and more. Stand right beside each other and the
-  **house's** name comes up between you; and the first time each visit, they say yours aloud.
+  scallop shell and more. Stand right beside each other and the **house's** name comes up
+  between you; and the first time each visit, they say yours aloud.
+- **Every name, animated (V44)** — all 43 names the village has (his, hers and the house's, in
+  Rome and on the coast, the plain ones too) have their own moving picture, no two alike: the
+  village still thinking of a name for a man of the common run, a gull landing on a plain post,
+  the matron's distaff spinning, a hand waving from the shore, the Destroyer measured twice, the
+  Ten stamping a heart on the Satisfier's record, the curule seat, the hourglass, the cold bed's
+  frost, the seals leaving the loudest house on the shore. The pictures move wherever the name
+  is written: the hall, the village board, the street, the record, the body map, the news the
+  day a name lands, and the look over her shoulder. (The body map's top, where the name sits,
+  can now be scrolled to, and its button rows no longer slide under each other.)
 - **The hall walks on the woohoo bodies (V42)** — the spouse pacing the atrium, you, a grown
   child, a husband crossing the room and the walks to the pool and the wardrobe are the same
   posable figures the scenes use, in profile, facing the way they walk, their feet planted by the

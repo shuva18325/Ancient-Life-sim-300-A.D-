@@ -198,8 +198,9 @@ const ok=(name,cond,note)=>{ if(cond){pass++; console.log('  PASS  '+name+(note?
   R=await T(()=>{ const S=window.__SS; const c=[]; for(let i=0;i<400;i++){ const t=S.rollTraits(10,false,'roman'); c.push(...t); }
     S.newDemo('Marcus','Italia','Roman'); const G=S.G; G.married=true; const w=S.makeBride('roman',true,8); w.traits=['esc_big']; G.wife=w; S.openDomus();
     const fired=S.escAfterSlap({k:'ok'},'slap','spouse',260);
-    G.traits=['esc_big','rs_looker','smart']; const kid=S.inheritDNA(true);
-    return {adultOff:c.filter(t=>/^esc_|^rs_/.test(t)).length, fired, kidEsc:(kid.traits||[]).filter(t=>/^esc_|^rs_/.test(t)).length}; });
+    G.traits=['esc_big','rs_looker','smart']; let kidEsc=0;
+    for(let i=0;i<300;i++){ const kid=S.inheritDNA(i%2===0); kidEsc+=(kid.traits||[]).filter(t=>/^esc_|^rs_/.test(t)).length; }   // (a child's OWN trait roll could land on one — 300 children, not one)
+    return {adultOff:c.filter(t=>/^esc_|^rs_/.test(t)).length, fired, kidEsc}; });
   ok('with it off they never roll and never fire; and a child never inherits them', !R.err && R.adultOff===0 && R.fired===false && R.kidEsc===0, R.err||JSON.stringify(R));
 
   ok('no page errors anywhere', errs.length===0, errs.slice(0,2).join(' | '));

@@ -9,7 +9,7 @@ grounds produce nine distinct pictures" is.
 
 ---
 
-## 0 — NEXT, PROPOSED AFTER V43 (in the order they would help most)
+## 0 — NEXT, PROPOSED AFTER V44 (in the order they would help most)
 
 1. ~~**The villa walkers onto the template.**~~ — DONE (V42), see 0.8 below.
 2. **Faces in the arena.** The face library is shared — a fighter could grit his teeth on a
@@ -33,6 +33,14 @@ grounds produce nine distinct pictures" is.
 
 11. **Names on the street.** The five households on the street have their own village names in
     the ledger; walking past a neighbour's door could show theirs, with its emoji, the same way.
+
+### ~~0.6 Every name, animated~~ — DONE (V44)
+**Result:** `tests/v43.cjs` (24 checks, 12 of them new). All 43 names have a picture of their
+own, none shared; each one moves; a fading name fades its picture in one piece; the pictures are
+drawn on the board, the street, the record, the body map, the news toast and the reveal line by
+one animation loop that drops canvases no longer on the page. The body map's centred scroll panel
+no longer hides its top or crushes its button rows. And a V42 slip, found by the suite: a child's
+own trait roll could land on an escalator or a resist style (12 in 300 children) — it cannot now.
 
 ### ~~0.7 The names, near her~~ — DONE (V43)
 **Result:** `tests/v43.cjs` (15 checks). The village title only shows within reach of the

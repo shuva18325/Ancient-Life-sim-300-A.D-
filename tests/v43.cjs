@@ -1,11 +1,12 @@
-/* 🗣 V43 — THE NAMES, NEAR HER, AND THEIR LITTLE PICTURES
+/* 🗣 V43–V44 — THE NAMES, NEAR HER, AND THEIR LITTLE PICTURES — ALL OF THEM
    ---------------------------------------------------------------------
    From the round that asked:
      · "why does THE BOOTY DESTROYER and the names appear every time I walk —
         fix it, maybe near the wife";
      · "add custom animated emojis for the booty destroyer and the other
         names — a length going into a booty";
-     · "expand this idea, add 1–2 ideas of your own".
+     · "expand this idea, add 1–2 ideas of your own";
+     · and then: "do ALL animated".
    Run against the build before with FILE=…: it fails there.               */
 const {chromium}=require('playwright');
 const FILE=process.env.FILE || ('file://'+require('path').resolve(__dirname,'..','index.html'));
@@ -70,23 +71,72 @@ const ok=(name,cond,note)=>{ if(cond){pass++; console.log('  PASS  '+name+(note?
       onScreen:e.r1.x-e.r1.w/2-22>=0 && e.r2.x+e.r2.w/2+22<=480}; });
   ok('far enough apart each sits over its owner; with the ardor charm up the row clears it; nothing runs off the edge', !R.err && R.apart && R.lifted && R.charmClear && R.onScreen, R.err||JSON.stringify(R));
 
-  console.log('\n=== 🍑 THE LITTLE PICTURES ===');
+  console.log('\n=== 🍑 THE LITTLE PICTURES — ALL OF THEM ===');
   R=await T(()=>{ const S=window.__SS; const cv=document.getElementById('game'), c=cv.getContext('2d'); const out={missing:[], blank:[], still:[], errs:[]};
-    const all=[]; for(const cult of ['rome','rk']){ S.VILLAGE_NAMES[cult].forEach(n=>all.push(n)); S.VILLAGE_NAMES_F[cult].forEach(n=>all.push(n)); }
-    const plain=new Set(['common','plain','matron','hand']);
-    all.forEach(n=>{ if(!plain.has(n.id) && !S.titleEmojiKind(n)) out.missing.push(n.id); });
-    const kinds=[...new Set(Object.values(S.TITLE_EMOJI).concat(['twohearts']))];
-    const snap=()=>{ const d=c.getImageData(200,100,40,40).data; let h=0, n=0; for(let i=0;i<d.length;i+=4){ if(d[i+3]>0){ n++; h=(h*31 + d[i]*3 + d[i+1]*7 + d[i+2] + i)%1000000007; } } return {h,n}; };
+    const all=[]; for(const cult of ['rome','rk']){ S.VILLAGE_NAMES[cult].forEach(n=>all.push([Object.assign({cult},n),false])); S.VILLAGE_NAMES_F[cult].forEach(n=>all.push([Object.assign({cult},n),false]));
+      S.VILLAGE_HOUSE[cult].forEach(n=>all.push([Object.assign({cult},n),true])); }
+    const got=all.map(([n,h])=>S.titleEmojiKind(n,h));
+    all.forEach(([n,h],i)=>{ if(!got[i]) out.missing.push(n.cult+':'+n.id+(h?' (house)':'')); });
+    out.names=all.length; out.unique=new Set(got.filter(Boolean)).size;
+    const kinds=[...new Set(Object.values(S.TITLE_EMOJI).concat(Object.values(S.TITLE_EMOJI_HOUSE)))];
+    const snap=()=>{ const d=c.getImageData(200,100,40,40).data; let h=0, n=0, amax=0; for(let i=0;i<d.length;i+=4){ if(d[i+3]>0){ n++; amax=Math.max(amax,d[i+3]); h=(h*31 + d[i]*3 + d[i+1]*7 + d[i+2] + i)%1000000007; } } return {h,n,amax}; };
     for(const k of kinds){ try{
-      c.setTransform(1,0,0,1,0,0); c.clearRect(0,0,480,270); S.drawTitleEmoji(k,220,120,0,false); const a=snap();
-      let moved=false; for(const t of [5,11,17,23,37,53]){ c.clearRect(0,0,480,270); S.drawTitleEmoji(k,220,120,t,false); if(snap().h!==a.h){ moved=true; break; } }
-      if(a.n<6) out.blank.push(k); if(!moved) out.still.push(k); }catch(e){ out.errs.push(k+': '+e.message); } }
-    out.kinds=kinds.length; out.destroyer=S.titleEmojiKind({id:'destroyer'}); out.queen=S.titleEmojiKind({id:'queen'}); out.houseD=S.titleEmojiKind({id:'destroyed'},true);
-    out.houseVenus=S.titleEmojiKind({id:'venus'},true); out.herVenus=S.titleEmojiKind({id:'venus'});
-    return out; });
-  ok('every name but the plain ones has its own picture', !R.err && R.missing.length===0, R.err||JSON.stringify(R.missing));
-  ok('the Booty Destroyer is the length going in, the Queen a crowned peach, the house the Destroyer’s too', !R.err && R.destroyer==='destroyer' && R.queen==='crownpeach' && R.houseD==='destroyer' && R.houseVenus==='twohearts' && R.herVenus==='shell', R.err||JSON.stringify(R));
-  ok('all '+(R.kinds||'')+' pictures draw, and every one of them moves', !R.err && R.blank.length===0 && R.still.length===0 && R.errs.length===0, R.err||JSON.stringify([R.blank,R.still,R.errs]));
+      c.setTransform(1,0,0,1,0,0); c.globalAlpha=1; c.clearRect(0,0,480,270); S.drawTitleEmoji(k,220,120,0); const a0=snap();
+      let moved=false; for(const t of [5,11,17,23,37,53,90,150]){ c.clearRect(0,0,480,270); S.drawTitleEmoji(k,220,120,t); if(snap().h!==a0.h){ moved=true; break; } }
+      if(a0.n<6) out.blank.push(k); if(!moved) out.still.push(k); }catch(e){ out.errs.push(k+': '+e.message); } }
+    /* and a fading name fades its picture with it — the old pictures reset the alpha half-way through */
+    out.fadeMax=0; for(const k of ['hearts','steam','notes','seals','quiet','destroyer','racks']){ c.clearRect(0,0,480,270); c.globalAlpha=1; S.drawTitleEmojiFaded(k,220,120,7,0.3); out.fadeMax=Math.max(out.fadeMax, snap().amax); }
+    c.globalAlpha=0.3; S.drawTitleEmoji('hearts',220,120,7); out.alphaAfter=c.globalAlpha; c.globalAlpha=1;
+    const K=(cult,id,h)=>S.titleEmojiKind({cult,id},h);
+    out.pick={ destroyer:K('rk','destroyer'), destroyer2:K('rk','destroyer2'), queen:K('rk','queen'), satRome:K('rome','satisfier'), satRk:K('rk','satisfier'),
+      common:K('rome','common'), plain:K('rk','plain'), matron:K('rome','matron'), hand:K('rk','hand'), destroyed:K('rk','destroyed',true), venusHouse:K('rome','venus',true), venusHer:K('rome','venus') };
+    out.kinds=kinds.length; return out; });
+  ok('every name — his, hers and the house’s, in Rome and on the coast, the plain ones too — has its own picture, no two alike', !R.err && R.missing.length===0 && R.names===43 && R.unique===43, R.err||JSON.stringify([R.missing,R.names,R.unique]));
+  ok('the Destroyer is the length going in and the one measured twice harder still; the Queen a crowned peach; the Satisfier a heart in Rome, a stamp on the coast',
+    !R.err && R.pick.destroyer==='destroyer' && R.pick.destroyer2==='obliterate' && R.pick.queen==='crownpeach' && R.pick.satRome==='hearts' && R.pick.satRk==='stamp' && R.pick.destroyed==='destroyed' && R.pick.venusHouse==='twohearts' && R.pick.venusHer==='shell', R.err||JSON.stringify(R.pick));
+  ok('and the plain names move too: the village still thinking, a gull on the post, the matron’s distaff, a hand waving from the shore',
+    !R.err && R.pick.common==='mull' && R.pick.plain==='gullpost' && R.pick.matron==='distaff' && R.pick.hand==='wave', R.err||JSON.stringify(R.pick));
+  ok('all '+(R.kinds||'')+' pictures draw, and every one of them moves', !R.err && R.kinds===43 && R.blank.length===0 && R.still.length===0 && R.errs.length===0, R.err||JSON.stringify([R.blank,R.still,R.errs]));
+  ok('a fading name fades its picture evenly, all in one piece, and the alpha is handed back as it was', !R.err && R.fadeMax>0 && R.fadeMax<=0.3*255+2 && Math.abs(R.alphaAfter-0.3)<1e-6, R.err||JSON.stringify([R.fadeMax,R.alphaAfter]));
+
+  console.log('\n=== 🖼 ON EVERY PAGE THE NAME IS WRITTEN ===');
+  R=await T(async ([SETUP])=>{ const S=window.__SS; const setup=eval(SETUP); setup(false, 10); S.G.wifePhys=90;
+    S.openVillageTalk(); const b=document.getElementById('villa-body');
+    const cs=[...b.querySelectorAll('canvas.temoji')];
+    const hash=(c)=>{ const d=c.getContext('2d').getImageData(0,0,c.width,c.height).data; let h=0; for(let i=0;i<d.length;i+=4) if(d[i+3]) h=(h*31+d[i]+d[i+1]*3+d[i+2]*7+i)%1000000007; return h; };
+    const h0=cs.map(hash), t0=S.TITLE_EMOJI_T;
+    await new Promise(r=>setTimeout(r,700));
+    const h1=cs.map(hash);
+    const pos=cs.map(c=>getComputedStyle(c).position), box=cs.map(c=>{ const r=c.getBoundingClientRect(); return [Math.round(r.width),Math.round(r.height)]; });
+    /* and when the board is closed, its pictures stop being painted */
+    S.openVillageTalk(); await new Promise(r=>setTimeout(r,100));
+    const stale=[...S.TITLE_EMOJI_LIVE].filter(c=>!c.isConnected).length;
+    return {n:cs.length, moved:h0.filter((h,i)=>h!==h1[i]).length, ticked:S.TITLE_EMOJI_T-t0, static:pos.every(p=>p==='static'), big:box.every(([w,h])=>w>=30 && h>=24),
+      mine:b.innerHTML.includes(S.villageName().name), stale}; }, [SETUP]);
+  ok('the village board: your name, theirs, the house and the whole street, each with its picture, moving', !R.err && R.n>=5 && R.moved>=Math.ceil(R.n*0.6) && R.ticked>10 && R.mine, R.err||JSON.stringify(R));
+  ok('laid out in the text, not thrown over the page by the full-screen canvas rule', !R.err && R.static && R.big, R.err||JSON.stringify(R));
+  ok('and a board that is gone stops being painted', !R.err && R.stale===0, R.err||JSON.stringify(R));
+  R=await T(async ([SETUP])=>{ const S=window.__SS; const setup=eval(SETUP); setup(false, 10);
+    S.openBodyMap(S.selfSubject(),'villa'); const v=document.getElementById('bodymap-verdict'); const inMap=v.querySelectorAll('canvas.temoji').length;
+    S.G.villageName=null; S.villageNameNews(); await new Promise(r=>setTimeout(r,1300));
+    const tt=document.getElementById('hud-toast'); const inToast=tt.querySelectorAll('canvas.temoji').length, toastText=tt.textContent;
+    const last=(S.G.villageNameLog||[]).slice(-1)[0]||{};
+    return {inMap, inToast, named:toastText.includes(S.villageName().name), logId:last.id, logCult:last.cult,
+      old:S.titleByName('THE LONG POST','him'), oldHouse:S.titleByName('THE COLD LONGHOUSE','house')}; }, [SETUP]);
+  ok('the body map writes it with its picture, and so does the news the day a name lands', !R.err && R.inMap>=1 && R.inToast===1 && R.named, R.err||JSON.stringify(R));
+  ok('the record keeps which name it was, and an old line still finds its picture by the name', !R.err && !!R.logId && !!R.logCult && R.old && R.old.id==='long' && R.oldHouse && R.oldHouse.id==='cold', R.err||JSON.stringify(R));
+  R=await T(([SETUP])=>{ const S=window.__SS; const setup=eval(SETUP); setup(false, 10);
+    S.openBodyMap(S.selfSubject(),'villa');
+    const t=document.getElementById('bodymap-title'); let box=t.parentElement; while(box && !box.classList.contains('scrollbox')) box=box.parentElement;
+    box.scrollTop=0; const tr=t.getBoundingClientRect(), br=box.getBoundingClientRect();
+    const kids=[...box.children].filter(k=>getComputedStyle(k).display!=='none');
+    const squeezed=kids.filter(k=>k.scrollHeight>k.clientHeight+2 && getComputedStyle(k).overflowY==='visible').map(k=>(k.id||k.className)+' '+k.clientHeight+'/'+k.scrollHeight);
+    const v=document.getElementById('bodymap-verdict').getBoundingClientRect();
+    return {titleIn: tr.top>=br.top-1, verdictReach: v.top>=br.top-1, squeezed}; }, [SETUP]);
+  ok('the body map’s top — its title and the name the village calls you — can be scrolled to; no row of buttons is crushed under the next', !R.err && R.titleIn && R.verdictReach && R.squeezed.length===0, R.err||JSON.stringify(R));
+  R=await T(()=>{ const S=window.__SS; const N={id:'destroyer2', cult:'rk', name:'THE BOOTY DESTROYER'};
+    return {big:S.villaRevealLine(11,false,N).N===N, small:S.villaRevealLine(5,false,N).N===null}; });
+  ok('and the look over her shoulder — “So THAT is why they call you…” — carries the name to draw its picture', !R.err && R.big && R.small, R.err||JSON.stringify(R));
 
   console.log('\n=== 🙋 HER HALL, AND THE GATE ===');
   R=await T(([SETUP,frames])=>{ const S=window.__SS; const setup=eval(SETUP), run=eval(frames);
