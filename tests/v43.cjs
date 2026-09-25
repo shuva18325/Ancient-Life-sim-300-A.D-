@@ -112,7 +112,7 @@ const ok=(name,cond,note)=>{ if(cond){pass++; console.log('  PASS  '+name+(note?
     S.openVillageTalk(); await new Promise(r=>setTimeout(r,100));
     const stale=[...S.TITLE_EMOJI_LIVE].filter(c=>!c.isConnected).length;
     return {n:cs.length, moved:h0.filter((h,i)=>h!==h1[i]).length, ticked:S.TITLE_EMOJI_T-t0, static:pos.every(p=>p==='static'), big:box.every(([w,h])=>w>=30 && h>=24),
-      mine:b.innerHTML.includes(S.villageName().name), stale}; }, [SETUP]);
+      mine:b.textContent.includes(S.villageName().name), stale}; }, [SETUP]);
   ok('the village board: your name, theirs, the house and the whole street, each with its picture, moving', !R.err && R.n>=5 && R.moved>=Math.ceil(R.n*0.6) && R.ticked>10 && R.mine, R.err||JSON.stringify(R));
   ok('laid out in the text, not thrown over the page by the full-screen canvas rule', !R.err && R.static && R.big, R.err||JSON.stringify(R));
   ok('and a board that is gone stops being painted', !R.err && R.stale===0, R.err||JSON.stringify(R));
@@ -137,6 +137,52 @@ const ok=(name,cond,note)=>{ if(cond){pass++; console.log('  PASS  '+name+(note?
   R=await T(()=>{ const S=window.__SS; const N={id:'destroyer2', cult:'rk', name:'THE BOOTY DESTROYER'};
     return {big:S.villaRevealLine(11,false,N).N===N, small:S.villaRevealLine(5,false,N).N===null}; });
   ok('and the look over her shoulder — “So THAT is why they call you…” — carries the name to draw its picture', !R.err && R.big && R.small, R.err||JSON.stringify(R));
+
+  console.log('\n=== ✨ AND EVERY TITLE MOVES ===');
+  R=await T(()=>{ const S=window.__SS; const out={};
+    const kinds=[...new Set(Object.values(S.TITLE_EMOJI).concat(Object.values(S.TITLE_EMOJI_HOUSE)))];
+    out.noFx=kinds.filter(k=>!S.TITLE_TEXT_FX[k]); const styles=[...new Set(kinds.map(k=>S.TITLE_TEXT_FX[k]))]; out.styles=styles.length;
+    const tc=document.getElementById('gtext'), g=tc.getContext('2d');
+    const snap=()=>{ const d=g.getImageData(760,420,400,90).data; let h=0,n=0; for(let i=0;i<d.length;i+=4) if(d[i+3]){ n++; h=(h*31+d[i]+d[i+1]*7+d[i+2]*3+i)%1000000007; } return {h,n}; };
+    out.still=[]; out.blank=[];
+    for(const fx of styles){ g.setTransform(1,0,0,1,0,0); g.clearRect(0,0,1920,1080); S.pixelTextFx('THE TEST OF A NAME', 240, 116, [255,214,150], 1, 0.6, fx, 0, null, 'destroyer'); const a=snap();
+      let moved=false; for(let t=3;t<=90;t+=3){ g.clearRect(0,0,1920,1080); S.pixelTextFx('THE TEST OF A NAME', 240, 116, [255,214,150], 1, 0.6, fx, t, null, 'destroyer'); if(snap().h!==a.h){ moved=true; break; } }
+      if(a.n<200) out.blank.push(fx); if(!moved) out.still.push(fx); }
+    g.clearRect(0,0,1920,1080);
+    const wS=[0,20,40,60].map(t=>S.pixelTextFx('THE LONG POST',240,116,[255,255,255],1,0.6,'stretch',t)); out.stretch=Math.max(...wS)-Math.min(...wS);
+    const wC=[0,10,20,30].map(t=>S.pixelTextFx('A POST AND ITS SEAT',240,116,[255,255,255],1,0.6,'click',t)); out.click=Math.max(...wC)-Math.min(...wC);
+    g.clearRect(0,0,1920,1080);
+    /* the outline: each picture sits on a dark rim */
+    const O=S.titleEmojiOutlined('shell',10), od=O.getContext('2d').getImageData(0,0,O.width,O.height).data; let rim=0; for(let i=0;i<od.length;i+=4) if(od[i+3]>200 && od[i]===0x14 && od[i+1]===0x0c && od[i+2]===0x06) rim++;
+    out.rim=rim;
+    out.run=S.nameRun('~ “So THAT is why they call you THE BOOTY DESTROYER.” ~', {name:'THE BOOTY DESTROYER'});
+    return out; });
+  ok('every one of the 43 pictures has a way its title moves — '+(R.styles||'?')+' of them: shake, heartbeat, glow, hop, shiver, hush, ink, march, wobble, rise, vibrate, stretch, click',
+    !R.err && R.noFx.length===0 && R.styles>=13, R.err||JSON.stringify(R));
+  ok('and every one of those actually moves the letters, frame to frame', !R.err && R.still.length===0 && R.blank.length===0, R.err||JSON.stringify([R.still,R.blank]));
+  ok('the Long Post stretches and the key’s house clicks shut — the title gets wider and narrower', !R.err && R.stretch>2 && R.click>2, R.err||JSON.stringify([R.stretch,R.click]));
+  ok('every picture sits on a dark pixel rim, so it reads on any wall', !R.err && R.rim>20, R.err||JSON.stringify(R.rim));
+  ok('a name inside a longer line is found, so only the name moves in her “So THAT is why…”', !R.err && R.run && R.run[1]-R.run[0]===19, R.err||JSON.stringify(R.run));
+  R=await T(([SETUP,frames])=>{ const S=window.__SS; const setup=eval(SETUP), run=eval(frames);
+    const D=setup(false, 10); D.x=D.wifeX-44; run(40);
+    const tc=document.getElementById('gtext'), g=tc.getContext('2d');
+    const frame=()=>{ g.setTransform(1,0,0,1,0,0); g.clearRect(0,0,1920,1080); D.t++; S.drawDomus(); const L=D._titleDbg.L, r=L.r1;
+      const d=g.getImageData(Math.round((r.x-r.w/2-4)*4), Math.round((r.y-6)*4), Math.round((r.w+8)*4), 48).data; let h=0,n=0; for(let i=0;i<d.length;i+=4) if(d[i+3]){ n++; h=(h*31+d[i]+d[i+1]*7+d[i+2]*3+i)%1000000007; } return {h,n}; };
+    const hs=[]; for(let i=0;i<6;i++) hs.push(frame());
+    return {inked:hs.every(x=>x.n>100), distinct:new Set(hs.map(x=>x.h)).size, quipN:!!(D.walkQuip && D.walkQuip.N)}; }, [SETUP,frames]);
+  ok('in the hall your title is drawn and its letters move from one frame to the next', !R.err && R.inked && R.distinct>=4, R.err||JSON.stringify(R));
+  ok('and her tease carries your name, so it moves in her line too', !R.err && R.quipN, R.err||JSON.stringify(R));
+  R=await T(async ([SETUP])=>{ const S=window.__SS; const setup=eval(SETUP); setup(false, 10); S.G.wifePhys=90;
+    S.openVillageTalk(); const b=document.getElementById('villa-body');
+    const T=[...b.querySelectorAll('.ttx')], pics=b.querySelectorAll('canvas.temoji').length;
+    const moving=T.filter(x=>{ const kids=[...x.children]; const cn=getComputedStyle(x).animationName; return kids.length && kids.every(k=>getComputedStyle(k).animationName!=='none') || (cn && cn!=='none'); }).length;
+    const styles=[...new Set(T.map(x=>[...x.classList].find(c=>c.startsWith('tt-'))))];
+    S.openBodyMap(S.selfSubject(),'villa'); const inMap=document.querySelectorAll('#bodymap-verdict .ttx').length;
+    S.G.villageName=null; S.villageNameNews(); await new Promise(r=>setTimeout(r,1300));
+    const tt=document.getElementById('hud-toast').querySelector('.ttx');
+    return {n:T.length, pics, moving, styles, textOK:T.every(x=>x.textContent.length>3), inMap, toast:tt? tt.textContent : null, name:S.villageName().name}; }, [SETUP]);
+  ok('on the board every title is letters that move — yours, theirs, the house’s, the street’s and the record’s', !R.err && R.n>=R.pics && R.n>=10 && R.moving===R.n && R.textOK && R.styles.length>=3, R.err||JSON.stringify(R));
+  ok('and on the body map, and in the news the day a name lands', !R.err && R.inMap>=1 && R.toast===R.name, R.err||JSON.stringify(R));
 
   console.log('\n=== 🙋 HER HALL, AND THE GATE ===');
   R=await T(([SETUP,frames])=>{ const S=window.__SS; const setup=eval(SETUP), run=eval(frames);

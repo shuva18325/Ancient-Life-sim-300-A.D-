@@ -56,6 +56,16 @@ publicly, leaving it off keeps the game safe for a general audience.
   Queen's crowned peach, the Satisfier's heartbeat, the boinging post, the measuring rod, the
   scallop shell and more. Stand right beside each other and the **house's** name comes up
   between you; and the first time each visit, they say yours aloud.
+- **Every title moves (V45)** — the names' letters animate too, each in the manner of its
+  picture (13 ways): the Destroyer's title jolts and flashes pink the instant it lands, the
+  Satisfier's beats like a heart, the post's letters hop, the cold bed's shiver, Kan's and the
+  Queen's glow, the Long Post's stretch, the key's click shut, the steps march, the steam rises,
+  the loud houses vibrate, and the common man's name is still being inked in by the village's
+  pen — with a slow wave and a glint running along every one. They move in the hall, in her
+  tease and her look over the shoulder (only the name moves inside the line), and on every page
+  as CSS letter animations. Every picture now sits on a dark pixel rim, as the game's sprites do,
+  and five were redrawn at a closer look (the hills, the detour, the kayak, the humming face,
+  the forum's fruit).
 - **Every name, animated (V44)** — all 43 names the village has (his, hers and the house's, in
   Rome and on the coast, the plain ones too) have their own moving picture, no two alike: the
   village still thinking of a name for a man of the common run, a gull landing on a plain post,

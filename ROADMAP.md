@@ -9,7 +9,7 @@ grounds produce nine distinct pictures" is.
 
 ---
 
-## 0 — NEXT, PROPOSED AFTER V44 (in the order they would help most)
+## 0 — NEXT, PROPOSED AFTER V45 (in the order they would help most)
 
 1. ~~**The villa walkers onto the template.**~~ — DONE (V42), see 0.8 below.
 2. **Faces in the arena.** The face library is shared — a fighter could grit his teeth on a
@@ -33,6 +33,13 @@ grounds produce nine distinct pictures" is.
 
 11. **Names on the street.** The five households on the street have their own village names in
     the ledger; walking past a neighbour's door could show theirs, with its emoji, the same way.
+
+### ~~0.5 Every title moves~~ — DONE (V45)
+**Result:** `tests/v43.cjs` (33 checks, 9 of them new). Each of the 43 pictures names one of 13
+letter animations; every one moves the letters frame to frame; the stretch and the click change
+the title's width (and the hall layout keeps room for it); the hall's titles, her tease and the
+reveal line animate only the name; the board, street, record, body map and news toast carry the
+same animations as per-letter CSS (glint-only under reduced motion). The pictures are outlined.
 
 ### ~~0.6 Every name, animated~~ — DONE (V44)
 **Result:** `tests/v43.cjs` (24 checks, 12 of them new). All 43 names have a picture of their
