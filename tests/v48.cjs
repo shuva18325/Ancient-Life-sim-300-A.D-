@@ -196,7 +196,7 @@ const ok=(name,cond,note)=>{ if(cond){pass++; console.log('  PASS  '+name+(note?
 
   console.log('\n=== 🚪 AND THE REST ===');
   R=await T(()=>window.__SS.BUILD_STAMP);
-  ok('the build says V48', typeof R==='string' && /V48/.test(R), String(R));
+  ok('the build says V48 or later', typeof R==='string' && /V(4[89]|[5-9][0-9])/.test(R), String(R));
   ok('no page errors anywhere', errs.length===0, errs.slice(0,3).join(' | '));
   console.log('\n'+(fail? fail+' FAILED, ' : 'ALL GREEN   ')+'('+pass+' checks)');
   await br.close(); process.exit(fail?1:0);

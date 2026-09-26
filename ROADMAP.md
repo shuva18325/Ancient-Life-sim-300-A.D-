@@ -31,14 +31,12 @@ courtship, the arena and the Kanvek all reworked. What comes next, in order:
    Shameless spouse who asks YOU to wear one.
 6. **A rhythm duel in the bedchamber.** Tap in time to keep her in the HOT zone, or push it and
    watch it tip into TOO MUCH — stamina as something you play, not only a number.
-7. **Every culture's bedchamber painted.** Tatami, andon and a byōbu screen for Japan; silk and a
-   lacquer bed for Han and Ming; glazed niches for Persia; a ger for the steppe; India.
+7. ~~**Every culture's bedchamber painted.**~~ **DONE (V49)** — ten peoples, see 0.0 below.
 8. **More escalations and the wife's bend, round two.** A second running order per escalator (the
    stair, the impluvium's rim, the tablinum desk) and bends at the shelf, the pool and the stairs.
 9. **Courtship, round two.** A second evening with the same person (they remember the first), a
    walk together as a beat, and the rival met again in the arena.
-10. **Beasts on vector bodies.** The venatio lion, bear, bull and leopard with IK legs, to match the
-    men they fight.
+10. ~~**Beasts on vector bodies.**~~ **DONE (V49)** — see 0.0 below.
 11. **The wardrobe in the villa.** The walkers wear their people's garments the way the portraits do.
 12. **The coast's commissions on the new body**, the sivrak as a front-view garment.
 13. **Names on the street** — a neighbour's village name and moving picture as you walk past.
@@ -75,9 +73,7 @@ And the list from after V46, still open:
 3. **Greedy, round two.** The hands follow the eyes: a grab beat when a Greedy one catches you
    bent over, a slap back when you catch them, and the village's own word for it on the board
    ("THE WANDERING EYE"). A Greedy spouse with Jealous looks at the servants too — and minds.
-4. **Every culture's bedchamber painted.** The cubiculum and the longhouse got the full pass;
-   Japan (tatami, andon, a byōbu screen), Han and Ming (silk hangings, a lacquer bed), Persia
-   (glazed niches, a brazier), the steppe (a ger's felt and lattice) and India should too.
+4. ~~**Every culture's bedchamber painted.**~~ **DONE (V49).**
 5. **More escalation scenes.** A second running order per escalator, his and hers — the stair,
    the impluvium's rim, the tablinum desk — so the third one does not feel familiar.
 6. **The wife's bend, round two.** Bend at the low shelf, the pool's edge or the stairs; his
@@ -97,6 +93,16 @@ And the list from after V46, still open:
 14. ~~**Creation-card portraits on the template**~~ (V48) — the first body a player sees.
 15. **Performance pass.** Cache fighter frames per pose; the bedchamber's painted room could be
     rendered once per session to an offscreen canvas and only its lamp and stars redrawn.
+
+### ~~0.0 The roadmap's ten: the beasts, every people's bedchamber~~ — DONE (V49)
+**Result:** `tests/v49.cjs`. The venatio's lion, leopard, bear and bull are painted vector bodies
+with a gait, a leap, a fall and an attack of their own (R10). Every people has its own bedchamber
+(R7): Wa, Korea, Han and Ming, Persia, the ger, Gandhara, the Tamil south, Egypt, the Celtic
+roundhouse and the Germanic hall are each painted to the cubiculum's standard at both sizes — the
+whole-screen walk-in and the stage the positions play on (and the wall she is braced on) — each
+with its own light, its own door (a fusuma slides, the others swing), its own bed through the door
+and its own jar for the wine. The parts that never move (floors, tile, thatch, lattices, a screen)
+are painted once into cached layers, so a painted room costs about what the cubiculum does.
 
 ### ~~0.1 The arena's faces, wear and scars; the size switch; poses, faces and stamina you pick~~ — DONE (V48)
 **Result:** `tests/v48.cjs` (39 checks in all). A fighter grits their teeth on the swing and the

@@ -49,6 +49,27 @@ publicly, leaving it off keeps the game safe for a general audience.
 ---
 
 ## Feature highlights
+- **Every people's own bedchamber (V49)** — the walk-in room and the stage the positions play on
+  are painted for ten peoples now, not only Rome and the coast: a Wa washitsu (four shoji leaves
+  with the bamboo's shadow moving on the paper, a tokonoma with its scroll, a gold byōbu of pines
+  and cranes, a round moon window, an andon on the tatami); a Korean room (ttisal doors, a peony
+  screen, the bedding stacked on a brass-bound chest, oiled-paper ondol floor); Han and Ming
+  (lacquered columns under painted brackets, a round window with plum blossom across the moon, red
+  lanterns, a couplet, an ink-landscape screen, a censer breathing smoke); Persia (star tiles under
+  a gilt frieze, pointed niches with lamps and ewers, pierced lanterns scattering their light, a
+  brazier, a medallion carpet); the inside of a ger (the lattice ring, the roof poles running up to
+  the open crown and its stars, the two painted pillars, the hearth); Gandhara (schist, the
+  garland-bearer frieze, Indo-Corinthian pilasters, a jali laying moonlight on the floor); the Tamil
+  south (limewash over red-and-white temple stripes, teak and brass, a barred window with a palm
+  outside, brass lamps on chains, the oonjal swing, a kolam, mango leaves over the door); Egypt
+  (the kheker frieze, a painted marsh, papyrus columns, Bes in his niche, a painted pool underfoot);
+  a Celtic roundhouse (thatch and rafters, a loom with a check half-woven, a shield with La Tène
+  swirls, firedogs with ox heads); and a Germanic log hall (shields, horns, antlers, a bear pelt, the
+  long hearth). Each has its own door (a fusuma slides; the rest swing), its own bed through it and
+  its own jar for the wine; what never moves is painted once and cached.
+- **The venatio's beasts on bodies of their own (V49)** — the lion, leopard, bear and bull are
+  drawn like the men they fight: painted vector bodies with a stride, a leap, a fall, and an attack
+  each (a swipe, a rearing maul, a hook of the horns).
 - **The three bots (V48)** — Settings → 🤖 THE THREE BOTS. **Minerva the Clever** (plays the odds,
   studies law, climbs to the Senate, marries for advantage), **Lucius the Lover** (the Rkrai coast;
   fights only to pay for a longhouse and the curviest wife on the coast, gifts, the bath, and the
