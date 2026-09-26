@@ -49,6 +49,27 @@ publicly, leaving it off keeps the game safe for a general audience.
 ---
 
 ## Feature highlights
+- **The three bots (V48)** — Settings → 🤖 THE THREE BOTS. **Minerva the Clever** (plays the odds,
+  studies law, climbs to the Senate, marries for advantage), **Lucius the Lover** (the Rkrai coast;
+  fights only to pay for a longhouse and the curviest wife on the coast, gifts, the bath, and the
+  cheats console when the numbers disappoint) and **Brutus the Bold** (the hardest bout every day,
+  bigger weapons, chariot races, romance by bicep). ● RECORD and one plays a whole fresh career in a
+  sandbox — your career and your save are never touched — on the game's own brides, courtship
+  lines, temperaments, foes and gear. ▶ WATCH plays it back on the game canvas like a video: a scene
+  per beat (the bouts on the arena's own gladiators, the courtship scene, the wedding, the forum, the
+  circus, home), a caption, their **thoughts as subtitles** ("I gotta get a wife." · "62% odds. I'll
+  take it." · "…I slipped. The sand was wet."), and a play / skip / speed / scrub bar. With mature
+  content off Lucius stays tame.
+- **Courtship, upgraded (V48)** — a live scene in the places of your world (Rome, Wa, the East and
+  the coast, by station), where every line is a gesture and every answer a reaction, with speech
+  bubbles, a distance that closes as it goes well, and a finale. Each person has a temperament you
+  read by asking or by watching; you can ask about them, give one gift, take their hand, and see
+  off a rival who cuts in.
+- **Kanvek you can see, and a less hungry house (V48, mature content)** — the length is drawn
+  through the whole stroke and the swallow; Hungry comes in flashes instead of all day, even for a
+  Greedy spouse.
+- **The villa tablet as a panel (V48)** — tabs you can click or tap (⌘ in the villa), and the
+  Dominus Console split into tabs with a search.
 - **The new bodies, everywhere (V47)** — every spouse portrait (TAKE A WIFE / TAKE A HUSBAND,
   the courting card, the ledger, the bedroom's sprite) now stands the body-map figure in its
   culture's room — her own measurements, face, hair and gown — framed crown to thigh and

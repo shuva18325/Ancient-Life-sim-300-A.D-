@@ -255,7 +255,7 @@ const ok=(name,cond,note)=>{ if(cond){pass++; console.log('  PASS  '+name+(note?
   ok('and the portrait dresses them anyway — a stola over the linen, and a coast woman in her parka rather than the ulvik', !R.err && R.coast==='parka' && R.dressVsNot>1500, R.err||JSON.stringify(R));
 
   R=await T(()=>window.__SS.BUILD_STAMP);
-  ok('the build says V47', typeof R==='string' && /V47/.test(R), String(R));
+  ok('the build says V47 or later', typeof R==='string' && /V(4[7-9]|[5-9][0-9])/.test(R), String(R));
   ok('no page errors anywhere', errs.length===0, errs.slice(0,3).join(' | '));
   await br.close();
   console.log(fail? `\n${fail} FAILED, ${pass} passed` : `\nALL GREEN   (${pass} checks)`);

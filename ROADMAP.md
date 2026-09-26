@@ -9,7 +9,21 @@ grounds produce nine distinct pictures" is.
 
 ---
 
-## 0 — NEXT, PROPOSED AFTER V47 (in the order they would help most)
+## 0 — NEXT, PROPOSED AFTER V48 (in the order they would help most)
+
+V48 retired the last old bodies (the barber, the peek, the suitors, the pool, the children),
+turned the villa tablet into a clickable panel and the Dominus Console into tabs, fixed the
+spouse list for heirs of the other sex, made Hungry a face that comes in flashes, let you SEE
+him in the kanvek, rebuilt the courtship as a live scene and added the three bots. New since then:
+
+- **The bots, round two.** Let a bot play on from YOUR save (a copy of it) instead of a fresh
+  career, a fourth bot you write the brief for, and a ⏺ EXPORT that saves the playback as a file.
+- **Courtship, round two.** A second evening with the same person (they remember the first), a
+  walk together as a beat, and the rival as someone you meet again in the arena.
+
+Everything in the list below (from after V47 and V46) is still open.
+
+## 0b — STILL OPEN FROM AFTER V47 (in the order they would help most)
 
 V47 took the new bodies into the portraits and the courtship, made the jungle suit a choice,
 slowed the walk to the door and gave the player a look of their own. New since then:
@@ -61,6 +75,27 @@ And the list from after V46, still open:
 14. **Creation-card portraits on the template** — the first body a player sees.
 15. **Performance pass.** Cache fighter frames per pose; the bedchamber's painted room could be
     rendered once per session to an offscreen canvas and only its lamp and stars redrawn.
+
+### ~~0.2 The last old bodies, a usable tablet, courtship upgraded, the three bots~~ — DONE (V48)
+**Result:** `tests/v48.cjs` (28 checks). The barber, the peek ("the look"), the suitors, the pool's
+robe-drop, the wardrobe intro and the children all draw the new figures; the villa tablet is a
+panel of tabs you can click (SCENES · FACES · EYES · COAST) and the Dominus Console has tabs and a
+search. A son is never offered husbands, nor a daughter wives. Hungry comes in flashes — a Greedy
+spouse wore it 30–67% of the time and a wife in top form 100%; both are now about a tenth — and the
+villa's Hungry has thought clouds (a booty for him, a length for her). In the kanvek the length is
+DRAWN at last (a bare figure was being "covered" by a tunic hem it was not wearing), every stroke
+runs from the tip to her depth and back, and her hand is on his thigh instead of over him.
+**Courtship** is a live scene: the place is the place of your world (a noren-hung street, a moon
+gate, a shore fire, a council house of the Ten…), you walk up, every line is a gesture and every
+answer a reaction (a laugh, a nod, folded arms, a turned shoulder, and on a poor street a slap),
+speech bubbles say it, the distance closes as it goes well, and it ends with the two of you
+together or with them walking off. Each person has a temperament (Romantic, Cynic, Daring,
+Earnest, Vain, Shy) that you read by asking or by watching; 👂 ASK, 🎁 GIFT (once, priced to their
+station) and 🤝 TAKE THEIR HAND; a rival who cuts in with a line of their own; and street-only and
+hall-only lines. **The three bots** (Settings → 🤖): Minerva the Clever, Lucius the Lover (the Rkrai
+coast, the curviest wife) and Brutus the Bold play whole careers in a sandbox on the game's own
+data and rules, and ▶ WATCH plays them back on the game canvas as a video with their thoughts as
+subtitles, a caption per scene, and a play / skip / speed / scrub bar.
 
 ### ~~0.3 The new bodies everywhere: portraits, courtship, the sivrak, the walk, the look~~ — DONE (V47)
 **Result:** `tests/v47.cjs` (40 checks; 34 of them fail on V46). Bride and groom portraits are the

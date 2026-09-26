@@ -217,6 +217,18 @@
   .sact.hot .cap{border-color:#9fe8a8;color:#9fe8a8;}
   .sact.warn{border-color:#c85a6a;} .sact.warn .cap{border-color:#c85a6a;color:#e08a96;}
   .sact.dim{opacity:.5;}
+  /* 🤖 THE BOTS' PLAYBACK — a caption, subtitles, and a video bar over the game canvas */
+  #botwatch{position:absolute;inset:0;pointer-events:none;z-index:14;font-family:Georgia,serif;}
+  #botwatch .bw-top{position:absolute;left:0;right:0;top:0;height:4.4%;display:flex;justify-content:space-between;align-items:center;padding:0 1.2%;
+    color:#e8dcc2;font-size:clamp(9px,1.5vw,14px);letter-spacing:.08em;}
+  #botwatch .bw-rec{color:#ff7a7a;}
+  #botwatch .bw-sub{position:absolute;left:3%;right:3%;bottom:8.6%;min-height:6%;display:flex;align-items:center;justify-content:center;text-align:center;
+    color:#fff;font-size:clamp(12px,2.2vw,22px);font-style:italic;line-height:1.25;text-shadow:0 0 3px #000,0 0 6px #000,1px 1px 0 #000;transition:opacity .25s;}
+  #botwatch .bw-sub b{font-style:normal;letter-spacing:.06em;margin-right:.4em;}
+  #botwatch .bw-bar{position:absolute;left:0;right:0;bottom:0;height:8%;display:flex;align-items:center;gap:6px;padding:0 1%;background:rgba(0,0,0,.62);pointer-events:auto;}
+  #botwatch .bw-bar button{background:#2a1e14;border:1px solid #8a6f35;color:#e8c34a;border-radius:4px;padding:1px 8px;cursor:pointer;font-size:clamp(10px,1.6vw,15px);}
+  #botwatch .bw-seek{flex:1;accent-color:#e8c34a;min-width:40px;}
+  #botwatch .bw-time{color:#cdbca0;font-size:clamp(9px,1.3vw,13px);font-family:monospace;white-space:nowrap;}
   /* ⌘ THE ACTION TABLET, as a panel you can click and tap */
   #tabpanel{position:absolute;left:50%;top:3%;transform:translateX(-50%);width:min(94%,600px);max-height:90%;overflow-y:auto;
     z-index:12;background:rgba(14,9,18,.96);border:2px solid rgba(232,195,74,.6);border-radius:7px;padding:8px 10px 10px;
@@ -13056,6 +13068,105 @@ const COURT_BOASTS=[
 ];
 /* MEDIUM CENSORING — bodies rather than blackout, veils rather than silhouette.
    A single switch so the old shadow-theatre look is one boolean away. */
+/* =====================================================================
+   🌹 COURTSHIP, UPGRADED — "upgrade courtship"
+   ---------------------------------------------------------------------
+   The conversation was a wall of text over a still picture. It is a scene
+   now: you walk up, every line you choose is a gesture (a hand on the heart,
+   open palms, a flourish, a flex, a pointed finger), they react the way the
+   line landed (a laugh and a blush, a nod, a shrug, folded arms and a step
+   back, a turned shoulder — and on a poor street, for the worst lines, a
+   slap), speech bubbles say it, and the distance between you closes as it
+   goes well. Each person now has a TEMPERAMENT of their own on top of their
+   station, which you can read by asking or by watching; you can give a gift
+   (once, and it had better suit their station), take their hand when it is
+   going well, and a rival can walk up and cut in. The places are the places
+   of whichever world you are in — Rome, Wa, the East and the Rkrai coast —
+   and the person you meet is from there too. It ends with the two of you
+   together, or with them walking off.
+   ===================================================================== */
+const COURT_TEMPERS={
+  romantic:{name:'a Romantic', note:'sweet words land; bluster does not', mul:{sweet:1.40, honest:1.05, wit:0.95, body:0.90, bold:0.75}, gift:1.30, hand:1.25},
+  cynic:   {name:'a Cynic', note:'has heard every line — wants wit and the truth', mul:{sweet:0.60, honest:1.20, wit:1.40, body:0.95, bold:0.90}, gift:0.80, hand:0.80},
+  daring:  {name:'Daring', note:'likes nerve, and a body that backs it up', mul:{sweet:0.85, honest:0.95, wit:1.00, body:1.30, bold:1.45}, gift:0.90, hand:1.35},
+  earnest: {name:'Earnest', note:'honesty above everything', mul:{sweet:1.00, honest:1.45, wit:0.85, body:0.85, bold:0.80}, gift:1.00, hand:1.00},
+  vain:    {name:'Vain', note:'loves to be admired — and to be given things', mul:{sweet:1.25, honest:0.80, wit:1.05, body:1.10, bold:0.95}, gift:1.60, hand:1.00},
+  shy:     {name:'Shy', note:'startles at boldness; warms to gentleness', mul:{sweet:1.20, honest:1.20, wit:1.00, body:0.80, bold:0.55}, gift:1.10, hand:0.60},
+};
+const COURT_GIFTS=[
+  {id:'flower',  price:2,    icon:'🌸', name:{west:'a spray of violets', wa:'a camellia', east:'a peony', rk:'a sea-pink off the cliff'}},
+  {id:'ribbon',  price:15,   icon:'🎀', name:{west:'a silk ribbon', wa:'a lacquered comb', east:'a jade hairpin', rk:'a carved bone comb'}},
+  {id:'bracelet',price:70,   icon:'📿', name:{west:'a silver bracelet', wa:'a silver kanzashi', east:'a silver bangle', rk:'a string of amber'}},
+  {id:'silk',    price:300,  icon:'🧣', name:{west:'a length of Tyrian silk', wa:'a silk obi', east:'a bolt of brocade', rk:'a sealskin mantle'}},
+  {id:'jewel',   price:1400, icon:'💎', name:{west:'a pearl the size of a thumbnail', wa:'a gold-leaf hair ornament', east:'a pearl from the southern sea', rk:'a gold office-ring'}},
+];
+const COURT_GIFT_EXPECT={poor:2, rich:60, elite:250, imperial:1200};
+/* more to say — some of it only on some streets */
+COURT_PROMPTS.push(
+ {ranks:['poor'], q:'“There is a piper on the corner and nobody is dancing.”', opts:[
+   {t:'honest',v:9, say:'“I dance badly. I will do it anyway.”', r:'“Then we will be bad at it together.” They are already moving.'},
+   {t:'sweet', v:8, say:'You offer your hand without a word.', r:'They look at it for a long second — and take it.'},
+   {t:'wit',   v:6, say:'“Only when nobody is watching. Everybody is watching.”', r:'“That is the POINT,” they say, laughing.'},
+   {t:'bold',  v:-5,say:'“I lead.”', r:'“Do you.” They fold their arms and stay exactly where they are.'} ]},
+ {ranks:['poor'], q:'They hold out a skewer of something hot from the stall. “Try it.”', opts:[
+   {t:'honest',v:8, say:'You try it, and admit it is the best thing you have eaten all week.', r:'“It IS, isn’t it.” Something about that pleased them a great deal.'},
+   {t:'body',  v:7, say:'You eat the whole thing in two bites.', r:'They stare, and then laugh. “A man of appetite.”'},
+   {t:'wit',   v:6, say:'“Is this a test or a kindness?”', r:'“Both. Eat.”'},
+   {t:'sweet', v:-4,say:'“Anything from your hands.”', r:'“It is from HIS hands. The stall-keeper’s.” They take the skewer back.'} ]},
+ {ranks:['rich'], q:'“Father says fighters are a poor investment.”', opts:[
+   {t:'wit',   v:9, say:'“Tell him my returns are violent but reliable.”', r:'They choke on their wine, delighted.'},
+   {t:'honest',v:8, say:'“He is right. I am asking you to invest anyway.”', r:'“That is the worst pitch I have ever heard.” They are smiling.'},
+   {t:'body',  v:7, say:'“Then he has not seen the collateral.”', r:'They look you up and down, slowly. “No. He has not.”'},
+   {t:'sweet', v:-5,say:'“Some things cannot be priced.”', r:'“Everything can be priced. That is rather the family business.”'} ]},
+ {ranks:['rich'], q:'They hand you a cup of something expensive and watch to see if you know what it is.', opts:[
+   {t:'honest',v:9, say:'“I have no idea. It is very good.”', r:'“Nobody ever SAYS that.” They pour you more.'},
+   {t:'wit',   v:7, say:'“Something older than me and better travelled.”', r:'“…Falernian. And that was nearly right.”'},
+   {t:'bold',  v:5, say:'You drink it straight down.', r:'A scandalised laugh. “That was a year’s rent.”'},
+   {t:'sweet', v:-4,say:'“It tastes like you look.”', r:'“Sour and overpriced?” They take the cup back.'} ]},
+ {ranks:['elite','imperial'], q:'“Quote something. Anything. I want to know if you read.”', opts:[
+   {t:'honest',v:9, say:'“I do not read much. I remember what people say to me.”', r:'“Then remember THIS evening.” It lands softer than they meant it to.'},
+   {t:'wit',   v:10,say:'“‘I came, I saw’ — and I am still deciding about the third part.”', r:'A startled, genuine laugh. Several heads turn.'},
+   {t:'sweet', v:6, say:'You quote the only love poem you know. Badly.', r:'They wince at the metre and are touched anyway.'},
+   {t:'bold',  v:-6,say:'“Reading is for people who cannot do things.”', r:'Their face goes perfectly polite, which is worse than angry.'} ]},
+ {ranks:['elite','imperial'], q:'“My brother says you are a brute.”', opts:[
+   {t:'wit',   v:9, say:'“Your brother has met me. That is fair.”', r:'“He said you would say something like that.” They are grinning.'},
+   {t:'honest',v:8, say:'“On the sand, yes. Off it I am trying not to be.”', r:'They consider that seriously, which is a compliment.'},
+   {t:'body',  v:6, say:'“Did he say it from a safe distance?”', r:'“From the other side of the room.” A small, wicked smile.'},
+   {t:'bold',  v:-7,say:'“Bring him here and say it again.”', r:'“And there it is.” They look for the door.'} ]},
+ {ranks:['imperial'], q:'A courtier coughs behind them, pointedly. Your time is nearly up.', opts:[
+   {t:'honest',v:10,say:'“Then I will be quick: I would like to see you again.”', r:'They wave the courtier off. “Say that part slower.”'},
+   {t:'wit',   v:8, say:'“He sounds unwell. Someone should see to him.”', r:'The courtier glares; they laugh behind their hand.'},
+   {t:'sweet', v:6, say:'“I have been happy for the length of one cough.”', r:'“…You may have another.”'},
+   {t:'bold',  v:-8,say:'You ignore the courtier completely.', r:'“That,” they say coolly, “is how people end up in a report.”'} ]},
+ {q:'Somebody jostles them and they spill wine down their front.', opts:[
+   {t:'sweet', v:9, say:'You offer your own cloak without a word.', r:'They take it, and keep it round their shoulders longer than they need to.'},
+   {t:'wit',   v:8, say:'“It suits you. Everyone will be wearing it next week.”', r:'They laugh, which is exactly what the moment needed.'},
+   {t:'body',  v:6, say:'You turn and look at the man who did it until he leaves.', r:'“You did not have to do that.” They are pleased you did.'},
+   {t:'bold',  v:-5,say:'“Here, let me —” You reach for the stain.', r:'“I can manage my OWN front, thank you.”'} ]},
+ {q:'“What do you actually want? Out of all of it — the fighting, the noise?”', opts:[
+   {t:'honest',v:11,say:'“A door I can shut, and somebody on the right side of it.”', r:'They go very quiet. “…That is not a small thing to want.”'},
+   {t:'wit',   v:7, say:'“A quieter job. Lion-tamer, maybe.”', r:'“That is not QUIETER.” They are laughing.'},
+   {t:'sweet', v:7, say:'“Tonight? Just this.”', r:'Their eyes stay on you a beat longer than before.'},
+   {t:'bold',  v:-6,say:'“Everything. And I will take it.”', r:'“Of course you will.” They sound tired of the answer.'} ]}
+);
+/* the rival, cutting in */
+const COURT_RIVAL_BEATS=[
+ {q:'Another suitor strolls up — better dressed than you — and cuts straight in: “Is this one bothering you?”', say:'“Is this one bothering you?”', opts:[
+   {t:'wit',   v:10,say:'“Only in the ways I intend to.”', r:'They laugh, and the newcomer does not know where to put their hands.'},
+   {t:'body',  v:9, say:'You straighten to your full height and wait.', r:'The newcomer does the arithmetic on your shoulders and remembers an appointment.'},
+   {t:'honest',v:8, say:'“I am. Give us a moment and I will stop.”', r:'“No,” they tell the newcomer. “Stay out of it. I am enjoying being bothered.”'},
+   {t:'bold',  v:-6,say:'“Walk away before I help you.”', r:'“Lovely,” they say. “Two of you. Shall I fetch a referee?”'} ]},
+ {q:'The rival slides in beside them with a better cup of wine than yours and says: “I have a box at the games. Do you?”', say:'“I have a box at the games.”', opts:[
+   {t:'wit',   v:9, say:'“I have a better view. I am IN the games.”', r:'Delighted, they turn their back on the box.'},
+   {t:'honest',v:8, say:'“No. I have this conversation, and I would like to keep it.”', r:'“So would I,” they say, and the rival is quietly dismissed.'},
+   {t:'sweet', v:6, say:'“A box is a long way from the sand. I am right here.”', r:'They hesitate — and stay.'},
+   {t:'bold',  v:-5,say:'“Then go and sit in it.”', r:'“Children,” they say, to nobody in particular.'} ]},
+ {q:'The rival leans in and murmurs something in their ear, glancing at you, and they both laugh.', say:'(a murmur, and a glance at you)', opts:[
+   {t:'wit',   v:9, say:'“Whatever it was, I did it better and louder.”', r:'They laugh at THAT, and it is not with the rival any more.'},
+   {t:'honest',v:9, say:'“Tell me. I would rather hear it from you.”', r:'“He said you have a face like a shut door. I said I like doors.”'},
+   {t:'body',  v:5, say:'You step between them without a word.', r:'They raise an eyebrow — but they do not step back.'},
+   {t:'sweet', v:-5,say:'“I will not compete for you.”', r:'“Then you have already lost,” says the rival, pleased.'} ]}
+];
 let MEDIUM_CENSOR = true;
 const COURT_RESULT={
   glow:  {c:'#7ad48a', w:['flattered','warmed','delighted','pleased','disarmed']},
@@ -13090,6 +13201,8 @@ function courtStanding(id){
         : f<4? 'You have been refused here '+f+' times. They have heard about you.'
         : 'You are a known quantity at this station, and not a flattering one.' };
 }
+let COURT_WORLD_OV=null;                  // 🤖 the bots' playback says which world it is in
+function courtWorld(){ if(COURT_WORLD_OV) return COURT_WORLD_OV; let w='west'; try{ w=playerWorld(); }catch(e){} return (w==='wa'||w==='east'||w==='rk')? w : 'west'; }
 function startCourtship(rankId){
   const R=COURT_RANKS[rankId]; if(!R) return;
   const acc=courtAccess(rankId);
@@ -13097,64 +13210,86 @@ function startCourtship(rankId){
   if(courtCooldown(rankId)>0){
     toast('⏳ You were here today already. Turning up twice in an evening is how a man gets a reputation — come back tomorrow.',4200);
     return; }
-  // the person is rolled UP FRONT, with a face and a name — you are courting
-  // somebody specific, not an abstraction you win at the end
-  const eth=pick(BRIDE_ETHS);
+  // the person is rolled UP FRONT, with a face and a name — and from HERE: a street in Kyōto is not full of Romans
+  const pool=(typeof brideEthsHere==='function')? brideEthsHere() : BRIDE_ETHS;
+  const home=(typeof homeBrideEth==='function')? homeBrideEth() : 'roman';
+  const eth=Math.random()<0.55? home : pick(pool);
   const q=clamp(Math.round(rnd(R.quality[0],R.quality[1])),1,10);
   const who=makeBride(eth, R.noble, q, {ageNear:(G.age||22), spread: rankId==='poor'?7:5});
   who.tier = rankId==='poor'?'common' : rankId==='rich'?'rich' : rankId==='elite'?'elite':'imperial';
   const st=courtStanding(rankId), rec=courtRec(rankId);
   rec.tries++; rec.lastDay=G.day;
-  // AND SOMETIMES SOMEBODY IS ALREADY THERE. A rival makes them harder work,
-  // and you find out about it from them rather than from a rules screen.
+  // AND SOMETIMES SOMEBODY IS ALREADY THERE — and now you can see them, standing a little way off
   const rival = Math.random() < (rankId==='poor'?0.16 : rankId==='rich'?0.28 : 0.38);
+  const temper = pick(Object.keys(COURT_TEMPERS));
   CT={ rank:R, rankId, who, prog:0, mistakes:0,
        max: Math.max(1, R.mistakes - st.lifePenalty),
        beat:null, used:[], doubt:null, over:false, won:false, turns:0, lastMsg:null,
-       standing:st, rival, progPenalty:st.progPenalty };
-  if(rival) CT.max=Math.max(1,CT.max);
+       standing:st, rival, progPenalty:st.progPenalty, temper, readT:false, asked:false, gifted:false, handTried:false, holding:false,
+       rivalDone:false, rivalLook: rival? makeBride(pick(pool), R.noble, clamp(q-1,1,10), {male:!G.isFemale}) : null,
+       anim:{t:0, me:{x:null, dist:0}, them:{x:null, dist:0, dir:1, turnT:99}, rv:{x:null, dist:0, leave:false},
+             ges:null, rea:null, bub:[], fx:[], end:null, slap:null, giftItem:null} };
+  /* ✨ THE FIRST IMPRESSION. Before a word is said they have looked at you. */
+  { const fa=courtBodyVal('face'), fame=(G.glory||0)+(G.renown||0)*2;
+    let imp=Math.max(0,fa-5)*2 + (rankId!=='poor' && fame>=600? 3 : 0);
+    if(CT.progPenalty>0) imp=Math.floor(imp/2);
+    imp=clamp(imp,0,12);
+    if(imp>0){ CT.prog=imp;
+      CT.lastMsg={say:'(You walk up to them.)', r: fa>=8? 'They noticed you before you noticed them.' : 'They look you over, and they do not look away.', band:'ok', delta:imp, note:'A first impression — and it counts.'}; } }
   courtNextBeat();
   state='court'; show('scr-court'); $('statbar').classList.remove('hide'); refreshStatbar();
   renderCourt();
 }
-// pick the next thing they say — a boast opportunity sometimes, otherwise a prompt
+// pick the next thing they say — a boast opportunity sometimes, the rival sometimes, otherwise a prompt
 function courtNextBeat(){
   if(!CT) return;
-  const fresh=COURT_PROMPTS.filter((p,i)=>!CT.used.includes(i));
-  const pool = fresh.length? fresh : COURT_PROMPTS;
+  /* 🗡 THE RIVAL CUTS IN — once, a couple of lines in */
+  if(CT.rival && !CT.rivalDone && CT.turns>=2 && (Math.random()<0.55 || CT.turns>=4)){
+    const B=pick(COURT_RIVAL_BEATS);
+    CT.beat={ q:B.q, opts:B.opts.slice(), rival:true };
+    courtBubble('rival', B.say, 150); CT.anim.rv.cut=true;
+    return;
+  }
+  const ok=(p)=>!p.ranks || p.ranks.indexOf(CT.rankId)>=0;
+  const fresh=COURT_PROMPTS.filter((p,i)=>ok(p) && !CT.used.includes(i));
+  const pool = fresh.length? fresh : COURT_PROMPTS.filter(ok);
   const idx = COURT_PROMPTS.indexOf(pick(pool));
-  CT.used.push(idx); if(CT.used.length>COURT_PROMPTS.length-2) CT.used=[idx];
+  CT.used.push(idx); if(CT.used.length>COURT_PROMPTS.filter(ok).length-2) CT.used=[idx];
   const P=COURT_PROMPTS[idx];
-  // options are the prompt's four, PLUS any boast the conversation has earned
   const opts=P.opts.slice();
   const fem=!!(G&&G.isFemale);
   const boasts=COURT_BOASTS.filter(b=>{
     if(CT.prog < b.minProg) return false;
     if(b.adultOnly && !ADULT) return false;
-    if(b.fem)  return fem;                  // hers
-    if(b.male) return !fem;                 // his
-    return true;                            // and the ones either of them can make
+    if(b.fem)  return fem;
+    if(b.male) return !fem;
+    return true;
   });
-  if(boasts.length && Math.random()<0.55){
-    const B=pick(boasts);
-    opts.push({t:B.t, v:B.v, say:B.say, boast:B});
-  }
+  if(boasts.length && Math.random()<0.55){ const B=pick(boasts); opts.push({t:B.t, v:B.v, say:B.say, boast:B}); }
   CT.beat={ q:P.q, opts };
 }
-// the standing penalty is applied as a ceiling you have to climb back from
 function courtApplyStanding(){
   if(!CT || CT._stApplied) return; CT._stApplied=true;
-  if(CT.progPenalty>0) CT.prog=0;      // you begin at nothing and the bar is longer
+  if(CT.progPenalty>0) CT.prog=0;
 }
-function courtWeight(t){ const w=CT.rank.taste[t]; return w===undefined?1:w; }
+/* how well a kind of line lands: their station's taste, times their own temperament */
+function courtWeight(t){ const w=CT.rank.taste[t]===undefined? 1 : CT.rank.taste[t];
+  const T=CT.temper && COURT_TEMPERS[CT.temper]; return w*((T && T.mul[t])||1); }
+/* and what YOU can tell about it: their station's taste, until you have read them */
+function courtLean(t){ return CT.readT? courtWeight(t) : (CT.rank.taste[t]===undefined? 1 : CT.rank.taste[t]); }
 function courtBand(score){
   return score>=9? 'glow' : score>=4? 'ok' : score>=0? 'cool' : score>=-5? 'bad' : 'awful';
+}
+function courtReadNote(){
+  if(CT.readT || CT.turns<4) return null;
+  CT.readT=true; const T=COURT_TEMPERS[CT.temper];
+  return 'You are starting to read them: '+T.name+' — '+T.note+'.';
 }
 function courtChoose(i){
   if(!CT||CT.over) return;
   const O=CT.beat.opts[i]; if(!O) return;
+  const wasRival=!!CT.beat.rival;
   CT.turns++;
-  // A BOAST IS A CLAIM, AND A CLAIM CAN BE FALSE
   if(O.boast){
     const B=O.boast, have=courtBodyVal(B.stat), true_=have>=B.need;
     if(true_){
@@ -13162,25 +13297,29 @@ function courtChoose(i){
       CT.prog=clamp(CT.prog+gain,0,100);
       CT.lastMsg={say:O.say, r:B.good, band:'glow', delta:gain, note:'They believe you, because it is true.'};
     } else {
-      // THEY DO NOT BELIEVE YOU. Now you have a decision to make.
       CT.doubt={boast:B, stat:B.stat, need:B.need};
-      CT.lastMsg={say:O.say, r:B.bad, band:'bad', delta:0,
-        note:'They do not believe a word of it. You can let it go — or prove it.'};
+      CT.lastMsg={say:O.say, r:B.bad, band:'bad', delta:0, note:'They do not believe a word of it. You can let it go — or prove it.'};
     }
+    courtAnimLine('flex', CT.lastMsg.band, O.say, CT.lastMsg.delta);
     if(!CT.doubt) courtAdvance();
     renderCourt(); return;
   }
-  const drag = 1 - (CT.progPenalty||0)/100 - (CT.rival? 0.12 : 0);   // a poor record is a headwind
+  const drag = 1 - (CT.progPenalty||0)/100 - (CT.rival? 0.12 : 0);
   const raw=O.v, score=Math.round(raw*courtWeight(O.t)*Math.max(0.55,drag));
   CT.prog=clamp(CT.prog+Math.max(score,0),0,100);
   if(score<0){ CT.mistakes++; CT.prog=clamp(CT.prog+Math.round(score*0.6),0,100); }
-  CT.lastMsg={say:O.say, r:O.r, band:courtBand(score), delta:score,
-    note: score<0? 'A mistake. '+(CT.max-CT.mistakes)+' left.' : null};
+  const notes=[];
+  if(score<0) notes.push('A mistake. '+(CT.max-CT.mistakes)+' left.');
+  if(wasRival){ CT.rivalDone=true;
+    if(score>=4){ CT.rival=false; CT.anim.rv.leave=true; CT.prog=clamp(CT.prog+4,0,100); notes.push('The other one gives up and leaves.'); }
+    else notes.push('The other one is still here.'); }
+  const rn=courtReadNote(); if(rn) notes.push(rn);
+  CT.lastMsg={say:O.say, r:O.r, band:courtBand(score), delta:score, note: notes.length? notes.join(' ') : null};
+  const G2={sweet:'heart', honest:'palms', wit:'flourish', body:'flex', bold:'point'}[O.t]||'palms';
+  courtAnimLine(G2, CT.lastMsg.band, O.say, score);
   courtAdvance();
   renderCourt();
 }
-// SHOW THEM — the last resort. Honest if you have it, catastrophic if you do not,
-// and simply not done at all in front of the kind of people who write things down.
 function courtShow(){
   if(!CT||!CT.doubt) return;
   const D=CT.doubt, have=courtBodyVal(D.stat), true_=have>=D.need;
@@ -13190,7 +13329,7 @@ function courtShow(){
     CT.lastMsg={say:'You offer to prove it, here, in front of everyone.',
       r:'They stand up. “I am going to pretend that did not happen, and you are going to leave.”',
       band:'awful', delta:-99, note:'That is not done. Not with this one.'};
-    CT.mistakes=CT.max+1; courtAdvance(); renderCourt(); return;
+    CT.mistakes=CT.max+1; courtAnimLine('flex','awful','…',-99); courtAdvance(); renderCourt(); return;
   }
   if(true_){
     const gain=Math.round(D.boast.v*1.5*courtWeight('bold'));
@@ -13204,6 +13343,7 @@ function courtShow(){
       r:'They look. They look back up at your face. “Why,” they ask, “would you DO that?”',
       band:'awful', delta:-22, note:'It was not true, and now everyone is certain.'};
   }
+  courtAnimLine('flex', CT.lastMsg.band, 'Look.', CT.lastMsg.delta);
   courtAdvance(); renderCourt();
 }
 function courtBackDown(){
@@ -13213,11 +13353,59 @@ function courtBackDown(){
   CT.lastMsg={say:'“…Forget I said it.”',
     r:'“Already have,” they say, and mean about half of it.',
     band:'bad', delta:-6, note:'A mistake, but a survivable one. '+(CT.max-CT.mistakes)+' left.'};
+  courtAnimLine('rub','bad','…forget it.',-6);
+  courtAdvance(); renderCourt();
+}
+/* 👂 ASK ABOUT THEM — once. They talk about themselves, and you learn what they are like. */
+function courtAsk(){
+  if(!CT||CT.over||CT.asked||CT.doubt) return;
+  CT.asked=true; CT.readT=true; CT.turns++;
+  const T=COURT_TEMPERS[CT.temper], gain=Math.round(3*courtWeight('honest'));
+  CT.prog=clamp(CT.prog+gain,0,100);
+  CT.lastMsg={say:'“Tell me about yourself. Not the family — you.”',
+    r:'They are surprised to be asked, and they tell you — at length. They are '+T.name+': '+T.note+'.',
+    band:'ok', delta:gain, note:'You can read them now: the hints on your answers are about THEM, not just their station.'};
+  courtAnimLine('palms','ok','Tell me about you.',gain);
+  courtAdvance(); renderCourt();
+}
+/* 🎁 A GIFT — once, and it had better suit their station */
+function courtGiftName(g){ const w=courtWorld(); return g.name[w]||g.name.west; }
+function courtGift(id){
+  if(!CT||CT.over||CT.gifted||CT.doubt) return;
+  const g=COURT_GIFTS.find(x=>x.id===id); if(!g) return;
+  if((G.coin||0)<g.price){ toast('✗ You cannot afford '+courtGiftName(g)+'.', 2400); return; }
+  G.coin-=g.price; CT.gifted=true; CT.turns++;
+  try{ refreshStatbar(); }catch(e){}
+  const expect=COURT_GIFT_EXPECT[CT.rankId]||10, ratio=g.price/expect, T=COURT_TEMPERS[CT.temper];
+  let score, r, band;
+  if(ratio<0.2){ score=-4; band='bad';
+    r='They turn '+courtGiftName(g)+' over in their fingers. “How… thoughtful.” It goes on the table and stays there.'; }
+  else if(ratio<0.8){ score=Math.round(3*(T.gift||1)); band='cool'; r='“Oh — thank you.” Polite, and a little puzzled.'; }
+  else { score=Math.round(Math.min(18, (7+3*Math.log2(ratio))*(T.gift||1))); band=score>=9? 'glow' : 'ok';
+    r= CT.rankId==='poor' && ratio>=40? 'They stare at it. “Where did a man like you get THIS?” — and they do not give it back.'
+     : '“For me?” They hold '+courtGiftName(g)+' against themselves at once, delighted.'; }
+  if(score<0){ CT.mistakes++; CT.prog=clamp(CT.prog+score,0,100); } else CT.prog=clamp(CT.prog+score,0,100);
+  CT.lastMsg={say:'You give them '+courtGiftName(g)+'.', r, band, delta:score, note: score<0? 'Too little, for this one. A mistake. '+(CT.max-CT.mistakes)+' left.' : null};
+  CT.anim.giftItem={icon:g.icon, t0:CT.anim.t};
+  courtAnimLine('give', band, g.icon+' for you.', score);
+  courtAdvance(); renderCourt();
+}
+/* 🤝 TAKE THEIR HAND — when it is going well. Too soon, or with the wrong one, and it is a mistake. */
+function courtHand(){
+  if(!CT||CT.over||CT.handTried||CT.doubt||CT.prog<50) return;
+  CT.handTried=true; CT.turns++;
+  const T=COURT_TEMPERS[CT.temper], rk={poor:1, rich:0.85, elite:0.6, imperial:0.3}[CT.rankId]||1;
+  const chance=clamp((CT.prog-40)/55*(T.hand||1)*rk, 0.05, 0.95);
+  if(Math.random()<chance){ const gain=12; CT.prog=clamp(CT.prog+gain,0,100); CT.holding=true;
+    CT.lastMsg={say:'You take their hand.', r:'They let you. Their fingers close round yours, and neither of you says anything for a moment.', band:'glow', delta:gain, note:null}; }
+  else { CT.mistakes++; CT.prog=clamp(CT.prog-6,0,100);
+    CT.lastMsg={say:'You take their hand.', r:'They take it back — without hurry, and without apology.', band:'bad', delta:-6, note:'Too soon, for this one. A mistake. '+(CT.max-CT.mistakes)+' left.'}; }
+  courtAnimLine('reach', CT.lastMsg.band, '…', CT.lastMsg.delta);
   courtAdvance(); renderCourt();
 }
 function courtAdvance(){
-  if(CT.mistakes>CT.max){ CT.over=true; CT.won=false; return; }
-  if(CT.prog>=100){ CT.over=true; CT.won=true; return; }
+  if(CT.mistakes>CT.max){ CT.over=true; CT.won=false; CT.anim.end={won:false, t0:CT.anim.t+60}; return; }
+  if(CT.prog>=100){ CT.over=true; CT.won=true; CT.anim.end={won:true, t0:CT.anim.t+60}; return; }
   courtNextBeat();
 }
 function courtFinish(){
@@ -13225,127 +13413,330 @@ function courtFinish(){
   { const rec=courtRec(CT.rankId); if(CT.won) rec.wins++; else rec.fails++; saveQuiet(); }
   if(CT.won){
     const who=CT.who;
-    marryList=[who];                       // the person you actually talked to
+    marryList=[who];
     CT=null; state='marry';
     toast('🌹 They say yes — and they say it to YOU, not to your purse.',4200);
     openMarry(false); return;
   }
   CT=null; state='marry'; openMarry(false);
 }
-/* ---- THE SCENE. A courtship is two people standing somewhere, and until now
-   it was a wall of text with a stamp-sized portrait in the corner. This draws
-   the pair of you where you actually are — a street fountain, a colonnaded
-   garden, a marble hall, the palace — and their posture answers to how it is
-   going: turned half away while they are unconvinced, square on once you have
-   them, leaning in at the end. ---- */
+/* ---- THE ANIMATION: what each of you does with a line ---- */
+function courtAnim(){ if(!CT.anim) CT.anim={t:0, me:{x:null,dist:0}, them:{x:null,dist:0,dir:1,turnT:99}, rv:{x:null,dist:0}, ges:null, rea:null, bub:[], fx:[], end:null}; return CT.anim; }
+function courtShort(txt, n){ let s=String(txt||'').replace(/[“”"]/g,'').trim(); n=n||30; return s.length>n? s.slice(0,n-1).trim()+'…' : s; }
+function courtBubble(who, text, dur){ const A=courtAnim(); A.bub=A.bub.filter(b=>b.who!==who); A.bub.push({who, text, t0:A.t, dur:dur||95}); }
+const COURT_REACT_WORDS={glow:['Ha!','Oh!','…oh.','Mm!','Ohh.'], ok:['Hm!','Go on.','Ha.','Mm.'], cool:['…','Hm.','Right.'], bad:['Hm.','Right.','…really.'], awful:['Excuse me?!','No.','Ugh.','OUT.']};
+function courtAnimLine(gesture, band, say, delta){
+  const A=courtAnim(), T=A.t;
+  A.ges={kind:gesture, t0:T, dur:74};
+  courtBubble('me', courtShort(say, 30), 100);
+  const stiff=(CT.rankId==='elite'||CT.rankId==='imperial');
+  let rk = band==='glow'? 'laugh' : band==='ok'? 'nod' : band==='cool'? 'shrug' : band==='bad'? 'cross' : 'turn';
+  if(band==='awful' && !stiff && (delta||0)<=-8) rk='slap';
+  if(gesture==='give' && (band==='glow'||band==='ok')) rk='take';
+  if(gesture==='reach') rk= (band==='glow')? 'hold' : 'cross';
+  A.rea={kind:rk, band, t0:T+48, dur:96};
+  A.pendingWord={t:T+52, w:pick(COURT_REACT_WORDS[band]||['…'])};
+  A.pendingFx={t:T+54, band};
+}
+function courtSpawnFx(band, x, y){
+  const A=courtAnim(), n= band==='glow'? 6 : band==='ok'? 3 : 2;
+  for(let i=0;i<n;i++) A.fx.push({kind: band==='glow'? 'heart' : band==='ok'? 'spark' : band==='cool'? 'q' : band==='bad'? 'sweat' : 'anger',
+    x:x+rnd(-6,6), y:y+rnd(-4,2), vx:rnd(-0.25,0.25), vy:-rnd(0.35,0.7), life:60+rnd(0,30), max:90});
+}
+function courtEnv(t, t0, dur){ const u=t-t0; if(u<0||u>dur) return 0; return Math.min(1, u/12, (dur-u)/14); }
+/* where the hands go for each gesture, hip-relative (x toward the one they are facing, y down) */
+const COURT_HANDS_M={ heart:{near:[3.4,-16.5]}, palms:{near:[10,-9], far:[9,-10]}, flourish:{near:[11,-25]}, flex:{near:[1.8,-30], far:[1.0,-29]},
+  point:{near:[18,-21]}, give:{near:[14,-14]}, reach:{near:[14,-11]}, rub:{near:[-1.5,-31]}, laugh:{near:[4.2,-27]}, cross:{near:[4.2,-15], far:[3.6,-16]},
+  shrug:{near:[8,-11], far:[7,-12]}, take:{near:[4.4,-15]}, hold:{near:[12,-11]}, slap:{near:[17,-27]}, wave:{far:[3,-35]} };
+const COURT_HANDS_F={ heart:{near:[3.6,-16.5]}, palms:{near:[10.5,-10], far:[9.5,-11]}, flourish:{near:[11,-24]}, flex:{near:[-0.8,-4.5], far:[-1.2,-32]},
+  point:{near:[17,-20]}, give:{near:[14,-13]}, reach:{near:[14,-11]}, rub:{far:[-1.2,-32]}, laugh:{near:[5,-27]}, cross:{near:[4.2,-13], far:[3.4,-14.5]},
+  shrug:{near:[8.5,-11], far:[7.5,-12]}, take:{near:[4.6,-15]}, hold:{near:[12,-11]}, slap:{near:[16,-26]}, wave:{far:[3,-34]} };
+function courtHandsFor(male, kind, k, restN, restF){
+  const H=(male? COURT_HANDS_M : COURT_HANDS_F)[kind]; if(!H || k<=0) return {near:null, far:null};
+  const L=(a,b)=>(a&&b)? [a[0]+(b[0]-a[0])*k, a[1]+(b[1]-a[1])*k] : null;
+  return {near: H.near? L(restN, H.near) : null, far: H.far? L(restF, H.far) : null};
+}
+function courtFaceHard(id){ return HARD_FACES[id] || ((typeof faceAsHard==='function' && FACE_EX[id])? faceAsHard(id) : null) || HARD_FACES[HALL_MAN_FACE[id]] || HARD_FACES.stoic; }
+function courtManKit(look){
+  const coast=courtWorld()==='rk' && (look.self? true : look.eth==='rkrai');
+  let cloth=hexOf(look.dress || (look.self && G && G.tunic) || '#7a2f22'); if(coast) cloth=mixHex(cloth,'#5a4028',0.35);
+  return {coast, cloth, band: coast? '#8a6a3a' : undefined};
+}
+/* one of the three people, posed: g = gesture, k = how far into it, face, lean, head, walking */
+function courtFigure(c, look, x, fl, dir, P, T, Z){
+  const male=!!look.male;
+  if(male){
+    const H=courtHandsFor(true, P.g, P.k||0, [1.5,-3.7], [2.5,-3.7]), K=courtManKit(look);
+    return drawManProfile(c, x, fl, look, {k:Z, u:0, aro:0, near:H.near, far:H.far, lean:(P.lean===undefined? 0.02 : P.lean), headAng:P.headAng,
+      face:courtFaceHard(P.face||'stoic'), cloth:K.cloth, band:K.band, coast:K.coast, walk:P.walk? 1 : 0, walkPh:P.walkPh||0}, dir);
+  }
+  return drawFemProfile(c, x, fl, look, {k:Z, t:T, expr:(FACE_EX[P.face]? P.face : 'flat'), blush:P.blush||0, dress:hallDressOf(look),
+    pose:(X0,FL)=>{ const B=femWalkPose(look,{mode:P.walk? 'walk' : 'idle', ph:P.walkPh||0, t:T},X0,FL);
+      const hip=B.hip, restN=[B.hands.near[0]-hip[0], B.hands.near[1]-hip[1]], restF=[B.hands.far[0]-hip[0], B.hands.far[1]-hip[1]];
+      const H=courtHandsFor(false, P.g, P.k||0, restN, restF);
+      if(H.near) B.hands.near=[hip[0]+H.near[0], hip[1]+H.near[1]];
+      if(H.far)  B.hands.far =[hip[0]+H.far[0],  hip[1]+H.far[1]];
+      if(P.lean!==undefined) B.lean=P.lean; if(P.headAng!==undefined) B.headAng=P.headAng;
+      return B; }}, dir);
+}
+/* ---- THE PLACE, in whichever world you are standing ---- */
+function drawCourtVenue(c, W2, H2, FL, id, world, T, warm){
+  const PX=(x,y,w,h,col)=>{ c.fillStyle=col; c.fillRect(Math.round(x),Math.round(y),Math.round(w),Math.round(h)); };
+  const sky=c.createLinearGradient(0,0,0,H2);
+  const PAL={ west:{poor:['#241a2e','#2e2130','#1a1218'], rich:['#2a2236','#3a2c30','#1e1618'], elite:['#2c2438','#39304a','#1c1826'], imperial:['#331c42','#3d2150','#1c0f26']},
+              wa:  {poor:['#1c2030','#2a2430','#16121a'], rich:['#2a2430','#3a2e2a','#1c1614'], elite:['#2a2620','#3a3226','#1c1810'], imperial:['#1a2238','#2a2a44','#141628']},
+              east:{poor:['#281a22','#3a2226','#1a1014'], rich:['#22222e','#32282a','#181214'], elite:['#2a1a1a','#3e2420','#1a0e0c'], imperial:['#2a1830','#44203a','#1a0c1c']},
+              rk:  {poor:['#0c1624','#14223a','#0a0e16'], rich:['#1a1a20','#2a2420','#141010'], elite:['#1c1612','#2e2218','#120c08'], imperial:['#18120e','#2c1e14','#100a06']} };
+  const pc=(PAL[world]||PAL.west)[id]||PAL.west.poor;
+  sky.addColorStop(0,pc[0]); sky.addColorStop(.6,pc[1]); sky.addColorStop(1,pc[2]); c.fillStyle=sky; c.fillRect(0,0,W2,H2);
+  { const g=c.createRadialGradient(W2/2,FL-52,10,W2/2,FL-52,120+warm*80);             // a warm pool of light that grows as it goes well
+    g.addColorStop(0,'rgba(255,214,150,'+(0.10+warm*0.20)+')'); g.addColorStop(1,'rgba(255,190,120,0)'); c.fillStyle=g; c.fillRect(0,0,W2,H2); }
+  const lantern=(x,y,col,sw)=>{ const s=Math.sin(T*0.05+x)*sw; c.strokeStyle='rgba(20,10,8,.8)'; c.lineWidth=1; c.beginPath(); c.moveTo(x,y-8); c.lineTo(x+s,y); c.stroke();
+    const g=c.createRadialGradient(x+s,y+5,1,x+s,y+5,16); g.addColorStop(0,'rgba(255,170,90,.35)'); g.addColorStop(1,'rgba(255,170,90,0)'); c.fillStyle=g; c.fillRect(x+s-16,y-11,32,32);
+    c.fillStyle=col; c.beginPath(); c.ellipse(x+s,y+5,4.5,6,0,0,7); c.fill(); c.fillStyle='rgba(255,230,180,.55)'; c.fillRect(x+s-1,y+1,2,8); c.fillStyle='#1a0e08'; c.fillRect(x+s-3,y-1,6,1.5); c.fillRect(x+s-3,y+10,6,1.5); };
+  const torch=(tx,y)=>{ PX(tx,y,3,12,'#5a4028'); const fl=3+Math.sin(T*0.3+tx)*1.4; PX(tx-1,y-4-fl,5,fl+5,'#ffb84a'); PX(tx,y-6-fl,3,fl+3,'#ffe6a0'); };
+  if(world==='wa'){
+    if(id==='poor'){ // a night street: townhouse fronts, noren, paper lanterns on a line, a noodle stall
+      for(let x=0;x<W2;x+=62){ PX(x+2,FL-78,58,78,'#3a2a1c'); for(let i=0;i<9;i++) PX(x+6+i*6,FL-66,2,40,'#5a4430'); PX(x+2,FL-80,58,4,'#241810');
+        PX(x+14,FL-26,32,14,'#2a3a5a'); PX(x+29,FL-26,2,14,'#1a2438'); }
+      c.strokeStyle='rgba(30,16,10,.7)'; c.beginPath(); c.moveTo(0,FL-92); c.quadraticCurveTo(W2/2,FL-80,W2,FL-92); c.stroke();
+      for(let i=0;i<7;i++) lantern(24+i*66, FL-92+Math.sin(i/6*Math.PI)*10, '#c8302a', 1.2);
+      PX(8,FL-30,42,4,'#6a4a2c'); PX(10,FL-26,38,26,'#4a3420'); PX(12,FL-44,2,14,'#6a4a2c'); PX(46,FL-44,2,14,'#6a4a2c'); PX(8,FL-46,42,4,'#8a2a22');   // the yatai
+      for(let i=0;i<3;i++){ const k=(T*0.4+i*20)%40; c.fillStyle='rgba(230,230,230,'+(0.25*(1-k/40)).toFixed(2)+')'; c.beginPath(); c.arc(24+i*4+Math.sin(k*0.2)*2, FL-34-k, 3+k*0.08, 0,7); c.fill(); }
+    } else if(id==='rich'){ // a merchant house veranda: shoji glowing, posts, a stone lantern, the moon
+      PX(0,FL-90,W2,90,'#3a2c1e'); for(let x=20;x<W2-20;x+=40){ PX(x,FL-86,36,64,'#e8dcc0'); for(let i=1;i<4;i++) PX(x+i*9,FL-86,1,64,'#8a7050'); for(let j=1;j<5;j++) PX(x,FL-86+j*13,36,1,'#8a7050'); }
+      c.fillStyle='rgba(255,210,140,.12)'; c.fillRect(20,FL-86,W2-40,64);
+      for(let x=12;x<W2;x+=80) PX(x,FL-94,6,94,'#5a4028'); PX(0,FL-10,W2,10,'#6a5034');
+      c.fillStyle='#f4ecd0'; c.beginPath(); c.arc(W2-40,26,10,0,7); c.fill();
+      PX(22,FL-26,12,4,'#8a8a82'); PX(24,FL-38,8,12,'#7a7a72'); PX(20,FL-42,16,4,'#9a9a92'); PX(26,FL-34,4,4,'#ffc060');
+    } else if(id==='elite'){ // a castle hall: tatami, fusuma with gold cloud and pine, a tokonoma
+      PX(0,FL-96,W2,96,'#2a2218');
+      for(let x=0;x<W2;x+=55){ PX(x+1,FL-90,53,70,'#c8a860'); c.fillStyle='rgba(255,240,190,.35)'; c.beginPath(); c.ellipse(x+20,FL-70,18,6,0,0,7); c.fill(); PX(x+1,FL-90,53,2,'#6a5030'); }
+      c.strokeStyle='#2a4a2a'; c.lineWidth=2; for(let i=0;i<3;i++){ c.beginPath(); c.moveTo(60+i*140,FL-30); c.quadraticCurveTo(80+i*140,FL-60,110+i*140,FL-58); c.stroke(); }
+      for(let x=0;x<W2;x+=40){ PX(x,FL,40,H2-FL,'#a8a060'); PX(x,FL,40,1.5,'#1a1a10'); PX(x,FL,1.5,H2-FL,'#1a1a10'); }
+      PX(W2/2-24,FL-86,48,60,'#1c140c'); PX(W2/2-8,FL-80,16,40,'#e8dcc0'); PX(W2/2-6,FL-76,12,2,'#2a1a10'); PX(W2/2-4,FL-64,6,14,'#3a2a1a');   // a hanging scroll
+    } else { // imperial: a palace garden at night, an arched red bridge, a cherry tree losing its petals
+      PX(0,FL-18,W2,18,'#1a2438'); c.fillStyle='rgba(120,160,220,.18)'; c.fillRect(0,FL-18,W2,18);
+      c.strokeStyle='#b0302a'; c.lineWidth=3; c.beginPath(); c.moveTo(W2*0.55,FL-6); c.quadraticCurveTo(W2*0.72,FL-44,W2*0.9,FL-6); c.stroke();
+      for(let i=0;i<5;i++){ const x=W2*0.58+i*W2*0.07; c.beginPath(); c.moveTo(x,FL-12-Math.sin(i/4*Math.PI)*24); c.lineTo(x,FL-26-Math.sin(i/4*Math.PI)*24); c.stroke(); }
+      PX(40,FL-70,6,70,'#3a2418'); c.fillStyle='#f0b8c8'; for(let i=0;i<9;i++){ c.beginPath(); c.arc(30+((i*37)%50),FL-80+((i*23)%26),9,0,7); c.fill(); }
+      for(let i=0;i<10;i++){ const k=(T*0.5+i*29)%120; c.fillStyle='rgba(250,200,215,.85)'; c.fillRect(20+((i*47)%140)+Math.sin(k*0.1)*6, FL-80+k, 1.5, 1.2); }
+      lantern(W2-30, FL-60, '#e8b050', 0.6);
+    }
+  } else if(world==='east'){
+    if(id==='poor'){ // a night market: red lanterns strung across, stalls with awnings, a steaming pot
+      for(let x=0;x<W2;x+=74){ PX(x+4,FL-56,66,56,'#3a2418'); PX(x,FL-64,74,8,x%148? '#8a2a22' : '#2a5a4a'); for(let i=0;i<6;i++) PX(x+i*12,FL-58,6,3,x%148? '#b03a2a' : '#3a7a6a'); }
+      c.strokeStyle='rgba(30,10,8,.7)'; c.beginPath(); c.moveTo(0,FL-96); c.quadraticCurveTo(W2/2,FL-84,W2,FL-96); c.stroke();
+      for(let i=0;i<8;i++) lantern(18+i*58, FL-96+Math.sin(i/7*Math.PI)*10, '#d0302a', 1.0);
+      PX(W2-56,FL-18,26,14,'#5a5a5a'); for(let i=0;i<3;i++){ const k=(T*0.4+i*20)%40; c.fillStyle='rgba(230,230,230,'+(0.25*(1-k/40)).toFixed(2)+')'; c.beginPath(); c.arc(W2-44+Math.sin(k*0.2)*2, FL-22-k, 3+k*0.08, 0,7); c.fill(); }
+    } else if(id==='rich'){ // a courtyard: a white wall with a round moon gate, a plum tree, lanterns
+      PX(0,FL-92,W2,92,'#d8d0c0'); PX(0,FL-96,W2,6,'#3a3a44'); for(let x=0;x<W2;x+=10) PX(x,FL-100,8,5,'#4a4a56');
+      c.fillStyle='#1a1418'; c.beginPath(); c.arc(W2/2,FL-40,34,0,7); c.fill(); c.fillStyle='rgba(120,150,190,.25)'; c.beginPath(); c.arc(W2/2,FL-40,30,0,7); c.fill();
+      c.strokeStyle='#3a2418'; c.lineWidth=2; c.beginPath(); c.moveTo(40,FL); c.quadraticCurveTo(44,FL-40,70,FL-70); c.stroke(); c.fillStyle='#f0d0e0'; for(let i=0;i<8;i++){ c.beginPath(); c.arc(50+((i*19)%36),FL-60+((i*13)%26),3,0,7); c.fill(); }
+      lantern(W2-50, FL-80, '#e04a30', 0.8); lantern(W2-90, FL-80, '#e04a30', 0.8);
+    } else if(id==='elite'){ // a hall: red lacquer pillars, a painted screen, gauze lanterns
+      PX(0,FL-100,W2,100,'#2a1612'); for(const x of [30,W2-46]){ PX(x,0,16,FL,'#a8281e'); PX(x+3,0,4,FL,'#d04a36'); PX(x-3,FL-8,22,8,'#6a4a2a'); }
+      PX(W2/2-60,FL-78,120,60,'#d8c8a0'); for(let i=1;i<4;i++) PX(W2/2-60+i*30,FL-78,1.5,60,'#6a4a2a');
+      c.strokeStyle='#3a4a3a'; c.lineWidth=1.4; c.beginPath(); c.moveTo(W2/2-50,FL-30); c.quadraticCurveTo(W2/2-20,FL-70,W2/2+10,FL-40); c.quadraticCurveTo(W2/2+30,FL-20,W2/2+50,FL-60); c.stroke();
+      lantern(90, FL-86, '#f0d8a0', 0.4); lantern(W2-90, FL-86, '#f0d8a0', 0.4);
+    } else { // imperial: a palace terrace under golden eaves
+      PX(0,FL-100,W2,24,'#8a6a1e'); for(let x=0;x<W2;x+=12) PX(x,FL-78,10,4,'#c8a030'); PX(0,FL-104,W2,6,'#3a2a14');
+      for(const x of [24,W2/2-8,W2-40]){ PX(x,FL-74,16,74,'#b0281e'); PX(x+3,FL-74,4,74,'#d84a36'); }
+      PX(0,FL-12,W2,4,'#e8e0d0'); for(let x=0;x<W2;x+=16) PX(x,FL-24,3,12,'#e8e0d0');
+      for(let i=0;i<14;i++){ const tw=0.5+0.5*Math.sin(T*0.05+i); c.fillStyle='rgba(255,250,220,'+(0.4*tw).toFixed(2)+')'; c.fillRect((i*97)%W2, 8+(i*31)%30, 1.5, 1.5); }
+    }
+  } else if(world==='rk'){
+    if(id==='poor'){ // the fire on the shore: stars, an aurora, the sea line, drying racks
+      for(let i=0;i<20;i++){ const tw=0.5+0.5*Math.sin(T*0.04+i*1.7); c.fillStyle='rgba(230,240,255,'+(0.5*tw).toFixed(2)+')'; c.fillRect((i*89)%W2, 6+(i*37)%50, 1.4, 1.4); }
+      for(let b=0;b<3;b++){ c.strokeStyle='rgba(90,220,160,'+(0.10+0.05*Math.sin(T*0.02+b)).toFixed(2)+')'; c.lineWidth=6; c.beginPath(); c.moveTo(0,30+b*9); for(let x=0;x<=W2;x+=40) c.lineTo(x,30+b*9+Math.sin(x*0.02+T*0.01+b)*8); c.stroke(); }
+      PX(0,FL-26,W2,6,'#1a2a3a'); c.fillStyle='rgba(120,160,200,.2)'; for(let x=0;x<W2;x+=14) c.fillRect(x+Math.sin(T*0.03+x)*2,FL-24,8,1);
+      for(const x of [30,W2-60]){ PX(x,FL-40,2,40,'#4a3a28'); PX(x+26,FL-40,2,40,'#4a3a28'); PX(x,FL-40,28,2,'#4a3a28'); for(let i=0;i<4;i++) PX(x+3+i*6,FL-38,3,12,'#8a6a4a'); }
+      PX(W2/2-18,FL-4,36,4,'#3a2a1a'); for(let i=0;i<5;i++){ const f=Math.sin(T*0.25+i)*2; c.fillStyle=i%2? '#ffb84a' : '#ff7a2a'; c.beginPath(); c.moveTo(W2/2-12+i*6,FL-3); c.lineTo(W2/2-9+i*6,FL-16-f-(i%3)*3); c.lineTo(W2/2-6+i*6,FL-3); c.fill(); }
+      { const g=c.createRadialGradient(W2/2,FL-10,2,W2/2,FL-10,70); g.addColorStop(0,'rgba(255,150,60,.25)'); g.addColorStop(1,'rgba(255,150,60,0)'); c.fillStyle=g; c.fillRect(0,0,W2,H2); }
+    } else if(id==='rich'){ // a longhouse porch: plank wall, the house-post with its notches, an oil lamp
+      { let x=0,i=0; while(x<W2){ const bw=9+((i*7)%6); PX(x,FL-100,bw-1,100,i%3? '#5e4830' : '#6a5238'); PX(x,FL-100,1,100,'#8a6e48'); x+=bw; i++; } }
+      PX(W2-70,FL-100,12,100,'#7a6242'); for(let n=0;n<3;n++){ PX(W2-71,FL-40-n*14,14,4,'#3a2e1c'); PX(W2-71,FL-40-n*14,14,1,'#9a8058'); }
+      PX(40,FL-22,12,5,'#6a6a62'); PX(44,FL-25,4,3,'#ffb43a'); { const g=c.createRadialGradient(46,FL-24,2,46,FL-24,60); g.addColorStop(0,'rgba(255,180,90,.25)'); g.addColorStop(1,'rgba(255,180,90,0)'); c.fillStyle=g; c.fillRect(0,0,W2,H2); }
+    } else if(id==='elite'){ // the great house: carved posts, hides, the hearth trench
+      PX(0,FL-104,W2,104,'#2e2218'); for(const x of [26,W2-40]){ PX(x,FL-104,14,104,'#7a5a38'); for(let k=0;k<3;k++){ PX(x-1,FL-90+k*26,16,12,'#8a3a2a'); PX(x+3,FL-86+k*26,3,3,'#1a1208'); PX(x+8,FL-86+k*26,3,3,'#1a1208'); } }
+      for(let i=0;i<3;i++){ PX(90+i*100,FL-80,38,30,'#9a7a54'); PX(92+i*100,FL-78,34,2,'#b89a70'); }
+      PX(W2/2-40,FL-4,80,4,'#2a1a10'); for(let i=0;i<8;i++){ const f=Math.sin(T*0.25+i)*2; c.fillStyle=i%2? '#ffb84a' : '#ff7a2a'; c.beginPath(); c.moveTo(W2/2-34+i*9,FL-3); c.lineTo(W2/2-31+i*9,FL-12-f); c.lineTo(W2/2-28+i*9,FL-3); c.fill(); }
+    } else { // the council house of the Ten: tall carved posts with faces, ten seats, a great fire
+      PX(0,FL-110,W2,110,'#241a12'); for(let i=0;i<5;i++){ const x=20+i*(W2-40)/4; PX(x-6,FL-100,12,100,'#6a4a2c');
+        PX(x-7,FL-92,14,10,'#9a3a2a'); PX(x-4,FL-89,3,3,'#e8dcc2'); PX(x+1,FL-89,3,3,'#e8dcc2'); PX(x-3,FL-84,6,2,'#1a1208'); }
+      for(let i=0;i<10;i++) PX(30+i*(W2-60)/9,FL-8,10,8,'#5a5a52');
+      { const g=c.createRadialGradient(W2/2,FL-20,2,W2/2,FL-20,90); g.addColorStop(0,'rgba(255,150,60,.3)'); g.addColorStop(1,'rgba(255,150,60,0)'); c.fillStyle=g; c.fillRect(0,0,W2,H2); }
+    }
+  } else {
+    if(id==='poor'){
+      for(let i=0;i<5;i++) PX(0,18+i*13,W2,1,'#3a2c34');
+      PX(W2-52,FL-52,40,52,'#3a2f38'); PX(W2-52,FL-52,40,2,'#4e4048');
+      PX(6,FL-30,32,30,'#4a4048'); PX(6,FL-30,32,3,'#6a5c62'); PX(10,FL-27,24,6,'#2f6a90'); PX(10,FL-27,24,1,'#7fc0dc');
+      PX(19,FL-46,6,17,'#5a4e56'); PX(20,FL-44,2,15,'#7a6c74');
+      for(let i=0;i<4;i++){ const fy=(T*0.9+i*9)%17; PX(21,FL-44+fy,2,3,'rgba(150,214,238,.7)'); }
+      torch(12,FL-58); torch(W2-14,FL-58);
+    } else if(id==='rich'){
+      for(const cx of [30,W2-34]){ PX(cx,10,12,FL-10,'#cfc0a2'); PX(cx+1,10,4,FL-10,'#e8dcc2'); PX(cx-2,8,16,4,'#e8dcc2'); }
+      PX(W2/2-46,FL-30,92,6,'#6a4a2c'); PX(W2/2-46,FL-30,92,1,'#8a6640'); PX(W2/2-46,FL-24,4,24,'#5a3e24'); PX(W2/2+42,FL-24,4,24,'#5a3e24');
+      PX(W2/2-30,FL-38,6,8,'#a8703a'); PX(W2/2-29,FL-40,4,3,'#c89050'); PX(W2/2+18,FL-36,5,6,'#7a2f4a');
+      for(let i=0;i<10;i++) PX(6+i*((W2-12)/10),4,((W2-12)/10)-4,4,'#4a3a44');
+    } else if(id==='elite'){
+      for(const cx of [18,W2-30]){ PX(cx,0,14,FL,'#ded2b8'); PX(cx+1,0,5,FL,'#f4ecd8'); for(let f=0;f<5;f++) PX(cx+3+f*2,0,1,FL,'#c0b298'); }
+      PX(0,FL-2,W2,2,'#b8a888'); PX(W2/2-8,FL-62,16,44,'#c8bca4'); PX(W2/2-6,FL-66,12,6,'#d8ccb4'); PX(W2/2-10,FL-18,20,4,'#a89a80');
+    } else {
+      for(const cx of [14,W2-28]){ PX(cx,0,16,FL,'#5a2f52'); PX(cx+2,0,5,FL,'#7a4270'); PX(cx-2,0,20,5,'#e8c34a'); PX(cx-2,FL-6,20,6,'#e8c34a'); }
+      PX(W2/2-30,4,60,10,'#e8c34a'); PX(W2/2-26,6,52,6,'#7a4270');
+      for(const gx of [40,W2-44]){ PX(gx,FL-56,2,56,'#8a7a5c'); PX(gx-2,FL-60,6,6,'#c8c0a8'); }
+    }
+  }
+  // the floor
+  const flc={west:{poor:'#2a2028',rich:'#3a2c1e',elite:'#3a3448',imperial:'#2a1830'}, wa:{poor:'#2a2418',rich:'#4a3a24',elite:'#6a6a3a',imperial:'#1a2418'},
+             east:{poor:'#2a1c16',rich:'#6a6660',elite:'#3a1c14',imperial:'#8a8278'}, rk:{poor:'#2a2a2e',rich:'#4a3a28',elite:'#2a1e14',imperial:'#2a1e14'}};
+  if(!(world==='wa' && id==='elite')) PX(0,FL,W2,H2-FL,((flc[world]||flc.west)[id])||'#2a2028');
+  if(world==='west' && id!=='poor' && id!=='rich') for(let mx=0;mx<W2;mx+=14){ PX(mx,FL,7,H2-FL,'#3a3448'); PX(mx+7,FL,7,H2-FL,'#2e2a3a'); }
+}
+/* ---- THE SCENE ---- */
 function drawCourtScene(cnv){
   if(!CT) return;
   const c=cnv.getContext('2d'); c.imageSmoothingEnabled=false;
-  const W2=cnv.width, H2=cnv.height, FLOOR=H2-10;
-  const id=CT.rankId, P=CT.prog, T=(CT.turns||0)*17 + (performance.now()/90|0);
-  const warm=clamp(P/100,0,1);
-  // ---------- THE PLACE ----------
-  const sky=c.createLinearGradient(0,0,0,H2);
-  if(id==='poor'){      sky.addColorStop(0,'#241a2e'); sky.addColorStop(.6,'#2e2130'); sky.addColorStop(1,'#1a1218'); }
-  else if(id==='rich'){ sky.addColorStop(0,'#2a2236'); sky.addColorStop(.6,'#3a2c30'); sky.addColorStop(1,'#1e1618'); }
-  else if(id==='elite'){sky.addColorStop(0,'#2c2438'); sky.addColorStop(.6,'#39304a'); sky.addColorStop(1,'#1c1826'); }
-  else {                sky.addColorStop(0,'#331c42'); sky.addColorStop(.6,'#3d2150'); sky.addColorStop(1,'#1c0f26'); }
-  c.fillStyle=sky; c.fillRect(0,0,W2,H2);
+  const W2=cnv.width, H2=cnv.height, FLOOR=H2-(H2>150? 14 : 10);
+  const A=courtAnim(), T=A.t + (CT.turns||0)*17, id=CT.rankId, world=courtWorld();
+  const warm=clamp(CT.prog/100,0,1);
+  drawCourtVenue(c, W2, H2, FLOOR, id, world, T, warm);
   const PX=(x,y,w,h,col)=>{ c.fillStyle=col; c.fillRect(Math.round(x),Math.round(y),Math.round(w),Math.round(h)); };
-  // a warm pool of light that grows as the conversation does
-  { const g=c.createRadialGradient(W2/2,FLOOR-52,10,W2/2,FLOOR-52,120+warm*80);
-    g.addColorStop(0,'rgba(255,214,150,'+(0.10+warm*0.20)+')');
-    g.addColorStop(1,'rgba(255,190,120,0)');
-    c.fillStyle=g; c.fillRect(0,0,W2,H2); }
-  if(id==='poor'){
-    for(let i=0;i<5;i++) PX(0,18+i*13,W2,1,'#3a2c34');                       // rough plaster courses
-    PX(W2-52,FLOOR-52,40,52,'#3a2f38'); PX(W2-52,FLOOR-52,40,2,'#4e4048');   // a doorway in the far wing
-    PX(6,FLOOR-30,32,30,'#4a4048'); PX(6,FLOOR-30,32,3,'#6a5c62');            // THE FOUNTAIN, off to the side
-    PX(10,FLOOR-27,24,6,'#2f6a90'); PX(10,FLOOR-27,24,1,'#7fc0dc');
-    PX(19,FLOOR-46,6,17,'#5a4e56'); PX(20,FLOOR-44,2,15,'#7a6c74');
-    for(let i=0;i<4;i++){ const fy=(T*0.9+i*9)%17;                            // water falling
-      PX(21,FLOOR-44+fy,2,3,'rgba(150,214,238,.7)'); }
-    for(const tx of [12,W2-14]){                                              // torches
-      PX(tx,FLOOR-58,3,12,'#5a4028');
-      const fl=3+Math.sin(T*0.3+tx)*1.4;
-      PX(tx-1,FLOOR-62-fl,5,fl+5,'#ffb84a'); PX(tx,FLOOR-64-fl,3,fl+3,'#ffe6a0'); }
-  } else if(id==='rich'){
-    for(const cx of [30,W2-34]){ PX(cx,10,12,FLOOR-10,'#cfc0a2'); PX(cx+1,10,4,FLOOR-10,'#e8dcc2'); PX(cx-2,8,16,4,'#e8dcc2'); }
-    PX(W2/2-46,FLOOR-30,92,6,'#6a4a2c'); PX(W2/2-46,FLOOR-30,92,1,'#8a6640'); // a table
-    PX(W2/2-46,FLOOR-24,4,24,'#5a3e24'); PX(W2/2+42,FLOOR-24,4,24,'#5a3e24');
-    PX(W2/2-30,FLOOR-38,6,8,'#a8703a'); PX(W2/2-29,FLOOR-40,4,3,'#c89050');   // wine
-    PX(W2/2+18,FLOOR-36,5,6,'#7a2f4a');
-    for(let i=0;i<10;i++) PX(6+i*((W2-12)/10),4,((W2-12)/10)-4,4,'#4a3a44');   // a beamed ceiling
-  } else if(id==='elite'){
-    for(const cx of [18,W2-30]){ PX(cx,0,14,FLOOR,'#ded2b8'); PX(cx+1,0,5,FLOOR,'#f4ecd8');
-      for(let f=0;f<5;f++) PX(cx+3+f*2,0,1,FLOOR,'#c0b298'); }
-    PX(0,FLOOR-2,W2,2,'#b8a888');
-    for(let mx=0;mx<W2;mx+=14){ PX(mx,FLOOR,7,14,'#3a3448'); PX(mx+7,FLOOR,7,14,'#2e2a3a'); }  // mosaic floor
-    PX(W2/2-8,FLOOR-62,16,44,'#c8bca4'); PX(W2/2-6,FLOOR-66,12,6,'#d8ccb4');   // a statue in a niche
-    PX(W2/2-10,FLOOR-18,20,4,'#a89a80');
-  } else {
-    for(const cx of [14,W2-28]){ PX(cx,0,16,FLOOR,'#5a2f52'); PX(cx+2,0,5,FLOOR,'#7a4270');
-      PX(cx-2,0,20,5,'#e8c34a'); PX(cx-2,FLOOR-6,20,6,'#e8c34a'); }              // porphyry + gold
-    for(let mx=0;mx<W2;mx+=10){ PX(mx,FLOOR,5,14,'#2a1830'); PX(mx+5,FLOOR,5,14,'#3a2440'); }
-    PX(W2/2-30,4,60,10,'#e8c34a'); PX(W2/2-26,6,52,6,'#7a4270');                 // a gilded lintel
-    for(const gx of [40,W2-44]){ PX(gx,FLOOR-56,2,56,'#8a7a5c'); PX(gx-2,FLOOR-60,6,6,'#c8c0a8'); } // guards' spears
-  }
-  PX(0,FLOOR,W2,H2-FLOOR, id==='poor'?'#2a2028': id==='rich'?'#3a2c1e':'#00000000');
-  // ---------- THE TWO OF YOU ----------
-  const gap = 68 - warm*22;                      // you close the distance as it goes well
-  const meX = W2/2 - gap, themX = W2/2 + gap;
-  const me = playerLook(), Z=1.30;
+  const Z=1.30, gap0 = CT.holding? 20 : 68 - warm*22;
+  if(A.me.x===null){ A.me.x=W2/2-gap0-70; }
+  if(A.them.x===null){ A.them.x=W2/2+gap0; }
+  if(A.rv.x===null){ A.rv.x=W2-30; }
   const band0 = CT.lastMsg? CT.lastMsg.band : 'cool';
+  const me = CT.meLook || playerLook(), who=CT.who;
   if(portraitsNew()){
-    /* 🌹 ON THE NEW BODIES — the same figures as the villa. They stand turned
-       away while they are unconvinced and face you once you have them; their
-       face is how it is going, and yours brightens as theirs does. */
-    const themFace = band0==='glow'? (warm>0.7? 'smitten' : 'pleased') : band0==='ok'? 'pleased' : band0==='bad'? 'sulk' : band0==='cool'? (warm<0.25? 'flat' : 'dreamy') : 'cross';
-    const meFace = warm>0.66? 'smitten' : warm>0.33? 'pleased' : 'flat';
-    const f0=NB_HALL; NB_HALL=true;
-    try{
-      c.save(); c.translate(meX, FLOOR); c.scale(Z,Z); HALL_EXPR=meFace;
-      withFace(1, null, ()=>{ if(G.isFemale) drawHallFem(c,0,0,me,T*0.02,'idle'); else drawHallMan(c,0,0,0,null,null,me,0,'idle'); });
-      c.restore();
-      c.save(); c.translate(themX, FLOOR); c.scale(Z,Z); HALL_EXPR=themFace;
-      withFace(warm<0.22? 1 : -1, null, ()=>{ if(CT.who.male) drawHallMan(c,0,0,0,null,null,CT.who,0,'idle'); else drawHallFem(c,0,0,CT.who,T*0.02,'idle'); });
-      c.restore();
-    } finally { NB_HALL=f0; HALL_EXPR=null; }
+    /* HOW EACH OF YOU IS STANDING, from the animation clocks */
+    const ge=A.ges, gk= ge? courtEnv(A.t, ge.t0, ge.dur) : 0;
+    const re=A.rea, rk= re? courtEnv(A.t, re.t0, re.dur) : 0;
+    const E=A.end, eT= E? A.t-E.t0 : -1;
+    const themFace = (rk>0.3 && re.kind==='laugh')? 'laugh' : (rk>0.3 && re.kind==='turn')? 'cross' : (rk>0.3 && re.kind==='slap')? 'cross'
+                   : band0==='glow'? (warm>0.7? 'smitten' : 'pleased') : band0==='ok'? 'pleased' : band0==='bad'? 'sulk' : band0==='cool'? (warm<0.25? 'flat' : 'dreamy') : 'cross';
+    const meFace = (rk>0.3 && re.band==='glow')? 'smug' : (rk>0.3 && (re.band==='bad'||re.band==='awful'))? (re.kind==='slap'? 'shock' : 'flush') : warm>0.66? 'smitten' : warm>0.33? 'pleased' : 'flat';
+    // they face away while they are unconvinced, and turn to you when you have them
+    let themDir = (warm<0.22 && band0!=='glow')? 1 : -1;
+    if(re && (rk>0.05 || (re.kind==='slap' && A.t<re.t0+re.dur))) themDir = (re.kind==='turn')? 1 : -1;   // they turn round to answer you
+    if(E && !E.won && eT>0) themDir=1;
+    if(E && E.won) themDir=-1;
+    if(themDir!==A.them.dir){ A.them.dir=themDir; A.them.turnT=0; }
+    const turnK = A.them.turnT<16? Math.max(0.15, Math.abs(Math.cos(Math.PI*A.them.turnT/16))) : 1;
+    // the rival, behind them
+    if(CT.rivalLook && (CT.rival || A.rv.leave) && A.rv.x < W2+40){
+      const rvDir = A.rv.leave? 1 : -1;
+      const phR=(A.rv.dist/Z)*Math.PI/(2*5.2);
+      courtFigure(c, CT.rivalLook, A.rv.x, FLOOR, rvDir, {g:'cross', k:A.rv.walking? 0 : 1, face:'smug', walk:A.rv.walking, walkPh:phR}, T, Z*0.98);
+    }
+    // THEM
+    let themG=null, themK=0;
+    if(re && rk>0){ themG = {laugh:'laugh', nod:null, shrug:'shrug', cross:'cross', turn:'cross', slap:'slap', take:'take', hold:'hold'}[re.kind]; themK=rk; }
+    if(CT.holding){ themG='hold'; themK=1; }
+    if(E && E.won && eT>0){ themG='hold'; themK=1; }
+    const nod = (re && re.kind==='nod' && rk>0)? Math.sin((A.t-re.t0)*0.35)*0.14 : 0;
+    const themLean = (E && E.won && eT>40)? 0.10 : (re && rk>0 && re.kind==='laugh')? -0.04 : (re && rk>0 && re.kind==='cross')? -0.03 : 0.02;
+    const themHead = (E && E.won && eT>40)? 0.14 : (re && rk>0 && re.kind==='laugh')? -0.22 : nod || undefined;
+    const phT=(A.them.dist/Z)*Math.PI/(2*(who.male? 5.2 : 4.6));
+    c.save(); if(turnK<1){ c.translate(A.them.x,0); c.scale(turnK,1); c.translate(-A.them.x,0); }
+    const RT=courtFigure(c, who, A.them.x, FLOOR, themDir, {g:themG, k:themK, face:themFace, blush: warm>0.5? 0.5 : 0, lean:themLean, headAng:themHead, walk:A.them.walking, walkPh:phT}, T, Z);
+    c.restore();
+    // YOU
+    let meG = ge && gk>0? ge.kind : null, meK=gk;
+    if(CT.holding || (E && E.won && eT>0)){ meG='hold'; meK=1; }
+    if(E && !E.won && eT>20){ meG='rub'; meK=clamp((eT-20)/12,0,1); }
+    let meHead=undefined;
+    if(A.slap && A.t-A.slap.t<14) meHead=-0.35*(1-(A.t-A.slap.t)/14);
+    if(E && E.won && eT>40) meHead=0.14;
+    const phM=(A.me.dist/Z)*Math.PI/(2*(me.male? 5.2 : 4.6));
+    const RM=courtFigure(c, me, A.me.x, FLOOR, 1, {g:meG, k:meK, face:meFace, lean:(ge && gk>0 && ge.kind==='point')? 0.08 : (E && E.won && eT>40)? 0.10 : 0.02, headAng:meHead, walk:A.me.walking, walkPh:phM}, T, Z);
+    // the gift, on its way across and then in their hands
+    if(A.giftItem){ const u=clamp((A.t-A.giftItem.t0-20)/30,0,1), hx=(RM&&RM.hand)? RM.hand[0] : A.me.x+14, hy=(RM&&RM.hand)? RM.hand[1] : FLOOR-50;
+      const tx=(RT&&RT.hand)? RT.hand[0] : A.them.x-10, ty=(RT&&RT.hand)? RT.hand[1] : FLOOR-50;
+      if(A.t-A.giftItem.t0<200){ c.font='10px serif'; c.textAlign='center'; c.fillText(A.giftItem.icon, hx+(tx-hx)*u, hy+(ty-hy)*u-4-Math.sin(u*Math.PI)*8); c.textAlign='left'; } }
+    // the moment they win: a heart over the two of you
+    if(E && E.won && eT>50){ const hx=(A.me.x+A.them.x)/2, hy=FLOOR-100-Math.min(12,(eT-50)*0.3); c.fillStyle='rgba(255,90,140,'+clamp((eT-50)/20,0,1).toFixed(2)+')';
+      c.beginPath(); c.moveTo(hx,hy+7); c.bezierCurveTo(hx-10,hy-2,hx-6,hy-10,hx,hy-4); c.bezierCurveTo(hx+6,hy-10,hx+10,hy-2,hx,hy+7); c.fill();
+      if(((A.t|0)%14)===0) courtSpawnFx('glow', hx, hy); }
+    A._heads={me: RM&&RM.head, them: RT&&RT.head};
   } else {
-  // YOU, on the left
-  c.save(); c.translate(meX, FLOOR); c.scale(Z,Z);
-  if(G.isFemale) drawWifeFig(c,0,0,me,0,'idle');
-  else drawHusbandFig(c,0,0,0,me.skin,me.dress,me,0,'idle');
-  c.restore();
-  // THEM, on the right — mirrored so the pair face each other, and turned a
-  // little away while they are still deciding about you
-  c.save(); c.translate(themX, FLOOR); c.scale(-Z,Z);
-  { const turn = 1 - 0.30*(1-warm);            // squashed = half turned away
-    c.scale(turn,1); }
-  if(CT.who.male) drawHusbandFig(c,0,0,0,CT.who.skin,CT.who.dress,CT.who,0,'idle');
-  else drawWifeFig(c,0,0,CT.who,0,'idle');
-  c.restore(); }
+    // the classic switch: the old sprites, still standing
+    const meX=W2/2-gap0, themX=W2/2+gap0;
+    c.save(); c.translate(meX, FLOOR); c.scale(Z,Z);
+    if(!me.male) drawWifeFig(c,0,0,me,0,'idle'); else drawHusbandFig(c,0,0,0,me.skin,me.dress,me,0,'idle');
+    c.restore();
+    c.save(); c.translate(themX, FLOOR); c.scale(-Z,Z); { const turn=1-0.30*(1-warm); c.scale(turn,1); }
+    if(who.male) drawHusbandFig(c,0,0,0,who.skin,who.dress,who,0,'idle'); else drawWifeFig(c,0,0,who,0,'idle');
+    c.restore();
+    A._heads={me:[meX, FLOOR-92], them:[themX, FLOOR-92]};
+  }
+  // ✨ the little things in the air
+  A.fx.forEach(p=>{ const a=clamp(p.life/40,0,1); c.globalAlpha=a;
+    if(p.kind==='heart'){ c.fillStyle='#ff5a8c'; c.beginPath(); c.moveTo(p.x,p.y+3); c.bezierCurveTo(p.x-4,p.y-1,p.x-2.5,p.y-4,p.x,p.y-1.8); c.bezierCurveTo(p.x+2.5,p.y-4,p.x+4,p.y-1,p.x,p.y+3); c.fill(); }
+    else if(p.kind==='spark'){ c.fillStyle='#ffe38a'; c.fillRect(p.x-0.5,p.y-2.5,1,5); c.fillRect(p.x-2.5,p.y-0.5,5,1); }
+    else if(p.kind==='sweat'){ c.fillStyle='#8ad0ff'; c.beginPath(); c.moveTo(p.x,p.y-3); c.quadraticCurveTo(p.x+2.2,p.y+1,p.x,p.y+2); c.quadraticCurveTo(p.x-2.2,p.y+1,p.x,p.y-3); c.fill(); }
+    else if(p.kind==='anger'){ c.strokeStyle='#ff4a3a'; c.lineWidth=1.3; c.beginPath(); c.moveTo(p.x-3,p.y-1); c.lineTo(p.x-1,p.y-1); c.lineTo(p.x-1,p.y-3); c.moveTo(p.x+3,p.y+1); c.lineTo(p.x+1,p.y+1); c.lineTo(p.x+1,p.y+3); c.stroke(); }
+    else { c.fillStyle='#d8d0e8'; c.font='bold 8px Georgia,serif'; c.fillText('?', p.x-2, p.y+3); }
+    c.globalAlpha=1; });
+  if(A.slap && A.t-A.slap.t<30){ c.fillStyle='rgba(255,240,200,'+clamp(1-(A.t-A.slap.t)/30,0,1).toFixed(2)+')'; c.font='bold 11px Georgia,serif'; c.textAlign='center'; c.fillText('SMACK!', A.me.x+10, FLOOR-104); c.textAlign='left'; }
+  // 💬 who is saying what
+  const H=A._heads||{};
+  A.bub.forEach(b=>{ const u=A.t-b.t0; if(u<0) return; const a=clamp(Math.min(u/8,(b.dur-u)/12),0,1); if(a<=0) return;
+    const hp= b.who==='me'? H.me : b.who==='them'? H.them : [A.rv.x, FLOOR-92];
+    if(!hp) return;
+    c.font='italic 9px Georgia,serif'; const tw=Math.min(200, c.measureText(b.text).width)+10, bh=15;
+    let bx=hp[0]-tw/2+(b.who==='me'? -8 : 8), by=hp[1]-30;
+    bx=clamp(bx, 3, W2-tw-3); by=Math.max(3, by);
+    c.globalAlpha=a;
+    c.fillStyle= b.who==='rival'? 'rgba(40,20,20,.92)' : 'rgba(250,244,236,.95)'; c.strokeStyle= b.who==='rival'? '#e8c34a' : 'rgba(80,50,60,.8)'; c.lineWidth=1;
+    c.beginPath(); c.moveTo(bx+4,by); c.lineTo(bx+tw-4,by); c.quadraticCurveTo(bx+tw,by,bx+tw,by+4); c.lineTo(bx+tw,by+bh-4); c.quadraticCurveTo(bx+tw,by+bh,bx+tw-4,by+bh);
+    const tx=clamp(hp[0], bx+8, bx+tw-8); c.lineTo(tx+4,by+bh); c.lineTo(tx,by+bh+6); c.lineTo(tx-3,by+bh); c.lineTo(bx+4,by+bh); c.quadraticCurveTo(bx,by+bh,bx,by+bh-4); c.lineTo(bx,by+4); c.quadraticCurveTo(bx,by,bx+4,by); c.fill(); c.stroke();
+    c.fillStyle= b.who==='rival'? '#ffe0a0' : '#3a1a24'; c.fillText(b.text, bx+5, by+11, tw-10);
+    c.globalAlpha=1; });
   // the mood, over their head
-  const band = CT.lastMsg? CT.lastMsg.band : 'cool';
+  const band = (A.end && A.end.won)? 'glow' : CT.lastMsg? CT.lastMsg.band : 'cool';
   const glyph = band==='glow'?'♥' : band==='ok'?'✦' : band==='cool'?'·' : band==='bad'?'✗' : '✖';
-  const gcol  = (COURT_RESULT[band]||COURT_RESULT.cool).c;
-  c.font='bold 13px Georgia,serif'; c.textAlign='center'; c.fillStyle=gcol;
-  c.fillText(glyph, themX, FLOOR-118+Math.sin(T*0.1)*2);
+  c.font='bold 13px Georgia,serif'; c.textAlign='center'; c.fillStyle=(COURT_RESULT[band]||COURT_RESULT.cool).c;
+  if(H.them && !A.bub.some(b=>b.who==='them')) c.fillText(glyph, H.them[0], H.them[1]-16+Math.sin(T*0.1)*2);
   if(warm>0.66){ c.fillStyle='rgba(226,106,138,'+((warm-0.66)*2)+')';
-    for(let i=0;i<3;i++) c.fillText('♥', W2/2-10+i*10, FLOOR-86-((T*0.6+i*22)%44)); }
+    for(let i=0;i<3;i++) c.fillText('♥', (A.me.x+A.them.x)/2-10+i*10, FLOOR-96-((T*0.6+i*22)%44)); }
   c.textAlign='left';
-  // a frame, because everything else in this game has one
   c.strokeStyle='#4a3a26'; c.lineWidth=2; c.strokeRect(1,1,W2-2,H2-2);
 }
+/* ---- THE CLOCK: the scene moves on its own between your lines ---- */
+function courtTick(dt, cnv){
+  if(!CT) return; const A=courtAnim(); A.t+=dt;
+  const cv=cnv||document.getElementById('court-cv'), W2=(cv||{width:440}).width;
+  const warm=clamp(CT.prog/100,0,1), E=A.end, eT=E? A.t-E.t0 : -1;
+  let gap = CT.holding? 20 : 68 - warm*22;
+  if(E && E.won && eT>0) gap=Math.max(15, gap-eT*0.8);
+  const slapping=!!(A.rea && A.rea.kind==='slap' && A.t<A.rea.t0+A.rea.dur*0.6);        // they come right up to you to do it
+  const meT=W2/2-gap, themT=(E && !E.won && eT>40)? W2+60 : slapping? (A.me.x+26) : W2/2+gap;
+  const step=(P, tx, sp)=>{ if(P.x===null) return; const d=tx-P.x; if(Math.abs(d)<=sp*dt+0.01){ P.x=tx; P.walking=false; } else { P.x+=Math.sign(d)*sp*dt; P.dist=(P.dist||0)+sp*dt; P.walking=true; } };
+  step(A.me, meT, 1.0); step(A.them, themT, slapping? 2.4 : (E && !E.won)? 0.9 : 0.8);
+  if(A.rv.x!==null){ const rvT = A.rv.leave? W2+60 : (CT.beat && CT.beat.rival)? A.them.x+26 : W2-30; step(A.rv, rvT, 1.0); }
+  A.them.turnT=(A.them.turnT||0)+dt;
+  if(A.pendingWord && A.t>=A.pendingWord.t){ courtBubble('them', A.pendingWord.w, A.wordDur||80); A.pendingWord=null; }
+  if(A.pendingFx && A.t>=A.pendingFx.t){ const H=A._heads||{}, hp=H.them||[A.them.x, 40];
+    if(A.pendingFx.band==='bad'||A.pendingFx.band==='awful'){ const hm=H.me||[A.me.x,40]; courtSpawnFx(A.pendingFx.band==='bad'? 'bad' : 'awful', A.pendingFx.band==='bad'? hm[0] : hp[0], (A.pendingFx.band==='bad'? hm[1] : hp[1])-6); }
+    else courtSpawnFx(A.pendingFx.band, hp[0], hp[1]-6);
+    if(A.rea && A.rea.kind==='slap'){ A.slap={t:A.t}; try{ sfx('hit'); }catch(e){} }
+    A.pendingFx=null; }
+  A.fx.forEach(p=>{ p.x+=p.vx*dt; p.y+=p.vy*dt; p.life-=dt; }); A.fx=A.fx.filter(p=>p.life>0);
+  A.bub=A.bub.filter(b=>A.t-b.t0<b.dur);
+  if(cv) drawCourtScene(cv);
+}
 /* ---- THE SCREEN ---------------------------------------------------------- */
+let COURT_GIFT_OPEN=false;
 function renderCourt(){
   if(!CT) return;
   const who=CT.who, R=CT.rank;
   $('court-title').innerHTML='🌹 COURTING <span style="color:#e2a0b8">'+who.name+'</span>';
   const head=$('court-head'); head.innerHTML='';
-  // ---- THE SCENE: the two of you, where you actually are ----
-  { const sc=document.createElement('canvas'); sc.width=440; sc.height=138;
-    sc.style.cssText='position:static;display:block;width:100%;max-width:440px;margin:0 auto;'
+  { const sc=document.createElement('canvas'); sc.width=440; sc.height=164; sc.id='court-cv';
+    sc.style.cssText='position:static;display:block;width:100%;max-width:660px;margin:0 auto;'
       +'image-rendering:pixelated;border-radius:3px;';
     drawCourtScene(sc); head.appendChild(sc); }
   const card=document.createElement('div'); card.className='shopcard';
@@ -13354,12 +13745,14 @@ function renderCourt(){
   const info=document.createElement('div'); info.style.flex='1';
   const st=lookStage(who.looks===undefined?5:who.looks);
   const pc = CT.prog>=75?'#7ad48a' : CT.prog>=40?'#e8c34a' : '#c8a86a';
-  const lives=CT.max-CT.mistakes;
+  const lives=CT.max-CT.mistakes, TM=COURT_TEMPERS[CT.temper];
   info.innerHTML=
     `<div><b style="color:var(--gold)">${who.name}</b> ${tierBadge(who.tier, who.male)}
        <span class="small muted">— ${who.adj} ${who.rank}${who.age!==undefined?', '+who.age:''}</span></div>
      <div class="small"><b style="color:${st.col}">${st.name}</b></div>
      <div class="small muted" style="font-style:italic;margin:2px 0">${R.icon} ${R.blurb}</div>
+     <div class="small" style="margin-top:3px">🧭 ${CT.readT? `<b style="color:#e2a0b8">${TM.name}</b> <span class="muted">— ${TM.note}</span>`
+        : '<span class="muted">You have not read them yet — ask about them, or watch how they take things.</span>'}</div>
      <div class="small" style="margin-top:5px">💗 <b>HOW IT IS GOING</b>
        <span style="display:inline-block;width:200px;height:12px;background:#1c1410;
          border:1px solid #000;border-radius:2px;vertical-align:middle;position:relative;
@@ -13381,10 +13774,8 @@ function renderCourt(){
      ${CT.standing && CT.standing.note? `<div class="small" style="color:#e0705b;margin-top:2px">📖 ${CT.standing.note}${
         CT.standing.lifePenalty? ' <b>('+CT.standing.lifePenalty+' fewer mistakes allowed)</b>':''}</div>`:''}
      ${CT.rival? `<div class="small" style="color:#e8c34a;margin-top:2px">🗡 <b>SOMEBODY GOT HERE FIRST.</b>
-        There is another name in play — every word of yours has to do more work.</div>`:''}`;
+        There is another name in play — every word of yours has to do more work, until you see them off.</div>`:''}`;
   row.appendChild(info); card.appendChild(row); head.appendChild(card);
-
-  // what just happened, in colour
   if(CT.lastMsg){
     const M=CT.lastMsg, RES=COURT_RESULT[M.band]||COURT_RESULT.ok;
     const fb=document.createElement('div'); fb.className='shopcard';
@@ -13396,9 +13787,7 @@ function renderCourt(){
         <span class="muted">— ${pick(RES.w)}</span>${M.note? ' <span style="color:#e8c34a">'+M.note+'</span>':''}</div>`;
     head.appendChild(fb);
   }
-
   const body=$('court-body'); body.innerHTML='';
-  // ---- IT IS OVER ----
   if(CT.over){
     const end=document.createElement('div'); end.className='shopcard';
     end.style.borderColor=CT.won?'#7ad48a':'#e05b5b';
@@ -13415,7 +13804,6 @@ function renderCourt(){
     b2.onclick=()=>courtFinish(); body.appendChild(b2);
     return;
   }
-  // ---- THEY DOUBT YOU: show, or let it go ----
   if(CT.doubt){
     const d=document.createElement('div'); d.className='shopcard'; d.style.borderColor='#e8c34a';
     d.innerHTML=`<div><b style="color:#e8c34a">⚠ THEY DO NOT BELIEVE YOU.</b></div>
@@ -13434,11 +13822,10 @@ function renderCourt(){
     body.appendChild(r2);
     return;
   }
-  // ---- THEIR LINE, AND YOUR FOUR ANSWERS ----
   const q=document.createElement('div'); q.className='shopcard';
-  q.style.cssText+='border-color:#8a6f35;background:linear-gradient(#2e2118,#241a12);border-left:4px solid #e2a0b8;';
+  q.style.cssText+='border-color:#8a6f35;background:linear-gradient(#2e2118,#241a12);border-left:4px solid '+(CT.beat.rival? '#e8c34a' : '#e2a0b8')+';';
   q.innerHTML=`<div style="color:#e2a0b8;font-size:14px;line-height:1.45">
-      <b style="color:var(--gold)">${who.name.split(' ')[0]}</b>
+      ${CT.beat.rival? '<b style="color:#e8c34a">🗡 THE RIVAL</b>' : '<b style="color:var(--gold)">'+who.name.split(' ')[0]+'</b>'}
       <span style="color:#cfc0a2">${CT.beat.q}</span></div>`;
   body.appendChild(q);
   const TYPE_LABEL={sweet:'💗 sweet', honest:'🫱 honest', wit:'🎭 wit', body:'💪 body', bold:'🔥 bold'};
@@ -13446,25 +13833,36 @@ function renderCourt(){
   CT.beat.opts.forEach((O,i)=>{
     const bt=document.createElement('button'); bt.className='btn';
     bt.style.textAlign='left'; bt.style.textTransform='none'; bt.style.whiteSpace='normal';
-    // each kind of line gets its own colour down the edge — you learn the
-    // palette in about two conversations and stop reading the labels
     const tc=TYPE_COL[O.t]||'#8a7a5a';
     bt.style.borderLeft='4px solid '+tc;
     bt.style.background='linear-gradient(90deg,'+tc+'22,#43301f 38%)';
-    const w=courtWeight(O.t);
-    // the TYPE is shown, and how well this person takes that type — that is the
-    // read. It never tells you the answer, only what they are inclined to hear.
+    const w=courtLean(O.t);
     const lean = w>=1.25? '<span style="color:#7ad48a">▲ they like this sort of thing</span>'
                : w>=1.05? '<span style="color:#c8dda0">▲ works on them</span>'
                : w>=0.95? '<span class="muted">— neutral ground</span>'
                : w>=0.8 ? '<span style="color:#e8c34a">▼ not really their taste</span>'
                :          '<span style="color:#e0705b">▼ falls flat on this one</span>';
     bt.innerHTML=`<div style="font-size:12px;color:#f2e8d6">${O.say}</div>
-      <div class="small" style="margin-top:2px"><b style="color:${tc}">${TYPE_LABEL[O.t]||O.t}</b> · ${lean}${
+      <div class="small" style="margin-top:2px"><b style="color:${tc}">${TYPE_LABEL[O.t]||O.t}</b> · ${lean}${CT.readT? '' : ' <span class="muted">(their station)</span>'}${
         O.boast? ' · <span style="color:#ff8ad0">⚠ a CLAIM about yourself — only say it if it is true</span>':''}</div>`;
     bt.onclick=()=>courtChoose(i);
     body.appendChild(bt);
   });
+  /* ✦ AND WHAT ELSE YOU CAN DO, besides answer */
+  if(!CT.beat.rival){
+    const ar=document.createElement('div'); ar.className='row gap6'; ar.style.cssText='flex-wrap:wrap;margin-top:4px;';
+    const mk=(label, title, fn, off)=>{ const b=document.createElement('button'); b.className='btn sm'; b.textContent=label; b.title=title; b.disabled=!!off; b.onclick=fn; ar.appendChild(b); };
+    mk('👂 ASK ABOUT THEM', 'They talk about themselves, and you learn what they are like — once.', ()=>courtAsk(), CT.asked);
+    mk('🎁 A GIFT'+(COURT_GIFT_OPEN? ' ▴' : ' ▾'), 'Once. It had better suit their station.', ()=>{ COURT_GIFT_OPEN=!COURT_GIFT_OPEN; renderCourt(); }, CT.gifted);
+    mk('🤝 TAKE THEIR HAND', CT.prog<50? 'Not yet — it is not going well enough.' : 'When it is going well. With the wrong one, too soon, it is a mistake.', ()=>courtHand(), CT.handTried || CT.prog<50);
+    body.appendChild(ar);
+    if(COURT_GIFT_OPEN && !CT.gifted){
+      const gr=document.createElement('div'); gr.className='row gap6'; gr.style.cssText='flex-wrap:wrap;margin-top:3px;';
+      COURT_GIFTS.forEach(g=>{ const b=document.createElement('button'); b.className='btn sm'; b.textContent=g.icon+' '+courtGiftName(g)+' ('+g.price+'d)';
+        b.disabled=(G.coin||0)<g.price; b.onclick=()=>{ COURT_GIFT_OPEN=false; courtGift(g.id); }; gr.appendChild(b); });
+      body.appendChild(gr);
+    }
+  }
 }
 /* ---- WHO THE MATCHMAKER WILL WORK FOR. Station opens the door by default —
    but so does money, because it always did. A gladiator with a real purse is a
@@ -13939,7 +14337,7 @@ function migrate(g){ const d={stamina:3,escCoolDay:-1,escSlowDay:-1,escSlow:0,es
     const best=Object.keys(LEGACY_RK).sort((a,b)=>Math.abs(LEGACY_RK[a].w-w0)-Math.abs(LEGACY_RK[b].w-w0))[0];
     g.legacy.prov=best; }
   return g; }
-function saveGame(){ try{ localStorage.setItem(slotKey(saveSlot), JSON.stringify(G)); toast('Saved to slot '+saveSlot+'.'); }catch(e){ toast('⚠ Could not save — browser storage is blocked or full.',3200); } }
+function saveGame(){ if(BOT_SANDBOX) return; try{ localStorage.setItem(slotKey(saveSlot), JSON.stringify(G)); toast('Saved to slot '+saveSlot+'.'); }catch(e){ toast('⚠ Could not save — browser storage is blocked or full.',3200); } }
 function hasSave(n){ try{ return !!localStorage.getItem(slotKey(n||saveSlot)); }catch(e){ return false; } }
 function loadGame(n){ try{ if(n) setSlot(n); G=migrate(JSON.parse(localStorage.getItem(slotKey(saveSlot)))); return !!G; }catch(e){ return false; } }
 
@@ -13959,7 +14357,7 @@ const SETTINGS_KEY='SANDSTEEL_SETTINGS';
 /* WHICH BUILD IS THIS. Printed on the title screen, in Settings and in the
    corner of the hall — because an old link to an old build looks exactly
    like a fix that did not work. */
-const BUILD_STAMP='V48 · the last old bodies, the tablet, courtship';
+const BUILD_STAMP='V48 · the last old bodies, the tablet, courtship upgraded, the three bots';
 try{ document.addEventListener('DOMContentLoaded',()=>{ const e=document.getElementById('build-stamp'); if(e) e.textContent='build '+BUILD_STAMP; });
      const e0=document.getElementById('build-stamp'); if(e0) e0.textContent='build '+BUILD_STAMP; }catch(e){}
 const SETTINGS=(function(){ const d={sound:true,shake:true,difficulty:'normal',
@@ -14170,7 +14568,7 @@ function applyStartKit(g, K){
   return g;
 }
 let toastT=0;
-function toast(msg,ms=1400){ const t=$('hud-toast'); t.textContent=msg; t.style.display='block'; toastT=performance.now()+ms; }
+function toast(msg,ms=1400){ if(BOT_SANDBOX) return; const t=$('hud-toast'); t.textContent=msg; t.style.display='block'; toastT=performance.now()+ms; }
 
 /* =====================================================================
    PIXEL SPRITE: gladiator (drawn procedurally, faces +x by default)
@@ -17419,7 +17817,7 @@ function finishFight(won){
   showResult(won,{glory,coin,popDelta,honorDelta,note,crowdLove,slaveCoin});
   saveQuiet();
 }
-function saveQuiet(){ try{ localStorage.setItem(slotKey(saveSlot), JSON.stringify(G)); }catch(e){} }
+function saveQuiet(){ if(BOT_SANDBOX) return; try{ localStorage.setItem(slotKey(saveSlot), JSON.stringify(G)); }catch(e){} }
 
 function showResult(won,r){
   if(won) advanceDay(2);   // victory feasts eat the calendar — a month per triumph (with the road home)
@@ -19572,6 +19970,8 @@ function loop(now){
     if(DM){ const sk=hallShake();
       if(sk){ ctx.save(); ctx.translate(sk.x, sk.y); drawDomus(); ctx.restore(); }
       else drawDomus(); } }
+  else if(state==='court' && CT){ try{ courtTick(dt); }catch(e){ console.error(e); } }
+  else if(state==='botwatch' && BW){ botWatchTick(dt); }                                   // 🤖 a bot's career, played back   // 🌹 the courtship moves between your lines
   else if(state==='map'||state==='travel'){
     /* WHICH ATLAS. A man born in Luoyang was being shown the Mediterranean. */
     const _w=playerWorld();
@@ -23902,6 +24302,7 @@ function drawBedPose(vi, E){
             hands:{near:null, far:[hx-12, base-24]}}; }
     else hims={hip:[hx, base-36], lean:(vi===22? 0.17 : -0.02), headAng:(vi===22? 0.55 : 0.30), face:(vi===22? Object.assign({},HARD_FACES.sheepish,{blush:0.6}) : HF), cloak:(vi===22? '#5a4a34' : null),
                hands:{near:null, far: vi===22? [cx0-43, base-56] : [hx-5, base-38]}};
+    hims.showLen=true;                                                          // ✧ this is the pose that is about it
     // his rise, in four stages, for the sundial — the gnomon comes round
     if(vi===5){ const st=Math.min(3, Math.floor(vt/40)), sub=clamp((vt%40)/12,0,1); hims.aro=[0.05,0.38,0.70,1.0][st]*(0.7+0.3*sub); hims.aimK=0; }
     const HMd=HIM(Object.assign({dry:true}, hims));
@@ -23918,10 +24319,16 @@ function drawBedPose(vi, E){
         const pAll=0.22+((G&&G.wifeRel||0)>=80? 0.12 : 0)+(tr.includes('insatiable')||tr.includes('gr_greedy')||tr.includes('shameless')? 0.18 : 0);
         s.kanDeep={ all: Math.random()<pAll, snd:[], lastPk:false }; }
       kAll=!!s.kanDeep.all;
-      const D0=clamp(plen*0.62, 3, 9.5);
+      /* ✧ AND YOU CAN SEE HIM. Her mouth sat within a finger of the root and her hand covered the rest,
+         so there was nothing of him on the screen at all. Now every stroke runs the whole way: at the top
+         of it only the tip is in her mouth and the length of him is out in the lamp-light; at the bottom
+         she has what she can take — and on the nights she eats it up, all of it. */
+      const cap=clamp(plen*0.55, 2.2, 8.5);                                          // what she can take
       const eat=kAll? sstep(0,1,clamp((vt-60)/220,0,1)) : 0;                     // she starts eating it up
-      const Dm=D0+(Math.max(D0,plen)-D0)*eat;
-      kd = SWAL>=0? Dm : Dm*(0.76+0.24*gv);
+      const Dmax=cap+(Math.max(cap,plen*0.97)-cap)*eat, Dmin=Math.min(1.3, plen*0.2);
+      const kst=0.5-0.5*Math.cos(T*0.19);                                            // one long stroke, tip to depth and back
+      s.kanDeep.kst=kst;
+      kd = SWAL>=0? Dmin+(cap-Dmin)*(0.42+0.10*Math.sin(SWAL*0.22)) : Dmin+(Dmax-Dmin)*kst;   // swallowing, she eases back so he shows
       kd = Math.min(kd, plen);
       kInside = Math.max(0, kd-4.2);                                                 // past her mouth: in her throat
       s.kanDeep.depth=kd; s.kanDeep.inside=kInside; s.kanDeep.eat=eat;
@@ -23943,7 +24350,7 @@ function drawBedPose(vi, E){
     if(kneelUp){ const reach=(vi===22)? plen-kd : plen, dx=(root[0]+reach+0.4)-HRd.mouth[0], dy=(root[1]-1.5)-HRd.mouth[1];
       herF.hip=[wx+dx, hipY+dy*0.45]; herF.lean=clamp(herF.lean - dy*0.018, 0.55, 1.25);
       herF.ankles={near:L(herF.hip[0],[herF.hip[0]+12, base-2.4]), far:L(herF.hip[0],[herF.hip[0]+10.5, base-3])};
-      herF.hands={near:L(herF.hip[0], (vi===22 && kd>plen*0.7)? [root[0]-1.5, root[1]+5] : [root[0]+1, root[1]-8]), far:L(herF.hip[0],[herF.hip[0]-3, herF.hip[1]+6])};
+      herF.hands={near:L(herF.hip[0], (vi===22)? [root[0]-2.2, root[1]+7] : [root[0]+1, root[1]-8]), far:L(herF.hip[0],[herF.hip[0]-3, herF.hip[1]+6])};   // ✧ on his thigh, not over him
       HRd=MX(herF.hip[0],()=>HER(Object.assign({dry:true},herF)));
       hims.aim=[HRd.mouth[0]-0.8, HRd.mouth[1]]; hims.aimK=1; hims.clip=true; }
     const hxW=herF.hip[0];
@@ -23980,7 +24387,7 @@ function drawBedPose(vi, E){
         if(gi<3 && gp<0.8){ const t2=gp/0.8, d0=3+t2*16; bump(d0-1.6, d0+1.6, rB*0.9+0.5, 1); }
         if(gi<3 && (SWAL%26)<3){ hearts(HR.head[0], HR.head[1]-6, 4); s.kanDeep && s.kanDeep.snd.push({t:0, x:HR.head[0]+4, y:HR.head[1]-10, w:'*gulp*'}); try{ sfx('gulp'); }catch(e){} } }
       // ✧ AND SHE IS NOT QUIET ABOUT IT: a sound at the bottom of every stroke
-      if(s.kanDeep){ const K=s.kanDeep, pk=gv>0.93;
+      if(s.kanDeep){ const K=s.kanDeep, pk=(K.kst||0)>0.95;
         if(pk && !K.lastPk && SWAL<0){ const W2 = kAll && K.eat>0.6? ['GLLK—','*gulp*','mmph!','GLK'] : kInside>2? ['gluk','glk!','mmf','hlk'] : ['mm~','mmf','hm~'];
           K.snd.push({t:0, x:HR.head[0]+rnd(-2,5), y:HR.head[1]-8, w:pick(W2)}); if(kInside>2 && Math.random()<0.5){ try{ sfx('gulp'); }catch(e){} } }
         K.lastPk=pk;
@@ -26978,7 +27385,8 @@ function wifeExpr(w){
     const rel=(G&&G.wifeRel)|0, phys=(G&&G.wifePhys===undefined?45:G.wifePhys)|0;
     if(rel<30) return 'cross';
     if(typeof jealousyLevel==='function' && jealousyLevel()>=2) return 'sulk';     // 😤 and she is not saying why, because you know why
-    if(phys>=92 && rel>=70) return 'hungry';                                     // 🤤 chasing it
+    /* 🤤 chasing it — but in flashes, not as a resting face: a few seconds in every forty */
+    if(phys>=92 && rel>=70 && ((((typeof performance!=='undefined'? performance.now() : Date.now())/1000)+((w.name||'').length*7))%40)<4) return 'hungry';
     if(phys>=80) return 'flush';
     if(rel>=96) return 'smitten';                                                 // 😍 gone, entirely
     if(rel>=85) return 'pleased';
@@ -27597,7 +28005,10 @@ function drawMateFig(bk, fr, M){
   // where the garment is on him, for everything that has to know (Rome: s is the hem, −0.55 on the thigh up to +0.85 at the chest; coast: the kilt's top, down the legs)
   const sHem = -0.55 + clamp((u-0.28)/0.42,0,1)*1.40;
   const kTop = RK? (u<0.28? -0.16 : -0.16 + clamp((u-0.28)/0.60,0,1)*1.00) : 0;   // it stops bunched at his shins
-  const groinCovered = KIT? true : (RK? (kTop<0.10 && u<0.95) : (sHem<0.04 && u<0.72));   // in kit there is ALWAYS a loincloth
+  /* ✧ BARE IS BARE. The bedchamber draws him with nothing on (M.bare) but never says how far undressed,
+     so u read as 0 — fully dressed — and the hem "covered" him: his length was never drawn, and the
+     kanvek showed her kneeling to nothing at all. A bare figure whose scene aims or shows it is uncovered. */
+  const groinCovered = (M.bare && (M.aim || M.showLen))? false : KIT? true : (RK? (kTop<0.10 && u<0.95) : (sHem<0.04 && u<0.72));   // in kit there is ALWAYS a loincloth
   const legPt=(Lg,f)=> f<=0.5? lerp(Lg.hip, Lg.K, f/0.5) : lerp(Lg.K, Lg.ank, (f-0.5)/0.5);
   const handsOf=(which)=>{ const h=M.hands&&M.hands[which]; if(h) return h;
     const sw=Math.sin(wph+(which==='far'? 0 : Math.PI))*3.4*wk;                    // the arm swings against its leg
@@ -31423,9 +31834,12 @@ function gazeReady(){ if(!G || !ADULT || !G.married || !G.wife) return false; co
 function gazeDue(){
   const D=DM; if(!D || !gazeReady() || hallBusy() || D.floor) return false;
   if(Math.abs((D.x||0)-(D.wifeX||0))>=74) return false;
-  const K=gazeKindsOf(G.wife), cool=K.greedy? GAZE_COOL*0.6 : GAZE_COOL;
+  /* 🤤 NOT EVERY TIME YOU WALK PAST. A Greedy spouse looked every five or six seconds — the Hungry face
+     was on them more than their own face was. Now a Greedy one looks roughly every twenty seconds and
+     the Seat- and Front-Struck about every half minute: often enough to notice, rare enough to mean it. */
+  const K=gazeKindsOf(G.wife), cool=K.greedy? GAZE_COOL*1.6 : GAZE_COOL*2.4;
   if((D.t||0)-(D.lastGazeT===undefined? -9999 : D.lastGazeT) < cool) return false;
-  return Math.random() < (K.greedy? 0.018 : 0.010);
+  return Math.random() < (K.greedy? 0.005 : 0.003);
 }
 function startGaze(kind){
   const D=DM; if(!D || !G || !G.wife) return;
@@ -31435,7 +31849,7 @@ function startGaze(kind){
   D.gaze={t:0, kind, dur:K.greedy? 190 : 150, caught:false, caughtT:0, toYou, greedy:K.greedy, male:!!G.wife.male, face0:D.face,
           line:pick(GAZE_LINES[(G.wife.male? 'm' : 'f')+kind])};
   D.wifeDir=toYou; D.wifePause=Math.max(D.wifePause||0, 220);
-  setWifeMood('hungry', 3400);
+  setWifeMood('hungry', K.greedy? 2600 : 2200);
 }
 const GAZE_LINES={
   mseat:['👀 He is looking at your seat.','👀 His eyes are on your seat, and staying there.','👀 He has stopped pretending to read.'],
@@ -35432,7 +35846,7 @@ function escAfterSlap(v, kind, who, atX){
       if(G.escSlow>=3){ esc='slow'; G.escSlow=0; }
       else toast('🕯 '+(G.escSlow===1? 'One coal. Nothing happens.' : 'Two. '+They+(who==='self'? ' are' : ' is')+' counting too.'), 2800);
     }
-    if(!esc && E.indexOf('mid')>=0 && kind==='slap'){ if(who!=='self') setWifeMood('hungry', 8000);
+    if(!esc && E.indexOf('mid')>=0 && kind==='slap'){ if(who!=='self') setWifeMood('hungry', 4500);
       toast('🔸 That look. Not this kind of slap — the other kind.', 3400); }
     if(!esc && E.indexOf('spark')>=0){ D.escSpark={at:(D.t||0)+ri(360,780), who};
       toast('✨ '+(who==='self'? 'You look back over your shoulder.' : They+' looks back over '+(male?'his':'her')+' shoulder.')+' That was not the end of it.', 3600);
@@ -39729,6 +40143,744 @@ let prevHelp=null;
    whatever you were doing — which is most of the reason it was only ever wired
    to the title in the first place. */
 let settingsFrom=null;
+/* =====================================================================
+   🤖 THE THREE BOTS — "make 3 bots in the settings, record their
+   playthrough, make their playthrough watchable, add personalities: one
+   smart, one wants to do woohoos… one is a woman, the other two men"
+   ---------------------------------------------------------------------
+   Minerva the Clever, Lucius the Lover and Brutus the Bold each play a
+   fresh career of their own, in a SANDBOX — your career, your save and
+   your screen are put aside and handed back untouched, and nothing is
+   written to your save slot while they play. They play on the game's own
+   rules and data: its brides and its titled women of the coast, its
+   courtship lines, temperaments, tastes and gifts, its foes, its gear and
+   its prices. Every decision is written down as a beat with what they
+   were THINKING at the time, and ▶ WATCH plays the whole career back on
+   the game canvas like a video — a scene per beat, a caption, and their
+   thoughts as subtitles.
+   ===================================================================== */
+var BOT_SANDBOX=false;                    // (var: toast and the savers read it from the top of the file) while true: no toasts, and nothing is saved
+const BOT_KEY='SANDSTEEL_BOTS';
+const BOTS={
+  minerva:{ id:'minerva', name:'Minerva', title:'THE CLEVER', icon:'🦉', col:'#8ad0ff', female:true,
+    arch:'Roman', origin:'Italia', social:'citizen',
+    brief:'You are Minerva, a gladiatrix who plays to win on paper. Take only the bouts you can win, bank the coin, and study your wits — then move from the sand to the courts, the advocate’s bench and the Senate. Court only when the odds are good: read their temperament first and answer in their taste, and never boast what is not true. Marry for advantage and build a legacy. Think in short, dry, confident lines.',
+    sample:['62% odds. I’ll take it.','Sweet words won’t work on a Cynic. Wit, then.','Coin first. Villa later.'],
+    look:{ male:false, skin:'#c8906a', dress:'#2f4a7a', hair:'#2a1a10', hairStyle:'crown', beard:'none',
+           body:{bust:6, booty:6, waist:5, legs:7, face:8, hairq:7} } },
+  lucius:{ id:'lucius', name:'Lucius', title:'THE LOVER', icon:'🌹', col:'#ff8ab0', female:false,
+    arch:'RkTorvak', origin:'Leokanis', social:'gladiator',
+    brief:'You are Lucius, a gladiator on the Rkrai coast who fights only to pay for a longhouse and a wife. Not just any wife: the curviest on the coast, fattest booty and biggest bust. You’ll turn down a sweet one to hold out for her, and chase the seat and bosom title-holders. Court boldly, give gifts, then spend every evening in the bedchamber and the bath. Train stamina, not swordplay. If your length or stamina disappoints, open the cheats console. Think in eager, cheeky, impatient lines.',
+    briefTame:'You are Lucius, a gladiator on the Rkrai coast who fights only to pay for a longhouse and a wife — the most beautiful woman on the coast, and you will turn down a sweet one to hold out for her, chasing the title-holders themselves. Court boldly, give gifts, then spend every evening at home with her. Train stamina, not swordplay, and if the numbers disappoint, open the cheats console. Think in eager, cheeky, impatient lines.',
+    sample:['I gotta get a wife.','My length’s too small… let’s use cheats!','Home. Now. She’s been waiting.'],
+    sampleTame:['I gotta get a wife.','Coin’s too low… let’s use cheats!','Home. Now. She’s been waiting.'],
+    look:{ male:true, skin:'#b88458', dress:'#7a3a2a', hair:'#3a2210', hairStyle:'messy', beard:'stubble',
+           body:{legs:6, face:7, hairq:6, secret:4, booty:5, bust:5, waist:6} } },
+  brutus:{ id:'brutus', name:'Brutus', title:'THE BOLD', icon:'🗡', col:'#ffb04a', female:false,
+    arch:'Roman', origin:'Italia', social:'gladiator',
+    brief:'You are Brutus, a gladiator who lives for the roar. Fight every single day and always take the hardest bout on the board. Spend every coin on a bigger weapon and heavier armour, race chariots when you can, and never rest — rest is for poets. Romance is an afterthought: when you court, answer with muscle and bravado. Think in loud, boastful, one-line bursts, and when you lose, sulk and blame the sand.',
+    sample:['Bigger sword. Obviously.','She liked the arms. Wedding’s on.','…I slipped. The sand was wet.'],
+    look:{ male:true, skin:'#d8a878', dress:'#8a2a1a', hair:'#1a1008', hairStyle:'caesar', beard:'full',
+           body:{legs:7, face:5, hairq:5, secret:6, booty:6, bust:7, waist:7} } },
+};
+const BOT_ORDER=['minerva','lucius','brutus'];
+/* what each of them thinks, by the moment */
+const BOT_LINES={
+  minerva:{
+    intro:['Minerva. Citizen of Rome. The sand is a means, not an end.'],
+    take:['{p}% odds. I’ll take it.','{p}%. Acceptable.','{p}% — the numbers like me today.','{p}%. Proceed.'],
+    refuse:['{p}%? No. Drill instead.','{p}% is a coin toss. I don’t toss coins. Drill.'],
+    win:['As calculated.','Coin first. Villa later.','Clean. Efficient. Paid.','He never read my footwork.'],
+    loss:['An outlier. Noted.','I misjudged his reach. It won’t happen twice.'],
+    blade:['Footwork, then reach, then timing.','A hundred repetitions. Then a hundred more.'],
+    wits:['Rhetoric, then law. The sand doesn’t last.','Cicero pleaded his first case at twenty-six. I’m ahead of schedule.','Precedent is just other people’s homework.'],
+    caseW:['The magistrate is bored. Be brief.','Three precedents and a joke. Case closed.','The other side brought a witness. I brought his tax records.'],
+    caseL:['Bribed judge. I’ll remember his name.','Lost. The law was on my side; the jury was not.'],
+    court:['Elite house, good odds. Proceed.','Their family has three votes in the Senate.','A patrician house. I’ve done the reading.'],
+    read:{romantic:'A Romantic. Sweetness, then — measured.', cynic:'Sweet words won’t work on a Cynic. Wit, then.', daring:'Daring. Nerve it is.',
+          earnest:'Earnest. The truth, plainly.', vain:'Vain. Admire, and bring something shiny.', shy:'Shy. Gently. No sudden moves.'},
+    good:['Landed.','Exactly as planned.','They laughed. Good.','Noted: that works.'],
+    bad:['Miscalculated.','Wrong register. Adjust.'],
+    gift:['A gift at the going rate. Not a denarius over.'],
+    hand:['The numbers say now.'],
+    won:['A good match. Their family has three votes in the Senate.','Signed, sealed, allied.'],
+    lost:['Not worth a second attempt. Next.','Poor fit. I’ll find a better one.'],
+    wedding:['A good alliance. And — fine — I like them.'],
+    villa:['Now the villa.','Land. The only thing they aren’t making more of.'],
+    office:{1:'Quaestor. The ladder has rungs; I have legs.', 2:'Aedile. The games are mine to fund now.', 3:'A seat in the Senate. It has a ring to it.'},
+    child:['An heir. The legacy begins.'],
+    home:['Home by sunset. As scheduled.'],
+    bed:['Scheduled. Efficient. …Not bad, actually.'],
+    bedTame:['An evening off. Scheduled, of course.'],
+    end:['Senator, wife, mother, landowner. On paper and off.'] },
+  lucius:{
+    intro:['I gotta get a wife.'],
+    take:['Every coin’s a step closer to her.','Win this, buy flowers.','Fight fast. There’s a longhouse to pay for.'],
+    win:['Longhouse fund: growing!','Easy. Now, about that wife…','Coin! Coin for gifts!'],
+    loss:['Ow. Worth it. Probably.','Lost. But I have a great smile.'],
+    stamina:['Swordplay? Nah. Stamina.','Laps. For… reasons.','Stamina training. She’ll thank me.'],
+    reject:['She’s sweet. Not curvy enough. Next.','Nice smile. Where’s the rest of her? Next.','Lovely girl. Not THE girl. Next.'],
+    rejectTame:['She’s sweet. Not quite the one. Next.','Nice smile. Not THE smile. Next.'],
+    approve:['Oh. OH. That’s the one.','Look at her. Just look at her.'],
+    titled:{bosom:'The Bosom title-holder is receiving suitors. I’m going.', seat:'The Seat herself. Be brave, Lucius.'},
+    titledTame:{bosom:'A title-holder is receiving suitors. I’m going.', seat:'The other title-holder! Be brave, Lucius.'},
+    court:['Curviest on the coast, or nobody.','Gifts, compliments, courage. In that order.'],
+    courtTame:['The most beautiful woman on the coast, or nobody.','Gifts, compliments, courage. In that order.'],
+    good:['She’s smiling at me!','Keep going, keep going…','Nailed it.'],
+    bad:['Too eager. Too eager!','Oops.','Why did I say that?'],
+    gift:['Gifts. Lots of gifts.','Nothing says “marry me” like jewellery.'],
+    hand:['Hand-holding. We’re basically married.'],
+    won:['SHE SAID YES!','Yes! YES! Somebody pinch me.'],
+    lost:['She’ll come round. Or her cousin will.','Rejected. Temporarily.'],
+    wedding:['Best. Day. Ever.'],
+    cheatLen:['My length’s too small… let’s use cheats!'],
+    cheatStam:['Stamina two? Pathetic. Cheats again!'],
+    cheatCoin:['Coin’s too low… let’s use cheats!'],
+    longhouse:['A longhouse! With a door that SHUTS.'],
+    home:['Home. Now. She’s been waiting.','Home early. Again.','Is it evening yet? It’s evening somewhere.'],
+    bed:['Again? Again.','Stamina training pays off.','Best part of the day. Every day.'],
+    bedTame:['Dinner, a story by the fire, and her.','Best part of the day. Every day.'],
+    bath:['Bath first. Then… bath again.','The bath! Together! Obviously.'],
+    child:['A little Lucius! Or Lucia! Either way — more cuddles.'],
+    end:['Curviest wife on the coast. I’d do it all again. Tonight, even.'],
+    endTame:['The most beautiful wife on the coast. I’d do it all again.'] },
+  brutus:{
+    intro:['Bigger sword. Obviously.'],
+    take:['Hardest bout they’ve got. Obviously.','Champion? Never heard of him.','Odds are for cowards.','Bring me the big one.'],
+    win:['Too easy!','Did you SEE that?','Next!','Is that it?'],
+    loss:['…I slipped. The sand was wet.','The sun was in my eyes. Indoors.','He cheated. Probably.'],
+    hurt:['Rest is for poets.','It’s just a flesh wound. Mostly flesh.'],
+    lift:['Lift heavy. Lift heavier.','More muscle. More ME.'],
+    weapon:['Bigger sword. Obviously.','Longer. Heavier. Louder.'],
+    armour:['More armour. More ME.'],
+    raceW:['Fastest horses, fastest man.','Eat my dust. All of you.'],
+    raceL:['The horse was lazy.','That wasn’t a race, that was an ambush.'],
+    court:['Romance. Fine. How hard can it be?','A wife. Sure. After the bout.'],
+    good:['She liked the arms.','Muscles: the universal language.','Nailed it. Like a champion.'],
+    bad:['Rude.','She’ll regret that.','…Was that bad?'],
+    slap:['…She hits harder than the Gaul.'],
+    won:['She liked the arms. Wedding’s on.'],
+    lost:['Her loss. Literally.','Whatever. I have a bout.'],
+    wedding:['Short ceremony. I’ve got a bout at noon.'],
+    child:['A son! I’ll get him a sword. A small one. For now.'],
+    home:['Home. For a bit.'],
+    bed:['Victory lap.'],
+    bedTame:['A quiet night. Don’t tell anyone.'],
+    end:['Champion. Undefeated. Mostly.'] },
+};
+const BOT_VENUES={
+  west:['a village ring in Latium','the ludus at Capua','the amphitheatre at Pompeii','the arena at Verona','the Flavian Amphitheatre'],
+  rk:['the fire-ring on the shingle','the Leokanis fighting-yard','the Kraiq-Harra ring','the games at the ice edge','the ring of the Ten'],
+  wa:['a shrine yard','the castle-town ring','the Owari tournament','the Kyōto exhibition','the Shōgun’s field'],
+  east:['a market ring','the county arena','the provincial games','the capital arena','the imperial games'] };
+function botLoad(){ try{ return JSON.parse(localStorage.getItem(BOT_KEY)||'{}')||{}; }catch(e){ return {}; } }
+function botSaveAll(all){ try{ localStorage.setItem(BOT_KEY, JSON.stringify(all)); return true; }catch(e){ return false; } }
+/* a figure to draw, and nothing else — the bride objects carry a life story */
+function botTrim(w){ if(!w) return null;
+  const o={}; ['male','name','skin','dress','hair','hairStyle','beard','eth','age','rank','tier','jewel','outfit','adj'].forEach(k=>{ if(w[k]!==undefined) o[k]=w[k]; });
+  o.body=Object.assign({}, w.body||{}); o.self=false; return o; }
+function botCurves(w){ const B=(w&&w.body)||{}; return (B.bust||0)+(B.booty||0); }
+/* the sandbox: your career is put to one side, and handed back whatever happens */
+function botRecord(id){
+  const B=BOTS[id]; if(!B) return null;
+  const keep={G, state, CT, marryList, DM, BC};
+  BOT_SANDBOX=true;
+  let rec=null;
+  try{ rec=botPlay(B); }
+  catch(e){ try{ console.error(e); }catch(_){} rec={id, err:String(e&&e.stack||e)}; }
+  finally{ G=keep.G; state=keep.state; CT=keep.CT; marryList=keep.marryList; DM=keep.DM; BC=keep.BC; BOT_SANDBOX=false; }
+  if(rec && !rec.err){ const all=botLoad(); all[id]=rec; if(!botSaveAll(all)){ delete all[id]; } }
+  return rec;
+}
+function botPlay(B){
+  const L=BOT_LINES[B.id], P=(a)=>pick(a);
+  G=freshCareer(B.name, B.origin, B.arch, B.social); G.quirks=[];
+  G.isFemale=!!B.female; G.body=Object.assign({}, B.look.body);
+  G.skin=B.look.skin; G.tunic=B.look.dress; G.hairCol=B.look.hair; G.hairStyle=B.look.hairStyle; G.beardStyle=B.look.beard;
+  G.skills=G.skills||{}; G.stamina=(B.id==='lucius')? 2 : 3; G.renown=G.renown||0;
+  CT=null; marryList=null; DM=null; BC=null; state='title';
+  const world=(typeof playerWorld==='function')? playerWorld() : 'west';
+  const R={v:1, id:B.id, name:B.name, at:Date.now(), world, look:botTrim(Object.assign({}, B.look, {name:B.name})), beats:[], adult:!!ADULT};
+  const S={wits:0, fit:0, cases:0, casesWon:0, married:false, spouse:null, kids:[], courts:0, courtFails:0, lastCourt:-9,
+           villa:false, wins:0, losses:0, races:0, raceWins:0, cheats:0, nights:0, rejected:0, titledTried:[], hurt:0, lastBed:-9};
+  const beat=(o)=>{ o.day=G.day; o.body=Object.assign({}, G.body); o.coin=Math.round(G.coin||0); o.glory=Math.round(G.glory||0); R.beats.push(o); return o; };
+  const venue=(tier)=>((BOT_VENUES[world]||BOT_VENUES.west)[tier])||'the arena';
+  const power=()=>{ const w=gearOf('weapon',G.loadout.weapon), a=gearOf('armor',G.loadout.armor), sh=gearOf('shield',G.loadout.shield);
+    return 9 + (G.level||1)*2.2 + (G.skills.blade||0)*1.8 + (w.dmg||3)*2.2 + (w.reach||30)*0.05 + (a.cost||0)*0.012 + (sh.cost||0)*0.006 + S.fit*1.4 - (S.hurt>0? 3 : 0); };
+  const odds=(tier)=>1/(1+Math.exp(-(power()-(10+tier*7))/5));
+  const foeOf=(tier)=>{ let f=null;
+    try{ f=makeArenaFoe(tier, 1, 1, G.current); }catch(e){ f=null; }
+    if(!f) f=makeFighter({name:(typeof FOE_NAMES!=='undefined'? pick(FOE_NAMES) : 'Flamma')});
+    const g=f.gear||{};
+    return {name:f.name||'a fighter', skin:f.skin, tunic:f.tunic, female:!!f.female, beard:!!f.beard, beardC:f.beardC, scale:f.scale||1,
+            gear:{weapon:(g.weapon&&g.weapon.id)||'gladius', shield:(g.shield&&g.shield.id)||'scutum', helmet:(g.helmet&&g.helmet.id)||'none', armor:(g.armor&&g.armor.id)||'none'}}; };
+  const kit=()=>Object.assign({}, G.loadout);
+  const fight=(tier, thought)=>{
+    const p=odds(tier), won=Math.random()<p, foe=foeOf(tier);
+    const b=beat({k:'fight', tier, venue:venue(tier), foe, kit:kit(), odds:Math.round(p*100), won, th:thought.replace('{p}', Math.round(p*100)),
+                  cap:'THE ARENA · '+venue(tier).toUpperCase()});
+    if(won){ S.wins++; G.wins=(G.wins||0)+1; const c=Math.round((30+tier*70)*rnd(0.8,1.25)); G.coin+=c; G.glory=(G.glory||0)+8+tier*14; G.renown+=tier;
+      G.xp=(G.xp||0)+1; if(G.xp>=(G.level||1)){ G.level=(G.level||1)+1; G.xp=0; }
+      b.prize=c; b.after=P(L.win); }
+    else { S.losses++; G.losses=(G.losses||0)+1; G.coin+=10; if(Math.random()<0.35) S.hurt=3; b.after=P(L.loss); }
+    return won; };
+  const kidOf=()=>{ const m=Math.random()<0.5, sp=S.spouse||{};
+    return {sex:m? 'm' : 'f', name:(m? pick(['Marcus','Gaius','Titus','Aulus','Kaiq','Toruk']) : pick(['Julia','Livia','Aqa','Ulla','Claudia'])),
+            skin:mixHex(hexOf(B.look.skin), hexOf(sp.skin||B.look.skin), 0.5), hair:Math.random()<0.5? B.look.hair : (sp.hair||B.look.hair), age:3}; };
+  /* ---- COURTSHIP, on the game's own lines and tastes ---- */
+  const court=(rankId, who, style, opener)=>{
+    const Rk=COURT_RANKS[rankId]; const temper=style.temper||pick(Object.keys(COURT_TEMPERS)), T=COURT_TEMPERS[temper];
+    const cid='c'+(S.courts++);
+    const W=(t)=>(Rk.taste[t]===undefined? 1 : Rk.taste[t])*((T.mul&&T.mul[t])||1);
+    const Lean=(t,readT)=> readT? W(t) : (Rk.taste[t]===undefined? 1 : Rk.taste[t]);
+    let prog=0, mistakes=0, max=Math.max(1,Rk.mistakes||3), readT=false, asked=false, gifted=false, handTried=false, holding=false, turns=0, used=[];
+    beat({k:'court_start', cid, rankId, who:botTrim(who), temper, th:opener, cap:'COURTING · '+(who.name||'').toUpperCase()});
+    const capC='COURTING · '+(who.name||'').toUpperCase();
+    const line=(o)=>{ o.k='court'; o.cid=cid; o.cap=capC; o.prog=prog; o.mis=mistakes; o.max=max; o.holding=holding; return beat(o); };
+    while(turns<14 && prog<100 && mistakes<=max){
+      if(style.ask && !asked){ asked=true; readT=true; turns++; const g=Math.round(3*W('honest')); prog=clamp(prog+g,0,100);
+        line({g:'palms', say:'“Tell me about yourself. Not the family — you.”', r:'They tell you — at length. They are '+T.name+': '+T.note+'.', band:'ok', delta:g, th:(L.read&&L.read[temper])||P(L.good)}); continue; }
+      if(style.gift && !gifted && turns>=1){ gifted=true;
+        const exp=COURT_GIFT_EXPECT[rankId]||10, cap=exp*(style.giftMul||1.2);
+        const aff=COURT_GIFTS.filter(g=>g.price<=Math.min(G.coin, cap)).sort((a,b)=>b.price-a.price)[0];
+        if(aff){ turns++; G.coin-=aff.price; const ratio=aff.price/exp;
+          let sc, band; if(ratio<0.2){ sc=-4; band='bad'; } else if(ratio<0.8){ sc=Math.round(3*(T.gift||1)); band='cool'; } else { sc=Math.round(Math.min(18,(7+3*Math.log2(ratio))*(T.gift||1))); band=sc>=9? 'glow' : 'ok'; }
+          if(sc<0) mistakes++; prog=clamp(prog+sc,0,100);
+          line({g:'give', icon:aff.icon, say:'You give them '+(aff.name[world]||aff.name.west)+'.', r: sc>=9? '“For me?” — delighted.' : sc>0? '“Oh — thank you.”' : '“How… thoughtful.”', band, delta:sc, th:P(L.gift||L.good)});
+          continue; } }
+      if(style.hand && !handTried && prog>=(style.handAt||55)){ handTried=true; turns++;
+        const rk={poor:1, rich:0.85, elite:0.6, imperial:0.3}[rankId]||1, ch=clamp((prog-40)/55*(T.hand||1)*rk,0.05,0.95);
+        if(Math.random()<ch){ prog=clamp(prog+12,0,100); holding=true; line({g:'reach', say:'You take their hand.', r:'They let you.', band:'glow', delta:12, th:P(L.hand||L.good)}); }
+        else { mistakes++; prog=clamp(prog-6,0,100); line({g:'reach', say:'You take their hand.', r:'They take it back.', band:'bad', delta:-6, th:P(L.bad)}); }
+        continue; }
+      const ok=(p)=>!p.ranks || p.ranks.indexOf(rankId)>=0;
+      let pool=COURT_PROMPTS.map((p,i)=>i).filter(i=>ok(COURT_PROMPTS[i]) && used.indexOf(i)<0); if(!pool.length){ used=[]; pool=COURT_PROMPTS.map((p,i)=>i).filter(i=>ok(COURT_PROMPTS[i])); }
+      const pi=pick(pool); used.push(pi); const Pq=COURT_PROMPTS[pi];
+      const oi=style.choose(Pq.opts, (t)=>Lean(t,readT), W); const O=Pq.opts[oi]; turns++;
+      const sc=Math.round(O.v*W(O.t)); prog=clamp(prog+Math.max(sc,0),0,100);
+      if(sc<0){ mistakes++; prog=clamp(prog+Math.round(sc*0.6),0,100); }
+      if(turns>=4 && !readT){ readT=true; }
+      const band=courtBand(sc);
+      line({g:{sweet:'heart', honest:'palms', wit:'flourish', body:'flex', bold:'point'}[O.t]||'palms', q:Pq.q, say:O.say, r:O.r, band, delta:sc,
+            slap:(band==='awful' && rankId==='poor' && sc<=-8), th: band==='awful' && L.slap && rankId==='poor' && sc<=-8? P(L.slap) : sc>=4? P(L.good) : sc<0? P(L.bad) : P(L.good)});
+    }
+    const won=prog>=100 && mistakes<=max;
+    beat({k:'court_end', cid, won, th: won? P(L.won) : P(L.lost), cap:capC});
+    S.lastCourt=G.day;
+    if(won){ S.married=true; S.spouse=botTrim(who); R.spouse=S.spouse; G.married=true;
+      beat({k:'wedding', rankId, spouse:S.spouse, th:P(L.wedding), cap:'THE WEDDING'}); }
+    else S.courtFails++;
+    return won; };
+  const stylePick=(prefs, noise)=>(opts, lean, W)=>{ let best=0, bs=-1e9;
+    opts.forEach((o,i)=>{ const s=o.v*lean(o.t)*(prefs[o.t]||1)+rnd(-noise,noise); if(s>bs){ bs=s; best=i; } }); return best; };
+  const nextDay=()=>{ G.day=(G.day||0)+1; if(S.hurt>0) S.hurt--; };
+  /* ---- AND NOW THEY PLAY ---- */
+  beat({k:'intro', th:P(L.intro), cap:B.icon+' '+B.name.toUpperCase()+' · '+B.title});
+  const MAXB=50;
+  if(B.id==='minerva'){
+    while((R.beats.length<MAXB || (S.married && !S.kids.length && R.beats.length<62)) && G.day<130){ nextDay();
+      const eliteOk=courtAccess('elite').ok, impOk=courtAccess('imperial').ok;
+      if(!S.married && (eliteOk||impOk) && G.coin>=300 && G.day-S.lastCourt>=3){
+        const rk=(impOk && Math.random()<0.35)? 'imperial' : 'elite', Rk=COURT_RANKS[rk];
+        const who=makeBride(pick(brideEthsHere()), Rk.noble, clamp(Math.round(rnd(Rk.quality[0],Rk.quality[1])),1,10), {male:true, ageNear:G.age||24, spread:5});
+        who.male=true;
+        court(rk, who, {ask:true, gift:true, giftMul:1.0, hand:true, handAt:72, choose:stylePick({}, 0.3)}, P(L.court));
+        continue; }
+      if(S.married && !S.villa && G.coin>=1500){ G.coin-=1200; S.villa=true; G.hasVilla=true; beat({k:'villa', th:P(L.villa), cap:'THE VILLA'}); continue; }
+      if(S.married && S.kids.length<2 && G.day%(S.kids.length? 9 : 4)===0){ const kd=kidOf(); S.kids.push(kd); beat({k:'child', kid:kd, kids:S.kids.slice(), spouse:S.spouse, th:P(L.child), cap:'A CHILD IS BORN'}); continue; }
+      if(S.married && G.day-S.lastBed>=12){ S.lastBed=G.day; S.nights++; beat({k:'home', spouse:S.spouse, th:P(L.home), cap:'HOME'}); beat({k:'bed', spouse:S.spouse, th:P(L.bed), thTame:P(L.bedTame), cap:'THE BEDCHAMBER'}); continue; }
+      if(S.wits>=3 && (G.office||0)<3 && G.day%3===0 && G.coin>=120){
+        const won=Math.random()<clamp(0.35+S.wits*0.08,0,0.92); S.cases++; if(won){ S.casesWon++; G.coin+=180; G.honor=(G.honor||50)+2; }
+        beat({k:'forum', won, th:won? P(L.caseW) : P(L.caseL), cap:'THE FORUM · A CASE'});
+        if(won && S.casesWon>=(G.office||0)*2+2 && (G.office||0)<3){ G.office=(G.office||0)+1; if(G.office>=3) G.senate=true;
+          beat({k:'office', office:G.office, title:['','QUAESTOR','AEDILE','SENATOR'][G.office], th:L.office[G.office], cap:'THE CURSUS HONORUM'}); }
+        continue; }
+      if(G.day%4===0 && S.wits<7){ S.wits++; beat({k:'train', what:'wits', th:P(L.wits), cap:'STUDY · RHETORIC AND LAW'}); continue; }
+      let tier=-1; for(let t=4;t>=0;t--){ if(odds(t)>=0.6){ tier=t; break; } }
+      if(tier<0){ G.skills.blade=(G.skills.blade||0)+1; beat({k:'train', what:'blade', kit:kit(), th:P(L.refuse).replace('{p}',Math.round(odds(1)*100)), cap:'THE LUDUS · DRILL'}); continue; }
+      fight(tier, P(L.take));
+      if(G.day%5===0){ G.skills.blade=(G.skills.blade||0)+1; }
+    }
+  }
+  else if(B.id==='lucius'){
+    const titledIds=['bosom','seat'];
+    while(R.beats.length<MAXB && G.day<110){ nextDay();
+      if(!S.married){
+        if(G.stamina<5 && G.day%3===0){ G.stamina++; beat({k:'train', what:'stamina', th:P(L.stamina), cap:'THE SHORE · LAPS'}); continue; }
+        if(S.rejected<2 && G.day>=2+S.rejected*4){
+          const w=makeBride('rkrai', false, ri(4,7), {ageNear:G.age||22, spread:5}); w.male=false;
+          if(botCurves(w)>=16){ w.body.bust=Math.max(w.body.bust||5,6); }
+          S.rejected++; beat({k:'look', who:botTrim(w), verdict:'no', th:P(L.reject), thTame:P(L.rejectTame), cap:'THE STREET · A LOOK'}); continue; }
+        if(G.coin>=180 && G.day-S.lastCourt>=3 && (G.glory||0)>=70){
+          let who, rk='elite', opener, openerTame;
+          const tid=titledIds.find(t=>S.titledTried.filter(x=>x===t).length<(S.courtFails>=2? 2 : 1));
+          if(tid && S.courtFails<4){ S.titledTried.push(tid);
+            try{ who=makeRkTitledWife(tid, ri(8,10)); }catch(e){ who=null; }
+            opener=L.titled[tid]; openerTame=L.titledTame[tid]; }
+          if(!who){ rk='rich'; const pool=[]; for(let i=0;i<14;i++){ const w=makeBride('rkrai', Math.random()<0.4, ri(7,10), {ageNear:G.age||22, spread:5}); w.male=false; pool.push(w); }
+            pool.sort((a,b)=>botCurves(b)-botCurves(a)); who=pool[0]; who.body.bust=Math.max(who.body.bust||6,9); who.body.booty=Math.max(who.body.booty||6,9);
+            beat({k:'look', who:botTrim(who), verdict:'yes', th:P(L.approve), cap:'THE STREET · A LOOK'}); opener=P(L.court); openerTame=P(L.courtTame); }
+          who.male=false;
+          const temper=(S.courtFails>=3)? 'romantic' : undefined;
+          const b0=R.beats.length;
+          court(rk, who, {temper, ask:false, gift:true, giftMul:2.0, hand:true, handAt:48, choose:stylePick({sweet:1.4, bold:1.25, body:1.15}, 1.2)}, opener);
+          if(R.beats[b0]) R.beats[b0].thTame=openerTame;
+          continue; }
+        if(G.coin<60 && S.cheats===0 && G.day>12){ S.cheats++; beat({k:'cheat', what:'coin', from:G.coin, to:G.coin+400, th:P(L.cheatCoin), cap:'⌘ THE DOMINUS CONSOLE'}); G.coin+=400; continue; }
+        let tier=2; for(let t=3;t>=0;t--){ if(odds(t)>=0.5){ tier=t; break; } if(t===0) tier=0; }
+        fight(tier, P(L.take));
+      } else {
+        const sp=S.spouse;
+        if(!S.villa && G.coin>=700){ G.coin-=600; S.villa=true; G.hasVilla=true; beat({k:'villa', longhouse:true, th:P(L.longhouse), cap:'THE LONGHOUSE'}); continue; }
+        if(ADULT && (G.body.secret||5)<8 && !S.lenCheat){ S.lenCheat=true; const f=G.body.secret||4; G.body.secret=10;
+          beat({k:'cheat', what:'length', from:f, to:10, th:P(L.cheatLen), thTame:P(L.cheatCoin), cap:'⌘ THE DOMINUS CONSOLE'}); continue; }
+        if((G.stamina||0)<6 && !S.stamCheat){ S.stamCheat=true; const f=G.stamina; G.stamina=(typeof STAMINA_MAX!=='undefined'? STAMINA_MAX : 10);
+          beat({k:'cheat', what:'stamina', from:f, to:G.stamina, th:P(L.cheatStam), cap:'⌘ THE DOMINUS CONSOLE'}); continue; }
+        if(S.nights>=3 && S.kids.length<3 && G.day%5===0){ const kd=kidOf(); S.kids.push(kd); beat({k:'child', kid:kd, kids:S.kids.slice(), spouse:sp, th:P(L.child), cap:'A CHILD IS BORN'}); continue; }
+        if(G.day%2===0) fight(Math.max(0,Math.min(3, (G.level||1)-1)), P(L.take));
+        beat({k:'home', spouse:sp, th:P(L.home), cap:'HOME · EVENING'}); S.nights++;
+        if(S.nights%3===0) beat({k:'bath', spouse:sp, th:P(L.bath), cap:'THE BATH'});
+        else beat({k:'bed', spouse:sp, th:P(L.bed), thTame:P(L.bedTame), cap:'THE BEDCHAMBER'});
+      }
+    }
+  }
+  else {
+    while(R.beats.length<MAXB && G.day<110){ nextDay();
+      // a bigger weapon, the moment there is coin for one
+      const cur=gearOf('weapon',G.loadout.weapon);
+      const up=GEAR.weapon.filter(w=>(w.cost||0)<=G.coin && (w.dmg||0)>(cur.dmg||0)+0.05 && (w.cost||0)>0).sort((a,b)=>(b.dmg||0)-(a.dmg||0))[0];
+      if(up){ G.coin-=up.cost; G.loadout.weapon=up.id; beat({k:'shop', item:up.name, slot:'weapon', kit:kit(), th:P(L.weapon), cap:'THE ARMOURER · '+up.name.toUpperCase()}); continue; }
+      const curA=gearOf('armor',G.loadout.armor);
+      const upA=GEAR.armor.filter(a=>(a.cost||0)<=G.coin-40 && (a.cost||0)>(curA.cost||0)).sort((a,b)=>(b.cost||0)-(a.cost||0))[0];
+      if(upA && G.day%2===0){ G.coin-=upA.cost; G.loadout.armor=upA.id; beat({k:'shop', item:upA.name, slot:'armor', kit:kit(), th:P(L.armour), cap:'THE ARMOURER · '+upA.name.toUpperCase()}); continue; }
+      if(G.day%7===0){ S.races++; const won=Math.random()<clamp(0.42+S.fit*0.04,0,0.85); if(won){ S.raceWins++; G.coin+=160; G.glory+=20; }
+        beat({k:'race', won, th:won? P(L.raceW) : P(L.raceL), cap:'THE CIRCUS · A CHARIOT RACE'}); continue; }
+      if(!S.married && G.day>=24 && G.day-S.lastCourt>=4){
+        const temper=(S.courtFails>=2)? 'daring' : undefined;
+        const who=makeBride(pick(brideEthsHere()), false, ri(5,8), {ageNear:G.age||24, spread:6}); who.male=false;
+        court('poor', who, {temper, ask:false, gift:false, hand:false, choose:stylePick({body:2.2, bold:1.8, wit:0.7, sweet:0.6}, 0.5)}, P(L.court)); continue; }
+      if(S.married && S.kids.length<1 && G.day%8===0){ const kd=kidOf(); kd.sex='m'; S.kids.push(kd); beat({k:'child', kid:kd, kids:S.kids.slice(), spouse:S.spouse, th:P(L.child), cap:'A CHILD IS BORN'}); continue; }
+      if(S.married && G.day-S.lastBed>=10){ S.lastBed=G.day; beat({k:'bed', spouse:S.spouse, th:P(L.bed), thTame:P(L.bedTame), cap:'THE BEDCHAMBER'}); continue; }
+      if(G.day%5===0){ S.fit++; beat({k:'train', what:'lift', th:P(L.lift), cap:'THE LUDUS · WEIGHTS'}); continue; }
+      const tier=Math.min(4, (G.level||1)+2);                                   // the hardest bout on the board, always
+      if(S.hurt>0 && Math.random()<0.5) beat({k:'sulk', hurt:true, th:P(L.hurt), cap:'THE INFIRMARY — NOT FOR LONG'});
+      const won=fight(tier, P(L.take));
+      if(!won && Math.random()<0.6) beat({k:'sulk', th:P(L.loss), cap:'AFTER THE BOUT'});
+    }
+  }
+  R.stats={days:G.day, wins:S.wins, losses:S.losses, coin:Math.round(G.coin||0), glory:Math.round(G.glory||0), level:G.level||1,
+           spouse:S.spouse? S.spouse.name : null, kids:S.kids.length, office:G.office||0, villa:S.villa, races:S.races, raceWins:S.raceWins, cases:S.casesWon};
+  beat({k:'end', spouse:S.spouse, kids:S.kids.slice(), stats:R.stats, th:P(L.end), thTame:L.endTame? P(L.endTame) : undefined, cap:'THE STORY SO FAR'});
+  return R;
+}
+/* ---- ▶ WATCH: the career, played back on the game canvas like a video ---- */
+const BOT_DUR={intro:330, fight:430, train:250, court_start:230, court:280, court_end:230, wedding:340, home:230, bed:300, bath:270,
+               child:280, cheat:320, shop:250, race:430, forum:300, office:280, sulk:230, look:240, villa:260, end:520};
+let BW=null;
+function botBeatDur(b){ return BOT_DUR[b.k]||260; }
+function botTimeline(rec){ let t=0; return rec.beats.map(b=>{ const s=t; t+=botBeatDur(b); return s; }).concat([t]); }
+function botThought(b){ return (!ADULT && b.thTame)? b.thTame : b.th; }
+function botMeLook(){ const r=BW.rec; return Object.assign({}, r.look, {body:(BW.beat && BW.beat.body)||r.look.body}); }
+function openBotWatch(id, from){
+  const rec=botLoad()[id]; if(!rec || !rec.beats || !rec.beats.length){ toast('Nothing recorded for that bot yet — press ● RECORD first.', 3000); return; }
+  BW={id, rec, B:BOTS[id], i:0, t:0, T:0, speed:1, playing:true, from: from||'scr-settings', tl:botTimeline(rec), ct:null, cc:null, fx:[], F:null, lastSub:'', lastCap:''};
+  state='botwatch'; document.querySelectorAll('.screen').forEach(s=>s.classList.remove('on'));
+  $('statbar').classList.add('hide');
+  botBuildBar(); botEnterBeat(0);
+}
+function closeBotWatch(){
+  const from=(BW&&BW.from)||'scr-settings'; BW=null;
+  const el=$('botwatch'); if(el) el.classList.add('hide');
+  if(from==='scr-settings'){ show('scr-settings'); buildSettings(); } else show(from);
+}
+function botEnterBeat(i){
+  if(!BW) return; const rec=BW.rec; i=clamp(i,0,rec.beats.length-1);
+  BW.i=i; BW.t=0; BW.beat=rec.beats[i]; BW.fx=[]; BW.F=null;
+  const b=BW.beat;
+  // a courtship carries on across its beats: rebuild it up to here, so a jump lands in the middle of one
+  if(b.k==='court_start'||b.k==='court'||b.k==='court_end'){
+    let s=i; while(s>0 && rec.beats[s].k!=='court_start') s--;
+    const st=rec.beats[s];
+    if(!BW.ct || BW.ct.cid!==st.cid || i<=BW.ctAt){
+      BW.ct={cid:st.cid, rankId:st.rankId, who:st.who, prog:0, mistakes:0, max:3, turns:0, lastMsg:null, holding:false, rival:false, rivalLook:null,
+             over:false, won:false, anim:null, world:rec.world, meLook:null}; BW.ctAt=s; }
+    const C=BW.ct; C.meLook=botMeLook();
+    const ct0=CT; CT=C;
+    try{
+      if(b.k==='court'){ C.turns++; C.prog=b.prog; C.mistakes=b.mis||0; C.max=b.max||3; C.holding=!!b.holding;
+        C.lastMsg={say:b.say, r:b.r, band:b.band, delta:b.delta};
+        const A0=courtAnim(); A0.wordDur=150;
+        courtAnimLine(b.g||'palms', b.band, b.say, b.delta);
+        A0.bub.forEach(q=>{ if(q.who==='me') q.dur=200; });                 // a viewer needs longer to read it than a player does
+        if(b.g==='give' && b.icon) courtAnim().giftItem={icon:b.icon, t0:courtAnim().t};
+        if(b.slap){ const A=courtAnim(); A.rea={kind:'slap', band:'awful', t0:A.t+48, dur:96}; } }
+      else if(b.k==='court_end'){ C.over=true; C.won=!!b.won; const A=courtAnim(); A.end={won:!!b.won, t0:A.t+30}; if(b.won) C.prog=100; }
+      else courtAnim();
+    } finally { CT=ct0; }
+    BW.ctAt=i;
+  } else BW.ct=null;
+  botSyncBar(true);
+}
+function botWatchTick(dt){
+  if(!BW) return;
+  const d=(BW.playing? dt*BW.speed : 0);
+  BW.t+=d; BW.T+=d;
+  const dur=botBeatDur(BW.beat);
+  if(BW.t>=dur){ if(BW.i<BW.rec.beats.length-1) botEnterBeat(BW.i+1); else { BW.t=dur; BW.playing=false; } }
+  try{ botDraw(d); }catch(e){ try{ console.error(e); }catch(_){} }
+  botSyncBar(false);
+}
+/* ---------- the scenes ---------- */
+function botFigure(c, look, x, fl, dir, P, Z){
+  const w0=COURT_WORLD_OV; COURT_WORLD_OV=BW.rec.world;
+  try{ return courtFigure(c, look, x, fl, dir, P||{}, BW.T, Z||1.3); } finally { COURT_WORLD_OV=w0; } }
+function botBars(c){ c.fillStyle='#000'; c.fillRect(0,0,480,12); c.fillRect(0,230,480,40); }
+function botFx(c, kind, x, y, n){ for(let i=0;i<(n||1);i++) BW.fx.push({kind, x:x+rnd(-6,6), y:y+rnd(-4,3), vx:rnd(-0.3,0.3), vy:-rnd(0.3,0.8), life:60+rnd(0,40)}); }
+function botDrawFx(c, dt){
+  BW.fx.forEach(p=>{ p.x+=p.vx*dt; p.y+=p.vy*dt; p.life-=dt; const a=clamp(p.life/40,0,1); c.globalAlpha=a;
+    if(p.kind==='heart'){ c.fillStyle='#ff5a8c'; c.beginPath(); c.moveTo(p.x,p.y+3); c.bezierCurveTo(p.x-4,p.y-1,p.x-2.5,p.y-4,p.x,p.y-1.8); c.bezierCurveTo(p.x+2.5,p.y-4,p.x+4,p.y-1,p.x,p.y+3); c.fill(); }
+    else if(p.kind==='spark'){ c.fillStyle='#ffe38a'; c.fillRect(p.x-0.5,p.y-2.5,1,5); c.fillRect(p.x-2.5,p.y-0.5,5,1); }
+    else if(p.kind==='sweat'){ c.fillStyle='#8ad0ff'; c.beginPath(); c.arc(p.x,p.y,1.3,0,7); c.fill(); }
+    else if(p.kind==='petal'){ c.fillStyle='#f4b8cc'; c.fillRect(p.x,p.y,2,1.4); }
+    else if(p.kind==='confetti'){ c.fillStyle=['#e8c34a','#e26a8a','#7ad48a','#6fb0d8'][(p.x|0)%4]; c.fillRect(p.x,p.y,1.6,1.6); }
+    else if(p.kind==='blood'){ c.fillStyle='#b01818'; c.fillRect(p.x,p.y,1.5,1.5); }
+    c.globalAlpha=1; });
+  BW.fx=BW.fx.filter(p=>p.life>0);
+}
+function botBigText(txt, y, col, sc){ pixelText(txt, 240, y, col||'#ffe296', sc||2); }
+function botHome(c, T){ drawCourtVenue(c, 480, 230, 214, 'rich', BW.rec.world, T, 0.8); }
+function botDraw(dt){
+  const c=ctx, b=BW.beat, T=BW.T, u=clamp(BW.t/botBeatDur(b),0,1), me=botMeLook(), rec=BW.rec, world=rec.world;
+  c.save(); c.setTransform(1,0,0,1,0,0); c.imageSmoothingEnabled=false;
+  c.fillStyle='#0a0608'; c.fillRect(0,0,480,270);
+  const k=b.k, FL=214;
+  const PX=(x,y,w,h,col)=>{ c.fillStyle=col; c.fillRect(Math.round(x),Math.round(y),Math.round(w),Math.round(h)); };
+  if(k==='court_start'||k==='court'||k==='court_end'){
+    if(!BW.cc){ BW.cc=document.createElement('canvas'); BW.cc.width=480; BW.cc.height=216; }
+    const ct0=CT, w0=COURT_WORLD_OV; CT=BW.ct; COURT_WORLD_OV=world;
+    try{ courtTick(dt, BW.cc); } finally { CT=ct0; COURT_WORLD_OV=w0; }
+    c.drawImage(BW.cc, 0, 12);
+    // the bar, as a thin strip across the top of the picture
+    const C=BW.ct, pc=C.prog>=75? '#7ad48a' : C.prog>=40? '#e8c34a' : '#c8a86a';
+    PX(150,16,180,4,'#1c1410'); PX(150,16,180*C.prog/100,4,pc);
+    if(k==='court' && b.q && BW.t<150) pixelText(courtShort(b.q, 64), 240, 32, '#e2a0b8', 1.05);      // what they said to you
+    if(k==='court_start') botBigText((b.who&&b.who.name)||'', 40, '#e2a0b8', 1.6);
+    if(k==='court_start' && b.temper && BW.t>60) pixelText('('+COURT_TEMPERS[b.temper].name+')', 240, 52, '#cdbca0', 1.1);
+    if(k==='court_end' && BW.t>70) botBigText(b.won? '🌹 THEY SAY YES' : '🚪 THEY ARE DONE', 60, b.won? '#7ad48a' : '#e05b5b', 2);
+  }
+  else if(k==='fight'||(k==='train' && b.what==='blade')||k==='shop'){ botDrawArena(c, b, T, u, dt); }
+  else if(k==='race'){ botDrawRace(c, b, T, u, dt); }
+  else if(k==='intro'){
+    const g=c.createLinearGradient(0,0,480,0); g.addColorStop(0,'#0a0608'); g.addColorStop(1, mixHex(hexOf(BW.B.col),'#0a0608',0.7)); c.fillStyle=g; c.fillRect(0,0,480,270);
+    for(let i=0;i<30;i++){ const tw=0.5+0.5*Math.sin(T*0.04+i); c.fillStyle='rgba(255,240,220,'+(0.25*tw).toFixed(2)+')'; c.fillRect((i*97)%480, 20+(i*53)%190, 1.2, 1.2); }
+    const x=90+Math.min(1,u*4)*40;
+    botFigure(c, me, x, FL, 1, {g:u>0.25? 'wave' : null, k:1, face:'smug', walk:u<0.25, walkPh:T*0.3}, 1.9);
+    if(u>0.15){ pixelText(BW.B.icon+' '+BW.B.name.toUpperCase(), 330, 70, BW.B.col, 3); pixelText(BW.B.title, 330, 96, '#ffe296', 1.8); }
+    if(u>0.3){ const sm=(!ADULT && BW.B.sampleTame)? BW.B.sampleTame : BW.B.sample; sm.forEach((s2,i)=>{ if(u>0.3+i*0.12) pixelText('“'+s2+'”', 330, 128+i*16, '#e8dcc2', 1.05); }); }
+    pixelText((world==='rk'? 'THE RKRAI COAST' : world==='wa'? 'WA' : world==='east'? 'THE EAST' : 'ROME')+' · A NEW CAREER', 330, 200, '#a89a80', 1);
+  }
+  else if(k==='train'){
+    if(b.what==='wits'){ PX(0,0,480,230,'#2a1e16'); for(let r=0;r<5;r++){ PX(20,30+r*36,440,4,'#5a3e24'); for(let i=0;i<40;i++){ PX(24+i*11,14+r*36,8,16, ['#e8dcc2','#c8b88a','#a88c5a'][(i+r)%3]); PX(24+i*11,20+r*36,8,2,'#6a4a2a'); } }
+      PX(0,FL,480,16,'#3a2a1c'); PX(250,FL-26,90,6,'#6a4a2c'); PX(254,FL-20,4,20,'#5a3e24'); PX(332,FL-20,4,20,'#5a3e24');
+      const R=botFigure(c, me, 210, FL, 1, {g:'take', k:1, face:'flat', headAng:0.25}, 1.3);
+      if(R && R.hand){ PX(R.hand[0]-1,R.hand[1]-7,12,9,'#efe4c6'); PX(R.hand[0]-1,R.hand[1]-7,12,1.4,'#8a6a3a'); for(let l=0;l<3;l++) PX(R.hand[0]+1,R.hand[1]-4+l*2,8,0.8,'#6a5a4a'); }
+      if(((T|0)%80)<2) botFx(c,'spark',260,FL-80,1);
+    } else if(b.what==='stamina'){
+      const g=c.createLinearGradient(0,0,0,230); g.addColorStop(0,'#3a5a7a'); g.addColorStop(1,'#a8b8c0'); c.fillStyle=g; c.fillRect(0,0,480,230);
+      PX(0,150,480,10,'#5a7a8a'); for(let x=0;x<480;x+=14) PX(x+Math.sin(T*0.03+x)*2,152,8,1,'rgba(230,240,255,.5)'); PX(0,160,480,70,'#9a8a6a');
+      const x=-30+BW.t*2.2;
+      botFigure(c, me, x, FL, 1, {walk:true, walkPh:T*0.42, face:'smug', lean:0.1}, 1.3);
+      if(((T|0)%16)<1) botFx(c,'sweat',x,FL-82,1);
+    } else { // lifting
+      PX(0,0,480,230,'#4a3624'); for(let x=0;x<480;x+=12) PX(x,40,10,150,x%24? '#5e4630' : '#6a5238'); PX(0,FL,480,16,'#7a6a4a');
+      const up=0.5+0.5*Math.sin(T*0.12);
+      const R=botFigure(c, me, 230, FL, 1, {g:'flex', k:up, face:up>0.6? 'smug' : 'flush'}, 1.35);
+      if(R && R.hand){ PX(R.hand[0]-14,R.hand[1]-3,28,3,'#3a3a3a'); PX(R.hand[0]-18,R.hand[1]-7,5,11,'#2a2a2a'); PX(R.hand[0]+13,R.hand[1]-7,5,11,'#2a2a2a'); }
+      if(up>0.97 && ((T|0)%6)<1) botFx(c,'sweat',230,FL-90,2);
+    }
+  }
+  else if(k==='forum'||k==='office'){
+    drawCourtVenue(c, 480, 230, FL, 'elite', 'west', T, 0.6);
+    for(let i=0;i<22;i++){ const hx=20+i*21, hy=FL+4+(i%2)*3+Math.sin(T*0.1+i)*(k==='office'?1.5:0.4); c.fillStyle=i%3? '#2a1e1a' : '#3a2a24'; c.beginPath(); c.arc(hx,hy,6,0,7); c.fill(); }
+    const gs=['flourish','point','palms'], g=gs[Math.floor(T/70)%3];
+    botFigure(c, me, 240, FL-6, 1, {g: k==='office'? 'wave' : g, k:1, face: k==='office'? 'smug' : 'flat'}, 1.3);
+    if(k==='forum'){ if(u<0.7) pixelText(pick2(['“…and so, by the lex Cornelia —”','“Consider the tax records.”','“The witness was in Ostia.”'], Math.floor(T/90)), 240, 48, '#e8dcc2', 1.1);
+      if(u>0.7) botBigText(b.won? '⚖ CASE WON' : '⚖ CASE LOST', 60, b.won? '#7ad48a' : '#e05b5b', 2); }
+    else { PX(150,26,180,26,'#5a2f52'); PX(150,26,180,2,'#e8c34a'); PX(150,50,180,2,'#e8c34a'); botBigText(b.title||'', 40, '#ffe296', 2);
+      if(((T|0)%5)<1) botFx(c,'confetti',rnd(120,360),30,2); }
+  }
+  else if(k==='look'){
+    drawCourtVenue(c, 480, 230, FL, 'poor', world, T, 0.3);
+    const x2=300-Math.max(0,1-u*3)*100;
+    botFigure(c, me, 150, FL, 1, {g:'rub', k:1, face: b.verdict==='yes'? 'smitten' : 'flat'}, 1.3);
+    botFigure(c, b.who, x2, FL, -1, {walk:u<0.33, walkPh:T*0.3, face:'pleased'}, 1.3);
+    if(u>0.55) botBigText(b.verdict==='yes'? '♥ THE ONE' : '✗ NEXT', 50, b.verdict==='yes'? '#ff8ab0' : '#e0705b', 2);
+    if(b.verdict==='yes' && ((T|0)%10)<1) botFx(c,'heart',150,FL-100,1);
+  }
+  else if(k==='wedding'){
+    drawCourtVenue(c, 480, 230, FL, b.rankId||'rich', world, T, 1);
+    const g=Math.max(16, 60-u*120);
+    botFigure(c, me, 240-g, FL, 1, {g:u>0.4? 'hold' : null, k:1, face:'smitten'}, 1.3);
+    botFigure(c, b.spouse||rec.spouse, 240+g, FL, -1, {g:u>0.4? 'hold' : null, k:1, face:'smitten', blush:0.5}, 1.3);
+    if(((T|0)%3)<1) botFx(c,'petal',rnd(20,460),14,1);
+    if(u>0.45){ botBigText('⚭ MARRIED', 40, '#ffe296', 2.2); if(((T|0)%12)<1) botFx(c,'heart',240,FL-100,2); }
+  }
+  else if(k==='home'||k==='child'||k==='villa'){
+    botHome(c, T);
+    const sp=b.spouse||rec.spouse;
+    if(k==='villa'){ botFigure(c, me, 200, FL, 1, {g:'wave', k:1, face:'smug'}, 1.3); if(sp) botFigure(c, sp, 250, FL, -1, {face:'pleased'}, 1.3);
+      botBigText(b.longhouse? '🏠 THE LONGHOUSE' : '🏛 THE VILLA', 40, '#ffe296', 2); if(((T|0)%6)<1) botFx(c,'confetti',rnd(100,380),24,1); }
+    else if(k==='home'){ const mx=Math.min(210, 40+u*420);
+      botFigure(c, me, mx, FL, 1, {walk:mx<210, walkPh:T*0.33, g:mx>=210? 'hold' : null, k:1, face:'smitten'}, 1.3);
+      if(sp) botFigure(c, sp, mx>=210? 236 : 300, FL, -1, {g:mx>=210? 'hold' : null, k:1, face:mx>=210? 'smitten' : 'pleased'}, 1.3);
+      if(mx>=210 && ((T|0)%14)<1) botFx(c,'heart',224,FL-100,1); }
+    else { if(sp) botFigure(c, sp, 280, FL, -1, {face:'smitten'}, 1.3); botFigure(c, me, 190, FL, 1, {face:'smitten', g:'heart', k:1}, 1.3);
+      const kids=b.kids||[b.kid]; kids.forEach((kd,i)=>{ try{ drawKidProfile(c, 225+i*18, FL, kd, {age:(i===kids.length-1? 2 : 5+i*2), expr:'pleased', k:1.3}, i%2? -1 : 1); }catch(e){} });
+      botBigText('👶 '+((b.kid&&b.kid.name)||'A CHILD'), 40, '#ffe296', 2); if(((T|0)%10)<1) botFx(c,'heart',235,FL-80,1); }
+  }
+  else if(k==='bed'){
+    if(!ADULT){ botHome(c, T); const sp=b.spouse||rec.spouse; PX(360,FL-40,50,40,'#3a2a1a'); for(let i=0;i<4;i++){ const f=Math.sin(T*0.25+i)*2; c.fillStyle=i%2? '#ffb84a' : '#ff7a2a'; c.beginPath(); c.moveTo(368+i*9,FL-6); c.lineTo(371+i*9,FL-20-f); c.lineTo(374+i*9,FL-6); c.fill(); }
+      botFigure(c, me, 220, FL, 1, {g:'hold', k:1, face:'dreamy'}, 1.3); if(sp) botFigure(c, sp, 244, FL, -1, {g:'hold', k:1, face:'dreamy'}, 1.3); }
+    else {
+      PX(0,0,480,230,'#2a1a14'); for(let x=0;x<480;x+=16) PX(x,0,15,FL,'#34221a'); PX(0,FL,480,16,'#4a3424');
+      const dx=300; PX(dx-4,FL-96,58,96,'#1a0e08'); const shut=clamp((u-0.55)/0.12,0,1);
+      PX(dx,FL-92,50*shut,92,'#6a4228'); if(shut>0){ for(let i=0;i<3;i++) PX(dx,FL-80+i*30,50*shut,3,'#3a3a3a'); }
+      PX(dx+60,FL-60,4,10,'#e8dcc2'); const fl=Math.sin(T*0.3); PX(dx+60,FL-66-fl,4,6,'#ffc860');
+      const sp=b.spouse||rec.spouse, wx=Math.min(dx+22, 60+u*520);
+      if(shut<1){ botFigure(c, me, wx-18, FL, 1, {walk:wx<dx+22, walkPh:T*0.33, face:'smitten'}, 1.3); if(sp) botFigure(c, sp, wx+8, FL, 1, {walk:wx<dx+22, walkPh:T*0.33+1, face:'smitten'}, 1.3); }
+      if(shut>=1){ const j=Math.sin(T*0.5)*(u>0.75? 0.8 : 0); c.save(); c.translate(j,0); PX(dx,FL-92,50,92,'#6a4228'); for(let i=0;i<3;i++) PX(dx,FL-80+i*30,50,3,'#3a3a3a'); c.restore();
+        if(((T|0)%9)<1) botFx(c,'heart',dx+25,FL-100,1); if(u>0.8) pixelText('♥ ♥ ♥', dx+25, FL-112, '#ff8ab0', 1.4); }
+    }
+  }
+  else if(k==='bath'){
+    PX(0,0,480,230,'#2a3a44'); for(let x=0;x<480;x+=12) for(let y=0;y<150;y+=12) PX(x+1,y+1,10,10,((x+y)/12)%2? '#3a4e5a' : '#34464f');
+    const sp=b.spouse||rec.spouse, wy=FL-46;
+    botFigure(c, me, 220, FL, 1, {face:'smitten', g:'hold', k:1}, 1.3); if(sp) botFigure(c, sp, 246, FL, -1, {face:'smitten', g:'hold', k:1, blush:0.4}, 1.3);
+    c.fillStyle='rgba(60,140,180,.82)'; c.fillRect(0,wy,480,230-wy); c.fillStyle='rgba(200,240,255,.5)'; for(let x=0;x<480;x+=10) c.fillRect(x+Math.sin(T*0.05+x)*3, wy+Math.sin(T*0.08+x*0.3), 6, 1);
+    PX(0,wy-4,480,4,'#c8c0a8');
+    for(let i=0;i<5;i++){ const s=(T*0.4+i*30)%90; c.fillStyle='rgba(240,240,240,'+(0.18*(1-s/90)).toFixed(2)+')'; c.beginPath(); c.arc(140+i*50+Math.sin(s*0.1)*6, wy-s, 6+s*0.1, 0,7); c.fill(); }
+    if(((T|0)%16)<1) botFx(c,'heart',233,FL-104,1);
+  }
+  else if(k==='cheat'){
+    botHome(c, T); c.fillStyle='rgba(0,0,0,.45)'; c.fillRect(0,0,480,230);
+    botFigure(c, me, 110, FL, 1, {g:'point', k:1, face:'smug'}, 1.3);
+    PX(170,40,280,150,'#1a1410'); PX(170,40,280,2,'#e8c34a'); PX(170,188,280,2,'#e8c34a');
+    pixelText('⌘ DOMINUS CONSOLE', 310, 54, '#ffe296', 1.3);
+    const tame=(!ADULT && b.what==='length');
+    const what=tame? 'coin' : b.what, from=tame? b.coin : b.from, to=tame? (b.coin||0)+500 : b.to;
+    const nm={length:'body.length', stamina:'stamina', coin:'coin'}[what]||what;
+    const txt='> '+nm+' = '+to, n=Math.floor(clamp((u-0.1)/0.4,0,1)*txt.length);
+    pixelText(txt.slice(0,n)+(((T|0)%30)<15? '▌' : ''), 310, 84, '#7ad48a', 1.2);
+    if(u>0.55){ const lab=what==='length'? (typeof lenRankName==='function'? '' : '') : '';
+      const mx=what==='coin'? Math.max(to,1) : (what==='length'? 11 : (typeof STAMINA_MAX!=='undefined'? STAMINA_MAX : 10));
+      const k2=clamp((u-0.55)/0.25,0,1), cur=from+(to-from)*k2;
+      PX(200,120,220,10,'#2a2018'); PX(200,120,220*clamp(cur/mx,0,1),10, what==='length'? '#ff8ab0' : what==='stamina'? '#7ad48a' : '#e8c34a');
+      pixelText(Math.round(from)+'  →  '+Math.round(cur)+lab, 310, 148, '#e8dcc2', 1.3); }
+    if(u>0.8) pixelText('✓ APPLIED', 310, 172, '#7ad48a', 1.2);
+  }
+  else if(k==='sulk'){
+    drawCourtVenue(c, 480, 230, FL, 'poor', world, T, 0.1); c.fillStyle='rgba(20,20,40,.35)'; c.fillRect(0,0,480,230);
+    const R=botFigure(c, me, 240, FL, 1, {g:'rub', k:1, face:'sulk', headAng:0.3, lean:0.08}, 1.3);
+    const hx=(R&&R.head)? R.head[0] : 240, hy=(R&&R.head)? R.head[1] : 110;
+    c.fillStyle='#4a4a5a'; for(const [ox,oy,r] of [[-8,0,7],[0,-3,8],[9,0,7],[3,2,7]]){ c.beginPath(); c.arc(hx+ox,hy-24+oy,r,0,7); c.fill(); }
+    c.fillStyle='#8ab0e0'; for(let i=0;i<6;i++){ const yy=(T*1.2+i*9)%26; c.fillRect(hx-10+i*4, hy-18+yy, 1, 3); }
+  }
+  else if(k==='end'){
+    const g=c.createLinearGradient(0,0,0,230); g.addColorStop(0,'#1a1020'); g.addColorStop(1,'#0a0608'); c.fillStyle=g; c.fillRect(0,0,480,230);
+    botFigure(c, me, 90, FL, 1, {face:'smug', g:u>0.2? 'hold' : null, k:1}, 1.3);
+    if(b.spouse) botFigure(c, b.spouse, 116, FL, -1, {face:'smitten', g:u>0.2? 'hold' : null, k:1}, 1.3);
+    (b.kids||[]).forEach((kd,i)=>{ try{ drawKidProfile(c, 150+i*16, FL, kd, {age:4+i*2, expr:'pleased', k:1.3}, -1); }catch(e){} });
+    const S2=b.stats||{}, rows=[
+      ['DAYS', S2.days], ['BOUTS', (S2.wins||0)+' won · '+(S2.losses||0)+' lost'], ['COIN', (S2.coin||0)+'d'], ['GLORY', S2.glory],
+      ['SPOUSE', S2.spouse||'—'], ['CHILDREN', S2.kids||0]];
+    if(S2.office) rows.push(['OFFICE', ['','Quaestor','Aedile','Senator'][S2.office]]);
+    if(S2.races) rows.push(['RACES', (S2.raceWins||0)+' / '+S2.races+' won']);
+    if(S2.villa) rows.push(['HOME', rec.world==='rk'? 'a longhouse' : 'a villa']);
+    pixelText(BW.B.icon+' '+BW.B.name.toUpperCase()+' — THE STORY SO FAR', 320, 30, BW.B.col, 1.6);
+    rows.forEach((r,i)=>{ if(u>0.08+i*0.06){ pixelText(r[0], 250, 60+i*17, '#a89a80', 1.1); pixelText(String(r[1]), 370, 60+i*17, '#f2e8d6', 1.2); } });
+    if(u>0.85) pixelText('▶ PRESS ⏮ TO WATCH AGAIN', 320, 216, '#e8c34a', 1);
+  }
+  botDrawFx(c, dt);
+  botBars(c);
+  c.restore();
+}
+function pick2(a, i){ return a[((i%a.length)+a.length)%a.length]; }
+/* the arena: sand, the stands, the crowd — and two gladiators on the same bodies the real bouts use */
+function botArenaBg(c, T){
+  const g=c.createLinearGradient(0,0,0,120); g.addColorStop(0,'#3a4a6a'); g.addColorStop(1,'#c88a5a'); c.fillStyle=g; c.fillRect(0,0,480,120);
+  for(let r=0;r<5;r++){ const y=40+r*20; c.fillStyle=r%2? '#6a5040' : '#5e4636'; c.fillRect(0,y,480,20);
+    for(let i=0;i<60;i++){ const x=(i*8+r*3)%480, bob=Math.sin(T*0.2+i*1.3+r)*(BW.cheer||0.4); c.fillStyle=['#c89a6a','#8a5a3a','#e8c8a0','#6a3a2a'][(i+r)%4]; c.fillRect(x, y+6-Math.max(0,bob)*2, 4, 5); c.fillStyle=['#8a2a1a','#2a4a8a','#e8dcc2','#4a6a2a'][(i*3+r)%4]; c.fillRect(x-1, y+11-Math.max(0,bob)*2, 6, 6); } }
+  c.fillStyle='#8a6a4a'; c.fillRect(0,140,480,24); c.fillStyle='#6a4a30'; c.fillRect(0,160,480,4);
+  const s=c.createLinearGradient(0,164,0,230); s.addColorStop(0,'#c8a870'); s.addColorStop(1,'#a88850'); c.fillStyle=s; c.fillRect(0,164,480,66);
+  for(let i=0;i<40;i++){ c.fillStyle='rgba(120,90,50,.35)'; c.fillRect((i*53)%480, 170+(i*29)%56, 3, 1); }
+}
+function botFighter(f0, look, x, facing, kit){
+  const K=kit||{};
+  const f=makeFighter({x, y:GROUND, facing, name:f0.name, skin:f0.skin||look&&look.skin, tunic:f0.tunic||(look&&look.dress), female:!!f0.female, beard:!!f0.beard, beardC:f0.beardC, scale:f0.scale||1,
+    gear:{weapon:gearOf('weapon',K.weapon||'gladius'), shield:gearOf('shield',K.shield||'scutum'), helmet:gearOf('helmet',K.helmet||'none'), armor:gearOf('armor',K.armor||'none')}});
+  if(look) f._nbLook=Object.assign({}, look, {self:false});
+  f.hpK=1; return f;
+}
+function botDrawArena(c, b, T, u, dt){
+  botArenaBg(c, T);
+  const F=BW.F || (BW.F={});
+  const me=botMeLook();
+  if(!F.p){
+    F.p=botFighter({name:BW.B.name, female:!me.male, beard:me.beard && me.beard!=='none', scale:1}, me, b.k==='fight'? 110 : 200, 1, b.kit||{});
+    if(b.k==='fight'){ F.e=botFighter(b.foe||{}, null, 370, -1, (b.foe&&b.foe.gear)||{}); F.nextAtk=70; F.turn=0; F.hits=0; }
+    if(b.k==='shop'){ F.p.x=220; F.p.stance='high'; }
+  }
+  const p=F.p, e=F.e, t=BW.t;
+  const step=(f)=>{ if(f.atk){ f.atkT-=dt; if(f.atkT<=0){ f.atk=false; f.atkT=0; } } if(f.hurt>0) f.hurt=Math.max(0,f.hurt-dt); if(f.blockFlash>0) f.blockFlash=Math.max(0,f.blockFlash-dt); };
+  if(b.k==='fight'){
+    BW.cheer=0.4+Math.min(1,F.hits*0.1);
+    if(t<60){ p.x=Math.min(190, p.x+1.4*dt); e.x=Math.max(290, e.x-1.4*dt); p.vx=1; e.vx=-1; p.legPhase+=0.3*dt; e.legPhase+=0.3*dt; }
+    else { p.vx=0; e.vx=0;
+      const ending=t>330;
+      if(!ending && t>=F.nextAtk){ const winFirst=Math.random()<0.64; const atkr=((F.turn++)%3===2? !winFirst : winFirst)? (b.won? p : e) : (b.won? e : p);
+        const def=atkr===p? e : p; atkr.atk=true; atkr.atkDur=18; atkr.atkT=18; atkr.atkType=Math.random()<0.5? 'slash' : 'thrust'; atkr._tgt=def; atkr._hit=false; F.nextAtk=t+42+rnd(0,16); }
+      [p,e].forEach(f=>{ if(f.atk && !f._hit && f.atkT<=9){ f._hit=true; const d=f._tgt;
+        if(Math.random()<0.28){ d.blockFlash=8; try{ sfx('block'); }catch(e2){} }
+        else { d.hurt=10; d.hpK=Math.max(d===(b.won? e : p)? 0.05 : 0.35, d.hpK-rnd(0.12,0.22)); F.hits++; botFx(c,'blood', d.x, d.y-40, 4); botFx(c,'spark', d.x, d.y-42, 2); try{ sfx('hit'); }catch(e2){} } } });
+      const pa=Math.sin(t*0.05)*0.5; if(!ending){ p.x+= (Math.sin(t*0.07)*0.3)*dt; e.x+= (Math.sin(t*0.07+1)*0.3)*dt; p.legPhase+=Math.abs(pa)*0.05*dt; }
+      if(ending){ const L=b.won? e : p, Wn=b.won? p : e, kk=clamp((t-330)/24,0,1); L.hpK=0; L.koTimer=1; L.rot=-L.facing*1.45*kk; L.atk=false; Wn.stance='high';
+        if(t>350 && ((t|0)%8)<1) botFx(c, b.won? 'confetti' : 'sweat', b.won? rnd(100,380) : Wn.x, b.won? 40 : Wn.y-60, 2); BW.cheer=b.won? 1.4 : 0.2; }
+    }
+    step(p); step(e);
+    try{ if(portraitsNew()){ drawGladiatorNB(e); drawGladiatorNB(p); } else { drawGladiator(e); drawGladiator(p); } }catch(err){}
+    // the two bars
+    const bar=(x,f,nm,col,al)=>{ c.fillStyle='#1a1008'; c.fillRect(x,16,150,6); c.fillStyle=col; c.fillRect(al? x+150-150*f.hpK : x,16,150*f.hpK,6); pixelText(nm, x+75, 28, '#f2e8d6', 0.9); };
+    bar(14,p,BW.B.name.toUpperCase(),'#7ad48a',false); bar(316,e,(b.foe&&b.foe.name||'').toUpperCase(),'#e05b5b',true);
+    if(t<80) pixelText(b.odds+'% ODDS', 240, 40, '#ffe296', 1.3);
+    if(t>345) botBigText(b.won? 'VICTORY' : 'DEFEAT', 60, b.won? '#ffe296' : '#e05b5b', 2.6);
+    if(t>370 && b.won && b.prize) pixelText('+'+b.prize+'d', 240, 84, '#e8c34a', 1.4);
+  } else if(b.k==='train'){
+    BW.cheer=0.05;
+    c.fillStyle='#5a4028'; c.fillRect(262,150,8,60); c.fillStyle='#7a5a38'; c.fillRect(262,150,8,3);          // the palus
+    if(!p.atk && ((t|0)%34)<1){ p.atk=true; p.atkDur=18; p.atkT=18; p.atkType=Math.random()<0.5? 'slash' : 'thrust'; p._hit=false; }
+    if(p.atk && !p._hit && p.atkT<=9){ p._hit=true; botFx(c,'spark',262,170,3); try{ sfx('block'); }catch(e2){} }
+    step(p); p.x=230;
+    try{ if(portraitsNew()) drawGladiatorNB(p); else drawGladiator(p); }catch(err){}
+  } else { // the armourer
+    BW.cheer=0.1; c.fillStyle='rgba(0,0,0,.35)'; c.fillRect(0,0,480,230);
+    c.fillStyle='#4a3020'; c.fillRect(300,120,140,90); for(let i=0;i<6;i++){ c.fillStyle='#b8c0c8'; c.fillRect(310+i*22,126,2,60); c.fillStyle='#6a4a2a'; c.fillRect(308+i*22,180,6,8); }
+    p.stance= ((t|0)%120)<70? 'high' : 'mid'; step(p);
+    try{ if(portraitsNew()) drawGladiatorNB(p); else drawGladiator(p); }catch(err){}
+    if(t>40) botBigText('⚔ '+(b.item||'').toUpperCase(), 50, '#ffe296', 2);
+    if(((t|0)%20)<1) botFx(c,'spark', p.x+20, p.y-70, 2);
+  }
+}
+/* the circus: four chariots, seven laps, one finish line */
+function botDrawRace(c, b, T, u, dt){
+  const g=c.createLinearGradient(0,0,0,120); g.addColorStop(0,'#4a6a9a'); g.addColorStop(1,'#d8a870'); c.fillStyle=g; c.fillRect(0,0,480,230);
+  for(let r=0;r<3;r++){ c.fillStyle=r%2? '#6a5040' : '#5e4636'; c.fillRect(0,50+r*18,480,18); for(let i=0;i<60;i++){ c.fillStyle=['#c89a6a','#e8c8a0','#8a2a1a','#2a4a8a'][(i+r)%4]; c.fillRect((i*8+r*4)%480, 56+r*18-Math.max(0,Math.sin(T*0.25+i))*2, 4, 6); } }
+  c.fillStyle='#c8a870'; c.fillRect(0,104,480,126);
+  c.fillStyle='#9a8a6a'; c.fillRect(0,140,480,10); c.fillStyle='#b8a888'; c.fillRect(0,140,480,2);                // the spina
+  const ob=((-T*2.2)%600+600)%600-60; c.fillStyle='#d8c8a8'; c.beginPath(); c.moveTo(ob,140); c.lineTo(ob+4,98); c.lineTo(ob+8,140); c.fill();
+  const lap=Math.min(7, 1+Math.floor(u*7)); pixelText('LAP '+lap+' / 7', 240, 24, '#ffe296', 1.4);
+  const cols=[BW.B.col,'#e05b5b','#6fb0d8','#7ad48a'], lanes=[176,196,160,212];
+  for(let i=0;i<4;i++){
+    const mine=(i===0), lead= mine? (b.won? 1 : 0.35) : [0.2,0.8,0.5][i-1]*(b.won? 0.9 : 1.05);
+    const x=150+Math.sin(T*0.013+i*1.7)*40+(u>0.8? (lead-0.5)*(u-0.8)*900 : (lead-0.5)*40), y=lanes[i];
+    const gal=Math.sin(T*0.5+i);
+    // the horses
+    for(let h=0;h<2;h++){ const hx=x+30+h*3, hy=y-4+h*2; c.fillStyle=h? '#5a3a24' : '#6a4a2c'; c.fillRect(hx,hy-10,20,8); c.fillRect(hx+17,hy-15,5,7);
+      c.fillStyle='#3a2414'; c.fillRect(hx+2+gal*2,hy-2,2,6); c.fillRect(hx+15-gal*2,hy-2,2,6); }
+    c.strokeStyle='#3a2a1a'; c.beginPath(); c.moveTo(x+12,y-14); c.lineTo(x+30,y-12); c.stroke();
+    // the car and the man in it
+    c.fillStyle=cols[i]; c.fillRect(x,y-16,14,10); c.fillStyle='#2a1a10'; c.beginPath(); c.arc(x+5,y-4,5,0,7); c.fill(); c.fillStyle='#8a6a3a'; c.beginPath(); c.arc(x+5,y-4,2,0,7); c.fill();
+    c.fillStyle=mine? hexOf(BW.rec.look.skin) : '#c89a6a'; c.fillRect(x+4,y-26,6,10); c.beginPath(); c.arc(x+7,y-28,3,0,7); c.fill();
+    if(mine){ pixelText(BW.B.name.toUpperCase(), x+7, y-38, BW.B.col, 0.9); }
+    for(let d=0;d<3;d++){ c.fillStyle='rgba(200,170,120,'+(0.3-d*0.08)+')'; c.beginPath(); c.arc(x-6-d*7, y-3, 3+d, 0,7); c.fill(); }
+  }
+  if(u>0.9) botBigText(b.won? '🏁 FIRST PAST THE POST' : '🏁 BEATEN', 60, b.won? '#ffe296' : '#e05b5b', 2);
+}
+/* ---------- the controls and the subtitles ---------- */
+function botFmt(fr){ const s=Math.floor(fr/60); return String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0'); }
+function botBuildBar(){
+  let el=$('botwatch');
+  if(!el){ el=document.createElement('div'); el.id='botwatch'; $('stage').appendChild(el); }
+  el.className='';
+  el.innerHTML='<div class="bw-top"><span class="bw-cap"></span><span class="bw-rec">▶ PLAYBACK</span></div>'
+    +'<div class="bw-sub"></div>'
+    +'<div class="bw-bar"><button data-a="first" title="Back to the start">⏮</button><button data-a="prev" title="Previous scene (←)">⏪</button>'
+    +'<button data-a="play" class="bw-play" title="Play / pause (space)">⏸</button><button data-a="next" title="Next scene (→)">⏩</button><button data-a="last" title="Skip to the end">⏭</button>'
+    +'<button data-a="speed" class="bw-speed" title="Speed">1×</button>'
+    +'<input type="range" class="bw-seek" min="0" max="1000" value="0">'
+    +'<span class="bw-time">00:00 / 00:00</span>'
+    +'<button data-a="close" title="Close (Esc)">✕</button></div>';
+  el.querySelectorAll('button').forEach(bt=>{ bt.onclick=(e)=>{ e.stopPropagation(); botCmd(bt.dataset.a); }; });
+  const sk=el.querySelector('.bw-seek');
+  sk.oninput=()=>{ if(!BW) return; const tot=BW.tl[BW.tl.length-1], want=sk.value/1000*tot; let i=0; while(i<BW.rec.beats.length-1 && BW.tl[i+1]<=want) i++;
+    botEnterBeat(i); BW.t=want-BW.tl[i]; };
+}
+function botCmd(a){
+  if(!BW) return;
+  if(a==='play'){ if(!BW.playing && BW.i>=BW.rec.beats.length-1 && BW.t>=botBeatDur(BW.beat)){ botEnterBeat(0); } BW.playing=!BW.playing; }
+  else if(a==='prev') botEnterBeat(BW.t>40? BW.i : BW.i-1);
+  else if(a==='next') botEnterBeat(BW.i+1);
+  else if(a==='first'){ botEnterBeat(0); BW.playing=true; }
+  else if(a==='last') botEnterBeat(BW.rec.beats.length-1);
+  else if(a==='speed'){ BW.speed= BW.speed>=4? 0.5 : BW.speed>=2? 4 : BW.speed>=1? 2 : 1; }
+  else if(a==='close'){ closeBotWatch(); return; }
+  botSyncBar(true);
+}
+function botSyncBar(force){
+  const el=$('botwatch'); if(!el || !BW) return;
+  const b=BW.beat, cap='DAY '+(b.day||0)+' · '+(b.cap||'');
+  if(force || cap!==BW.lastCap){ BW.lastCap=cap; el.querySelector('.bw-cap').textContent=cap; }
+  // the thought comes up a moment into the scene, and the after-thought (a win, a loss) near the end
+  let th=botThought(b)||'', tAfter=b.after && BW.t>botBeatDur(b)*0.84;
+  if(tAfter) th=b.after;
+  const show= BW.t>18 && th;
+  const sub= show? ('<b style="color:'+BW.B.col+'">'+BW.B.name.toUpperCase()+'</b> <span class="bw-tk">💭</span> “'+th.replace(/^[“"]|[”"]$/g,'')+'”') : '';
+  if(force || sub!==BW.lastSub){ BW.lastSub=sub; const s=el.querySelector('.bw-sub'); s.innerHTML=sub; s.style.opacity=sub? '1' : '0'; }
+  const tot=BW.tl[BW.tl.length-1], now=BW.tl[BW.i]+BW.t;
+  el.querySelector('.bw-time').textContent=botFmt(now)+' / '+botFmt(tot);
+  const sk=el.querySelector('.bw-seek'); if(document.activeElement!==sk) sk.value=Math.round(now/Math.max(1,tot)*1000);
+  el.querySelector('.bw-play').textContent=BW.playing? '⏸' : '▶';
+  el.querySelector('.bw-speed').textContent=(BW.speed===0.5? '½' : BW.speed)+'×';
+}
+window.addEventListener('keydown', e=>{
+  if(state!=='botwatch' || !BW) return;
+  const k=e.key;
+  if(k===' '){ botCmd('play'); e.preventDefault(); e.stopImmediatePropagation(); }
+  else if(k==='ArrowRight'){ botCmd('next'); e.preventDefault(); e.stopImmediatePropagation(); }
+  else if(k==='ArrowLeft'){ botCmd('prev'); e.preventDefault(); e.stopImmediatePropagation(); }
+  else if(k==='Escape'){ botCmd('close'); e.preventDefault(); e.stopImmediatePropagation(); }
+  else if(k==='+'||k==='='){ botCmd('speed'); e.preventDefault(); }
+}, true);
+/* ---------- the card in Settings ---------- */
+function buildBotsCard(b){
+  const wrap=document.createElement('div');
+  wrap.style.cssText='margin-top:10px;padding:9px;border:2px solid #000;border-radius:4px;text-align:left;background:linear-gradient(#1c1624,#120c16);box-shadow:inset 0 0 0 1px rgba(138,208,255,.18)';
+  wrap.innerHTML='<b style="color:#8ad0ff">🤖 THE THREE BOTS</b><div class="small muted" style="margin:3px 0 6px;line-height:1.5">Three players with minds of their own. '
+    +'<b>● RECORD</b> and one plays a whole fresh career in a sandbox — your career and your save are never touched — and '
+    +'<b>▶ WATCH</b> plays it back like a video, with what they were thinking as subtitles.</div>';
+  const all=botLoad();
+  BOT_ORDER.forEach(id=>{
+    const B=BOTS[id], R=all[id];
+    const row=document.createElement('div'); row.style.cssText='border-top:1px dashed #3a2e40;padding:6px 0;';
+    const brief=(!ADULT && B.briefTame)? B.briefTame : B.brief;
+    row.innerHTML='<div class="row gap6" style="align-items:center;justify-content:space-between">'
+      +'<div><b style="color:'+B.col+'">'+B.icon+' '+B.name.toUpperCase()+'</b> <span class="small" style="color:#ffe296">'+B.title+'</span>'
+      +' <span class="small muted">· '+(B.female? 'a woman' : 'a man')+' · '+(B.arch==='RkTorvak'? 'the Rkrai coast' : 'Rome')+'</span>'
+      +'<div class="small muted">'+(R&&R.stats? ('Recorded: day '+R.stats.days+' · '+R.beats.length+' scenes · '+R.stats.wins+'–'+R.stats.losses+(R.stats.spouse? ' · married '+R.stats.spouse : ' · unmarried')) : 'Not recorded yet.')+'</div></div>'
+      +'<div class="row gap6"></div></div>'
+      +'<details style="margin-top:3px"><summary class="small" style="cursor:pointer;color:#a8c8e0">the brief they play to</summary><div class="small" style="font-style:italic;color:#cfc0a2;line-height:1.5;margin-top:3px">'+brief+'</div></details>';
+    const btns=row.querySelector('.row.gap6 .row.gap6')||row.querySelectorAll('.row.gap6')[1];
+    const rb=document.createElement('button'); rb.className='btn sm'; rb.textContent=R? '● RE-RECORD' : '● RECORD';
+    rb.onclick=()=>{ const r=botRecord(id); if(r && !r.err){ toast('● '+B.name+' played '+r.stats.days+' days — '+r.beats.length+' scenes recorded.', 3000); } else toast('⚠ The recording failed: '+((r&&r.err)||'').slice(0,80), 4000); buildSettings(); };
+    const wb=document.createElement('button'); wb.className='btn sm gold'; wb.textContent='▶ WATCH'; wb.disabled=!R;
+    wb.onclick=()=>openBotWatch(id, 'scr-settings');
+    btns.appendChild(rb); btns.appendChild(wb);
+    wrap.appendChild(row);
+  });
+  const ra=document.createElement('button'); ra.className='btn sm'; ra.style.marginTop='4px'; ra.textContent='● RECORD ALL THREE';
+  ra.onclick=()=>{ BOT_ORDER.forEach(id=>botRecord(id)); toast('● All three have played. Pick one and press ▶ WATCH.', 3000); buildSettings(); };
+  wrap.appendChild(ra);
+  b.appendChild(wrap);
+}
 function openSettings(from){
   settingsFrom = from || (document.querySelector('.screen.on')||{}).id || 'scr-title';
   if(settingsFrom==='scr-settings') settingsFrom='scr-title';
@@ -39827,6 +40979,7 @@ function buildSettings(){
     }
     b.appendChild(wrap);
   }
+  try{ buildBotsCard(b); }catch(e){ try{ console.error(e); }catch(_){} }          // 🤖 the three bots
 }
 /* =====================================================================
    THE WOOHOO GUIDE
@@ -61536,6 +62689,8 @@ window.__SS = {
   rollBrides, drawUndressedFig, drawWaterCouple, waterMetrics, drawSteamVeil,
   COURT_RANKS, COURT_PROMPTS, COURT_BOASTS, courtAccess, courtOnly, startCourtship,
   courtChoose, courtShow, courtBackDown, courtFinish, renderCourt, get CT(){return CT;},
+  courtAsk, courtGift, courtHand, courtTick, courtWeight, courtNextBeat, updateDomus, wifeExpr, drawCourtVenue,
+  BOTS, BOT_LINES, botRecord, botLoad, openBotWatch, closeBotWatch, botCmd, botEnterBeat, botWatchTick, get BW(){return BW;}, get BOT_SANDBOX(){return BOT_SANDBOX;}, buildBotsCard, COURT_TEMPERS, COURT_GIFTS, COURT_RIVAL_BEATS, drawCourtVenue,
   buildCourtBoard, rollHiddenPotential, drawCourtScene, openCreate, MATCHMAKER_FEE,
   courtRec, courtCooldown, courtStanding, get MEDIUM_CENSOR(){return MEDIUM_CENSOR;},
   setMediumCensor:(v)=>{ MEDIUM_CENSOR=!!v; },

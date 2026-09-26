@@ -163,11 +163,16 @@ const ok=(name,cond,note)=>{ if(cond){pass++; console.log('  PASS  '+name+(note?
   ok('when she takes a big one it goes slower, and her tongue is out a little', !R.err && R.bigV===11 && R.slow<1 && R.midSlow===1 && R.he==='overwhelmed', R.err||JSON.stringify(R));
 
   console.log('\n=== 😋 THE FACES COME UP IN THE VILLA ON THEIR OWN ===');
-  R=await T((src)=>{ const S=window.__SS; const G=eval(src)('rome'); G.wifeRel=82; G.wifePhys=96; G.jealousy=0; S.setWifeMood(null,1);
+  /* (V48: "why does the hungry expression happen so much?" — it is a flash now, a few seconds in
+     every forty, not her resting face; so this looks inside one of those flashes, and counts them) */
+  R=await T((src)=>{ const S=window.__SS; const G=eval(src)('rome'); G.wifeRel=82; G.wifePhys=96; G.jealousy=0;
+    const pn=performance.now.bind(performance), n=((G.wife&&G.wife.name)||'').length, base=(((1-n*7)%40)+40)%40;
+    let FK=(base+400)*1000; performance.now=()=>FK; S.setWifeMood(null,1);
     S.openVilla(); const card=[...document.querySelectorAll('#villa-body .small')].map(e=>e.textContent).find(t=>/Right now:/.test(t))||'';
-    S.openDomus(); S.DM.wifeX=300; S.DM.x=200; S.drawDomus(); const mood=S.DM.moodW&&S.DM.moodW.id;
-    return {expr:S.wifeExpr(G.wife), card, mood}; }, src);
-  ok('a wife who is running hot is HUNGRY in the hall, with a bubble saying so', !R.err && R.expr==='hungry' && R.mood==='hungry', R.err||JSON.stringify(R));
+    S.openDomus(); S.DM.wifeX=300; S.DM.x=200; S.drawDomus(); const mood=S.DM.moodW&&S.DM.moodW.id; const expr=S.wifeExpr(G.wife);
+    let hung=0; for(let i=0;i<400;i++){ FK+=100; if(S.wifeExpr(G.wife)==='hungry') hung++; }
+    performance.now=pn; return {expr, card, mood, frac:hung/400}; }, src);
+  ok('a wife who is running hot goes HUNGRY in the hall in flashes, with a bubble saying so', !R.err && R.expr==='hungry' && R.mood==='hungry' && R.frac>0.03 && R.frac<0.25, R.err||JSON.stringify(R));
   ok('and the villa card says what her face is doing right now', !R.err && /HUNGRY/.test(R.card), R.err||R.card);
 
   console.log('\n=== 🔞 AND WITH MATURE CONTENT OFF ===');
