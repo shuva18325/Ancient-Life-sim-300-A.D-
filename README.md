@@ -68,6 +68,12 @@ publicly, leaving it off keeps the game safe for a general audience.
 - **Kanvek you can see, and a less hungry house (V48, mature content)** — the length is drawn
   through the whole stroke and the swallow; Hungry comes in flashes instead of all day, even for a
   Greedy spouse.
+- **The arena takes the bout (V48)** — faces that fight (teeth gritted on the swing, HURT on a
+  hit, SHOCKED on a knockdown, a laugh for the winner), kit that wears (dents, tears, a shield that
+  cracks and loses a corner as HP falls) and your ledger's scars on your body.
+- **Chosen, not rolled (V48)** — a 🖼 POSE button for spouse portraits, TONIGHT'S FACES at the
+  bedchamber door (or 🎲 SURPRISE ME), a size switch for IMPOSSIBLE in Settings, a night's worth of
+  stamina from the kitchen, TRAIN TOGETHER, and a bold spouse who looks back when caught looking.
 - **The villa tablet as a panel (V48)** — tabs you can click or tap (⌘ in the villa), and the
   Dominus Console split into tabs with a search.
 - **The new bodies, everywhere (V47)** — every spouse portrait (TAKE A WIFE / TAKE A HUSBAND,

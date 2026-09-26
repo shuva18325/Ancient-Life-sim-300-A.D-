@@ -31,10 +31,9 @@ slowed the walk to the door and gave the player a look of their own. New since t
 - **The sivrak, round two.** Build it together as a scene (an afternoon of leaf and cord, the
   pieces going on one at a time), let it wilt over the evening, and let a Shameless spouse ask
   YOU to wear one.
-- **The look, round two.** Looking back: when they catch you and are bold, they look at the front
-  of YOUR tunic in turn; a Jealous spouse minds you looking at the servants.
-- **Portrait poses you pick.** A POSE row on the marriage card (and the ledger) so the player can
-  choose how their spouse stands for the painter, plus a few seated and leaning poses.
+- **The look, round two.** ~~Looking back: when they catch you and are bold, they look at the front
+  of YOUR tunic in turn~~ (V48); a Jealous spouse minds you looking at the servants.
+- ~~**Portrait poses you pick.**~~ (V48 — a 🖼 POSE button under the portrait on the marriage cards and the ledger); still open: a few seated and leaning poses.
 - **The commissions on the new body.** The coast's carved and painted commissions and the hide
   sketch still crop the old full-length plate (their frames were measured on it); re-measure the
   frames on the new figure and move them over, with the sivrak as a front-view garment.
@@ -44,11 +43,11 @@ slowed the walk to the door and gave the player a look of their own. New since t
 And the list from after V46, still open:
 
 
-1. **Stamina, round two.** A night's worth of it from the kitchen — oysters, garum and honeyed
+1. **Stamina, round two.** ~~A night's worth of it from the kitchen — oysters, garum and honeyed
    wine in Rome, seal fat and kelp on the coast — a TRAIN TOGETHER beat in the villa that raises
-   both of yours, and a rhythm duel in the bedchamber: tap in time to keep her in the HOT zone,
+   both of yours~~ (V48), and still open: a rhythm duel in the bedchamber: tap in time to keep her in the HOT zone,
    or push it and watch it tip into TOO MUCH.
-2. **Pick the night's faces.** The tablet's face grid, offered at the bedchamber door: the face
+2. ~~**Pick the night's faces.**~~ (V48) The tablet's face grid, offered at the bedchamber door: the face
    she (or he) wears for the whole session, yours too, or SURPRISE ME.
 3. **Greedy, round two.** The hands follow the eyes: a grab beat when a Greedy one catches you
    bent over, a slap back when you catch them, and the village's own word for it on the board
@@ -60,21 +59,34 @@ And the list from after V46, still open:
    the impluvium's rim, the tablinum desk — so the third one does not feel familiar.
 6. **The wife's bend, round two.** Bend at the low shelf, the pool's edge or the stairs; his
    resist styles against it; and "he gets it out" leading straight into the sundial.
-7. **Faces in the arena.** The face library is shared — a fighter could grit his teeth on a
+7. ~~**Faces in the arena.**~~ (V48) The face library is shared — a fighter could grit his teeth on a
    swing, go HURT on a hit, SHOCKED on a knockdown and grin on a win, instead of four states.
-8. **Wear on the kit.** Dents in the bronze, torn cloth and a shield that loses planks as the
+8. ~~**Wear on the kit.**~~ (V48) Dents in the bronze, torn cloth and a shield that loses planks as the
    bout goes on, read off HP — the kit already knows where every piece sits.
 9. **Beasts in the same hand.** The venatio lion, bear, bull and leopard are still block pixel
    quadrupeds; a vector body with IK legs would match the men they fight.
-10. **Scars on the new body.** The template body carries none of the scars the ledger records.
-11. **A size switch in Settings.** IMPOSSIBLE is a step past IMMENSE now (22–26in); a toggle
+10. ~~**Scars on the new body.**~~ (V48) The template body carries none of the scars the ledger records.
+11. ~~**A size switch in Settings.**~~ (V48) IMPOSSIBLE is a step past IMMENSE now (22–26in); a toggle
     between that and V41's comic 26–34 would let either taste play.
 12. **Names on the street.** Walking past a neighbour's door could show their village name and
     its moving picture, the way yours shows near your spouse.
 13. **The crowd and the charioteers** as cached template sprites, the way the soldiers are.
-14. **Creation-card portraits on the template** — the first body a player sees.
+14. ~~**Creation-card portraits on the template**~~ (V48) — the first body a player sees.
 15. **Performance pass.** Cache fighter frames per pose; the bedchamber's painted room could be
     rendered once per session to an offscreen canvas and only its lamp and stars redrawn.
+
+### ~~0.1 The arena's faces, wear and scars; the size switch; poses, faces and stamina you pick~~ — DONE (V48)
+**Result:** `tests/v48.cjs` (39 checks in all). A fighter grits their teeth on the swing and the
+block, goes HURT on a hit, SHOCKED knocked flying, out cold on the sand, cross when it is going
+badly and laughs having won; the kit takes the bout (dents in the bronze and the helmet, a torn
+loincloth, cracks spreading across the shield and a plank's corner gone, read off HP); and the
+scars in your ledger are on your arms, legs and face in the arena. Settings flips IMPOSSIBLE
+between a step past IMMENSE (22–26in) and the comic 26–34in. A 🖼 POSE button under a spouse's
+portrait chooses how they stand; the marriage card offers TONIGHT'S FACES (theirs and yours, or 🎲
+SURPRISE ME, a new one each position); the kitchen sells a night's worth of stamina (+2 each,
+tonight — oysters and garum, seal fat and kelp, eel and sake, ginseng soup) and TRAIN TOGETHER can
+raise both for good once a day; a bold spouse who catches you looking looks right back; and women
+who are not fighters stand on the portrait figure on the creation cards.
 
 ### ~~0.2 The last old bodies, a usable tablet, courtship upgraded, the three bots~~ — DONE (V48)
 **Result:** `tests/v48.cjs` (28 checks). The barber, the peek ("the look"), the suitors, the pool's

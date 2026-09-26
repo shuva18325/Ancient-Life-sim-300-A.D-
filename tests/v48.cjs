@@ -134,6 +134,55 @@ const ok=(name,cond,note)=>{ if(cond){pass++; console.log('  PASS  '+name+(note?
     S.closeBotWatch(); return {lenCheat:r.beats.some(b=>b.k==='cheat' && b.what==='length'), rude:subs.filter(s=>/length|curv|booty|bust/i.test(s)).length}; });
   ok('with mature content off Lucius stays tame (no length cheat, no talk of curves)', !R.err && !R.lenCheat && R.rude===0, R.err||JSON.stringify(R));
 
+  console.log('\n=== 😬 THE ARENA: FACES, WEAR, SCARS ===');
+  await pg.evaluate(()=>{ localStorage.setItem('SANDSTEEL_ADULT','1'); }); await pg.reload(); await pg.waitForTimeout(400);
+  await pg.evaluate(()=>{ window.__cv=(w,h)=>{ const c=document.createElement('canvas'); c.width=w; c.height=h; return c; };
+    window.__diff=(a,b)=>{ const A=a.getContext('2d').getImageData(0,0,a.width,a.height).data, B=b.getContext('2d').getImageData(0,0,b.width,b.height).data;
+      let n=0; for(let i=0;i<A.length;i+=4){ if(Math.abs(A[i]-B[i])+Math.abs(A[i+1]-B[i+1])+Math.abs(A[i+2]-B[i+2])>30) n++; } return n; }; });
+  R=await T(()=>{ const S=window.__SS, F=S.nbFightFaceId;
+    return {knock:F({knock:true,hp:1,maxHp:10}), ko:F({koTimer:5,hp:0,maxHp:10}), hurt:F({hurt:5,hp:50,maxHp:100}), swing:F({atk:true,hp:90,maxHp:100}), low:F({atk:true,hp:20,maxHp:100}), won:F({won:true,hp:50,maxHp:100}), calm:F({hp:100,maxHp:100})}; });
+  ok('a fighter grits their teeth on the swing, goes HURT on a hit, SHOCKED knocked flying, out cold on the sand, and laughs having won', !R.err && R.swing==='brace' && R.hurt==='hurt' && R.knock==='shock' && R.ko==='asleep' && R.won==='laugh' && R.low==='cross' && R.calm===null, R.err||JSON.stringify(R));
+  R=await T(()=>{ const S=window.__SS; S.newDemo('Marcus','Italia','Roman'); const G=S.G; G.scars=[]; G.loadout.helmet='none'; G.loadout.armor='lorica';
+    const cv=document.getElementById('game'), gc=cv.getContext('2d');
+    const shot=(hpK, scars)=>{ G.scars=scars||[]; S.startFight(S.REGION_BY_ID['Italia'], {}); const FT=S.FT; const p=FT.p; p.x=200; FT.foe.x=420; p.hp=p.maxHp*hpK; p._nb=null; p._nbLook=null;
+      gc.setTransform(1,0,0,1,0,0); gc.fillStyle='#000'; gc.fillRect(0,0,480,270); S.drawArena(); const c=__cv(80,110); c.getContext('2d').drawImage(cv,160,110,80,110,0,0,80,110); return c; };
+    const a=shot(0.54), b=shot(0.31);
+    const sc=[{name:'forearm gash',zone:'arm',sev:2},{name:'thigh cut',zone:'leg',sev:2},{name:'cheek scar',zone:'face',sev:1}];
+    const c=shot(1.0), d=shot(1.0, sc);
+    return {wear:__diff(a,b), scars:__diff(c,d), w0:S.FT && 1}; });
+  ok('the kit takes the bout: more dents, tears and shield cracks as HP falls (same blood level, different wear)', !R.err && R.wear>4, R.err||JSON.stringify(R));
+  ok('and the scars in your ledger are on your body in the arena', !R.err && R.scars>2, R.err||JSON.stringify(R));
+
+  console.log('\n=== 📏 THE SIZE SWITCH · 🖼 POSES · 🎭 TONIGHT’S FACES · 🦪 STAMINA · 👀 LOOKING BACK ===');
+  R=await T(()=>{ const S=window.__SS; const L=(v)=>S.lengthInches({name:'x', body:{secret:v, secretFrac:0.5}},1).hard;
+    const step=L(11); S.SETTINGS.comicSize=true; S.applySizeSwitch(); const comic=L(11); S.SETTINGS.comicSize=false; S.applySizeSwitch(); const back=L(11);
+    return {step, comic, back}; });
+  ok('Settings flips IMPOSSIBLE between a step past IMMENSE (22–26in) and the comic 26–34in', !R.err && R.step>=22 && R.step<=26 && R.comic>26 && R.comic<=34 && R.back===R.step, R.err||JSON.stringify(R));
+  R=await T(()=>{ const S=window.__SS; S.newDemo('Marcus','Italia','Roman'); const w=S.makeBride('roman',true,8); w.male=false;
+    const box=S.portraitPosePick(w,132); const img0=box.querySelector('img').src, p0=S.portraitPoseOf(w); box.querySelector('button').click();
+    return {isBox:box.tagName==='DIV', changed:S.portraitPoseOf(w)!==p0, redrawn:box.querySelector('img').src!==img0, label:box.querySelector('button').textContent}; });
+  ok('🖼 a POSE button under a spouse’s portrait chooses how they stand, and repaints it', !R.err && R.isBox && R.changed && R.redrawn, R.err||JSON.stringify(R));
+  R=await T((H)=>{ const S=window.__SS; const G=eval(H)(false,{domus:false}); G.body=G.body||{}; G.body.secret=6; G.nightFaces={spouse:'wink', self:'smug'};
+    S.setWH('done'); S.startBedScene('long','love','bed'); const pk=S.BC.pick; const Tt=520+(S.BED_UNDRESS||0)+60; S.setBCT(Tt); S.drawShadowPlay(S.BC, Tt);
+    const he=S.BC.nf && S.BC.nf.he, hf=S.BC.nf && S.BC.nf.hf && S.BC.nf.hf.id;
+    G.nightFaces={spouse:'surprise', self:null}; S.startBedScene('long','love','bed'); S.setBCT(Tt); S.drawShadowPlay(S.BC, Tt); const sur=S.BC.nf && S.BC.nf.he;
+    return {pk, he, hf, sur, ok:S.NIGHT_FACES.indexOf(sur)>=0}; }, HOUSE);
+  ok('🎭 the faces picked at the bedchamber door are the faces worn — and SURPRISE ME picks one', !R.err && R.pk && R.he==='wink' && R.hf==='smug' && R.ok, R.err||JSON.stringify(R));
+  R=await T((H)=>{ const S=window.__SS; const G=eval(H)(false,{domus:false}); G.body=G.body||{}; G.body.secret=6; G.stamina=3;
+    const a=S.bedStaminaCalc(); G.kitchenDay=G.day; const b=S.bedStaminaCalc(); G.kitchenDay=-9;
+    const t1=S.trainTogether(), t2=S.trainTogether(); return {a:[a.her,a.his], b:[b.her,b.his], t1:t1&&t1.ok, t2:t2&&t2.ok, dish:S.kitchenDish().name}; }, HOUSE);
+  ok('🦪 a night’s worth from the kitchen: +2 stamina for you both, tonight', !R.err && R.b[0]===Math.min(10,R.a[0]+2) && R.b[1]===Math.min(10,R.a[1]+2), R.err||JSON.stringify(R));
+  ok('🏃 and TRAIN TOGETHER works once a day', !R.err && R.t1===true && R.t2===false, R.err||JSON.stringify(R));
+  R=await T((H)=>{ const S=window.__SS; const G=eval(H)(false,{rel:90}); const D=S.DM; D.wifeX=D.x+30; D.gaze=null; D.face=1;
+    S.startPlayerLook(); const X=D.plook; X.noticeAt=1; const r0=Math.random; Math.random=()=>0.5;
+    try{ for(let i=0;i<260 && D.plook;i++) S.updatePlayerLook(1); } finally{ Math.random=r0; }
+    return {react:X.react, gaze:!!D.gaze, back:!!(D.gaze&&D.gaze.back), kind:D.gaze&&D.gaze.kind}; }, HOUSE);
+  ok('👀 caught looking, a bold spouse looks right back at you', !R.err && R.react==='bold' && R.gaze && R.back, R.err||JSON.stringify(R));
+  R=await T(()=>{ const S=window.__SS; S.SETTINGS.classicBodies=false; const sel=S.sel; sel.world='west'; sel.sex='f'; sel.social='elite'; sel.arch=null; S.openCreate();
+    const imgs=[...document.querySelectorAll('#scr-create img')].map(i=>i.src); S.SETTINGS.classicBodies=true; S.openCreate(); const old=[...document.querySelectorAll('#scr-create img')].map(i=>i.src); S.SETTINGS.classicBodies=false;
+    let diff=0; for(let i=0;i<Math.min(imgs.length,old.length);i++) if(imgs[i]!==old[i]) diff++; return {n:imgs.length, diff}; });
+  ok('the creation cards stand the new figure — women who are not fighters in their people’s garment too', !R.err && R.n>=4 && R.diff>=Math.floor(R.n*0.75), R.err||JSON.stringify(R));
+
   console.log('\n=== 🚪 AND THE REST ===');
   R=await T(()=>window.__SS.BUILD_STAMP);
   ok('the build says V48', typeof R==='string' && /V48/.test(R), String(R));
