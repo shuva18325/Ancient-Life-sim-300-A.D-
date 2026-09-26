@@ -14357,7 +14357,7 @@ const SETTINGS_KEY='SANDSTEEL_SETTINGS';
 /* WHICH BUILD IS THIS. Printed on the title screen, in Settings and in the
    corner of the hall — because an old link to an old build looks exactly
    like a fix that did not work. */
-const BUILD_STAMP='V48 · the last old bodies, the tablet, courtship upgraded, the three bots';
+const BUILD_STAMP='V49 · the roadmap’s ten: beasts, bedchambers, the rhythm, the bots’ heirs';
 try{ document.addEventListener('DOMContentLoaded',()=>{ const e=document.getElementById('build-stamp'); if(e) e.textContent='build '+BUILD_STAMP; });
      const e0=document.getElementById('build-stamp'); if(e0) e0.textContent='build '+BUILD_STAMP; }catch(e){}
 const SETTINGS=(function(){ const d={sound:true,shake:true,difficulty:'normal',
@@ -14913,7 +14913,7 @@ function swingSfx(f){
   else sfx('swing');
 }
 function drawGladiator(f){
-  if(f.beast){ drawBeast(f); return; }
+  if(f.beast){ if(nbOn()){ try{ if(drawBeastNB(f)) return; }catch(e){ if(!drawGladiator._bwarned){ drawGladiator._bwarned=true; console.warn('beast body failed, old sprite', e); } } } drawBeast(f); return; }
   /* ⚔ THE NEW BODY — the woohoo's figure, in his kit (Settings → Bodies to go back to the old rig) */
   if(nbOn()){ try{ drawGladiatorNB(f); return; }catch(e){ if(!drawGladiator._warned){ drawGladiator._warned=true; console.warn('new body failed, old rig', e); } } }
   f._nbPiv=null;
@@ -15003,6 +15003,432 @@ function drawBeast(f){
   drawStuck(f);
   ctx.restore();
 }
+/* =====================================================================
+   🦁 THE BEASTS, ON BODIES OF THEIR OWN
+   ---------------------------------------------------------------------
+   The venatio's lion, leopard, bear and bull were the last block-pixel
+   figures on the sand: four rectangles for legs that slid fore and aft, a
+   box for a head, and a man on the new template body fighting them. They
+   are built the same way the men are now. Each has a skeleton — a torso
+   laid along the line from hip to withers, a neck and a head, a tail, and
+   four legs solved by inverse kinematics (a cat stands on its toes with the
+   hock high behind it, a bear walks flat on its soles, a bull on hooves at
+   the end of long cannon bones) — and a gait: the feet are planted and
+   carried by the distance covered, one leg after another, and in the air
+   the fore legs reach and the hind legs trail. Each attacks the way it
+   would: the cats rise into a swipe with the claws out and the jaw open,
+   the bear rears up on its hind legs and brings a paw down, the bull drops
+   its head and hooks upward. A hit recoils them; the end knocks them
+   flying and leaves them folded on the sand. They are painted in the same
+   manner as the men — shaded fills in one light, fur laid along the body,
+   the lion's mane, the leopard's rosettes, the bear's hump and claws, the
+   bull's horns, dewlap and split hooves — drawn into a buffer, snapped to
+   the pixel, and ringed with the same dark line.
+   ===================================================================== */
+const BST_SPEC={
+  lion:{ kind:'cat', L:46, hipH:36, shH:38, shX:12, gait:22, lift:7,
+    torso:[[-0.20,9],[-0.06,13],[0.22,11.5],[0.48,10],[0.74,11.5],[0.98,14.5],[1.16,11],[1.25,-2],[1.15,-13.5],[0.92,-15.5],[0.62,-13],[0.34,-11.5],[0.12,-10],[-0.10,-6],[-0.21,1]],
+    fore:{j:[0.97,-7], up:14, lo:14, ft:6, r:[8.5,5.2,3.8,3.9], paw:[5.2,2.8]}, hind:{j:[0.02,-3], up:17, lo:15, ft:12, r:[11,5.6,3.5,3.7], paw:[5.0,2.8]},
+    haunch:[0.04,-1,13,14], shoulder:[0.93,-4,9.5,12.5],
+    neck:{b:[1.07,4], len:12, ang:-0.70, r:[11.5,8.5]}, head:{L:25, H:19, ang:0.18},
+    tail:{root:[-0.19,8], len:38, r:[3.2,1.7], tuft:true, th0:0.60, curl:1.35},
+    col:{base:'#c89e52', lit:'#ecc97f', deep:'#8a6630', belly:'#ead6a4', mane:'#6e4519', maneLit:'#a26c2a', maneDeep:'#3c250e', nose:'#7a3e30', eye:'#e2a936', tuft:'#3a2412'} },
+  leopard:{ kind:'cat', L:40, hipH:29, shH:28, shX:10, gait:24, lift:7,
+    torso:[[-0.20,7],[-0.05,10],[0.24,9],[0.50,8],[0.76,9],[0.98,11],[1.15,8],[1.23,-2],[1.13,-10.5],[0.90,-11.5],[0.60,-9],[0.32,-8],[0.12,-7.5],[-0.10,-4.5],[-0.21,1]],
+    fore:{j:[0.97,-5], up:12, lo:11, ft:5, r:[6.6,4.1,3.0,3.1], paw:[4.2,2.4]}, hind:{j:[0.02,-2], up:14, lo:13, ft:10, r:[8.6,4.5,2.8,3.0], paw:[4.0,2.4]},
+    haunch:[0.04,-1,10,10.5], shoulder:[0.93,-3,7.5,9.5],
+    neck:{b:[1.07,3], len:11, ang:-0.52, r:[7,5.2]}, head:{L:16, H:12, ang:0.22},
+    tail:{root:[-0.19,6], len:42, r:[3.0,2.3], th0:0.70, curl:1.6},
+    col:{base:'#d8a445', lit:'#f4cf78', deep:'#9a6c26', belly:'#f3e2b8', spot:'#2e1e0e', spotIn:'#b0782a', nose:'#8a4a3a', eye:'#e8c040'} },
+  bear:{ kind:'bear', L:44, hipH:38, shH:40, shX:12, gait:18, lift:6,
+    torso:[[-0.19,10],[-0.04,15.5],[0.24,15],[0.50,15.5],[0.74,19.5],[0.94,20],[1.12,13],[1.20,-1],[1.12,-15],[0.90,-18],[0.60,-18],[0.30,-17],[0.08,-14],[-0.12,-8],[-0.20,1]],
+    fore:{j:[0.95,-8], up:15, lo:15, ft:3, r:[10,7,5.4,5.0], paw:[7.2,3.2], plant:true}, hind:{j:[0.03,-4], up:16, lo:14, ft:8, r:[12,7.2,5.2,4.6], paw:[6.0,3.0], plant:true},
+    haunch:[0.04,-1,14,15], shoulder:[0.92,-3,12,15],
+    neck:{b:[1.05,3], len:11, ang:-0.12, r:[13,10]}, head:{L:23, H:16, ang:0.34},
+    tail:{root:[-0.18,9], len:6, r:[4.2,3.2], th0:0.85, curl:0.4},
+    col:{base:'#6c4a2c', lit:'#9a7048', deep:'#3c2816', belly:'#5a3c22', muzzle:'#a07a54', nose:'#1e140c', eye:'#2a1a0c', claw:'#e8dcc4'} },
+  bull:{ kind:'bull', L:50, hipH:43, shH:45, shX:12, gait:22, lift:6,
+    torso:[[-0.18,10],[-0.04,13.5],[0.12,12.5],[0.40,11.5],[0.66,14],[0.86,19],[1.04,15],[1.18,2],[1.13,-17],[0.95,-21],[0.62,-19.5],[0.32,-18],[0.10,-15],[-0.10,-8],[-0.19,1]],
+    fore:{j:[0.97,-9], up:14, lo:12, ft:14, r:[10,6.2,3.6,3.4], hoof:[4.2,4.0]}, hind:{j:[0.03,-4], up:17, lo:15, ft:15, r:[12.5,6.4,3.4,3.2], hoof:[4.0,4.0]},
+    haunch:[0.05,-1,14,15], shoulder:[0.92,-3,12,15],
+    neck:{b:[1.05,5], len:9, ang:-0.12, r:[15,11]}, head:{L:25, H:15, ang:0.95},
+    tail:{root:[-0.17,11], len:32, r:[2.4,1.2], tuft:true, hang:true, th0:0.53, curl:0.12},
+    col:{base:'#2f2721', lit:'#5e4c3e', deep:'#15100c', belly:'#241d18', muzzle:'#5c524a', nose:'#1a1410', eye:'#120c08', horn:'#e8dfc6', hornTip:'#3a3226', hoof:'#1c1612'} },
+};
+const BST_BW=220, BST_BH=150, BST_OX=132, BST_OY=138;         // the buffer: feet at (132,138), room for a tail behind and a reared bear above
+function bstBuf(f){
+  if(!f._bst){ const mk=()=>{ const k=document.createElement('canvas'); k.width=BST_BW; k.height=BST_BH; k.getContext('2d',{willReadFrequently:true}); return k; };
+    f._bst={bk:mk(), fr:mk(), sil:mk()}; }
+  return f._bst;
+}
+/* a smooth closed (or open) curve through the points — Catmull-Rom, as cubic Béziers */
+function bstSpline(g, pts, closed){
+  const n=pts.length; if(n<2) return;
+  const P=(i)=> closed? pts[(i%n+n)%n] : pts[Math.max(0,Math.min(n-1,i))];
+  g.moveTo(pts[0][0], pts[0][1]);
+  const segs= closed? n : n-1;
+  for(let i=0;i<segs;i++){ const p0=P(i-1), p1=P(i), p2=P(i+1), p3=P(i+2);
+    g.bezierCurveTo(p1[0]+(p2[0]-p0[0])/6, p1[1]+(p2[1]-p0[1])/6, p2[0]-(p3[0]-p1[0])/6, p2[1]-(p3[1]-p1[1])/6, p2[0], p2[1]); }
+  if(closed) g.closePath();
+}
+/* a limb: circles at the joints and the hull between them, all wound the same way so they fill as one */
+function bstLimbPath(g, pts, rs){
+  for(let i=0;i<pts.length-1;i++){ const a=pts[i], b=pts[i+1], ra=rs[i], rb=rs[i+1];
+    const dx=b[0]-a[0], dy=b[1]-a[1], d=Math.hypot(dx,dy)||1, nx=-dy/d, ny=dx/d;
+    const q=[[a[0]+nx*ra, a[1]+ny*ra],[b[0]+nx*rb, b[1]+ny*rb],[b[0]-nx*rb, b[1]-ny*rb],[a[0]-nx*ra, a[1]-ny*ra]];
+    let ar=0; for(let k=0;k<4;k++){ const p=q[k], r=q[(k+1)%4]; ar+=p[0]*r[1]-r[0]*p[1]; }
+    if(ar<0) q.reverse();                                           // clockwise, like the arcs
+    g.moveTo(q[0][0],q[0][1]); for(let k=1;k<4;k++) g.lineTo(q[k][0],q[k][1]); g.closePath(); }
+  pts.forEach((p,i)=>{ g.moveTo(p[0]+rs[i], p[1]); g.arc(p[0],p[1],rs[i],0,Math.PI*2,false); });
+}
+function bstLG(g, a, b, stops){ const gr=g.createLinearGradient(a[0],a[1],b[0],b[1]); stops.forEach(([o,c])=>gr.addColorStop(o,c)); return gr; }
+function bstRand(seed){ let s=seed>>>0||1; return ()=>{ s^=s<<13; s>>>=0; s^=s>>>17; s^=s<<5; s>>>=0; return (s%10000)/10000; }; }
+/* ---- THE POSE: where every joint is this frame, from the fighter's own state ---- */
+function bstPose(f, S){
+  const T=(typeof FT!=='undefined' && FT && FT.time)? FT.time : ((typeof performance!=='undefined'? performance.now() : Date.now())/16.7);
+  const air=!f.onGround, down=!!(f.knock && f.onGround), flying=!!(f.knock && !f.onGround);
+  const moving=f.onGround && Math.abs(f.vx||0)>0.3 && !down;
+  const ph=((f.legPhase||0)/(Math.PI*2))%1;
+  const atkP=f.atk? clamp(1-(f.atkT/Math.max(1,f.atkDur)),0,1) : -1;
+  const hurtK=f.hurt>0? clamp(f.hurt/10,0,1) : 0;
+  const breathe=Math.sin(T*0.07);
+  let hip=[-S.L+S.shX, -S.hipH], sh=[S.shX, -S.shH], pitch=0, pivot=null;
+  let neckAng=S.neck.ang, headAng=S.head.ang, jaw=0, squint=0, shut=false, tongue=false, clawsOut=false, earsBack=0, reach=0;
+  let bob= moving? -Math.abs(Math.sin(ph*Math.PI*2))*1.4 : breathe*0.35;
+  // the attack, by kind
+  if(atkP>=0 && !down){
+    const sw=Math.sin(atkP*Math.PI);
+    if(S.kind==='cat'){ sh[0]+=4*sw; sh[1]+=2.5*sw; hip[1]+=1*sw; neckAng+=0.34*sw; headAng-=0.10*sw; reach=5*sw;
+      jaw=clamp((atkP-0.12)/0.28,0,1)*(1-clamp((atkP-0.82)/0.18,0,1)); clawsOut=true; earsBack=sw; }
+    else if(S.kind==='bear'){ pitch=-0.62*Math.sin(Math.min(1,atkP*1.25)*Math.PI*0.5)*(1-clamp((atkP-0.78)/0.22,0,1)); pivot='hip';
+      jaw=clamp((atkP-0.05)/0.3,0,1)*(1-clamp((atkP-0.85)/0.15,0,1)); headAng-=0.25*sw; clawsOut=true; earsBack=sw; }
+    else { const low=clamp(atkP/0.45,0,1)*(1-clamp((atkP-0.45)/0.2,0,1)), hook=clamp((atkP-0.45)/0.25,0,1)*(1-clamp((atkP-0.85)/0.15,0,1));
+      neckAng+=0.80*low-0.45*hook; headAng+=0.50*low-0.95*hook; sh[0]+=5*hook+2*low; sh[1]+=3*low-2*hook; jaw=0.25*hook; earsBack=low; }
+  }
+  // a hit recoils it: weight back, head up, mouth open
+  if(hurtK>0 && !down){ sh[0]-=3*hurtK; hip[0]-=1.5*hurtK; neckAng-=0.28*hurtK; headAng-=0.15*hurtK; jaw=Math.max(jaw, 0.65*hurtK); squint=hurtK; earsBack=Math.max(earsBack,hurtK); }
+  if(flying){ jaw=0.5; shut=true; tongue=true; }
+  if(down){ hip=[-S.L+S.shX, -S.hipH*0.36]; sh=[S.shX-2, -S.shH*0.42]; neckAng=0.42; headAng=0.30; shut=true; tongue=(S.kind!=='bull'); bob=0; }
+  hip[1]+=bob; sh[1]+=bob*1.1;
+  if(pitch){ const pv= pivot==='hip'? hip : [(hip[0]+sh[0])/2,(hip[1]+sh[1])/2], c=Math.cos(pitch), s=Math.sin(pitch);
+    const rot=(p)=>[pv[0]+(p[0]-pv[0])*c-(p[1]-pv[1])*s, pv[1]+(p[0]-pv[0])*s+(p[1]-pv[1])*c]; if(pivot!=='hip') hip=rot(hip); sh=rot(sh); }
+  // the body frame: u along hip→shoulder, v up off it
+  const ax=[sh[0]-hip[0], sh[1]-hip[1]], al=Math.hypot(ax[0],ax[1])||1, nrm=[ax[1]/al, -ax[0]/al];
+  const breatheV=1+0.02*breathe;
+  const at=(u,v)=>[hip[0]+ax[0]*u+nrm[0]*v*breatheV, hip[1]+ax[1]*u+nrm[1]*v*breatheV];
+  const bodyAng=Math.atan2(ax[1],ax[0]);
+  // ---- the legs ----
+  const legs={};
+  const legDefs=[['fh','hind',0.0],['ff','fore',0.25],['nh','hind',0.5],['nf','fore',0.75]];
+  for(const [id, which, off] of legDefs){
+    const D=S[which], top=at(D.j[0], D.j[1]), near=id[0]==='n', fore=(which==='fore');
+    const restX= fore? sh[0]+ (S.kind==='bull'? 1 : 2) : hip[0]+(S.kind==='bear'? 3 : -1);
+    let toe;
+    if(down){ toe= fore? [sh[0]+12+(near?2:0), -1.5] : [hip[0]+10+(near?3:0), -1.5]; }
+    else if(flying){ const w=Math.sin(T*0.5+off*6); toe= fore? [top[0]+12+w*6, top[1]+22] : [top[0]-14-w*6, top[1]+20]; }
+    else if(air){ const rise=clamp(-(f.vy||0)/5,-1,1);
+      toe= fore? [top[0]+14+6*rise, top[1]+(D.up+D.lo+D.ft)*(0.78-0.18*rise)] : [top[0]-16-4*rise, top[1]+(D.up+D.lo+D.ft)*(0.74+0.1*rise)];
+      if(near && fore && (f.vx||0)*1>2.6) clawsOut=true; }
+    else if(moving){ const p=(ph+off)%1, st=0.6;
+      if(p<st){ toe=[restX+S.gait*(0.5-p/st), 0]; }
+      else { const s=(p-st)/(1-st); toe=[restX+S.gait*(-0.5+s), -S.lift*Math.sin(s*Math.PI)]; } }
+    else toe=[restX+(near?1.5:-1.5)*(fore?1:0.6), 0];
+    // the swipe (cats), the rear (bear): the near forepaw goes up and comes down
+    if(fore && atkP>=0 && !down){
+      if(S.kind==='cat' && near){ const a=clamp(atkP*1.35,0,1), up=Math.sin(Math.min(1,a*1.6)*Math.PI*0.5), dn=clamp((a-0.55)/0.45,0,1);
+        toe=[sh[0]+6+16*up+10*dn, -(D.up+D.lo)*0.95*up*(1-dn)+(-4)*dn]; }
+      if(S.kind==='bear'){ const rearK=Math.abs(pitch)/0.62; toe=[top[0]+8+(near? 10*Math.sin(atkP*Math.PI) : 4), top[1]+(D.up+D.lo)*(1-0.55*rearK)+(near? -6*Math.sin(atkP*Math.PI) : 0)]; }
+      if(S.kind==='bull'){ toe=[toe[0]+3, toe[1]]; }
+    }
+    // how the lower leg stands: a cat on its toes with the hock high, a bear flat, a bull on the hoof
+    let ank;
+    if(S.kind==='bear'){ ank= fore? [toe[0]-3, toe[1]-D.ft] : [toe[0]-D.ft, toe[1]-2.2]; }
+    else if(S.kind==='bull'){ ank= fore? [toe[0]-1.2, toe[1]-D.ft] : [toe[0]-4.5, toe[1]-D.ft+0.6]; }
+    else { ank= fore? [toe[0]-1.6, toe[1]-D.ft] : [toe[0]-5.2, toe[1]-D.ft+1]; }
+    if(air||flying){ const sw=fore? 0.6 : -0.9; ank=[toe[0]-Math.sin(sw)*D.ft, toe[1]-Math.cos(sw)*D.ft]; }
+    if(down){ ank= fore? [toe[0]-D.ft, toe[1]-1] : [toe[0]-D.ft*0.9, toe[1]-2]; }
+    const bend= fore? 1 : -1;
+    const K=ik2(top, ank, D.up, D.lo, bend);
+    legs[id]={top, knee:K.J, ank:K.end, toe:[toe[0]+(K.end[0]-ank[0]), toe[1]+(K.end[1]-ank[1])], near, fore, D};
+  }
+  // ---- the neck and the head ----
+  const nb=at(S.neck.b[0], S.neck.b[1]);
+  const na=neckAng+bodyAng;
+  const occ=[nb[0]+Math.cos(na)*S.neck.len+reach, nb[1]+Math.sin(na)*S.neck.len];
+  const ha=headAng+bodyAng*0.6;
+  // the tail: root, a sway, and gravity
+  const tr=at(S.tail.root[0], S.tail.root[1]);
+  const sway=Math.sin(T*0.09+(f.legPhase||0)*0.5)*(moving? 0.35 : 0.22);
+  const tail=[tr];
+  { let th=Math.PI*(S.tail.th0||0.7)+sway, curl=S.tail.curl||1, amp=1;
+    if(atkP>=0 && !down){ th-=0.55; curl*=0.6; amp=2.2; }
+    if(air||flying){ th=Math.PI*0.96+sway*0.4; curl=0.25; }
+    if(down){ th=Math.PI*0.97; curl=-0.15; }
+    if(hurtK>0){ th-=0.4*hurtK; }
+    const step=S.tail.len/7; let x=tr[0], y=tr[1];
+    for(let i=1;i<=7;i++){ const k=i/7, a=th+curl*Math.pow(k,1.5)+(S.tail.hang? 0 : Math.sin(T*0.13+k*3)*0.12*amp*k);
+      x+=Math.cos(a)*step; y+=Math.sin(a)*step; if(down) y=Math.min(y, -1.2); tail.push([x,y]); } }
+  const nose=[occ[0]+Math.cos(ha)*S.head.L, occ[1]+Math.sin(ha)*S.head.L];
+  return {T, hip, sh, at, ax, nrm, bodyAng, legs, nb, occ, ha, na, nose, jaw, squint, shut, tongue, clawsOut, earsBack, tail, air, down, flying, atkP, hurtK, moving};
+}
+/* ---- THE PAINT ---- */
+function bstDrawLeg(g, L, S, C, far){
+  const D=L.D, r=D.r, pts=[L.top, L.knee, L.ank, L.toe];
+  const base= far? mixHex(C.base,C.deep,0.55) : C.base, lit= far? mixHex(C.lit,C.deep,0.5) : C.lit, deep= far? mixHex(C.deep,'#000000',0.25) : C.deep;
+  g.beginPath(); bstLimbPath(g, pts, r);
+  const dir=[L.toe[0]-L.top[0], L.toe[1]-L.top[1]], dl=Math.hypot(dir[0],dir[1])||1, nx=dir[1]/dl, ny=-dir[0]/dl;
+  g.fillStyle=bstLG(g, [L.top[0]+nx*6, L.top[1]+ny*6], [L.top[0]-nx*6, L.top[1]-ny*6], [[0,lit],[0.45,base],[1,deep]]);
+  g.fill();
+  // the lower leg a shade darker toward the ground, and the joints marked
+  g.save(); g.beginPath(); bstLimbPath(g, [L.knee, L.ank, L.toe], [r[1],r[2],r[3]]); g.clip();
+  g.fillStyle=bstLG(g, L.knee, L.toe, [[0,'rgba(0,0,0,0)'],[1,'rgba(20,10,4,'+(far? 0.35 : 0.22)+')']]); g.fillRect(L.knee[0]-20, L.knee[1]-20, 40, 60);
+  g.restore();
+  if(!far){ g.strokeStyle='rgba(30,16,6,.35)'; g.lineWidth=0.7; g.beginPath(); g.moveTo(L.knee[0]-r[1]*0.6, L.knee[1]+0.5); g.quadraticCurveTo(L.knee[0], L.knee[1]+1.6, L.knee[0]+r[1]*0.6, L.knee[1]+0.3); g.stroke(); }
+  if(C.spot){ const Rl=bstRand((L.fore? 11 : 17)+(far? 5 : 0)); g.save(); g.beginPath(); bstLimbPath(g, pts, r); g.clip(); g.fillStyle=far? 'rgba(30,20,10,.7)' : C.spot;
+    for(let k=0;k<12;k++){ const t=Rl()*0.95, seg=t<0.4? [pts[0],pts[1],t/0.4] : t<0.8? [pts[1],pts[2],(t-0.4)/0.4] : [pts[2],pts[3],(t-0.8)/0.2];
+      const x=seg[0][0]+(seg[1][0]-seg[0][0])*seg[2]+(Rl()-0.5)*r[1]*1.2, y=seg[0][1]+(seg[1][1]-seg[0][1])*seg[2];
+      g.beginPath(); g.arc(x,y,0.6+Rl()*0.5*(1-t),0,Math.PI*2); g.fill(); } g.restore(); }
+  // the foot
+  if(S.kind==='bull'){
+    const hv=D.hoof, a=Math.atan2(L.toe[1]-L.ank[1], L.toe[0]-L.ank[0]);
+    g.save(); g.translate(L.toe[0], L.toe[1]);
+    g.fillStyle=far? '#0e0a08' : C.hoof; g.beginPath(); g.moveTo(-hv[0]*0.55,-hv[1]*0.9); g.lineTo(hv[0]*0.55,-hv[1]*0.9); g.lineTo(hv[0]*0.8,1); g.lineTo(-hv[0]*0.7,1); g.closePath(); g.fill();
+    g.strokeStyle='rgba(120,100,80,.55)'; g.lineWidth=0.5; g.beginPath(); g.moveTo(0.4,-hv[1]*0.8); g.lineTo(0.8,0.8); g.stroke();
+    g.fillStyle=far? '#1a120c' : mixHex(C.base,'#e8dcc4',0.12); g.fillRect(-hv[0]*0.6,-hv[1]*1.05,hv[0]*1.2,1.2);     // the coronet band
+    g.restore(); void a;
+  } else {
+    const pw=D.paw, a=Math.atan2(L.toe[1]-L.ank[1], L.toe[0]-L.ank[0]);
+    const cx=L.toe[0]+(S.kind==='bear'? 1.5 : 1.2), cy=L.toe[1]-pw[1]*0.55;
+    g.fillStyle=bstLG(g,[cx,cy-pw[1]],[cx,cy+pw[1]],[[0,lit],[0.5,base],[1,deep]]);
+    g.beginPath(); g.ellipse(cx, cy, pw[0], pw[1], (L.near? 0 : 0)+ (Math.abs(a-Math.PI/2)>0.9? a*0.15 : 0), 0, Math.PI*2); g.fill();
+    g.strokeStyle='rgba(30,16,6,'+(far? 0.35 : 0.5)+')'; g.lineWidth=0.55;
+    for(let k=1;k<=(S.kind==='bear'? 3 : 2);k++){ const tx=cx+pw[0]*(0.15+k*0.22); g.beginPath(); g.moveTo(tx, cy-pw[1]*0.3); g.lineTo(tx, cy+pw[1]*0.9); g.stroke(); }
+    const claws=(S.kind==='bear') || (L.fore && L.near && S._claws);
+    if(claws){ g.strokeStyle=far? '#8a8070' : (C.claw||'#f0e8d8'); g.lineWidth=S.kind==='bear'? 1.0 : 0.8; g.lineCap='round';
+      for(let k=0;k<(S.kind==='bear'? 4 : 3);k++){ const bx=cx+pw[0]*(0.35+k*0.2), by=cy+pw[1]*0.2-k*0.3;
+        g.beginPath(); g.moveTo(bx, by); g.quadraticCurveTo(bx+2.2, by+0.4, bx+2.4, by+2.3); g.stroke(); }
+      g.lineCap='butt'; }
+  }
+}
+function bstDrawHead(g, P, S, C, f, hurtFlash){
+  const H=S.head, o=P.occ, a=P.ha, K=S.kind;
+  g.save(); g.translate(o[0], o[1]); g.rotate(a);
+  const L=H.L, Hh=H.H, jawA=P.jaw*(K==='bull'? 0.25 : 0.62);
+  const hinge=[L*0.18, Hh*0.18];
+  // the far ear / far horn were drawn behind; here: the lower jaw (behind the skull), then the skull
+  const jawPts= K==='bull'
+    ? [[L*0.10,Hh*0.20],[L*0.55,Hh*0.36],[L*0.90,Hh*0.38],[L*0.98,Hh*0.24],[L*0.60,Hh*0.16],[L*0.22,Hh*0.10]]
+    : K==='bear'
+    ? [[L*0.08,Hh*0.24],[L*0.50,Hh*0.40],[L*0.86,Hh*0.36],[L*0.96,Hh*0.24],[L*0.60,Hh*0.14],[L*0.20,Hh*0.12]]
+    : [[L*0.06,Hh*0.26],[L*0.42,Hh*0.44],[L*0.74,Hh*0.40],[L*0.86,Hh*0.24],[L*0.55,Hh*0.16],[L*0.18,Hh*0.12]];
+  const rj=(p)=>{ const c=Math.cos(jawA), s=Math.sin(jawA), x=p[0]-hinge[0], y=p[1]-hinge[1]; return [hinge[0]+x*c-y*s, hinge[1]+x*s+y*c]; };
+  if(P.jaw>0.05){
+    // the inside of the mouth, the tongue, the teeth of the lower jaw
+    g.fillStyle='#3a0c0c'; g.beginPath(); g.moveTo(hinge[0],hinge[1]); const jp=jawPts.map(rj); g.lineTo(jp[3][0],jp[3][1]); g.lineTo(L*0.92, Hh*0.14); g.closePath(); g.fill();
+    g.fillStyle='#c8506a'; g.beginPath(); g.ellipse((hinge[0]+jp[2][0])/2, (hinge[1]+jp[2][1])/2+0.6, L*0.22, Hh*0.08, jawA*0.6, 0, Math.PI*2); g.fill();
+  }
+  { const jp=jawPts.map(rj); g.beginPath(); bstSpline(g, jp, true);
+    g.fillStyle= K==='cat'? mixHex(C.belly, C.base, 0.35) : K==='bear'? C.muzzle : mixHex(C.muzzle,C.base,0.4); g.fill();
+    if(P.jaw>0.05 && K!=='bull'){ g.fillStyle='#f4efe4'; const tp=rj([L*0.80,Hh*0.20]); g.beginPath(); g.moveTo(tp[0]-1.2,tp[1]+0.6); g.lineTo(tp[0]+0.2,tp[1]-(K==='cat'? 3.2 : 2.4)); g.lineTo(tp[0]+1.0,tp[1]+0.6); g.closePath(); g.fill(); } }
+  // the skull, by kind
+  let sk;
+  if(K==='cat') sk=[[-Hh*0.30,-Hh*0.05],[-Hh*0.10,-Hh*0.46],[L*0.28,-Hh*0.56],[L*0.62,-Hh*0.36],[L*0.86,-Hh*0.18],[L*1.0,-Hh*0.02],[L*0.97,Hh*0.16],[L*0.70,Hh*0.20],[L*0.35,Hh*0.24],[L*0.02,Hh*0.36],[-Hh*0.26,Hh*0.24]];
+  else if(K==='bear') sk=[[-Hh*0.34,0],[-Hh*0.12,-Hh*0.48],[L*0.26,-Hh*0.54],[L*0.52,-Hh*0.30],[L*0.80,-Hh*0.16],[L*1.0,-Hh*0.06],[L*1.0,Hh*0.12],[L*0.72,Hh*0.18],[L*0.36,Hh*0.24],[L*0.02,Hh*0.36],[-Hh*0.28,Hh*0.24]];
+  else sk=[[-Hh*0.20,-Hh*0.10],[-Hh*0.02,-Hh*0.52],[L*0.30,-Hh*0.50],[L*0.66,-Hh*0.36],[L*0.92,-Hh*0.30],[L*1.02,-Hh*0.10],[L*1.0,Hh*0.20],[L*0.80,Hh*0.28],[L*0.40,Hh*0.30],[L*0.06,Hh*0.40],[-Hh*0.24,Hh*0.24]];
+  g.beginPath(); bstSpline(g, sk, true);
+  g.fillStyle=bstLG(g,[0,-Hh*0.6],[0,Hh*0.4],[[0,C.lit],[0.45,C.base],[1,C.deep]]); g.fill();
+  g.save(); g.beginPath(); bstSpline(g, sk, true); g.clip();
+  // the muzzle: a cat's whisker pad, a bear's pale snout, a bull's grey nose
+  if(K==='cat'){ g.fillStyle=C.belly; g.beginPath(); g.ellipse(L*0.84, Hh*0.08, L*0.20, Hh*0.18, 0, 0, Math.PI*2); g.fill();
+    g.fillStyle='rgba(60,30,10,.55)'; for(let r2=0;r2<3;r2++) for(let k=0;k<4;k++){ g.fillRect(L*0.74+k*1.6, Hh*0.0+r2*1.4, 0.7, 0.7); }
+    g.fillStyle=C.belly; g.beginPath(); g.ellipse(L*0.46, Hh*0.26, L*0.26, Hh*0.12, 0, 0, Math.PI*2); g.fill();          // the pale chin
+    g.fillStyle='rgba(255,250,230,.55)'; g.beginPath(); g.ellipse(L*0.60, -Hh*0.10, L*0.08, Hh*0.06, 0,0,Math.PI*2); g.fill();   // the pale mark under the eye
+    if(C.spot){ const Rh=bstRand(5151); g.fillStyle=C.spot; for(let k=0;k<14;k++){ g.beginPath(); g.arc(L*(0.05+Rh()*0.5), -Hh*(0.12+Rh()*0.4), 0.45+Rh()*0.35, 0, Math.PI*2); g.fill(); }
+      g.strokeStyle='rgba(30,18,8,.75)'; g.lineWidth=0.6; g.beginPath(); g.moveTo(L*0.66,-Hh*0.06); g.quadraticCurveTo(L*0.72,Hh*0.06,L*0.70,Hh*0.16); g.stroke(); } }   // and the leopard's tear line
+  else if(K==='bear'){ g.fillStyle=bstLG(g,[L*0.55,0],[L*1.0,0],[[0,'rgba(160,122,84,0)'],[0.4,C.muzzle],[1,mixHex(C.muzzle,'#000',0.15)]]); g.fillRect(L*0.45,-Hh*0.5,L*0.7,Hh*1.2); }
+  else { g.fillStyle=bstLG(g,[L*0.6,0],[L*1.05,0],[[0,'rgba(92,82,74,0)'],[0.5,C.muzzle],[1,mixHex(C.muzzle,'#000',0.2)]]); g.fillRect(L*0.5,-Hh*0.6,L*0.7,Hh*1.2);
+    g.strokeStyle='rgba(140,120,100,.35)'; g.lineWidth=0.6; for(let k=0;k<4;k++){ g.beginPath(); g.moveTo(L*0.12, -Hh*0.32+k*2.4); g.quadraticCurveTo(L*0.35, -Hh*0.36+k*2.4, L*0.55, -Hh*0.28+k*2.4); g.stroke(); } }  // the curly poll
+  // fur along the face
+  const R=bstRand(K.length*977+31); g.strokeStyle= K==='bull'? 'rgba(120,96,76,.25)' : 'rgba(255,240,200,.18)'; g.lineWidth=0.5;
+  for(let k=0;k<14;k++){ const x=-Hh*0.2+R()*L*0.9, y=-Hh*0.45+R()*Hh*0.5; g.beginPath(); g.moveTo(x,y); g.lineTo(x+1.8,y+0.5); g.stroke(); }
+  g.restore();
+  // the nose
+  if(K==='cat'){ g.fillStyle=C.nose; g.beginPath(); g.moveTo(L*0.93,-Hh*0.10); g.lineTo(L*1.03,-Hh*0.06); g.lineTo(L*1.0,Hh*0.04); g.lineTo(L*0.92,Hh*0.0); g.closePath(); g.fill(); }
+  else if(K==='bear'){ g.fillStyle=C.nose; g.beginPath(); g.ellipse(L*1.0,-Hh*0.02,2.6,2.0,0.2,0,Math.PI*2); g.fill(); g.fillStyle='rgba(255,255,255,.35)'; g.fillRect(L*0.98,-Hh*0.10,1,0.7); }
+  else { g.fillStyle=C.nose; g.beginPath(); g.ellipse(L*0.96,Hh*0.02,2.4,1.5,0.5,0,Math.PI*2); g.fill(); g.fillStyle='rgba(0,0,0,.6)'; g.beginPath(); g.ellipse(L*0.97,Hh*0.02,1.1,0.7,0.5,0,Math.PI*2); g.fill(); }
+  // the mouth line (closed) and the upper fang (open)
+  g.strokeStyle='rgba(30,12,6,.7)'; g.lineWidth=0.7; g.beginPath(); g.moveTo(L*0.98, Hh*0.12); g.quadraticCurveTo(L*0.70, Hh*0.22, L*0.40, Hh*0.20); g.stroke();
+  if(P.jaw>0.05 && K!=='bull'){ g.fillStyle='#f6f2e8'; g.beginPath(); g.moveTo(L*0.84,Hh*0.13); g.lineTo(L*0.87,Hh*0.13+(K==='cat'? 4.0 : 3.0)*Math.min(1,P.jaw*1.5)); g.lineTo(L*0.905,Hh*0.13); g.closePath(); g.fill();
+    g.beginPath(); g.moveTo(L*0.70,Hh*0.17); g.lineTo(L*0.72,Hh*0.17+1.6); g.lineTo(L*0.74,Hh*0.17); g.closePath(); g.fill(); }
+  if(P.tongue && P.jaw>0.2){ g.fillStyle='#d8607a'; g.beginPath(); g.ellipse(L*0.86, Hh*0.34, 2.2, 1.2, 0.6, 0, Math.PI*2); g.fill(); }
+  // the eye
+  const ex= K==='bull'? L*0.42 : L*0.56, ey= K==='bull'? -Hh*0.16 : -Hh*0.20, er= K==='cat'? (S===BST_SPEC.lion? 2.2 : 1.8) : K==='bear'? 1.4 : 2.0;
+  if(P.shut){ g.strokeStyle='rgba(20,10,4,.9)'; g.lineWidth=0.8; g.beginPath(); g.moveTo(ex-er,ey+0.3); g.quadraticCurveTo(ex,ey+1.2,ex+er,ey+0.3); g.stroke(); }
+  else {
+    const sq=P.squint;
+    g.fillStyle= K==='bull'? '#f0e8dc' : '#1a0e06'; g.beginPath(); g.ellipse(ex, ey, er*1.15, er*(0.85-0.45*sq), -0.15, 0, Math.PI*2); g.fill();
+    g.fillStyle= hurtFlash? '#ffffff' : (C.eye||'#2a1a0c'); g.beginPath(); g.ellipse(ex+(K==='bull'? 0.3 : 0.15), ey, er*(K==='bull'? 0.85 : 0.9), er*(0.75-0.4*sq), -0.15, 0, Math.PI*2); g.fill();
+    if(K==='cat'){ g.fillStyle='#120804'; g.beginPath(); g.ellipse(ex+0.4, ey, er*0.28, er*(0.66-0.35*sq), 0, 0, Math.PI*2); g.fill(); }
+    g.fillStyle='rgba(255,255,255,.85)'; g.fillRect(ex+er*0.2, ey-er*0.5, 0.9, 0.8);
+    g.strokeStyle='rgba(20,10,4,.65)'; g.lineWidth=0.7; g.beginPath(); g.moveTo(ex-er*1.3, ey-er*(0.9-0.3*sq)); g.quadraticCurveTo(ex, ey-er*(1.35-0.5*sq)-(P.earsBack*0.6), ex+er*1.4, ey-er*(0.7-0.2*sq)); g.stroke();   // the brow, lower when it means it
+  }
+  // the near ear / the near horn
+  if(K==='cat'||K==='bear'){ const ea=-0.35-P.earsBack*0.7, erx= K==='bear'? Hh*0.20 : Hh*(S===BST_SPEC.lion? 0.19 : 0.2);
+    g.save(); g.translate(L*0.14, -Hh*0.46); g.rotate(ea);
+    g.fillStyle=C.deep; g.beginPath(); g.ellipse(0,-erx*0.7,erx,erx*1.05,0,0,Math.PI*2); g.fill();
+    g.fillStyle=K==='cat'? mixHex(C.belly,'#7a5a3a',0.35) : mixHex(C.base,'#2a1a0e',0.4); g.beginPath(); g.ellipse(erx*0.15,-erx*0.6,erx*0.55,erx*0.65,0,0,Math.PI*2); g.fill();
+    if(S===BST_SPEC.leopard){ g.fillStyle='#1c120a'; g.beginPath(); g.ellipse(0,-erx*1.4,erx*0.8,erx*0.35,0,0,Math.PI*2); g.fill(); }
+    g.restore(); }
+  if(K==='bull'){ bstHorn(g, L, Hh, C, false); g.fillStyle=C.deep; g.save(); g.translate(L*0.08,-Hh*0.28); g.rotate(-0.25-P.earsBack*0.4); g.beginPath(); g.ellipse(-3,0,4.2,1.8,0,0,Math.PI*2); g.fill(); g.restore(); }
+  g.restore();
+}
+function bstHorn(g, L, Hh, C, far){
+  const base=[L*0.12,-Hh*0.48];
+  const pts=[base,[base[0]-3,base[1]-5],[base[0]+1,base[1]-11],[base[0]+7,base[1]-14]];
+  g.beginPath(); bstLimbPath(g, pts, [2.6,2.2,1.5,0.7]);
+  g.fillStyle=bstLG(g,base,pts[3],[[0,far? '#9a9280' : C.horn],[0.7,far? '#7a7262' : mixHex(C.horn,'#c8bca0',0.3)],[1,C.hornTip]]); g.fill();
+  if(!far){ g.strokeStyle='rgba(255,255,255,.45)'; g.lineWidth=0.5; g.beginPath(); g.moveTo(base[0]-2,base[1]-4); g.quadraticCurveTo(base[0]-1,base[1]-10,base[0]+5,base[1]-13); g.stroke(); }
+}
+function bstDrawTorso(g, P, S, C){
+  const pts=S.torso.map(q=>P.at(q[0],q[1]));
+  const top=P.at(0.5,16), bot=P.at(0.5,-16);
+  g.beginPath(); bstSpline(g, pts, true);
+  g.fillStyle=bstLG(g, top, bot, [[0,C.lit],[0.35,C.base],[0.8,mixHex(C.base,C.deep,0.4)],[1,C.deep]]); g.fill();
+  g.save(); g.beginPath(); bstSpline(g, pts, true); g.clip();
+  // countershading: the cats' pale belly, the bull's and bear's dark underside
+  const b0=P.at(0.5,-6), b1=P.at(0.5,-16);
+  g.fillStyle=bstLG(g, b0, b1, S.kind==='cat'? [[0,'rgba(0,0,0,0)'],[0.35,mixHex(C.belly,C.base,0.55)],[0.8,C.belly],[1,C.belly]] : [[0,'rgba(0,0,0,0)'],[1,'rgba(10,6,3,.55)']]);
+  g.beginPath(); bstSpline(g, [P.at(-0.3,-4),P.at(0.3,-6),P.at(0.9,-5),P.at(1.3,-6),P.at(1.3,-30),P.at(-0.3,-30)], true); g.fill();
+  // fur, laid along the body
+  const R=bstRand(S.L*131+S.hipH*7);
+  for(let k=0;k<70;k++){ const u=-0.15+R()*1.35, v=-14+R()*30, p=P.at(u,v), d=[P.ax[0]/Math.hypot(P.ax[0],P.ax[1]), P.ax[1]/Math.hypot(P.ax[0],P.ax[1])];
+    const len=1.6+R()*2.2, dk=R()<0.55;
+    g.strokeStyle= dk? 'rgba(40,22,8,'+(S.kind==='bull'? 0.35 : 0.18)+')' : 'rgba(255,244,210,'+(S.kind==='bull'? 0.12 : 0.2)+')'; g.lineWidth=0.55;
+    g.beginPath(); g.moveTo(p[0],p[1]); g.lineTo(p[0]-d[0]*len, p[1]-d[1]*len+0.5); g.stroke(); }
+  // the leopard's rosettes
+  if(C.spot){ const R2=bstRand(4242);
+    for(let k=0;k<48;k++){ const gi=k%8, gj=Math.floor(k/8), u=-0.14+(gi+0.2+R2()*0.6)/8*1.32, v=-9.5+(gj+0.15+R2()*0.7)/6*19.5, p=P.at(u,v), rr=1.3+R2()*1.0;
+      g.fillStyle=C.spotIn; g.beginPath(); g.arc(p[0],p[1],rr*0.8,0,Math.PI*2); g.fill();
+      g.fillStyle=C.spot; for(let q=0;q<5;q++){ const a=q*1.26+R2()*0.5; g.beginPath(); g.arc(p[0]+Math.cos(a)*rr, p[1]+Math.sin(a)*rr, 0.75+R2()*0.35, 0, Math.PI*2); g.fill(); } }
+    for(let k=0;k<10;k++){ const u=0.2+R2()*0.9, p=P.at(u, 9+R2()*3); g.fillStyle=C.spot; g.beginPath(); g.arc(p[0],p[1],0.9,0,Math.PI*2); g.fill(); } }
+  // the light along the back
+  g.strokeStyle='rgba(255,246,220,'+(S.kind==='bull'? 0.28 : 0.4)+')'; g.lineWidth=1.4;
+  g.beginPath(); bstSpline(g, pts.slice(0,7), false); g.stroke();
+  g.restore();
+  // the bear's shag: tufts standing out along the top line
+  if(S.kind==='bear'){ const R3=bstRand(777); g.fillStyle=C.base;
+    for(let i=0;i<7;i++) for(let k=0;k<5;k++){ const t=(k+R3()*0.6)/5, a=pts[i], b=pts[i+1], x=a[0]+(b[0]-a[0])*t, y=a[1]+(b[1]-a[1])*t;
+      g.beginPath(); g.moveTo(x-1.4,y+0.6); g.lineTo(x+0.8+R3()*0.8,y-1.6-R3()*1.2); g.lineTo(x+1.6,y+0.6); g.closePath(); g.fill(); } }
+}
+function bstDrawMuscle(g, P, S, C, which){
+  const M=S[which], c=P.at(M[0],M[1]);
+  g.save(); g.translate(c[0],c[1]); g.rotate(P.bodyAng+(which==='haunch'? -0.35 : 0.15));
+  g.fillStyle=bstLG(g,[-M[2]*0.5,-M[3]*0.8],[M[2]*0.3,M[3]*0.9],[[0,C.lit],[0.5,C.base],[1,mixHex(C.base,C.deep,0.6)]]);
+  g.beginPath(); g.ellipse(0,0,M[2],M[3],0,0,Math.PI*2); g.fill();
+  g.strokeStyle='rgba(255,246,220,'+(S.kind==='bull'? 0.3 : 0.35)+')'; g.lineWidth=0.8; g.beginPath(); g.ellipse(0,0,M[2]-1,M[3]-1,0,Math.PI*1.05,Math.PI*1.6); g.stroke();
+  g.strokeStyle='rgba(30,14,4,'+(S.kind==='bull'? 0.14 : 0.2)+')'; g.lineWidth=0.7; g.beginPath(); g.ellipse(0,0,M[2]-0.6,M[3]-0.6,0,Math.PI*0.15,Math.PI*0.6); g.stroke();
+  if(S.kind==='bull'){ g.strokeStyle='rgba(120,100,84,.3)'; g.lineWidth=0.6; g.beginPath(); g.moveTo(-M[2]*0.3,-M[3]*0.6); g.quadraticCurveTo(M[2]*0.1,0,-M[2]*0.1,M[3]*0.6); g.stroke(); }
+  if(C.spot){ g.save(); g.beginPath(); g.ellipse(0,0,M[2],M[3],0,0,Math.PI*2); g.clip(); const Rm=bstRand(which==='haunch'? 313 : 919);   // the rosettes go on over the muscle
+    for(let k=0;k<10;k++){ const x=(Rm()-0.5)*M[2]*1.8, y=(Rm()-0.5)*M[3]*1.8, rr=1.1+Rm()*0.8;
+      g.fillStyle=C.spotIn; g.beginPath(); g.arc(x,y,rr*0.75,0,Math.PI*2); g.fill(); g.fillStyle=C.spot;
+      for(let q=0;q<5;q++){ const a=q*1.26+Rm()*0.5; g.beginPath(); g.arc(x+Math.cos(a)*rr, y+Math.sin(a)*rr, 0.6+Rm()*0.3, 0, Math.PI*2); g.fill(); } }
+    g.restore(); }
+  g.restore();
+}
+function bstDrawNeck(g, P, S, C){
+  const nb=P.nb, o=P.occ, r=S.neck.r;
+  g.beginPath(); bstLimbPath(g, [nb, [(nb[0]+o[0])/2, (nb[1]+o[1])/2], o], [r[0], (r[0]+r[1])/2, r[1]]);
+  g.fillStyle=bstLG(g,[nb[0],nb[1]-r[0]],[nb[0],nb[1]+r[0]],[[0,C.lit],[0.4,C.base],[1,mixHex(C.base,C.deep,0.5)]]); g.fill();
+  if(C.spot){ g.save(); g.beginPath(); bstLimbPath(g, [nb, o], [r[0], r[1]]); g.clip(); const Rn=bstRand(606); g.fillStyle=C.spot;
+    for(let k=0;k<14;k++){ const t=Rn(), x=nb[0]+(o[0]-nb[0])*t+(Rn()-0.5)*r[0]*1.4, y=nb[1]+(o[1]-nb[1])*t+(Rn()-0.5)*r[0]*1.4; g.beginPath(); g.arc(x,y,0.6+Rn()*0.5,0,Math.PI*2); g.fill(); }
+    g.restore(); }
+  if(S.kind==='bull'){ // the dewlap, hanging off the throat
+    const t0=[nb[0]+2, nb[1]+r[0]*0.7], t1=[o[0]-2, o[1]+r[1]*0.8], lowY=Math.max(t0[1],t1[1])+6;
+    g.fillStyle=mixHex(C.base,C.deep,0.3); g.beginPath(); g.moveTo(t0[0]-3,t0[1]-2); g.quadraticCurveTo((t0[0]+t1[0])/2, lowY+3, t1[0]+1, t1[1]-1); g.lineTo(t1[0]-2,t1[1]-4); g.closePath(); g.fill(); }
+}
+function bstDrawMane(g, P, S, C, back){
+  const o=P.occ, nb=P.nb, T=P.T;
+  const cx=(o[0]*0.60+nb[0]*0.40)-1, cy=(o[1]*0.60+nb[1]*0.40)+2, R=17.5;
+  const pts=[]; const N=34;
+  for(let i=0;i<N;i++){ const a=i/N*Math.PI*2, jag=(i%2? 0.84 : 1.08)+0.04*Math.sin(T*0.05+i);
+    const down=Math.max(0, Math.sin(a))*0.72, backK=Math.max(0,-Math.cos(a))*0.28;
+    pts.push([cx+Math.cos(a)*R*jag*(1+backK), cy+Math.sin(a)*R*jag*(1+down)]); }
+  g.beginPath(); bstSpline(g, pts, true);
+  g.fillStyle=bstLG(g,[cx,cy-R],[cx,cy+R*1.5],[[0,back? C.maneDeep : C.maneLit],[0.45,back? C.maneDeep : C.mane],[1,C.maneDeep]]); g.fill();
+  if(back) return;
+  { const hx=o[0]+Math.cos(P.ha)*S.head.L*0.35, hy=o[1]+Math.sin(P.ha)*S.head.L*0.35;       // the ruff darkens toward the face
+    const gr=g.createRadialGradient(hx,hy,2,hx,hy,R*0.9); gr.addColorStop(0,'rgba(40,20,6,.55)'); gr.addColorStop(1,'rgba(40,20,6,0)');
+    g.save(); g.beginPath(); bstSpline(g, pts, true); g.clip(); g.fillStyle=gr; g.fillRect(cx-R*2, cy-R*2, R*4, R*4); g.restore(); }
+  const Rr=bstRand(9191); g.lineWidth=0.8; g.lineCap='round';
+  for(let k=0;k<30;k++){ const a=Rr()*Math.PI*2, rr=R*(0.35+Rr()*0.6), x=cx+Math.cos(a)*rr, y=cy+Math.sin(a)*rr*(1+Math.max(0,Math.sin(a))*0.5);
+    g.strokeStyle= Rr()<0.5? 'rgba(200,140,60,.45)' : 'rgba(40,20,6,.45)';
+    g.beginPath(); g.moveTo(x,y); g.quadraticCurveTo(x+Math.cos(a)*2.5, y+Math.sin(a)*2.5+1, x+Math.cos(a)*4.5, y+Math.sin(a)*4.5+2.5); g.stroke(); }
+  g.lineCap='butt';
+}
+function bstDrawTail(g, P, S, C){
+  const t=P.tail, r=S.tail.r, n=t.length, rs=t.map((p,i)=>r[0]+(r[1]-r[0])*(i/(n-1)));
+  g.beginPath(); bstLimbPath(g, t, rs);
+  g.fillStyle=bstLG(g,t[0],t[n-1],[[0,C.base],[1,mixHex(C.base,C.deep,0.35)]]); g.fill();
+  if(C.spot){ g.fillStyle=C.spot; for(let i=2;i<n;i++){ const p=t[i]; g.beginPath(); g.arc(p[0]+0.5,p[1]-0.5,1.0,0,Math.PI*2); g.fill(); }
+    const e=t[n-1]; g.beginPath(); g.arc(e[0],e[1],rs[n-1]*0.95,0,Math.PI*2); g.fill(); }
+  if(S.tail.tuft){ const e=t[n-1], pv=t[n-2], a=Math.atan2(e[1]-pv[1], e[0]-pv[0]);
+    g.fillStyle=C.tuft||C.deep; g.beginPath(); g.ellipse(e[0]+Math.cos(a)*2, e[1]+Math.sin(a)*2, 3.4, 2.2, a, 0, Math.PI*2); g.fill(); }
+}
+function drawBeastNB(f){
+  const B=f.beastType||{}, S=BST_SPEC[B.id]; if(!S) return false;
+  const C=S.col, P=bstPose(f, S);
+  S._claws=P.clawsOut;
+  const buf=bstBuf(f), bk=buf.bk.getContext('2d'), fr=buf.fr.getContext('2d');
+  for(const g of [bk,fr]){ g.setTransform(1,0,0,1,0,0); g.clearRect(0,0,BST_BW,BST_BH); g.setTransform(1,0,0,1,BST_OX,BST_OY); }
+  const hurtFlash=f.hurt>0 && ((f.hurt|0)%4)<2;
+  // ---- behind: the tail, the far legs, the far ear or horn, the back of the mane ----
+  bstDrawTail(bk, P, S, C);
+  bstDrawLeg(bk, P.legs.fh, S, C, true);
+  bstDrawLeg(bk, P.legs.ff, S, C, true);
+  if(S.kind==='bull'){ bk.save(); bk.translate(P.occ[0],P.occ[1]); bk.rotate(P.ha); bk.translate(5.5,-2.5); bk.rotate(0.12); bstHorn(bk, S.head.L, S.head.H, C, true); bk.restore(); }
+  if(S.kind==='cat'||S.kind==='bear'){ bk.save(); bk.translate(P.occ[0],P.occ[1]); bk.rotate(P.ha); bk.translate(S.head.L*0.24, -S.head.H*0.5); bk.rotate(-0.2-P.earsBack*0.6);
+    bk.fillStyle=mixHex(C.deep,'#000',0.2); bk.beginPath(); bk.ellipse(0,-S.head.H*0.14,S.head.H*0.18,S.head.H*0.2,0,0,Math.PI*2); bk.fill(); bk.restore(); }
+  if(C.mane) bstDrawMane(bk, P, S, C, true);
+  // ---- the body, near side ----
+  bstDrawTorso(fr, P, S, C);
+  bstDrawMuscle(fr, P, S, C, 'haunch');
+  if(C.mane) bstDrawNeck(fr, P, S, C); else bstDrawNeck(fr, P, S, C);
+  bstDrawMuscle(fr, P, S, C, 'shoulder');
+  if(C.mane) bstDrawMane(fr, P, S, C, false);
+  bstDrawLeg(fr, P.legs.nh, S, C, false);
+  bstDrawLeg(fr, P.legs.nf, S, C, false);
+  bstDrawHead(fr, P, S, C, f, hurtFlash);
+  // snap to the pixel, like the men
+  for(const k of [buf.bk, buf.fr]){ const g=k.getContext('2d'); g.setTransform(1,0,0,1,0,0);
+    const im=g.getImageData(0,0,BST_BW,BST_BH), d=im.data; for(let i=3;i<d.length;i+=4) d[i]= d[i]>=110? 255 : 0; g.putImageData(im,0,0); }
+  { const g=buf.sil.getContext('2d'); g.setTransform(1,0,0,1,0,0); g.globalCompositeOperation='source-over'; g.clearRect(0,0,BST_BW,BST_BH);
+    g.drawImage(buf.bk,0,0); g.drawImage(buf.fr,0,0); g.globalCompositeOperation='source-in'; g.fillStyle='#160e07'; g.fillRect(0,0,BST_BW,BST_BH); g.globalCompositeOperation='source-over'; }
+  // a turn narrows it and brings it round, instead of snapping
+  f._bfx = (f._bfx===undefined)? f.facing : f._bfx+(f.facing-f._bfx)*0.3;
+  const sx=Math.abs(f._bfx)<0.16? 0.16*Math.sign(f._bfx||f.facing) : f._bfx;
+  ctx.save();
+  ctx.translate(Math.round(f.x), Math.round(f.y));
+  ctx.rotate(clamp((f.vx||0)*0.02,-0.3,0.3)*(f.knock? 0 : 1)+(f.rot||0));
+  ctx.scale(sx,1);
+  for(const [dx,dy] of [[-1,0],[1,0],[0,-1],[0,1]]) ctx.drawImage(buf.sil, -BST_OX+dx, -BST_OY+dy);
+  ctx.drawImage(buf.bk, -BST_OX, -BST_OY); ctx.drawImage(buf.fr, -BST_OX, -BST_OY);
+  if(hurtFlash){ ctx.globalCompositeOperation='lighter'; ctx.globalAlpha=0.42; ctx.drawImage(buf.bk,-BST_OX,-BST_OY); ctx.drawImage(buf.fr,-BST_OX,-BST_OY); ctx.globalAlpha=1; ctx.globalCompositeOperation='source-over'; }
+  // the rake of the claws on a swipe, three pale arcs along the paw's path
+  if(P.atkP>0.3 && P.atkP<0.78 && (S.kind==='cat'||S.kind==='bear')){ const L=P.legs.nf, a=clamp((P.atkP-0.3)/0.48,0,1);
+    ctx.globalAlpha=(1-a)*0.8; ctx.strokeStyle='#fff4dc'; ctx.lineWidth=1;
+    for(let k=0;k<3;k++){ ctx.beginPath(); ctx.arc(L.top[0]+2, L.top[1]+4, 18+k*2.5, -1.3+a*0.8, -0.2+a*1.2); ctx.stroke(); }
+    ctx.globalAlpha=1; }
+  if(S.kind==='bull' && (P.atkP>=0 || Math.abs(f.vx||0)>1.8) && !P.down){ const n=P.nose, T2=P.T;
+    for(let k=0;k<3;k++){ const q=((T2*0.08+k*0.33)%1), a=(1-q)*0.55; ctx.fillStyle='rgba(235,230,220,'+a.toFixed(2)+')'; ctx.beginPath(); ctx.arc(n[0]+2+q*7, n[1]+3+q*2, 1.2+q*2.2, 0, Math.PI*2); ctx.fill(); } }
+  // a charging bull kicks up the sand
+  if(S.kind==='bull' && f.onGround && Math.abs(f.vx||0)>1.5){ ctx.fillStyle='rgba(200,168,112,.45)';
+    for(let k=0;k<3;k++){ const x=P.legs.nh.toe[0]-6-k*5, y=-2-k*1.5; ctx.beginPath(); ctx.arc(x, y, 2+k, 0, Math.PI*2); ctx.fill(); } }
+  drawStuck(f);
+  ctx.restore();
+  BST_DRAWS++;
+  return true;
+}
+let BST_DRAWS=0;
 /* =====================================================================
    THE SASHIMONO — the flag on a man's back
    ---------------------------------------------------------------------
@@ -19211,6 +19637,10 @@ function drawArena(){
   if(t.over) drawVerdict();
 }
 function drawShadow(f){
+  if(f.beast && nbOn() && typeof BST_SPEC!=='undefined' && f.beastType && BST_SPEC[f.beastType.id]){     // 🦁 a beast's shadow is as long as the beast
+    const S2=BST_SPEC[f.beastType.id], h=clamp((GROUND-f.y)/50,0,1), cx=f.x+(f._bfx||f.facing)*((S2.shX+(-S2.L+S2.shX))/2+2), w=S2.L*0.62*(1-h*0.3);
+    ctx.globalAlpha=.28-h*.12; ctx.fillStyle='#000'; ctx.beginPath(); ctx.ellipse(cx,GROUND+2,w,3.4,0,0,7); ctx.fill();
+    ctx.globalAlpha=.14-h*.07; ctx.beginPath(); ctx.ellipse(cx,GROUND+2,w+7,4.6,0,0,7); ctx.fill(); ctx.globalAlpha=1; return; }
   const h=clamp((GROUND-f.y)/40,0,1), w=14-h*5;      // shadow tightens as they leap
   ctx.globalAlpha=.30-h*.14; ctx.fillStyle='#000';
   ctx.beginPath(); ctx.ellipse(f.x,GROUND+2,w,3,0,0,7); ctx.fill();
@@ -62900,7 +63330,7 @@ window.__SS = {
   rollBrides, drawUndressedFig, drawWaterCouple, waterMetrics, drawSteamVeil,
   COURT_RANKS, COURT_PROMPTS, COURT_BOASTS, courtAccess, courtOnly, startCourtship,
   courtChoose, courtShow, courtBackDown, courtFinish, renderCourt, get CT(){return CT;},
-  courtAsk, courtGift, courtHand, courtTick, courtWeight, courtNextBeat, updateDomus, wifeExpr, drawCourtVenue,
+  courtAsk, courtGift, courtHand, courtTick, courtWeight, drawBeastNB, BST_SPEC, bstPose, makeBeast, BEASTS, get BST_DRAWS(){ return BST_DRAWS; }, courtNextBeat, updateDomus, wifeExpr, drawCourtVenue,
   BOTS, BOT_LINES, botRecord, botLoad, openBotWatch, closeBotWatch, botCmd, botEnterBeat, botWatchTick, get BW(){return BW;}, get BOT_SANDBOX(){return BOT_SANDBOX;}, buildBotsCard, COURT_TEMPERS, COURT_GIFTS, COURT_RIVAL_BEATS, drawCourtVenue,
   buildCourtBoard, rollHiddenPotential, drawCourtScene, openCreate, MATCHMAKER_FEE,
   courtRec, courtCooldown, courtStanding, get MEDIUM_CENSOR(){return MEDIUM_CENSOR;},
