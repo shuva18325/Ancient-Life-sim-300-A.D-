@@ -64,7 +64,7 @@ const ok=(name,cond,note)=>{ if(cond){pass++; console.log('  PASS  '+name+(note?
   ok('THE REVEAL: undressed, and all of him showing', !R.err && R.revealTip===true);
   ok('at his real length — IMPOSSIBLE, well over a hand', !R.err && R.revealLen >= R.hard*0.8, R.err||(R.revealLen.toFixed(1)+' px for '+R.hard.toFixed(1)+' in'));
   ok('and he is still a step back from her when he shows it', !R.err && R.apartAtReveal > 8, R.err||(R.apartAtReveal.toFixed(1)+' px'));
-  ok('then he is IN: his hips at her, where she is, not near her', !R.err && R.joined < 7, R.err||(R.joined.toFixed(1)+' px'));
+  ok('then he is IN: his hips at her, where she is, not near her', !R.err && R.joined < 8.5,   /* V49: the join is on her outline, under the seat */ R.err||(R.joined.toFixed(1)+' px'));
   ok('and the beat moves him', !R.err && R.beat > 0.6, R.err||(R.beat.toFixed(2)+' px between two ticks'));
   ok('while she stays bent over', R.herBent===true);
 

@@ -5598,6 +5598,8 @@ function ensureQuirks(w){ if(!w) return w;
 function ensureLook(w){
   ensureQuirks(w); fixTraitsForSex(w);
   if(!w) return w;
+  if(!w.male && Array.isArray(w.traits) && w.traits.includes('gr_seat')){          // 🍑 a wife's eyes go to the front of your tunic
+    w.traits=w.traits.filter(t=>t!=='gr_seat'); if(!w.traits.includes('gr_front')) w.traits.push('gr_front'); }
   const eth=w.eth||'roman';
   if(!w.hairStyle) w.hairStyle = pick((w.male? HAIR_M_BY_ETH : HAIR_F_BY_ETH)[eth] || (w.male?['caesar']:['crown']));
   if(w.male && !w.beard) w.beard = pick(BEARD_BY_ETH[eth]||['stubble']);
@@ -7376,8 +7378,11 @@ const WIFE_TRAITS=[
    desc:'A slap earns a look back, and a while later something is on the low shelf that was not there before.'},
   /* ---- V46 · GREEDY. Where the eyes go when you walk past — his or hers. ---- */
   {id:'gr_greedy', name:'Greedy',        icon:'🤤', min:2, adult:true, greedy:'all',
-   desc:'Eyes everywhere — the seat, the front, the lot — and more often than not the hands follow the eyes across the room.'},
-  {id:'gr_seat',   name:'Seat-Struck',   icon:'🍑', min:2, adult:true, greedy:'seat',
+   desc:'Eyes everywhere — and more often than not the hands follow the eyes across the room.'},
+  /* 🍑 A HUSBAND'S. "Why would she be looking at my seat?" — she would not: a wife watching you walk
+     past looks at the front of your tunic, so Seat-Struck is his alone, and a wife who rolled it
+     before this is Front-Struck now (ensureLook). */
+  {id:'gr_seat',   name:'Seat-Struck',   icon:'🍑', min:2, adult:true, greedy:'seat', male:true,
    desc:'Cannot walk past a seat without looking at it. Will find a reason to be standing behind you.'},
   {id:'gr_front',  name:'Front-Struck',  icon:'👀', min:2, adult:true, greedy:'front',
    desc:'Talks to your front. Has never once apologised for it, and never will.'},
@@ -20242,6 +20247,8 @@ function sceneActions(){
     return [{k:'k', c:'K', t:'KEEP IT (inside)', hot:true}, {k:'x', c:'X', t:'NOT THIS TIME (outside)'}];
   const D=DM; if(!D || state!=='domus') return [];
   const A=[];
+  const SC0=D.scene; if(SC0 && (SC0.kind==='villalove'||SC0.kind==='escalate') && SC0.asked && !SC0.choice){      // 💞 / 🌾 the ask, as buttons too
+    A.push({k:'space', c:'␣', t:'💞 FOR LOVE', hot:true}); A.push({k:'w', c:'W', t:'🌾 FOR AN HEIR'}); return A; }
   const X=D.clam;
   if(X){
     if(X.ph==='call'){
@@ -21884,25 +21891,70 @@ function startBedScene(mode,len,place){
 function updateWifeHappy(dt){
   if(!WH || WH==='done'){ return; }
   WH.t+=dt;
-  if(WH.t>=78 || consume('space') || consume('attack')){
+  if(WH.t>=WH_DUR || consume('space') || consume('attack')){
     const w=WH; WH='done'; startBedScene(w.mode,w.len,w.place);
   }
 }
+/* 💞 SHE LIGHTS UP — the beat before either night. It was a blown-up pixel portrait in a square frame with a
+   few pixel hearts round it and "press SPACE", and it was the same card whether you had asked FOR AN HEIR or
+   FOR LOVE. Now: her own room behind her, dim and waiting (the painted chamber of her people); her portrait
+   crisp at its own resolution in a lit frame; real hearts and sparks rising round it; and the night named —
+   the heir and Venus, or love and nothing else — with how long it is going to be. It fades in, and out. */
+const WH_DUR=112;
+function whHeart(x, y, r, a, hue){
+  const g=ctx.createRadialGradient(x-r*0.3, y-r*0.35, r*0.1, x, y, r*1.3);
+  g.addColorStop(0, hue==='gold'? '#fff0c0' : '#ffd6e4'); g.addColorStop(0.5, hue==='gold'? '#f0b848' : '#ff6a9a'); g.addColorStop(1, hue==='gold'? '#a86a18' : '#b8285a');
+  ctx.save(); ctx.globalAlpha=a; ctx.fillStyle=g; ctx.beginPath();
+  ctx.moveTo(x, y+r*0.9); ctx.bezierCurveTo(x-r*1.3, y+r*0.1, x-r*1.1, y-r*1.0, x, y-r*0.35); ctx.bezierCurveTo(x+r*1.1, y-r*1.0, x+r*1.3, y+r*0.1, x, y+r*0.9);
+  ctx.fill(); ctx.globalAlpha=a*0.8; ctx.fillStyle='rgba(255,255,255,.8)'; ctx.beginPath(); ctx.ellipse(x-r*0.45, y-r*0.35, r*0.22, r*0.14, -0.6, 0, Math.PI*2); ctx.fill(); ctx.restore(); }
+function whSpark(x, y, r, a){ ctx.save(); ctx.globalAlpha=a; ctx.fillStyle='#fff4d8'; ctx.beginPath();
+  for(let k=0;k<8;k++){ const an=k*Math.PI/4, rr=k%2? r*0.28 : r; ctx.lineTo(x+Math.cos(an)*rr, y+Math.sin(an)*rr); } ctx.closePath(); ctx.fill(); ctx.restore(); }
+/* the room she is waiting in: the same painted chamber the walk-in uses */
+function whRoomBackdrop(T){
+  try{ const HP=hallPlan(), Pf=(x,y,w,h,c)=>{ ctx.fillStyle=c; ctx.fillRect(x|0,y|0,Math.max(1,w|0),Math.max(1,h|0)); }, Df=(c)=>mixHex(c,'#120a06',0.18);
+    px(-4,-4,W+8,H+8,'#140c08');
+    if(HP.kind==='plank'){ Pf(0,14,W,210,Df('#6a5238')); drawLonghouseDressing(Pf, Df, 0, 14, W, 256, 224, T); drawLonghouseFloor(Pf, Df, 0, 224, W, H-224); }
+    else if(CH_PAINTERS[HP.kind]) chPaint(HP.kind, Pf, Df, 0, 14, W, 256, 224, T, HP, {full:true});
+    else { drawCubiculum(Pf, Df, 0, 14, W, 256, 224, T, HP, {bright:true}); drawCubiculumFloor(Pf, Df, 0, 224, W, H-224, HP); }
+  }catch(e){ const g=ctx.createLinearGradient(0,0,0,H); g.addColorStop(0,'#3a2036'); g.addColorStop(1,'#160c14'); ctx.fillStyle=g; ctx.fillRect(0,0,W,H); }
+}
 function drawWifeHappy(){
   const w=G.wife; if(!w||!WH||WH==='done') return;
-  const g=ctx.createLinearGradient(0,0,0,H); g.addColorStop(0,'#3a2036'); g.addColorStop(1,'#160c14');
-  ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
-  if(!WH.spr){ const cv=document.createElement('canvas'); cv.width=cv.height=148;
+  const T=WH.t, heir=(WH.mode==='heir'), fadeIn=clamp(T/10,0,1), fadeOut=clamp((WH_DUR-T)/12,0,1), A=Math.min(fadeIn, fadeOut);
+  whRoomBackdrop(T);
+  ctx.globalAlpha=0.58; px(-4,-4,W+8,H+8,'#0e060c'); ctx.globalAlpha=1;                                   // the room, dimmed
+  { const v=ctx.createRadialGradient(W/2,H*0.46,40,W/2,H*0.46,W*0.62); v.addColorStop(0,'rgba(0,0,0,0)'); v.addColorStop(1,'rgba(8,2,8,.72)'); ctx.fillStyle=v; ctx.fillRect(0,0,W,H); }
+  /* the portrait, at its own resolution — no blocky scaling — in a lit frame */
+  const PS=150, PX=Math.round(W/2-PS/2), PY=40;
+  if(!WH.spr || WH.spr.width!==PS){ const cv=document.createElement('canvas'); cv.width=cv.height=PS;
     const ex=w._expr; w._expr='love'; drawBridePortrait(cv,w); if(ex!==undefined) w._expr=ex; else delete w._expr; WH.spr=cv; }
-  const s=Math.min(W,H)*0.64, sx=W/2-s/2, sy=H/2-s/2-4;
-  ctx.imageSmoothingEnabled=false; ctx.drawImage(WH.spr, sx, sy, s, s);
-  const T=WH.t;
-  for(let i=0;i<7;i++){ const hx=W/2+Math.sin(T*0.05+i*1.7)*(26+i*7), hy=H*0.72-((T*0.55+i*20)%(H*0.55));
-    ctx.globalAlpha=clamp(0.35+0.45*Math.sin(T*0.09+i),0,1); pixelText('♥',hx,hy,'#e26a8a',1+(i%2)); }
-  ctx.globalAlpha=1; ctx.textAlign='center';
-  pixelText(w.name.toUpperCase()+'  LIGHTS UP  ♥', W/2, 20, '#ffd0da', 1);
-  pixelText(ADULT?'“Veni, mi amor…”':'She smiles and takes your hand.', W/2, H-18, '#f0d4dc', 1);
-  pixelText('press SPACE', W/2, H-8, 'rgba(240,212,220,.7)', 1);
+  ctx.save(); ctx.globalAlpha=A;
+  { const lg=ctx.createRadialGradient(W/2,PY+PS*0.45,10,W/2,PY+PS*0.45,PS*0.95); lg.addColorStop(0, heir? 'rgba(255,214,140,.40)' : 'rgba(255,150,196,.40)'); lg.addColorStop(1,'rgba(0,0,0,0)'); ctx.fillStyle=lg; ctx.fillRect(PX-PS*0.5,PY-PS*0.4,PS*2,PS*1.8); }
+  const rr=(x,y,w2,h2,r)=>{ ctx.beginPath(); if(ctx.roundRect) ctx.roundRect(x,y,w2,h2,r); else ctx.rect(x,y,w2,h2); };
+  ctx.shadowColor= heir? 'rgba(255,200,110,.75)' : 'rgba(255,120,180,.75)'; ctx.shadowBlur=14; rr(PX-3,PY-3,PS+6,PS+6,12); ctx.fillStyle='#2a1420'; ctx.fill(); ctx.shadowBlur=0;
+  ctx.save(); rr(PX,PY,PS,PS,10); ctx.clip(); ctx.imageSmoothingEnabled=false; ctx.drawImage(WH.spr, PX, PY);
+  { const gl=ctx.createLinearGradient(0,PY,0,PY+PS); gl.addColorStop(0,'rgba(255,255,255,.10)'); gl.addColorStop(0.35,'rgba(255,255,255,0)'); gl.addColorStop(1,'rgba(40,0,20,.28)'); ctx.fillStyle=gl; ctx.fillRect(PX,PY,PS,PS); }
+  ctx.restore();
+  const rim=ctx.createLinearGradient(PX,PY,PX+PS,PY+PS); rim.addColorStop(0,'#fff0b0'); rim.addColorStop(0.5,'#c8963a'); rim.addColorStop(1,'#fff0b0');
+  ctx.strokeStyle=rim; ctx.lineWidth=2.2; rr(PX-1,PY-1,PS+2,PS+2,11); ctx.stroke();
+  ctx.strokeStyle='rgba(255,240,200,.35)'; ctx.lineWidth=0.8; rr(PX-4.5,PY-4.5,PS+9,PS+9,13); ctx.stroke();
+  /* hearts and sparks, rising round her — gold ones for an heir */
+  for(let i=0;i<12;i++){ const side=i%2? 1 : -1, sp=0.35+((i*7)%5)*0.08, yy=PY+PS+10-((T*sp*1.6+i*23)%(PS+40)), xx=W/2+side*(PS*0.56+((i*13)%26))+Math.sin(T*0.05+i)*6;
+    const a=clamp((yy-PY+30)/40,0,1)*clamp((PY+PS+10-yy)/30,0,1)*0.9; whHeart(xx, yy, 3.2+((i*5)%4), a, (heir && i%3===0)? 'gold' : 'rose'); }
+  for(let i=0;i<9;i++){ const tw=0.5+0.5*Math.sin(T*0.2+i*2.3); whSpark(PX+((i*37)%PS), PY+((i*53)%PS), 1.2+tw*1.6, 0.55*tw); }
+  ctx.restore();
+  /* the words: who, which night, how long, what she says, and how to go to her */
+  ctx.textAlign='center';
+  { ctx.save(); ctx.globalAlpha=A*0.92; const bw=250, bx=W/2-bw/2, by=12; const bg=ctx.createLinearGradient(0,by,0,by+20); bg.addColorStop(0,'rgba(70,20,46,.92)'); bg.addColorStop(1,'rgba(36,10,26,.92)');
+    ctx.fillStyle=bg; rr(bx,by,bw,20,10); ctx.fill(); ctx.strokeStyle='rgba(255,190,220,.55)'; ctx.lineWidth=1; rr(bx+0.5,by+0.5,bw-1,19,10); ctx.stroke(); ctx.restore(); }
+  ctx.globalAlpha=A; pixelText('💞 '+w.name.toUpperCase()+' LIGHTS UP', W/2, 22, '#ffd6e6', 1.05);
+  const lenWord={quick:'a quick one', long:'a long one', night:'all night', vigil:'until the lamps give out'}[WH.len]||'';
+  pixelText(heir? '🌾 FOR AN HEIR — tonight, Venus is asked' : '🍷 FOR LOVE — no heir tonight, only each other', W/2, PY+PS+16, heir? '#ffd98a' : '#ffb8d4', 0.98);
+  if(lenWord) pixelText('~ '+lenWord+' ~', W/2, PY+PS+28, 'rgba(240,214,226,.75)', 0.8);
+  pixelText(ADULT? '“Veni, mi amor…”' : 'She smiles and takes your hand.', W/2, H-24, '#f4dce6', 0.95);
+  { const kp=0.6+0.4*Math.sin(T*0.2); ctx.save(); ctx.globalAlpha=A*kp; ctx.fillStyle='rgba(255,255,255,.14)'; rr(W/2-44,H-14,40,11,3); ctx.fill(); ctx.strokeStyle='rgba(255,220,235,.6)'; rr(W/2-43.5,H-13.5,39,10,3); ctx.stroke(); ctx.restore();
+    ctx.globalAlpha=A; pixelText('SPACE', W/2-24, H-8, '#fff4f8', 0.7); pixelText('go to her', W/2+18, H-8, 'rgba(240,212,220,.8)', 0.7); }
+  ctx.globalAlpha=1; ctx.textAlign='left';
 }
 /* ---- ✧ KAN'S TURN, IN THE SCENE ---------------------------------------
    The last beat of a kanvek night is a decision and the decision is HIS, so
@@ -23362,7 +23414,7 @@ function drawBedAfterProps(s,T,dx,dw){
     else if(beat===1) pixelText('♪',hx0+18,pool?166:108,'#f0d0da',1.2);
     else pixelText('✧',hx0+2,pool?156:98,'#ffd0da',1);
     if(T>600 && T<(s.dur||700)-160) pixelText('[SPACE] slip away to morning',W-72,26,'rgba(200,176,96,.55)',1);
-    if(T>560 && T<1100) pixelText(BC.mode==='fun'? '~ just the two of them ~': pool?'~ the steam keeps its secrets ~':'~ the lamps burn low ~',W/2,248,'rgba(232,195,74,.75)',1);
+    if(T>560 && T<1100 && !MEDIUM_CENSOR) pixelText(BC.mode==='fun'? '~ just the two of them ~': pool?'~ the steam keeps its secrets ~':'~ the lamps burn low ~',W/2,248,'rgba(232,195,74,.75)',1);
     // THE VIGIL: five hours, counted like a watch on the walls
     if(s.len==='vigil'){
       const hr=Math.min(5,1+(T/3500|0)), hp=(T%3500);
@@ -23600,14 +23652,21 @@ function drawShadowTheatre(s,T){
     px(lx-1,180-fl,3,fl+5,'#ffd88a'); px(lx,178-fl,1,fl+4,'#fff6dc');
     ctx.globalAlpha=0.22; px(lx-11,174-fl,23,22,'#ffcf80'); ctx.globalAlpha=1;
   }
-  // 4 — the camera comes in
-  ctx.save();
-  ctx.translate(CX,CAMY); ctx.scale(Z,Z); ctx.translate(-SX0,-SY0+22);
-  drawShadowPlay(s,T);
-  ctx.restore();
+  // 4 — the camera comes in — and for HER GIFT it comes in close: her mouth and him, filling the frame, not a small
+  //     picture in the middle of a box ("it's in the tablet"). It eases in once she is down, and out again after.
+  { const BL=(typeof BEDPOSE_LAST!=='undefined')? BEDPOSE_LAST : null, KF=(BL && BL.vi===22 && BL.her && BL.her.mouth && MEDIUM_CENSOR)? BL.her.mouth : null;
+    s.kanPush=clamp((s.kanPush||0)+(KF? 0.03 : -0.06), 0, 1);
+    if(KF) s.kanF = s.kanF? [s.kanF[0]+(KF[0]-s.kanF[0])*0.2, s.kanF[1]+(KF[1]-s.kanF[1])*0.2] : KF.slice();
+    const kp=sstep(0,1,s.kanPush), ZK=2.55, F=s.kanF||[SX0,SY0-22];
+    const Zc=Z+(ZK-Z)*kp, Ox=SX0+((F[0]-6)-SX0)*kp, Oy=(SY0-22)+((F[1]-14)-(SY0-22))*kp, Ay=CAMY+((CAMY-12)-CAMY)*kp;
+    s.camZ=Zc;
+    ctx.save();
+    ctx.translate(CX,Ay); ctx.scale(Zc,Zc); ctx.translate(-Ox,-Oy);
+    drawShadowPlay(s,T);
+    ctx.restore(); }
   // the tier plate is a UI element, not scenery — it was riding inside the camera
   // transform, so pushing in stretched it off the bottom of the screen
-  if(s._STG) drawStagePlate(s._STG, CX, MEDIUM_CENSOR? 226 : 218, T);
+  if(s._STG && (s.kanPush||0)<0.5) drawStagePlate(s._STG, CX, MEDIUM_CENSOR? 226 : 218, T);   // (not over her in the close-up)
   // 5 — and just enough vignette to hold the eye
   { const g2=ctx.createRadialGradient(CX,CY,110,CX,CY,258);
     g2.addColorStop(0,'rgba(0,0,0,0)'); g2.addColorStop(1,'rgba(5,3,7,.62)');
@@ -23615,7 +23674,7 @@ function drawShadowTheatre(s,T){
   // 6 — and the name of what is playing, in screen coordinates where it belongs
   if(s.poseName && s.poseFade>0.02){
     ctx.globalAlpha=s.poseFade*0.95; ctx.textAlign='center';
-    pixelText('· '+s.poseName.toUpperCase()+' ·', W/2, MEDIUM_CENSOR? 246 : 232, s.poseCol||'#e8c34a', 1.1);
+    pixelText('· '+s.poseName.toUpperCase()+' ·', W/2, MEDIUM_CENSOR? 258 : 232, s.poseCol||'#e8c34a', 1.1);   // under the plate's own line, not over it
     ctx.globalAlpha=1; ctx.textAlign='left';
   }
   drawBedStageUI(s);                                        // ✦ where in it you are
@@ -25452,6 +25511,7 @@ function drawBedPose(vi, E){
   const shut=Object.assign({}, HF, {shut:1, open:0});
   const IN1=lengthInches(him,1);
   const HIM=(M)=>{ const a=(M.aro===undefined)? 1 : M.aro, IN=lengthInches(him,a);
+    if(s && s.choice==='love' && s.fx && s.kind==='escalate') M=Object.assign({}, M, {noLen:true});                 // 💦 out — the finish draws it
     return drawMateFig(c, c, Object.assign({look:him, bare:true, noFloorCloth:true, face:HF, lenIn:IN.now, diaIn:IN.dia, pxi:1.0, floor:base, aro:a}, M)); };
   const HER=(F)=>drawFemFig(c, c, Object.assign({look:her, floor:base, t:T, expr:HE}, F));
   // mirror: draw about x, and bring the points it returns back into the room
@@ -25853,6 +25913,19 @@ function drawBedPose(vi, E){
           c.fillStyle='rgba(255,214,232,'+a.toFixed(2)+')'; c.fillText(q.w, q.x, q.y-q.t*0.25); });
         if(kAll && K.eat>0.95 && SWAL<0){ c.font='bold 4.2px Georgia,serif'; c.fillStyle='rgba(255,176,208,.9)'; c.fillText('ALL OF IT', HR.head[0]+2, HR.head[1]-16); }
         c.restore(); }
+      /* ✧ HER LIPS, round him. The mouth was a point he was aimed at and then hidden behind her face, so
+         nothing on the screen said she was doing anything at all. Now her lips close round him where he goes
+         in, pushed out a little on the draw back, and her cheek hollows on it. */
+      if(SWAL<0 || SWAL<80){ const md=[HR.mouth[0]-root[0], HR.mouth[1]-root[1]], ang=Math.atan2(md[1],md[0]), dI=Math.max(1.6,(IN1.dia||1.6));
+        const lipC=mixHex(skn,'#b8405a',0.48), lipD=mixHex(skn,'#5a1422',0.55), pout=0.35+0.45*(1-(s.kanDeep? s.kanDeep.kst||0 : 0));
+        c.save(); c.translate(HR.mouth[0]-Math.cos(ang)*0.2, HR.mouth[1]-Math.sin(ang)*0.2); c.rotate(ang);
+        c.fillStyle=lipD; c.beginPath(); c.ellipse(-0.1,0,0.95+pout*0.5,dI*0.5+1.05,0,0,Math.PI*2); c.fill();
+        c.fillStyle=lipC; c.beginPath(); c.ellipse(-0.35,0,0.75+pout*0.45,dI*0.5+0.8,0,0,Math.PI*2); c.fill();
+        c.fillStyle='rgba(255,236,240,.75)'; c.fillRect(-0.9,-(dI*0.5+0.5),0.6,0.5);                       // the light on the upper lip
+        c.restore();
+        const hol=(s.kanDeep? s.kanDeep.kst||0 : 0);
+        if(hol>0.3){ const cx2=HR.mouth[0]+(HR.head[0]-HR.mouth[0])*0.45, cy2=HR.mouth[1]+(HR.head[1]-HR.mouth[1])*0.3+0.8;
+          c.fillStyle=rgbA(mixHex(skn,'#2a1408',0.4),0.35*hol); c.beginPath(); c.ellipse(cx2,cy2,1.3,0.8,0.3,0,Math.PI*2); c.fill(); } }
       try{ const _M=c.getTransform(), AX=HR.mouth[0], AY=HR.mouth[1];
         s.finAt={ x:_M.a*AX + _M.c*AY + _M.e, y:_M.b*AX + _M.d*AY + _M.f, z:_M.a }; }catch(e){}
       if(gv>0.86 && (T|0)%9<2){ c.fillStyle='#ffb0d0'; c.fillRect(HR.head[0]-2+rnd(-3,3), HR.head[1]-12, 1.6, 1.6); } }
@@ -29353,11 +29426,24 @@ function drawBendFig(c, x, y, w, k, Q){
   c.beginPath(); c.ellipse(x+(H[0]+Sh[0])*0.3, y-1, 12+kk*8, 3.0, 0,0,7); c.fill(); c.restore();
   c.drawImage(BEND_CV, Math.round(x-OX), Math.round(y-OY));
   BEND_OPT=null;                                                    // a scene's flag is good for one draw
-  /* and where the parts of her are, for whoever is drawn with her: the
-     join is at the bottom of the seat where it meets the thighs, on the
-     side the seat faces */
-  const join=[SC[0]+thighDir[0]*rs*0.72+sd[0]*rs*0.30, SC[1]+thighDir[1]*rs*0.72+sd[1]*rs*0.30];
+  /* and where the parts of her are, for whoever is drawn with her. 🍑 THE JOIN IS ON HER OUTLINE: the
+     notch where the underside of the seat meets the back of the thigh. It used to sit a little below the
+     middle of the seat — inside her — so he was aimed into the middle of it, all of him vanished behind
+     her, and at the end of the stroke his hips were standing inside her seat. */
+  const join=bendNotch(H, K, SC, rs, thighDir, sd, be);
   return {H, Sh, SC, rs, head:HC, join, waist:at(0.30,0), kk};
+}
+/* where the seat's outline meets the back edge of the thigh (the thigh is the capsule legPts draws) */
+function bendNotch(H, K, SC, rs, thighDir, sd, be){
+  let pb=[-thighDir[1], thighDir[0]]; if(pb[0]*sd[0]+pb[1]*sd[1]<0) pb=[-pb[0],-pb[1]];      // the back of the thigh: the seat's side
+  const L=Math.hypot(K[0]-H[0],K[1]-H[1]), r0=3.4+be*0.20, r1=2.9+be*0.10;
+  let best=null;
+  for(let f=0.8; f>=0; f-=0.02){
+    const r= f<=0.5? r0+(r1-r0)*(f/0.5) : r1+(2.0-r1)*((f-0.5)/0.5);
+    const p=[H[0]+thighDir[0]*L*f+pb[0]*r, H[1]+thighDir[1]*L*f+pb[1]*r];
+    if(Math.hypot(p[0]-SC[0],p[1]-SC[1])<=rs*0.96){ best=p; break; } }
+  if(!best) best=[SC[0]+thighDir[0]*rs*0.95, SC[1]+thighDir[1]*rs*0.95];
+  return [best[0]-pb[0]*0.5, best[1]-pb[1]*0.5];                                              // a hair inside, so nothing shows past the seam
 }
 /* =====================================================================
    🧍‍♂️ HIM, IN PROFILE — AND THE TWO OF THEM TOGETHER
@@ -29494,7 +29580,16 @@ function drawMateFig(bk, fr, M){
       lit(p, dark? sSh : skin, dark? rgbA(skin,0.4) : rgbA(sLit,0.7), rgbA(sDeep,0.45));
       oc.fillStyle= dark? sSh : skin; oc.fill(ell(Wr[0]+0.6, Wr[1]+0.4, 1.7, 1.45, 0));
       return Wr; };
-    if(layer==='front'){ if(!M.only || M.only==='near'){ M._hand=arm(S0, handsOf('near'), false); if(KIT) nbKit(oc,K,Qm,KIT,'armNear'); } return; }
+    if(layer==='front'){
+      /* 🍑 THE PART OF HIM BETWEEN THEM, over her: from his root to her outline, with a dark rim so it reads against
+         her skin and his own thigh alike. The rest of it is in her, behind her outline, where it belongs. */
+      if(M.lenFrontFull && M._lenSeg){ const S=M._lenSeg, a=S.R, b=[a[0]+S.dir[0]*S.lenPx, a[1]+S.dir[1]*S.lenPx];        // 💦 out, and all of it, over her
+        finShaftDraw(oc, a, b, S.dia, skin, sLit, sDeep); }
+      else if(M.lenFront && M._lenSeg && M._lenSeg.shown>1.2){ const S=M._lenSeg, a=S.R, b=[a[0]+S.dir[0]*S.shown, a[1]+S.dir[1]*S.shown], m=[(a[0]+b[0])/2,(a[1]+b[1])/2];
+        lit(capsule([[a[0],a[1],S.dia*0.5+0.75],[m[0],m[1],S.dia*0.49+0.75],[b[0],b[1],S.dia*0.47+0.6]]), sDeep, rgbA(sDeep,0.9), rgbA(sDeep,0.9));
+        lit(capsule([[a[0],a[1],S.dia*0.5],[m[0],m[1],S.dia*0.49],[b[0],b[1],S.dia*0.47]]), skin, rgbA(sLit,0.85), rgbA(sDeep,0.5));
+        line([add(a,[S.dir[0]*1.1,S.dir[1]*1.1-S.dia*0.26]), add(b,[-S.dir[0]*0.8,-S.dir[1]*0.8-S.dia*0.26])], rgbA(sLit,0.75), 0.7); }
+      if(!M.only || M.only==='near'){ M._hand=arm(S0, handsOf('near'), false); if(KIT) nbKit(oc,K,Qm,KIT,'armNear'); } return; }
     // ---- far leg, far arm ----
     if(!M.only || M.only==='far' || M.only==='back'){
       { lit(legCap(LF), sSh, rgbA(skin,0.45), rgbA(sDeep,0.5)); foot(LF, sSh); }
@@ -29524,7 +29619,7 @@ function drawMateFig(bk, fr, M){
     const lenPx=Math.max(3, M.lenIn*(M.pxi||1)), dia=Math.max(1.8, (M.diaIn||1.6)*(M.pxi||1)*(1+0.25*lp.swell));
     let shown=lenPx;
     if(M.clip && M.aim){ shown=clamp(Math.hypot(M.aim[0]-R[0], M.aim[1]-R[1])+0.6, 0, lenPx); }   // the rest of it is in her
-    if(!groinCovered && lenPx>0){
+    if(!groinCovered && lenPx>0 && !M.noLen){
       const dir=[Math.cos(ang), Math.sin(ang)], droop=(1-lp.lift)*1.2;
       const mid=add(R,[dir[0]*shown*0.5, dir[1]*shown*0.5+droop*0.4]), tip=add(R,[dir[0]*shown, dir[1]*shown+droop]);
       oc.fillStyle=sSh; oc.fill(ell(R[0]-0.8, R[1]+2.0+(1-lp.lift)*0.4, 2.1+M.lenIn*0.05, 2.0+M.lenIn*0.05, 0));   // the pair
@@ -29534,7 +29629,7 @@ function drawMateFig(bk, fr, M){
           lit(ell(tip[0]+dir[0]*0.4, tip[1]+dir[1]*0.4, dia*0.62, dia*0.55, ang), gl, rgbA(mixHex(gl,'#ffffff',0.3),0.8), rgbA(sDeep,0.45)); }
         line([add(R,[dir[0]*1.5,dir[1]*1.5-dia*0.3]), add(mid,[0,-dia*0.3])], rgbA(sLit,0.55), 0.45); }   // the light along it
       oc.fillStyle=hair; oc.fill(ell(R[0]-0.6, R[1]-1.5, 2.0, 1.3, aT));                                 // and what is at the root
-      M._tip=add(R,[dir[0]*lenPx, dir[1]*lenPx]); }
+      M._tip=add(R,[dir[0]*lenPx, dir[1]*lenPx]); M._lenSeg={R:R.slice(), dir, shown, dia, lenPx}; }
     M._root=R;
     // ---- WHAT HE IS WEARING, and how it comes off ----
     if(M.bare){ /* nothing: the bedchamber */ }
@@ -30852,7 +30947,7 @@ function drawPair(c, o){
     const look0=E.look||{}, lg0=((look0.body||{}).legs===undefined? 6 : look0.body.legs);
     const standY=FYb-2.2-(15.6+lg0*0.22+16.2+lg0*0.22)*0.975;
     const standK=(E.stand!==undefined)? clamp(E.stand,0,1) : clamp((((E.atX!==undefined)? gapPx : (E.gap||0))-2)/8,0,1);
-    const hip=[J[0]-3.6-gapPx, (J[1]+0.4)+(standY-(J[1]+0.4))*standK];
+    const hip=[J[0]-3.1-gapPx, (J[1]-0.9)+(standY-(J[1]-0.9))*standK];            // 🍑 flush: at the bottom of the stroke his root is AT her, not a stub short
     if(seatLevel!==null) hip[1]=clamp(seatLevel, standY, J[1]+3);
     const tgt=(h)=> h==='hips'? [out.hip[0]-1.2, out.hip[1]-1.6]
                : h==='waist'? [out.waist[0]-0.5, out.waist[1]]
@@ -30875,7 +30970,8 @@ function drawPair(c, o){
     const look=E.look||{};
     const IN=(typeof lengthInches==='function')? lengthInches(look, E.aro||0) : {now:6,dia:1.6};
     const MR=drawMateFig(X(pk), X(pf), {hip, floor:FYb, lean:E.lean||0, u:E.u||0, aro:E.aro||0,
-      hands:{near, far}, face:E.face||HARD_FACES.stoic, aim:J, aimK:E.aimK||0, clip:(E.aimK||0)>0.5, lenAng:E.lenAng, walk:E.walk||0, walkPh:E.walkPh||0, headAng:E.headAng,
+      hands:{near, far}, face:E.face||HARD_FACES.stoic, aim:(E.aimOff? [J[0]+E.aimOff[0], J[1]+E.aimOff[1]] : J), aimK:E.aimK||0,
+      clip:(E.aimK||0)>0.5 && !E.noClip, lenFront:(E.aimK||0)>0.5 && !E.noClip, lenFrontFull:!!E.lenFrontFull, lenAng:E.lenAng, walk:E.walk||0, walkPh:E.walkPh||0, headAng:E.headAng,
       look, coast:!!E.coast, cloth:E.cloth, band:E.band, lenIn:IN.now, diaIn:IN.dia, pxi:E.pxi||1.0});
     const W2b=(p)=>p? [o.x+(p[0]-FXb)*dir, FY+(p[1]-FYb)] : null;
     out.hisHead=MR.head; out.hisHand=MR.hand; out.hisShoulder=MR.shoulder; out.hisHip=MR.hip; out.hisTip=MR.tip; out.hisRoot=MR.root;
@@ -33360,7 +33456,12 @@ function hallBusyWhy(mine){
    goes and finds a reason to reach for the low shelf.
    ===================================================================== */
 const GAZE_COOL=560;
-function gazeKindsOf(w){ const tr=(w&&w.traits)||[]; return {greedy:tr.includes('gr_greedy'), seat:tr.includes('gr_seat'), front:tr.includes('gr_front')}; }
+function gazeKindsOf(w){ const tr=(w&&w.traits)||[], wifeOnHim=!!(w && !w.male);
+  /* 🍑 a wife watching you looks at your FRONT — never your seat — so for her the seat folds into the front */
+  if(wifeOnHim) return {greedy:tr.includes('gr_greedy'), seat:false, front:tr.includes('gr_front')||tr.includes('gr_seat')};
+  return {greedy:tr.includes('gr_greedy'), seat:tr.includes('gr_seat'), front:tr.includes('gr_front')}; }
+/* a wife looks at the front of your tunic, so she can only do it while you are facing her */
+function gazeFrontOnly(){ return !!(G && G.wife && !G.wife.male); }
 function gazeReady(){ if(!G || !ADULT || !G.married || !G.wife) return false; const K=gazeKindsOf(G.wife); return K.greedy||K.seat||K.front; }
 function gazeDue(){
   const D=DM; if(!D || !gazeReady() || hallBusy() || D.floor) return false;
@@ -33370,6 +33471,7 @@ function gazeDue(){
      the Seat- and Front-Struck about every half minute: often enough to notice, rare enough to mean it. */
   const K=gazeKindsOf(G.wife), cool=K.greedy? GAZE_COOL*1.6 : GAZE_COOL*2.4;
   if((D.t||0)-(D.lastGazeT===undefined? -9999 : D.lastGazeT) < cool) return false;
+  if(gazeFrontOnly()){ const toYou=Math.sign((D.x||0)-(D.wifeX||0))||1; if((D.face||1)!==-toYou) return false; }   // your back is to her: nothing of yours she is after
   return Math.random() < (K.greedy? 0.005 : 0.003);
 }
 function startGaze(kind){
@@ -33377,6 +33479,7 @@ function startGaze(kind){
   D.lastGazeT=D.t;
   const K=gazeKindsOf(G.wife), toYou=Math.sign((D.x||0)-(D.wifeX||0))||1, facingThem=((D.face||1)===-toYou);
   kind = kind || (K.seat && !K.front? 'seat' : K.front && !K.seat? 'front' : (facingThem? 'front' : 'seat'));
+  if(gazeFrontOnly()) kind='front';                                                   // 🍑 hers go to the front of your tunic
   D.gaze={t:0, kind, dur:K.greedy? 190 : 150, caught:false, caughtT:0, toYou, greedy:K.greedy, male:!!G.wife.male, face0:D.face,
           line:pick(GAZE_LINES[(G.wife.male? 'm' : 'f')+kind])};
   D.wifeDir=toYou; D.wifePause=Math.max(D.wifePause||0, 220);
@@ -33480,9 +33583,9 @@ function updatePlayerLook(dt){
     const follow=X.follow, back=(X.react==='bold' && !X.follow && Math.random()<0.6); D.plook=null;
     /* 👀 AND A BOLD ONE LOOKS BACK. Caught looking, a bold spouse returns the favour — at the front of YOUR
        tunic if you are facing them, at your seat if you are not — and makes no secret of it. */
-    if(back && !follow && !D.gaze && typeof startGaze==='function'){
-      const toYou=Math.sign((D.x||0)-(D.wifeX||0))||1, facingThem=((D.face||1)===-toYou);
-      startGaze(facingThem? 'front' : 'seat'); if(D.gaze) D.gaze.back=true;
+    const toYou0=Math.sign((D.x||0)-(D.wifeX||0))||1, facing0=((D.face||1)===-toYou0);
+    if(back && !follow && !D.gaze && typeof startGaze==='function' && (facing0 || !gazeFrontOnly())){   // a wife looks back at your front, so only if you face her
+      startGaze(facing0? 'front' : 'seat'); if(D.gaze) D.gaze.back=true;
       toast('👀 Two can play at that — '+(G.wife.male? 'he' : 'she')+' is looking at yours now.', 3000); }
     if(follow){ if(G.wife.male && typeof startHusbandMove==='function'){ startHusbandMove(); toast('😏 He saw you looking. He is coming over about it.', 3200); }
                 else if(!G.wife.male && typeof startTempt==='function'){ startTempt(); toast('😏 She saw you looking. Something on the low shelf needs reaching for.', 3200); } }
@@ -37492,15 +37595,13 @@ function escSpotFor(sc, stg){
 function escFinish(mode){
   const D=DM, sc=D&&D.scene; if(!sc || sc.choice) return;
   sc.choice=mode; sc.chooseT=sc.t;
-  const L=(typeof BEDPOSE_LAST!=='undefined' && BEDPOSE_LAST && BEDPOSE_LAST.her && BEDPOSE_LAST.her.seat)? BEDPOSE_LAST.her.seat : [sc.x, 214-30];
-  const jx=L[0], jy=L[1];
-  if(mode==='love'){ for(let i=0;i<64;i++) sc.burst.push({x:jx+rnd(-3,3), y:jy+rnd(-3,3), vx:rnd(-3.4,3.4), vy:rnd(-3.6,0.6), life:rnd(30,74), r:rnd(1,2.4), drip:false});
-    try{ sfx('giggle'); }catch(e){} }
-  else { for(let i=0;i<14;i++) sc.burst.push({x:jx+rnd(-3,3), y:jy+rnd(-2,2), vx:rnd(-0.16,0.16), vy:rnd(0.05,0.30), life:rnd(70,140), r:rnd(1,2), drip:true}); }
+  sc.fx=finFxNew(mode);                                  // 💦 the same finish as the villa's own
+  try{ sfx(mode==='love'? 'giggle' : 'kiss'); }catch(e){}
 }
 function updateEscalate(dt){
   const D=DM, sc=D.scene, T=sc.t;
   sc.st+=dt;
+  if(sc.fx){ if(sc.choice==='heir' && T-sc.chooseT>118) sc.fx.dripsOn=true; finFxTick(sc.fx, dt); }
   for(const b of sc.burst){ b.x+=b.vx*dt; b.y+=b.vy*dt; b.vy += (b.drip? 0.012 : 0.13)*dt; if(b.drip) b.vy=Math.min(b.vy,0.55); b.life-=dt;
     if(b.y>212){ b.y=212; b.vx*=0.55; b.vy=0; if(b.drip) b.life=Math.min(b.life,26); } }
   sc.burst=sc.burst.filter(b=>b.life>0);
@@ -37555,6 +37656,7 @@ function drawEscalate(){
     const E={c:ctx, T, s:sc, cx0, base:FY, HB, hall:true, ut:sc.st, vt:sc.st};       // (vt: the sundial's rise runs on the beat's own clock)
     if(mir){ ctx.save(); ctx.translate(B.face,0); ctx.scale(-1,1); ctx.translate(-B.face,0); }
     try{ drawBedPose(vi, E); }catch(e){}
+    try{ escFinishLayer(sc); }catch(e){}                                            // 💦 drawn in the pose's own frame
     if(mir) ctx.restore();
   };
   if(stg.k==='intro'){
@@ -37572,19 +37674,13 @@ function drawEscalate(){
   // ---- the finish ----
   ctx.textAlign='center';
   if(sc.choice==='love'){
-    for(const b of sc.burst){ ctx.globalAlpha=clamp(b.life/40,0,1); px(b.x,b.y,Math.round(b.r*1.6),Math.round(b.r*1.4),'#f6f2ea'); px(b.x,b.y,Math.round(b.r),1,'#ffffff'); }
-    ctx.globalAlpha=1;
-    const fl=clamp(1-(T-sc.chooseT)/26,0,1); if(fl>0){ ctx.globalAlpha=fl*0.6; px(-4,-4,W+8,H+8,'#fff6ea'); ctx.globalAlpha=1; }
+    const fl=clamp(1-(T-sc.chooseT)/22,0,1); if(fl>0){ ctx.globalAlpha=fl*0.32; px(-4,-4,W+8,H+8,'#fff6ea'); ctx.globalAlpha=1; }
     pixelText('~ and nobody in the house could pretend they missed that ~', W/2, 46, '#fff0dc', 1.0);
   } else if(sc.choice==='heir'){
-    for(const b of sc.burst){ ctx.globalAlpha=clamp(b.life/50,0,1)*0.9; px(b.x,b.y,1,Math.round(1+b.r),'#f2ece0'); px(b.x,b.y,1,1,'#ffffff'); }
-    ctx.globalAlpha=1;
-    const fl=clamp(1-(T-sc.chooseT)/50,0,1); if(fl>0){ ctx.globalAlpha=fl*0.24; px(-4,-4,W+8,H+8,'#e0a060'); ctx.globalAlpha=1; }
+    const fl=clamp(1-(T-sc.chooseT)/60,0,1)*(0.6+0.4*Math.sin((T-sc.chooseT)*0.44)); if(fl>0){ ctx.globalAlpha=fl*0.18; px(-4,-4,W+8,H+8,'#e0a060'); ctx.globalAlpha=1; }
     pixelText('~ held. every drop of it. Venus decides ~', W/2, 46, '#ffd9a0', 1.0);
   } else if(sc.asked){
-    const left=clamp(1-(sc.st-stg.dur*0.55)/(stg.dur*0.45+170),0,1);
-    px(W/2-60, 30, 120, 4, '#2a1620'); px(W/2-60, 30, Math.round(120*left), 4, '#e8c34a');
-    pixelText('SPACE — FOR LOVE            W — FOR AN HEIR', W/2, 24, '#ffd0da', 1.05);
+    drawFinishAsk(clamp(1-(sc.st-stg.dur*0.55)/(stg.dur*0.45+170),0,1), T); ctx.textAlign='center';
   } else if(stg.line){
     pixelText(escSay(stg.line, sc.who), W/2, 44, 'rgba(255,214,190,.9)', 1.0);
   }
@@ -37666,19 +37762,12 @@ function startVillaLove(atX, invited, force){
 function villaLoveFinish(mode){
   const D=DM, sc=D.scene; if(!sc || sc.choice) return;
   sc.choice=mode; sc.chooseT=sc.t;
-  if(mode==='love'){                                     // and you see every bit of it
-    for(let i=0;i<64;i++) sc.burst.push({
-      x:(sc.jx||sc.x)+rnd(-3,3), y:(sc.jy||214-30)+rnd(-3,3),
-      vx:rnd(-3.4,3.4), vy:rnd(-3.6,0.6), life:rnd(30,74), r:rnd(1,2.4), drip:false});
-    sfx('giggle');
-  } else {                                               // held — a few only, and they run DOWN
-    for(let i=0;i<14;i++) sc.burst.push({
-      x:(sc.jx||sc.x-14)+rnd(-3,3), y:(sc.jy||214-28)+rnd(-2,2),
-      vx:rnd(-0.16,0.16), vy:rnd(0.05,0.30), life:rnd(70,140), r:rnd(1,2), drip:true});
-  }
+  sc.fx=finFxNew(mode);                                  // 💦 drawn: ropes that land on her, or held, and the drip after
+  try{ sfx(mode==='love'? 'giggle' : 'kiss'); }catch(e){}
 }
 function updateVillaLove(dt){
   const D=DM, sc=D.scene, T=sc.t;
+  if(sc.fx){ if(sc.choice==='heir' && T-sc.chooseT>118) sc.fx.dripsOn=true; finFxTick(sc.fx, dt); }
   for(const b of sc.burst){ b.x+=b.vx*dt; b.y+=b.vy*dt;
     b.vy += (b.drip? 0.012 : 0.13)*dt;                   // a drip barely accelerates; a burst falls
     if(b.drip) b.vy=Math.min(b.vy,0.55);
@@ -39990,6 +40079,138 @@ function drawWalkIn(sc){
     ctx.textAlign='left';
   }
 }
+/* =====================================================================
+   💦 THE FINISH, DRAWN — FOR LOVE, AND FOR AN HEIR
+   ---------------------------------------------------------------------
+   "For an heir and for love — those are outdated." They were a spray of
+   square pixels and a flash: sixty-four white blocks flung out of the join
+   in every direction for one, fourteen for the other. Both are drawn now,
+   and both are about where it goes:
+     · FOR LOVE — he is out, and it goes in ROPES: four pulses, each a
+       stream that leaves the tip, arcs, thins out and lands ON her — across
+       the small of her back and the curve of her seat — where it stays,
+       glossy, and slowly runs down her sides. What misses finds the floor.
+     · FOR AN HEIR — he stays in. Four pulses at the join, a warm glow that
+       swells and fades with each one, her head coming up with it; and only
+       when he draws back does a little of it follow him, drop by drop, down
+       the back of her thigh.
+   One finish serves the villa's own and every escalation. The scene hands
+   it the bodies each frame (finFxGeo) — his root and tip, her join, her
+   seat and the line of her back — and it lands on whatever she is doing.
+   ===================================================================== */
+const FIN_ROPES=[{at:6, spd:2.05}, {at:19, spd:1.8}, {at:31, spd:1.5}, {at:42, spd:1.15}];
+const FIN_PULSES=[4,18,31,43];
+function finShaftDraw(oc, a, b, dia, skin, sLit, sDeep){
+  const K=vecKit(oc), {capsule,ell,lit,line}=K, L=Math.hypot(b[0]-a[0],b[1]-a[1])||1, d=[(b[0]-a[0])/L,(b[1]-a[1])/L], m=[(a[0]+b[0])/2,(a[1]+b[1])/2], ang=Math.atan2(d[1],d[0]);
+  lit(capsule([[a[0],a[1],dia*0.5+0.75],[m[0],m[1],dia*0.49+0.75],[b[0],b[1],dia*0.47+0.7]]), sDeep, rgbA(sDeep,0.9), rgbA(sDeep,0.9));
+  lit(capsule([[a[0],a[1],dia*0.5],[m[0],m[1],dia*0.49],[b[0],b[1],dia*0.47]]), skin, rgbA(sLit,0.85), rgbA(sDeep,0.5));
+  const gl=mixHex(skin,'#c46a62',0.5); lit(ell(b[0]+d[0]*0.4, b[1]+d[1]*0.4, dia*0.62, dia*0.55, ang), gl, rgbA(mixHex(gl,'#ffffff',0.3),0.8), rgbA(sDeep,0.45));
+  line([[a[0]+d[0]*1.1, a[1]+d[1]*1.1-dia*0.26],[b[0]-d[0]*1.2, b[1]-d[1]*1.2-dia*0.26]], rgbA(sLit,0.75), 0.7);
+}
+function escFinishLayer(sc){
+  if(!sc || !sc.fx || typeof BEDPOSE_LAST==='undefined' || !BEDPOSE_LAST) return;
+  const HM=BEDPOSE_LAST.him||{}, HR=BEDPOSE_LAST.her||{}; if(!HM.root || !HR.seat) return;
+  const him=pairHimLook(), IN=lengthInches(him,1), L=IN.hard, dia=Math.max(1.8,(IN.dia||1.6)*(1+0.25));
+  let tip=HM.tip||HR.join||HM.root;
+  if(sc.choice==='love'){                                                    // out, and laid up along her, pointing where it is going
+    const j=HR.join||HR.seat, sx=(j[0]>=HM.root[0])? 1 : -1, up=0.52;                // toward her, a little above level: over her, not up his own belly
+    tip=[HM.root[0]+sx*Math.cos(up)*L, HM.root[1]-Math.sin(up)*L];
+    const L0=him||{}, skin=hexOf(L0.skin||'#c89a6a'); finShaftDraw(ctx, HM.root, tip, dia, skin, mixHex(skin,'#fff2e6',0.30), mixHex(skin,'#1a0a06',0.55)); }
+  finFxGeo(sc.fx, {tip, root:HM.root, join:HR.join||HR.seat, seat:HR.seat, rs:HR.rs||6, back0:HR.hip, back1:HR.shoulder||HR.head, tr:3.8, floor:213});
+  finFxDraw(ctx, sc.fx);
+}
+function finFxNew(mode){ return {mode, t:0, drops:[], splats:[], drips:[], pools:[], ropes:FIN_ROPES.map((r,i)=>Object.assign({i, n:0, jit:(Math.random()-0.5)*0.16}, r)), glow:0, dripsOn:false, g:null}; }
+/* g: {tip, root, join, seat, rs, back0, back1, tr, floor} — in the scene's own coordinates */
+function finFxGeo(F, g){ if(F && g && g.seat) F.g=g; }
+function finFxHit(g, x, y){
+  if(!g || !g.seat) return null;
+  if(Math.hypot(x-g.seat[0], y-g.seat[1]) <= (g.rs||6)*0.98) return 'seat';
+  if(g.back0 && g.back1){ const ax=g.back0[0], ay=g.back0[1], vx=g.back1[0]-ax, vy=g.back1[1]-ay, L2=(vx*vx+vy*vy)||1;
+    const u=clamp(((x-ax)*vx+(y-ay)*vy)/L2,0,1); if(Math.hypot(x-(ax+vx*u), y-(ay+vy*u)) <= (g.tr||3.8)) return 'back'; }
+  return null;
+}
+function finFxTick(F, dt){
+  if(!F) return; F.t+=dt; const g=F.g; F.glow=Math.max(0, F.glow-0.05*dt);
+  if(F.mode==='heir'){ for(const p of FIN_PULSES) if(F.t-dt<p && F.t>=p){ F.glow=1; F.pulse=(F.pulse|0)+1; } }
+  if(!g) return;
+  /* FOR LOVE: each pulse lets go a rope — seven drops a tick apart, the head of it fastest and fattest */
+  if(F.mode==='love' && g.tip && g.root){
+    let dx=g.tip[0]-g.root[0], dy=g.tip[1]-g.root[1]; const m=Math.hypot(dx,dy)||1; dx/=m; dy/=m;
+    for(const R of F.ropes){ if(F.t>=R.at && R.n<7){ const k=R.n, a=Math.atan2(dy,dx)+R.jit-(k*0.012), sp=R.spd*(1-k*0.07);
+        F.drops.push({x:g.tip[0]+dx*0.6, y:g.tip[1]+dy*0.6, vx:Math.cos(a)*sp, vy:Math.sin(a)*sp-0.25, r:Math.max(0.55,1.15-k*0.09), rope:R.i, k, t:0});
+        R.n++; if(k===0){ F.glow=Math.max(F.glow,0.6); } } } }
+  /* FOR AN HEIR: when he draws back, a little of it follows — two or three drips from the join, down the back of her thigh */
+  if(F.mode==='heir' && F.dripsOn && !F.dripsSpawned && g.join){ F.dripsSpawned=true;
+    const n=2+(Math.random()<0.5? 1 : 0); for(let i=0;i<n;i++) F.drips.push({dx:(i-1)*0.9+(Math.random()-0.5)*0.5, len:0, max:4+Math.random()*5, v:0.028+Math.random()*0.03, d:i*26, fell:false}); }
+  for(const d of F.drops){ d.t+=dt; d.vy+=0.11*dt; d.x+=d.vx*dt; d.y+=d.vy*dt;
+    const hit=finFxHit(g, d.x, d.y);
+    if(hit && d.t>1.5){ d.dead=true;
+      /* it lies ALONG her: snapped onto the curve it hit and turned to follow it, not stood up the way it fell */
+      let sx=d.x, sy=d.y, a=0;
+      if(hit==='seat'){ const ax=d.x-g.seat[0], ay=d.y-g.seat[1], m=Math.hypot(ax,ay)||1, R=(g.rs||6)*0.9; sx=g.seat[0]+ax/m*R; sy=g.seat[1]+ay/m*R; a=Math.atan2(ay,ax)+Math.PI/2; }
+      else { const ax=g.back0[0], ay=g.back0[1], vx=g.back1[0]-ax, vy=g.back1[1]-ay, L2=(vx*vx+vy*vy)||1, u=clamp(((d.x-ax)*vx+(d.y-ay)*vy)/L2,0,1), qx=ax+vx*u, qy=ay+vy*u, nx=d.x-qx, ny=d.y-qy, m=Math.hypot(nx,ny)||1;
+        sx=qx+nx/m*(g.tr||3.8)*0.85; sy=qy+ny/m*(g.tr||3.8)*0.85; a=Math.atan2(vy,vx); }
+      if(Math.cos(a)<0) a+=Math.PI;
+      F.splats.push({ox:sx-g.seat[0], oy:sy-g.seat[1], a, len:1.6+Math.hypot(d.vx,d.vy)*0.8+d.r, r:d.r, run:0, runMax:1.5+Math.random()*4.5*(d.k<3? 1 : 0.5), v:0.02+Math.random()*0.03, on:hit}); }
+    else if(d.y>=(g.floor||213)){ d.dead=true; F.pools.push({x:d.x, y:g.floor||213, r:0.8+d.r, a:1}); }
+    else if(d.t>160) d.dead=true; }
+  F.drops=F.drops.filter(d=>!d.dead);
+  for(const s of F.splats){ if(s.run<s.runMax) s.run=Math.min(s.runMax, s.run+s.v*dt); }
+  for(const d of F.drips){ if(d.d>0){ d.d-=dt; continue; } if(!d.fell){ d.len+=d.v*dt*(1+d.len*0.08); if(d.len>=d.max){ d.fell=true;          // the drop at the end of it lets go
+        F.drops.push({x:g.join[0]+d.dx, y:g.join[1]+d.len+0.8, vx:0, vy:0.2, r:0.7, rope:-1, k:9, t:2}); d.len*=0.55; } } }
+  for(const p of F.pools) p.a=Math.max(0.35, p.a-0.0015*dt);
+}
+function finFxDraw(c, F){
+  if(!F) return; const g=F.g; if(!g) return;
+  const base='#f4efe4', hiC='rgba(255,255,255,.85)', rim='rgba(150,130,110,.55)';
+  c.save(); c.lineCap='round'; c.lineJoin='round';
+  /* the glow where they are joined, one swell for every pulse (and the first of the ropes flashes the tip) */
+  if(F.glow>0.01){ const at=F.mode==='heir'? g.join : g.tip; if(at){ const r=5+F.glow*7, gr=c.createRadialGradient(at[0],at[1],0,at[0],at[1],r);
+      gr.addColorStop(0,'rgba(255,244,230,'+(0.55*F.glow).toFixed(3)+')'); gr.addColorStop(1,'rgba(255,220,200,0)'); c.fillStyle=gr; c.fillRect(at[0]-r,at[1]-r,r*2,r*2); } }
+  /* what landed on the floor */
+  for(const p of F.pools){ c.globalAlpha=p.a; c.fillStyle=base; c.beginPath(); c.ellipse(p.x,p.y,p.r*1.6,p.r*0.5,0,0,Math.PI*2); c.fill(); c.fillStyle=hiC; c.fillRect(p.x-p.r*0.6,p.y-p.r*0.3,0.8,0.5); }
+  c.globalAlpha=1;
+  /* what landed on her: a glossy streak along the way it was going, and a run down from it */
+  for(const s of F.splats){ const x=g.seat[0]+s.ox, y=g.seat[1]+s.oy;
+    c.fillStyle=rim; c.beginPath(); c.ellipse(x,y+0.3,s.len*0.5+0.5,s.r*0.75+0.45,s.a,0,Math.PI*2); c.fill();
+    c.fillStyle=base; c.beginPath(); c.ellipse(x,y,s.len*0.5,s.r*0.75,s.a,0,Math.PI*2); c.fill();
+    if(s.run>0.4){ c.strokeStyle=base; c.lineWidth=Math.max(0.7,s.r*0.9); c.beginPath(); c.moveTo(x,y); c.quadraticCurveTo(x+0.3,y+s.run*0.5,x+0.1,y+s.run); c.stroke();
+      c.fillStyle=base; c.beginPath(); c.arc(x+0.1,y+s.run,Math.max(0.55,s.r*0.62),0,Math.PI*2); c.fill(); }
+    c.fillStyle=hiC; c.fillRect(x-s.len*0.18,y-s.r*0.35,Math.max(0.6,s.len*0.22),0.55); }
+  /* the ropes in the air: every rope a tapering stroke through its drops, head first */
+  const byRope={}; for(const d of F.drops){ (byRope[d.rope]=byRope[d.rope]||[]).push(d); }
+  for(const k in byRope){ const L=byRope[k].sort((a,b)=>a.k-b.k);
+    if(L.length>=2 && k!=='-1'){ for(let i=1;i<L.length;i++){ const a=L[i-1], b=L[i]; if(Math.hypot(a.x-b.x,a.y-b.y)>9) continue;
+        c.strokeStyle=base; c.lineWidth=Math.max(0.6,(a.r+b.r)); c.beginPath(); c.moveTo(a.x,a.y); c.lineTo(b.x,b.y); c.stroke(); }
+      c.strokeStyle=hiC; c.lineWidth=0.5; c.beginPath(); c.moveTo(L[0].x-0.3,L[0].y-0.4); for(let i=1;i<L.length;i++){ if(Math.hypot(L[i].x-L[i-1].x,L[i].y-L[i-1].y)>9) break; c.lineTo(L[i].x-0.3,L[i].y-0.4); } c.stroke(); }
+    for(const d of L){ c.fillStyle=base; c.beginPath(); c.arc(d.x,d.y,d.r,0,Math.PI*2); c.fill(); if(d.r>0.8){ c.fillStyle=hiC; c.fillRect(d.x-d.r*0.5,d.y-d.r*0.5,0.7,0.7); } } }
+  /* and the drips that follow him out, down the back of her thigh */
+  if(g.join) for(const d of F.drips){ if(d.d>0 || d.len<0.3) continue; const x=g.join[0]+d.dx, y=g.join[1]+0.4;
+    c.strokeStyle=rim; c.lineWidth=1.5; c.beginPath(); c.moveTo(x,y); c.quadraticCurveTo(x+0.4,y+d.len*0.6,x+0.2,y+d.len); c.stroke();
+    c.strokeStyle=base; c.lineWidth=1.0; c.beginPath(); c.moveTo(x,y); c.quadraticCurveTo(x+0.4,y+d.len*0.6,x+0.2,y+d.len); c.stroke();
+    c.fillStyle=base; c.beginPath(); c.arc(x+0.2,y+d.len,0.9,0,Math.PI*2); c.fill(); c.fillStyle=hiC; c.fillRect(x-0.1,y+d.len-0.5,0.5,0.5); }
+  c.restore();
+}
+/* 💞 / 🌾 THE ASK, as two cards instead of a line of type — with the keys on them, a ring that runs down, and buttons on touch */
+function drawFinishAsk(left, T){
+  const cx=W/2, y=20, cw=118, ch=30, gap=10;
+  ctx.save();
+  const card=(x, title, sub, key, col, glow)=>{ const pulse=0.5+0.5*Math.sin(T*0.16);
+    ctx.globalAlpha=0.9; const gr=ctx.createLinearGradient(0,y,0,y+ch); gr.addColorStop(0,'rgba(40,18,30,.92)'); gr.addColorStop(1,'rgba(22,10,18,.92)');
+    ctx.fillStyle=gr; ctx.beginPath(); if(ctx.roundRect) ctx.roundRect(x,y,cw,ch,6); else ctx.rect(x,y,cw,ch); ctx.fill();
+    ctx.globalAlpha=0.55+0.35*pulse; ctx.strokeStyle=col; ctx.lineWidth=1.2; ctx.beginPath(); if(ctx.roundRect) ctx.roundRect(x+0.5,y+0.5,cw-1,ch-1,6); else ctx.rect(x+0.5,y+0.5,cw-1,ch-1); ctx.stroke();
+    ctx.globalAlpha=1; const kg=ctx.createRadialGradient(x+14,y+ch/2,1,x+14,y+ch/2,11); kg.addColorStop(0,glow); kg.addColorStop(1,'rgba(0,0,0,0)'); ctx.fillStyle=kg; ctx.fillRect(x+2,y+2,24,ch-4);
+    ctx.fillStyle='rgba(255,255,255,.12)'; ctx.beginPath(); if(ctx.roundRect) ctx.roundRect(x+6,y+7,16,16,3); else ctx.rect(x+6,y+7,16,16); ctx.fill();
+    ctx.textAlign='center'; pixelText(key, x+14, y+15, '#fff4e8', 0.72);
+    pixelText(title, x+cw/2+10, y+11, col, 0.9); pixelText(sub, x+cw/2+10, y+22, 'rgba(240,216,226,.8)', 0.62); };
+  card(cx-cw-gap/2, '💞 FOR LOVE', 'you will see it', 'SPC', '#ffb8d4', 'rgba(255,150,200,.45)');
+  card(cx+gap/2, '🌾 FOR AN HEIR', 'held — you will not', 'W', '#ffd9a0', 'rgba(255,210,140,.45)');
+  /* the ring between them, running down: say nothing and nature decides */
+  const r=7, ry=y+ch/2; ctx.globalAlpha=0.9; ctx.strokeStyle='rgba(60,30,40,.9)'; ctx.lineWidth=2.4; ctx.beginPath(); ctx.arc(cx,ry,r,0,Math.PI*2); ctx.stroke();
+  ctx.strokeStyle='#e8c34a'; ctx.beginPath(); ctx.arc(cx,ry,r,-Math.PI/2,-Math.PI/2+Math.PI*2*clamp(left,0,1)); ctx.stroke();
+  ctx.globalAlpha=1; ctx.restore(); ctx.textAlign='left';
+}
+
 function drawVillaLove(){
   const D=DM, sc=D.scene, T=sc.t, FY=214, w=G.wife, X=sc.x;
   const heat=clamp(T/560,0,1);
@@ -40000,9 +40221,12 @@ function drawVillaLove(){
      is actually free of it, and then it ramps in rather than snapping on. */
   const READY=190;
   const ramp=clamp((T-READY)/70,0,1);
-  const after = sc.choice? (T-sc.chooseT) : -1;
-  const cool = after>=0? clamp((after-70)/150,0,1) : 0;      // the wind-down, 0 → 1
-  const dr = (after>=0? Math.max(0,1-after/60) : beat*ramp) * (1-cool);
+  const after = sc.choice? (T-sc.chooseT) : -1, LOVE=(sc.choice==='love'), HEIR=(sc.choice==='heir');
+  const cool = after>=0? clamp((after-(LOVE? 112 : 124))/150,0,1) : 0;      // the wind-down, 0 → 1 (after the finish has played)
+  /* 💦 FOR LOVE he is out — a step back, and aimed up over her; FOR AN HEIR he stays in, and it comes in four pulses */
+  const throb = (HEIR && after>=0 && after<64)? Math.max(0,Math.sin((after-2)*0.44))*(1-after/70) : 0;
+  const outK  = LOVE? clamp(after/9,0,1)*(1-clamp((cool-0.15)*2.2,0,1)) : 0;
+  const dr = (after>=0? (HEIR? 1-cool : 0) : beat*ramp) * (1-cool);
   // the room dims to a pool of lamplight around the two of them
   ctx.globalAlpha=0.30+heat*0.26; px(-4,-4,W+8,H+8,'#160b12'); ctx.globalAlpha=1;
   { const g=ctx.createRadialGradient(X,FY-34,6,X,FY-34,86+heat*22);
@@ -40030,7 +40254,8 @@ function drawVillaLove(){
   const aroV  = cool>0.25? Math.max(0,1-(cool-0.25)*1.6) : clamp((T-100)/90,0,1);
   const inK   = clamp((T-READY+10)/40,0,1)*(1-clamp(cool*2.4,0,1));
   const gap0V = (sc.gap0!==null && sc.gap0!==undefined)? clamp(sc.gap0,0,60) : 26;      // from where the tempt left him
-  const gapV  = (1-walkK)*gap0V + (1-inK)*12*walkK + cool*14;
+  const lenV  = sc.lenV||(sc.lenV=lengthInches(pairHimLook(),1).hard);
+  const gapV  = (1-walkK)*gap0V + (1-inK)*12*walkK + cool*14 + outK*(lenV*0.82+(sc.rsV||7)+2) - throb*0.9;   // for love: back far enough that all of it is in the open
   const handsV= inK>0.35? 'hips' : (uV>0.28 && uV<0.9)? (coastV? 'hem' : 'up') : (T>28 && uV<=0.28)? 'belt' : 'side';
   /* played as a woman, SHE is the one bent over the shelf and her husband
      is the man — the scene used to draw him bending and her behind him */
@@ -40039,10 +40264,14 @@ function drawVillaLove(){
     her:{ lifted:true, rock:dr*inK, blush:Math.max(inK*heat, (uV>=0.95 && inK<0.3)? 0.35 : 0),
           expr: inK>0.5? ((heat>0.8 && sc.herAct!=='cross' && sc.herAct!=='smug')? 'flush' : (sc.herAct||(sc.herAct=herFace(herW,'act'))))
                        : (uV>=0.95? (sc.herRev||(sc.herRev=herFace(herW,'reveal'))) : (T>120? 'smug' : null)) },
-    he:{ gap:gapV, drive:dr, stroke:3.6, u:uV, aro:aroV, hands:handsV, farHands:(inK>0.35? 'hips' : handsV),
-         aimK:inK, lean:0.03+inK*(0.12+dr*0.10), face:sc.face, look:pairHimLook(), coast:coastV,
+    he:{ gap:gapV, drive:dr, stroke:(sc.strokePx||(sc.strokePx=clamp(lengthInches(pairHimLook(),1).hard*0.56,3.8,8.5))), u:uV, aro:aroV, hands:handsV, farHands:(inK>0.35? 'hips' : handsV),
+         aimK:inK, lean:0.03+inK*(0.12+dr*0.10)+throb*0.04, face:sc.face, look:pairHimLook(), coast:coastV,
+         lenAng: outK>0.05? -0.62-outK*0.06 : undefined, noClip: outK>0.05, stand: outK>0.05? 0.12 : undefined,
          cloth: coastV? mixHex((G&&G.tunic)||'#6a4a2e','#5a4028',0.35) : ((G&&G.tunic)||'#7a2f22'),
          band:(typeof rkOfficeBand==='function')? rkOfficeBand(G&&G.wife) : '#8a6a3a' }});
+  if(PR && PR.rs) sc.rsV=PR.rs;
+  if(sc.fx && PR) finFxGeo(sc.fx, {tip:PR.hisTip, root:PR.hisRoot, join:PR.join, seat:PR.seat, rs:PR.rs||6,
+      back0:PR.hip? [PR.hip[0], PR.hip[1]-1.5] : null, back1:PR.head? [PR.head[0]-(PR.dir||1)*5, PR.head[1]+3] : null, tr:3.6, floor:FY-1});
   if(PR && PR.join){ sc.jx=PR.join[0]; sc.jy=PR.join[1];
     if(inK>0.1 && cool<0.9){ const [jx,jy]=PR.join;                    // a warm bloom where they meet, pulsing with the beat
       const g=ctx.createRadialGradient(jx,jy,0,jx,jy,8+dr*5); g.addColorStop(0,'rgba(255,214,190,'+(0.10+dr*0.16*inK).toFixed(2)+')');
@@ -40060,33 +40289,24 @@ function drawVillaLove(){
     ctx.textAlign='left'; }
   ctx.textAlign='center';
   // ---- THE FINISH ----
+  if(sc.fx) finFxDraw(ctx, sc.fx);                                       // 💦 on her, in the air, on the floor
   if(sc.choice==='love'){
-    for(const b of sc.burst){ ctx.globalAlpha=clamp(b.life/40,0,1);
-      px(b.x,b.y,Math.round(b.r*1.6),Math.round(b.r*1.4),'#f6f2ea');
-      px(b.x,b.y,Math.round(b.r),1,'#ffffff'); }
-    ctx.globalAlpha=1;
-    const fl=clamp(1-(T-sc.chooseT)/26,0,1);
-    if(fl>0){ ctx.globalAlpha=fl*0.6; px(-4,-4,W+8,H+8,'#fff6ea'); ctx.globalAlpha=1; }
+    const fl=clamp(1-(T-sc.chooseT)/22,0,1);
+    if(fl>0){ ctx.globalAlpha=fl*0.32; px(-4,-4,W+8,H+8,'#fff6ea'); ctx.globalAlpha=1; }
     pixelText('~ and you did not even try to be quiet about it ~', W/2, 46, '#fff0dc', 1.05);
+    if(after>200) pixelText('~ she is laughing. the whole household heard THAT. ~', W/2, 58, 'rgba(240,216,190,.7)', 1);
   } else if(sc.choice==='heir'){
-    /* Not a burst. Held means it goes nowhere fast — so the few that escape
-       just run DOWN, slowly, and the room glows warm instead of flashing. */
-    for(const b of sc.burst){ ctx.globalAlpha=clamp(b.life/50,0,1)*0.9;
-      px(b.x,b.y,1,Math.round(1+b.r),'#f2ece0'); px(b.x,b.y,1,1,'#ffffff'); }
-    ctx.globalAlpha=1;
-    const fl=clamp(1-(T-sc.chooseT)/50,0,1);
-    if(fl>0){ ctx.globalAlpha=fl*0.24; px(-4,-4,W+8,H+8,'#e0a060'); ctx.globalAlpha=1; }
+    /* Not a burst. Held means it goes nowhere — the room glows warm with each pulse instead of flashing */
+    const fl=clamp(1-(T-sc.chooseT)/60,0,1)*(0.6+0.4*Math.sin((T-sc.chooseT)*0.44));
+    if(fl>0){ ctx.globalAlpha=fl*0.18; px(-4,-4,W+8,H+8,'#e0a060'); ctx.globalAlpha=1; }
     pixelText('~ contained. held. every drop of it. ~', W/2, 46, '#ffd9a0', 1.05);
     pixelText('~ Venus has been asked, and Venus decides ~', W/2, 58, 'rgba(255,208,150,.75)', 1);
     if(after>200) pixelText(sc.choice==='love'
       ? '~ she is laughing. the whole household heard THAT. ~'
       : '~ she straightens up, and neither of you says anything ~', W/2, 70, 'rgba(240,216,190,.7)', 1);
   } else if(sc.asked){
-    // the ask itself, and the bar that runs out if you sit on your hands
-    const left=clamp(1-(T-640)/180,0,1);
-    px(W/2-60, 30, 120, 4, '#2a1620'); px(W/2-60, 30, Math.round(120*left), 4, '#e8c34a');
-    pixelText('SPACE — FOR LOVE            W — FOR AN HEIR', W/2, 24, '#ffd0da', 1.05);
-    pixelText('love: you will see it. an heir: you will not.', W/2, 44, 'rgba(240,212,220,.8)', 1);
+    // the ask itself, as two cards, and the ring that runs out if you sit on your hands
+    drawFinishAsk(clamp(1-(T-640)/180,0,1), T); ctx.textAlign='center';
   } else {
     if(T<70)  pixelText('~ “…the door is shut. Come here.” ~', W/2, 40, 'rgba(255,214,190,.9)', 1.05);
     else if(T>320 && T<420) pixelText('~ the household has found somewhere else to be ~', W/2, 40, 'rgba(255,214,190,.7)', 1);
@@ -64025,7 +64245,7 @@ drawLogo();
 }catch(e){} })();
 
 window.__SS = {
-  chPaint, CH_PAINTERS, chProps, chDoor, chBedIn, get CH_DRAWS(){ return CH_DRAWS; }, get CH_CACHE_N(){ return CH_CACHE.size; },
+  drawWifeHappy, get WH_DUR(){ return WH_DUR; }, finFxNew, finFxTick, get CH_CACHE_SIZE(){ return CH_CACHE.size; }, chPaint, CH_PAINTERS, chProps, chDoor, chBedIn, get CH_DRAWS(){ return CH_DRAWS; }, get CH_CACHE_N(){ return CH_CACHE.size; },
   show, openCreate, enterMap, openShop, openBrief, openStable, openVilla, openIntrigue, startFight, FT:()=>FT,
   setG:(g)=>{G=g;}, newDemo:(name,origin,arch)=>{G=freshCareer(name||'Verus',origin||'Italia',arch||'Roman'); G.quirks=rollQuirks();},
   cheat:(o)=>{ Object.assign(G,o); refreshStatbar(); }, regionById:id=>REGION_BY_ID[id], get state(){return state;},
@@ -64363,7 +64583,7 @@ window.__SS = {
   /* V46 — stamina, the face picker, and Impossible brought back to earth */
   STAMINA_MAX, selfStamina, spouseStamina, staminaOf, STAM_TIERS, staminaCap, staminaRange, staminaTierFor, staminaDrive, bedStaminaCalc, bedStamina, bedStamLeft,
   staminaLine, staminaCost, drawStaminaIcon, TABLET_FACES, tabletFaceName, tabletFaceApply, drawFacePreview, selfMood, setSelfMood,
-  gazeKindsOf, gazeReady, gazeDue, startGaze, updateGaze, drawGaze, gazeTarget, GAZE_LINES, playerBendOk, startPlayerBend, bendReaction, ESC_HUSB,
+  gazeKindsOf, gazeFrontOnly, gazeReady, gazeDue, startGaze, updateGaze, drawGaze, gazeTarget, GAZE_LINES, playerBendOk, startPlayerBend, bendReaction, ESC_HUSB,
   drawCubiculum, drawCubiculumFloor, drawLonghouseDressing, drawLonghouseFloor, drawRoomPlace,
   /* V47 — the portraits, the courtship, the walk, the jungle suit, the look */
   PORTRAIT_POSES_F, PORTRAIT_POSES_M, portraitPosePick, NIGHT_FACES, nightFacesPick, KITCHEN, kitchenDish, trainTogether, bedStaminaCalc, updatePlayerLook, startPlayerLook, applySizeSwitch, LEN_INCH, nbFightFaceId, portraitPoseOf, portraitFaceOf, portraitArm, drawPortraitFigure, portraitsNew,

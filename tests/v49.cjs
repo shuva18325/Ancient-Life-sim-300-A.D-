@@ -81,6 +81,55 @@ const ok=(name,cond,note)=>{ if(cond){pass++; console.log('  PASS  '+name+(note?
   ok('the bed through the open door is their own bed: a futon, a canopied lacquer bed, a takht, a charpai, lion legs, a box bed', !R.err && R.bedVsRome.every(([c,d])=>d>60), R.err||JSON.stringify(R.bedVsRome));
   ok('and they are cheap to draw: what never moves is painted once and cached (and the cache stays small)', !R.err && R.avgMs<8 && R.cache2<=80, R.err||(R.avgMs.toFixed(2)+'ms, cache '+R.cache2));
 
+  console.log('\n=== 🛠 YOUR FIXES: THE SEAT, THE BEND, THE FINISH, THE INTRO, THE KANVEK ===');
+  const HOUSE=(fem, traits)=>{ const S=window.__SS; S.newDemo('Marcus','Italia','Roman'); const G=S.G; G.coin=99999; G.isFemale=!!fem; G.married=true; G.hygiene=90; G.day=40; G.lastLoveDay=39;
+    const sp=S.makeBride('roman',false,9,{male:!!fem}); sp.male=!!fem; sp.quirks=[]; sp.flaws=[]; sp.traits=traits||[]; sp._sexFixed=true; sp.body=Object.assign(sp.body||{},{booty:9,bust:8,legs:7,secret:8}); G.wife=sp; G.wifeRel=85; G.wifePhys=60;
+    G.body=G.body||{}; G.body.secret=8; G.skin='#e0b894'; try{ S.syncPlayerLooks(); }catch(e){} return G; };
+  await pg.evaluate((src)=>{ window.__HOUSE=eval(src); }, '('+HOUSE.toString()+')');
+  R=await T(()=>{ const S=window.__SS, out={};
+    let G=__HOUSE(false,['gr_seat']); S.ensureLook(G.wife); out.wifeNowFront=G.wife.traits.includes('gr_front') && !G.wife.traits.includes('gr_seat');
+    G.wife.traits=['gr_seat']; const K=S.gazeKindsOf(G.wife); out.kinds=K;
+    S.openDomus(); const D=S.DM; D.x=D.wifeX-40; D.face=-1; D.t=99999; D.lastGazeT=-99999;                 // your back to her
+    let fired=0; for(let i=0;i<400;i++){ if(S.gazeDue()) fired++; } out.backFired=fired;
+    D.face=1; S.startGaze(); out.facingKind=D.gaze&&D.gaze.kind;
+    G=__HOUSE(true,['gr_seat']); S.openDomus(); const D2=S.DM; D2.x=D2.wifeX+40; D2.face=1; S.startGaze(); out.husbandKind=D2.gaze&&D2.gaze.kind;
+    out.traitMale=!!S.WIFE_TRAITS.find(t=>t.id==='gr_seat').male; return out; });
+  ok('🍑 a wife never looks at your seat: Seat-Struck is a husband\u2019s, a wife who had it is Front-Struck, and with your back to her she does not look', !R.err && R.wifeNowFront && !R.kinds.seat && R.kinds.front && R.backFired===0 && R.facingKind==='front' && R.traitMale, R.err||JSON.stringify(R));
+  ok('…while a Seat-Struck husband, playing the wife, still looks at yours', !R.err && R.husbandKind==='seat', R.err||R.husbandKind);
+  R=await T(()=>{ const S=window.__SS; __HOUSE(false,[]); S.openDomus(); const D=S.DM; D.x=D.wifeX-30; D.face=1; S.startVillaLove(D.wifeX,false,true); const sc=D.scene;
+    const at=(t)=>{ sc.t=t; S.drawDomus(); const R2=S.PAIR_LAST.R; return {join:R2.join, seat:R2.seat, rs:R2.rs, root:R2.hisRoot, tip:R2.hisTip}; };
+    let back=null, deep=null, maxGap=0, minGap=99;
+    for(let t=262;t<330;t++){ const f=at(t), g=Math.hypot(f.root[0]-f.join[0], f.root[1]-f.join[1]); if(g>maxGap){ maxGap=g; back=f; } if(g<minGap){ minGap=g; deep=f; } }
+    const inSeat=Math.hypot(back.join[0]-back.seat[0], back.join[1]-back.seat[1])/back.rs;
+    return {inSeat, maxGap, minGap, belowSeat: back.join[1] > back.seat[1]}; });
+  ok('🍑 in the bend he goes in where she opens — the notch under her seat, on her outline, not the middle of it', !R.err && R.inSeat>0.85 && R.belowSeat, R.err||JSON.stringify(R));
+  ok('…and the stroke shows: a length of him out between them at the back of it, all of him in at the bottom', !R.err && R.maxGap>3.5 && R.minGap<1.6, R.err||JSON.stringify(R));
+  R=await T(()=>{ const S=window.__SS, out={};
+    const run=(mode)=>{ __HOUSE(false,[]); S.openDomus(); const D=S.DM; D.x=D.wifeX-30; D.face=1; S.startVillaLove(D.wifeX,false,true); const sc=D.scene;
+      for(let i=0;i<660;i++){ sc.t+=1; S.updateVillaLove(1); } S.drawDomus(); const asked=sc.asked, acts=S.sceneActions().map(a=>a.t).join('|');
+      S.villaLoveFinish(mode); let k=0; while(D.scene && sc.t-sc.chooseT<200 && k++<400){ sc.t+=1; S.updateVillaLove(1); S.drawDomus(); }
+      const F=sc.fx; return {asked, acts, fx:!!F, splats:F? F.splats.length : 0, pulses:F? F.pulse|0 : 0, drips:F? F.drips.filter(d=>d.len>0.5).length : 0, burst:(sc.burst||[]).length}; };
+    out.love=run('love'); out.heir=run('heir'); return out; });
+  ok('💞 FOR LOVE: he is out, and it lands on her in ropes — and it stays there (no square pixels)', !R.err && R.love.fx && R.love.splats>=10 && R.love.burst===0, R.err||JSON.stringify(R.love));
+  ok('🌾 FOR AN HEIR: held, in four pulses at the join, and a little of it follows him down her thigh after', !R.err && R.heir.fx && R.heir.pulses>=4 && R.heir.drips>=1 && R.heir.splats===0, R.err||JSON.stringify(R.heir));
+  ok('the ask is two cards, and two buttons on touch', !R.err && R.love.asked && /FOR LOVE/.test(R.love.acts) && /FOR AN HEIR/.test(R.love.acts), R.err||R.love.acts);
+  R=await T(()=>{ const S=window.__SS; const G=__HOUSE(false,['esc_big']); G.traits=['esc_big']; S.openDomus(); const D=S.DM; D.x=D.wifeX-30; D.face=1; S.startEscalation('big','self',D.wifeX); const sc=D.scene;
+    let k=0; while(D.scene && !sc.asked && k++<9000){ sc.t+=1; S.updateEscalate(1); } S.drawDomus(); S.escFinish('love');
+    k=0; while(D.scene && sc.t-sc.chooseT<120 && k++<400){ sc.t+=1; S.updateEscalate(1); S.drawDomus(); } return {fx:!!sc.fx, splats:sc.fx? sc.fx.splats.length : 0}; });
+  ok('and the escalations finish the same way', !R.err && R.fx && R.splats>=6, R.err||JSON.stringify(R));
+  R=await T(()=>{ const S=window.__SS, out={}; const g=document.getElementById('game').getContext('2d');
+    const shot=(mode, wa)=>{ const G=__HOUSE(false,[]); if(wa) G.current=Object.keys(S.REGION_WA_BY_ID)[3]; S.setWH(null); S.startBedScene(mode,'long','bed'); const W0=S.WH; W0.t=40;
+      const d0=S.CH_DRAWS; S.drawWifeHappy(); return {c:__crop(0,0,480,270), room:S.CH_DRAWS-d0, dur:S.WH_DUR}; };
+    const a=shot('heir',true), b=shot('fun',true); out.room=a.room; out.dur=a.dur; out.diff=__diff(a.c,b.c); out.colors=__colors(a.c); return out; });
+  ok('💞 SHE LIGHTS UP: her own room behind her, a lit portrait, and the night named — an heir and a night for love look different', !R.err && R.room>=1 && R.diff>200 && R.colors>300 && R.dur>=100, R.err||JSON.stringify(R));
+  R=await T(()=>{ const S=window.__SS; S.newDemo('Kaiq','Leokanis','RkTorvak'); const G=S.G; G.married=true; G.coin=9999; G.hygiene=90; G.day=40; G.lastLoveDay=39; G.body=G.body||{}; G.body.secret=8;
+    const w=S.makeBride('rkrai',true,8); w.male=false; w.eth='rkrai'; w.traits=['kanvek']; w._sexFixed=true; G.wife=w; G.wifeRel=80; S.setWH('done');
+    S.openDomus(); S.startRkReward(); const D=S.DM; D.reward.ph='go'; D.reward.t=97; S.updateRkReward(0);
+    let i=0, zMax=0, len=0; while(S.BC && S.BC.t<700 && i++<3000){ S.updateBed(1); S.drawBed(); zMax=Math.max(zMax, S.BC? S.BC.camZ||0 : 0); const L=S.BEDPOSE_LAST; if(L && L.vi===22 && L.him && L.him.root && L.her && L.her.mouth) len=Math.max(len, Math.hypot(L.him.root[0]-L.her.mouth[0], L.him.root[1]-L.her.mouth[1])); }
+    return {zMax, len, kan:!!(S.BC&&S.BC.kanvekOnly)}; });
+  ok('✧ THE KANVEK is not a small picture in a box: the camera comes in close on her and him', !R.err && R.zMax>2.3, R.err||JSON.stringify(R));
+  ok('…and you can see him going into her mouth: a length of him between his root and her lips', !R.err && R.len>2, R.err||JSON.stringify(R));
+
   console.log('\n=== 🚪 AND THE REST ===');
   R=await T(()=>window.__SS.BUILD_STAMP);
   ok('the build says V49', typeof R==='string' && /V49/.test(R), String(R));
