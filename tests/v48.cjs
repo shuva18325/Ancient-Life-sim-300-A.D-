@@ -127,12 +127,23 @@ const ok=(name,cond,note)=>{ if(cond){pass++; console.log('  PASS  '+name+(note?
   ok('▶ WATCH plays it on the game canvas with a caption and the bot’s thought as a subtitle', !R.err && R.state==='botwatch' && R.overlay && /LUCIUS/.test(R.sub) && /💭/.test(R.sub) && /DAY/.test(R.cap) && R.lit>20000, R.err||JSON.stringify(R));
   ok('the bouts are fought on the arena’s own gladiators, and the video bar skips and speeds up', !R.err && R.fightDrawn && R.next && R.speed===2, R.err||JSON.stringify(R));
   ok('✕ closes it and puts you back in Settings', !R.err && R.back, R.err||'');
+  R=await T(()=>{ const S=window.__SS; S.newDemo('Verus','Italia','Roman'); const G0=S.G; G0.coin=777; window.requestAnimationFrame=()=>0; const bc0=S.BC;
+    const r=S.botRecord('lucius'), m=S.botRecord('minerva');
+    S.openBotWatch('lucius','scr-settings'); const B=S.BW; const bi=B.rec.beats.findIndex(b=>b.k==='bed'); S.botEnterBeat(bi); B.playing=true;
+    for(let i=0;i<120;i++) S.botWatchTick(1);
+    const out={kids:r.stats.kids, twins:r.beats.some(b=>b.k==='child' && b.twins), luciusFirst:(r.beats.find(b=>b.k==='bed')||{}).th, minervaFirst:(m.beats.find(b=>b.k==='bed')||{}).th,
+      realBed:!!(B.bed && B.bed.bc), gBack:(S.G===G0 && S.G.coin===777), bcClean:S.BC===bc0, state:S.state, dur:S.BW && (function(){ return 420; })()};
+    S.closeBotWatch(); return out; });
+  ok('🔞 with mature content on, a bot’s night is the game’s own bedchamber scene — and your career is untouched while it plays', !R.err && R.realBed && R.gBack && R.bcClean && R.state==='botwatch', R.err||JSON.stringify(R));
+  ok('Lucius fills the longhouse: ten children (twins run in the family)', !R.err && R.kids>=8, R.err||JSON.stringify(R));
+  ok('and they say what they are thinking: “I gotta hit that booty again” · “I need that length”', !R.err && /booty/.test(R.luciusFirst||'') && /length/.test(R.minervaFirst||''), R.err||JSON.stringify([R.luciusFirst, R.minervaFirst]));
   // mature content off: a tame Lucius
   await pg.evaluate(()=>{ localStorage.setItem('SANDSTEEL_ADULT','0'); }); await pg.reload(); await pg.waitForTimeout(400);
   R=await T(()=>{ const S=window.__SS; S.newDemo('Verus','Italia','Roman'); const r=S.botRecord('lucius'); S.openBotWatch('lucius','scr-settings'); const B=S.BW; const subs=[];
     for(let i=0;i<B.rec.beats.length;i++){ S.botEnterBeat(i); B.playing=true; for(let k=0;k<30;k++) S.botWatchTick(1); subs.push(document.querySelector('#botwatch .bw-sub').textContent); }
-    S.closeBotWatch(); return {lenCheat:r.beats.some(b=>b.k==='cheat' && b.what==='length'), rude:subs.filter(s=>/length|curv|booty|bust/i.test(s)).length}; });
-  ok('with mature content off Lucius stays tame (no length cheat, no talk of curves)', !R.err && !R.lenCheat && R.rude===0, R.err||JSON.stringify(R));
+    const bi=B.rec.beats.findIndex(b=>b.k==='bed'); let realBed=false; if(bi>=0){ S.botEnterBeat(bi); realBed=!!B.bed; }
+    S.closeBotWatch(); return {lenCheat:r.beats.some(b=>b.k==='cheat' && b.what==='length'), rude:subs.filter(s=>/length|curv|booty|bust/i.test(s)).length, realBed}; });
+  ok('with mature content off Lucius stays tame (no length cheat, no talk of curves, no bedchamber scene)', !R.err && !R.lenCheat && R.rude===0 && !R.realBed, R.err||JSON.stringify(R));
 
   console.log('\n=== 😬 THE ARENA: FACES, WEAR, SCARS ===');
   await pg.evaluate(()=>{ localStorage.setItem('SANDSTEEL_ADULT','1'); }); await pg.reload(); await pg.waitForTimeout(400);

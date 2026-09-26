@@ -11,17 +11,40 @@ grounds produce nine distinct pictures" is.
 
 ## 0 — NEXT, PROPOSED AFTER V48 (in the order they would help most)
 
-V48 retired the last old bodies (the barber, the peek, the suitors, the pool, the children),
-turned the villa tablet into a clickable panel and the Dominus Console into tabs, fixed the
-spouse list for heirs of the other sex, made Hungry a face that comes in flashes, let you SEE
-him in the kanvek, rebuilt the courtship as a live scene and added the three bots. New since then:
+V48 ended with the three bots playing whole careers, their nights drawn as the game's own
+bedchamber scene when mature content is on, Lucius filling a longhouse with ten children, and the
+courtship, the arena and the Kanvek all reworked. What comes next, in order:
 
-- **The bots, round two.** Let a bot play on from YOUR save (a copy of it) instead of a fresh
-  career, a fourth bot you write the brief for, and a ⏺ EXPORT that saves the playback as a file.
-- **Courtship, round two.** A second evening with the same person (they remember the first), a
-  walk together as a beat, and the rival as someone you meet again in the arena.
-
-Everything in the list below (from after V47 and V46) is still open.
+1. **The bots' children grow up.** Lucius's ten are the obvious next story: a bot's career ends and
+   an heir picks it up (the succession the game already has), so a recording can run two
+   generations. A family-tree card on the end screen, and the eldest's first bout as a coda.
+2. **Bots, round two.** Play on from a copy of YOUR save instead of a fresh career; a fourth bot
+   whose brief you write in Settings (five sliders — fight, study, court, home, cheat — plus a line
+   of voice); and bots with the traits of the house (a Greedy Lucius, a Jealous Minerva).
+3. **Their nights, in character.** The bedchamber in the playback picks poses by personality —
+   Lucius the long ones and the bath, Minerva short and decisive, Brutus whatever finishes first — and
+   the stamina bar becomes part of the subtitle ("Stamina two? Pathetic.").
+4. **Greedy, round two.** The hands follow the eyes: a grab when a Greedy spouse catches you bent
+   over, a slap back when you catch them, the village's word for it on the board ("THE WANDERING
+   EYE"), and a Jealous spouse who minds you looking at the servants.
+5. **The sivrak, round two.** Built together as a scene, wilting through the evening, and a
+   Shameless spouse who asks YOU to wear one.
+6. **A rhythm duel in the bedchamber.** Tap in time to keep her in the HOT zone, or push it and
+   watch it tip into TOO MUCH — stamina as something you play, not only a number.
+7. **Every culture's bedchamber painted.** Tatami, andon and a byōbu screen for Japan; silk and a
+   lacquer bed for Han and Ming; glazed niches for Persia; a ger for the steppe; India.
+8. **More escalations and the wife's bend, round two.** A second running order per escalator (the
+   stair, the impluvium's rim, the tablinum desk) and bends at the shelf, the pool and the stairs.
+9. **Courtship, round two.** A second evening with the same person (they remember the first), a
+   walk together as a beat, and the rival met again in the arena.
+10. **Beasts on vector bodies.** The venatio lion, bear, bull and leopard with IK legs, to match the
+    men they fight.
+11. **The wardrobe in the villa.** The walkers wear their people's garments the way the portraits do.
+12. **The coast's commissions on the new body**, the sivrak as a front-view garment.
+13. **Names on the street** — a neighbour's village name and moving picture as you walk past.
+14. **Seated and leaning portrait poses**, added to the POSE button.
+15. **Performance.** Crowd and charioteers as cached template sprites, fighter frames cached per
+    pose, the bedchamber's painted room rendered once per session.
 
 ## 0b — STILL OPEN FROM AFTER V47 (in the order they would help most)
 

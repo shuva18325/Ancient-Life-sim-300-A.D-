@@ -59,7 +59,8 @@ publicly, leaving it off keeps the game safe for a general audience.
   per beat (the bouts on the arena's own gladiators, the courtship scene, the wedding, the forum, the
   circus, home), a caption, their **thoughts as subtitles** ("I gotta get a wife." · "62% odds. I'll
   take it." · "…I slipped. The sand was wet."), and a play / skip / speed / scrub bar. With mature
-  content off Lucius stays tame.
+  content on, their nights play as the game's own bedchamber scene ("I gotta hit that booty again." ·
+  "I need that length.") and Lucius fills the longhouse with ten children; with it off he stays tame.
 - **Courtship, upgraded (V48)** — a live scene in the places of your world (Rome, Wa, the East and
   the coast, by station), where every line is a gesture and every answer a reaction, with speech
   bubbles, a distance that closes as it goes well, and a finale. Each person has a temperament you
