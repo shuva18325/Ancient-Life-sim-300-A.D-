@@ -16365,7 +16365,417 @@ function drawThrowArm(f,C,seg){
   if(f.charging>0 && cp>0.4){ ctx.save(); ctx.rotate(-0.15); ctx.globalAlpha=cp; px(16,-1,2,2,'#fff'); px(17,-2,1,1,'#ffe9a0'); ctx.globalAlpha=1; ctx.restore(); }
   ctx.restore();
 }
-function drawWeapon2(id,C){
+/* =====================================================================
+   ⚔ THE ARMOURY, REDRAWN
+   ---------------------------------------------------------------------
+   Every weapon in the game was a stack of axis-aligned rectangles: a
+   gladius was a grey bar with a lighter bar on top, a katana was a
+   staircase of one-pixel steps, and turned in the hand they smeared into
+   whatever the canvas made of a rotated box. The men holding them had
+   been rebuilt as painted bodies; the steel in their fists had not.
+
+   Now each is a small painting in the weapon's own frame (the hand at the
+   origin, the point along +x): a blade is a real outline — leaf-shaped,
+   waisted, parallel, curved, clipped — with the light running down one
+   bevel and the shadow down the other, a fuller where it had one, a
+   hamon on a Japanese edge; a hilt is guard, grip and pommel, bound or
+   wrapped or bare; a spear is a grained shaft, a socket and a head of
+   the right shape; an axe has a bit, a beard and an eye. It is painted
+   at the hand, in the hand's own rotation, into a scratch buffer at the
+   screen's resolution, snapped to the pixel and ringed in the same dark
+   line as the body holding it — so it turns with the arm and stays
+   crisp. The same painter draws the shop's icons, bigger, where the
+   detail shows.
+   ===================================================================== */
+const WPAL={
+  steel:['#f4f8fc','#c6ced8','#6f7a87'], iron:['#cdd4dc','#8f98a2','#4a5058'], bronze:['#f0cc80','#bb8a46','#6e4e24'],
+  gold:['#fff3bc','#e8c34a','#9a7a26'], silver:['#ffffff','#e4eaf2','#98a2ae'], wood:['#b08a54','#7a5630','#432a14'],
+  dark:['#6e5a40','#4a3a22','#241a0e'], oak:['#c49a64','#8e6a3e','#503a1c'], bamboo:['#e2e8a8','#b0b870','#6a7a3a'],
+  bone:['#fbf4e4','#e2d4b2','#a89468'], ivory:['#fffaec','#ece0c4','#b4a282'], slate:['#96a0a8','#5e666e','#2e343a'],
+  leather:['#9a7040','#6b4a2a','#3e2a16'], wrap:['#5e5e6a','#2c2c34','#121216'], red:['#ea6a5a','#b02424','#661010'],
+  horn:['#8a6a44','#5a3e22','#2a1c0e'], blue:['#7aa8e0','#2a5ab0','#16305e'],
+};
+function wLG(g,x0,y0,x1,y1,st){ const gr=g.createLinearGradient(x0,y0,x1,y1); for(const [o,c] of st) gr.addColorStop(o,c); return gr; }
+function wPoly(g,pts){ g.beginPath(); g.moveTo(pts[0][0],pts[0][1]); for(let i=1;i<pts.length;i++) g.lineTo(pts[i][0],pts[i][1]); g.closePath(); }
+function wLine(g,pts,col,w){ g.strokeStyle=col; g.lineWidth=w; g.lineCap='round'; g.lineJoin='round'; g.beginPath(); g.moveTo(pts[0][0],pts[0][1]); for(let i=1;i<pts.length;i++) g.lineTo(pts[i][0],pts[i][1]); g.stroke(); }
+/* ---- A BLADE: from x0, L long. w0/w1 the width at the root and toward the point; tip = length of the point;
+   curve = how far the point rises (a sabre, a katana); single = one edge (the spine on top); leaf/waist shape it. ---- */
+function wBlade(g, x0, L, o){
+  const P=o.pal||WPAL.steel, N=28, top=[], bot=[], cy=(t)=>-(o.curve||0)*Math.pow(t,o.cpow||1.7);
+  const tipL=o.tip||Math.max(2,L*0.18);
+  for(let i=0;i<=N;i++){ const t=i/N, x=x0+t*L; let w=o.w0+(o.w1-o.w0)*t;
+    if(o.leaf) w*=1+o.leaf*Math.max(0,Math.sin((t-0.25)/0.75*Math.PI));                                     // swells before the point (a leaf)
+    if(o.waist) w*=1-o.waist*Math.sin(Math.min(1,t/0.7)*Math.PI);                                            // pinched in the middle (a pugio, a Mainz gladius)
+    const k=clamp((t*L-(L-tipL))/tipL,0,1);
+    let a=w/2, b=w/2;
+    if(o.single){ if(o.clip){ b=w/2*(1-k); a=w/2*(1-Math.pow(k,3)*0.9); } else { a=w/2*(1-Math.pow(k,2.4)); b=w/2*(1-Math.pow(k,0.75)); } }   // a spine that runs on, an edge that rises to meet it
+    else { const s=o.round? Math.sqrt(Math.max(0,1-k*k)) : (1-Math.pow(k,o.ogive||1)); a=w/2*s; b=w/2*s; }
+    const c=cy(t); top.push([x, c-a]); bot.push([x, c+b]); }
+  const pts=top.concat(bot.slice().reverse());
+  wPoly(g,pts); g.fillStyle=wLG(g,0,cy(0.5)-o.w0*0.7,0,cy(0.5)+o.w0*0.7,[[0,P[0]],[0.42,P[1]],[1,P[2]]]); g.fill();
+  // the bevel: a light line along the upper face, a dark one under it
+  if(!o.flat){ g.save(); wPoly(g,pts); g.clip();
+    const mid=top.map((q,i)=>[q[0], (q[1]+bot[i][1])/2]);
+    if(o.fuller){ const n=Math.round(N*o.fuller); wLine(g, mid.slice(1,n), P[2], Math.max(0.7,o.w0*0.22)); wLine(g, mid.slice(1,n).map(q=>[q[0],q[1]-Math.max(0.5,o.w0*0.16)]), P[0], 0.45); }
+    else if(!o.single && o.ridge!==false) wLine(g, mid.slice(1,N), mixHex(P[0],P[1],0.4), 0.55);            // a midrib catching the light
+    wLine(g, bot.slice(1,N).map(q=>[q[0],q[1]-0.35]), P[0], 0.55);                                           // the edge, honed bright
+    if(o.hamon){ wLine(g, bot.slice(2,N-2).map((q,i)=>[q[0], q[1]-Math.max(0.8,o.w0*0.32)-Math.sin(i*1.9)*0.35]), 'rgba(255,255,255,.85)', 0.5); }
+    g.restore(); }
+  return {tip:[top[N][0], top[N][1]], top, bot};
+}
+function wGrip(g, x0, x1, w, pal, wrap){
+  const P=pal||WPAL.wood; g.fillStyle=wLG(g,0,-w/2,0,w/2,[[0,P[0]],[0.45,P[1]],[1,P[2]]]);
+  g.beginPath(); g.moveTo(x0,-w/2); g.lineTo(x1,-w/2); g.lineTo(x1,w/2); g.lineTo(x0,w/2); g.closePath(); g.fill();
+  if(wrap==='cord'||wrap==='ito'){ g.strokeStyle= wrap==='ito'? '#8a7a64' : P[2]; g.lineWidth=0.55; for(let x=x0+0.8;x<x1;x+=1.6){ g.beginPath(); g.moveTo(x,-w/2); g.lineTo(x+0.9,w/2); g.stroke(); if(wrap==='ito'){ g.beginPath(); g.moveTo(x+0.9,-w/2); g.lineTo(x,w/2); g.stroke(); } } }
+  else if(wrap==='ribs'){ g.fillStyle=P[2]; for(let x=x0+0.8;x<x1-0.5;x+=1.5) g.fillRect(x,-w/2,0.6,w); }
+  else if(wrap==='bands'){ g.fillStyle=WPAL.bronze[1]; for(const x of [x0+0.3, x1-1.1]) g.fillRect(x,-w/2-0.2,0.9,w+0.4); }
+}
+function wPommel(g, x, type, r, pal){
+  const P=pal||WPAL.bronze;
+  g.fillStyle=wLG(g,0,-r,0,r,[[0,P[0]],[0.5,P[1]],[1,P[2]]]);
+  if(type==='ball'){ g.beginPath(); g.ellipse(x-r*0.8,0,r,r,0,0,Math.PI*2); g.fill(); g.fillStyle=P[0]; g.fillRect(x-r*1.2,-r*0.6,0.8,0.7); }
+  else if(type==='disc'){ g.beginPath(); g.ellipse(x-r*0.4,0,r*0.5,r,0,0,Math.PI*2); g.fill(); }
+  else if(type==='ring'){ g.strokeStyle=g.fillStyle; g.lineWidth=Math.max(1,r*0.45); g.beginPath(); g.ellipse(x-r,0,r*0.95,r*0.8,0,0,Math.PI*2); g.stroke(); }
+  else if(type==='lobes'){ g.beginPath(); g.ellipse(x-r*0.6,-r*0.55,r*0.6,r*0.62,0,0,Math.PI*2); g.ellipse(x-r*0.6,r*0.55,r*0.6,r*0.62,0,0,Math.PI*2); g.fill(); }
+  else if(type==='cap'){ g.beginPath(); g.moveTo(x,-r); g.lineTo(x-r*0.9,-r*0.8); g.quadraticCurveTo(x-r*1.3,0,x-r*0.9,r*0.8); g.lineTo(x,r); g.closePath(); g.fill(); }
+  else if(type==='mush'){ g.beginPath(); g.moveTo(x,-r*0.5); g.quadraticCurveTo(x-r*1.6,-r*1.2,x-r*1.4,0); g.quadraticCurveTo(x-r*1.6,r*1.2,x,r*0.5); g.closePath(); g.fill(); }
+}
+function wGuard(g, x, type, h, pal, t){
+  const P=pal||WPAL.bronze, th=t||1.6;
+  g.fillStyle=wLG(g,0,-h/2,0,h/2,[[0,P[0]],[0.45,P[1]],[1,P[2]]]);
+  if(type==='bar'){ g.beginPath(); g.moveTo(x,-h/2+0.6); g.quadraticCurveTo(x+th/2,-h/2-0.4,x+th,-h/2+0.6); g.lineTo(x+th,h/2-0.6); g.quadraticCurveTo(x+th/2,h/2+0.4,x,h/2-0.6); g.closePath(); g.fill(); }
+  else if(type==='tsuba'){ g.beginPath(); g.ellipse(x+th/2,0,th/2+0.3,h/2,0,0,Math.PI*2); g.fill(); g.strokeStyle=WPAL.gold[1]; g.lineWidth=0.45; g.beginPath(); g.ellipse(x+th/2,0,th/2,h/2-0.4,0,0,Math.PI*2); g.stroke(); }
+  else if(type==='roman'){ g.beginPath(); g.ellipse(x+th/2,0,th/2+0.4,h/2,0,0,Math.PI*2); g.fill(); g.fillStyle=WPAL.bronze[1]; g.fillRect(x+th,-h/2+1,0.7,h-2); }
+  else if(type==='heart'){ g.beginPath(); g.moveTo(x+th,-0.8); g.bezierCurveTo(x+th*0.2,-h/2-0.8,x-th*0.8,-h/2,x,-0.4); g.lineTo(x,0.4); g.bezierCurveTo(x-th*0.8,h/2,x+th*0.2,h/2+0.8,x+th,0.8); g.closePath(); g.fill(); }
+  else if(type==='wings'){ g.beginPath(); g.moveTo(x,-0.8); g.quadraticCurveTo(x+th*2,-h/2,x+th*2.6,-h/2-0.6); g.lineTo(x+th,-0.3); g.lineTo(x+th,0.3); g.lineTo(x+th*2.6,h/2+0.6); g.quadraticCurveTo(x+th*2,h/2,x,0.8); g.closePath(); g.fill(); }
+}
+/* ---- A SHAFT: grained wood, bands, lacquer, or bamboo with its nodes ---- */
+function wShaft(g, x0, x1, w, pal, o){
+  const P=pal||WPAL.wood; o=o||{};
+  g.fillStyle=wLG(g,0,-w/2,0,w/2,[[0,P[0]],[0.4,P[1]],[1,P[2]]]); g.fillRect(x0,-w/2,x1-x0,w);
+  if(o.grain!==false && !o.nodes){ g.strokeStyle='rgba(40,22,8,.35)'; g.lineWidth=0.4; const R=bstRand(Math.round(x1*7+w*13));
+    for(let k=0;k<Math.max(2,(x1-x0)/6);k++){ const x=x0+R()*(x1-x0-4), y=(R()-0.5)*w*0.6; g.beginPath(); g.moveTo(x,y); g.lineTo(x+3+R()*4,y+(R()-0.5)*0.3); g.stroke(); } }
+  if(o.nodes){ for(let x=x0+o.nodes*0.6;x<x1-1;x+=o.nodes){ g.fillStyle=P[2]; g.fillRect(x,-w/2,0.7,w); g.fillStyle=P[0]; g.fillRect(x+0.7,-w/2,0.5,w); } }
+  if(o.bands) for(const [bx,bw,bp] of o.bands){ const Q=bp||WPAL.bronze; g.fillStyle=wLG(g,0,-w/2-0.4,0,w/2+0.4,[[0,Q[0]],[0.5,Q[1]],[1,Q[2]]]); g.fillRect(bx,-w/2-0.3,bw,w+0.6); }
+  if(o.wrapAt) { const [a,b]=o.wrapAt; g.strokeStyle=o.wrapCol||WPAL.leather[2]; g.lineWidth=0.5; for(let x=a;x<b;x+=1.3){ g.beginPath(); g.moveTo(x,-w/2); g.lineTo(x+0.8,w/2); g.stroke(); } }
+  g.fillStyle='rgba(255,246,220,.28)'; g.fillRect(x0,-w/2,x1-x0,Math.max(0.5,w*0.22));
+}
+function wSocket(g, x, len, w, pal){ const P=pal||WPAL.iron; g.fillStyle=wLG(g,0,-w/2,0,w/2,[[0,P[0]],[0.5,P[1]],[1,P[2]]]);
+  g.beginPath(); g.moveTo(x,-w/2); g.lineTo(x+len,-w/2+0.4); g.lineTo(x+len,w/2-0.4); g.lineTo(x,w/2); g.closePath(); g.fill(); g.fillStyle=P[2]; g.fillRect(x+0.4,-w/2,0.5,w); }
+/* ---- A SPEARHEAD from x: leaf, lance, triangle (yari), barbed, broad leaf (vel), a boar-spear with lugs ---- */
+function wHead(g, x, type, L, W, pal){
+  const P=pal||WPAL.steel;
+  if(type==='leaf'||type==='broad'||type==='lance'||type==='triangle'){
+    const sw= type==='broad'? 1.0 : type==='lance'? 0.35 : type==='triangle'? 0.05 : 0.55;
+    const pts=[]; const N=16;
+    for(let i=0;i<=N;i++){ const t=i/N; let w= type==='triangle'? W*(1-t) : W*Math.sin(Math.pow(t,0.55+0.5*(1-sw))*Math.PI)*(t<0.3? 0.6+t*1.3 : 1); if(type==='broad') w=W*Math.sin(Math.pow(t,0.8)*Math.PI)*1.0; pts.push([x+t*L, -w/2]); }
+    const bot=pts.map(q=>[q[0],-q[1]]).reverse(); wPoly(g, pts.concat(bot));
+    g.fillStyle=wLG(g,0,-W/2,0,W/2,[[0,P[0]],[0.46,P[1]],[1,P[2]]]); g.fill();
+    wLine(g, [[x+0.5,0],[x+L-0.6,0]], mixHex(P[0],P[1],0.2), 0.6);                         // the midrib
+    if(W>=3.4) wLine(g, pts.slice(3,N-1).map(q=>[q[0],q[1]*0.45+0.1]), P[0], 0.45);
+    return; }
+  if(type==='barbed'){ wPoly(g,[[x,-1],[x+L*0.7,-1.2],[x+L*0.7,-W/2],[x+L,0],[x+L*0.7,W/2],[x+L*0.7,1.2],[x,1]]);
+    g.fillStyle=wLG(g,0,-W/2,0,W/2,[[0,P[0]],[0.5,P[1]],[1,P[2]]]); g.fill();
+    g.fillStyle=P[1]; wPoly(g,[[x+L*0.7,-W/2],[x+L*0.52,-W/2-1.2],[x+L*0.66,-1]]); g.fill(); wPoly(g,[[x+L*0.7,W/2],[x+L*0.52,W/2+1.2],[x+L*0.66,1]]); g.fill(); return; }
+  if(type==='spike'){ wPoly(g,[[x,-W/2],[x+L,0],[x,W/2]]); g.fillStyle=wLG(g,0,-W/2,0,W/2,[[0,P[0]],[0.5,P[1]],[1,P[2]]]); g.fill(); return; }
+}
+/* ---- AN AXE HEAD on the shaft at x: bit forward (+y down is the cutting side for a hewing axe drawn edge-down) ---- */
+function wAxe(g, x, type, pal){
+  const P=pal||WPAL.iron, gr=(h)=>wLG(g,0,-h,0,h,[[0,P[0]],[0.45,P[1]],[1,P[2]]]);
+  /* the head sits ACROSS the haft at its end; the bit hangs off one side and its edge runs PARALLEL to the haft */
+  if(type==='bearded'){ wPoly(g,[[x-0.6,-2.2],[x+3,-2.2],[x+3.3,1.2],[x+5.4,6.2],[x+5.6,8.2],[x+1.4,7.8],[x-3.6,7.4],[x-1.2,5.4],[x-0.6,2.2]]); g.fillStyle=gr(8); g.fill();
+    wPoly(g,[[x-0.6,-2.2],[x+3,-2.2],[x+2.6,-3.6],[x-0.2,-3.6]]); g.fill();                                                      // the poll
+    wLine(g,[[x+5.2,8.0],[x-3.2,7.3]],P[0],0.6); g.fillStyle=P[2]; g.fillRect(x+0.2,-1.1,2.4,2.2); return; }
+  if(type==='felling'){ wPoly(g,[[x-0.6,-2.6],[x+3.4,-2.6],[x+3.6,1.6],[x+5.6,7.2],[x+5.2,9.2],[x-2.2,9.2],[x-2.6,7.2],[x-0.6,1.6]]); g.fillStyle=gr(9); g.fill();
+    wPoly(g,[[x-0.6,-2.6],[x+3.4,-2.6],[x+3,-4.4],[x-0.2,-4.4]]); g.fill();
+    wLine(g,[[x+5.0,9.0],[x-2.0,9.0]],P[0],0.65); wLine(g,[[x+3.6,2],[x+5.4,7.4]],'rgba(255,255,255,.35)',0.5); g.fillStyle=P[2]; g.fillRect(x+0.2,-1.2,2.8,2.4); return; }
+  if(type==='hand'){ wPoly(g,[[x-0.6,-2],[x+2.8,-2],[x+3,1.2],[x+4.6,5],[x+4.2,6.6],[x-1.6,6.6],[x-1.8,5],[x-0.6,1.2]]); g.fillStyle=gr(6); g.fill();
+    wLine(g,[[x+4.0,6.4],[x-1.4,6.4]],P[0],0.55); g.fillStyle=P[2]; g.fillRect(x+0.2,-1,2.2,2); return; }
+  if(type==='double'){ for(const s of [-1,1]){ wPoly(g,[[x-1.5,0],[x-1.5,s*1.8],[x-4,s*6.2],[x-5,s*7.6],[x+5,s*7.6],[x+4,s*6.2],[x+1.5,s*1.8],[x+1.5,0]]); g.fillStyle=gr(8); g.fill();
+      wLine(g,[[x-4.6,s*7.3],[x+4.6,s*7.3]], s<0? P[0] : P[2], 0.6); } g.fillStyle=P[2]; g.fillRect(x-1.2,-1.3,2.4,2.6); return; }
+  if(type==='pick'){ wPoly(g,[[x-0.6,-2],[x+2.8,-2],[x+3,-4.6],[x+4.8,-8.4],[x+4.4,-9.6],[x-1.8,-9.6],[x-1.6,-8.2],[x-0.6,-4.6]]); g.fillStyle=gr(10); g.fill();   // the axe bit, up
+    wPoly(g,[[x-0.6,2],[x+2.8,2],[x+2.4,3.8],[x-3.6,9.4],[x-4.6,9.0],[x-0.4,3.6]]); g.fill();                                                                  // the pick, down and back
+    wLine(g,[[x+4.2,-9.4],[x-1.6,-9.4]],P[0],0.6); g.fillStyle=P[2]; g.fillRect(x+0.2,-1.2,2.4,2.4); return; }
+  if(type==='hammer'){ wPoly(g,[[x-0.6,-2],[x+2.8,-2],[x+3.2,-4.4],[x+5.2,-9.2],[x+4.6,-10.4],[x-0.4,-9.8],[x-0.8,-8.4],[x-0.6,-4.4]]); g.fillStyle=gr(10); g.fill();   // a narrow bit, flaring
+    wPoly(g,[[x-0.4,2],[x+2.6,2],[x+2.8,5.6],[x-0.6,5.6]]); g.fill(); g.fillStyle=P[2]; g.fillRect(x-0.6,5,3.4,0.8);                                             // the hammer poll
+    wLine(g,[[x+4.8,-10],[x-0.2,-9.6]],P[0],0.6); g.fillStyle=WPAL.gold[1]; g.fillRect(x+0.2,-1.3,2.4,0.7); return; }
+  if(type==='hoe'){ wPoly(g,[[x-1.4,-2.4],[x+1.8,-2.4],[x+2.2,-1],[x+2.2,7.6],[x-2,8.2],[x-2.6,7],[x-0.8,1.6],[x-1.4,1.6]]); g.fillStyle=gr(8); g.fill(); wLine(g,[[x-2.2,7.8],[x+1.8,7.4]],P[0],0.55); return; }
+  if(type==='adze'){ wPoly(g,[[x-1.4,-1.6],[x+1.8,-1.6],[x+2.4,1.2],[x+1.2,6.8],[x-1.4,7],[x-0.4,1.4]]); g.fillStyle=gr(7); g.fill(); wLine(g,[[x+1.1,6.6],[x-1.2,6.8]],P[0],0.5); return; }
+}
+/* ---- THE PAINTERS, one per weapon: the hand at the origin, the point along +x ---- */
+const WPN_ART={};
+function wSword(o){ return (g,C,gold)=>{ const bp=gold? WPAL.gold : (o.pal||WPAL.steel);
+  const gx=o.guardX||3.4;
+  if(o.pommel) wPommel(g, o.gripX0, o.pommel, o.pr||1.8, gold? WPAL.gold : (o.ppal||WPAL.bronze));
+  wGrip(g, o.gripX0, gx, o.gw||2.4, o.gpal||WPAL.wood, o.wrap);
+  const r=wBlade(g, gx+(o.gt||1.4)-0.3, o.L, Object.assign({pal:bp}, o.blade));
+  if(o.guard) wGuard(g, gx, o.guard, o.gh||5, gold? WPAL.gold : (o.guardPal||WPAL.bronze), o.gt||1.4);
+  if(o.extra) o.extra(g, r, gx); }; }
+function wPolearm(o){ return (g,C,gold)=>{ const hp=gold? WPAL.gold : (o.hpal||WPAL.steel);
+  if(o.butt) wSocket(g, o.x0-1.6, 2, (o.w||2)+0.6, o.buttPal||WPAL.iron);
+  wShaft(g, o.x0, o.x1, o.w||2, o.spal||WPAL.wood, o.shaft);
+  if(o.sock) wSocket(g, o.x1-0.4, o.sock, (o.w||2)+0.8, o.sockPal||WPAL.iron);
+  const hx=o.x1-0.4+(o.sock||0);
+  if(o.head) wHead(g, hx, o.head, o.hl, o.hw, hp);
+  if(o.axe) wAxe(g, o.x1-2.8, o.axe, hp);
+  if(o.extra) o.extra(g, hx, hp); }; }
+Object.assign(WPN_ART, {
+  gladius: wSword({gripX0:-3.2, pommel:'ball', pr:1.7, gpal:WPAL.ivory, wrap:'ribs', guard:'roman', gh:5.6, gt:1.8, L:14.2, blade:{w0:3.2, w1:2.8, waist:0.08, tip:4.2, fuller:0.25, ogive:0.8}}),
+  gladius_aureus: (g,C)=>WPN_ART.gladius(g,C,true),
+  spatha: wSword({gripX0:-4.0, pommel:'mush', pr:1.8, gpal:WPAL.dark, wrap:'cord', guard:'roman', gh:5.2, gt:1.6, L:22, blade:{w0:2.8, w1:2.5, tip:3.0, fuller:0.7, round:true}}),
+  celtic_longsword: wSword({gripX0:-4.2, pommel:'cap', pr:1.7, ppal:WPAL.bronze, gpal:WPAL.horn, wrap:'ribs', guard:'bar', gh:4.2, gt:1.2, L:24, blade:{w0:2.8, w1:2.4, tip:2.2, round:true, ridge:true},
+    extra:(g,r,gx)=>{ g.strokeStyle='rgba(60,70,84,.5)'; g.lineWidth=0.4; for(let x=gx+3;x<gx+22;x+=2.4){ g.beginPath(); g.moveTo(x,-0.6); g.quadraticCurveTo(x+1.2,0.4,x+2.2,-0.4); g.stroke(); } }}),    // the pattern-welded ripple
+  rudis_ferrea: wSword({gripX0:-2.8, pommel:'ball', pr:1.4, ppal:WPAL.iron, gpal:WPAL.wood, wrap:'bands', guard:'bar', guardPal:WPAL.iron, gh:4.2, gt:1.2, L:11.5, blade:{w0:2.4, w1:2.4, tip:1.6, round:true, pal:WPAL.iron, ridge:false}}),
+  pugio: wSword({gripX0:-2.6, pommel:'disc', pr:1.9, gpal:WPAL.horn, wrap:'bands', guard:'bar', gh:4.4, gt:1.2, L:8.2, blade:{w0:2.8, w1:2.2, waist:0.26, leaf:0.2, tip:3.2}}),
+  akinakes: wSword({gripX0:-2.6, pommel:'lobes', pr:1.9, ppal:WPAL.gold, gpal:WPAL.gold, wrap:null, guard:'heart', guardPal:WPAL.gold, gh:5.4, gt:1.8, L:9.4, blade:{w0:2.6, w1:2.0, tip:3.4}}),
+  sica: wSword({gripX0:-2.6, pommel:'ball', pr:1.4, gpal:WPAL.bone, wrap:'bands', guard:'bar', gh:3.6, gt:1.0, L:12, blade:{w0:2.4, w1:2.4, tip:3.6, curve:-3.4, cpow:2.2, single:true}}),
+  huan_dao: wSword({gripX0:-3.2, pommel:'ring', pr:1.8, ppal:WPAL.iron, gpal:WPAL.wrap, wrap:'cord', guard:'bar', guardPal:WPAL.iron, gh:3.8, gt:1.0, L:17, blade:{w0:2.2, w1:2.1, tip:2.6, single:true, clip:true}}),
+  jian: wSword({gripX0:-3.4, pommel:'disc', pr:1.6, gpal:WPAL.wrap, wrap:'cord', guard:'wings', gh:4.6, gt:1.0, L:19, blade:{w0:2.4, w1:2.0, tip:2.6, ogive:1.2}}),
+  khanda: wSword({gripX0:-4.2, pommel:'disc', pr:2.4, ppal:WPAL.iron, gpal:WPAL.iron, wrap:'ribs', guard:'bar', guardPal:WPAL.iron, gh:5.2, gt:1.2, L:18, blade:{w0:2.6, w1:4.2, tip:1.6, round:true, fuller:0.6},
+    extra:(g,r,gx)=>{ wLine(g,[[gx-4.6,0],[gx-7,0]],WPAL.iron[1],1); g.fillStyle=WPAL.iron[2]; g.fillRect(gx+1.2,-1.5,4,0.7); g.fillRect(gx+1.2,0.8,4,0.7); }}),   // the spike off the pommel disc, the reinforcing strips
+  steppe_sabre: wSword({gripX0:-3.2, pommel:'cap', pr:1.4, ppal:WPAL.iron, gpal:WPAL.leather, wrap:'cord', guard:'bar', guardPal:WPAL.iron, gh:3.6, gt:1.0, L:15, blade:{w0:2.0, w1:1.9, tip:3.0, curve:2.6, cpow:1.6, single:true}}),
+  katana: wSword({gripX0:-6.2, pommel:'cap', pr:1.4, ppal:WPAL.iron, gpal:WPAL.wrap, wrap:'ito', guard:'tsuba', guardPal:WPAL.iron, gh:5.2, gt:1.2, L:17, blade:{w0:2.0, w1:1.7, tip:2.6, curve:1.9, cpow:1.5, single:true, hamon:true}}),
+  uchigatana: wSword({gripX0:-5.2, pommel:'cap', pr:1.3, ppal:WPAL.iron, gpal:WPAL.wrap, wrap:'ito', guard:'tsuba', guardPal:WPAL.iron, gh:4.8, gt:1.1, L:15.5, blade:{w0:1.9, w1:1.6, tip:2.4, curve:1.5, cpow:1.4, single:true, hamon:true}}),
+  tachi: wSword({gripX0:-6.4, pommel:'cap', pr:1.4, ppal:WPAL.gold, gpal:WPAL.wrap, wrap:'ito', guard:'tsuba', guardPal:WPAL.gold, gh:5.2, gt:1.2, L:20, blade:{w0:2.0, w1:1.6, tip:2.6, curve:3.0, cpow:1.1, single:true, hamon:true}}),
+  wakizashi: wSword({gripX0:-4.4, pommel:'cap', pr:1.2, ppal:WPAL.iron, gpal:WPAL.wrap, wrap:'ito', guard:'tsuba', guardPal:WPAL.iron, gh:4.4, gt:1.1, L:11.5, blade:{w0:1.9, w1:1.6, tip:2.2, curve:1.2, single:true, hamon:true}}),
+  odachi: wSword({gripX0:-9.4, pommel:'cap', pr:1.5, ppal:WPAL.iron, gpal:WPAL.wrap, wrap:'ito', guard:'tsuba', guardPal:WPAL.iron, gh:6, gt:1.4, L:28, blade:{w0:2.3, w1:1.9, tip:3.0, curve:3.2, cpow:1.4, single:true, hamon:true}}),
+  nagamaki: wSword({gripX0:-14, pommel:'cap', pr:1.4, ppal:WPAL.iron, gpal:WPAL.wrap, wrap:'ito', guard:'tsuba', guardPal:WPAL.iron, gh:5, gt:1.2, L:20, blade:{w0:2.4, w1:2.2, tip:3.2, curve:2.2, cpow:1.6, single:true, hamon:true}}),
+  tanto: wSword({gripX0:-3.8, pommel:'cap', pr:1.2, ppal:WPAL.iron, gpal:WPAL.wrap, wrap:'ito', guard:'tsuba', guardPal:WPAL.iron, gh:3.6, gt:1.0, L:7.8, blade:{w0:2.0, w1:1.8, tip:2.2, curve:0.3, single:true, hamon:true}}),
+  bokuto: wSword({gripX0:-6.0, pommel:null, gpal:WPAL.oak, wrap:null, guard:'tsuba', guardPal:WPAL.dark, gh:4.6, gt:1.0, L:17, blade:{w0:2.2, w1:1.9, tip:2.8, curve:1.8, cpow:1.5, single:true, pal:WPAL.oak, flat:true}}),
+});
+Object.assign(WPN_ART, {
+  hasta: wPolearm({x0:-9, x1:29, w:2, spal:WPAL.wood, sock:2.6, head:'leaf', hl:9.5, hw:3.6, butt:true}),
+  hasta_argentea: wPolearm({x0:-9, x1:31, w:2, spal:WPAL.oak, sock:2.6, sockPal:WPAL.gold, head:'leaf', hl:10.5, hw:3.8, hpal:WPAL.silver, butt:true, buttPal:WPAL.gold, shaft:{bands:[[4,1,WPAL.gold],[18,1,WPAL.gold]]}}),
+  lancea: wPolearm({x0:-8, x1:26, w:1.8, sock:2.4, head:'lance', hl:9, hw:2.8}),
+  qiang: wPolearm({x0:-10, x1:30, w:2, spal:WPAL.dark, sock:2.4, head:'leaf', hl:9, hw:3.2, butt:true, extra:(g,x)=>{ const T=(typeof FT!=='undefined'&&FT&&FT.time)||0;          // the red horsehair tassel under the head
+    g.fillStyle=WPAL.red[1]; g.beginPath(); g.moveTo(x-2.4,-1.4); g.quadraticCurveTo(x-6,-0.5+Math.sin(T*0.2)*0.6,x-8,2.8); g.lineTo(x-5,3.2); g.quadraticCurveTo(x-3.6,1.4,x-1.8,1.4); g.closePath(); g.fill(); g.fillStyle=WPAL.red[0]; g.fillRect(x-4.6,-0.8,2,0.8); }}),
+  yari: wPolearm({x0:-10, x1:31, w:2, spal:WPAL.dark, sock:2.6, sockPal:WPAL.gold, head:'triangle', hl:8.5, hw:2.8, butt:true, shaft:{bands:[[6,0.8],[14,0.8],[22,0.8]]}}),
+  nagae_yari: wPolearm({x0:-14, x1:45, w:2, spal:WPAL.dark, sock:2.6, sockPal:WPAL.gold, head:'triangle', hl:9, hw:2.8, butt:true, shaft:{bands:[[4,0.8],[16,0.8],[28,0.8],[40,0.8]]}}),
+  contus: wPolearm({x0:-14, x1:40, w:2.2, spal:WPAL.oak, sock:3, head:'lance', hl:11, hw:3.2, butt:true, shaft:{wrapAt:[-3,4]}}),
+  kontos: wPolearm({x0:-14, x1:42, w:2.4, spal:WPAL.oak, sock:3, head:'lance', hl:12, hw:3.4, butt:true, shaft:{wrapAt:[-3,4], bands:[[-4,1],[5,1]]}}),
+  venabulum: wPolearm({x0:-9, x1:26, w:2.2, spal:WPAL.wood, sock:3.2, head:'leaf', hl:10, hw:4.2, butt:true, extra:(g,x)=>{ const P=WPAL.iron;                            // THE LUGS, the wings behind the head
+    g.fillStyle=wLG(g,0,-6,0,6,[[0,P[0]],[0.5,P[1]],[1,P[2]]]); wPoly(g,[[x-2.4,-1],[x-1.4,-5.4],[x-0.4,-5.4],[x-0.8,-1]]); g.fill(); wPoly(g,[[x-2.4,1],[x-1.4,5.4],[x-0.4,5.4],[x-0.8,1]]); g.fill(); }}),
+  vel: wPolearm({x0:-9, x1:26, w:2, spal:WPAL.dark, sock:2.6, sockPal:WPAL.gold, head:'broad', hl:11, hw:6.6, shaft:{bands:[[20,1.2,WPAL.gold]]}, extra:(g,x)=>{ g.fillStyle=WPAL.gold[1]; g.beginPath(); g.arc(x+3.4,0,0.9,0,Math.PI*2); g.fill(); }}),
+  herd_spear: wPolearm({x0:-10, x1:30, w:1.8, spal:WPAL.wood, sock:2, sockPal:WPAL.bone, head:'lance', hl:7, hw:2.4, hpal:WPAL.bone, extra:(g,x)=>{ g.fillStyle=WPAL.leather[1]; g.fillRect(x+1.5,-1.6,2.2,3.2); g.fillStyle=WPAL.leather[0]; g.fillRect(x+1.5,-1.6,2.2,0.7); }}),   // the leather stop a hand back from the point
+  torv_spear: wPolearm({x0:-6, x1:24, w:2.4, spal:WPAL.dark, sock:3, sockPal:WPAL.bone, head:'leaf', hl:11, hw:5.2, hpal:WPAL.slate, extra:(g,x)=>{ g.strokeStyle=WPAL.bone[2]; g.lineWidth=0.5; for(let k=0;k<3;k++){ g.beginPath(); g.moveTo(x-2.6+k*0.9,-1.6); g.lineTo(x-2.2+k*0.9,1.6); g.stroke(); } }}),   // a slate head, a carved bone collar
+  takeyari: wPolearm({x0:-10, x1:31, w:2.6, spal:WPAL.bamboo, shaft:{nodes:7.5}, extra:(g,x)=>{ const P=WPAL.bamboo;                                                // no head at all: a long slant cut
+    g.fillStyle=wLG(g,0,-1.3,0,1.3,[[0,P[0]],[0.5,P[1]],[1,P[2]]]); wPoly(g,[[x,-1.3],[x+8,-0.2],[x+8.2,0.4],[x,1.3]]); g.fill(); g.fillStyle='#f4f6d8'; wPoly(g,[[x+0.6,0.4],[x+7.6,0.1],[x+0.6,1.1]]); g.fill(); }}),
+  harpuun: wPolearm({x0:-10, x1:32, w:2, spal:WPAL.wood, sock:3, sockPal:WPAL.ivory, head:'barbed', hl:8, hw:4, hpal:WPAL.slate, extra:(g,x)=>{                     // the toggling head, and its line coiled back along the shaft
+    g.strokeStyle='#d8c89a'; g.lineWidth=0.85; g.beginPath(); g.moveTo(x+1,-0.6); for(let k=0;k<6;k++) g.quadraticCurveTo(x-2-k*4,-2.2*(k%2? -1:1),x-4-k*4,-0.4); g.stroke(); }}),
+  ice_chisel: wPolearm({x0:-8, x1:26, w:2, spal:WPAL.wood, sock:2, sockPal:WPAL.leather, head:'spike', hl:8, hw:2.8, hpal:WPAL.bone, shaft:{wrapAt:[20,24], wrapCol:'#d8c89a'}}),
+  reach_pole: wPolearm({x0:-22, x1:26, w:2, spal:WPAL.wood, shaft:{bands:[[-21,1.4,WPAL.leather],[24.6,1.4,WPAL.leather]]}, extra:(g,x)=>{ for(const bx of [-22, x]){ g.fillStyle=WPAL.leather[1]; g.fillRect(bx-0.6,-1.4,1.8,2.8); }
+    for(const bx of [-21.4, x-0.6]){ g.strokeStyle='#c8b888'; g.lineWidth=0.85; g.beginPath(); g.moveTo(bx,1); g.lineTo(bx-1.4,5); g.moveTo(bx,1); g.lineTo(bx+1.4,5); g.stroke();
+      g.fillStyle=WPAL.leather[0]; g.beginPath(); g.ellipse(bx,6.6,2.8,2.2,0,0,Math.PI*2); g.fill(); g.fillStyle=WPAL.leather[2]; g.fillRect(bx-2.6,7.4,5.2,0.8); } }}),   // the two loads, slung
+  talk_staff: wPolearm({x0:-10, x1:30, w:2.2, spal:WPAL.dark, extra:(g,x)=>{ g.fillStyle=WPAL.bone[1]; g.beginPath(); g.ellipse(x+1.8,0,2.6,2.2,0,0,Math.PI*2); g.fill();                   // a carved knob, and the tokens hung from it
+    g.fillStyle=WPAL.bone[2]; g.fillRect(x+0.8,-0.4,2,0.6); for(const [dx,c] of [[-1,'#b02424'],[1,'#2a5ab0'],[3,'#e8c34a']]){ g.strokeStyle='#c8b888'; g.lineWidth=0.8; g.beginPath(); g.moveTo(x+1+dx*0.6,2); g.lineTo(x+dx,5.4); g.stroke(); g.fillStyle=c; g.fillRect(x+dx-0.6,5.2,1.3,1.8); }
+    g.strokeStyle='rgba(30,20,10,.5)'; g.lineWidth=0.4; for(let k=0;k<4;k++){ g.beginPath(); g.moveTo(x-6+k*1.2,-1.1); g.lineTo(x-5.4+k*1.2,1.1); g.stroke(); } }}),
+  weigh_rod: wPolearm({x0:-6, x1:30, w:1.6, spal:WPAL.oak, shaft:{bands:[[4,0.5,WPAL.bone],[9,0.5,WPAL.bone],[14,0.5,WPAL.bone],[19,0.5,WPAL.bone],[24,0.5,WPAL.bone]]}, extra:(g,x)=>{                 // a steelyard: the hook, the notches, the sliding stone
+    g.strokeStyle=WPAL.iron[2]; g.lineWidth=0.9; g.beginPath(); g.moveTo(-3,0.8); g.lineTo(-3,4); g.quadraticCurveTo(-3,6,-1.4,5.4); g.stroke();
+    g.strokeStyle='#c8b888'; g.lineWidth=0.8; g.beginPath(); g.moveTo(17,0.8); g.lineTo(17,3.4); g.stroke(); g.fillStyle=WPAL.slate[1]; g.beginPath(); g.ellipse(17,5,2.2,1.9,0,0,Math.PI*2); g.fill(); g.fillStyle=WPAL.slate[0]; g.fillRect(16,3.8,1.2,0.7); }}),
+});
+Object.assign(WPN_ART, {
+  fuscina: wPolearm({x0:-9, x1:27, w:2, spal:WPAL.wood, sock:2.2, extra:(g,x,P)=>{ const Q=WPAL.steel; g.fillStyle=wLG(g,0,-6,0,6,[[0,Q[0]],[0.5,Q[1]],[1,Q[2]]]);
+    wPoly(g,[[x-0.4,-5.6],[x+1.4,-5.6],[x+1.4,5.6],[x-0.4,5.6]]); g.fill();                                                                              // the crossbar
+    for(const yy of [-4.8,0,4.8]){ wPoly(g,[[x+1,yy-0.8],[x+7.6,yy-0.7],[x+10.4,yy],[x+7.6,yy+0.7],[x+1,yy+0.8]]); g.fill(); g.fillStyle=Q[1];
+      wPoly(g,[[x+7.6,yy-0.7],[x+6.6,yy-2.0],[x+7.2,yy-0.4]]); g.fill(); g.fillStyle=wLG(g,0,-6,0,6,[[0,Q[0]],[0.5,Q[1]],[1,Q[2]]]); } }}),              // three barbed tines
+  bidens: wPolearm({x0:-8, x1:26, w:2.2, spal:WPAL.wood, extra:(g,x)=>{ const Q=WPAL.iron; g.fillStyle=wLG(g,0,-2,0,10,[[0,Q[0]],[0.5,Q[1]],[1,Q[2]]]);
+    wPoly(g,[[x-2.6,-2],[x+0.8,-2],[x+0.8,2],[x-2.6,2]]); g.fill(); for(const dx of [-1.6,0.2]){ wPoly(g,[[x+dx-0.7,2],[x+dx+0.7,2],[x+dx+0.4,9.6],[x+dx-0.2,10.2],[x+dx-0.7,9.4]]); g.fill(); } }}),
+  kuwa: wPolearm({x0:-8, x1:25, w:2.2, spal:WPAL.wood, axe:'hoe'}),
+  ji: wPolearm({x0:-10, x1:27, w:2, spal:WPAL.dark, sock:2.4, head:'leaf', hl:8, hw:3.2, butt:true, extra:(g,x)=>{ const Q=WPAL.steel; g.fillStyle=wLG(g,0,-8,0,0,[[0,Q[0]],[0.5,Q[1]],[1,Q[2]]]);
+    wPoly(g,[[x-1.6,-1.2],[x+0.6,-1.2],[x+0.2,-6.4],[x-2.2,-9.2],[x-5.8,-9.6],[x-3.4,-7.8],[x-1.8,-5.6]]); g.fill();                                              // the crescent branch
+    g.fillStyle=WPAL.red[1]; g.beginPath(); g.moveTo(x-2,1.2); g.quadraticCurveTo(x-5,2.6,x-6.4,4.6); g.lineTo(x-3.4,4.2); g.lineTo(x-1,1.2); g.fill(); }}),
+  ge: wPolearm({x0:-10, x1:30, w:2, spal:WPAL.dark, butt:true, extra:(g,x)=>{ const Q=WPAL.bronze; g.fillStyle=wLG(g,0,-9,0,4,[[0,Q[0]],[0.5,Q[1]],[1,Q[2]]]);
+    wPoly(g,[[x-3,-1.6],[x+0.4,-1.6],[x+0.6,1.4],[x-0.4,3.6],[x-3,1.6]]); g.fill();                                                                               // the tang lashed through the shaft
+    wPoly(g,[[x-2.4,-1.4],[x-0.2,-1.6],[x+0.6,-3],[x+2.6,-11],[x+1.4,-12.4],[x-1.4,-4.8]]); g.fill(); wLine(g,[[x+1.6,-11.4],[x-0.4,-3.2]],Q[0],0.5); }}),        // the dagger blade, crosswise
+  naginata: wPolearm({x0:-10, x1:23, w:2.2, spal:WPAL.dark, sock:2.6, sockPal:WPAL.gold, butt:true, shaft:{bands:[[8,0.8],[16,0.8]]}, extra:(g,x)=>{ wGuard(g,x-0.8,'tsuba',4,WPAL.iron,0.9);
+    wBlade(g, x+0.4, 13, {w0:2.8, w1:3.4, tip:4.6, curve:4.4, cpow:1.7, single:true, hamon:true}); }}),
+  take_naginata: wPolearm({x0:-10, x1:23, w:2.2, spal:WPAL.oak, sock:2, sockPal:WPAL.dark, extra:(g,x)=>{ wBlade(g, x+0.4, 13, {w0:2.8, w1:3.2, tip:4.4, curve:4, cpow:1.7, single:true, pal:WPAL.bamboo, flat:true});
+    g.strokeStyle=WPAL.bamboo[2]; g.lineWidth=0.4; g.beginPath(); g.moveTo(x+1,-0.2); g.quadraticCurveTo(x+8,-0.6,x+12,-3); g.stroke(); }}),
+  ankusha: wPolearm({x0:-6, x1:24, w:2.2, spal:WPAL.dark, sock:2.2, sockPal:WPAL.gold, head:'spike', hl:7, hw:2.6, shaft:{bands:[[8,1,WPAL.gold],[14,1,WPAL.gold]]}, extra:(g,x)=>{ const Q=WPAL.steel;       // the hook back off the point
+    g.strokeStyle=Q[1]; g.lineWidth=1.3; g.lineCap='round'; g.beginPath(); g.moveTo(x+1.2,1); g.quadraticCurveTo(x+2.4,5.6,x-1.6,6.2); g.stroke(); g.strokeStyle=Q[0]; g.lineWidth=0.45; g.beginPath(); g.moveTo(x+1.2,1); g.quadraticCurveTo(x+2.2,5,x-1,5.6); g.stroke(); }}),
+  dolabra: wPolearm({x0:-6, x1:15, w:2.2, spal:WPAL.wood, axe:'pick', shaft:{bands:[[13.6,1.2,WPAL.iron]]}}),
+  sagaris: wPolearm({x0:-6, x1:17, w:2, spal:WPAL.dark, axe:'hammer', shaft:{bands:[[2,1,WPAL.gold],[10,1,WPAL.gold]]}}),
+  bipennis: wPolearm({x0:-6, x1:16, w:2.2, spal:WPAL.wood, axe:'double'}),
+  securis: wPolearm({x0:-6, x1:15, w:2.2, spal:WPAL.wood, axe:'bearded'}),
+  ono: wPolearm({x0:-6, x1:16, w:2.2, spal:WPAL.oak, axe:'felling', shaft:{wrapAt:[-4,1]}}),
+  shou_fu: wPolearm({x0:-4, x1:10, w:2, spal:WPAL.wood, axe:'hand'}),
+  adze: wPolearm({x0:-4, x1:13, w:2.2, spal:WPAL.dark, axe:'adze', hpal:WPAL.slate, shaft:{wrapAt:[9,12.6], wrapCol:'#d8c89a'}}),
+});
+/* the blunt, the bound and the strange */
+function wClub(g, x0, x1, w0, w1, pal, o){
+  const P=pal||WPAL.oak; o=o||{};
+  const pts=[[x0,-w0/2],[x1-1.4,-w1/2],[x1,-w1/2+0.8],[x1,w1/2-0.8],[x1-1.4,w1/2],[x0,w0/2]];
+  wPoly(g,pts); g.fillStyle=wLG(g,0,-w1/2,0,w1/2,[[0,P[0]],[0.42,P[1]],[1,P[2]]]); g.fill();
+  if(o.knots){ const R=bstRand(o.knots); for(let k=0;k<o.kn;k++){ const t=0.35+R()*0.6, x=x0+(x1-x0)*t, w=w0+(w1-w0)*t, y=(R()<0.5?-1:1)*w*0.42;
+    g.fillStyle=P[1]; g.beginPath(); g.ellipse(x,y,1.3,1.1,0,0,Math.PI*2); g.fill(); g.fillStyle=P[2]; g.beginPath(); g.arc(x+0.3,y+0.2,0.5,0,Math.PI*2); g.fill(); } }
+  if(o.studs){ for(let ry=-1;ry<=1;ry++) for(let x=x1-o.studs;x<x1-1;x+=2.4){ const t=(x-x0)/(x1-x0), w=w0+(w1-w0)*t; g.fillStyle=WPAL.iron[1]; g.beginPath(); g.arc(x+(ry&1)*1.2, ry*w*0.3, 0.75, 0, Math.PI*2); g.fill(); g.fillStyle=WPAL.iron[0]; g.fillRect(x+(ry&1)*1.2-0.4, ry*w*0.3-0.6, 0.5, 0.4); } }
+  if(o.band) { const Q=o.bandPal||WPAL.iron; for(const bx of o.band){ const t=(bx-x0)/(x1-x0), w=w0+(w1-w0)*t+0.6; g.fillStyle=wLG(g,0,-w/2,0,w/2,[[0,Q[0]],[0.5,Q[1]],[1,Q[2]]]); g.fillRect(bx,-w/2,1.2,w); } }
+  g.fillStyle='rgba(255,246,220,.22)'; wPoly(g,[[x0,-w0/2],[x1-1.4,-w1/2],[x1-1.4,-w1/2+Math.max(0.6,w1*0.2)],[x0,-w0/2+0.5]]); g.fill();
+}
+Object.assign(WPN_ART, {
+  fustis: (g)=>wClub(g,-4,17,2.2,3.2,WPAL.wood,{knots:17,kn:3}),
+  konbo: (g)=>{ wClub(g,-5,18,2.4,4.2,WPAL.oak,{knots:23,kn:2}); for(let k=0;k<3;k++){ g.fillStyle=WPAL.iron[2]; g.fillRect(12+k*2.1,-2.4+((k%2)*3.4),0.7,1.2); } },
+  clava: (g)=>wClub(g,-4,20,2.4,6.2,WPAL.oak,{knots:41,kn:7, band:[16,18.4]}),
+  kanabo: (g)=>{ wGrip(g,-5,3,2.6,WPAL.wrap,'cord'); wPommel(g,-5,'ball',1.5,WPAL.iron); wClub(g,3,24,4,6.4,WPAL.dark,{studs:19, band:[3,22.6]}); },
+  otsuchi: (g)=>{ wShaft(g,-5,17,2.2,WPAL.oak); const P=WPAL.oak; g.fillStyle=wLG(g,0,-6,0,6,[[0,P[0]],[0.45,P[1]],[1,P[2]]]); wPoly(g,[[16,-6.4],[24,-6.4],[24.6,-5.6],[24.6,5.6],[24,6.4],[16,6.4],[15.4,5.6],[15.4,-5.6]]); g.fill();
+    g.fillStyle=WPAL.iron[1]; g.fillRect(15.6,-6.6,1,13.2); g.fillRect(23.2,-6.6,1,13.2); g.fillStyle='rgba(255,246,220,.3)'; g.fillRect(16.4,-6.2,6.8,1.2); },
+  bo: (g)=>wShaft(g,-18,18,2.2,WPAL.oak,{bands:[[-18,1,WPAL.iron],[17,1,WPAL.iron]]}),
+  bian_dan: (g)=>{ const P=WPAL.bamboo; g.fillStyle=wLG(g,0,-1.4,0,1.4,[[0,P[0]],[0.5,P[1]],[1,P[2]]]); g.beginPath(); g.moveTo(-17,-0.4); g.quadraticCurveTo(0,-2.6,17,-0.4); g.lineTo(17,1); g.quadraticCurveTo(0,-1,-17,1); g.closePath(); g.fill();    // flat, springy, bowed
+    for(const x of [-16,16]){ g.fillStyle=WPAL.dark[1]; g.fillRect(x-0.8,-1.6,1.6,3.2); } },
+  tally_baton: (g)=>{ const P=WPAL.oak; for(let k=0;k<5;k++){ const y=-2.2+k*1.1; g.fillStyle=k%2? P[1] : P[0]; g.fillRect(-4+k*0.3,y,18-k*0.8,1.0); g.fillStyle=P[2]; for(let x=0;x<13;x+=2.2) g.fillRect(-2+x+k*0.4,y,0.5,0.6); }
+    g.fillStyle='#d8c89a'; g.fillRect(-4,-2.6,2.4,5.2); g.fillStyle='#a89460'; g.fillRect(-4,-2.6,2.4,0.6); },
+  tusk_club: (g)=>{ wShaft(g,-5,6,2.4,WPAL.wood,{wrapAt:[-4,2], wrapCol:'#d8c89a'}); const P=WPAL.ivory; g.fillStyle=wLG(g,0,-3,0,3,[[0,P[0]],[0.5,P[1]],[1,P[2]]]);
+    g.beginPath(); g.moveTo(5,-2.6); g.quadraticCurveTo(14,-3.4,21,-1.6); g.quadraticCurveTo(22.4,-0.6,21.2,0.2); g.quadraticCurveTo(14,0.2,5,2.6); g.closePath(); g.fill(); g.strokeStyle=P[2]; g.lineWidth=0.4; g.beginPath(); g.moveTo(7,-0.4); g.quadraticCurveTo(14,-1.2,20,-0.8); g.stroke(); },
+  jutte: (g)=>{ wGrip(g,-4,1,2.4,WPAL.wrap,'cord'); wPommel(g,-4,'ring',1.3,WPAL.iron); const P=WPAL.iron; wShaft(g,1,14,1.8,P,{grain:false});
+    g.fillStyle=wLG(g,0,-5,0,0,[[0,P[0]],[0.5,P[1]],[1,P[2]]]); wPoly(g,[[1.4,-0.9],[3,-0.9],[3.4,-4.4],[5.6,-5.2],[5.2,-4],[4.2,-3.6],[4,-0.9]]); g.fill(); wPoly(g,[[14,-0.9],[15.2,0],[14,0.9]]); g.fill(); },
+  tessen: (g)=>{ const P=WPAL.iron; for(let k=0;k<7;k++){ const a=-0.55+k*0.18; g.save(); g.rotate(a); g.fillStyle= k%2? '#e8dcc0' : '#d8c8a8'; wPoly(g,[[1.2,-0.5],[13,-1.4],[13,1.4],[1.2,0.5]]); g.fill(); g.fillStyle=P[1]; g.fillRect(1,-0.3,12.4,0.6); g.restore(); }
+    g.fillStyle='#b02424'; g.beginPath(); g.arc(9,0,1.6,0,Math.PI*2); g.fill(); g.fillStyle=P[2]; g.beginPath(); g.arc(0.6,0,1.2,0,Math.PI*2); g.fill(); },
+  cestus: (g)=>{ const P=WPAL.leather; g.fillStyle=wLG(g,0,-3.6,0,3.6,[[0,P[0]],[0.5,P[1]],[1,P[2]]]); wPoly(g,[[-2,-3.4],[4.2,-3.8],[6.4,-2.2],[6.6,2.4],[4.2,3.8],[-2,3.4]]); g.fill();
+    g.fillStyle=WPAL.leather[2]; for(let x=-1;x<4;x+=1.6) g.fillRect(x,-3.4,0.5,6.8); for(const [x,y] of [[5.2,-1.6],[5.6,0.6],[5.0,2.6],[3.4,-2.6]]){ g.fillStyle=WPAL.iron[1]; g.beginPath(); g.arc(x,y,0.8,0,Math.PI*2); g.fill(); g.fillStyle=WPAL.iron[0]; g.fillRect(x-0.4,y-0.6,0.5,0.4); } },
+  sumo_bare: (g)=>{},
+  none: (g)=>{},
+  chakram: (g)=>{ const P=WPAL.steel; g.strokeStyle=wLG(g,0,-6,0,6,[[0,P[0]],[0.5,P[1]],[1,P[2]]]); g.lineWidth=1.8; g.beginPath(); g.arc(5.4,0,5.2,0,Math.PI*2); g.stroke();
+    g.strokeStyle=P[0]; g.lineWidth=0.5; g.beginPath(); g.arc(5.4,0,6.0,Math.PI*1.1,Math.PI*1.7); g.stroke(); g.fillStyle=WPAL.gold[1]; for(let k=0;k<4;k++){ const a=k*Math.PI/2+0.4; g.fillRect(5.4+Math.cos(a)*5.2-0.5,Math.sin(a)*5.2-0.5,1,1); } },
+  makibishi: (g)=>{ g.strokeStyle='#c8b888'; g.lineWidth=0.85; g.beginPath(); g.moveTo(-2,0); g.quadraticCurveTo(4,4,10,1); g.stroke();
+    for(const [bx,by] of [[2,-1],[6,2],[10,0],[13,3]]){ const P=WPAL.dark; g.fillStyle=P[1]; for(let k=0;k<4;k++){ const a=k*Math.PI/2+0.5+bx; wPoly(g,[[bx-0.6,by],[bx+Math.cos(a)*2.6,by+Math.sin(a)*2.6],[bx+0.6,by]]); g.fill(); } g.fillStyle=P[0]; g.beginPath(); g.arc(bx,by,0.9,0,Math.PI*2); g.fill(); } },
+  kama: (g)=>{ wShaft(g,-4,6,2.4,WPAL.wood); wSickle(g,6,9,WPAL.steel); },
+  lian: (g)=>{ wShaft(g,-4,6,2.4,WPAL.wood,{bands:[[5,1,WPAL.iron]]}); wSickle(g,6,10,WPAL.iron); },
+  falx_mess: (g)=>{ wShaft(g,-4,5,2.4,WPAL.wood); wSickle(g,5,11,WPAL.iron,true); },
+  falx: (g)=>{ wShaft(g,-6,9,2.4,WPAL.wood,{bands:[[8,1.2,WPAL.iron]]}); wBlade(g,9,19,{w0:3,w1:2.6,tip:4,curve:-9,cpow:2.4,single:true,pal:WPAL.steel}); },
+  kusarigama: (g)=>{ wShaft(g,-4,7,2.4,WPAL.dark,{bands:[[6,1,WPAL.iron]]}); wSickle(g,7,9,WPAL.steel);
+    g.strokeStyle=WPAL.iron[1]; g.lineWidth=0.9; for(let k=0;k<10;k++){ const t=k/10, x=-4-t*18, y=1+t*t*9; g.beginPath(); g.ellipse(x,y,0.9,0.6,0.6,0,Math.PI*2); g.stroke(); }
+    g.fillStyle=wLG(g,0,8,0,12,[[0,WPAL.iron[0]],[1,WPAL.iron[2]]]); g.beginPath(); g.arc(-23,10.6,1.7,0,Math.PI*2); g.fill(); },
+  lianjia: (g)=>{ wShaft(g,-4,15,2.2,WPAL.wood); g.fillStyle=WPAL.leather[1]; g.fillRect(14.6,-1.6,1.6,3.2);
+    g.strokeStyle=WPAL.leather[2]; g.lineWidth=1; g.beginPath(); g.moveTo(16,0); g.lineTo(17.6,1.6); g.stroke();
+    g.save(); g.translate(17.6,1.6); g.rotate(0.35); wShaft(g,0,12,2.6,WPAL.oak,{bands:[[10.8,1,WPAL.iron]]}); g.restore(); },
+  shinai: (g)=>{ wGrip(g,-5,1,2.6,WPAL.leather,'cord'); const P=WPAL.bamboo; for(let k=0;k<4;k++){ const y=-1.5+k*1.0; g.fillStyle= k%2? P[1] : P[0]; g.fillRect(1,y,22,0.9); }
+    g.fillStyle=WPAL.leather[1]; g.fillRect(9,-1.8,1.2,3.6); g.fillStyle='#e8e0c8'; g.fillRect(1,-0.1,22,0.3); g.fillStyle=WPAL.leather[1]; g.fillRect(22.4,-1.9,2.6,3.8); g.fillStyle=WPAL.leather[0]; g.fillRect(22.4,-1.9,2.6,0.7); },
+  shikomizue: (g)=>{ wShaft(g,-6,15,3,WPAL.bamboo,{nodes:6}); g.fillStyle=WPAL.horn[1]; g.fillRect(-7.4,-1.7,1.6,3.4);
+    wBlade(g,15,11,{w0:1.9,w1:1.8,tip:2.2,curve:0.5,single:true,hamon:true}); g.fillStyle=WPAL.gold[1]; g.fillRect(14.4,-1.6,0.9,3.2); },
+  scissor_blade: (g)=>{ const P=WPAL.iron; g.fillStyle=wLG(g,0,-3,0,3,[[0,P[0]],[0.5,P[1]],[1,P[2]]]); wPoly(g,[[-8,-2.8],[3,-2.6],[3,2.6],[-8,2.8]]); g.fill();       // the iron tube over the forearm
+    g.fillStyle=P[2]; for(let x=-6;x<3;x+=2.6) g.fillRect(x,-2.8,0.6,5.6);
+    const Q=WPAL.steel; g.fillStyle=wLG(g,0,-8,0,8,[[0,Q[0]],[0.5,Q[1]],[1,Q[2]]]); g.beginPath(); g.moveTo(3,-1.4); g.lineTo(5,-1.4); g.bezierCurveTo(10,-8,12,-3,12.6,0); g.bezierCurveTo(12,3,10,8,5,1.4); g.lineTo(3,1.4); g.closePath(); g.fill();   // the half-moon
+    g.strokeStyle=Q[0]; g.lineWidth=0.5; g.beginPath(); g.moveTo(9,-4.6); g.quadraticCurveTo(12.4,-2.4,12.3,0); g.stroke(); },
+  ulaq: (g)=>{ wGrip(g,-3,3,2.2,WPAL.ivory,null); g.fillStyle=WPAL.bone[2]; g.fillRect(-0.4,1.1,0.8,1.6); const Q=WPAL.slate; g.fillStyle=wLG(g,0,2,0,9,[[0,Q[0]],[0.5,Q[1]],[1,Q[2]]]);
+    g.beginPath(); g.moveTo(-3.4,2.4); g.lineTo(3.4,2.4); g.quadraticCurveTo(4,7.8,0,8.2); g.quadraticCurveTo(-4,7.8,-3.4,2.4); g.closePath(); g.fill(); g.strokeStyle=Q[0]; g.lineWidth=0.5; g.beginPath(); g.moveTo(-3,6.6); g.quadraticCurveTo(0,8.6,3,6.6); g.stroke(); },
+  flenser: (g)=>{ wShaft(g,-5,4,2.4,WPAL.wood,{wrapAt:[-4,3], wrapCol:'#d8c89a'}); wBlade(g,4,15,{w0:1.7,w1:2.4,tip:3,single:true,clip:true,pal:WPAL.slate}); },
+  nu: (g)=>{ const W=WPAL.wood; wShaft(g,-6,18,2.8,W); g.fillStyle=W[2]; wPoly(g,[[-6,-1.4],[-8,-2.6],[-8,2.6],[-6,1.4]]); g.fill();                     // the tiller and butt
+    g.strokeStyle=WPAL.horn[1]; g.lineWidth=1.6; g.lineCap='round'; g.beginPath(); g.moveTo(17,-9.6); g.quadraticCurveTo(19,0,17,9.6); g.stroke();       // the prod, across the stock
+    g.strokeStyle='#3a2a18'; g.lineWidth=0.85; g.beginPath(); g.moveTo(16.6,-9.4); g.lineTo(12.6,0); g.lineTo(16.6,9.4); g.stroke();                       // the string, spanned
+    const B=WPAL.bronze; g.fillStyle=wLG(g,0,-3,0,1,[[0,B[0]],[0.5,B[1]],[1,B[2]]]); wPoly(g,[[5,-1.4],[11,-1.4],[11,-3.4],[5,-3.2]]); g.fill(); g.fillRect(7.4,1.2,1.4,3.2);   // the bronze lock and trigger
+    g.fillStyle='#c8b088'; g.fillRect(12,-1.9,9,0.7); g.fillStyle=WPAL.iron[1]; wPoly(g,[[21,-2.2],[23,-1.55],[21,-0.9]]); g.fill(); },
+  steppe_bow: (g)=>{ const P=WPAL.horn; g.strokeStyle=P[1]; g.lineWidth=1.6; g.lineCap='round'; g.beginPath(); g.moveTo(3.2,-15); g.quadraticCurveTo(-1,-12,0.8,-6); g.quadraticCurveTo(2.6,0,0.8,6); g.quadraticCurveTo(-1,12,3.2,15); g.stroke();
+    g.strokeStyle='#c8a870'; g.lineWidth=0.6; g.beginPath(); g.moveTo(1.6,-11); g.quadraticCurveTo(3,0,1.6,11); g.stroke();
+    g.strokeStyle='#e8e0c8'; g.lineWidth=1.1; g.beginPath(); g.moveTo(3.2,-15); g.lineTo(4.4,-16.4); g.moveTo(3.2,15); g.lineTo(4.4,16.4); g.stroke();       // the stiff bone ears
+    g.strokeStyle='#2a1e12'; g.lineWidth=0.85; g.beginPath(); g.moveTo(4.2,-15.6); g.lineTo(4.2,15.6); g.stroke();
+    g.fillStyle=WPAL.leather[1]; g.fillRect(-0.4,-1.6,2.4,3.2); g.fillStyle='#c8b088'; g.fillRect(2,-0.35,9,0.7); g.fillStyle=WPAL.iron[1]; wPoly(g,[[11,-1.2],[13.4,0],[11,1.2]]); g.fill();
+    g.fillStyle='#b02424'; wPoly(g,[[2,-0.4],[4.6,-1.8],[4.6,-0.3]]); g.fill(); wPoly(g,[[2,0.4],[4.6,1.8],[4.6,0.3]]); g.fill(); },
+});
+function wSickle(g, x, L, pal, deep){
+  const P=pal||WPAL.steel; g.fillStyle=wLG(g,0,-L,0,2,[[0,P[0]],[0.5,P[1]],[1,P[2]]]);
+  g.beginPath(); g.moveTo(x-1,-1.1); g.lineTo(x+1.2,-1.4); g.bezierCurveTo(x+L*0.9,-2,x+L*1.1,-L*(deep? 0.9 : 0.65),x+L*0.55,-L*(deep? 1.05 : 0.85));
+  g.bezierCurveTo(x+L*0.9,-L*0.6,x+L*0.6,-0.2,x+1.2,1.2); g.lineTo(x-1,1.1); g.closePath(); g.fill();
+  g.strokeStyle=P[0]; g.lineWidth=0.5; g.beginPath(); g.moveTo(x+L*0.55,-L*(deep? 1.0 : 0.8)); g.bezierCurveTo(x+L*0.85,-L*0.55,x+L*0.6,-0.4,x+1.6,0.4); g.stroke();
+  if(!deep){ g.strokeStyle='rgba(20,14,8,.35)'; g.lineWidth=0.4; for(let k=0;k<4;k++){ g.beginPath(); g.moveTo(x+2+k*1.4,0.2-k*0.2); g.lineTo(x+2.4+k*1.4,0.8-k*0.2); g.stroke(); } }   // the teeth of a grain sickle
+}
+/* ---- WHAT IS THROWN AND SHOT: the pilum, the bows, the darts, the repeating crossbow, the throwing-board, the bombs ---- */
+function wBowLimb(g, pts, w, pal){ const P=pal||WPAL.horn; g.lineCap='round'; g.lineJoin='round';
+  g.strokeStyle=P[2]; g.lineWidth=w+0.6; g.beginPath(); g.moveTo(pts[0][0],pts[0][1]); for(let i=1;i<pts.length;i+=2) g.quadraticCurveTo(pts[i][0],pts[i][1],pts[i+1][0],pts[i+1][1]); g.stroke();
+  g.strokeStyle=P[1]; g.lineWidth=w; g.beginPath(); g.moveTo(pts[0][0],pts[0][1]); for(let i=1;i<pts.length;i+=2) g.quadraticCurveTo(pts[i][0],pts[i][1],pts[i+1][0],pts[i+1][1]); g.stroke();
+  g.strokeStyle=P[0]; g.lineWidth=Math.max(0.45,w*0.3); g.beginPath(); g.moveTo(pts[0][0]-0.3,pts[0][1]); for(let i=1;i<pts.length;i+=2) g.quadraticCurveTo(pts[i][0]-0.3,pts[i][1],pts[i+1][0]-0.3,pts[i+1][1]); g.stroke(); }
+function wArrowOn(g, x0, len, pal){ g.fillStyle='#c8b088'; g.fillRect(x0,-0.35,len,0.7); const P=pal||WPAL.iron; g.fillStyle=P[1]; wPoly(g,[[x0+len,-1.1],[x0+len+2.6,0],[x0+len,1.1]]); g.fill();
+  g.fillStyle='#b02424'; wPoly(g,[[x0,-0.4],[x0+2.8,-1.8],[x0+3,-0.3]]); g.fill(); wPoly(g,[[x0,0.4],[x0+2.8,1.8],[x0+3,0.3]]); g.fill(); }
+Object.assign(WPN_ART, {
+  _pilum: (g,C,gold)=>{ wShaft(g,-9,5,2.2,WPAL.wood); g.fillStyle=WPAL.bone[1]; g.fillRect(2,-1.4,3,2.8); g.fillStyle=WPAL.bone[0]; g.fillRect(2,-1.4,3,0.6);   // the bone grip
+    const Q=gold? WPAL.gold : WPAL.iron; g.fillStyle=wLG(g,0,-2.4,0,2.4,[[0,Q[0]],[0.5,Q[1]],[1,Q[2]]]); wPoly(g,[[5,-1.8],[7.4,-1.1],[7.4,1.1],[5,1.8]]); g.fill();          // the pyramidal socket
+    g.fillRect(7.4,-0.45,10.4,0.9); wPoly(g,[[17.6,-1.2],[20.6,0],[17.6,1.2]]); g.fill(); g.fillStyle=Q[0]; g.fillRect(7.4,-0.45,10,0.3); },                   // the long soft shank, and the little head
+  _bow_steppe: (g)=>{ wBowLimb(g,[[3.4,-15.4],[-0.6,-13],[1,-8],[3.4,-2],[1.6,0],[3.4,2],[1,8],[-0.6,13],[3.4,15.4]],1.6,WPAL.horn);
+    wLine(g,[[3.4,-15.4],[4.6,-17]],'#e8e0c8',1.1); wLine(g,[[3.4,15.4],[4.6,17]],'#e8e0c8',1.1); wLine(g,[[4.4,-16.6],[4.4,16.6]],'#2a1e12',0.85);
+    g.fillStyle=WPAL.leather[1]; g.fillRect(0.6,-1.8,2.6,3.6); wArrowOn(g,2.6,10); },
+  _bow_parthian: (g)=>{ wBowLimb(g,[[4,-18],[-1,-15],[1,-9],[3.6,-2.4],[1.6,0],[3.6,2.4],[1,9],[-1,15],[4,18]],1.8,WPAL.horn);
+    wLine(g,[[4,-18],[5.8,-20]],'#f0e8d4',1.3); wLine(g,[[4,18],[5.8,20]],'#f0e8d4',1.3); wLine(g,[[5.6,-19.6],[5.6,19.6]],'#2a1e12',0.85);
+    g.fillStyle=WPAL.gold[1]; g.fillRect(0.4,-2.2,3,0.7); g.fillRect(0.4,1.5,3,0.7); g.fillStyle=WPAL.leather[1]; g.fillRect(0.6,-1.5,2.6,3); wArrowOn(g,3,12); },
+  _bow_yumi: (g)=>{ wBowLimb(g,[[3,-34],[6.4,-18],[3.4,-6],[1.6,0],[3,6],[5.2,12],[3,18]],1.7,WPAL.oak);
+    g.strokeStyle=WPAL.dark[2]; g.lineWidth=1.3; for(const y of [-26,-16,-6,6,13]){ g.beginPath(); g.moveTo(2.4+(y<0? Math.abs(y)*0.06 : 0),y); g.lineTo(5.6,y); g.stroke(); }   // the rattan bindings
+    wLine(g,[[2.8,-33.6],[2.8,17.6]],'#e8e0c8',0.85); g.fillStyle=WPAL.leather[1]; g.fillRect(0.8,-1.6,2.6,3.2); wArrowOn(g,2.8,13,WPAL.steel); },
+  _plumbata: (g)=>{ for(const [a,dx] of [[-0.24,0],[0,1.4],[0.24,0.6]]){ g.save(); g.rotate(a); g.fillStyle='#c8b088'; g.fillRect(-6+dx,-0.45,15,0.9);       // three lead-weighted darts, fanned in the fist
+      g.fillStyle=WPAL.slate[1]; g.beginPath(); g.ellipse(7+dx,0,1.8,1.3,0,0,Math.PI*2); g.fill(); g.fillStyle=WPAL.slate[0]; g.fillRect(6+dx,-1,1.2,0.6);
+      g.fillStyle=WPAL.iron[1]; wPoly(g,[[8.4+dx,-1],[12.4+dx,0],[8.4+dx,1]]); g.fill(); g.fillStyle='#e8dcc0'; wPoly(g,[[-6+dx,-0.5],[-3+dx,-2],[-2.4+dx,-0.4]]); g.fill(); wPoly(g,[[-6+dx,0.5],[-3+dx,2],[-2.4+dx,0.4]]); g.fill(); g.restore(); } },
+  _lian_nu: (g)=>{ const W=WPAL.wood; wShaft(g,-6,15,2.6,W); g.fillStyle=W[2]; wPoly(g,[[-6,-1.3],[-8,-2.4],[-8,2.4],[-6,1.3]]); g.fill();
+    g.fillStyle=wLG(g,0,-6,0,-1,[[0,W[0]],[0.5,W[1]],[1,W[2]]]); g.fillRect(2,-5.6,11,4.4); g.fillStyle=W[2]; for(let x=3.4;x<12;x+=2.2) g.fillRect(x,-5.4,0.5,4);   // the magazine box on top
+    g.strokeStyle=WPAL.dark[1]; g.lineWidth=1; g.beginPath(); g.moveTo(3,-3.4); g.lineTo(-3,-7.4); g.stroke();                                                         // the cocking lever
+    g.strokeStyle=WPAL.horn[1]; g.lineWidth=1.4; g.lineCap='round'; g.beginPath(); g.moveTo(14,-8); g.quadraticCurveTo(15.6,0,14,8); g.stroke();
+    g.strokeStyle='#3a2a18'; g.lineWidth=0.85; g.beginPath(); g.moveTo(13.6,-7.8); g.lineTo(11.4,0); g.lineTo(13.6,7.8); g.stroke(); },
+  _nuqaq: (g)=>{ const P=WPAL.wood; g.fillStyle=wLG(g,0,-1.6,0,1.6,[[0,P[0]],[0.5,P[1]],[1,P[2]]]); wPoly(g,[[-4,-1.8],[9,-1.2],[10,-0.4],[10,0.8],[-4,1.8]]); g.fill();
+    g.fillStyle=P[2]; g.beginPath(); g.ellipse(-1.8,0,0.9,0.7,0,0,Math.PI*2); g.fill(); g.beginPath(); g.ellipse(0.8,0,0.9,0.7,0,0,Math.PI*2); g.fill();                 // the finger holes
+    g.fillStyle=WPAL.ivory[1]; g.fillRect(9.2,-1.4,1,1); g.fillStyle='#c8b088'; g.fillRect(-2,-2.2,16,0.7); g.fillStyle=WPAL.slate[1]; wPoly(g,[[14,-2.9],[17,-1.85],[14,-0.8]]); g.fill(); },   // the dart laid in its groove
+  _bomb_clay: (g)=>{ const P=['#d8a07a','#a8724a','#6a4428'], R=4.6; g.fillStyle=wLG(g,2,-R,8,R,[[0,P[0]],[0.5,P[1]],[1,P[2]]]); g.beginPath(); g.arc(6,0,R,0,Math.PI*2); g.fill();
+    g.strokeStyle='#5a4030'; g.lineWidth=0.5; for(const y of [-2,0,2]){ g.beginPath(); g.moveTo(6-Math.sqrt(R*R-y*y),y); g.lineTo(6+Math.sqrt(R*R-y*y),y); g.stroke(); } for(const x of [4,6,8]){ g.beginPath(); g.moveTo(x,-R+0.6); g.lineTo(x,R-0.6); g.stroke(); }   // the cord net
+    g.fillStyle='#3a2a18'; g.fillRect(5.2,-R-2.4,1.6,2.6); const T=(typeof FT!=='undefined'&&FT&&FT.time)||0; g.fillStyle='#ff7a2a'; g.beginPath(); g.arc(6,-R-3,1.2+Math.sin(T*0.5)*0.3,0,Math.PI*2); g.fill(); g.fillStyle='#fff0b0'; g.fillRect(5.6,-R-3.4,0.9,0.9);
+    wShaft(g,-6,2,2.6,WPAL.wood); },
+  _bomb_iron: (g)=>{ const P=['#9a9088','#5e5650','#2e2a26'], R=5.4; g.fillStyle=wLG(g,2,-R,8,R,[[0,P[0]],[0.5,P[1]],[1,P[2]]]); g.beginPath(); g.arc(6,0,R,0,Math.PI*2); g.fill();
+    g.fillStyle=P[2]; g.fillRect(0.8,-0.5,10.4,1); g.fillStyle='rgba(255,255,255,.35)'; g.beginPath(); g.arc(4.2,-2.2,1.4,0,Math.PI*2); g.fill();
+    g.fillStyle='#3a2a18'; g.fillRect(5.2,-R-2.4,1.6,2.6); const T=(typeof FT!=='undefined'&&FT&&FT.time)||0; g.fillStyle='#ff7a2a'; g.beginPath(); g.arc(6,-R-3,1.2+Math.sin(T*0.5)*0.3,0,Math.PI*2); g.fill(); g.fillStyle='#fff0b0'; g.fillRect(5.6,-R-3.4,0.9,0.9);
+    wShaft(g,-6,1,2.6,WPAL.wood); },
+});
+const WPN_RANGED={ steppe:'_bow_steppe', parthian:'_bow_parthian', yumi:'_bow_yumi', plumbata:'_plumbata', lian_nu:'_lian_nu', nuqaq:'_nuqaq', horoku:'_bomb_clay', tetsuhau:'_bomb_iron' };
+/* how far along it runs, for the icons */
+function wpnExtent(id){
+  const k=document.createElement('canvas'); k.width=160; k.height=80; const g=k.getContext('2d'); g.translate(60,40);
+  try{ (WPN_ICON_ART[id]||WPN_ART[id])(g, null, false); }catch(e){}
+  const d=g.getImageData(0,0,160,80).data; let x0=160,x1=-1,y0=80,y1=-1;
+  for(let y=0;y<80;y++) for(let x=0;x<160;x++){ if(d[(y*160+x)*4+3]>60){ if(x<x0)x0=x; if(x>x1)x1=x; if(y<y0)y0=y; if(y>y1)y1=y; } }
+  return x1<0? [-2,2,-2,2] : [x0-60,x1-60,y0-40,y1-40];
+}
+const WPN_EXT={};
+/* in the hand these are nothing at all; on a shop tile, a fist */
+function wFist(g){ const P=['#f0c8a0','#c89070','#7a4a30']; g.fillStyle=wLG(g,0,-5,0,5,[[0,P[0]],[0.5,P[1]],[1,P[2]]]);
+  g.beginPath(); g.moveTo(-6,-3); g.lineTo(2,-4.6); g.quadraticCurveTo(6.4,-4.6,6.6,-1); g.lineTo(6.6,2.6); g.quadraticCurveTo(6,4.8,2,4.8); g.lineTo(-6,3.6); g.closePath(); g.fill();
+  g.strokeStyle=P[2]; g.lineWidth=0.5; for(const y of [-2.2,0,2.2]){ g.beginPath(); g.moveTo(3,y); g.lineTo(6.4,y+0.2); g.stroke(); }
+  g.fillStyle=P[1]; g.beginPath(); g.ellipse(1.2,-3.8,2.6,1.3,-0.2,0,Math.PI*2); g.fill(); g.strokeStyle=P[2]; g.beginPath(); g.moveTo(-1,-3.4); g.quadraticCurveTo(1.6,-5,3.6,-3.6); g.stroke();
+  g.fillStyle='#e8dcc0'; g.fillRect(-6.6,-3.4,2,7.2); g.fillStyle='#b8a888'; g.fillRect(-6.6,-3.4,2,0.8); }
+const WPN_ICON_ART={ sumo_bare:wFist, none:wFist };
+/* ---- IN THE HAND: painted in the hand's own rotation into a scratch buffer at screen resolution, snapped, ringed ---- */
+let WPN_BUF=null, WPN_LAST='', WPN_DRAWS=0;
+function wpnStamp(id, C, gold){
+  const art=WPN_ART[id]; if(!art) return false;
+  const m=ctx.getTransform(), sc=Math.max(Math.hypot(m.a,m.b), Math.hypot(m.c,m.d)), R=Math.ceil(56*sc), S=R*2;
+  if(!WPN_BUF || WPN_BUF.cv.width<S){ const mk=()=>{ const k=document.createElement('canvas'); k.width=S; k.height=S; k.getContext('2d',{willReadFrequently:true}); return k; }; WPN_BUF={cv:mk(), sil:mk()}; }
+  const W=WPN_BUF.cv.width, bx=Math.round(m.e)-(W>>1), by=Math.round(m.f)-(W>>1);
+  const key=id+'|'+(gold?1:0)+'|'+[m.a,m.b,m.c,m.d,m.e,m.f].map(v=>v.toFixed(3)).join(',')+'|'+(typeof FT!=='undefined'&&FT? (FT.time|0) : 0);
+  if(key!==WPN_LAST){ WPN_LAST=key;
+    const g=WPN_BUF.cv.getContext('2d'); g.setTransform(1,0,0,1,0,0); g.clearRect(0,0,W,W);
+    g.setTransform(m.a,m.b,m.c,m.d, m.e-bx, m.f-by); art(g, C, gold);
+    g.setTransform(1,0,0,1,0,0); const im=g.getImageData(0,0,W,W), d=im.data; for(let i=3;i<d.length;i+=4) d[i]= d[i]>=100? 255 : 0; g.putImageData(im,0,0);
+    const s=WPN_BUF.sil.getContext('2d'); s.setTransform(1,0,0,1,0,0); s.globalCompositeOperation='source-over'; s.clearRect(0,0,W,W); s.drawImage(WPN_BUF.cv,0,0);
+    s.globalCompositeOperation='source-in'; s.fillStyle='#160e07'; s.fillRect(0,0,W,W); s.globalCompositeOperation='source-over';
+    WPN_DRAWS++; }
+  ctx.save(); ctx.setTransform(1,0,0,1,0,0);
+  if(OUTL){ for(const [dx,dy] of [[-1,0],[1,0],[0,-1],[0,1]]) ctx.drawImage(WPN_BUF.sil, bx+dx, by+dy); }
+  else ctx.drawImage(WPN_BUF.cv, bx, by);
+  ctx.restore();
+  return true;
+}
+/* ---- THE SHOP'S ICON: the same painting, laid on the diagonal and as big as the tile allows ---- */
+function wpnIcon(c, id, S, gold){
+  const art=WPN_ICON_ART[id]||WPN_ART[id]; if(!art) return false;
+  const e=WPN_EXT[id]||(WPN_EXT[id]=wpnExtent(id)), a=-Math.PI/4, ca=Math.cos(a), sa=Math.sin(a);
+  const cx0=(e[0]+e[1])/2, cy0=(e[2]+e[3])/2; let bw=0, bh=0;
+  for(const [x,y] of [[e[0],e[2]],[e[1],e[2]],[e[0],e[3]],[e[1],e[3]]]){ const dx=x-cx0, dy=y-cy0; bw=Math.max(bw,Math.abs(dx*ca-dy*sa)*2); bh=Math.max(bh,Math.abs(dx*sa+dy*ca)*2); }   // the box it fills, once it is on the diagonal
+  const sc=Math.min(4, (S-7)/Math.max(4,bw), (S-7)/Math.max(4,bh));
+  const k=document.createElement('canvas'); k.width=S; k.height=S; const g=k.getContext('2d');
+  const cx=(e[0]+e[1])/2, cy=(e[2]+e[3])/2;
+  g.translate(S/2,S/2); g.rotate(a); g.scale(sc,sc); g.translate(-cx,-cy); art(g, null, gold);
+  const im=g.getImageData(0,0,S,S), d=im.data; for(let i=3;i<d.length;i+=4) d[i]= d[i]>=100? 255 : 0; g.setTransform(1,0,0,1,0,0); g.putImageData(im,0,0);
+  const s=document.createElement('canvas'); s.width=S; s.height=S; const q=s.getContext('2d'); q.drawImage(k,0,0); q.globalCompositeOperation='source-in'; q.fillStyle='#0a0604'; q.fillRect(0,0,S,S);
+  for(const [dx,dy] of [[-1,0],[1,0],[0,-1],[0,1]]) c.drawImage(s,dx,dy);
+  c.drawImage(k,0,0);
+  return true;
+}
+
+function drawWeapon2(id,C){ if(wpnStamp(id,C)) return; drawWeapon2Old(id,C); }
+/* the old rectangles, kept only for anything the armoury has not painted */
+function drawWeapon2Old(id,C){
   const m=C.metal,mh=C.metalHi,ms=C.metalSh,wood=C.wood,woodHi=C.woodHi,gold=C.gold;
   if(id==='gladius'){ px(-1,-1,4,3,wood); px(-1,-2,5,1,gold); px(3,-1,13,2,m); px(3,-2,13,1,mh); px(3,0,13,1,ms); px(16,-1,2,2,m); }
   else if(id==='spatha'){ px(-1,-1,4,3,wood); px(-1,-2,6,1,gold); px(4,-1,22,2,m); px(4,-2,22,1,mh); px(4,0,22,1,ms); px(26,-1,2,2,m); }
@@ -17779,6 +18189,7 @@ function drawPilum(pj){
 }
 // a shortened spear held in the fist (for the charge / throw pose)
 function drawHeldPilum(gold){
+  if(wpnStamp('_pilum', null, gold)) return;
   ctx.fillStyle='#160e07'; ctx.fillRect(-9,-2.3,28,4.6);                // outline
   ctx.fillStyle='#9a6636'; ctx.fillRect(-8,-1.2,13,2.4);               // shaft
   ctx.fillStyle='#c08a4e'; ctx.fillRect(-8,-1.2,13,0.8);
@@ -17968,6 +18379,7 @@ function drawHeldGun(bw, phase, pt){
 }
 /* the clay bomb: a fat pot, a lashed neck, and a fuse already lit */
 function drawHeldBomb(bw){
+  if(bw && WPN_RANGED[bw.id] && wpnStamp(WPN_RANGED[bw.id], null, false)) return;
   const c=ctx;
   const R = bw.id==='tetsuhau'? 5.4 : 4.6;
   c.fillStyle='#160e07'; c.beginPath(); c.arc(6,0,R+1.2,0,6.2832); c.fill();
@@ -17984,6 +18396,7 @@ function drawHeldBomb(bw){
 }
 /* and a real bow, which was also being drawn as a javelin */
 function drawHeldBow(bw){
+  if(bw && WPN_RANGED[bw.id] && wpnStamp(WPN_RANGED[bw.id], null, false)) return;
   const c=ctx;
   const H = bw.id==='yumi'? 26 : 17;                                       // the yumi is enormous
   const off = bw.id==='yumi'? 8 : 0;                                       // and gripped a THIRD up
@@ -63437,6 +63850,7 @@ function drawRangedIcon(cnv, bw){
   c.strokeStyle = bw.bomb? '#8a5a2a' : bw.gun? '#6a6a74' : '#4a3a26';
   c.lineWidth=2; c.strokeRect(1,1,S-2,S-2);
   const m='#3a3a40', mh='#5a5a64', ms='#22222a', brass='#c8a24a', brassHi='#e8c86a';
+  if(WPN_RANGED[bw.id] && wpnIcon(c, WPN_RANGED[bw.id], S, false)) return;          // ⚔ the armoury's painting
   /* ---- V42 ---- */
   if(bw.id==='plumbata'){ for(let i=0;i<3;i++){ const x=11+i*7;                      // three weighted darts
       P(x+1,8,2,24,'#8a6a44'); P(x,24,4,5,'#6a6a72'); P(x,24,4,1,'#9a9aa2'); P(x+1,5,2,4,'#c8ccd4'); P(x-1,30,6,3,'#c8b078'); } return; }
@@ -63525,7 +63939,8 @@ function drawGearIcon(cnv,cat,g){
   const m='#c2cad4',mh='#eef4fa',ms='#6f7a87',gold='#e8c34a',goldHi='#fff0b0',wood='#7a5630',br='#bb8a46',brHi='#dcb066';
   const bladeC=g.gold?gold:m, bladeH=g.gold?goldHi:mh, bladeS=g.gold?'#a8862e':ms;
   const id=g.id;
-  if(cat==='weapon'){
+  if(cat==='weapon' && wpnIcon(c, id, S, !!g.gold)){ }                // ⚔ the armoury's own painting, on the diagonal
+  else if(cat==='weapon'){
     if(id==='hasta'||id==='hasta_argentea'){ P(19,8,2,26,wood); P(19,8,1,26,'#9a7448'); P(17,3,6,7,id==='hasta_argentea'?'#e8eef4':m); P(19,1,2,4,id==='hasta_argentea'?'#fff':mh); }
     else if(id==='fuscina'){ P(19,10,2,24,wood); P(14,4,2,8,m); P(19,4,2,8,m); P(24,4,2,8,m); P(14,10,12,2,m); P(14,4,2,2,mh); P(24,4,2,2,mh); }
     else if(id==='sagaris'||id==='bipennis'||id==='dolabra'){ P(19,6,2,28,wood); P(19,6,1,28,'#9a7448');
@@ -64879,6 +65294,7 @@ drawLogo();
 }catch(e){} })();
 
 window.__SS = {
+  WPN_ART, WPN_RANGED, drawRangedIcon, BOWS, wpnStamp, wpnIcon, drawHeldBow, drawHeldPilum, drawHeldBomb, get WPN_DRAWS(){ return WPN_DRAWS; }, setOUTL:(v)=>{ OUTL=!!v; }, drawWeapon2Old,
   doAttack, heavyShove, hop, jump, chSetup, chUpdate, chDrawScene, chDrawRig, chMakeCar, chWreck, chDismount, chOnHit, chTrample, chPin, chSpeedMul, HORSE_COATS, get CH_DECK(){ return CH_DECK; },
   drawWifeHappy, get WH_DUR(){ return WH_DUR; }, finFxNew, finFxTick, get CH_CACHE_SIZE(){ return CH_CACHE.size; }, chPaint, CH_PAINTERS, chProps, chDoor, chBedIn, get CH_DRAWS(){ return CH_DRAWS; }, get CH_CACHE_N(){ return CH_CACHE.size; },
   show, openCreate, enterMap, openShop, openBrief, openStable, openVilla, openIntrigue, startFight, FT:()=>FT,

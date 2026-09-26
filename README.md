@@ -70,6 +70,15 @@ publicly, leaving it off keeps the game safe for a general audience.
 - **The venatio's beasts on bodies of their own (V49)** — the lion, leopard, bear and bull are
   drawn like the men they fight: painted vector bodies with a stride, a leap, a fall, and an attack
   each (a swipe, a rearing maul, a hook of the horns).
+- **The armoury, redrawn (V49)** — every one of the 81 weapons, and the pilum, the three bows, the lead
+  darts, the repeating crossbow, the throwing-board and the two bombs, is a painting now instead of a
+  stack of rectangles: blades with real outlines (leaf, waisted, parallel, curved, clipped), a bevel of
+  light and shadow, fullers, a hamon on the Japanese edges; hilts of guard, wrapped grip and pommel;
+  spears with grained shafts, sockets and the right head (a yari's spike, a vel's broad leaf, a boar
+  spear's lugs, a harpoon's barbs); axes with the bit hanging off the haft the way it does. Each is
+  painted in the hand's own rotation at screen resolution, snapped to the pixel and ringed like the
+  body, so it turns with the arm and stays crisp — and the shop draws its tiles from the same
+  painting, bigger. (The darts, the repeating crossbow and the throwing-board had been drawn as bows.)
 - **The essedarii — chariot fights (V49)** — 🐎 ESSEDARII on the match brief (tier 2 arenas and up). You
   stand on the platform of a two-horse war car while your driver keeps the pair at the gallop: A/D
   choose which way he drives (hold the way you are going and he whips them on), he wheels round before

@@ -124,6 +124,33 @@ const ok=(name,cond,note)=>{ if(cond){pass++; console.log('  PASS  '+name+(note?
     return {passes, hits, lowAtWheel, dismount, eMounted:!!e.mounted}; });
   ok('he drives passes at you, strikes as he goes by, goes for your wheel — and gets down to finish it', !R.err && R.passes>=3 && R.hits>=2 && R.lowAtWheel>=1 && R.dismount!==null, R.err||JSON.stringify(R));
 
+  console.log('\n=== ⚔ THE ARMOURY, REDRAWN ===');
+  R=await T(()=>{ const S=window.__SS, out={}; const ids=S.GEAR.weapon.map(w=>w.id); const g=document.getElementById('game').getContext('2d'); const C=S.paletteFor({});
+    out.n=ids.length; out.missing=ids.filter(id=>!S.WPN_ART[id]);
+    const shots={}; const d0=S.WPN_DRAWS;
+    for(const id of ids){ g.setTransform(1,0,0,1,0,0); g.fillStyle='rgb(40,60,90)'; g.fillRect(0,0,120,60); g.save(); g.translate(40,30); g.rotate(-0.35);
+      S.setOUTL(true); S.drawWeapon2(id,C); S.setOUTL(false); S.drawWeapon2(id,C); g.restore(); shots[id]=__crop(0,0,120,60); }
+    out.draws=S.WPN_DRAWS-d0;
+    const px=(c)=> c.getContext? c.getContext('2d').getImageData(0,0,c.width,c.height).data : c;
+    const sig=(c0)=>{ const c=px(c0); let h=0; for(let i=0;i<c.length;i+=4) h=(h*31+c[i]*3+c[i+1]*5+c[i+2]*7)>>>0; return h; };
+    const blank=ids.filter(id=>id!=='sumo_bare'&&id!=='none').filter(id=>__busy(shots[id],[40,60,90])<20);
+    out.blank=blank; out.unique=new Set(ids.map(id=>sig(shots[id]))).size;
+    { const c=px(shots.gladius); let dark=0, n=0; for(let i=0;i<c.length;i+=4){ if(!(c[i]===40&&c[i+1]===60&&c[i+2]===90)){ n++; if(c[i]<34&&c[i+1]<24&&c[i+2]<16) dark++; } } out.rim=dark/n; }
+    out.vsOld=__diff(shots.katana, (()=>{ g.setTransform(1,0,0,1,0,0); g.fillStyle='rgb(40,60,90)'; g.fillRect(0,0,120,60); g.save(); g.translate(40,30); g.rotate(-0.35); S.drawWeapon2Old('katana',C); g.restore(); return __crop(0,0,120,60); })());
+    // the thrown and shot: darts, a repeating crossbow and a throwing-board are no longer drawn as a bow
+    const rs={}; for(const id of ['steppe','plumbata','lian_nu','nuqaq','yumi']){ const bw=S.BOWS.find(b=>b.id===id); g.setTransform(1,0,0,1,0,0); g.fillStyle='rgb(40,60,90)'; g.fillRect(0,0,120,60); g.save(); g.translate(40,30); S.drawHeldBow(bw); g.restore(); rs[id]=__crop(0,0,120,60); }
+    out.notBows=['plumbata','lian_nu','nuqaq'].map(id=>__diff(rs[id],rs.steppe));
+    // the shop's tiles, every one painted
+    const ic={}; for(const w of S.GEAR.weapon){ const k=document.createElement('canvas'); k.width=40; k.height=40; S.drawGearIcon(k,'weapon',w); ic[w.id]=k.getContext('2d').getImageData(0,0,40,40).data; }
+    out.iconUnique=new Set(Object.values(ic).map(sig)).size;
+    // and in a real bout it is the armoury that draws what he holds
+    S.newDemo('Marcus','Italia','Roman'); S.startFight(S.REGION_BY_ID['Italia'],{}); const e0=S.WPN_DRAWS; for(let i=0;i<4;i++){ S.updateFight(1); S.drawArena(); } out.inBout=S.WPN_DRAWS-e0;
+    return out; });
+  ok('⚔ every weapon in the game has its own painting — none left as stacked rectangles, none blank', !R.err && R.missing.length===0 && R.blank.length===0 && R.n>=80, R.err||JSON.stringify({n:R.n, missing:R.missing, blank:R.blank}));
+  ok('…all different from each other, ringed in the body’s dark line, and not the old katana', !R.err && R.unique>=R.n-2 && R.rim>0.18 && R.vsOld>30, R.err||JSON.stringify({unique:R.unique, n:R.n, rim:R.rim, vsOld:R.vsOld}));
+  ok('…the darts, the repeating crossbow and the throwing-board are drawn as themselves, not as a bow', !R.err && R.notBows.every(d=>d>60), R.err||JSON.stringify(R.notBows));
+  ok('…the shop shows the same painting on every tile, and a real bout draws the weapon in hand through it', !R.err && R.iconUnique>=R.n-2 && R.inBout>=2, R.err||JSON.stringify({iconUnique:R.iconUnique, inBout:R.inBout}));
+
   console.log('\n=== 🏯 R7 · EVERY CULTURE\u2019S BEDCHAMBER, PAINTED ===');
   R=await T(()=>{ const S=window.__SS, out={}; S.newDemo('Marcus','Italia','Roman'); const g=document.getElementById('game').getContext('2d');
     const reg={roman:'Italia', wa:Object.keys(S.REGION_WA_BY_ID)[3], korean:'Goguryeo', han:'Luoyang', persian:Object.keys(S.THEATRE_OF).find(k=>S.THEATRE_OF[k]==='persia'), steppe:'Xianbei Steppe',
