@@ -70,6 +70,18 @@ publicly, leaving it off keeps the game safe for a general audience.
 - **The venatio's beasts on bodies of their own (V49)** — the lion, leopard, bear and bull are
   drawn like the men they fight: painted vector bodies with a stride, a leap, a fall, and an attack
   each (a swipe, a rearing maul, a hook of the horns).
+- **The essedarii — chariot fights (V49)** — 🐎 ESSEDARII on the match brief (tier 2 arenas and up). You
+  stand on the platform of a two-horse war car while your driver keeps the pair at the gallop: A/D
+  choose which way he drives (hold the way you are going and he whips them on), he wheels round before
+  the wall on his own, and you fight from the car — stance, slash, thrust, pilum — as the two cars close
+  and pass. Speed is damage. A LOW blow at a man in his car hits the car, and enough of them break it:
+  the wheel spins off across the sand, he is flung out, and his team bolts dragging the wreck. W leaps
+  down from your own car; on foot a galloping team rides you down unless you jump it. He drives passes
+  at you, goes for your wheel, and gets down to finish it when you are on foot. The horses are painted
+  on the beast skeleton (a real gallop, a trot when slow; bay, grey, black and chestnut, bridled and
+  plumed), the car is an essedum with iron-tyred wheels that turn with the ground, double-hooped
+  side-screens (painted, or wicker) and a pole to the yoke, and the driver kneels at the front with the
+  reins running to both bits. Richer glory, coin and popularity; a new achievement, *Essedarius*.
 - **The North African elephant (V49)** — the great arenas (tier 4) can loose one of Carthage's old
   forest breed on you: 430 HP of thick hide that walks (it never hops) and, from far off, charges.
   It fights with the trunk (a swat that throws you), the tusks (a low gore) and its whole weight (it

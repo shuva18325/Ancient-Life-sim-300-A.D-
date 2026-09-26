@@ -79,6 +79,51 @@ const ok=(name,cond,note)=>{ if(cond){pass++; console.log('  PASS  '+name+(note?
   ok('…you cannot walk through it — its bulk shoves you out', !R.err && R.inside<8, R.err||JSON.stringify(R));
   ok('…you can wound it with a spear, and it hurts you back with more than one attack', !R.err && R.dmgE>100 && R.dmgP>60 && R.atks.length>=2, R.err||JSON.stringify(R));
 
+  console.log('\n=== 🐎 THE ESSEDARII — CHARIOT FIGHTS ===');
+  R=await T(()=>{ const S=window.__SS; S.newDemo('Marcus','Italia','Roman'); const out={}; const g=document.getElementById('game').getContext('2d'), BG=[210,178,122];
+    S.startFight(S.REGION_BY_ID['Italia'], {chariot:true}); const FT=S.FT, p=FT.p, e=FT.foe;
+    out.both=!!(p.mounted && e.mounted && FT.chariot); out.cars=FT.cars.length; out.onDeck=Math.round(210-p.y);
+    const d0=S.BST_DRAWS; S.drawArena(); out.horseDraws=S.BST_DRAWS-d0;
+    // one rig alone on plain sand, at a gallop, two strides apart
+    const c=p.mounted; FT.cars=[c]; e.x=-600; const em=e.mounted; e.mounted=null;
+    const shot=(ph,v)=>{ c.x=150; c.vx=v; c.dir=1; c.sx=1; for(const h of c.horses){ h.legPhase=ph; h.vx=Math.abs(v); } S.chPin(p); g.setTransform(1,0,0,1,0,0); g.fillStyle='rgb(210,178,122)'; g.fillRect(0,0,480,270); S.chDrawScene(); return __crop(110,120,190,95); };
+    const a=shot(0,3), b=shot(2.2,3), still=shot(0,0);
+    out.busy=__busy(a,BG); out.colors=__colors(a); out.gallop=__diff(a,b);
+    out.coats=Object.keys(S.HORSE_COATS).length; e.mounted=em; return out; });
+  ok('🐎 a chariot bout puts both men on the platforms of two-horse cars, standing on the deck', !R.err && R.both && R.cars===2 && R.onDeck>=18, R.err||JSON.stringify(R));
+  ok('…the teams are painted horses on the beast skeleton (four a frame), in four coats', !R.err && R.horseDraws>=4 && R.coats>=4, R.err||JSON.stringify(R));
+  ok('…a rig is big and painted — car, wheels, driver, pole, reins and a pair — and the pair gallops', !R.err && R.busy>5000 && R.colors>150 && R.gallop>600, R.err||JSON.stringify(R));
+  R=await T(()=>{ const S=window.__SS; S.newDemo('Marcus','Italia','Roman'); S.startFight(S.REGION_BY_ID['Italia'], {chariot:true}); const FT=S.FT, p=FT.p, e=FT.foe; const c=p.mounted, out={};
+    e.x=-900; e.mounted.x=-900; e.mounted.leaving=true;
+    S.hold('d',true); let whipV=0; for(let i=0;i<110;i++){ S.updateFight(1); whipV=Math.max(whipV,Math.abs(c.vx)); } S.hold('d',false); out.whipV=whipV; out.maxX=c.x;
+    S.hold('a',true); out.turned=0; for(let i=0;i<90;i++){ S.updateFight(1); if(c.dir===-1 && c.vx<-1) out.turned=-1; } S.hold('a',false); out.vx=c.vx;
+    for(let i=0;i<400;i++) S.updateFight(1); out.minX=Math.min(c.x, out.maxX); out.inside= c.x>0 && c.x<480;
+    S.press('w'); S.updateFight(1); out.down=!p.mounted; out.leaving=!!c.leaving; return out; });
+  ok('you drive: A turns the team round, holding the way you go whips them on, and the driver wheels round before the wall', !R.err && R.turned===-1 && R.whipV>2.6 && R.inside, R.err||JSON.stringify(R));
+  ok('…and W leaps down from your car, and your driver takes it away', !R.err && R.down && R.leaving, R.err||JSON.stringify(R));
+  R=await T(()=>{ const S=window.__SS; S.newDemo('Marcus','Italia','Roman'); S.startFight(S.REGION_BY_ID['Italia'], {chariot:true}); const FT=S.FT, p=FT.p, e=FT.foe; const out={};
+    const fc=e.mounted;
+    const hp0=fc.hp, ehp0=e.hp; const d1=S.chOnHit(p, e, 20, 'low'); out.carHit=hp0-fc.hp; out.manDmg=d1;
+    let k=0; while(!fc.wreck && k++<20) S.chOnHit(p, e, 25, 'low');
+    out.wreck=!!fc.wreck; out.thrown=!e.mounted; out.loose=FT.chLoose.length; out.youWrecked=!!FT.youWrecked;
+    for(let i=0;i<200;i++) S.updateFight(1); out.gone=!FT.cars.includes(fc); return out; });
+  ok('a LOW blow at a man in his car hits the car, not the man — and enough of them wreck it', !R.err && R.carHit>15 && R.manDmg<10 && R.wreck, R.err||JSON.stringify(R));
+  ok('…the wheel comes off and rolls away, he is flung out, and his team bolts dragging the wreck off the sand', !R.err && R.thrown && R.loose>=1 && R.youWrecked && R.gone, R.err||JSON.stringify(R));
+  R=await T(()=>{ const S=window.__SS; S.newDemo('Marcus','Italia','Roman'); S.startFight(S.REGION_BY_ID['Italia'], {chariot:true}); const FT=S.FT, p=FT.p, e=FT.foe; const out={};
+    S.chDismount(p,'down'); for(let i=0;i<30;i++){ p.y=210; p.onGround=true; S.updateFight(0.01); }
+    const fc=e.mounted; fc.leaving=false; fc.x=p.x+120; fc.vx=-3; fc.dir=-1; fc.sx=-1; fc.trampleCd=0; e.ai.think=999;
+    p.x=200; p.y=210; p.onGround=true; p.vx=0; p.vy=0; const hp0=p.hp; fc.x=p.x+50; S.chTrample(fc, p); out.rode=hp0-p.hp;
+    const hp1=p.hp; fc.trampleCd=0; p.x=200; p.y=180; p.onGround=false; S.chTrample(fc, p); out.jumped=hp1-p.hp;
+    return out; });
+  ok('on foot, a galloping team rides you down — unless you jump it', !R.err && R.rode>10 && R.jumped===0, R.err||JSON.stringify(R));
+  R=await T(()=>{ const S=window.__SS; S.newDemo('Marcus','Italia','Roman'); S.G.maxHp=S.G.hp=400;
+    S.startFight(S.REGION_BY_ID['Italia'], {chariot:true}); const FT=S.FT, p=FT.p, e=FT.foe; p.hp=p.maxHp=600; let passes=0, hits=0, lowAtWheel=0, last=Math.sign(e.x-p.x), dismount=null;
+    for(let t=0;t<2400 && !FT.over;t++){ const s=Math.sign(e.x-p.x); if(s!==last){ passes++; last=s; } if(t===900 && p.mounted) S.chDismount(p,'down');
+      const fcHp=p.mounted? p.mounted.hp : null; const php=p.hp; S.updateFight(1); if(p.hp<php) hits++; if(fcHp!==null && p.mounted && p.mounted.hp<fcHp) lowAtWheel++;
+      if(!e.mounted && dismount===null) dismount=t; }
+    return {passes, hits, lowAtWheel, dismount, eMounted:!!e.mounted}; });
+  ok('he drives passes at you, strikes as he goes by, goes for your wheel — and gets down to finish it', !R.err && R.passes>=3 && R.hits>=2 && R.lowAtWheel>=1 && R.dismount!==null, R.err||JSON.stringify(R));
+
   console.log('\n=== 🏯 R7 · EVERY CULTURE\u2019S BEDCHAMBER, PAINTED ===');
   R=await T(()=>{ const S=window.__SS, out={}; S.newDemo('Marcus','Italia','Roman'); const g=document.getElementById('game').getContext('2d');
     const reg={roman:'Italia', wa:Object.keys(S.REGION_WA_BY_ID)[3], korean:'Goguryeo', han:'Luoyang', persian:Object.keys(S.THEATRE_OF).find(k=>S.THEATRE_OF[k]==='persia'), steppe:'Xianbei Steppe',
