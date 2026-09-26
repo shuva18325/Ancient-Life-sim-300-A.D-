@@ -48,6 +48,37 @@ const ok=(name,cond,note)=>{ if(cond){pass++; console.log('  PASS  '+name+(note?
     for(let i=0;i<6;i++) S.drawArena(); return {beast:!!FT.foe.beast, drew:S.BST_DRAWS-d0}; });
   ok('and a real venatio bout draws its beast on the new body', !R.err && R.beast && R.drew>=6, R.err||JSON.stringify(R));
 
+  console.log('\n=== 🐘 THE NORTH AFRICAN ELEPHANT ===');
+  R=await T(()=>{ const S=window.__SS; S.newDemo('Marcus','Italia','Roman'); const out={}; const g=document.getElementById('game').getContext('2d'), BG=[40,60,90];
+    const draw=(o)=>{ const f=S.makeBeast({tier:4},1); f.beastType=S.BEASTS.find(b=>b.id==='elephant'); f.heavy=true; f.girth=46; f.x=300; f.y=210; f.facing=1; f._bfx=1; Object.assign(f,o||{});
+      g.setTransform(1,0,0,1,0,0); g.fillStyle='rgb(40,60,90)'; g.fillRect(0,0,480,270); S.drawGladiator(f); return __crop(140,60,240,155); };
+    const idle=draw(), walkA=draw({vx:1.2,legPhase:0}), walkB=draw({vx:1.2,legPhase:3.1});
+    const atk=(k)=>{ const f={atk:true,atkDur:30,atkT:15,_elAtk:k}; return draw(f); };
+    const sw=atk('swat'), go=atk('gore'), st=atk('stomp');
+    const lion=(()=>{ const f=S.makeBeast({tier:4},1); f.beastType=S.BEASTS.find(b=>b.id==='lion'); f.x=300; f.y=210; f.facing=1; f._bfx=1; g.setTransform(1,0,0,1,0,0); g.fillStyle='rgb(40,60,90)'; g.fillRect(0,0,480,270); S.drawGladiator(f); return __crop(140,60,240,155); })();
+    out.busy=__busy(idle,BG); out.lionBusy=__busy(lion,BG); out.colors=__colors(idle); out.walk=__diff(walkA,walkB);
+    out.sw=__diff(idle,sw); out.go=__diff(idle,go); out.st=__diff(idle,st); out.swSt=__diff(sw,st); out.goSt=__diff(go,st);
+    const pools={}; for(const t of [2,3,4]){ pools[t]=new Set(); for(let i=0;i<300;i++) pools[t].add(S.makeBeast({tier:t},1).beastType.id); pools[t]=[...pools[t]]; }
+    out.pools=pools; return out; });
+  ok('🐘 an elephant is drawn on the new body: enormous next to a lion, and painted', !R.err && R.busy>R.lionBusy*1.8 && R.colors>80, R.err||JSON.stringify(R));
+  ok('…it walks, and it has three attacks of its own — a trunk swat, a tusk gore, a rear and stomp', !R.err && R.walk>200 && R.sw>300 && R.go>300 && R.st>300 && R.swSt>300 && R.goSt>300, R.err||JSON.stringify(R));
+  ok('…and only the great arenas (tier 4) can afford one', !R.err && R.pools[4].includes('elephant') && !R.pools[3].includes('elephant') && !R.pools[2].includes('elephant'), R.err||JSON.stringify(R.pools));
+  R=await T(()=>{ const S=window.__SS; S.newDemo('Marcus','Italia','Roman'); const G=S.G; G.loadout.weapon='hasta'; G.maxHp=G.hp=400;
+    S.startFight(S.REGION_BY_ID['Italia'], {venatio:true}); const FT=S.FT, p=FT.p;
+    const e=S.makeBeast({tier:4},1); if(e.beastType.id!=='elephant'){ const b=S.BEASTS.find(b=>b.id==='elephant'); e.beastType=b; e.heavy=true; e.girth=46; e.tall=34; e.strideMul=2.1; e.gear.weapon.dmg=b.dmg; e.gear.weapon.reach=b.reach; e.gear.armor.armor=b.armor; e.ai.react=b.react; e.ai.aggr=b.aggr; }
+    e.maxHp=e.hp=430; e.x=380; FT.foe=e; p.x=120; p.hp=p.maxHp=400;
+    let maxAir=0, inside=0, pThrown=0, atks={}; const hp0=e.hp, php0=p.hp;
+    for(let t=0;t<1400;t++){
+      if(t%40<20){ p.facing=e.x>p.x?1:-1; if(Math.abs(e.x-p.x)>60 && p.onGround && t%8===0) S.hop(p,p.facing); if(Math.abs(e.x-p.x)<90 && t%18===0) S.doAttack(p,t%36===0?'thrust':'slash'); }
+      S.updateFight(1); if(!FT.foe || FT.over) break;
+      if(e.atk && e._elAtk) atks[e._elAtk]=1;
+      maxAir=Math.max(maxAir, 210-e.y); if(!p.onGround) pThrown++;
+      const rel=(p.x-e.x)*e.facing; if(p.onGround && rel<30 && rel>-50) inside++; }
+    return {maxAir, inside, pThrown, dmgE:hp0-e.hp, dmgP:php0-p.hp, atks:Object.keys(atks)}; });
+  ok('in a real bout it is HEAVY: blows barely move it and it never leaves the ground', !R.err && R.maxAir<2, R.err||JSON.stringify(R));
+  ok('…you cannot walk through it — its bulk shoves you out', !R.err && R.inside<8, R.err||JSON.stringify(R));
+  ok('…you can wound it with a spear, and it hurts you back with more than one attack', !R.err && R.dmgE>100 && R.dmgP>60 && R.atks.length>=2, R.err||JSON.stringify(R));
+
   console.log('\n=== 🏯 R7 · EVERY CULTURE\u2019S BEDCHAMBER, PAINTED ===');
   R=await T(()=>{ const S=window.__SS, out={}; S.newDemo('Marcus','Italia','Roman'); const g=document.getElementById('game').getContext('2d');
     const reg={roman:'Italia', wa:Object.keys(S.REGION_WA_BY_ID)[3], korean:'Goguryeo', han:'Luoyang', persian:Object.keys(S.THEATRE_OF).find(k=>S.THEATRE_OF[k]==='persia'), steppe:'Xianbei Steppe',

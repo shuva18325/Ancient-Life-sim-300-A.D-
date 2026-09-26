@@ -14439,7 +14439,7 @@ const ACHIEVEMENTS=[
   {id:'combo10',     icon:'🌀', name:'Whirlwind',              desc:'Land a 10-hit combo.'},
   {id:'headshot',    icon:'🎯', name:'Dead-Eye',               desc:'Fell a foe with a ranged headshot.'},
   {id:'venator',     icon:'🐆', name:'Venator',                desc:'Slay your first beast in a venatio.'},
-  {id:'beastmaster', icon:'🦁', name:'Beastmaster',            desc:'Slay all four kinds of beast.'},
+  {id:'beastmaster', icon:'🦁', name:'Beastmaster',            desc:'Slay every kind of beast — the elephant too.'},
   {id:'rich',        icon:'🪙', name:'Crassus',                desc:'Hold 5,000 denarii at once.'},
   {id:'married',     icon:'💍', name:'Wed',                    desc:'Take a spouse.'},
   {id:'governor',    icon:'♦',  name:'Dominus',                desc:'Govern a province.'},
@@ -15059,6 +15059,17 @@ const BST_SPEC={
     neck:{b:[1.05,5], len:9, ang:-0.12, r:[15,11]}, head:{L:25, H:15, ang:0.95},
     tail:{root:[-0.17,11], len:32, r:[2.4,1.2], tuft:true, hang:true, th0:0.53, curl:0.12},
     col:{base:'#2f2721', lit:'#5e4c3e', deep:'#15100c', belly:'#241d18', muzzle:'#5c524a', nose:'#1a1410', eye:'#120c08', horn:'#e8dfc6', hornTip:'#3a3226', hoof:'#1c1612'} },
+  /* 🐘 THE NORTH AFRICAN ELEPHANT — Carthage's old breed from the forests under the Atlas, the ones Pompey set against
+     Gaetulian spearmen in 55 BC: smaller than the savanna elephant but still twice the height of the men in front of
+     it, saddle-backed, with big African ears, modest tusks and a trunk that swats, gores and trumpets. */
+  elephant:{ kind:'elephant', L:62, hipH:60, shH:68, shX:12, gait:22, lift:5, stride:2.1,
+    torso:[[-0.27,2],[-0.20,12],[-0.04,17],[0.16,16],[0.38,13],[0.58,13.5],[0.78,17],[0.94,20],[1.08,18],[1.20,7],[1.21,-10],[1.07,-25],[0.76,-31],[0.44,-32],[0.14,-30],[-0.10,-22],[-0.25,-9]],
+    fore:{j:[0.94,-15], up:24, lo:22, ft:4, r:[12.5,10,8.8,9.4], pad:[10,3.6]}, hind:{j:[0.06,-12], up:24, lo:21, ft:4, r:[13.5,10,8.6,9.2], pad:[9.6,3.4]},
+    haunch:[0.10,-5,13,15], shoulder:[0.90,-7,12,16],
+    neck:{b:[1.10,7], len:7, ang:-0.42, r:[19,17]}, head:{L:33, H:33, ang:0.70},
+    tail:{root:[-0.21,6], len:22, r:[1.9,1.0], tuft:true, hang:true, th0:0.52, curl:0.08},
+    trunk:{len:42, r:[7.4,2.2]},
+    col:{base:'#877e73', lit:'#b1a89b', deep:'#4a443d', belly:'#6a6259', ear:'#7a7166', earIn:'#9c7c78', tusk:'#efe6cf', tuskTip:'#c9b894', eye:'#1a120c', nail:'#dcd3c2', wrinkle:'rgba(40,34,28,.38)', tuft:'#2a2420'} },
 };
 const BST_BW=220, BST_BH=150, BST_OX=132, BST_OY=138;         // the buffer: feet at (132,138), room for a tail behind and a reared bear above
 function bstBuf(f){
@@ -15099,6 +15110,7 @@ function bstPose(f, S){
   const breathe=Math.sin(T*0.07);
   let hip=[-S.L+S.shX, -S.hipH], sh=[S.shX, -S.shH], pitch=0, pivot=null;
   let neckAng=S.neck.ang, headAng=S.head.ang, jaw=0, squint=0, shut=false, tongue=false, clawsOut=false, earsBack=0, reach=0;
+  let trunkUp=0, trunkSwat=-1, trunkCurl=0, earFlap=0;                             // 🐘
   let bob= moving? -Math.abs(Math.sin(ph*Math.PI*2))*1.4 : breathe*0.35;
   // the attack, by kind
   if(atkP>=0 && !down){
@@ -15107,13 +15119,21 @@ function bstPose(f, S){
       jaw=clamp((atkP-0.12)/0.28,0,1)*(1-clamp((atkP-0.82)/0.18,0,1)); clawsOut=true; earsBack=sw; }
     else if(S.kind==='bear'){ pitch=-0.62*Math.sin(Math.min(1,atkP*1.25)*Math.PI*0.5)*(1-clamp((atkP-0.78)/0.22,0,1)); pivot='hip';
       jaw=clamp((atkP-0.05)/0.3,0,1)*(1-clamp((atkP-0.85)/0.15,0,1)); headAng-=0.25*sw; clawsOut=true; earsBack=sw; }
+    else if(S.kind==='elephant'){ const v=f._elAtk||'swat';
+      if(v==='stomp'){ pitch=-0.40*Math.sin(Math.min(1,atkP*1.35)*Math.PI*0.5)*(1-clamp((atkP-0.66)/0.22,0,1)); pivot='hip'; headAng-=0.30*sw; trunkUp=sw; earFlap=sw; }
+      else if(v==='gore'){ const low=clamp(atkP/0.4,0,1)*(1-clamp((atkP-0.4)/0.2,0,1)), hook=clamp((atkP-0.4)/0.3,0,1)*(1-clamp((atkP-0.8)/0.2,0,1));
+        neckAng+=0.28*low-0.18*hook; headAng+=0.42*low-0.62*hook; sh[0]+=5*hook+2*low; sh[1]+=2*low; trunkCurl=low; earFlap=low; }
+      else { trunkSwat=atkP; headAng-=0.14*sw; sh[0]+=2*sw; earFlap=0.6*sw; } }
     else { const low=clamp(atkP/0.45,0,1)*(1-clamp((atkP-0.45)/0.2,0,1)), hook=clamp((atkP-0.45)/0.25,0,1)*(1-clamp((atkP-0.85)/0.15,0,1));
       neckAng+=0.80*low-0.45*hook; headAng+=0.50*low-0.95*hook; sh[0]+=5*hook+2*low; sh[1]+=3*low-2*hook; jaw=0.25*hook; earsBack=low; }
   }
   // a hit recoils it: weight back, head up, mouth open
-  if(hurtK>0 && !down){ sh[0]-=3*hurtK; hip[0]-=1.5*hurtK; neckAng-=0.28*hurtK; headAng-=0.15*hurtK; jaw=Math.max(jaw, 0.65*hurtK); squint=hurtK; earsBack=Math.max(earsBack,hurtK); }
+  if(hurtK>0 && !down){ sh[0]-=3*hurtK; hip[0]-=1.5*hurtK; neckAng-=0.28*hurtK; headAng-=0.15*hurtK; jaw=Math.max(jaw, 0.65*hurtK); squint=hurtK; earsBack=Math.max(earsBack,hurtK);
+    if(S.kind==='elephant'){ trunkUp=Math.max(trunkUp,hurtK); earFlap=Math.max(earFlap,hurtK); sh[0]+=1.8*hurtK; hip[0]+=0.8*hurtK; } }   // 🐘 it takes a blow with its trunk up, trumpeting
   if(flying){ jaw=0.5; shut=true; tongue=true; }
-  if(down){ hip=[-S.L+S.shX, -S.hipH*0.36]; sh=[S.shX-2, -S.shH*0.42]; neckAng=0.42; headAng=0.30; shut=true; tongue=(S.kind!=='bull'); bob=0; }
+  if(down){ hip=[-S.L+S.shX, -S.hipH*0.36]; sh=[S.shX-2, -S.shH*0.42]; neckAng=0.42; headAng=0.30; shut=true; tongue=(S.kind!=='bull'&&S.kind!=='elephant'); bob=0;
+    if(S.kind==='elephant'){ hip=[-S.L+S.shX, -S.hipH*0.50]; sh=[S.shX-2, -S.shH*0.46]; headAng=0.9; } }
+  if(S.kind==='elephant' && moving) bob*=0.5;
   hip[1]+=bob; sh[1]+=bob*1.1;
   if(pitch){ const pv= pivot==='hip'? hip : [(hip[0]+sh[0])/2,(hip[1]+sh[1])/2], c=Math.cos(pitch), s=Math.sin(pitch);
     const rot=(p)=>[pv[0]+(p[0]-pv[0])*c-(p[1]-pv[1])*s, pv[1]+(p[0]-pv[0])*s+(p[1]-pv[1])*c]; if(pivot!=='hip') hip=rot(hip); sh=rot(sh); }
@@ -15127,7 +15147,7 @@ function bstPose(f, S){
   const legDefs=[['fh','hind',0.0],['ff','fore',0.25],['nh','hind',0.5],['nf','fore',0.75]];
   for(const [id, which, off] of legDefs){
     const D=S[which], top=at(D.j[0], D.j[1]), near=id[0]==='n', fore=(which==='fore');
-    const restX= fore? sh[0]+ (S.kind==='bull'? 1 : 2) : hip[0]+(S.kind==='bear'? 3 : -1);
+    const restX= fore? sh[0]+ (S.kind==='bull'? 1 : 2) : hip[0]+(S.kind==='bear'? 3 : S.kind==='elephant'? 2 : -1);
     let toe;
     if(down){ toe= fore? [sh[0]+12+(near?2:0), -1.5] : [hip[0]+10+(near?3:0), -1.5]; }
     else if(flying){ const w=Math.sin(T*0.5+off*6); toe= fore? [top[0]+12+w*6, top[1]+22] : [top[0]-14-w*6, top[1]+20]; }
@@ -15144,11 +15164,13 @@ function bstPose(f, S){
         toe=[sh[0]+6+16*up+10*dn, -(D.up+D.lo)*0.95*up*(1-dn)+(-4)*dn]; }
       if(S.kind==='bear'){ const rearK=Math.abs(pitch)/0.62; toe=[top[0]+8+(near? 10*Math.sin(atkP*Math.PI) : 4), top[1]+(D.up+D.lo)*(1-0.55*rearK)+(near? -6*Math.sin(atkP*Math.PI) : 0)]; }
       if(S.kind==='bull'){ toe=[toe[0]+3, toe[1]]; }
+      if(S.kind==='elephant' && (f._elAtk==='stomp')){ const rearK=Math.abs(pitch)/0.40; toe=[top[0]+6+(near? 8 : 3)*rearK, top[1]+(D.up+D.lo+D.ft)*(1-0.42*rearK)]; }
     }
     // how the lower leg stands: a cat on its toes with the hock high, a bear flat, a bull on the hoof
     let ank;
     if(S.kind==='bear'){ ank= fore? [toe[0]-3, toe[1]-D.ft] : [toe[0]-D.ft, toe[1]-2.2]; }
     else if(S.kind==='bull'){ ank= fore? [toe[0]-1.2, toe[1]-D.ft] : [toe[0]-4.5, toe[1]-D.ft+0.6]; }
+    else if(S.kind==='elephant'){ ank=[toe[0]-0.4, toe[1]-D.ft]; }                           // 🐘 a column, standing on a pad
     else { ank= fore? [toe[0]-1.6, toe[1]-D.ft] : [toe[0]-5.2, toe[1]-D.ft+1]; }
     if(air||flying){ const sw=fore? 0.6 : -0.9; ank=[toe[0]-Math.sin(sw)*D.ft, toe[1]-Math.cos(sw)*D.ft]; }
     if(down){ ank= fore? [toe[0]-D.ft, toe[1]-1] : [toe[0]-D.ft*0.9, toe[1]-2]; }
@@ -15174,7 +15196,7 @@ function bstPose(f, S){
     for(let i=1;i<=7;i++){ const k=i/7, a=th+curl*Math.pow(k,1.5)+(S.tail.hang? 0 : Math.sin(T*0.13+k*3)*0.12*amp*k);
       x+=Math.cos(a)*step; y+=Math.sin(a)*step; if(down) y=Math.min(y, -1.2); tail.push([x,y]); } }
   const nose=[occ[0]+Math.cos(ha)*S.head.L, occ[1]+Math.sin(ha)*S.head.L];
-  return {T, hip, sh, at, ax, nrm, bodyAng, legs, nb, occ, ha, na, nose, jaw, squint, shut, tongue, clawsOut, earsBack, tail, air, down, flying, atkP, hurtK, moving};
+  return {T, hip, sh, at, ax, nrm, bodyAng, legs, nb, occ, ha, na, nose, jaw, squint, shut, tongue, clawsOut, earsBack, tail, air, down, flying, atkP, hurtK, moving, trunkUp, trunkSwat, trunkCurl, earFlap};
 }
 /* ---- THE PAINT ---- */
 function bstDrawLeg(g, L, S, C, far){
@@ -15189,6 +15211,9 @@ function bstDrawLeg(g, L, S, C, far){
   g.fillStyle=bstLG(g, L.knee, L.toe, [[0,'rgba(0,0,0,0)'],[1,'rgba(20,10,4,'+(far? 0.35 : 0.22)+')']]); g.fillRect(L.knee[0]-20, L.knee[1]-20, 40, 60);
   g.restore();
   if(!far){ g.strokeStyle='rgba(30,16,6,.35)'; g.lineWidth=0.7; g.beginPath(); g.moveTo(L.knee[0]-r[1]*0.6, L.knee[1]+0.5); g.quadraticCurveTo(L.knee[0], L.knee[1]+1.6, L.knee[0]+r[1]*0.6, L.knee[1]+0.3); g.stroke(); }
+  if(S.kind==='elephant'){ g.save(); g.beginPath(); bstLimbPath(g, pts, r); g.clip(); g.strokeStyle=far? 'rgba(20,16,12,.4)' : C.wrinkle; g.lineWidth=0.7;   // 🐘 the creases, all the way down
+    for(let k=0;k<9;k++){ const t=0.2+k*0.1, a=k<5? pts[0] : pts[1], b=k<5? pts[1] : pts[2], tt=k<5? t/0.6 : (t-0.6)/0.4, x=a[0]+(b[0]-a[0])*Math.min(1,tt), y=a[1]+(b[1]-a[1])*Math.min(1,tt), rr=r[k<5? 1 : 2]*0.9;
+      g.beginPath(); g.moveTo(x-rr, y); g.quadraticCurveTo(x, y+1.4, x+rr, y-0.3); g.stroke(); } g.restore(); }
   if(C.spot){ const Rl=bstRand((L.fore? 11 : 17)+(far? 5 : 0)); g.save(); g.beginPath(); bstLimbPath(g, pts, r); g.clip(); g.fillStyle=far? 'rgba(30,20,10,.7)' : C.spot;
     for(let k=0;k<12;k++){ const t=Rl()*0.95, seg=t<0.4? [pts[0],pts[1],t/0.4] : t<0.8? [pts[1],pts[2],(t-0.4)/0.4] : [pts[2],pts[3],(t-0.8)/0.2];
       const x=seg[0][0]+(seg[1][0]-seg[0][0])*seg[2]+(Rl()-0.5)*r[1]*1.2, y=seg[0][1]+(seg[1][1]-seg[0][1])*seg[2];
@@ -15201,6 +15226,10 @@ function bstDrawLeg(g, L, S, C, far){
     g.strokeStyle='rgba(120,100,80,.55)'; g.lineWidth=0.5; g.beginPath(); g.moveTo(0.4,-hv[1]*0.8); g.lineTo(0.8,0.8); g.stroke();
     g.fillStyle=far? '#1a120c' : mixHex(C.base,'#e8dcc4',0.12); g.fillRect(-hv[0]*0.6,-hv[1]*1.05,hv[0]*1.2,1.2);     // the coronet band
     g.restore(); void a;
+  } else if(S.kind==='elephant'){
+    const pd=D.pad, cx=L.toe[0]+0.6, cy=L.toe[1]-pd[1]*0.5;
+    g.fillStyle=far? mixHex(C.deep,'#000',0.2) : mixHex(C.deep,C.base,0.35); g.beginPath(); g.ellipse(cx, cy, pd[0], pd[1], 0, 0, Math.PI*2); g.fill();
+    if(!far){ g.fillStyle=C.nail; for(let k=0;k<3;k++){ g.beginPath(); g.ellipse(cx+pd[0]*(0.05+k*0.34), cy-pd[1]*0.35, 2.0, 1.6, 0, Math.PI, 0); g.fill(); } }
   } else {
     const pw=D.paw, a=Math.atan2(L.toe[1]-L.ank[1], L.toe[0]-L.ank[0]);
     const cx=L.toe[0]+(S.kind==='bear'? 1.5 : 1.2), cy=L.toe[1]-pw[1]*0.55;
@@ -15287,6 +15316,75 @@ function bstDrawHead(g, P, S, C, f, hurtFlash){
   if(K==='bull'){ bstHorn(g, L, Hh, C, false); g.fillStyle=C.deep; g.save(); g.translate(L*0.08,-Hh*0.28); g.rotate(-0.25-P.earsBack*0.4); g.beginPath(); g.ellipse(-3,0,4.2,1.8,0,0,Math.PI*2); g.fill(); g.restore(); }
   g.restore();
 }
+/* 🐘 the elephant's trunk, in the buffer's own frame: from under the brow, hanging and curling — raised for a trumpet, swung for a swat */
+function bstTrunkPts(P, S){
+  const o=P.occ, a=P.ha, Tk=S.trunk, L=S.head.L, Hh=S.head.H, T=P.T;
+  const b=[o[0]+Math.cos(a)*L*0.92-Math.sin(a)*Hh*0.10, o[1]+Math.sin(a)*L*0.92+Math.cos(a)*Hh*0.10];
+  const N=12, seg=Tk.len/N, pts=[b];
+  let a0=Math.PI*0.52+Math.sin(T*0.05)*0.10, curl=0.95;                                  // idle: down, the tip curling forward
+  if(P.trunkUp>0.02){ const k=P.trunkUp; a0=a0+(-Math.PI*0.42-a0)*k; curl=curl+(-1.9-curl)*k; }                 // up, and the tip turned back: the trumpet
+  if(P.trunkSwat>=0){ const q=P.trunkSwat, up=Math.sin(Math.min(1,q*1.6)*Math.PI*0.5), dn=clamp((q-0.55)/0.45,0,1);
+    a0=Math.PI*0.52+(-0.35-Math.PI*0.52)*up*(1-dn)+(0.5*dn); curl=0.95-1.3*up*(1-dn)+0.4*dn; }
+  if(P.trunkCurl>0.02){ a0=a0+(Math.PI*0.62-a0)*P.trunkCurl; curl=curl+2.2*P.trunkCurl; }                       // tucked for the gore
+  if(P.down){ a0=Math.PI*0.35; curl=0.3; }
+  let x=b[0], y=b[1];
+  for(let i=1;i<=N;i++){ const k=i/N, ang=a0-curl*Math.pow(k,1.7)+(P.moving? Math.sin(T*0.12+k*3)*0.08*k : 0);
+    x+=Math.cos(ang)*seg; y+=Math.sin(ang)*seg; if(!P.air && !P.flying) y=Math.min(y, -1.5); pts.push([x,y]); }
+  return pts;
+}
+function bstDrawElephantHead(g, P, S, C, f, hurtFlash){
+  const o=P.occ, a=P.ha, L=S.head.L, Hh=S.head.H, T=P.T;
+  // the ear, near side: a great flap hung from behind the eye, flapping, spread when it means business
+  const earA=-0.12+Math.sin(T*0.11)*0.09+P.earFlap*0.5;
+  const ear=(far)=>{ g.save(); g.translate(o[0]+Math.cos(a)*L*0.12+Math.sin(a)*Hh*0.1, o[1]+Math.sin(a)*L*0.12-Hh*0.30); g.rotate(earA*(far? -0.6 : 1));
+    const E=[[3,-13],[-8,-22],[-24,-20],[-33,-6],[-31,11],[-22,26],[-11,31],[-4,21],[1,8]];
+    g.beginPath(); bstSpline(g, E, true);
+    g.fillStyle= far? mixHex(C.ear,'#000',0.35) : bstLG(g,[-20,-14],[0,20],[[0,C.lit],[0.45,C.ear],[1,C.deep]]); g.fill();
+    if(!far){ g.save(); g.beginPath(); bstSpline(g, E, true); g.clip();
+      g.fillStyle=mixHex(C.earIn,C.ear,0.45); g.beginPath(); g.ellipse(-15,5,12,17,0.2,0,Math.PI*2); g.fill();          // the thin skin, pinker, and its veins
+      g.strokeStyle='rgba(110,70,70,.42)'; g.lineWidth=0.65; for(let k=0;k<5;k++){ g.beginPath(); g.moveTo(-2,-4+k*4); g.quadraticCurveTo(-14,-9+k*8,-27,-6+k*8); g.stroke(); }
+      g.fillStyle='rgba(40,30,26,.25)'; g.beginPath(); g.ellipse(-4,2,4,14,0,0,Math.PI*2); g.fill();                           // the fold where it hangs from the head
+      g.restore(); g.strokeStyle='rgba(30,24,20,.55)'; g.lineWidth=0.8; g.beginPath(); bstSpline(g, E.slice(1,8), false); g.stroke(); }
+    g.restore(); };
+  // the head itself: the domed brow, the cheek, the base of the trunk
+  g.save(); g.translate(o[0], o[1]); g.rotate(a);
+  const sk=[[-Hh*0.28,-Hh*0.06],[-Hh*0.16,-Hh*0.52],[L*0.14,-Hh*0.74],[L*0.46,-Hh*0.70],[L*0.74,-Hh*0.48],[L*0.94,-Hh*0.18],[L*1.0,Hh*0.08],[L*0.90,Hh*0.28],[L*0.64,Hh*0.40],[L*0.30,Hh*0.40],[-Hh*0.08,Hh*0.28]];
+  g.beginPath(); bstSpline(g, sk, true);
+  g.fillStyle=bstLG(g,[0,-Hh*0.7],[0,Hh*0.4],[[0,C.lit],[0.45,C.base],[1,C.deep]]); g.fill();
+  g.save(); g.beginPath(); bstSpline(g, sk, true); g.clip();
+  g.strokeStyle=C.wrinkle; g.lineWidth=0.6; const Rw=bstRand(8181); for(let k=0;k<16;k++){ const x=Rw()*L*0.9, y=-Hh*0.5+Rw()*Hh*0.8; g.beginPath(); g.moveTo(x,y); g.quadraticCurveTo(x+1.5,y+1.2,x+3,y); g.stroke(); }
+  g.fillStyle='rgba(255,250,240,.10)'; g.beginPath(); g.ellipse(L*0.32,-Hh*0.46,L*0.3,Hh*0.16,-0.2,0,Math.PI*2); g.fill();     // the light on the brow
+  g.restore();
+  // the mouth, under where the trunk leaves the face
+  g.strokeStyle='rgba(30,20,16,.7)'; g.lineWidth=0.8; g.beginPath(); g.moveTo(L*0.78,Hh*0.30); g.quadraticCurveTo(L*0.62,Hh*0.40,L*0.46,Hh*0.34); g.stroke();
+  g.restore();
+  ear(false);
+  // the eye, small and wrinkled round, in front of the ear
+  g.save(); g.translate(o[0], o[1]); g.rotate(a);
+  const ex=L*0.46, ey=-Hh*0.06;
+  if(P.shut){ g.strokeStyle='rgba(20,10,4,.9)'; g.lineWidth=0.8; g.beginPath(); g.moveTo(ex-1.8,ey); g.quadraticCurveTo(ex,ey+1,ex+1.8,ey); g.stroke(); }
+  else { g.fillStyle='#2a1e16'; g.beginPath(); g.ellipse(ex,ey,2.2,1.5-0.6*P.squint,0,0,Math.PI*2); g.fill(); g.fillStyle=hurtFlash? '#ffffff' : C.eye; g.beginPath(); g.ellipse(ex+0.3,ey,1.3,1.1-0.5*P.squint,0,0,Math.PI*2); g.fill();
+    g.fillStyle='rgba(255,255,255,.8)'; g.fillRect(ex+0.4,ey-0.8,0.7,0.6); }
+  g.strokeStyle=C.wrinkle; g.lineWidth=0.6; for(let k=0;k<3;k++){ g.beginPath(); g.arc(ex,ey,3+k*1.3,Math.PI*1.1,Math.PI*1.8); g.stroke(); }
+  g.restore();
+  // the trunk: rings along it, the fingered tip, darker toward the end
+  const tp=bstTrunkPts(P, S), n=tp.length, tr=S.trunk.r, rs=tp.map((p,i)=>tr[0]+(tr[1]-tr[0])*(i/(n-1)));
+  g.beginPath(); bstLimbPath(g, tp, rs);
+  g.fillStyle=bstLG(g, tp[0], tp[n-1], [[0,C.base],[0.6,mixHex(C.base,C.deep,0.3)],[1,C.deep]]); g.fill();
+  g.strokeStyle=C.wrinkle; g.lineWidth=0.6;
+  for(let i=1;i<n-1;i++){ const p=tp[i], q=tp[i+1], d=Math.hypot(q[0]-p[0],q[1]-p[1])||1, nx=-(q[1]-p[1])/d, ny=(q[0]-p[0])/d, r=rs[i]*0.95;
+    g.beginPath(); g.moveTo(p[0]+nx*r, p[1]+ny*r); g.quadraticCurveTo(p[0]+(q[0]-p[0])*0.3, p[1]+(q[1]-p[1])*0.3, p[0]-nx*r, p[1]-ny*r); g.stroke(); }
+  g.strokeStyle='rgba(255,248,232,.28)'; g.lineWidth=0.9; g.beginPath(); bstSpline(g, tp.slice(0,Math.floor(n*0.7)), false); g.stroke();
+  { const e=tp[n-1]; g.fillStyle=mixHex(C.deep,'#000',0.2); g.beginPath(); g.arc(e[0],e[1],rs[n-1]*1.05,0,Math.PI*2); g.fill(); }
+  // the tusk: modest, curving out from beside the trunk
+  g.save(); g.translate(o[0], o[1]); g.rotate(a);
+  const tb=[L*0.80,Hh*0.24], tk=[tb,[tb[0]+4,tb[1]+4.5],[tb[0]+9.5,tb[1]+5],[tb[0]+13,tb[1]+1.5]];
+  g.beginPath(); bstLimbPath(g, tk, [2.2,1.9,1.4,0.6]);
+  g.fillStyle=bstLG(g,tb,tk[3],[[0,C.tusk],[0.7,mixHex(C.tusk,'#fff',0.2)],[1,C.tuskTip]]); g.fill();
+  g.strokeStyle='rgba(255,255,255,.55)'; g.lineWidth=0.5; g.beginPath(); g.moveTo(tb[0]+1,tb[1]+2.5); g.quadraticCurveTo(tb[0]+6,tb[1]+4.8,tb[0]+11,tb[1]+2.8); g.stroke();
+  g.restore();
+  P._trunkTip=tp[n-1];
+}
 function bstHorn(g, L, Hh, C, far){
   const base=[L*0.12,-Hh*0.48];
   const pts=[base,[base[0]-3,base[1]-5],[base[0]+1,base[1]-11],[base[0]+7,base[1]-14]];
@@ -15304,9 +15402,12 @@ function bstDrawTorso(g, P, S, C){
   const b0=P.at(0.5,-6), b1=P.at(0.5,-16);
   g.fillStyle=bstLG(g, b0, b1, S.kind==='cat'? [[0,'rgba(0,0,0,0)'],[0.35,mixHex(C.belly,C.base,0.55)],[0.8,C.belly],[1,C.belly]] : [[0,'rgba(0,0,0,0)'],[1,'rgba(10,6,3,.55)']]);
   g.beginPath(); bstSpline(g, [P.at(-0.3,-4),P.at(0.3,-6),P.at(0.9,-5),P.at(1.3,-6),P.at(1.3,-30),P.at(-0.3,-30)], true); g.fill();
-  // fur, laid along the body
+  // fur, laid along the body (and on the elephant, creased hide instead)
   const R=bstRand(S.L*131+S.hipH*7);
-  for(let k=0;k<70;k++){ const u=-0.15+R()*1.35, v=-14+R()*30, p=P.at(u,v), d=[P.ax[0]/Math.hypot(P.ax[0],P.ax[1]), P.ax[1]/Math.hypot(P.ax[0],P.ax[1])];
+  if(S.kind==='elephant'){ g.strokeStyle=C.wrinkle; g.lineWidth=0.75;
+    for(let k=0;k<60;k++){ const u=-0.15+R()*1.3, v=-24+R()*36, p=P.at(u,v), a=P.bodyAng+Math.PI/2+(R()-0.5)*0.5, L2=2.5+R()*3.5;
+      g.beginPath(); g.moveTo(p[0]-Math.cos(a)*L2*0.5, p[1]-Math.sin(a)*L2*0.5); g.quadraticCurveTo(p[0]+1, p[1], p[0]+Math.cos(a)*L2*0.5, p[1]+Math.sin(a)*L2*0.5); g.stroke(); } }
+  for(let k=0;k<(S.kind==='elephant'? 0 : 70);k++){ const u=-0.15+R()*1.35, v=-14+R()*30, p=P.at(u,v), d=[P.ax[0]/Math.hypot(P.ax[0],P.ax[1]), P.ax[1]/Math.hypot(P.ax[0],P.ax[1])];
     const len=1.6+R()*2.2, dk=R()<0.55;
     g.strokeStyle= dk? 'rgba(40,22,8,'+(S.kind==='bull'? 0.35 : 0.18)+')' : 'rgba(255,244,210,'+(S.kind==='bull'? 0.12 : 0.2)+')'; g.lineWidth=0.55;
     g.beginPath(); g.moveTo(p[0],p[1]); g.lineTo(p[0]-d[0]*len, p[1]-d[1]*len+0.5); g.stroke(); }
@@ -15391,6 +15492,9 @@ function drawBeastNB(f){
   bstDrawLeg(bk, P.legs.fh, S, C, true);
   bstDrawLeg(bk, P.legs.ff, S, C, true);
   if(S.kind==='bull'){ bk.save(); bk.translate(P.occ[0],P.occ[1]); bk.rotate(P.ha); bk.translate(5.5,-2.5); bk.rotate(0.12); bstHorn(bk, S.head.L, S.head.H, C, true); bk.restore(); }
+  if(S.kind==='elephant'){ bk.save(); bk.translate(P.occ[0]+Math.cos(P.ha)*S.head.L*0.2, P.occ[1]+Math.sin(P.ha)*S.head.L*0.2-S.head.H*0.3); bk.rotate(-0.12-P.earFlap*0.3);     // 🐘 the far ear, over the head
+    bk.fillStyle=mixHex(C.ear,'#000',0.4); bk.beginPath(); bk.ellipse(-8,0,12,15,0.2,0,Math.PI*2); bk.fill(); bk.restore();
+    const tb=[P.occ[0]+Math.cos(P.ha)*S.head.L*0.78, P.occ[1]+Math.sin(P.ha)*S.head.L*0.78+4]; bk.fillStyle='#b8ad95'; bk.beginPath(); bk.moveTo(tb[0],tb[1]); bk.quadraticCurveTo(tb[0]+6,tb[1]+6,tb[0]+12,tb[1]+2); bk.lineTo(tb[0]+11,tb[1]+1); bk.quadraticCurveTo(tb[0]+6,tb[1]+3,tb[0]+1,tb[1]-1.5); bk.fill(); }
   if(S.kind==='cat'||S.kind==='bear'){ bk.save(); bk.translate(P.occ[0],P.occ[1]); bk.rotate(P.ha); bk.translate(S.head.L*0.24, -S.head.H*0.5); bk.rotate(-0.2-P.earsBack*0.6);
     bk.fillStyle=mixHex(C.deep,'#000',0.2); bk.beginPath(); bk.ellipse(0,-S.head.H*0.14,S.head.H*0.18,S.head.H*0.2,0,0,Math.PI*2); bk.fill(); bk.restore(); }
   if(C.mane) bstDrawMane(bk, P, S, C, true);
@@ -15402,7 +15506,7 @@ function drawBeastNB(f){
   if(C.mane) bstDrawMane(fr, P, S, C, false);
   bstDrawLeg(fr, P.legs.nh, S, C, false);
   bstDrawLeg(fr, P.legs.nf, S, C, false);
-  bstDrawHead(fr, P, S, C, f, hurtFlash);
+  if(S.kind==='elephant') bstDrawElephantHead(fr, P, S, C, f, hurtFlash); else bstDrawHead(fr, P, S, C, f, hurtFlash);
   // snap to the pixel, like the men
   for(const k of [buf.bk, buf.fr]){ const g=k.getContext('2d'); g.setTransform(1,0,0,1,0,0);
     const im=g.getImageData(0,0,BST_BW,BST_BH), d=im.data; for(let i=3;i<d.length;i+=4) d[i]= d[i]>=110? 255 : 0; g.putImageData(im,0,0); }
@@ -15425,6 +15529,13 @@ function drawBeastNB(f){
     ctx.globalAlpha=1; }
   if(S.kind==='bull' && (P.atkP>=0 || Math.abs(f.vx||0)>1.8) && !P.down){ const n=P.nose, T2=P.T;
     for(let k=0;k<3;k++){ const q=((T2*0.08+k*0.33)%1), a=(1-q)*0.55; ctx.fillStyle='rgba(235,230,220,'+a.toFixed(2)+')'; ctx.beginPath(); ctx.arc(n[0]+2+q*7, n[1]+3+q*2, 1.2+q*2.2, 0, Math.PI*2); ctx.fill(); } }
+  // 🐘 the elephant: dust off every footfall, and when it trumpets you can see the sound
+  if(S.kind==='elephant' && !P.down){
+    if(f.onGround && (P.moving || Math.abs(f.vx||0)>0.4)){ ctx.fillStyle='rgba(200,170,120,.35)'; for(const id of ['nf','nh']){ const t=P.legs[id].toe; if(t[1]>-2){ ctx.beginPath(); ctx.arc(t[0]-4, -2, 3+Math.sin(P.T*0.2)*0.8, 0, Math.PI*2); ctx.fill(); ctx.beginPath(); ctx.arc(t[0]+5, -1.5, 2.2, 0, Math.PI*2); ctx.fill(); } } }
+    if(P.trunkUp>0.4 && P._trunkTip){ const e=P._trunkTip; ctx.strokeStyle='rgba(255,246,220,.55)'; ctx.lineWidth=0.9;
+      for(let k=0;k<3;k++){ const r=4+k*4+((P.T*0.6)%4); ctx.beginPath(); ctx.arc(e[0]+2, e[1]-2, r, -1.6, -0.3); ctx.stroke(); } }
+    if(f._elAtk==='stomp' && P.atkP>0.62 && P.atkP<0.8){ ctx.fillStyle='rgba(200,170,120,.5)'; for(let k=0;k<7;k++){ const q=(P.atkP-0.62)/0.18; ctx.beginPath(); ctx.arc(P.legs.nf.toe[0]+(k-3)*6*(0.6+q), -2-q*6*Math.abs(Math.sin(k)), 2.5+q*3, 0, Math.PI*2); ctx.fill(); } }
+  }
   // a charging bull kicks up the sand
   if(S.kind==='bull' && f.onGround && Math.abs(f.vx||0)>1.5){ ctx.fillStyle='rgba(200,168,112,.45)';
     for(let k=0;k<3;k++){ const x=P.legs.nh.toe[0]-6-k*5, y=-2-k*1.5; ctx.beginPath(); ctx.arc(x, y, 2+k, 0, Math.PI*2); ctx.fill(); } }
@@ -16667,10 +16778,14 @@ const BEASTS=[
   {id:'lion',    name:'Libyan Lion',      body:'#c8a24a', dk:'#8a6a24', hp:165, dmg:2.7, speed:1.2, react:0.12, aggr:0.96, reach:24, armor:0.05, mane:true,  reward:1.6,  blurb:'the king of the sands, mane like a low sun'},
   {id:'bear',    name:'Caledonian Bear',  body:'#6a4a2e', dk:'#40301c', hp:210, dmg:3.3, speed:0.8, react:0.22, aggr:0.7,  reach:26, armor:0.16, hump:true,  reward:1.55, blurb:'a mountain of fur and slow, crushing fury'},
   {id:'bull',    name:'Hispanic Bull',    body:'#2e2620', dk:'#17120d', hp:180, dmg:3.1, speed:1.1, react:0.18, aggr:0.85, reach:24, armor:0.1,  horns:true, reward:1.4,  blurb:'a maddened bull, all horn and hate'},
+  /* 🐘 the old breed of Carthage and the Mauri, out of the forests under the Atlas — the ones Pompey set loose on
+     Gaetulian spearmen in 55 BC, and that the crowd famously pitied. Slow, enormous, thick-hided; it swats with the
+     trunk, gores with the tusks and rears up to come down on whoever is under it. */
+  {id:'elephant',name:'North African Elephant', body:'#877e73', dk:'#4a443d', hp:430, dmg:4.2, speed:0.62, react:0.26, aggr:0.8, reach:40, armor:0.24, reward:2.5, big:true, blurb:'an elephant of Carthage\u2019s old breed, from the forests under the Atlas'},
 ];
 function pickBeast(reg){
   const t=reg?reg.tier:2;   // wilder frontiers loose the bigger game
-  const pool = t>=4? BEASTS : t>=3? BEASTS.filter(b=>b.id!=='bear') : BEASTS.filter(b=>b.id==='leopard'||b.id==='bull');
+  const pool = t>=4? BEASTS : t>=3? BEASTS.filter(b=>b.id!=='bear'&&b.id!=='elephant') : BEASTS.filter(b=>b.id==='leopard'||b.id==='bull');   // 🐘 only the great arenas can afford an elephant
   return pick(pool.length?pool:BEASTS);
 }
 function makeBeast(reg, esc){
@@ -16685,8 +16800,11 @@ function makeBeast(reg, esc){
     ai:{ react:b.react, aggr:b.aggr, think:0, want:'chase', skill:3 },
   });
   f.beast=true; f.beastType=b; f.beard=false; f.stuck=[];
+  if(b.big){ f.heavy=true; f.girth=46; f.tall=34; f.strideMul=(BST_SPEC[b.id]&&BST_SPEC[b.id].stride)||2; f.x=360; }   // 🐘 a body you can hit anywhere along, that blows barely move
   return f;
 }
+/* 🐘 how an elephant moves: it walks — it does not hop — and from far off it CHARGES */
+function heavyWalk(f, dir, spd){ if(!f.onGround) return; f.facing=dir; const want=dir*spd*(f.charge>0? 3.2 : 1.35); f.vx+= (want-f.vx)*0.18; }
 /* =====================================================================
    NEMESIS — a named rival who rises with you, taunts, meddles, and finally
    calls you out for a grudge match to the death. Beat him for a lasting
@@ -16944,7 +17062,8 @@ function tryHit(att,def){
   const reach=weaponReach(att);
   const dx=(def.x-att.x)*att.facing;        // positive if foe is in front
   const dy=Math.abs((def.y-26)-(att.y-26));
-  if(dx>-10 && dx<reach+14 && dy<34){
+  const girth= def.girth? ((Math.sign(att.x-def.x)===def.facing)? 8 : def.girth) : 0;         // 🐘 from in front you meet its head; from the side or behind, its whole length
+  if(dx>-10 && dx<reach+14+girth && dy<34+(def.tall||0)){
     att.atkHit=true;
     // blocked? defender guarding the same zone & facing attacker & has block
     const facingAtt = Math.sign(att.x-def.x)===def.facing;
@@ -16977,8 +17096,11 @@ function tryHit(att,def){
       def.combo=0;
     } else {
       def.hp-=dmg; def.hurt=16;
-      def.vx += att.facing*(att.atkType==='thrust'?7.5:5.5);   // hefty knockback
-      def.vy -= 3.4; def.onGround=false; def.rot += att.facing*0.25;
+      if(def.heavy){ def.vx += att.facing*(att.atkType==='thrust'?1.2:0.8); }                   // 🐘 a blow barely moves it
+      else { def.vx += att.facing*(att.atkType==='thrust'?7.5:5.5);   // hefty knockback
+      def.vy -= 3.4; def.onGround=false; def.rot += att.facing*0.25; }
+      if(att.heavy){ def.vx += att.facing*(att._elAtk==='stomp'? 3 : 5); def.vy -= (att._elAtk==='swat'? 3.2 : 1.6); def.rot += att.facing*0.3;   // and its blows throw a man
+        if(typeof FT.shake==='number') FT.shake=Math.min(14, FT.shake+(att._elAtk==='stomp'? 10 : 6)); }
       // heavy thrusts can leave steel lodged in the flesh
       if(att.atkType==='thrust' && dmg>16 && def.stuck && def.stuck.length<4 && Math.random()<0.3){
         def.stuck.push({dx:rnd(-5,3), dy:rnd(-32,-18), ang:(att.facing*def.facing>0? rnd(2.6,3.5):rnd(-0.5,0.4))});
@@ -17803,6 +17925,10 @@ function beastLunge(f,dir){
 }
 function beastBite(f){
   if(f.atk||f.atkCd>0) return;
+  if(f.heavy){ const r=Math.random(); f._elAtk= r<0.25? 'stomp' : r<0.6? 'gore' : 'swat';                       // 🐘 the trunk, the tusks, or the whole weight of it
+    f.stance= f._elAtk==='stomp'? 'high' : f._elAtk==='swat'? 'mid' : 'low';
+    f.atk=true; f.atkType='slash'; f.atkHit=false; f.atkDur=f._elAtk==='stomp'? 36 : f._elAtk==='gore'? 26 : 22; f.atkT=f.atkDur; f.atkCd=f.atkDur+ri(14,26);
+    try{ sfx('thud'); }catch(e){} return; }
   f.stance = Math.random()<0.7?'mid':(Math.random()<0.5?'high':'low');  // mostly a body maul, sometimes high/low
   f.atk=true; f.atkType='slash'; f.atkHit=false;
   f.atkDur=Math.max(4,Math.round(14/(f.spdMul||1))); f.atkT=f.atkDur; f.atkCd=f.atkDur+ri(8,16);
@@ -17819,6 +17945,14 @@ function beastAI(f,opp,dt){
     else if(Math.random()<ai.aggr) ai.want='bite';
     else ai.want = Math.random()<0.35?'back':'bite';
   }
+  if(f.heavy){                                                                                   // 🐘
+    if(f.charge>0) f.charge-=dt;
+    if(ai.want==='lunge' && !f.charge && dist>reach+60){ f.charge=50; ai.want='chase'; try{ sfx('thud'); }catch(e){} }
+    if(f.onGround && !f.atk){
+      if(ai.want==='back' && dist<reach+40) heavyWalk(f,-f.facing,spd*0.7);
+      else if(dist>reach+3) heavyWalk(f,f.facing,spd);                                          // its bulk keeps a man ~38px off (heavyShove), so it strikes from there
+      else { f.vx*=0.8; if(ai.want!=='back') beastBite(f); } }
+    return; }
   if(f.onGround && !f.atk){
     if(ai.want==='chase'){ if(dist>reach-4) beastHop(f,f.facing,spd); }
     else if(ai.want==='lunge'){ beastLunge(f,f.facing); ai.want='bite'; }
@@ -17881,7 +18015,22 @@ function physics(f,dt){
   f.rot*=Math.pow(0.9,dt);
   // stamina regen on ground & idle
   if(f.onGround && Math.abs(f.vx)<0.4 && !f.atk){ f.stamina=Math.min(f.maxStamina,f.stamina+0.7*dt*(CLASSES_TRAIT(f,'+stamina')?1.5:1)*(1+(f.footTrain||0)*0.05)); }
-  f.legPhase+=Math.abs(f.vx)*0.08*dt;
+  f.legPhase+=Math.abs(f.vx)*0.08*dt*(f.strideMul||1);
+}
+
+/* 🐘 nobody walks through an elephant. Its bulk is a wall: a man on his feet
+   inside it is shoved out to whichever end is nearer (its tusks or its tail),
+   and if it is walking into him he is carried along. A man in the air is let
+   pass, so a good hop over the trunk puts you at its flank. */
+function heavyShove(e,p){
+  if(!e || !p || e.knock || p.y<GROUND-24) return;
+  const front=38, back=-(e.girth||46)-10, rel=(p.x-e.x)*e.facing;     // its head and tusks reach ~40 out in front of its shoulder
+  if(rel>=front || rel<=back) return;
+  let out = (front-rel < rel-back)? front : back, nx=e.x+out*e.facing;
+  if(nx<WALL_L || nx>WALL_R){                                   // pinned to the wall: he cannot give way, so it stops against him
+    const wx=clamp(nx,WALL_L,WALL_R); p.x=wx; e.x=wx-out*e.facing; if(Math.sign(e.vx)===Math.sign(wx-e.x)) e.vx*=0.3; return; }
+  p.x += (nx-p.x)*0.55;
+  if(Math.abs(e.vx)>0.5 && Math.sign(e.vx)===Math.sign(nx-e.x)) p.vx += (e.vx-p.vx)*0.35;
 }
 
 /* ---------- fight update ---------- */
@@ -17910,6 +18059,7 @@ function updateFight(dt){
   // AI
   if(!foe.knock && !FT.over){ if(foe.beast) beastAI(foe,p,dt); else aiUpdate(foe,p,dt); }
   physics(p,dt); physics(foe,dt);
+  if(foe.heavy) heavyShove(foe,p);
   // hits
   tryHit(p,foe); tryHit(foe,p);
   // thrown pila in flight
@@ -19595,7 +19745,7 @@ function drawArena(){
   // emperor box
   if(t.emperor) drawEmperorBox();
   // fighters (draw far one first)
-  const order = t.p.x<t.foe.x? [t.p,t.foe]:[t.foe,t.p];
+  const order = t.foe.heavy? [t.foe,t.p] : t.p.x<t.foe.x? [t.p,t.foe]:[t.foe,t.p];   // 🐘 an elephant's head hangs over the man it fights: draw him in front of it or he vanishes under it
   drawShadow(t.p); drawShadow(t.foe);
   drawGroundHaze(ctx);                        // the air over hot sand, behind everything on it
   drawSwingTrails(ctx);                       // the arc, behind the men who made it
@@ -64245,6 +64395,7 @@ drawLogo();
 }catch(e){} })();
 
 window.__SS = {
+  doAttack, heavyShove, hop,
   drawWifeHappy, get WH_DUR(){ return WH_DUR; }, finFxNew, finFxTick, get CH_CACHE_SIZE(){ return CH_CACHE.size; }, chPaint, CH_PAINTERS, chProps, chDoor, chBedIn, get CH_DRAWS(){ return CH_DRAWS; }, get CH_CACHE_N(){ return CH_CACHE.size; },
   show, openCreate, enterMap, openShop, openBrief, openStable, openVilla, openIntrigue, startFight, FT:()=>FT,
   setG:(g)=>{G=g;}, newDemo:(name,origin,arch)=>{G=freshCareer(name||'Verus',origin||'Italia',arch||'Roman'); G.quirks=rollQuirks();},

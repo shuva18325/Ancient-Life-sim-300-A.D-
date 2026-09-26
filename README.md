@@ -70,6 +70,11 @@ publicly, leaving it off keeps the game safe for a general audience.
 - **The venatio's beasts on bodies of their own (V49)** — the lion, leopard, bear and bull are
   drawn like the men they fight: painted vector bodies with a stride, a leap, a fall, and an attack
   each (a swipe, a rearing maul, a hook of the horns).
+- **The North African elephant (V49)** — the great arenas (tier 4) can loose one of Carthage's old
+  forest breed on you: 430 HP of thick hide that walks (it never hops) and, from far off, charges.
+  It fights with the trunk (a swat that throws you), the tusks (a low gore) and its whole weight (it
+  rears and comes down on you, and the sand jumps). Blows barely move it, you cannot walk through it
+  — its bulk shoves you out, or pins you to the wall — and you can hit it anywhere along its flank.
 - **The three bots (V48)** — Settings → 🤖 THE THREE BOTS. **Minerva the Clever** (plays the odds,
   studies law, climbs to the Senate, marries for advantage), **Lucius the Lover** (the Rkrai coast;
   fights only to pay for a longhouse and the curviest wife on the coast, gifts, the bath, and the
