@@ -3085,6 +3085,8 @@ function localCulture(){
   const byTheatre={ italia:'roman', asia:'greek', persia:'persian',
                     germania:'germanic', gallia:'celt', iberia:'celt',
                     africa:'numidian' };
+  { const RE=(typeof REGION_EAST_BY_ID!=='undefined')? REGION_EAST_BY_ID[G.current] : null;
+    if(!byRegion[G.current] && RE && RE.cul) return cultureById(RE.cul); }
   return cultureById(byRegion[G.current] || byTheatre[th] || playerCulture().id);
 }
 /* WHAT IT COSTS TO DRESS HER LIKE THAT HERE, 0..1 of a full scandal. */
@@ -8003,7 +8005,9 @@ function manNomen(n){
 }
 function makeBride(eth, noble, quality, opts){
   opts=opts||{};
-  const D=BRIDE[eth]||BRIDE.roman;
+  /* ✦ in the east she is of a PEOPLE, not just a culture row: her own names, looks, cloth and story */
+  let PPL=null; try{ if(typeof asiaPeopleFor==='function') PPL=asiaPeopleFor(eth, opts); }catch(e){ PPL=null; }
+  const D=PPL? Object.assign({}, BRIDE[eth]||BRIDE.roman, PPL) : (BRIDE[eth]||BRIDE.roman);
   // who this person IS: stated by the caller, else "the opposite of the player"
   const wantMale = (opts.male!==undefined)? !!opts.male : !!(G && G.isFemale);
   // QUALITY 0-10 drives looks, wits and traits. Nobles skew higher; paid matches are guaranteed high.
@@ -8039,8 +8043,8 @@ function makeBride(eth, noble, quality, opts){
     han:'#cfc0a0', steppe:'#8a7a5a', kushan:'#e0d4b8', tamil:'#e8dcc0', korean:'#e6ddc8',
     wa:'#5a6a72',                                    // indigo-dyed hemp, which is what most people had
     nanban:'#d8cdb4', ming:'#cfc0a0' };
-  const dressN = DRESS_N[eth] || (Math.random()<0.5?'#7a2d9a':'#a03a80');
-  const dressP = DRESS_P[eth] || '#eae4d6';
+  const dressN = (PPL&&PPL.dressN) || DRESS_N[eth] || (Math.random()<0.5?'#7a2d9a':'#a03a80');
+  const dressP = (PPL&&PPL.dressP) || DRESS_P[eth] || '#eae4d6';
   // ---- her house's standing: common → rich → elite → the Emperor's own daughter ----
   let tier='common';
   // ---- YOU CANNOT MARRY THE IMPERIAL HOUSE IF YOU *ARE* THE IMPERIAL HOUSE ----
@@ -8125,6 +8129,8 @@ function makeBride(eth, noble, quality, opts){
     b.dowrySoldiers=Math.round(ri(260,560)*s); b.honor=5; b.pop=6; b.tradeCoin=noble?4:2;
     b.perk='A shield-maiden of the north — sworn spearmen and iron loyalty.';
   }
+  /* her people's own offer, and her people's own story, over the culture row's */
+  if(PPL){ b.people=PPL.id; b.peopleNote=PPL.note||''; if(PPL.perk) b.perk=PPL.perk; }
   // ---- the house's wealth multiplies what she brings with her ----
   const TM=TIERS[b.tier]||TIERS.common;
   b.dowryCoin=Math.round((b.dowryCoin||0)*TM.mult); b.dowrySoldiers=Math.round((b.dowrySoldiers||0)*TM.mult);
@@ -25029,9 +25035,54 @@ function rkPoseOrder(){
   if(out.indexOf(21)<0) out.splice(Math.min(1,out.length),0,21);
   return out;
 }
+/* ✦ THE PEOPLES' OWN NIGHTS. A culture row's repertoire was standing in for every people under it — the Tibetan
+   plateau was being read the steppe's lines, a Cham house the Kamasutra. Where the province's people has a frame of
+   its own, it is used; the manners of the house still come from the culture row. */
+Object.assign(POSE_LORE, {
+  plateau: { frame:'A BLACK TENT ON THE ROOF OF THE WORLD',
+    src:'Nobody on the plateau will write anything down for another four hundred years. The cold sets the order here: under the fleeces first, the fire banked last.',
+    order:[0,1,3,2,5,7], names:{0:'under the fleeces, against the cold',1:'the long night above the clouds',3:'she rides, and the plateau is hers',
+      2:'as the drong do it',5:'lifted, by the hearth-stones',7:'and the butter lamp gutters out'} },
+  wuhuan: { frame:'TWO YEARS IN HER MOTHER’S HOUSE',
+    src:'The Hou Han shu: the groom serves the bride’s family before he takes her home, and the women decide everything but war. She has had two years to make up her mind about you.',
+    order:[3,0,2,1,7], names:{3:'she decides, as she decides everything',0:'the night her mother finally allows',2:'as the herds do it',
+      1:'the long felt night',7:'and her mother’s tent is ten yards off'} },
+  xiongnu: { frame:'THE YANZHI’S TENT',
+    src:'The shanyu’s consorts kept their own tents and their own herds, and a Han envoy who expected them to defer to him went home disappointed.',
+    order:[0,3,2,1,7], names:{0:'in her own tent, at her invitation',3:'the yanzhi rides first',2:'the steppe way',
+      1:'and the Han envoy is told to wait',7:'the cauldron fire, banked'} },
+  sogdian: { frame:'A PAINTED HALL IN SOGDIANA',
+    src:'Sogdian houses painted their halls floor to ceiling with feasts and epics and the goddess Nana on her lion; the room is a picture before anyone is in it.',
+    order:[0,1,3,2,5,7], names:{0:'under the goddess on her lion',1:'with the silver cup between you',3:'she rides, as Nana rides the lion',
+      2:'the merchant’s haste',5:'the whirling dance of Chach',7:'and the ledger can wait for morning'} },
+  oasis: { frame:'AN OASIS HOUSE, AND THE CARAVAN BELLS',
+    src:'The oasis kingdoms took their manners from India with the monks and from China with the garrisons, and kept their music for themselves.',
+    order:[20,0,3,2,1,7], names:{20:'to the Kuchean lute next door',0:'in the shade of the vine trellis',3:'she rides',
+      2:'at the caravan’s pace',1:'the long desert evening',7:'and the camel bells going past outside'} },
+  rain: { frame:'A HOUSE ON STILTS, AND THE RAIN',
+    src:'The Han wrote the southern peoples down as wild and free with themselves, which says more about the Han. Here the floor is bamboo and the rain does the talking.',
+    order:[0,3,2,1,5,7], names:{0:'with the rain on the thatch',3:'she rides, and the slats creak',2:'as the river does it',
+      1:'the long wet night',5:'lifted, by the bronze drum',7:'and the rice wine, through two straws'} },
+  monsoon: { frame:'THE MONSOON, AND THE SHIPS IN',
+    src:'Indian manners came with the merchants and stayed with the brahmin families; the weather came first and stayed longer.',
+    order:[20,0,3,2,1,7], names:null, inherit:'kushan' },
+  cham: { frame:'HER HOUSE, AND YOU MOVED INTO IT',
+    src:'The Cham reckon descent through the mother. The house is hers, and so is the order of the evening.',
+    order:[3,18,0,2,1,7], names:{3:'she rides — it is her house',18:'she has you where she wants you',0:'the ordinary night under her roof',
+      2:'from behind, by her leave',1:'the long evening',7:'and her mother’s room is across the floor'} },
+  samhan: { frame:'THE NIGHT AFTER THE SOWING DANCE',
+    src:'The Sanguozhi: at the sowing in the fifth month the Samhan dance day and night, dozens together stamping in time, and again at the harvest. Then they go home.',
+    order:[0,3,2,1,7], names:{0:'home from the dancing',3:'she is still keeping time',2:'the planting',
+      1:'the long tenth-month night',7:'and the drums still going in the next village'} },
+});
+const PEOPLE_LORE={ zhangzhung:'plateau', bod:'plateau', sumpa:'plateau', qiang:'plateau', wuhuan:'wuhuan', xiongnu:'xiongnu',
+  sogdian:'sogdian', kangju:'sogdian', dayuan:'sogdian', tocharian:'oasis', kroraina:'oasis', saka:'oasis',
+  yue:'rain', lac:'rain', dian:'rain', ailao:'rain', pyu:'monsoon', mon:'monsoon', funan:'monsoon', malay:'monsoon', cham:'cham', samhan:'samhan' };
 function poseLore(){
   let id='roman';
   try{ id=localCulture().id||'roman'; }catch(e){}
+  try{ const R=(typeof REGION_EAST_BY_ID!=='undefined')? REGION_EAST_BY_ID[G.current] : null, lk=R && R.people && PEOPLE_LORE[R.people];
+    if(lk && POSE_LORE[lk]){ const L2=POSE_LORE[lk]; return (L2.inherit && !L2.names)? Object.assign({}, POSE_LORE[L2.inherit], {frame:L2.frame, src:L2.src, order:L2.order}) : L2; } }catch(e){}
   const L=POSE_LORE[id]||POSE_LORE.roman;
   if(L.inherit && !L.names) return Object.assign({}, POSE_LORE[L.inherit], {frame:L.frame, src:L.src, order:L.order});
   /* THE ONE SHEET WHOSE ORDER IS A PROPERTY OF THE WIFE */
@@ -25099,11 +25150,17 @@ const HALL_PLAN={
      these people could store a winter in the first place. */
   rkrai:    {kind:'plank',   wall:'#6a5238', dado:'#3a2a18', trim:'#a8402a', floor:'#4a3a26', lamp:'seal-oil'},
   tamil:    {kind:'stone',   wall:'#b8a684', dado:'#6a4a2c', trim:'#a8302a', floor:'#8a6a48', lamp:'oil'},
+  /* ✦ AND THE ROOMS OF THE PEOPLES WHO ARE NOT THEIR CULTURE ROW: the plateau's black tent, and the rain country's stilt house */
+  yaktent:  {kind:'yaktent', wall:'#2a2420', dado:'#1a1410', trim:'#a83a2a', floor:'#4a3a28', lamp:'butter'},
+  stilt:    {kind:'stilt',   wall:'#a8905a', dado:'#5a4428', trim:'#2a6a4a', floor:'#8a7040', lamp:'oil'},
 };
 function hallPlan(){
   let id='roman';
   try{ id=(localCulture()||{}).id||'roman'; }catch(e){}
   try{ if(iceHere()) return HALL_PLAN.icecave; }catch(e){}
+  /* ✦ IN THE EAST THE ROOM IS THE PROVINCE'S PEOPLE'S: a black yak-hair tent on the plateau, a house on stilts in the
+     rain country, a Sogdian muralled hall — not the culture row's one room for half a continent */
+  try{ const PP=(typeof asiaPeopleHere==='function')? asiaPeopleHere() : null; if(PP && PP.hall && HALL_PLAN[PP.hall+'_'+id]) return HALL_PLAN[PP.hall+'_'+id]; if(PP && PP.hall && HALL_PLAN[PP.hall]) return HALL_PLAN[PP.hall]; }catch(e){}
   return HALL_PLAN[id]||HALL_PLAN.roman;
 }
 /* =====================================================================
@@ -26075,8 +26132,170 @@ function drawNordFloor(P, D, gx, fy, gw, fh){
   chPelt(D, gx+gw*0.7, fy+fh*0.52, gw*0.12, fh*0.38, '#3a2618', '#5a4028', 29);                                                 // and a bear's
 }
 /* the one call for both the whole screen and the stage: which painter, which floor */
+/* --------------------------------------------------------- THE PLATEAU ---- */
+/* THE BLACK TENT. The herders' tent of the plateau is not a ger: it is
+   woven yak-hair in long strips sewn edge to edge, pitched low and wide on
+   two poles under a ridge, with a slit left open along the top for the
+   smoke — and it is held up from OUTSIDE, by guy-ropes that run through the
+   cloth to stakes, so from inside you see the ropes pulling the roof into
+   peaks. The weave is loose enough that the daylight pricks through it.
+   Round the inside a low wall of turf and dung-cakes keeps the wind off the
+   sleepers; the hearth is a clay stove; and hung from the poles are the
+   sling, the saddle, and strings of dried cheese. The juniper on the little
+   altar is the oldest offering on the plateau, older than any temple. */
+function drawYakTentChamber(P, D, gx, gy, gw, gh, fy, T, H, opt){
+  opt=opt||{}; const C=chCtx(D), GA=CX.globalAlpha, al=(a)=>{ CX.globalAlpha=GA*a; }, wt=gy, wh=fy-gy, Z=chZones(gx,gw,opt);
+  const cx=gx+gw/2, ridgeY=wt+Math.max(10,wh*0.10), eaveY=wt+wh*0.76, slitW=Math.max(18,gw*0.22);
+  chLayer('yak|'+gx+'|'+wt+'|'+gw+'|'+wh+'|'+D('#808080',0.45), gx, wt, gw, wh, ()=>{ const P=chLP, R=chRand(gw*7+wh);
+    // the dark of the tent, and the sky in the slit along the ridge
+    CX.fillStyle=C.lg(gx,wt,gx,fy,[[0,'#1a1410'],[0.6,'#2a221a'],[1,'#3a2e22']]); CX.fillRect(gx,wt,gw,wh);
+    CX.fillStyle=C.lg(cx,wt,cx,ridgeY,[[0,'#3a5a8a',0.15],[1,'#7a9ac0',0.2]]); CX.fillRect(cx-slitW/2,wt,slitW,ridgeY-wt+2);
+    // the back cloth under the slit: the far side of the tent, the same black weave hanging straight
+    { const bx0=cx-slitW/2, bw0=slitW; CX.fillStyle=C.lg(cx,ridgeY,cx,eaveY,[[0,'#1e1814'],[1,'#2e251e']]); CX.fillRect(bx0,ridgeY,bw0,eaveY-ridgeY);
+      for(let x=bx0;x<bx0+bw0;x+=Math.max(9,bw0/6)) P(x,ridgeY,1,eaveY-ridgeY, D('#4a3c2e',0.4));
+      for(let n=0;n<Math.round(bw0*(eaveY-ridgeY)/60);n++){ const x=bx0+R()*bw0, y=ridgeY+R()*(eaveY-ridgeY); if(R()<0.85) P(x,y,2,1, D('#3a3028',0.42)); else { CX.fillStyle='rgba(255,236,190,.25)'; CX.fillRect(x|0,y|0,1,1); } }
+      CX.strokeStyle=D('#8a7a5a',0.3); CX.lineWidth=0.8; for(let k=0;k<3;k++){ CX.beginPath(); CX.moveTo(bx0+bw0*(0.2+k*0.3),ridgeY+2); CX.lineTo(bx0+bw0*(0.2+k*0.3),eaveY); CX.stroke(); } }
+    // the two roof planes: strips of woven yak-hair sewn edge to edge, pulled into peaks by the ropes
+    for(const side of [-1,1]){
+      const x0=cx+side*slitW/2, x1= side<0? gx-gw*0.04 : gx+gw*1.04;
+      const NS=opt.full? 11 : 8;
+      for(let k=0;k<NS;k++){ const u0=k/NS, u1=(k+1)/NS, ya=ridgeY+(eaveY-ridgeY)*u0, yb=ridgeY+(eaveY-ridgeY)*u1;
+        const xa0=x0+(x1-x0)*u0, xa1=x0+(x1-x0)*u1;
+        CX.fillStyle=D(k%2? '#2a221c' : '#241d18'); CX.beginPath(); CX.moveTo(x0,ridgeY); CX.lineTo(x1,ridgeY+(eaveY-ridgeY)*0.04); CX.lineTo(x1,eaveY); CX.lineTo(x0,eaveY); CX.closePath();
+        CX.save(); CX.clip(); CX.beginPath(); CX.moveTo(xa0,wt); CX.lineTo(xa1,wt); CX.lineTo(xa1,fy); CX.lineTo(xa0,fy); CX.closePath(); CX.fill(); CX.restore();
+        // the seam between strips, sewn with pale yak wool
+        CX.strokeStyle=D('#5a4a3a',0.4); CX.lineWidth=0.8; CX.beginPath(); CX.moveTo(xa1,ridgeY+(eaveY-ridgeY)*0.02); CX.lineTo(xa1,eaveY); CX.stroke(); }
+      // the weave: a fine twill, and daylight pricking through the open places
+      for(let n=0;n<Math.round(gw*wh/260);n++){ const u=R(), v=R(), x=x0+(x1-x0)*u, y=ridgeY+(eaveY-ridgeY)*v*0.98+ (u*(eaveY-ridgeY)*0.04);
+        if(R()<0.82){ P(x,y,2,1, D(R()<0.5? '#3a3028' : '#18120e',0.42)); } else { CX.fillStyle='rgba(255,236,190,'+(0.16+R()*0.22).toFixed(2)+')'; CX.fillRect(x|0,y|0,1,1); } }
+      // the guy-ropes running out through the roof — each one pulls a little peak
+      for(let k=1;k<4;k++){ const u=k/4, x=x0+(x1-x0)*u, y=ridgeY+(eaveY-ridgeY)*u*0.55;
+        CX.fillStyle=D('#3a3028'); CX.beginPath(); CX.moveTo(x-6,y+6); CX.lineTo(x,y-2); CX.lineTo(x+6,y+6); CX.closePath(); CX.fill();
+        CX.strokeStyle=D('#8a7a5a',0.38); CX.lineWidth=1.1; CX.beginPath(); CX.moveTo(x,y-1); CX.lineTo(x+side*gw*0.08,eaveY+2); CX.stroke(); } }
+    // the ridge itself, and the cords lacing the slit
+    P(cx-slitW/2-2,ridgeY-1,slitW+4,3, D('#4a3a28')); for(let i=0;i<7;i++){ const x=cx-slitW/2+i*(slitW/6); CX.strokeStyle=D('#8a7a5a',0.4); CX.lineWidth=0.7; CX.beginPath(); CX.moveTo(x,ridgeY); CX.lineTo(x+slitW/12,wt+2); CX.stroke(); }
+    // the low wall inside the hem: turf and dung-cakes, stacked, with barley sacks along it
+    const wy=eaveY, wH=fy-eaveY;
+    CX.fillStyle=C.lg(gx,wy,gx,fy,[[0,'#5a4a36'],[1,'#3a2e22']]); CX.fillRect(gx,wy,gw,wH);
+    for(let j=0;j<Math.max(3,Math.round(wH/7));j++) for(let x=gx+((j%2)? 5 : 0);x<gx+gw;x+=10){ CX.fillStyle=D(R()<0.5? '#6a5840' : '#5a4a34',0.42); CX.beginPath(); CX.ellipse(x+5,wy+j*7+4,4.6,3,0,0,Math.PI*2); CX.fill(); }
+    P(gx,wy-1,gw,2, D('#2a2018'));
+    for(let i=0;i<(opt.full? 5 : 3);i++){ const sx=gx+gw*(0.05+i*0.075); if(sx>Z.door0-10 && sx<Z.door1+10) continue; const sh=Math.max(10,wH*0.85);
+      CX.fillStyle=C.lg(sx,fy-sh,sx+12,fy,[[0,'#c8b48a'],[1,'#8a7a5a']]); CX.beginPath(); CX.moveTo(sx,fy); CX.quadraticCurveTo(sx-2,fy-sh*0.6,sx+3,fy-sh); CX.lineTo(sx+10,fy-sh); CX.quadraticCurveTo(sx+15,fy-sh*0.6,sx+13,fy); CX.closePath(); CX.fill();
+      P(sx+3,fy-sh+2,7,1, D('#6a5a3a')); }
+  });
+  // the two tent poles, with what the household hangs on them
+  for(const s2 of [-1,1]){ const px0=cx+s2*Math.max(14,slitW*0.62)-2;
+    CX.fillStyle=C.lg(px0,0,px0+4,0,[[0,'#4a3420'],[0.5,'#7a5a38'],[1,'#3a2818']]); CX.fillRect(px0,ridgeY,4,fy-ridgeY-1);
+    P(px0-2,ridgeY-2,8,3, D('#3a2818')); }
+  { const hp=cx-Math.max(14,slitW*0.62), hy=ridgeY+wh*0.22;
+    // strings of dried cheese, white cubes on a yak-hair cord
+    for(let s=0;s<2;s++){ const sx=hp-6-s*5; CX.strokeStyle=D('#2a2018'); CX.lineWidth=0.7; CX.beginPath(); CX.moveTo(sx,hy-4); CX.lineTo(sx,hy+30); CX.stroke(); for(let k=0;k<8;k++) P(sx-1.5,hy+k*3.6,3,2.6, D(k%2? '#efe6cc' : '#e0d4b4')); }
+    // the herder's sling, braided in black and white
+    const sp=cx+Math.max(14,slitW*0.62)+5; CX.strokeStyle=D('#e8e0d0'); CX.lineWidth=1; CX.beginPath(); CX.moveTo(sp,hy); CX.quadraticCurveTo(sp+8,hy+22,sp+2,hy+38); CX.stroke(); CX.strokeStyle=D('#1a1410'); CX.setLineDash([2,2]); CX.beginPath(); CX.moveTo(sp,hy); CX.quadraticCurveTo(sp+8,hy+22,sp+2,hy+38); CX.stroke(); CX.setLineDash([]);
+    CX.fillStyle=D('#8a4a2a'); CX.beginPath(); CX.ellipse(sp+4,hy+20,3,4,0.3,0,Math.PI*2); CX.fill();
+    // a saddle on the far pole, red felt and a high wooden tree
+    const sdx=sp+10, sdy=hy+wh*0.20; CX.fillStyle=D('#7a2a1a'); CX.fillRect(sdx,sdy,16,6); CX.fillStyle=D('#5a3a1a'); CX.beginPath(); CX.moveTo(sdx-1,sdy); CX.lineTo(sdx+2,sdy-6); CX.lineTo(sdx+5,sdy); CX.moveTo(sdx+11,sdy); CX.lineTo(sdx+14,sdy-6); CX.lineTo(sdx+17,sdy); CX.fill(); P(sdx,sdy+6,16,1, D('#e8c34a',0.4)); }
+  // the altar on the turf wall: a juniper fire smoking, and a butter lamp
+  { const ax=opt.full? Z.a0+(Z.a1-Z.a0)*0.12 : gx+gw*0.10, ay=eaveY-1, fl=0.85+0.15*Math.sin(T*0.31);
+    P(ax-10,ay-3,26,3, D('#6a5440')); P(ax-10,ay-3,26,1, D('#8a7458'));
+    CX.fillStyle=D('#c8a040'); CX.beginPath(); CX.moveTo(ax-3,ay-3); CX.lineTo(ax-2,ay-8); CX.lineTo(ax+2,ay-8); CX.lineTo(ax+3,ay-3); CX.fill(); CX.fillStyle='#ffd070'; CX.beginPath(); CX.ellipse(ax,ay-10,1.2,2.4*fl,0,0,Math.PI*2); CX.fill();
+    C.glow(ax,ay-10,Math.max(26,wh*0.24),'255,196,110',0.30*fl);
+    P(ax+7,ay-6,6,3, D('#5a4a3a')); for(let i=0;i<5;i++){ const q=((T*0.006+i*0.2)%1); al(0.28*(1-q)); CX.fillStyle='#d8d0c4'; CX.beginPath(); CX.ellipse(ax+10+Math.sin(T*0.02+i)*3*q, ay-8-q*40, 2+q*5, 1.6+q*3, 0, 0, Math.PI*2); CX.fill(); } al(1);
+    P(ax-8,ay-6,3,3, D('#e8dcc0')); P(ax-4,ay-5,2,2, D('#e8dcc0')); }      // torma of barley dough
+  // the hearth: a clay stove, a copper pot on it, a dung fire under, and the smoke going up to the slit
+  { const hx=cx, hy=fy-1, fl=0.85+0.15*Math.sin(T*0.35)+0.08*Math.sin(T*1.1);
+    C.glow(hx,hy-12,Math.max(70,wh*0.8),'255,140,60',0.30*fl);
+    CX.fillStyle=C.lg(hx-16,hy-16,hx+16,hy,[[0,'#8a6a4a'],[1,'#5a4430']]); CX.beginPath(); CX.moveTo(hx-16,hy); CX.lineTo(hx-13,hy-14); CX.lineTo(hx+13,hy-14); CX.lineTo(hx+16,hy); CX.closePath(); CX.fill();
+    P(hx-14,hy-15,28,2, D('#a8885e')); CX.fillStyle='#1a0e08'; CX.fillRect(hx-6,hy-8,12,8);
+    for(let i=0;i<5;i++){ const f=Math.sin(T*0.3+i*1.3)*1.6; CX.fillStyle=i%2? '#ffb040' : '#ff6a20'; CX.beginPath(); CX.moveTo(hx-5+i*2.5,hy-1); CX.quadraticCurveTo(hx-5.5+i*2.5,hy-4,hx-4+i*2.5,hy-6-f); CX.quadraticCurveTo(hx-3+i*2.5,hy-4,hx-2.5+i*2.5,hy-1); CX.fill(); }
+    CX.fillStyle=C.lg(hx-8,0,hx+8,0,[[0,'#7a3a1a'],[0.5,'#d8804a'],[1,'#6a2a10']]); CX.beginPath(); CX.ellipse(hx,hy-19,8,5,0,0,Math.PI*2); CX.fill(); P(hx-6,hy-24,12,2, D('#e8a060'));
+    for(let i=0;i<5;i++){ const q=((T*0.008+i*0.2)%1); al(0.20*(1-q)); CX.fillStyle='#cfc4b8'; CX.beginPath(); CX.ellipse(hx+Math.sin(T*0.02+i)*4*q, hy-26-(hy-26-ridgeY)*q, 4+q*8, 3+q*4, 0, 0, Math.PI*2); CX.fill(); } al(1); }
+  // the butter churn: a tall wooden tube bound in brass, by the stove
+  { const bx=opt.full? Z.b1-14 : gx+gw*0.72, by=fy-2, bh=Math.max(26,wh*0.28);
+    CX.fillStyle=C.lg(bx,0,bx+9,0,[[0,'#5a3a1a'],[0.5,'#9a6a3a'],[1,'#4a2e14']]); CX.fillRect(bx,by-bh,9,bh);
+    for(let k=0;k<3;k++) P(bx-0.5,by-bh+4+k*(bh/3),10,1.5, D('#c8a040')); P(bx+4,by-bh-10,1.4,10, D('#7a5a38')); P(bx+1,by-bh-11,7,1.6, D('#7a5a38')); }
+  CX.globalAlpha=GA;
+}
+function drawYakTentFloor(P, D, gx, fy, gw, fh){
+  const C=chCtx(D), R=chRand(gw+fh*3);
+  CX.fillStyle=C.lg(gx,fy,gx,fy+fh,[[0,'#4a3a28'],[1,'#2e2418']]); CX.fillRect(gx,fy,gw,fh);
+  // woven rugs: knotted wool, the tiger-stripe and the double-diamond the plateau weaves
+  const rugs=[[gx+gw*0.03,gw*0.28,'#8a2a1a','#e8c060'],[gx+gw*0.36,gw*0.27,'#1a3a6a','#e8e0c8'],[gx+gw*0.67,gw*0.29,'#7a4a1a','#1a1410']];
+  for(const [x,w,c1,c2] of rugs){ CX.fillStyle=D(c1); CX.fillRect(x,fy+2,w,fh-4); P(x,fy+2,w,1.5, D(c2)); P(x,fy+fh-3.5,w,1.5, D(c2));
+    for(let k=0;k<Math.floor(w/14);k++){ const mx=x+7+k*14, my=fy+fh/2; CX.strokeStyle=D(c2,0.42); CX.lineWidth=1; CX.beginPath(); CX.moveTo(mx-5,my); CX.lineTo(mx,my-4); CX.lineTo(mx+5,my); CX.lineTo(mx,my+4); CX.closePath(); CX.stroke(); } }
+  // and sheepskins thrown over them, the fleece still on
+  for(let i=0;i<3;i++) chPelt(D, gx+gw*(0.18+i*0.32), fy+fh*0.55, Math.max(10,gw*0.05), Math.max(4,fh*0.3), '#e8e0cc', '#c8bca0', 31+i*7);
+}
+/* ------------------------------------------------------ THE RAIN COUNTRY ---- */
+/* THE HOUSE ON STILTS. From the Yue coast to the Mekong, the Dian lake to
+   the Irrawaddy, people lived up off the wet ground: a floor of split bamboo
+   with the dark showing between the slats, walls of plaited bamboo matting,
+   and a roof of thatch under rafters that rise to the long saddle-shaped
+   ridge the Dian bronzes cast on their house models. The window is a shutter
+   propped open on the green and the rain. The bronze drum on its stand is
+   the wealth of the house; the rice-wine jar has bamboo straws in it because
+   it is drunk together; the hearth is a box of clay on the floor. */
+function drawStiltChamber(P, D, gx, gy, gw, gh, fy, T, H, opt){
+  opt=opt||{}; const C=chCtx(D), GA=CX.globalAlpha, al=(a)=>{ CX.globalAlpha=GA*a; }, wt=gy, wh=fy-gy, Z=chZones(gx,gw,opt);
+  const cx=gx+gw/2, roofB=wt+wh*0.36;
+  chLayer('stilt|'+gx+'|'+wt+'|'+gw+'|'+wh+'|'+D('#808080',0.45), gx, wt, gw, wh, ()=>{ const P=chLP, R=chRand(gw*5+wh);
+    // the plaited wall: bamboo matting in a twill, warm under the lamp
+    CX.fillStyle=C.lg(gx,roofB,gx,fy,[[0,'#a8905a'],[1,'#7a6438']]); CX.fillRect(gx,roofB,gw,fy-roofB);
+    const st=6; for(let y=roofB;y<fy;y+=st) for(let x=gx;x<gx+gw;x+=st){ const k=(((x-gx)/st|0)+((y-roofB)/st|0))%4;
+      if(k<2){ P(x,y,st,2, D('#c8ac6e',0.40)); P(x,y+2,st,1, D('#6a5430',0.40)); } else { P(x,y,2,st, D('#c0a466',0.40)); P(x+2,y,1,st, D('#5a4628',0.40)); } }
+    // the roof from inside: thatch over rafters running up to the saddle ridge
+    CX.fillStyle=C.lg(cx,wt,cx,roofB,[[0,'#2a2012'],[1,'#6a5430']]); CX.fillRect(gx,wt,gw,roofB-wt);
+    for(let n=0;n<Math.round(gw*(roofB-wt)/18);n++){ const x=gx+R()*gw, y=wt+R()*(roofB-wt); CX.strokeStyle=D(R()<0.5? '#8a7040' : '#4a3a20',0.42); CX.lineWidth=0.7; CX.beginPath(); CX.moveTo(x,y); CX.lineTo(x+(R()-0.5)*4,y+4+R()*3); CX.stroke(); }
+    const NR=opt.full? 18 : 12; for(let i=0;i<=NR;i++){ const x=gx+i*gw/NR; CX.strokeStyle=D('#3a2a14'); CX.lineWidth=1.6; CX.beginPath(); CX.moveTo(cx+(x-cx)*0.25,wt+2); CX.lineTo(x,roofB); CX.stroke(); }
+    // the ridge beam, and the saddle sweep of it up at both ends
+    CX.strokeStyle=D('#4a3418'); CX.lineWidth=4; CX.beginPath(); CX.moveTo(gx+gw*0.12,wt+4); CX.quadraticCurveTo(cx,wt+12,gx+gw*0.88,wt+4); CX.stroke();
+    CX.strokeStyle=D('#8a6a3a',0.4); CX.lineWidth=1; CX.beginPath(); CX.moveTo(gx+gw*0.12,wt+3); CX.quadraticCurveTo(cx,wt+11,gx+gw*0.88,wt+3); CX.stroke();
+    P(gx,roofB-2,gw,4, D('#3a2a14')); P(gx,roofB-2,gw,1, D('#8a6a3a',0.4));       // the wall plate
+    for(let i=0;i<=(opt.full? 6 : 4);i++){ const x=gx+i*gw/(opt.full? 6 : 4); P(x-2,roofB,4,fy-roofB, D('#5a4420')); P(x-2,roofB,1,fy-roofB, D('#8a6a3a',0.4)); }   // the posts, bamboo
+  });
+  // the shutter propped open: green, banana leaves, and the rain coming down past them
+  { const wx=opt.full? Z.a0+(Z.a1-Z.a0)*0.42 : gx+gw*0.30, ww=Math.max(30,gw*0.16), wy=roofB+(fy-roofB)*0.12, whh=(fy-roofB)*0.42;
+    CX.fillStyle=C.lg(wx,wy,wx,wy+whh,[[0,'#5a7a5a',0.25],[1,'#2a4a2a',0.25]]); CX.fillRect(wx,wy,ww,whh);
+    for(let k=0;k<4;k++){ const lx=wx+ww*(0.1+k*0.28), ly=wy+whh*(0.3+(k%2)*0.3); CX.fillStyle=D(k%2? '#2a5a2a' : '#3a6a30',0.28); CX.beginPath(); CX.ellipse(lx,ly,ww*0.2,whh*0.12,-0.6+k*0.4,0,Math.PI*2); CX.fill(); }
+    CX.save(); CX.beginPath(); CX.rect(wx,wy,ww,whh); CX.clip(); CX.strokeStyle='rgba(200,220,230,0.35)'; CX.lineWidth=0.6; for(let k=0;k<14;k++){ const rx=wx+((k*13+T*1.8)%ww), ry=wy+((k*29+T*5.5)%whh); CX.beginPath(); CX.moveTo(rx,ry); CX.lineTo(rx-1.5,ry+6); CX.stroke(); } CX.restore();
+    P(wx-2,wy-2,ww+4,2, D('#3a2a14')); P(wx-2,wy+whh,ww+4,3, D('#3a2a14')); P(wx-2,wy,2,whh, D('#3a2a14')); P(wx+ww,wy,2,whh, D('#3a2a14'));
+    CX.fillStyle=D('#8a7040'); CX.beginPath(); CX.moveTo(wx-2,wy-2); CX.lineTo(wx+ww+2,wy-2); CX.lineTo(wx+ww+8,wy-whh*0.36); CX.lineTo(wx+4,wy-whh*0.36); CX.closePath(); CX.fill();   // the shutter, propped
+    CX.strokeStyle=D('#3a2a14'); CX.lineWidth=1.2; CX.beginPath(); CX.moveTo(wx+ww*0.5,wy-1); CX.lineTo(wx+ww*0.6,wy-whh*0.34); CX.stroke(); }
+  // the bronze drum on its stand: the star in the middle of the face, birds flying round it
+  { const dx=opt.full? Z.b0+(Z.b1-Z.b0)*0.70 : gx+gw*0.70, dyb=fy-2, dr=Math.max(11,wh*0.10), dh=Math.max(12,wh*0.12);
+    P(dx-dr*0.7,dyb-5,2,5, D('#3a2a14')); P(dx+dr*0.7-2,dyb-5,2,5, D('#3a2a14'));
+    CX.fillStyle=C.lg(dx-dr,0,dx+dr,0,[[0,'#4a5a3a'],[0.4,'#8a9a5a'],[1,'#3a4a2a']]); CX.beginPath(); CX.moveTo(dx-dr,dyb-5-dh); CX.quadraticCurveTo(dx-dr*1.12,dyb-5-dh*0.5,dx-dr*0.86,dyb-5); CX.lineTo(dx+dr*0.86,dyb-5); CX.quadraticCurveTo(dx+dr*1.12,dyb-5-dh*0.5,dx+dr,dyb-5-dh); CX.closePath(); CX.fill();
+    for(let k=0;k<3;k++) P(dx-dr*0.95,dyb-5-dh*(0.3+k*0.22),dr*1.9,1, D('#c8b060',0.38));
+    CX.fillStyle=C.lg(dx,dyb-5-dh-3,dx,dyb-5-dh+3,[[0,'#b8b070'],[1,'#7a7a48']]); CX.beginPath(); CX.ellipse(dx,dyb-5-dh,dr,dr*0.28,0,0,Math.PI*2); CX.fill();
+    CX.strokeStyle=D('#e8d890',0.42); CX.lineWidth=0.6; for(let k=0;k<12;k++){ const a=k/12*Math.PI*2; CX.beginPath(); CX.moveTo(dx,dyb-5-dh); CX.lineTo(dx+Math.cos(a)*dr*0.36,dyb-5-dh+Math.sin(a)*dr*0.1); CX.stroke(); }
+    CX.beginPath(); CX.ellipse(dx,dyb-5-dh,dr*0.66,dr*0.18,0,0,Math.PI*2); CX.stroke(); for(let k=0;k<6;k++){ const a=k/6*Math.PI*2+T*0.002; P(dx+Math.cos(a)*dr*0.82,dyb-5-dh+Math.sin(a)*dr*0.22,2,1, D('#e8d890',0.4)); } }
+  // the rice-wine jar, with the bamboo straws standing in it
+  { const jx=opt.full? Z.b0+(Z.b1-Z.b0)*0.22 : gx+gw*0.86, jy=fy-2, jr=Math.max(7,wh*0.06);
+    CX.fillStyle=C.lg(jx-jr,0,jx+jr,0,[[0,'#3a2a1a'],[0.5,'#7a5a3a'],[1,'#2a1a10']]); CX.beginPath(); CX.ellipse(jx,jy-jr*1.1,jr,jr*1.15,0,0,Math.PI*2); CX.fill(); P(jx-jr*0.5,jy-jr*2.3,jr,jr*0.4, D('#5a3a1a'));
+    for(let k=0;k<3;k++){ CX.strokeStyle=D(k%2? '#c8b060' : '#a89a50'); CX.lineWidth=1.2; CX.beginPath(); CX.moveTo(jx-2+k*2,jy-jr*2.2); CX.quadraticCurveTo(jx-6+k*6,jy-jr*3.6,jx-10+k*10,jy-jr*4.4); CX.stroke(); } }
+  // the hearth box: clay in a wooden frame, three stones and a pot, and the lamp of the house
+  { const hx=opt.full? Z.a0+(Z.a1-Z.a0)*0.10 : gx+gw*0.10, hy=fy-1, fl=0.85+0.15*Math.sin(T*0.33);
+    C.glow(hx+10,hy-8,Math.max(50,wh*0.6),'255,150,70',0.26*fl);
+    P(hx-4,hy-4,30,4, D('#5a3a1a')); P(hx-2,hy-5,26,2, D('#8a6a4a'));
+    for(let k=0;k<3;k++){ CX.fillStyle=D('#6a645a'); CX.beginPath(); CX.ellipse(hx+4+k*8,hy-6,2.4,1.6,0,0,Math.PI*2); CX.fill(); }
+    for(let i=0;i<4;i++){ const f=Math.sin(T*0.3+i*1.3)*1.4; CX.fillStyle=i%2? '#ffb040' : '#ff6a20'; CX.beginPath(); CX.moveTo(hx+5+i*4,hy-6); CX.quadraticCurveTo(hx+5.5+i*4,hy-9,hx+6+i*4,hy-11-f); CX.quadraticCurveTo(hx+7+i*4,hy-9,hx+8+i*4,hy-6); CX.fill(); }
+    CX.fillStyle=D('#3a2a1a'); CX.beginPath(); CX.ellipse(hx+12,hy-14,7,4.6,0,0,Math.PI*2); CX.fill(); P(hx+6,hy-18,12,2, D('#5a4430')); }
+  // hanging baskets and a fish-trap off the rafters
+  for(let i=0;i<(opt.full? 3 : 2);i++){ const bx=gx+gw*(0.40+i*0.13), by=roofB+6+(i%2)*6; CX.strokeStyle=D('#3a2a14'); CX.lineWidth=0.6; CX.beginPath(); CX.moveTo(bx,roofB-2); CX.lineTo(bx,by); CX.stroke();
+    CX.fillStyle=D(i%2? '#a8884a' : '#8a6a38'); CX.beginPath(); CX.moveTo(bx-5,by); CX.lineTo(bx+5,by); CX.lineTo(bx+3,by+9); CX.lineTo(bx-3,by+9); CX.closePath(); CX.fill(); for(let k=0;k<3;k++) P(bx-4+k*0.6,by+2+k*2.6,8-k*1.2,0.8, D('#5a4420')); }
+  CX.globalAlpha=GA;
+}
+function drawStiltFloor(P, D, gx, fy, gw, fh){
+  const C=chCtx(D);
+  CX.fillStyle='#0e0a06'; CX.fillRect(gx,fy,gw,fh);           // the dark under the house, between the slats
+  for(let x=gx;x<gx+gw;x+=5){ CX.fillStyle=C.lg(x,0,x+4,0,[[0,'#8a7040'],[0.5,'#c8a86a'],[1,'#7a6036']]); CX.fillRect(x,fy,4,fh); P(x+1,fy,1,fh, D('#e0c890',0.36)); }
+  for(let k=0;k<3;k++) P(gx,fy+fh*(0.2+k*0.3),gw,1.4, D('#5a4420'));      // the cross-ties
+  // a plaited mat, and the pillows of the house
+  CX.fillStyle=D('#b89a5a'); CX.fillRect(gx+gw*0.30,fy+2,gw*0.40,fh-4); for(let x=gx+gw*0.30;x<gx+gw*0.70;x+=4) P(x,fy+2,1,fh-4, D('#8a6e3a'));
+  P(gx+gw*0.30,fy+2,gw*0.40,1.4, D('#a8302a')); P(gx+gw*0.30,fy+fh-3.4,gw*0.40,1.4, D('#a8302a'));
+}
 const CH_PAINTERS={ shoji:[drawWaChamber, drawWaFloor], paper:[(P,D,gx,gy,gw,gh,fy,T,H,o)=>drawWaChamber(P,D,gx,gy,gw,gh,fy,T,H,Object.assign({korean:true},o)), (P,D,gx,fy,gw,fh,o)=>drawWaFloor(P,D,gx,fy,gw,fh,Object.assign({korean:true},o))],
-  earth:[drawHanChamber, drawHanFloor], brick:[drawEgyptChamber, drawEgyptFloor], wattle:[drawCeltChamber, drawCeltFloor], logs:[drawNordChamber, drawNordFloor], niche:[drawPersianChamber, drawPersianFloor], ger:[drawGerChamber, drawGerFloor], stone:[drawIndianChamber, (P,D,gx,fy,gw,fh,o,H)=>drawIndianFloor(P,D,gx,fy,gw,fh,H)] };
+  earth:[drawHanChamber, drawHanFloor], brick:[drawEgyptChamber, drawEgyptFloor], wattle:[drawCeltChamber, drawCeltFloor], logs:[drawNordChamber, drawNordFloor], niche:[drawPersianChamber, drawPersianFloor], ger:[drawGerChamber, drawGerFloor], yaktent:[drawYakTentChamber, drawYakTentFloor], stilt:[drawStiltChamber, drawStiltFloor], stone:[drawIndianChamber, (P,D,gx,fy,gw,fh,o,H)=>drawIndianFloor(P,D,gx,fy,gw,fh,H)] };
 function chPaint(kind, P, D, gx, gy, gw, gh, fy, T, H, opt){
   const pr=CH_PAINTERS[kind]; if(!pr) return false;
   const fh=gy+gh-fy, key='floor|'+kind+'|'+gx+'|'+fy+'|'+gw+'|'+fh+'|'+D('#808080',0.45)+D('#c0a060')+'|'+((H&&H.trim)||'')+'|'+((opt&&opt.full)? 1 : 0);
@@ -26087,6 +26306,16 @@ let CH_DRAWS=0;
 /* the things on the floor of each room, and each people's jar for the wine */
 function chProps(kind, T, s){
   const pxx=(x,y,w,h,c)=>px(x,y,w,h,c);
+  if(kind==='yaktent'){ // a wooden bowl, a bag of roasted barley, and the chang in a wooden jug bound with brass
+    CX.fillStyle='#6a4a2a'; CX.beginPath(); CX.ellipse(160,212,7,3,0,0,Math.PI); CX.fill(); pxx(153,210,14,2,'#8a6a3a');
+    CX.fillStyle='#c8b48a'; CX.beginPath(); CX.ellipse(84,212,9,7,0,0,Math.PI*2); CX.fill(); pxx(80,204,8,3,'#a89870');
+    if(!s.wineTaken){ pxx(315,196,10,16,'#5a3a1a'); pxx(314,199,12,1.5,'#c8a040'); pxx(314,207,12,1.5,'#c8a040'); pxx(325,198,3,6,'#4a2e14'); pxx(316,193,8,3,'#7a5a38'); }
+    return; }
+  if(kind==='stilt'){ // a gourd, a betel box, and rice wine in a length of bamboo
+    CX.fillStyle='#c8a050'; CX.beginPath(); CX.ellipse(80,212,6,7,0,0,Math.PI*2); CX.fill(); CX.beginPath(); CX.ellipse(80,202,3.5,4,0,0,Math.PI*2); CX.fill(); pxx(79,196,2,3,'#5a3a1a');
+    pxx(150,206,20,6,'#5a2a1a'); pxx(150,206,20,1,'#c8a040'); pxx(156,208,8,2,'#2a6a4a');
+    if(!s.wineTaken){ pxx(316,188,7,24,'#a89a50'); pxx(316,196,7,1,'#6a5a2a'); pxx(316,205,7,1,'#6a5a2a'); pxx(317,187,5,2,'#d8c890'); }
+    return; }
   if(kind==='shoji'||kind==='paper'){ // a low lacquer table, a cushion, and a sake flask
     CX.fillStyle='#1a0c08'; CX.fillRect(150,206,34,4); pxx(152,210,3,10,'#140a06'); pxx(179,210,3,10,'#140a06'); pxx(150,206,34,1,'#8a2a22');
     pxx(160,202,5,4,'#e8e0d0'); pxx(170,203,4,3,'#e8e0d0');
@@ -26131,6 +26360,15 @@ function chProps(kind, T, s){
    a painted ger door, a studded teak door — and in the Tamil south a torana of mango leaves over it */
 function chDoor(kind, dX, dx, dw, open, T){
   const P=px, lw=Math.max(0,Math.round(dw*(1-open))), KO=(kind==='paper'), TAMIL=(kind==='stone' && (hallPlan()||{}).trim==='#a8302a');
+  if(kind==='yaktent'){                                // the tent's door is a flap of the same black cloth, rolled up and tied
+    P(dX-6,86,dw+12,138,'#1a1410'); P(dX-4,96,dw+8,128,'#0a0806'); P(dX-6,86,dw+12,10,'#2a221c');
+    return {frameDone:true, leaf:()=>{ if(lw<=0) return; const x=dx+dw-lw; P(x,96,lw,126,'#241d18'); for(let k=0;k<Math.floor(lw/4);k++) P(x+k*4,96,1,126,'#30271f');
+      if(lw>8){ P(x+lw/2-1,96,2,126,'#8a7a5a'); for(let k=0;k<5;k++) P(x+2,110+k*22,lw-4,1,'#3a3028'); } }}; }
+  if(kind==='stilt'){                                  // a door of plaited bamboo in a frame of whole stems
+    P(dX-6,86,dw+12,138,'#5a4420'); P(dX-6,86,4,138,'#8a6a3a'); P(dX+dw+2,86,4,138,'#8a6a3a'); P(dX-4,92,dw+8,132,'#0e0a06');
+    return {frameDone:true, leaf:()=>{ if(lw<=0) return; const x=dx+dw-lw; P(x,92,lw,130,'#a8905a');
+      for(let y=92;y<222;y+=6) for(let xx=x;xx<x+lw;xx+=6){ const k=(((xx-x)/6|0)+((y-92)/6|0))%4; if(k<2) P(xx,y,Math.min(6,x+lw-xx),1,'#6a5430'); else P(xx,y,1,6,'#6a5430'); }
+      P(x,92,lw,2,'#5a4420'); P(x,220,lw,2,'#5a4420'); }}; }
   if(kind==='shoji'||kind==='paper'){                 // it slides, it does not swing
     P(dX-6,86,dw+12,138,'#2e2016'); P(dX-4,90,dw+8,134,'#141008');
     return {frameDone:true, leaf:()=>{ if(open>=1) return; const x=dx+Math.round(dw*open), w=dw;
@@ -26196,6 +26434,10 @@ function chDoor(kind, dX, dx, dw, open, T){
 /* and the bed seen through the open door, in each people's way — the same height as the couch, because she sits on its edge */
 function chBedIn(kind, dX, T){
   const P=px, TAMIL=(kind==='stone' && (hallPlan()||{}).trim==='#a8302a');
+  if(kind==='yaktent'){ P(dX+2,194,40,8,'#3a2e22'); P(dX+2,194,40,1,'#5a4a36');                                          // felts and fleeces on the turf
+    for(let k=0;k<5;k++){ CX.fillStyle=k%2? '#e8e0cc' : '#d8ccb0'; CX.beginPath(); CX.ellipse(dX+6+k*8,192,5,2.4,0,0,Math.PI*2); CX.fill(); } P(dX+2,201,40,1,'#8a2a1a'); return true; }
+  if(kind==='stilt'){ P(dX+2,199,40,3,'#b89a5a'); for(let k=0;k<10;k++) P(dX+3+k*4,199,1,3,'#8a6e3a');                  // a sleeping mat, and a wooden headrest
+    P(dX+4,195,8,4,'#5a3a1a'); P(dX+5,194,6,1,'#8a6a3a'); P(dX+16,196,24,3,'#a8302a'); return true; }
   if(kind==='shoji'||kind==='paper'){ P(dX+3,198,40,4,'#2a1a10'); P(dX+3,194,40,4,'#3a2616');                     // a low dais, and the futon on it
     P(dX+3,189,40,6,kind==='paper'? '#c83a4a' : '#2a3a6a'); P(dX+3,189,40,1,kind==='paper'? '#e86a7a' : '#4a5a8a');
     for(let k=0;k<5;k++) P(dX+6+k*8,191,3,2,kind==='paper'? '#e8b830' : '#e8e0d0');
@@ -63541,6 +63783,7 @@ function openMarry(forced){
          for(const N of ns) h+=`<div class="small" style="margin-top:2px;padding:2px 4px;border-left:3px solid ${N.col};
             background:${N.col}14;color:${N.col}"><b>✖ ${N.icon} ${N.name}</b> — ${N.eff}</div>`;
          return h; })()}
+       ${w.peopleNote? `<div class="small" style="margin:3px 0;padding:3px 5px;border-left:3px solid #8a6a3a;background:#8a6a3a14;font-style:italic">🏔 <b>${w.adj}</b> — ${w.peopleNote}</div>` : ''}
        <div class="small muted" style="margin:2px 0">${w.perk}</div>
        <div class="small" style="color:var(--gold)">${marriageEffectsText(w)}</div>`;
     row.appendChild(info); card.appendChild(row);
@@ -64528,10 +64771,304 @@ function lonlatE(lon,lat){ const {lonW,lonE,latN,latS}=MAP_EAST_PROJ;
 function eastXY(lon,lat){ const {lonW,lonE,latN,latS}=MAP_EAST_PROJ;
   return { x:+(((lon-lonW)/(lonE-lonW))*100).toFixed(1),
            y:+(((latN-lat)/(latN-latS))*100).toFixed(1) }; }
+/* =====================================================================
+   THE PEOPLES OF ASIA — WHO A BRIDE ACTUALLY IS
+   ---------------------------------------------------------------------
+   Five culture rows were carrying a continent: every woman on the steppe
+   was "Xianbei", every woman from Kucha to Funan was "Kushan" or "Tamil",
+   and the plateau did not exist. Each people below keeps its parent
+   culture's rites and manners (the tables that run a household are keyed
+   to those), and brings its OWN names, looks, cloth, room and story.
+
+   On names: where a people's women are named in a source, those names are
+   used and the note says whose they are (Miwnay and Shayn of the Sogdian
+   Ancient Letters; the Trưng sisters and Triệu Thị Trinh; Naganika and
+   Gautami Balashri of the Satavahana inscriptions; Anula and Sivali of the
+   Mahavamsa; Aryeong, Saso and Heo Hwang-ok of the Samguk sagi and Samguk
+   yusa; Liuye and Soma of Funan's founding story). Where no woman's name
+   survives — the Wuhuan, the Qiang, the plateau before writing — the names
+   follow the nearest stock that does and say so in a comment, rather than
+   pretend to a record that is not there.
+   ===================================================================== */
+const ASIA_PEOPLES={
+  /* ---------------- THE STEPPE ---------------- */
+  wuhuan:{cul:'steppe', adj:'Wuhuan', hall:'ger',
+    /* no Wuhuan woman is named anywhere; these follow the chiefs' names as the Chinese transcribe them */
+    names:['Ayi','Tala','Sunu','Nalu','Ese','Bahan','Wuyan','Qiulin'],
+    surn:['of Tadun’s camp','of the Liaoxi Wuhuan','of the Shanggu Wuhuan','of Qiuliju’s line','of Liucheng'],
+    skin:'#d8b088', hair:['#1e1610','#2a1e14'], dressN:'#7a3a2a', dressP:'#9a8a6a',
+    note:'The men shave their heads; a married woman grows hers and pins it under a tall cap hung with gold and jade, the Hou Han shu says — and the groom works two years in her mother’s house before she comes to his. Women decide everything here except war.',
+    perk:'Wuhuan horse. In seven years Cao Cao will take twenty thousand of them into his own army and they will be called the finest cavalry under heaven.'},
+  xiongnu:{cul:'steppe', adj:'Southern Xiongnu', hall:'ger',
+    /* the four great clans are attested; given names follow the shanyus' as transcribed */
+    names:['Juqu','Tuqi','Suwen','Ahan','Lini','Moye','Yanru','Huqi'],
+    surn:['of the Huyan','of the Lan','of the Xubu','of the Qiulin','of the Southern court'],
+    skin:'#d4aa80', hair:['#1e1610','#2a1e14','#3a2a18'], dressN:'#5a2a2a', dressP:'#8a7a5a',
+    note:'The shanyu’s wives are yanzhi, and the four great clans — Huyan, Lan, Xubu, Qiulin — marry each other and the shanyu’s house and nobody else. Cai Yan, the scholar’s daughter, is a captive in one of these tents right now; she will have two sons here and write poems about it.',
+    perk:'The tents inside the wall: Xiongnu riders, paid out of the Han’s own subsidy, and a clan name the frontier still flinches at.'},
+  dingling:{cul:'steppe', adj:'Dingling', hall:'ger',
+    names:['Ulan','Sege','Ayan','Kemchi','Toli','Bura','Seren','Altai'],
+    surn:['of the Selenga','of the Baikal shore','of the high carts','of the north camps'],
+    skin:'#e0bc94', hair:['#1e1610','#2a1e14','#3a2a1a'], dressN:'#4a5a6a', dressP:'#8a7a60',
+    note:'North of the Xianbei, on the Selenga and the forest shore of Baikal — the people Tanshihuai drove out of the grass. They roll their houses about on carts with enormous wheels, and the Chinese will one day call them by it: the Gaoche, the High Carts.',
+    perk:'Furs, sable and a people nobody south of the Gobi has ever taxed. Her brothers will come if you send for them, and they will bring the cart.'},
+  wusun:{cul:'steppe', adj:'Wusun', hall:'ger',
+    names:['Aisha','Kunbi','Ulzhan','Saule','Tolgan','Ardak','Nurai','Bota'],
+    surn:['of Chigu','of the Ili','of the kunmi’s yurt','of the Hot Lake'],
+    skin:'#e2c09a', hair:['#2a1e14','#6a3a1e','#8a4a22'], dressN:'#2a5a6a', dressP:'#9a8a6a',
+    note:'The Han married two princesses to the Wusun kunmi: Liu Xijun, who wrote of a felt dome for a house and meat for food and wished herself a yellow swan flying home; and Liu Jieyou, who outlived three kunmi and went home at seventy. The Han commentators say the Wusun are the ones with green eyes and red beards.',
+    perk:'The Han’s oldest ally on the steppe, three hundred years running. Wusun horses, and a road west that does not go through anybody hostile.'},
+  /* ---------------- THE PLATEAU ---------------- */
+  zhangzhung:{cul:'steppe', adj:'Zhangzhung', hall:'yaktent',
+    /* nothing written survives from the plateau this early; these follow the later Tibetan stock */
+    names:['Lhamo','Pelmo','Tsomo','Dekyi','Yangchen','Drolkar','Metok','Nyima'],
+    surn:['of Khyunglung','of the Lig kings','of Dangra lake','of Tise','of the Silver Castle'],
+    skin:'#c8946a', hair:['#141014','#1e1410'], dressN:'#7a2a2a', dressP:'#8a7660',
+    note:'Zhangzhung holds the west of the plateau from the Silver Castle under the holy mountain, and its Bon priests will claim they taught Tibet everything, writing included. A queen keeps her own herds and her own household — and the last king of Zhangzhung will be brought down by a Tibetan wife who did not care for him.',
+    perk:'Salt, gold-dust from the western rivers, and the plateau’s oldest throne. Wool chuba, turquoise and coral — her dowry is worn, mostly on her head.'},
+  bod:{cul:'steppe', adj:'Bod of Yarlung', hall:'yaktent',
+    names:['Lhamo','Kyipa','Dolma','Sonam','Pema','Dawa','Yudron','Tsering'],
+    surn:['of Yarlung','of the Tsenpo’s house','of Chongye','of the Tsangpo valley','of Yumbu Lagang'],
+    skin:'#c48e64', hair:['#141014','#1e1410'], dressN:'#8a3a1a', dressP:'#8a7660',
+    note:'The first Tsenpo came down from the sky on a cord, the Yarlung valley says, and the early kings went back up it when they died — until Drigum cut the cord in a duel and had to be buried like anyone else. In 200 the Tsenpo is one valley lord among many. In four hundred years his house will rule the roof of the world.',
+    perk:'Barley from the one warm valley on the plateau, and a family that will one day be an empire. Ask her about the cord.'},
+  sumpa:{cul:'steppe', adj:'Sumpa', hall:'yaktent',
+    names:['Tsomo','Lhaki','Drolma','Gyalmo','Dekar','Yangkyi','Lhadon','Kunsang'],
+    surn:['of the Sumpa','of the blue lake','of the Tsaidam','of the salt pans'],
+    skin:'#c8946a', hair:['#141014','#1e1410'], dressN:'#5a3a2a', dressP:'#8a7660',
+    note:'Horse-herders of the salt basins north of the Kunlun, between the Qiang and the Tibetans. The Tibetan histories remember the Sumpa for two things: their horses, and being the first people the Tibetan empire swallowed whole.',
+    perk:'Horses that breathe thin air, and a bride-price paid in them.'},
+  qiang:{cul:'steppe', adj:'Qiang', hall:'yaktent',
+    /* the tribes are attested in the Hou Han shu; no Qiang woman is named */
+    names:['Mige','Shaozhi','Ayu','Bolang','Duoji','Seyang','Lanmu','Jiezhi'],
+    surn:['of the Shaodang','of the Xianling','of the White Wolf','of the Lejie','of the Shaohe'],
+    skin:'#c89468', hair:['#141014','#1e1410','#2a1a10'], dressN:'#3a2a24', dressP:'#8a7660',
+    note:'A hundred and fifty tribes and no king. A widow marries her husband’s brother, or his son by another wife, so that no woman of the house is ever lost to it — the Hou Han shu says there are no widows in the land. The first great Qiang war cost the Han twenty-four billion cash and they did not win it.',
+    perk:'Her tribe’s spearmen, who have beaten the Han more often than anybody, and a feud or two you are now part of.'},
+  /* ---------------- THE OASES AND THE SOGDIANS ---------------- */
+  sogdian:{cul:'persian', adj:'Sogdian', hall:'niche',
+    /* Miwnay, Shayn and Chatis are real — the women of the Ancient Letters; the rest follow the theophoric Nanai- names */
+    names:['Miwnay','Shayn','Chatis','Nanai-dhat','Wanuch','Zhimat','Farnu','Pishak'],
+    surn:['of Samarkand','of Panjikent','of the Dunhuang colony','of Bukhara','of Nanai-vandak’s house'],
+    skin:'#e0bc96', hair:['#3a2412','#2a1a10','#5a3a1e'], dressN:'#2a5a8a', dressP:'#c8b890',
+    note:'A century from now a Sogdian wife named Miwnay, left in Dunhuang with her daughter Shayn by a husband who went west and stayed there, will write to him that she would rather have married a dog or a pig. The letter never arrived and survives. Sogdian women write their own letters and keep their own books.',
+    perk:'A merchant house with factors at Samarkand, Dunhuang and Luoyang — the caravan trade end to end — and a wife who reads the ledgers better than you.'},
+  kangju:{cul:'persian', adj:'Kangju', hall:'ger',
+    names:['Apama','Zarina','Roshan','Mithri','Artaxa','Spitama','Barzin','Arsha'],
+    surn:['of Bityan','of the Syr Darya','of the king’s winter camp','of the Kangju'],
+    skin:'#dcb48a', hair:['#2a1a10','#3a2412'], dressN:'#6a2a3a', dressP:'#9a8a6a',
+    note:'The great nomad kingdom of the Syr Darya. Its king once gave his daughter to Zhizhi, a Xiongnu shanyu on the run from the Han, and lost son-in-law and daughter together when a Han general marched four thousand li to burn them in their fort.',
+    perk:'Kangju lancers and the northern road round the Sogdian cities.'},
+  dayuan:{cul:'persian', adj:'Ferghanan', hall:'niche',
+    names:['Roxana','Apama','Laodike','Zariadra','Bagdata','Artemis','Hydarne','Parysatis'],
+    surn:['of Ershi','of Khujand','of the Heavenly Horse pastures','of the Ferghana valley'],
+    skin:'#e4c49e', hair:['#3a2412','#5a3a1e','#2a1a10'], dressN:'#7a3a6a', dressP:'#c8b890',
+    note:'Dayuan, the Han call it — the country of the horses that sweat blood. Emperor Wu sent sixty thousand men across the desert to come back with three thousand of them. They grow grapes and keep wine ten years, and Sima Qian noticed something else: here what the women say is what the men decide.',
+    perk:'Heavenly Horses. One stallion of her father’s line is worth a Han general’s salary.'},
+  tocharian:{cul:'kushan', adj:'Tocharian', hall:'stone',
+    names:['Svarnadevi','Ksema','Upali','Madhuri','Shilavati','Ratna','Kumari','Suvarna'],
+    surn:['of the Bai of Kucha','of Agni','of Jiaohe','of the Muzat river','of Kucha'],
+    skin:'#e8c8a4', hair:['#2a1e14','#7a3a1a','#a85a2a'], dressN:'#2a6a6a', dressP:'#c8b890',
+    note:'Kucha and Agni speak a language that turns out to be cousin to Latin and Welsh rather than to anything round them, and the later paintings in the caves of Kizil show red-haired, blue-eyed donors. Kuchean musicians will be the fashion in Chang’an for six hundred years.',
+    perk:'The oasis between the mountains and the sand, a Buddhist house with a garden, and the best lute-players in Asia at your wedding.'},
+  kroraina:{cul:'kushan', adj:'Krorainan', hall:'stone',
+    names:['Sumana','Priya','Dhammapriya','Suvarna','Bhadra','Nanda','Sudatta','Kalyani'],
+    surn:['of Kroraina','of Cadota','of the Lop shore','of Loulan'],
+    skin:'#e0bc96', hair:['#2a1e14','#3a2412','#5a3a1e'], dressN:'#6a4a2a', dressP:'#c8b890',
+    note:'Kroraina keeps its records in Gandhari, in Kharosthi letters, on wooden tablets sealed with clay — and the tablets dug out of the sand at Niya include women going to law over land and a dowry, and a contract adopting a daughter. Women here own things and sue over them.',
+    perk:'A house on the Lop road with its title-deeds in order, and a camel line across the worst desert in the world.'},
+  saka:{cul:'kushan', adj:'Khotanese Saka', hall:'stone',
+    names:['Ysamavati','Hvamni','Sundari','Vijayadevi','Ratna','Hinai','Sudhana','Puna'],
+    surn:['of the Vijaya house','of Khotan','of the White Jade river','of Shule'],
+    skin:'#e2be98', hair:['#2a1e14','#3a2412'], dressN:'#3a6a3a', dressP:'#c8b890',
+    note:'The jade comes down the White Jade and Black Jade rivers after the spring floods and the women wade in by moonlight to find it, Khotan says. Its royal house is the Vijaya, and the story is that silk came here hidden in a bride’s headdress — a Chinese princess who would not leave her silkworms behind.',
+    perk:'Jade, by the river-load. The jade in Shang tombs came from these rivers fifteen centuries ago.'},
+  /* ---------------- THE SOUTH OF CHINA ---------------- */
+  yue:{cul:'han', adj:'Yue', hall:'stilt',
+    names:['Ou','Min','Lian','Yuenü','Xishi','Dan','Ahua','Lingnan'],
+    surn:['of the Shanyue hills','of Kuaiji','of Min','of Poyang','of Panyu'],
+    skin:'#cfa478', hair:['#141014','#1e1410'], dressN:'#2a6a5a', dressP:'#a89a70',
+    note:'The Yue cut their hair short and tattoo their skin so the dragons in the rivers take them for kin, the Han say. The hill Yue of the south-east have never paid a tax they could avoid; Sun Ce has spent five years trying, and Sun Quan will spend thirty more.',
+    perk:'Boatmen and hill-fighters, rice in two harvests, and a coast the north cannot reach.'},
+  lac:{cul:'han', adj:'Lạc Việt', hall:'stilt',
+    /* Trưng Trắc and Trưng Nhị (AD 40), their generals Lê Chân and Thiều Hoa, and Triệu Thị Trinh (AD 248) are real */
+    names:['Trắc','Nhị','Trinh','Thiều Hoa','Lê Chân','Bát Nàn','Ngọc','Hoa'],
+    surn:['of Mê Linh','of Luy Lâu','of Cửu Chân','of the Lạc lords','of Giao Chỉ'],
+    skin:'#c89868', hair:['#141014','#1e1410'], dressN:'#2a4a3a', dressP:'#a89a70',
+    note:'The Lạc lords keep their own law under the Han governor, and women hold land and office here in a way the Han find scandalous — which is how, a hundred and sixty years ago, two sisters, Trưng Trắc and Trưng Nhị, threw the Han out of the delta for three years. In forty-eight years Triệu Thị Trinh will ride an elephant against Wu.',
+    perk:'A Lạc lord’s rice-lands on the Red River, bronze drums, and a family that has done this before.'},
+  dian:{cul:'han', adj:'Dian', hall:'stilt',
+    names:['Kun','Yao','Shan','Lai','Mei','Zhao','Suo','Dianmu'],
+    surn:['of Lake Dian','of Shizhaishan','of the Kunming herds','of Yelang'],
+    skin:'#cc9a6c', hair:['#141014','#1e1410'], dressN:'#8a2a2a', dressP:'#a89a70',
+    note:'The Dian kings were folded into Yi Province three hundred years ago and buried with their bronzes: cowrie-drums with whole little worlds cast on the lids — a market, a sacrifice, and a weaving-house of women, its mistress cast larger than anyone and gilded.',
+    perk:'Bronze, horses from the hills, and the cowries the whole south-west counts its money in.'},
+  ailao:{cul:'han', adj:'Ailao', hall:'stilt',
+    names:['Shayi','Jiulong','Mengya','Ailan','Lao','Puyi','Rong','Yongmei'],
+    surn:['of the Ailao hills','of Yongchang','of the Lancang','of the nine dragons'],
+    skin:'#c8946a', hair:['#141014','#1e1410'], dressN:'#2a3a6a', dressP:'#a89a70',
+    note:'The Ailao say their first mother, Shayi, touched a log floating in the river and bore ten sons — and the log was a dragon, and the youngest, Jiulong, was king. They tattoo dragon scales on themselves and wear tails on their clothes, the Hou Han shu says, and they built Yongchang for the Han in 69.',
+    perk:'The road to India over the gorges — Burmese amber, jade, cotton cloth — and nine dragons for in-laws.'},
+  lelang:{cul:'han', adj:'Lelang', hall:null,
+    names:['Wang Zhen','Han Yu','Li Xuan','Wang Hui','Zhang Lan','Wang Shu','Guo Ying','Wang Ming'],
+    surn:['of Lelang','of Daifang','of the Lelang Wang','of the Taedong'],
+    skin:'#e3c49c', hair:['#141014','#1e1614'], dressN:'#8a2f3a', dressP:'#cfc0a0',
+    note:'Three hundred years of Han commandery on the Taedong, and the tombs are full of Chinese lacquer — a painted basket from here is covered in the paragons of filial piety. The Gongsun are about to cut a new commandery out of its south, Daifang, to watch the Han and the Wa.',
+    perk:'A frontier Han house with one foot in Korea and one in the court, and the lacquer to prove it.'},
+  /* ---------------- MAINLAND SOUTH-EAST ASIA ---------------- */
+  pyu:{cul:'tamil', adj:'Pyu', hall:'stilt',
+    names:['Sumana','Uttara','Siri','Nanda','Dhanavati','Pabhavati','Sanda','Mala'],
+    surn:['of Beikthano','of Halin','of the Irrawaddy','of the brick walls'],
+    skin:'#bc8a5c', hair:['#141014','#1e1410'], dressN:'#c87a2a', dressP:'#c8b890',
+    note:'The Pyu build round walled cities of brick on the Irrawaddy — Beikthano, Halin — and bury their dead in urns; the Chinese will write that their women of good family pile their hair high with flowers and pearls and that the Pyu dislike killing anything at all.',
+    perk:'River trade from India to Yunnan passes the walls, and pays.'},
+  mon:{cul:'tamil', adj:'Mon', hall:'stilt',
+    names:['Suvanna','Maddi','Kalyani','Ratana','Sanda','Ruci','Thiri','Mya'],
+    surn:['of Thaton','of Suvarnabhumi','of the Sittaung','of the gulf'],
+    skin:'#bc8a5c', hair:['#141014','#1e1410'], dressN:'#a8302a', dressP:'#c8b890',
+    note:'Suvarṇabhūmi, the Land of Gold, is what the Indian merchants call this coast, and the Mon ports on the gulf were trading with them before Rome had heard of either.',
+    perk:'Gold, teak, and a port the monsoon ships stop at.'},
+  cham:{cul:'tamil', adj:'Cham', hall:'stilt',
+    names:['Sri','Uma','Rati','Kanti','Bhavati','Jaya','Nagari','Vati'],
+    surn:['of Kandarpapura','of Xianglin','of the Thu Bồn','of the Areca clan','of the Coconut clan'],
+    skin:'#b8865a', hair:['#141014','#1e1410'], dressN:'#6a2a5a', dressP:'#c8b890',
+    note:'In 192 a man of Xianglin named Qu Lian killed the Han magistrate and made himself king, and Linyi has been its own country since. The Cham reckon descent through the mother: the house is the women’s, and a husband moves into it.',
+    perk:'Eaglewood, the most expensive smell in Asia, and a sea-going house on the Annam coast.'},
+  funan:{cul:'tamil', adj:'Funanese', hall:'stilt',
+    /* Liuye (Willow-Leaf) is the queen of the Chinese account, Soma of the Cambodian one */
+    names:['Soma','Liuye','Nagi','Mera','Kambuja','Sovann','Kunti','Chanda'],
+    surn:['of Vyadhapura','of Oc Eo','of the nāga line','of the Mekong mouth'],
+    skin:'#b4825a', hair:['#141014','#1e1410'], dressN:'#c8a034', dressP:'#c8b890',
+    note:'Funan begins with a queen: Liuye, Willow-Leaf — or Soma, daughter of the nāga king — who ruled the country until a brahmin named Kaundinya sailed in, shot an arrow clean through her boat, and married her. Its kings count their line through her, not him.',
+    perk:'The canal port every hull between India and China stops at — Roman coins and Han mirrors in the same mud.'},
+  malay:{cul:'tamil', adj:'Langkasukan', hall:'stilt',
+    names:['Dewi','Mayang','Kemboja','Melur','Seri','Puteri','Cempaka','Kuntum'],
+    surn:['of Langkasuka','of Kedah','of the isthmus','of Tun-sun'],
+    skin:'#b4825a', hair:['#141014','#1e1410'], dressN:'#2a6a4a', dressP:'#c8b890',
+    note:'The isthmus kingdoms carry Indian cargoes across the neck of land to the gulf rather than sail round it, and the Chinese say Tun-sun has a thousand brahmin families living in it who marry its daughters.',
+    perk:'The portage road between two oceans, and a cut of everything carried over it.'},
+  /* ---------------- INDIA ---------------- */
+  sinhala:{cul:'tamil', adj:'Sinhalese', hall:'stone',
+    names:['Anula','Sivali','Somadevi','Vihara Devi','Unmada Chitra','Ratna','Sanghamitta','Mahamatta'],
+    surn:['of Anuradhapura','of Ruhuna','of the Lambakanna','of Mahatittha'],
+    skin:'#9a6a3e', hair:['#0f0c10','#181214'], dressN:'#e8e0c8', dressP:'#d8ccb0',
+    note:'Two queens have already sat on the Lion Throne in their own right — Anula, a century before Christ, and Sivali after her — and the chronicle the monks keep at Anuradhapura names every one of them, approvingly or not.',
+    perk:'Pearls, gems from Ratnapura, cinnamon, and the island the Romans called Taprobane.'},
+  chera:{cul:'tamil', adj:'Chera', hall:'stone',
+    /* Nachchellaiyar, Atimanti, and Pari's daughters Angavai and Sangavai are Sangam names */
+    names:['Nachchellai','Atimanti','Angavai','Sangavai','Velliviti','Ponmudi','Kaveri','Nakkannai'],
+    surn:['of Vanji','of Muziris','of Tondi','of the bow banner'],
+    skin:'#8f5e33', hair:['#0f0c10','#181214'], dressN:'#e8d8a8', dressP:'#d8ccb0',
+    note:'The Chera banner is a bow, and the Roman ships come into Muziris on the monsoon for pepper — a papyrus in Vienna is a loan for one cargo out of here worth more than some provinces pay in tax. The poet Nachchellaiyar sang the sixth ten of the Patirruppattu for a Chera king and was paid in gold by weight.',
+    perk:'Pepper, by the shipload, sold for Roman gold.'},
+  andhra:{cul:'tamil', adj:'Andhra', hall:'stone',
+    /* Naganika and Gautami Balashri are inscribed queens; Bodhisiri and Chamtisiri are the Nagarjunakonda donors */
+    names:['Naganika','Gautami Balashri','Vasishthi','Bodhisiri','Chamtisiri','Kodabalisiri','Mahadevi','Sudarshana'],
+    surn:['of Dhanyakataka','of Pratishthana','of the Satavahanas','of Nagarjunakonda','of the Krishna mouth'],
+    skin:'#a87048', hair:['#0f0c10','#181214'], dressN:'#c8342a', dressP:'#d8ccb0',
+    note:'Satavahana kings are named for their mothers — Gautamiputra, son of Gautami; Vasishthiputra, son of Vasishthi — and queens cut their own inscriptions into the caves they paid for. At Nagarjunakonda the great monasteries will be built with the money of royal women.',
+    perk:'The Krishna delta, the Amaravati marbles, and a royal house whose queens sign their own donations.'},
+  kalinga:{cul:'kushan', adj:'Kalingan', hall:'stone',
+    names:['Kalindi','Sudarshana','Utpala','Vasavadatta','Padmavati','Indumati','Tilottama','Ketaki'],
+    surn:['of Tosali','of Dantapura','of the Mahameghavahanas','of Sisupalgarh'],
+    skin:'#a87048', hair:['#0f0c10','#181214'], dressN:'#2a5a8a', dressP:'#d8ccb0',
+    note:'Kalinga is the country Ashoka conquered and then regretted — a hundred thousand dead, his own edict says. Two centuries later its king Kharavela had his deeds cut in the rock at Udayagiri, beside the queen’s cave dug for the Jain monks.',
+    perk:'Elephants from the Kalinga forests, the best in India, and a coast that sails to Funan.'},
+  vanga:{cul:'kushan', adj:'Vanga', hall:'stone',
+    names:['Rupavati','Mallika','Kumudini','Champa','Padma','Shyama','Tara','Kanaka'],
+    surn:['of Tamralipti','of Chandraketugarh','of the Ganges mouth','of Wari'],
+    skin:'#a87048', hair:['#0f0c10','#181214'], dressN:'#e8e0d0', dressP:'#d8ccb0',
+    note:'The terracottas of Chandraketugarh are women — yakshis with towers of hair pinned with five little weapons — and the port of Tamralipti ships to Funan and Taprobane. The Periplus says the muslin of this coast is the finest in the world.',
+    perk:'Muslin so fine a bolt passes through a ring, and the port that ships it.'},
+  kamarupa:{cul:'kushan', adj:'Kamarupan', hall:'stone',
+    names:['Chandraprabha','Malini','Rupavati','Haimavati','Kaumudi','Tara','Ambika','Lohita'],
+    surn:['of Pragjyotishpura','of the Brahmaputra','of the Naraka line','of the hill country'],
+    skin:'#c09060', hair:['#0f0c10','#181214'], dressN:'#c8342a', dressP:'#d8ccb0',
+    note:'Pragjyotisha is the country the Mahabharata gives to King Bhagadatta and his war-elephants; the goddess on the hill above the river is a goddess of desire, and the kings will claim descent from Naraka, the demon son of the Earth.',
+    perk:'Silk from the wild moths, aloe-wood, elephants, and the road into the hills nobody else knows.'},
+  kuninda:{cul:'kushan', adj:'Kuninda', hall:'stone',
+    names:['Devika','Himani','Parvati','Ganga','Shaila','Vasudha','Uma','Hemavati'],
+    surn:['of the Kuninda hills','of the Sutlej','of Amoghabhuti’s house','of the deodar forests'],
+    skin:'#c8a070', hair:['#0f0c10','#181214','#2a1a10'], dressN:'#5a6a3a', dressP:'#d8ccb0',
+    note:'Hill people between the Kushan and the snow, with silver coins of their own stamped with a deer and a goddess, and the Mahabharata knows them as the Kulindas who brought the ant-gold of the mountains as tribute.',
+    perk:'A hill kingdom nobody has conquered, and the passes north.'},
+  magadhan:{cul:'kushan', adj:'Magadhan', hall:'stone',
+    names:['Kumaradevi','Dhruvadevi','Prabhavati','Kuberanaga','Dattadevi','Chandravati','Vatsala','Sujata'],
+    surn:['of Pataliputra','of the Licchavis','of Vaishali','of Rajagriha'],
+    skin:'#a87048', hair:['#0f0c10','#181214'], dressN:'#c8a034', dressP:'#d8ccb0',
+    note:'Between empires: the Mauryas long gone, the Guptas a century off — and when the Guptas come, their first king will put his queen on his gold coins beside him, because she is a Licchavi of Vaishali and the marriage is his whole claim.',
+    perk:'The old imperial city on the Ganges, and a family that remembers being one.'},
+  /* ---------------- PARTHIA'S EAST ---------------- */
+  parthian:{cul:'persian', adj:'Parthian', hall:'niche',
+    /* Musa and Aryazate are attested Parthian queens */
+    names:['Musa','Aryazate','Rhodogune','Anahita','Apama','Rinnu','Zarinaea','Artadokht'],
+    surn:['of Merv','of Nisa','of the Arsacids','of Margiana'],
+    skin:'#cf9e68', hair:['#2a1a10','#3a2414'], dressN:'#6a3a9a', dressP:'#c8b890',
+    note:'Merv is the Parthian east — the Roman prisoners from Carrhae were settled here two centuries ago — and a queen named Musa, an Italian slave-girl Augustus sent as a present, once ruled Parthia in her own name and put her own face on its coins.',
+    perk:'Horse-archers and cataphracts, and the eastern road through Merv.'},
+  chorasmian:{cul:'persian', adj:'Chorasmian', hall:'niche',
+    names:['Roshanak','Mithrina','Ardvi','Frada','Sraosha','Aryana','Vanant','Baga'],
+    surn:['of Toprak-kala','of the Oxus delta','of Kyzyl-kala','of the Chorasmian kings'],
+    skin:'#dcb48a', hair:['#2a1a10','#3a2412'], dressN:'#2a6a7a', dressP:'#c8b890',
+    note:'Toprak-kala is a palace-city on the Oxus delta with a hall of kings and a hall of dancers on its walls; Chorasmia keeps its own era, its own coins and its own fire-temples, and is nobody’s province.',
+    perk:'The Oxus delta, the northern caravan to the Volga, and a palace with painted rooms.'},
+  /* ---------------- KOREA AND MANCHURIA ---------------- */
+  buyeo:{cul:'korean', adj:'Buyeo', hall:'paper',
+    names:['Yuhwa','Soseono','Ahiryeong','Hayeon','Seol','Ara','Dami','Yeonhwa'],
+    surn:['of the Horse-ga','of the Ox-ga','of the Pig-ga','of the Dog-ga','of Wiyeseong'],
+    skin:'#e6c79f', hair:['#141014','#1e1614'], dressN:'#e8e0d0', dressP:'#d8ccb4',
+    note:'Buyeo is the oldest kingdom in Manchuria, and Goguryeo and Baekje both claim to have come out of it. Its four great houses are named the Horse, the Ox, the Pig and the Dog; the people wear white; and its law, the Sanguozhi says, is very hard on a jealous wife.',
+    perk:'The northern plain’s horses and furs, and the bloodline every Korean king claims.'},
+  okjeo:{cul:'korean', adj:'Okjeo', hall:'paper',
+    names:['Bada','Gaeul','Sori','Haneul','Mirae','Ondal','Nabi','Narae'],
+    surn:['of Okjeo','of Dongye','of the eastern shore','of the Hamhung plain'],
+    skin:'#e2c09a', hair:['#141014','#1e1614'], dressN:'#5a6a7a', dressP:'#d8ccb4',
+    note:'Okjeo buries a whole family in one long wooden chest — the flesh first in a shallow grave, then all the bones together, with a carved figure for each — and pays Goguryeo its tribute in cloth, fish and salt.',
+    perk:'Fish, salt and a sea-coast Goguryeo cannot do without.'},
+  samhan:{cul:'korean', adj:'Samhan', hall:'paper',
+    /* Aryeong, Saso and Unje are Silla's founding queens; Heo Hwang-ok is Gaya's */
+    names:['Aryeong','Saso','Unje','Heo Hwang-ok','Gyerim','Bokhui','Seondeok','Jinhui'],
+    surn:['of Saro','of Mokji','of the nine chiefs of Guya','of the fifty-four','of the Pak','of the Seok','of the Kim'],
+    skin:'#e6c79f', hair:['#141014','#1e1614','#241a12'], dressN:'#3a5a7a', dressP:'#e6ddc8',
+    note:'Three leagues of walled villages — Mahan, Jinhan, Byeonhan. The Samguk sagi gives Saro’s first queen a dragon for a mother, and Gaya’s first queen a ship from Ayuta in India; the Sanguozhi says everyone dances all night at the sowing and again at the harvest.',
+    perk:'Byeonhan iron — Lelang, Daifang and the Wa all buy it — and a league that votes.'},
+  yilou:{cul:'korean', adj:'Yilou', hall:'paper',
+    names:['Uda','Sule','Ayan','Neri','Gilan','Mo','Tumen','Sirin'],
+    surn:['of the Ussuri','of the deep forest','of the pit-houses','of Sushen’s line'],
+    skin:'#e0bc94', hair:['#141014','#1e1614'], dressN:'#6a4a2a', dressP:'#8a7a5a',
+    note:'The Yilou live in pit-houses dug nine ladders deep against the cold, raise pigs, wear pigskin and grease themselves with lard through the winter; their bows are four feet long and their arrows poisoned, the Sanguozhi says. Buyeo has ruled them for a century and is about to stop.',
+    perk:'Sable, the poisoned arrow, and the forest beyond everybody’s map.'},
+};
+/* ---- where each people is at home: the provinces that put her first on a go-between's list ---- */
+const ASIA_PEOPLE_OF_REGION={
+  'Ordos':'xiongnu', 'Tarim Basin':'tocharian', 'Khotan':'saka', 'Sogdiana':'sogdian', 'Magadha':'magadhan',
+  'Taprobane':'sinhala', 'Funan':'funan', 'Jiaozhi':'lac', 'Baekje':'samhan', 'Gaya':'samhan',
+};
+/* WHICH PEOPLE SHE COMES FROM. In the east, a bride of a given culture is
+   drawn from its peoples — and the people of the province you are standing
+   in come first, because a go-between works with the houses she knows. */
+function asiaPeopleFor(eth, opts){
+  opts=opts||{};
+  if(opts.people===null) return null;
+  if(opts.people && ASIA_PEOPLES[opts.people]) return Object.assign({id:opts.people}, ASIA_PEOPLES[opts.people]);
+  let w='west'; try{ w=playerWorld(); }catch(e){}
+  if(w!=='east') return null;
+  const here=(typeof G!=='undefined' && G)? G.current : null, R=here && REGION_EAST_BY_ID[here];
+  const local=R && R.people;
+  const pool=[];
+  if(local && ASIA_PEOPLES[local] && ASIA_PEOPLES[local].cul===eth) for(let i=0;i<10;i++) pool.push(local);
+  for(const id in ASIA_PEOPLES) if(ASIA_PEOPLES[id].cul===eth) pool.push(id);
+  for(let i=0;i<Math.max(2,Math.round(pool.length*0.35));i++) pool.push(null);   // and a fair share of the parent row itself
+  const id=pool[(Math.random()*pool.length)|0];
+  return id? Object.assign({id}, ASIA_PEOPLES[id]) : null;
+}
+function asiaPeopleHere(){
+  try{ const R=REGION_EAST_BY_ID[G.current]; return R && R.people? ASIA_PEOPLES[R.people] : null; }catch(e){ return null; }
+}
 const REGIONS_EAST = [
   /* ---- THE HAN WORLD, in the year of Guandu ---- */
   Object.assign({id:'Luoyang',        world:'east', tier:4, city:'Luoyang',       prov:'the Han court',
-    real:[112.45,34.6], note:'The capital, and the Emperor in it is a boy other men are holding.'}, eastXY(112.45,34.6)),
+    real:[112.45,34.6], note:'The capital, burned by Dong Zhuo in 190 and still half ash. The Emperor is at Xu now, a boy in Cao Cao’s keeping.'}, eastXY(112.45,34.6)),
   Object.assign({id:'Chang\u2019an',      world:'east', tier:4, city:'Chang\u2019an',      prov:'Han west',
     real:[108.9,34.3], note:'The old capital, sacked and burned in 190 and never the same.'}, eastXY(108.9,34.3)),
   Object.assign({id:'Ji Province',    world:'east', tier:4, city:'Ye',            prov:'Yuan Shao\u2019s domain',
@@ -64613,12 +65150,165 @@ const REGIONS_EAST = [
     real:[85.1,25.6], note:'The old imperial capital, between empires just now — the Mauryas gone, the Guptas a century off.'}, eastXY(85.1,25.6)),
   Object.assign({id:'Taprobane',      world:'east', tier:3, sea:true, city:'Anuradhapura', prov:'the island',
     real:[80.4,8.3], note:'Sri Lanka. Pliny records an embassy from here to Claudius, and the Romans knew the island by this name.'}, eastXY(80.4,8.3)),
+  /* =====================================================================
+     AND THE REST OF ASIA — THIRTY-NINE MORE
+     ---------------------------------------------------------------------
+     The sheet now draws every people of the year 200, and a man could
+     still only travel to thirty-four places on it: no Tibet at all, no
+     Wuhuan, no Buyeo, nothing between the Kushan and the Han but two
+     oases. Every province below is a real seat that mattered in exactly
+     this window. Each names its PEOPLE (the brides of the place, their
+     room and their story) and its parent culture (the rites of the house).
+     ===================================================================== */
+  /* ---- THE PLATEAU ---- */
+  Object.assign({id:'Zhangzhung', world:'east', tier:4, city:'Khyunglung Ngulkhar', prov:'the Silver Castle', people:'zhangzhung', cul:'steppe',
+    real:[80.0,31.1], leg:{w:2,s:true,note:'a castle in a cliff over the Sutlej, with the salt and gold of the western plateau'},
+    note:'The Silver Castle of the Garuda Valley, under the holy mountain. The Bon priests say everything began here, writing included.'}, eastXY(80.0,31.1)),
+  Object.assign({id:'Bod', world:'east', tier:4, city:'Yumbu Lagang', prov:'the Yarlung valley', people:'bod', cul:'steppe',
+    real:[91.75,29.0], leg:{w:2,s:true,note:'barley, in the one warm valley on the roof of the world'},
+    note:'A tower on a ridge over the barley of Yarlung. The Tsenpo here is one valley lord among many — for now.'}, eastXY(91.75,29.0)),
+  Object.assign({id:'Sumpa', world:'east', tier:4, city:'the Tsaidam camps', prov:'the salt-lake herders', people:'sumpa', cul:'steppe',
+    real:[97.0,36.6], leg:{w:1,s:false},
+    note:'Horse-herders of the salt basins north of the Kunlun, remembered for their horses and for being swallowed first.'}, eastXY(97.0,36.6)),
+  Object.assign({id:'Qiang Highlands', world:'east', tier:3, city:'Huangzhong', prov:'the Qiang tribes', people:'qiang', cul:'steppe',
+    real:[101.6,36.4], leg:{w:1,s:true,note:'a hundred and fifty tribes and no king to make terms with'},
+    note:'A hundred and fifty tribes and no king. The Han broke its treasury here for sixty years without breaking them.'}, eastXY(101.6,36.4)),
+  /* ---- THE STEPPE ---- */
+  Object.assign({id:'Wuhuan', world:'east', tier:3, city:'Liucheng', prov:'the Wuhuan of Liaoxi', people:'wuhuan', cul:'steppe',
+    real:[119.9,41.9], leg:{w:2,s:false,note:'the best horse in the north, and allied to whoever loses at Guandu'},
+    note:'Tadun’s horsemen, Yuan Shao’s allies. In seven years Cao Cao will march four hundred miles through roadless hills to fall on them at White Wolf Mountain.'}, eastXY(119.9,41.9)),
+  Object.assign({id:'Dingling', world:'east', tier:5, city:'the Selenga camps', prov:'beyond the Xianbei', people:'dingling', cul:'steppe',
+    real:[104.5,51.4], leg:{w:1,s:false},
+    note:'High carts on the Selenga and the forest shore of Baikal: the people Tanshihuai drove north. Nobody in Luoyang has a map that goes this far.'}, eastXY(104.5,51.4)),
+  Object.assign({id:'Wusun', world:'east', tier:4, city:'Chigu, the Red Valley City', prov:'the Ili and the Hot Lake', people:'wusun', cul:'steppe',
+    real:[77.6,42.4], leg:{w:2,s:false,note:'the Han’s oldest steppe ally, beside the lake that never freezes'},
+    note:'Beside the lake that never freezes. Two Han princesses were married here, and one wrote the saddest poem of the Western Regions.'}, eastXY(77.6,42.4)),
+  Object.assign({id:'Kangju', world:'east', tier:4, city:'Bityan', prov:'the Syr Darya kingdom', people:'kangju', cul:'persian', theatre:'steppe',
+    real:[67.8,42.9], leg:{w:2,s:false},
+    note:'The great nomad kingdom of the Syr Darya, which once hid a Xiongnu shanyu from the Han and lost him to a march of four thousand li.'}, eastXY(67.8,42.9)),
+  Object.assign({id:'Yueban', world:'east', tier:5, city:'the Jungar camps', prov:'the last northern Xiongnu', people:'xiongnu', cul:'steppe',
+    real:[84.6,45.6], leg:{w:1,s:false},
+    note:'What is left of the northern Xiongnu. They wash three times a day before they eat, the Chinese say, and are cleaner than any of the other barbarians.'}, eastXY(84.6,45.6)),
+  /* ---- THE OASES AND THE OXUS ---- */
+  Object.assign({id:'Margiana', world:'east', tier:4, city:'Merv', prov:'the Parthian east', people:'parthian', cul:'persian', theatre:'persia',
+    real:[61.85,37.65], leg:{w:3,s:true,note:'the walled oasis of Merv, and the Roman prisoners’ grandsons in it'},
+    note:'The Parthian east, walled against the steppe. The Roman prisoners from Carrhae were settled here; their grandsons are still about.'}, eastXY(61.85,37.65)),
+  Object.assign({id:'Chorasmia', world:'east', tier:4, city:'Toprak-kala', prov:'the Oxus delta', people:'chorasmian', cul:'persian', theatre:'persia',
+    real:[60.9,41.9], leg:{w:2,s:true},
+    note:'A palace-city on the Oxus delta with a hall of kings and a hall of dancers painted on its walls, and nobody’s province.'}, eastXY(60.9,41.9)),
+  Object.assign({id:'Ferghana', world:'east', tier:4, city:'Ershi', prov:'the Heavenly Horses', people:'dayuan', cul:'persian', theatre:'steppe',
+    real:[71.6,40.6], leg:{w:3,s:true,note:'horses that sweat blood, and wine that keeps ten years'},
+    note:'Horses that sweat blood, wine that keeps ten years, and an emperor who sent sixty thousand men to fetch three thousand of the horses.'}, eastXY(71.6,40.6)),
+  Object.assign({id:'Kashgar', world:'east', tier:3, city:'Shule', prov:'the western oases', people:'saka', cul:'kushan', theatre:'steppe',
+    real:[75.99,39.47], leg:{w:2,s:false,note:'the knot where the roads over the Pamirs come down'},
+    note:'Where every road over the Pamirs comes down. Eighty years ago the Kushan put a prince of their own on its throne and the Han let them.'}, eastXY(75.99,39.47)),
+  Object.assign({id:'Loulan', world:'east', tier:3, city:'Kroraina', prov:'the Lop shore', people:'kroraina', cul:'kushan', theatre:'steppe',
+    real:[89.9,40.5], leg:{w:1,s:false},
+    note:'A salt lake that moves, a town on its shore that keeps its accounts in Gandhari on wooden tablets, and the road to Dunhuang across the worst desert in the world.'}, eastXY(89.9,40.5)),
+  Object.assign({id:'Turfan', world:'east', tier:3, city:'Jiaohe', prov:'Jushi, the hollow', people:'tocharian', cul:'kushan', theatre:'steppe',
+    real:[89.1,42.95], leg:{w:2,s:true,note:'a city on an island of loess between two rivers'},
+    note:'A city on an island of loess between two rivers, in a hollow so low and hot the grapes dry on the vine. The Han keep a garrison-farm here and the Xianbei want it.'}, eastXY(89.1,42.95)),
+  /* ---- INDIA ---- */
+  Object.assign({id:'Kalinga', world:'east', tier:3, sea:true, city:'Tosali', prov:'the elephant coast', people:'kalinga', cul:'kushan',
+    real:[85.83,20.27], leg:{w:3,s:true,note:'the elephant forests, and ports that sail to Funan'},
+    note:'The country Ashoka conquered and repented of. Its elephants are the best in India and its ships sail for Funan.'}, eastXY(85.83,20.27)),
+  Object.assign({id:'Vanga', world:'east', tier:3, sea:true, city:'Tamralipti', prov:'the Ganges mouth', people:'vanga', cul:'kushan',
+    real:[87.9,22.3], leg:{w:3,s:true,note:'the muslin port at the mouth of the Ganges'},
+    note:'The port at the mouth of the Ganges. Its muslin, the Periplus says, is the finest in the world.'}, eastXY(87.9,22.3)),
+  Object.assign({id:'Kamarupa', world:'east', tier:4, city:'Pragjyotishpura', prov:'the Brahmaputra', people:'kamarupa', cul:'kushan',
+    real:[91.7,26.15], leg:{w:2,s:true},
+    note:'Bhagadatta’s country in the Mahabharata, and a goddess of desire on the hill above the river.'}, eastXY(91.7,26.15)),
+  Object.assign({id:'Kuninda', world:'east', tier:3, city:'the Sutlej hill-forts', prov:'the hill kingdom', people:'kuninda', cul:'kushan',
+    real:[77.2,31.0], leg:{w:1,s:true},
+    note:'A hill kingdom between the Kushan and the snow, with its own silver coins: a deer, and a goddess.'}, eastXY(77.2,31.0)),
+  Object.assign({id:'Chera Country', world:'east', tier:3, sea:true, city:'Muziris', prov:'Tamilakam', people:'chera', cul:'tamil',
+    real:[76.2,10.2], leg:{w:4,s:true,note:'Muziris, the pepper port, and Roman gold coming in on the monsoon'},
+    note:'Muziris, where the Roman ships come in on the monsoon for pepper and go home with it for gold.'}, eastXY(76.2,10.2)),
+  Object.assign({id:'Amaravati', world:'east', tier:3, city:'Dhanyakataka', prov:'the Satavahana east', people:'andhra', cul:'tamil',
+    real:[80.36,16.57], leg:{w:3,s:true,note:'the great stupa, and the Krishna delta’s rice'},
+    note:'The great stupa in white marble, and the eastern capital of a dynasty in its last generation.'}, eastXY(80.36,16.57)),
+  Object.assign({id:'Kanchi', world:'east', tier:3, sea:true, city:'Kanchipuram', prov:'Tondaimandalam', cul:'tamil',
+    real:[79.7,12.83], leg:{w:3,s:true},
+    note:'A city of learning already, and the Han annals record an embassy from a country called Huangzhi that may be this one.'}, eastXY(79.7,12.83)),
+  /* ---- THE SOUTH-WEST AND THE SOUTH OF CHINA ---- */
+  Object.assign({id:'Dian', world:'east', tier:3, city:'Dianchi', prov:'the bronze lake', people:'dian', cul:'han',
+    real:[102.7,24.9], leg:{w:2,s:true},
+    note:'The lake kingdom the Han swallowed three hundred years ago, buried with its bronzes and not quite gone.'}, eastXY(102.7,24.9)),
+  Object.assign({id:'Ailao', world:'east', tier:4, city:'Yongchang', prov:'the nine dragons', people:'ailao', cul:'han',
+    real:[99.2,25.1], leg:{w:2,s:true,note:'the road to India over the gorges'},
+    note:'The road to India over the gorges, and a people who say their first mother married a dragon.'}, eastXY(99.2,25.1)),
+  Object.assign({id:'Hanzhong', world:'east', tier:3, city:'Nanzheng', prov:'the Celestial Masters', cul:'han',
+    real:[107.02,33.07], leg:{w:3,s:true,note:'free inns on every road, and passes on every side'},
+    note:'Zhang Lu’s theocracy of the Five Pecks of Rice: free inns on the roads, confession for sickness, and libationers instead of magistrates.'}, eastXY(107.02,33.07)),
+  Object.assign({id:'Xuchang', world:'east', tier:4, city:'Xu', prov:'the Emperor’s new seat', cul:'han',
+    real:[113.85,34.05], leg:{w:5,s:true,note:'the Emperor himself, in Cao Cao’s keeping, and the military farms that feed his army'},
+    note:'Cao Cao moved the Emperor here in 196 and runs the empire in his name. The military farms around it feed the army about to fight at Guandu.'}, eastXY(113.85,34.05)),
+  Object.assign({id:'Kuaiji', world:'east', tier:3, sea:true, city:'Shanyin', prov:'the Shanyue hills', people:'yue', cul:'han',
+    real:[120.58,30.0], leg:{w:3,s:true},
+    note:'Rice, salt and the sea, and behind them hills full of Yue who have never paid a tax they could avoid.'}, eastXY(120.58,30.0)),
+  Object.assign({id:'Nanhai', world:'east', tier:3, sea:true, city:'Panyu', prov:'the old Nanyue', people:'yue', cul:'han',
+    real:[113.26,23.13], leg:{w:3,s:true,note:'pearls, rhinoceros horn and the southern sea trade'},
+    note:'Where Zhao Tuo was King of the Southern Yue for seventy years. Pearls come up from the sea; Shi Xie’s brothers govern it now.'}, eastXY(113.26,23.13)),
+  /* ---- MAINLAND SOUTH-EAST ASIA ---- */
+  Object.assign({id:'Pyu', world:'east', tier:3, city:'Beikthano', prov:'the Irrawaddy cities', people:'pyu', cul:'tamil',
+    real:[95.3,19.9], leg:{w:2,s:true},
+    note:'Round brick cities on the Irrawaddy, urn burials, and a people the Chinese will say dislike killing anything at all.'}, eastXY(95.3,19.9)),
+  Object.assign({id:'Thaton', world:'east', tier:3, sea:true, city:'Thaton', prov:'Suvarnabhumi', people:'mon', cul:'tamil',
+    real:[97.37,16.92], leg:{w:2,s:true},
+    note:'The Land of Gold, the Indian merchants call it, and the Mon ports were trading with them before Rome knew either.'}, eastXY(97.37,16.92)),
+  Object.assign({id:'Arakan', world:'east', tier:3, sea:true, city:'Dhanyawadi', prov:'the Arakan coast', people:'vanga', cul:'kushan',
+    real:[93.0,20.9], leg:{w:2,s:true},
+    note:'A long coast between Bengal and the Pyu, and a king-list fifty names long that nobody can check.'}, eastXY(93.0,20.9)),
+  Object.assign({id:'Linyi', world:'east', tier:3, sea:true, city:'Kandarpapura', prov:'Xianglin, broken away', people:'cham', cul:'tamil',
+    real:[107.6,16.45], leg:{w:2,s:true,note:'eaglewood, and a sea-going house on the Annam coast'},
+    note:'In 192 a man of Xianglin killed the Han magistrate and made himself king. Linyi has been its own country since.'}, eastXY(107.6,16.45)),
+  Object.assign({id:'Langkasuka', world:'east', tier:3, sea:true, city:'Langkasuka', prov:'the isthmus', people:'malay', cul:'tamil',
+    real:[101.3,6.85], leg:{w:2,s:true},
+    note:'The portage between two oceans — Indian cargoes carried over the neck of land rather than sailed round it.'}, eastXY(101.3,6.85)),
+  /* ---- KOREA AND MANCHURIA ---- */
+  Object.assign({id:'Buyeo', world:'east', tier:4, city:'Wiyeseong', prov:'the northern plain', people:'buyeo', cul:'korean',
+    real:[126.55,43.85], leg:{w:2,s:false,note:'the oldest kingdom in Manchuria, and the white-robed houses of the Horse, Ox, Pig and Dog'},
+    note:'The oldest kingdom in Manchuria, where everyone wears white, and the bloodline every Korean king claims.'}, eastXY(126.55,43.85)),
+  Object.assign({id:'Okjeo', world:'east', tier:3, sea:true, city:'the Hamhung shore', prov:'the eastern sea', people:'okjeo', cul:'korean',
+    real:[127.55,39.9], leg:{w:1,s:true},
+    note:'Fish, salt and long family coffins, and a tribute Goguryeo collects every year.'}, eastXY(127.55,39.9)),
+  Object.assign({id:'Yilou', world:'east', tier:5, city:'the Ussuri forests', prov:'beyond Buyeo', people:'yilou', cul:'korean',
+    real:[132.0,45.4], leg:{w:1,s:false},
+    note:'Pit-houses nine ladders deep, pigs, lard against the cold, and the longest bows and the worst arrows in the north.'}, eastXY(132.0,45.4)),
+  Object.assign({id:'Saro', world:'east', tier:3, sea:true, city:'Seorabeol', prov:'Jinhan', people:'samhan', cul:'korean',
+    real:[129.21,35.84], leg:{w:2,s:true},
+    note:'Six villages under a king whose mother was a dragon. In three hundred years it will be Silla and it will win.'}, eastXY(129.21,35.84)),
+  Object.assign({id:'Mahan', world:'east', tier:3, city:'Mokji', prov:'the fifty-four', people:'samhan', cul:'korean',
+    real:[127.1,36.0], leg:{w:2,s:true},
+    note:'Fifty-four walled villages under a paramount chief at Mokji, and Baekje growing out of the north end of them.'}, eastXY(127.1,36.0)),
+  Object.assign({id:'Lelang', world:'east', tier:3, city:'Lelang', prov:'the Gongsun’s commandery', people:'lelang', cul:'han',
+    real:[125.75,39.02], leg:{w:3,s:true,note:'three hundred years of Han commandery, and lacquer in every tomb'},
+    note:'Three hundred years of Han commandery on the Taedong, ruled from Liaodong now, and a Korea all round it.'}, eastXY(125.75,39.02)),
   /* ---- AND THE ONE THAT IS SHUT ---- */
   Object.assign({id:'Wa',             world:'east', tier:5, sea:true, city:'Yamatai', prov:'the islands',
     blocked:true,
     real:[130.4,33.6], note:'The islands of Wa. Not this life.'}, eastXY(130.4,33.6)),
 ];
 const REGION_EAST_BY_ID={}; REGIONS_EAST.forEach(r=>REGION_EAST_BY_ID[r.id]=r);
+/* EVERY EASTERN PROVINCE KNOWS ITS PEOPLE, AND THE OLD TABLES LEARN IT.
+   The twelve provinces added after the first twenty-two never made it into
+   the theatre table, so a bout in Dunhuang or Qing Province was being fought
+   inside the Colosseum. Every province now says what it is, and the region
+   tables are filled from that wherever nobody wrote an entry by hand. */
+(function(){
+  const CUL={ 'Qing Province':'han','Yan Province':'han','Xu Province':'han','Bing Province':'han','Liang Province':'han','Jiaozhi':'han','Dunhuang':'han',
+              'Khotan':'kushan','Sindh':'kushan','Magadha':'kushan','Taprobane':'tamil','Sogdiana':'persian' };
+  const TH={han:'han', steppe:'steppe', kushan:'india', tamil:'india', korean:'korea', persian:'persia'};
+  const SPORT={han:'jiaodi', steppe:'nerge', kushan:'ranga', tamil:'ranga', korean:'jiaodi', persian:'maydan'};
+  for(const r of REGIONS_EAST){
+    if(!r.cul && CUL[r.id]) r.cul=CUL[r.id];
+    if(!r.people && ASIA_PEOPLE_OF_REGION[r.id]) r.people=ASIA_PEOPLE_OF_REGION[r.id];
+    try{ if(!THEATRE_OF[r.id] && r.id!=='Sogdiana') THEATRE_OF[r.id]=r.theatre||TH[r.cul||'han']||'han'; }catch(e){}
+    try{ if(!VENUE_REGION[r.id] && r.cul) VENUE_REGION[r.id]=r.sport||SPORT[r.cul]; }catch(e){}
+    try{ if(r.leg && !LEGACY_EAST[r.id]) LEGACY_EAST[r.id]=r.leg; }catch(e){}
+    try{ if(REPUTATION_REACH[r.id]===undefined) REPUTATION_REACH[r.id]=0.01; }catch(e){}
+  }
+})();
 /* =====================================================================
    THE RKRAI SHORE — an invented people, held to internal consistency
    ---------------------------------------------------------------------
@@ -69705,7 +70395,7 @@ function asiaStatic(){
   /* the peoples: biggest first, each looking for the clear spot nearest its own heart and still inside its own border */
   const OFFS=[]; for(let r=0;r<=10;r+=0.5) for(let k=0;k<Math.max(1,Math.round(r*2.4));k++){ const an=k/Math.max(1,Math.round(r*2.4))*Math.PI*2; OFFS.push([Math.cos(an)*r*1.5,Math.sin(an)*r*0.8]); }
   const PINNAME=new Set((typeof REGIONS_EAST!=='undefined'? REGIONS_EAST : []).map(r=>r.id.toUpperCase()));
-  const PEOPLE=ASIA_POL.filter(P=>P.n && !PINNAME.has(P.n)).map(P=>({P, L:P.l||centroid(P.p), fs:P.fs||3}));
+  const PEOPLE=ASIA_POL.filter(P=>P.n && !(PINNAME.has(P.n) && (P.fs||3)<3)).map(P=>({P, L:P.l||centroid(P.p), fs:P.fs||3}));
   PEOPLE.push({P:{n:'HAN', s:'the Jian’an fifth year · one emperor, eight warlords', c:'#2f5a2c', p:null, col:'#244a22', scol:'#2f5a2c'}, L:[110.6,31.6], fs:7.2, ls:4.6, sfs:2.1});
   PEOPLE.sort((a,b)=>b.fs-a.fs);
   for(const E of PEOPLE){ const P=E.P, fs=E.fs, o={it:!!P.it, ls:E.ls!==undefined? E.ls : (P.ls!==undefined? P.ls : Math.max(0,fs*0.12))};
@@ -72955,7 +73645,7 @@ drawLogo();
 })();
 
 try{ iceMythInit(); iceClothInit(); iceTtsInit(); iceWrap(); }catch(e){ console.error('iceMythInit',e); }
-window.__SS = { campaignOdds:(cp)=>campaignOdds(cp), updateBattle:(dt)=>updateBattle(dt), drawBattle:()=>drawBattle(), get BT(){ return BT; }, romStyles:()=>ROM_STYLES, startRomanticStyled:(a,b)=>startRomanticStyled(a,b), bgFn:(n)=>({bgPalace,bgWar,bgCoast,bgWoa,bgOpelia,bgIsle,bgReiko,bgForge})[n], setPairSS:(v)=>{ PAIR_SS=v; }, ICE_T:{ get AC(){return AC;}, set AC(v){AC=v;}, iceSlap, iceSkin, iceUlk, iceGulp, iceVoc, iceCrowd, ICE_V, sfx }, ICE_TTS, STRIKES, getDM:()=>DM, drawBridePortrait:(...a)=>drawBridePortrait(...a), rhFig, RH_CAST, openBotWatch, botEnterBeat, getBW:()=>BW, iceGoddessOpen, paintGoddess, startBedScene, regionAny, iceDebug:()=>({here:iceHere(), prey:ICE_PREY_BY_REGION}),
+window.__SS = { roomBackdrop:(T)=>whRoomBackdrop(T), ASIA_PEOPLES, asiaPeopleFor:(e,o)=>asiaPeopleFor(e,o), EAST_PIN_POS, campaignOdds:(cp)=>campaignOdds(cp), updateBattle:(dt)=>updateBattle(dt), drawBattle:()=>drawBattle(), get BT(){ return BT; }, romStyles:()=>ROM_STYLES, startRomanticStyled:(a,b)=>startRomanticStyled(a,b), bgFn:(n)=>({bgPalace,bgWar,bgCoast,bgWoa,bgOpelia,bgIsle,bgReiko,bgForge})[n], setPairSS:(v)=>{ PAIR_SS=v; }, ICE_T:{ get AC(){return AC;}, set AC(v){AC=v;}, iceSlap, iceSkin, iceUlk, iceGulp, iceVoc, iceCrowd, ICE_V, sfx }, ICE_TTS, STRIKES, getDM:()=>DM, drawBridePortrait:(...a)=>drawBridePortrait(...a), rhFig, RH_CAST, openBotWatch, botEnterBeat, getBW:()=>BW, iceGoddessOpen, paintGoddess, startBedScene, regionAny, iceDebug:()=>({here:iceHere(), prey:ICE_PREY_BY_REGION}),
   openBookViewer:()=>openBookViewer(), openSettings:()=>openSettings(), 
   rhAmbTick:(b)=>rhAmbTick(b), rhAmbHit:(k,n)=>rhAmbHit(k,n), rhAmbStop:()=>rhAmbStop(), rhSting:(b)=>rhSting(b), setMuted:(v)=>{muted=v;}, ambKind:()=>RH_AMB&&RH_AMB.kind, acState:()=>AC&&AC.state,
   WPN_ART, WPN_RANGED, drawRangedIcon, BOWS, wpnStamp, wpnIcon, drawHeldBow, drawHeldPilum, drawHeldBomb, get WPN_DRAWS(){ return WPN_DRAWS; }, setOUTL:(v)=>{ OUTL=!!v; }, drawWeapon2Old,
