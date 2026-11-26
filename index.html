@@ -30261,10 +30261,13 @@ function seatWidthAt(t, bT, wTop, wMax, wBot){
 let BEND_OPT=null;                           // {lifted:true} · {bare:true} — set by a scene for one draw
 let BEND_CV=null;
 function drawBendFig(c, x, y, w, k, Q){
-  if(!BEND_CV){ BEND_CV=document.createElement('canvas'); BEND_CV.width=128; BEND_CV.height=104; }
+  /* ✦ SUPERSAMPLED when a scene is going to show her big (PAIR_SS): the buffer is SS times the size and painted at SS,
+     so a close camera gets her at full resolution instead of a 1x sprite blown up into blocks */
+  const SS=Math.max(1,PAIR_SS|0, pairAutoSS(c));
+  if(!BEND_CV || BEND_CV.width!==128*SS){ BEND_CV=document.createElement('canvas'); BEND_CV.width=128*SS; BEND_CV.height=104*SS; BEND_CV.getContext('2d',{willReadFrequently:true}); }
   const OX=46, OY=100;                       // where her feet are, inside the buffer
   const oc=BEND_CV.getContext('2d');
-  oc.setTransform(1,0,0,1,0,0); oc.clearRect(0,0,128,104);
+  oc.setTransform(1,0,0,1,0,0); oc.clearRect(0,0,128*SS,104*SS); oc.setTransform(SS,0,0,SS,0,0);
   oc.save(); oc.translate(OX,OY);
   const opt=BEND_OPT||{};
   const skin=hexOf(Q.skin), hair=hexOf(Q.hair);
@@ -30602,13 +30605,13 @@ function drawBendFig(c, x, y, w, k, Q){
   }
   oc.restore();
   // ---- 9. SNAP TO PIXELS: a crisp silhouette, like every other sprite in the room ----
-  { const im=oc.getImageData(0,0,128,104), d=im.data;
+  { const im=oc.getImageData(0,0,128*SS,104*SS), d=im.data;
     for(let i=3;i<d.length;i+=4) d[i]= d[i]>=110? 255 : 0;
     oc.putImageData(im,0,0); }
   // the shadow she casts, on the floor and not in the buffer, so it stays soft
   c.save(); c.globalAlpha=0.26; c.fillStyle='#120b08';
   c.beginPath(); c.ellipse(x+(H[0]+Sh[0])*0.3, y-1, 12+kk*8, 3.0, 0,0,7); c.fill(); c.restore();
-  c.drawImage(BEND_CV, Math.round(x-OX), Math.round(y-OY));
+  if(SS>1) c.drawImage(BEND_CV, x-OX, y-OY, 128, 104); else c.drawImage(BEND_CV, Math.round(x-OX), Math.round(y-OY));
   BEND_OPT=null;                                                    // a scene's flag is good for one draw
   /* and where the parts of her are, for whoever is drawn with her. 🍑 THE JOIN IS ON HER OUTLINE: the
      notch where the underside of the seat meets the back of the thigh. It used to sit a little below the
@@ -31124,10 +31127,21 @@ function drawFemFig(bk, fr, F){
         if(bellyB>1.2 && zA<0.24 && zB>0.24){ const bc=at(0.25,-fwAt(0.25)); const gg=oc.createRadialGradient(bc[0],bc[1]-1,0.2,bc[0],bc[1],3+bellyB);
           gg.addColorStop(0,rgbA(cHi,0.6)); gg.addColorStop(1,rgbA(cHi,0)); oc.fillStyle=gg; oc.fillRect(bc[0]-10,bc[1]-10,20,20); }
         const zf=Math.min(zB,0.1);                                                              // the folds hang from the hips to the hem
-        if(zA<zf-0.1) for(let k=0;k<4;k++){ const f=(k+0.5)/4, top=zf>=0? lerp(at(zf,bwAt(zf)), at(zf,-fwAt(zf)), f) : lerp(O.tb,O.tf,f), bot=lerp(O.bb,O.fb,f);
-          line([top, [bot[0]+(f-0.5)*1.5, bot[1]]], rgbA(k%2? cSh : cHi, 0.5), 0.55); }
+        if(zA<zf-0.1){ const NF=8, sway=Math.sin((F.t||0)*0.05)*0.6;                          // ✦ eight of them, each a lit ridge with its shadow beside it
+          for(let k=0;k<NF;k++){ const f=(k+0.5)/NF, top=zf>=0? lerp(at(zf,bwAt(zf)), at(zf,-fwAt(zf)), f) : lerp(O.tb,O.tf,f), bot=lerp(O.bb,O.fb,f), mid=lerp(top,bot,0.55), bend=(f-0.5)*1.8+sway;
+            const path=[top, [mid[0]+bend*0.5, mid[1]], [bot[0]+bend, bot[1]]];
+            line(path, rgbA(cSh, 0.42), 0.8); line(path.map(q=>[q[0]+0.6,q[1]]), rgbA(cHi, 0.38), 0.45); } }
+        { const g=oc.createLinearGradient(O.tb[0],0,O.tf[0],0); g.addColorStop(0,rgbA(cSh,0.28)); g.addColorStop(0.55,rgbA(cHi,0)); g.addColorStop(0.85,rgbA(mixHex(cHi,'#ffffff',0.35),0.30)); g.addColorStop(1,rgbA(cHi,0.05));   // a sheen down the lit side
+          oc.fillStyle=g; oc.fillRect(Math.min(O.tb[0],O.bb[0])-6, Math.min(O.tb[1],O.tf[1])-6, Math.abs(O.tf[0]-O.tb[0])+40, Math.abs(O.bb[1]-O.tb[1])+12); }
+        if(zA<-0.6 && !F.noTrim){                                                                // ✦ the woven border above the hem
+          const tr=hexOf(DR.trim || (DR.noble? '#e8c34a' : mixHex(col,'#4a2a10',0.55))), trHi=mixHex(tr,'#ffffff',0.35), b0=lerp(O.bb,O.tb,0.05), f0=lerp(O.fb,O.tf,0.05), b1=lerp(O.bb,O.tb,0.10), f1=lerp(O.fb,O.tf,0.10);
+          oc.fillStyle=rgbA(tr,0.85); oc.beginPath(); oc.moveTo(b0[0]-2,b0[1]); oc.lineTo(f0[0]+2,f0[1]); oc.lineTo(f1[0]+2,f1[1]); oc.lineTo(b1[0]-2,b1[1]); oc.closePath(); oc.fill();
+          const N=12; oc.strokeStyle=rgbA(DR.noble? '#7a1a1a' : trHi,0.9); oc.lineWidth=0.45; oc.beginPath();
+          for(let k=0;k<=N;k++){ const q=lerp(lerp(b0,f0,k/N), lerp(b1,f1,k/N), k%2? 0.85 : 0.15); if(k) oc.lineTo(q[0],q[1]); else oc.moveTo(q[0],q[1]); } oc.stroke();
+          line([b1,f1], rgbA(trHi,0.8), 0.4);
+          if(DR.noble) for(let k=0;k<6;k++){ const q=lerp(lerp(b0,f0,(k+0.5)/6), lerp(b1,f1,(k+0.5)/6), 0.5); oc.fillStyle='#fff2b0'; oc.fillRect(q[0]-0.3,q[1]-0.3,0.7,0.7); } }
         oc.restore(); oc.restore();
-        return O; };
+        O.P=P; return O; };
       const pool=(amt)=>{ if(amt<=0.02) return; const cx=(LN.ank[0]+LF.ank[0])/2, cy=fl-1.6, rx=5+amt*8, ry=1.3+amt*1.9;
         const P=smooth([[cx-rx,cy+0.6],[cx-rx*0.7,cy-ry],[cx-rx*0.1,cy-ry*1.2],[cx+rx*0.6,cy-ry*0.9],[cx+rx,cy+0.5],[cx,cy+ry*0.5]]);
         lit(P, col, rgbA(cHi,0.9), rgbA(cSh,0.85));
@@ -31140,7 +31154,8 @@ function drawFemFig(bk, fr, F){
           lit(P, col, rgbA(cHi,0.95), rgbA(cSh,0.85)); line([add(O.tb,[0,0.2]), add(O.tf,[0,0.2])], rgbA(cSh,0.7), 0.5); }        // bunched where she is pushing it down
         if(O){ if(zA>-0.995) line([O.bb,O.fb], DR.noble? '#e8c34a' : rgbA(cSh,0.95), 1.0);           // the hem
           if(zA<0.63 && zB>0.66){ const c1=mixHex(col,'#e8c34a',0.55); line([at(0.64,bwAt(0.64)+0.9), at(0.64,-(fwAt(0.64)+bustB(0.64)+0.9))], c1, 1.3); }   // the cord under her bust
-          if(zB<1.0 && zB>0.6) line([O.tb,O.tf], rgbA(cHi,0.9), 0.8); }                          // the edge, coming down her
+          if(zB<1.0 && zB>0.6) line([O.tb,O.tf], rgbA(cHi,0.9), 0.8);                          // the edge, coming down her
+          else if(zB>=1.0 && !F.noTrim){ const tr=hexOf(DR.trim || (DR.noble? '#e8c34a' : mixHex(col,'#4a2a10',0.45))); line([add(O.tb,[0,0.6]), add(O.tf,[0,0.6])], rgbA(tr,0.9), 0.9); } }   // ✦ and a bound neckline
         pool(clamp((-1-(-0.93+shift))/1.95,0,1));
       } else {
         const ds=ease(clamp((u-0.35)/0.65,0,1)), sshift=-2.0*ds, zA=Math.max(-1,-0.42+sshift), zB=0.32+sshift;
@@ -32107,14 +32122,17 @@ function drawStandsWifeNB(x, y, frame){
   ctx.drawImage(NB_WIFE_WAVE[frame], Math.round(x-12), Math.round(y-18));
   return true;
 }
-let PAIR_CV=null, PAIR_DRAWS=0, PAIR_LAST=null;       // the last two are for the tests: how often, and who
+let PAIR_CV=null, PAIR_DRAWS=0, PAIR_LAST=null, PAIR_SS=1, PAIR_SH=null;
+/* ✦ how much the canvas it is going onto is zoomed — a bedchamber camera at 1.7, a Rhuna close-up at 2 — so the pair is
+   painted at that resolution instead of a 1x sprite stretched into blocks (capped at 3) */
+function pairAutoSS(c){ try{ const m=c.getTransform(), z=Math.max(Math.hypot(m.a,m.b), Math.hypot(m.c,m.d)); return z>1.15? Math.min(3, Math.ceil(z-0.05)) : 1; }catch(e){ return 1; } }       // PAIR_SS: draw the pair supersampled (a close camera sets it for one draw)       // the last two are for the tests: how often, and who
 function drawPair(c, o){ return povPair(c,o,drawPair0); }
 function drawPair0(c, o){
   PAIR_DRAWS++;
-  const BW=260, BH=140, FXb=164, FYb=134;
-  if(!PAIR_CV){ PAIR_CV=[0,1,2,3].map(()=>{ const k=document.createElement('canvas'); k.width=BW; k.height=BH; return k; }); }
+  const BW=260, BH=140, FXb=164, FYb=134, SS=Math.max(1,PAIR_SS|0, pairAutoSS(c)), SS0=PAIR_SS; PAIR_SS=SS;   // her bend is drawn at the same resolution
+  if(!PAIR_CV || PAIR_CV[0].width!==BW*SS){ PAIR_CV=[0,1,2,3].map(()=>{ const k=document.createElement('canvas'); k.width=BW*SS; k.height=BH*SS; k.getContext('2d',{willReadFrequently:true}); return k; }); }
   const [pb,ph,pk,pf]=PAIR_CV, X=(k)=>k.getContext('2d');
-  PAIR_CV.forEach(k=>{ const g=X(k); g.setTransform(1,0,0,1,0,0); g.clearRect(0,0,BW,BH); });
+  PAIR_CV.forEach(k=>{ const g=X(k); g.setTransform(1,0,0,1,0,0); g.clearRect(0,0,BW*SS,BH*SS); g.setTransform(SS,0,0,SS,0,0); });
   const dir=(o.dir===-1)? -1 : 1, FY=o.FY;
   // ---- HER first, so he can be placed off her ----
   BEND_OPT=Object.assign({}, o.her||{});
@@ -32146,6 +32164,13 @@ function drawPair0(c, o){
     const standK=(E.stand!==undefined)? clamp(E.stand,0,1) : clamp((((E.atX!==undefined)? gapPx : (E.gap||0))-2)/8,0,1);
     const hip=[J[0]-3.1-gapPx, (J[1]-0.9)+(standY-(J[1]-0.9))*standK];            // 🍑 flush: at the bottom of the stroke his root is AT her, not a stub short
     if(seatLevel!==null) hip[1]=clamp(seatLevel, standY, J[1]+3);
+    /* 🍑 A BIG SEAT KEEPS HIM BEHIND IT. With a colossal seat the notch is far in under it, and flush to the notch his
+       hips stood under the middle of her seat with his chest coming up through it. Now his front stops at the back
+       curve of her seat (pressed into it a little — it gives), and what is between his root and the notch is the
+       part of him you see. `deep` lets a scene push him in further at the bottom of the stroke. */
+    if(out.seat && out.rs && !E.noBack && E.atX===undefined && (E.backClamp || out.rs>9.2)){
+      const back=out.seat[0]-out.rs*(0.80-0.22*clamp(E.drive||0,0,1)*(E.deep||0.6)) - 4.2;
+      if(hip[0]>back){ out.pressK=clamp((hip[0]-back)/Math.max(1,out.rs),0,1); hip[0]=back; } }
     const tgt=(h)=> h==='hips'? [out.hip[0]-1.2, out.hip[1]-1.6]
                : h==='waist'? [out.waist[0]-0.5, out.waist[1]]
                : h==='hair'? [out.head[0]-3.2, out.head[1]-2.4]
@@ -32175,15 +32200,21 @@ function drawPair0(c, o){
     // his shadow on the floor, soft
     const g=X(pb); g.save(); g.globalAlpha=0.24; g.fillStyle='#120b08'; g.beginPath(); g.ellipse(MR.hip[0]-1, FYb-1, 11, 2.8, 0,0,7); g.fill(); g.restore();
     // SNAP TO PIXELS, both of his layers
-    for(const k of [pk,pf]){ const im=X(k).getImageData(0,0,BW,BH), d=im.data;
+    for(const k of [pk,pf]){ const im=X(k).getImageData(0,0,BW*SS,BH*SS), d=im.data;
       for(let i=3;i<d.length;i+=4) d[i]= d[i]>=110? 255 : 0; X(k).putImageData(im,0,0); }
   }
   // ---- composite in depth: him, her over him, his near arm over her ----
-  { const g=X(pb); g.drawImage(pk,0,0); g.drawImage(ph,0,0); g.drawImage(pf,0,0); }
+  /* ✦ CONTACT SHADOW: her body darkens his where it is in front of him, so two bodies the same colour still read as
+     two — a soft offset silhouette of her, laid only on his pixels */
+  if(o.he && !o.noContact){ const g=X(pk), sh=PAIR_SH||(PAIR_SH=document.createElement('canvas')); if(sh.width!==BW*SS){ sh.width=BW*SS; sh.height=BH*SS; }
+    const q=sh.getContext('2d'); q.setTransform(1,0,0,1,0,0); q.clearRect(0,0,sh.width,sh.height); q.filter='blur('+(1.6*SS)+'px)'; q.drawImage(ph,-2.2*SS,0.6*SS); q.filter='none';
+    q.globalCompositeOperation='source-in'; q.fillStyle='rgba(40,16,8,0.55)'; q.fillRect(0,0,sh.width,sh.height); q.globalCompositeOperation='source-over';
+    g.setTransform(1,0,0,1,0,0); g.globalCompositeOperation='source-atop'; g.drawImage(sh,0,0); g.globalCompositeOperation='source-over'; }
+  { const g=X(pb); g.setTransform(1,0,0,1,0,0); g.drawImage(pk,0,0); g.drawImage(ph,0,0); g.drawImage(pf,0,0); }
   c.save();
   if(dir<0){ c.translate(o.x,0); c.scale(-1,1); c.translate(-o.x,0); }
-  c.drawImage(pb, Math.round(o.x-FXb), Math.round(FY-FYb));
-  c.restore();
+  if(SS>1) c.drawImage(pb, o.x-FXb, FY-FYb, BW, BH); else c.drawImage(pb, Math.round(o.x-FXb), Math.round(FY-FYb));
+  c.restore(); PAIR_SS=SS0;
   // and where everything landed, in the scene's own coordinates
   const W2=(p)=>p? [o.x+(p[0]-FXb)*dir, FY+(p[1]-FYb)] : null;
   const R={dir};
@@ -45290,7 +45321,7 @@ function rhWooDraw(c,b,T,u,dt){
   const strong=ST.strong;
   const hands = unb<0.45? 'belt' : unb<1? 'hem' : S.he.hands;
   const hisOpts={ gap:3+approach*34, drive, stroke:ST.stroke, u:unb, aro:engage, aimK:engage, look:(b.him||P.look), face:(peak? HARD_FACES.grit||HARD_FACES.intent : HARD_FACES[P.face]||HARD_FACES.smirk||HARD_FACES.stoic), lean:0.03+engage*(ST.lean+drive*0.08),
-    hands:(engage>0.99? (slapping? 'seat' : S.he.hands) : hands), farHands:(engage>0.99? S.he.farHands : 'belt'), cloth:P.robe, band:P.band, coast:b.p==='kharn' };
+    hands:(engage>0.99? (slapping? 'seat' : S.he.hands) : hands), farHands:(engage>0.99? S.he.farHands : 'belt'), cloth:P.robe, band:P.band, coast:b.p==='kharn', backClamp:true };
   if(engage>0.99 && slapping){ hisOpts.handFrom='wave'; hisOpts.handK=clamp(sK,0,1); }
   /* every one is built on its own pose and its own move */
   const nn=b.n||1, X=RH_X[nn-1]||['wall',.7,.4,'hips','hips','hold'], mv0=X[5], mv=ST.map[mv0]||mv0, ts=T*0.04*m;
@@ -45338,7 +45369,7 @@ function rhWooDraw(c,b,T,u,dt){
   if(unb>0.05 && unb<0.5 && ((T|0)%6)<2 && R.hisHip){ c.fillStyle='#fff6b0'; c.fillRect(R.hisHip[0]+4,R.hisHip[1]-4,2,2); }          // the buckle catching the light
   let R2=null;
   if(custom){ try{ R2=povCustom(c,{drive,kick:kP,her:herLook,him:(b.him||P.look),expr:herOpts.expr,blush:herOpts.blush,aro:1}) || rhCustom(c,cpid,{T,drive,kick:kP,her:herLook,him:(b.him||P.look),expr:herOpts.expr,blush:herOpts.blush,face:hisOpts.face,cloth:P.robe,band:P.band,coast:b.p==='kharn',u:1,aro:1,robe:herLook.dress}); }catch(e){ try{ console.error(e); }catch(_){} } }
-  else { try{ R2=drawPair(c,o); }catch(e){} }
+  else { PAIR_SS=Math.min(3,Math.max(2,Math.ceil(zoom))); try{ R2=drawPair(c,o); }catch(e){} finally{ PAIR_SS=1; } }   // ✦ the couple at full resolution under the close camera
   R2=R2||R; b._R=R2;
   if(R2.head && !R2.pov){ const hh=R2.head, sw2=Math.sin(T*0.2)*drive*3+kP*3; c.strokeStyle='#120a08'; c.lineWidth=1.1; c.lineCap='round'; [0,1,2].forEach(i=>{ c.globalAlpha=0.7; c.beginPath(); c.moveTo(hh[0]-2-i,hh[1]-1+i); c.quadraticCurveTo(hh[0]-8-i*2+sw2,hh[1]+5+i*2,hh[0]-10-i*2+sw2*1.6,hh[1]+12+i*3); c.stroke(); }); c.globalAlpha=1; }     // her hair swings with each stroke
   if(P.phase==='queen' && R2.head && !R2.pov){ rhCrownSun(c,R2.head[0],R2.head[1]-2,1.3,T,'#ffe070',7); }
@@ -45356,7 +45387,7 @@ function rhWooDraw(c,b,T,u,dt){
   if(cpid && engage>0.5 && engage<0.8){ c.fillStyle='rgba(255,246,220,'+(0.5*(1-(engage-0.5)/0.3)).toFixed(2)+')'; c.fillRect(0,12,480,218); }
   if(slapping && impact){ BW.fx.push({kind:'spark',x:cx+(R2.seat? R2.seat[0]*zoom*(b.flip?-1:1) : 0),y:FL+(R2.seat? R2.seat[1]*zoom : -60),vx:rnd(-0.4,0.4),vy:-rnd(0.3,0.7),life:30}); if(strong>0.6 && (every>100 || slapIdx%3===0)) pixelText(b.p==='vorgan'? 'CRACK' : b.p==='rekop'? 'SMACK — it rings' : 'SMACK', 240, 90, b.p==='rekop'? '#ffe898' : '#ffd8c0', 1.2); }
   if(peak && ((T|0)%9)<1) BW.fx.push({kind:'heart',x:cx+rnd(-30,30),y:120+rnd(-10,10),vx:rnd(-0.2,0.2),vy:-rnd(0.3,0.7),life:60});
-  if(engage>0.5 && u<0.92) rhPraise(c,b,u,P.col,110,172);
+  if(engage>0.5 && u>0.40 && u<0.92) rhPraise(c,b,u,P.col,(b.flip? 352 : 128),66);   // up in the corner, clear of them — it used to sit over the join
   // the title, then the numbers
   const a=clamp(u/0.08,0,1)*(1-clamp((u-0.28)/0.12,0,1)); if(a>0.02){ c.globalAlpha=a; rhBanner(c, b.title, 40, P.col); pixelText('STYLE · '+ST.name+' — '+ST.sub,240,56,P.col,0.72); c.globalAlpha=1; }
   c.fillStyle='rgba(8,4,10,.7)'; c.fillRect(352,18,120,16); c.fillStyle=P.col; c.fillRect(352,18,2,16); pixelText(b.tag||('🍑 WOOHOO '+b.n+' / '+RH_WOO.length),412,26,'#fff0b8',0.85);
@@ -45877,26 +45908,134 @@ RH_CAST.kaseth={name:'KASETH', look:{male:true, skin:'#a87a50', dress:'#6a4a2a',
   fx:{ front:(g,R,x,fl,dir,T,Z)=>{ if(!R) return; const h=R.head; rhR(g,h[0]-5*Z/1.3,h[1]-5.6*Z/1.3,10*Z/1.3,1.2,'#c88a3a'); } } };
 RH_KILT.kaseth=['#4a6a3a','#c88a3a'];
 
-function rhPalm(c,x,fl,h,lean,T,nuts){
-  const sw=Math.sin(T*0.03+x)*1.5; let tx=x,ty=fl;
-  for(let i=0;i<=10;i++){ const t=i/10, px=x+lean*t*t*h*0.4, py=fl-h*t; c.fillStyle=i%2? '#7a4c26' : '#9a6634'; c.fillRect(Math.round(px-(3.4-2*t)),Math.round(py),Math.round(6.8-4*t),Math.ceil(h/10)+1); tx=px; ty=py; }
-  for(let f=0;f<8;f++){ const a=-Math.PI*0.95+f*Math.PI*0.9/7+sw*0.02, L=h*0.46; c.strokeStyle=f%2? '#2f8a3a' : '#4aaa4a'; c.lineWidth=2.2; c.beginPath(); c.moveTo(tx,ty); c.quadraticCurveTo(tx+Math.cos(a)*L*0.6,ty+Math.sin(a)*L*0.6-L*0.25,tx+Math.cos(a)*L,ty+Math.sin(a)*L*0.55+L*0.35+sw); c.stroke(); }
-  if(nuts) for(let k=0;k<3;k++){ c.fillStyle='#6a4a22'; c.beginPath(); c.arc(tx-3+k*3,ty+3+(k%2),2,0,7); c.fill(); c.fillStyle='#9a7a42'; c.fillRect(tx-3.6+k*3,ty+2+(k%2),1,1); } }
+/* =====================================================================
+   🌴 THE PALM ISLE, PAINTED
+   ---------------------------------------------------------------------
+   The island the whole myth starts on was a gradient, a band of blue, a
+   band of yellow and three stick palms. It is a place now: a sky that
+   holds the hour (noon, the dusk the traveller lands at, the storm of the
+   one bolt, the night, the dawn of the ash, the gold day it joins Opelia),
+   the sun with its halo and, low, its road of light across the water;
+   clouds lit from the side the sun is on; the far islands of the chain;
+   a sea that is deep at the horizon and turquoise over the sand, swells
+   rolling in and a foam line washing up and drawing back over wet sand;
+   a beach with grain to it, shells, a stone or two, footprints and dune
+   grass; palms with ringed, leaning trunks, fronds made of leaflets and a
+   cluster of nuts; a stilt hut with layered thatch and a lamp at night;
+   and dark leaves in the near corners to put it all behind glass.
+   What never moves is painted once per hour of the day and cached.
+   ===================================================================== */
+const ISLE_MOODS={
+  day:  {sky:['#3f95d4','#7cc0e6','#c8ecf2','#f4f0d0'], sun:[388,46,12,'#fffbe0','rgba(255,248,210,.55)'], sea:['#6fc2d8','#2a8ab8','#1a5f92'], shal:'#5fd0c8', sand:['#f4e2ae','#e6c88a','#c9a46a'], wet:'#c8a878', cloud:['#ffffff','#d8e8f4'], tint:null, far:'#5a9ab4', glit:'#ffffff'},
+  gold: {sky:['#4aa8e0','#8ad0ee','#d8f0ee','#fff0b8'], sun:[392,44,13,'#fffbe0','rgba(255,240,180,.6)'], sea:['#7ad0dc','#2e96c4','#1c6a9c'], shal:'#6ad8cc', sand:['#f8e8b4','#ecd08e','#cfa86a'], wet:'#d0b07c', cloud:['#ffffff','#e8f0f0'], tint:'rgba(255,230,150,.07)', far:'#5aa8bc', glit:'#fff6d0'},
+  dusk: {sky:['#1e1c4c','#5a3270','#d0584e','#f8b060'], sun:[112,138,15,'#ffe8a8','rgba(255,170,90,.6)'], sea:['#e0886a','#8a3e5c','#3a1e44'], shal:'#c87a6a', sand:['#e8c08a','#c89466','#8a6448'], wet:'#9a6a52', cloud:['#ffb08a','#7a3a5a'], tint:'rgba(255,120,60,.08)', far:'#5a2a50', glit:'#ffd890'},
+  dawn: {sky:['#4a4e78','#8a7a9a','#e0a8a0','#f6dcb0'], sun:[112,140,14,'#fff0c8','rgba(255,210,170,.55)'], sea:['#d8a8a8','#7a6a8a','#3a3a5a'], shal:'#b0a0a8', sand:['#ecd4aa','#cfb086','#9a7c5c'], wet:'#a88a6c', cloud:['#ffd8c8','#9a8aa8'], tint:'rgba(255,200,170,.06)', far:'#6a6080', glit:'#fff0d8'},
+  storm:{sky:['#0c0e1a','#1a1f30','#2a3244','#3a4252'], sun:null, sea:['#3a4a5a','#1c2a3a','#0c1622'], shal:'#3a5a64', sand:['#8a8678','#6a665c','#3e3c36'], wet:'#4e4a42', cloud:['#3a4254','#14182a'], tint:'rgba(20,30,60,.10)', far:'#1a2230', glit:'#a8b8d0'},
+  night:{sky:['#04061a','#0c1236','#1a2452','#2a3a66'], moon:[92,48,9], sea:['#2a3a6a','#0e1838','#060c1c'], shal:'#2a4a6a', sand:['#5a5a6a','#44444e','#2a2a32'], wet:'#363844', cloud:['#3a4468','#141a34'], tint:'rgba(20,30,90,.12)', far:'#101830', glit:'#c8d8ff'},
+};
+const ISLE_CACHE=new Map();
+function isleRand(seed){ let s=seed>>>0||1; return ()=>{ s^=s<<13; s>>>=0; s^=s>>>17; s^=s<<5; s>>>=0; return (s%100000)/100000; }; }
+function isleStatic(mood){
+  const k=mood; if(ISLE_CACHE.has(k)) return ISLE_CACHE.get(k);
+  const M=ISLE_MOODS[mood]||ISLE_MOODS.day, cv=document.createElement('canvas'); cv.width=480; cv.height=270; const g=cv.getContext('2d'), R=isleRand(9157+mood.length*31);
+  // the sky, in four stops, and a haze over the horizon
+  { const gr=g.createLinearGradient(0,0,0,140); gr.addColorStop(0,M.sky[0]); gr.addColorStop(0.42,M.sky[1]); gr.addColorStop(0.8,M.sky[2]); gr.addColorStop(1,M.sky[3]); g.fillStyle=gr; g.fillRect(0,0,480,141);
+    const hz=g.createLinearGradient(0,112,0,142); hz.addColorStop(0,'rgba(255,255,255,0)'); hz.addColorStop(1,mood==='storm'||mood==='night'? 'rgba(120,140,170,.18)' : 'rgba(255,246,226,.45)'); g.fillStyle=hz; g.fillRect(0,112,480,30); }
+  if(mood==='night'){ for(let i=0;i<120;i++){ const x=R()*480, y=R()*118, b=R(); g.fillStyle='rgba(255,255,255,'+(0.25+b*0.6).toFixed(2)+')'; g.fillRect(x|0,y|0,b>0.92? 2 : 1,1); }
+    const mw=g.createLinearGradient(0,20,480,110); mw.addColorStop(0,'rgba(140,160,255,0)'); mw.addColorStop(0.5,'rgba(170,180,255,.10)'); mw.addColorStop(1,'rgba(140,160,255,0)'); g.fillStyle=mw; g.beginPath(); g.moveTo(120,0); g.lineTo(260,0); g.lineTo(420,120); g.lineTo(300,120); g.fill(); }
+  // the far islands of the chain, blue with distance, a palm or two on each
+  const isl=(x,w,h,col)=>{ g.fillStyle=col; g.beginPath(); g.moveTo(x-w/2,140); g.bezierCurveTo(x-w*0.35,140-h,x+w*0.15,140-h*1.15,x+w/2,140); g.fill();
+    for(let i=0;i<2;i++){ const px=x-w*0.1+i*w*0.18, py=140-h*0.95; g.strokeStyle=col; g.lineWidth=1; g.beginPath(); g.moveTo(px,py+3); g.lineTo(px+1,py-4); g.stroke();
+      for(let f=0;f<4;f++){ const a=-2.6+f*0.7; g.beginPath(); g.moveTo(px+1,py-4); g.lineTo(px+1+Math.cos(a)*4,py-4+Math.sin(a)*2+2); g.stroke(); } } };
+  isl(250,110,9,mixHex(M.far,M.sky[3],0.55)); isl(150,60,6,mixHex(M.far,M.sky[3],0.35)); isl(318,46,5,mixHex(M.far,M.sky[3],0.25));
+  // the sea, deep at the horizon and turquoise over the sand
+  { const gr=g.createLinearGradient(0,140,0,184); gr.addColorStop(0,M.sea[0]); gr.addColorStop(0.18,M.sea[1]); gr.addColorStop(0.75,M.sea[2]); gr.addColorStop(1,mixHex(M.sea[2],M.shal,0.6)); g.fillStyle=gr; g.fillRect(0,140,480,44);
+    g.fillStyle='rgba(255,255,255,.35)'; g.fillRect(0,140,480,1); }
+  { const gr=g.createLinearGradient(0,172,0,186); gr.addColorStop(0,rgbaHexA(M.shal,0)); gr.addColorStop(1,rgbaHexA(M.shal,0.85)); g.fillStyle=gr; g.fillRect(0,172,480,14); }
+  // the beach: a gradient, a wet band, and grain
+  { const gr=g.createLinearGradient(0,182,0,232); gr.addColorStop(0,M.sand[0]); gr.addColorStop(0.45,M.sand[1]); gr.addColorStop(1,M.sand[2]); g.fillStyle=gr; g.beginPath(); g.moveTo(0,186);
+    for(let x=0;x<=480;x+=20) g.lineTo(x,185+Math.sin(x*0.03)*1.6); g.lineTo(480,232); g.lineTo(0,232); g.fill();
+    g.fillStyle=rgbaHexA(M.wet,0.55); g.beginPath(); g.moveTo(0,186); for(let x=0;x<=480;x+=20) g.lineTo(x,185+Math.sin(x*0.03)*1.6); for(let x=480;x>=0;x-=20) g.lineTo(x,192+Math.sin(x*0.05+1)*1.4); g.fill();
+    for(let i=0;i<1400;i++){ const x=R()*480, y=186+Math.pow(R(),0.8)*46; g.fillStyle= R()<0.5? 'rgba(255,255,255,.22)' : 'rgba(90,60,30,.16)'; g.fillRect(x|0,y|0,1,1); }
+    for(let i=0;i<10;i++){ const x=20+R()*440, y=196+R()*28, a=R()*3; g.fillStyle=mixHex(M.sand[0],'#ffffff',0.5); g.beginPath(); g.ellipse(x,y,1.6,1.1,a,0,7); g.fill(); g.fillStyle=mixHex(M.sand[2],'#f0b0a0',0.4); g.fillRect(x-0.5|0,y|0,1,1); }   // shells
+    for(let i=0;i<5;i++){ const x=30+R()*420, y=200+R()*24, r=1.5+R()*2.5; g.fillStyle=mixHex(M.sand[2],'#5a5a5a',0.5); g.beginPath(); g.ellipse(x,y,r*1.4,r,0,0,7); g.fill(); g.fillStyle='rgba(255,255,255,.25)'; g.fillRect(x-r*0.6|0,y-r*0.6|0,r|0||1,1); }   // stones
+    for(let i=0;i<14;i++){ const x=150+i*14+(i%2)*4, y=206+Math.sin(i*0.7)*5; g.fillStyle='rgba(80,50,20,.18)'; g.beginPath(); g.ellipse(x,y,2,1,0.2,0,7); g.fill(); } }   // footprints along the waterline
+  // dune grass and flowers at the back of the beach
+  for(let i=0;i<26;i++){ const x=R()*480, y=188+R()*6; if(x>130 && x<350) continue; for(let k=0;k<4;k++){ g.strokeStyle= mood==='night'||mood==='storm'? '#3a4a3a' : (k%2? '#7a9a3a' : '#9ab84a'); g.lineWidth=1; g.beginPath(); g.moveTo(x+k,y+6); g.quadraticCurveTo(x+k+1,y+2,x+k+(k-1.5)*2,y-2-R()*3); g.stroke(); } }
+  ISLE_CACHE.set(k,cv); if(ISLE_CACHE.size>12) ISLE_CACHE.delete(ISLE_CACHE.keys().next().value);
+  return cv;
+}
+function rgbaHexA(h,a){ const n=parseInt(String(h).slice(1),16); return 'rgba('+((n>>16)&255)+','+((n>>8)&255)+','+(n&255)+','+a+')'; }
+/* a cloud: a few overlapping puffs, lit on the sun's side */
+function isleCloud(c,x,y,w,M,sunX){ const lit=M.cloud[0], sh=M.cloud[1], dir=(sunX||400)>x? 1 : -1, puffs=[[0,0,0.32],[-0.28,0.08,0.24],[0.3,0.06,0.26],[0.1,-0.12,0.24],[-0.12,-0.06,0.2]];
+  for(const [dx,dy,r] of puffs){ c.fillStyle=sh; c.beginPath(); c.ellipse(x+dx*w,y+dy*w+w*0.06,w*r,w*r*0.62,0,0,7); c.fill(); }
+  for(const [dx,dy,r] of puffs){ const gr=c.createRadialGradient(x+dx*w+dir*w*r*0.3,y+dy*w-w*r*0.2,1,x+dx*w,y+dy*w,w*r); gr.addColorStop(0,lit); gr.addColorStop(1,rgbaHexA(lit,0)); c.fillStyle=gr; c.beginPath(); c.ellipse(x+dx*w,y+dy*w,w*r,w*r*0.6,0,0,7); c.fill(); } }
+/* the palm: a ringed trunk that leans and tapers, fronds made of leaflets, and the nuts */
+function islePalm(c,x,fl,h,lean,T,nuts,M){
+  const dark=M&&(M===ISLE_MOODS.night||M===ISLE_MOODS.storm), tr=dark? ['#4a3a30','#2a2018'] : ['#a07448','#6a4a2a'], fr=dark? ['#2a4a3a','#1a3020'] : ['#5aa84a','#2e7a36'];
+  const sw=Math.sin(T*0.03+x*0.1)*(M===ISLE_MOODS.storm? 4 : 1.4);
+  const pt=(t)=>[x+lean*h*0.45*t*t+sw*t*t*0.6, fl-h*t];
+  for(let i=0;i<=14;i++){ const t=i/14, p=pt(t), w=(4.2-2.4*t); c.fillStyle=i%2? tr[0] : tr[1]; c.beginPath(); c.ellipse(p[0],p[1],w,h/26+0.6,lean*0.3*t,0,7); c.fill();
+    c.fillStyle='rgba(255,240,200,.18)'; c.fillRect(p[0]-w*0.6|0,p[1]|0,1,1); }
+  const top=pt(1);
+  if(nuts) for(let k=0;k<4;k++){ c.fillStyle=dark? '#3a2a1a' : '#6a4a20'; c.beginPath(); c.arc(top[0]-3+k*2.2,top[1]+3+(k%2)*1.4,2.1,0,7); c.fill(); c.fillStyle='rgba(255,230,160,.4)'; c.fillRect(top[0]-3.6+k*2.2|0,top[1]+2+(k%2)*1.4|0,1,1); }
+  for(let f=0;f<9;f++){ const a=-Math.PI*0.98+f*Math.PI*0.96/8+Math.sin(T*0.04+f+x)*0.04, L=h*(0.42+0.08*((f*7)%3)/2), droop=L*(0.45+0.15*Math.abs(Math.cos(a)));
+    const ex=top[0]+Math.cos(a)*L, ey=top[1]+Math.sin(a)*L*0.5+droop+sw*0.5, mx=top[0]+Math.cos(a)*L*0.55, my=top[1]+Math.sin(a)*L*0.55-L*0.18;
+    c.strokeStyle=fr[1]; c.lineWidth=1.3; c.beginPath(); c.moveTo(top[0],top[1]); c.quadraticCurveTo(mx,my,ex,ey); c.stroke();
+    for(let q=1;q<10;q++){ const t=q/10, bx=(1-t)*(1-t)*top[0]+2*(1-t)*t*mx+t*t*ex, by=(1-t)*(1-t)*top[1]+2*(1-t)*t*my+t*t*ey, ll=(1-t*0.6)*L*0.16;
+      for(const s of [-1,1]){ c.strokeStyle= s>0? fr[0] : fr[1]; c.lineWidth=1; c.beginPath(); c.moveTo(bx,by); c.lineTo(bx+Math.cos(a+s*1.2+0.6)*ll, by+Math.sin(a+s*1.2+0.6)*ll+ll*0.6); c.stroke(); } } }
+}
+function isleHut(c,x,fl,M,T,night){
+  c.fillStyle='rgba(30,20,10,.25)'; c.beginPath(); c.ellipse(x,fl,28,3,0,0,7); c.fill();
+  for(const sx of [-18,-6,6,18]){ c.fillStyle='#5a3a1e'; c.fillRect(x+sx-1,fl-12,2,12); }                                       // the stilts
+  c.fillStyle='#7a5530'; c.fillRect(x-22,fl-14,44,3);                                                                           // the floor
+  const wall=c.createLinearGradient(x-20,0,x+20,0); wall.addColorStop(0,'#b08a52'); wall.addColorStop(1,'#7a5a34'); c.fillStyle=wall; c.fillRect(x-19,fl-30,38,16);
+  c.strokeStyle='rgba(70,45,20,.5)'; c.lineWidth=0.8; for(let i=0;i<9;i++){ c.beginPath(); c.moveTo(x-19+i*4.5,fl-30); c.lineTo(x-19+i*4.5,fl-14); c.stroke(); }   // the woven reeds
+  c.fillStyle=night? '#ffcf6a' : '#2a1a0c'; c.fillRect(x-4,fl-27,9,13); if(night){ const gl=c.createRadialGradient(x,fl-20,1,x,fl-20,26); gl.addColorStop(0,'rgba(255,200,110,.45)'); gl.addColorStop(1,'rgba(255,200,110,0)'); c.fillStyle=gl; c.fillRect(x-26,fl-46,52,52); }
+  for(let r=0;r<4;r++){ const y0=fl-30-r*5, hw=27-r*5.5; c.fillStyle= r%2? '#c89a4a' : '#dcb060'; c.beginPath(); c.moveTo(x-hw,y0+3); c.lineTo(x,y0-8+r*0.5); c.lineTo(x+hw,y0+3); c.closePath(); c.fill();
+    c.strokeStyle='rgba(120,80,30,.6)'; c.lineWidth=0.7; for(let i=-hw;i<hw;i+=3){ c.beginPath(); c.moveTo(x+i,y0+3); c.lineTo(x+i*0.92,y0+0.5); c.stroke(); } }                    // layered thatch
+  c.fillStyle='#8a6030'; c.fillRect(x-1,fl-55,2,6);
+}
 function bgIsle(c,T,mood,o){ o=o||{};
-  const sk={day:['#4aa8d8','#a8e0ec','#f6ecb8'], dusk:['#2a2058','#c85a4a','#f6a858'], storm:['#14182a','#2c3448','#4a5262'], night:['#080a1c','#1a2048','#2a3a6a'], dawn:['#6a6a86','#d8a8a0','#f4dcb0'], gold:['#5ab8e8','#c8ecf0','#ffeaa0']}[mood]||[ '#4aa8d8','#a8e0ec','#f6ecb8'];
-  rhSky(c,sk[0],sk[1],sk[2]);
-  if(mood==='day'||mood==='gold'){ c.fillStyle='rgba(255,246,200,.95)'; c.beginPath(); c.arc(380,52,13,0,7); c.fill(); for(let i=0;i<3;i++){ c.fillStyle='rgba(255,255,255,.7)'; const cx2=(80+i*150+T*0.15*(1+i*0.3))%560-40; c.fillRect(cx2,44+i*14,34,5); c.fillRect(cx2+8,40+i*14,22,5); } }
-  if(mood==='dusk'||mood==='dawn'){ c.fillStyle='rgba(255,232,170,.9)'; c.beginPath(); c.arc(110,140,15,0,7); c.fill(); }
-  if(mood==='night'){ for(let i=0;i<40;i++){ c.fillStyle='rgba(255,255,255,'+(0.4+0.4*Math.sin(T*0.05+i)).toFixed(2)+')'; c.fillRect((i*67)%480,(i*29)%110+14,1,1); } c.fillStyle='#f0f0e0'; c.beginPath(); c.arc(90,50,9,0,7); c.fill(); }
-  if(mood==='storm'){ for(let i=0;i<6;i++){ c.fillStyle='rgba(10,12,24,.6)'; c.fillRect(((i*95+T*0.4)%560)-60,18+(i%3)*18,120,22); c.fillRect(((i*95+T*0.4)%560)-40,12+(i%3)*18,80,18); } }
-  const sea=c.createLinearGradient(0,138,0,182); sea.addColorStop(0,mood==='storm'? '#1c2a3a' : mood==='night'? '#0a1430' : mood==='dusk'||mood==='dawn'? '#a8506a' : '#2a8ac0'); sea.addColorStop(1,mood==='storm'? '#0c1622' : mood==='night'? '#060c1c' : mood==='dusk'||mood==='dawn'? '#5a2a48' : '#1a6a9a'); c.fillStyle=sea; c.fillRect(0,138,480,44);
-  for(let i=0;i<14;i++){ const wy=142+(i*7)%38, wx=((i*71+T*(0.3+(i%3)*0.15))%520)-20; c.fillStyle=mood==='storm'||mood==='night'? 'rgba(180,200,230,.2)' : 'rgba(255,255,255,.35)'; c.fillRect(wx,wy,12+(i%4)*5,1); }
-  if(mood==='gold'||o.ships){ [[70,'#f0c040'],[170,'#ffffff'],[420,'#a82aa8']].forEach((s,i)=>{ const bx=s[0]+Math.sin(T*0.02+i)*3; c.fillStyle='#5a3a1a'; c.fillRect(bx-14,150,28,4); c.fillStyle=s[1]; c.beginPath(); c.moveTo(bx,120); c.lineTo(bx+13,148); c.lineTo(bx,148); c.fill(); c.fillStyle='#8a6a3a'; c.fillRect(bx-0.5,120,1,30); }); }
-  const sand=c.createLinearGradient(0,176,0,232); sand.addColorStop(0,mood==='storm'||mood==='night'? '#6a6a62' : '#f0dca4'); sand.addColorStop(1,mood==='storm'||mood==='night'? '#3a3a3a' : '#c8a864'); c.fillStyle=sand; c.fillRect(0,176,480,56);
-  c.fillStyle='rgba(255,255,255,.4)'; c.fillRect(0,176,480,2);
-  rhPalm(c,48,214,92,0.5,T,o.nuts!==false); rhPalm(c,420,208,100,-0.4,T,o.nuts!==false); rhPalm(c,455,196,70,-0.2,T,false);
-  if(!o.nohut){ c.fillStyle='#8a6a3a'; c.fillRect(352,172,40,18); c.fillStyle='#d8b058'; c.beginPath(); c.moveTo(346,174); c.lineTo(372,152); c.lineTo(398,174); c.closePath(); c.fill(); c.fillStyle='#3a2410'; c.fillRect(366,178,12,12); }
-  if(mood==='storm'||o.rain){ c.strokeStyle='rgba(190,210,240,.45)'; c.lineWidth=1; for(let i=0;i<70;i++){ const rx=(i*43+T*6)%500-10, ry=((i*61+T*14)%230); c.beginPath(); c.moveTo(rx,ry); c.lineTo(rx-3,ry+9); c.stroke(); } } }
+  const M=ISLE_MOODS[mood]||ISLE_MOODS.day, night=(mood==='night'), storm=(mood==='storm');
+  c.drawImage(isleStatic(mood),0,0);
+  // the sun with its halo, or the moon
+  if(M.sun){ const [sx,sy,sr,core,halo]=M.sun; const gr=c.createRadialGradient(sx,sy,sr*0.5,sx,sy,sr*5); gr.addColorStop(0,halo); gr.addColorStop(1,'rgba(255,240,200,0)'); c.fillStyle=gr; c.fillRect(sx-sr*5,sy-sr*5,sr*10,sr*10);
+    c.save(); c.beginPath(); c.rect(0,0,480,140.5); c.clip(); c.fillStyle=core; c.beginPath(); c.arc(sx,sy,sr,0,7); c.fill(); c.restore();   // it sinks behind the horizon, it does not sit on the water
+    if(mood==='gold'||mood==='dawn'){ c.save(); c.globalCompositeOperation='lighter'; c.globalAlpha=0.08; c.fillStyle='#fff0c0'; for(let i=0;i<6;i++){ const a=1.9+i*0.22+Math.sin(T*0.004)*0.03; c.beginPath(); c.moveTo(sx,sy); c.lineTo(sx+Math.cos(a)*420,sy+Math.sin(a)*420); c.lineTo(sx+Math.cos(a+0.07)*420,sy+Math.sin(a+0.07)*420); c.fill(); } c.restore(); } }
+  if(M.moon){ const [mx,my,mr]=M.moon; const gr=c.createRadialGradient(mx,my,mr*0.5,mx,my,mr*4); gr.addColorStop(0,'rgba(220,230,255,.35)'); gr.addColorStop(1,'rgba(220,230,255,0)'); c.fillStyle=gr; c.fillRect(mx-mr*4,my-mr*4,mr*8,mr*8); c.fillStyle='#f2f2e4'; c.beginPath(); c.arc(mx,my,mr,0,7); c.fill(); c.fillStyle='rgba(180,180,170,.5)'; c.beginPath(); c.arc(mx-2,my-1,2,0,7); c.arc(mx+3,my+3,1.4,0,7); c.fill(); }
+  if(night){ for(let i=0;i<24;i++){ const x=(i*97)%480, y=(i*41)%110+8, tw=0.5+0.5*Math.sin(T*0.06+i*1.7); if(tw>0.7){ c.fillStyle='rgba(255,255,255,'+tw.toFixed(2)+')'; c.fillRect(x,y,1,1); } } }
+  // the clouds drift
+  const nC= storm? 9 : night? 3 : 5;
+  for(let i=0;i<nC;i++){ const w=storm? 120+(i%3)*30 : 36+(i%3)*14, x=((i*131+T*(0.06+(i%3)*0.03))%(560+w))-w*0.6, y= storm? 14+(i%3)*16 : 26+(i*23)%54; isleCloud(c,x,y,w,M,M.sun? M.sun[0] : 240); }
+  // the road of light on the water, and the glitter
+  { const sx= M.sun? M.sun[0] : M.moon? M.moon[0] : -999; if(sx>-100){ for(let i=0;i<46;i++){ const yy=142+Math.pow((i%23)/23,1.4)*40, sp=(yy-140)*0.5+4, xx=sx+Math.sin(i*12.9+T*0.07)*sp, on=Math.sin(T*0.11+i*2.3)>0.2;
+        if(on){ c.fillStyle=rgbaHexA(M.glit, (0.35+0.4*((i*7)%5)/5).toFixed(2)); c.fillRect(xx|0,yy|0,2+((i%3)? 1 : 3),1); } } } }
+  // the swells roll in
+  for(let i=0;i<20;i++){ const band=i%5, wy=146+band*8+Math.sin(T*0.02+i)*1.2, wx=((i*83+T*(0.18+band*0.05))%540)-30, wl=10+band*4+(i%3)*4;
+    c.fillStyle= storm? 'rgba(200,215,235,.28)' : night? 'rgba(170,190,240,.18)' : 'rgba(255,255,255,'+(0.18+band*0.05).toFixed(2)+')'; c.fillRect(wx|0,wy|0,wl,1); c.fillStyle='rgba(0,0,40,.10)'; c.fillRect(wx|0,(wy+1)|0,wl,1); }
+  // the ships, the day it joins Opelia
+  if(mood==='gold'||o.ships){ [[70,'#f0c040'],[170,'#ffffff'],[420,'#a82aa8']].forEach((s,i)=>{ const bx=s[0]+Math.sin(T*0.02+i)*3, by=150+Math.sin(T*0.05+i)*0.8; c.fillStyle='#5a3a1a'; c.beginPath(); c.moveTo(bx-15,by); c.lineTo(bx+15,by); c.lineTo(bx+11,by+4); c.lineTo(bx-11,by+4); c.fill(); c.fillStyle='#3a2410'; c.fillRect(bx-0.5,by-30,1.2,30);
+      const sg=c.createLinearGradient(bx,by-28,bx+14,by-4); sg.addColorStop(0,s[1]); sg.addColorStop(1,mixHex(s[1],'#000000',0.25)); c.fillStyle=sg; c.beginPath(); c.moveTo(bx+1,by-28); c.quadraticCurveTo(bx+16,by-16,bx+13,by-3); c.lineTo(bx+1,by-3); c.fill(); c.fillStyle='rgba(255,255,255,.4)'; c.fillRect(bx-14,by+4,28,1); }); }
+  // the foam washes up and draws back
+  { const wash=Math.sin(T*0.018)*0.5+0.5, fy=184+wash*4;
+    c.fillStyle= night||storm? 'rgba(200,215,240,.35)' : 'rgba(255,255,255,.75)'; c.beginPath(); c.moveTo(0,fy); for(let x=0;x<=480;x+=8) c.lineTo(x,fy+Math.sin(x*0.07+T*0.03)*1.2); for(let x=480;x>=0;x-=8) c.lineTo(x,fy+2.2+Math.sin(x*0.05+T*0.025)*1.6); c.fill();
+    c.fillStyle='rgba(255,255,255,.25)'; for(let x=0;x<480;x+=6){ const y=fy+3+Math.sin(x*0.3+T*0.05)*1.2; c.fillRect(x+((T*0.2)|0)%6,y|0,2,1); }
+    c.fillStyle='rgba(255,255,255,.12)'; c.fillRect(0,(fy+5)|0,480,1); }
+  // palms, the hut, and the near leaves
+  islePalm(c,52,216,96,0.55,T,o.nuts!==false,M); islePalm(c,424,210,104,-0.45,T,o.nuts!==false,M); islePalm(c,458,198,72,-0.25,T,false,M);
+  if(!o.nohut) isleHut(c,372,192,M,T,night||storm);
+  // a few birds over the water by day
+  if(mood==='day'||mood==='gold'||mood==='dawn'){ c.strokeStyle='rgba(40,40,60,.6)'; c.lineWidth=0.8; for(let i=0;i<3;i++){ const bx=((T*0.25+i*90)%540)-30, by=60+i*9+Math.sin(T*0.05+i)*3, fl=Math.sin(T*0.25+i)*1.6; c.beginPath(); c.moveTo(bx-3,by-fl); c.lineTo(bx,by); c.lineTo(bx+3,by-fl); c.stroke(); } }
+  if(storm||o.rain){ c.strokeStyle='rgba(190,210,240,.45)'; c.lineWidth=1; for(let i=0;i<90;i++){ const rx=(i*43+T*6)%500-10, ry=((i*61+T*14)%230); c.beginPath(); c.moveTo(rx,ry); c.lineTo(rx-3,ry+9); c.stroke(); } }
+  // the near leaves, in the bottom corners, dark against the beach
+  { const lf=night||storm? '#0c160e' : '#1e3a1c', lf2=night||storm? '#142418' : '#2e5426';
+    for(const [x0,s] of [[0,1],[480,-1]]) for(let k=0;k<5;k++){ const a=(s>0? -0.4 : Math.PI+0.4)+s*(k*0.32-0.5), L=30+k*6, bx=x0+s*2, by=232;
+      c.fillStyle= k%2? lf : lf2; c.beginPath(); c.moveTo(bx,by); c.quadraticCurveTo(bx+Math.cos(a)*L*0.5-s*6,by+Math.sin(a)*L*0.5-8,bx+Math.cos(a)*L,by+Math.sin(a)*L*0.6); c.quadraticCurveTo(bx+Math.cos(a)*L*0.5+s*4,by+Math.sin(a)*L*0.5+4,bx,by); c.fill(); } }
+  if(M.tint){ c.fillStyle=M.tint; c.fillRect(0,12,480,218); }
+}
+function rhPalm(c,x,fl,h,lean,T,nuts){ islePalm(c,x,fl,h,lean,T,nuts,ISLE_MOODS.day); }
+
 function rhHearts(c,x,y,T,n){ for(let i=0;i<(n||4);i++){ const ph=((T*0.012+i*0.27)%1); c.globalAlpha=1-ph; c.fillStyle='#ff6a9a'; const hx=x+Math.sin(i*2+T*0.05)*14, hy=y-ph*40; c.fillRect(hx-2,hy-1,2,2); c.fillRect(hx+1,hy-1,2,2); c.fillRect(hx-2,hy+1,5,2); c.fillRect(hx-1,hy+3,3,1); } c.globalAlpha=1; }
 function rhFlash(c,a,col){ if(a>0.01){ c.globalAlpha=clamp(a,0,1); c.fillStyle=col||'#fff'; c.fillRect(0,0,480,270); c.globalAlpha=1; } }
 function rhSeatGlow(c,x,y,r,T,col){ c.save(); c.globalCompositeOperation='lighter'; const g=c.createRadialGradient(x,y,2,x,y,r); g.addColorStop(0,col||'rgba(255,230,150,.75)'); g.addColorStop(1,'rgba(255,200,100,0)'); c.fillStyle=g; c.fillRect(x-r,y-r,2*r,2*r); c.restore(); }
