@@ -430,8 +430,8 @@
         <div id="region-layer" style="position:absolute;inset:0;"></div>
         </div>
         </div>
-        <div id="map-zoomctl" style="position:absolute;right:10px;top:10px;z-index:9;display:flex;gap:4px;align-items:center;">
-          <button class="btn sm" id="map-zout" title="Zoom out">−</button><span id="map-zoomlab" class="small" style="min-width:40px;text-align:center;background:rgba(20,14,8,.7);padding:2px 4px;border-radius:3px;">100%</span><button class="btn sm" id="map-zin" title="Zoom in — the tags stay the same size, the sheet opens up">＋</button><button class="btn sm" id="map-zreset" title="The whole sheet">⟲</button>
+        <div id="map-zoomctl" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);z-index:9;display:flex;flex-direction:column;gap:4px;align-items:center;opacity:.88;">
+          <button class="btn sm" id="map-zin" title="Zoom in — the tags stay the same size, the sheet opens up">＋</button><span id="map-zoomlab" class="small" style="min-width:40px;text-align:center;background:rgba(20,14,8,.7);padding:2px 4px;border-radius:3px;">100%</span><button class="btn sm" id="map-zout" title="Zoom out">−</button><button class="btn sm" id="map-zreset" title="The whole sheet">⟲</button>
         </div>
         <div style="position:absolute;left:6px;bottom:4px;font-size:10px;" class="muted">
           IMPERIVM ROMANVM · ANNO CC · ⬡ current ⬡ ✓ cleared ⬡ ✦ imperial</div>
@@ -7354,7 +7354,7 @@ const WIFE_TRAITS=[
   {id:'beauty',   name:'Beautiful',  icon:'🌹', min:6, desc:'Heads turn in the street. People love a beautiful house.'},
   {id:'fierce',   name:'Fierce',     icon:'🔥', min:5, desc:'Steel in her spine — she breeds fighters.'},
   {id:'devoted',  name:'Devoted',    icon:'💞', min:4, desc:'Her heart does not wander; the bond grows faster.'},
-  {id:'cunning',  name:'Cunning',    icon:'🗝', min:6, desc:'She hears everything in Rome before you do.'},
+  {id:'cunning',  name:'Cunning',    icon:'🗝', min:6, get desc(){ let w='west'; try{ w=playerWorld(); }catch(e){} return 'She hears everything in '+(w==='east'? 'the capital' : w==='ice'? 'the camp' : 'Rome')+' before you do.'; }},
   {id:'fertile',  name:'Fertile',    icon:'🌾', min:3, desc:'The house will not want for heirs.'},
   {id:'noble',    name:'Noble-blood',icon:'👑', min:7, desc:'Old blood — doors open for her children.'},
   {id:'wealthy',  name:'Wealthy',    icon:'💰', min:6, desc:'Her family sends coin, and keeps sending it.'},
@@ -19237,11 +19237,12 @@ function finishFight(won){
       const theirLoss=t.enemyArmy;
       G.soldiers=Math.max(0,G.soldiers-yourLoss);
       G.coin+=t.reward; G.glory+=t.glory; G.pop=clamp(G.pop+15,0,100); G.honor=clamp(G.honor-8,0,100); G.plotTier++; G.wins++;
-      const champ = G.plotTier>=PLOT_TARGETS.length;
-      if(champ){ G.imperialDone=true; G.emperor=true; G.approval=60; G.legions=Math.max(6,Math.round(G.soldiers/5000)+6); G.rivals=2; bumpStat('emperors'); unlock('emperor'); }
+      const champ = G.plotTier>=plotTargets().length;
+      if(champ && playerWorld()==='east') dynThroneFalls('sword');
+      else if(champ){ G.imperialDone=true; G.emperor=true; G.approval=60; G.legions=Math.max(6,Math.round(G.soldiers/5000)+6); G.rivals=2; bumpStat('emperors'); unlock('emperor'); }
       saveQuiet();
       showResult(true,{glory:t.glory,coin:t.reward,popDelta:15,honorDelta:-8,crowdLove:FT.crowd,battle:{yourLoss,theirLoss},
-        note: champ? 'THE EMPEROR IS SLAIN. Your legions hail you Imperator — the purple is yours, Rome at your feet.'
+        note: champ? EW('THE EMPEROR IS SLAIN. Your legions hail you Imperator — the purple is yours, Rome at your feet.','THE HAN THRONE FALLS. The palace guard throws down its halberds and the Mandate waits for a name.')
                    : 'You have toppled '+t.name+'! The provinces whisper your name in fear.'}); }
     else { const yourLoss=Math.round(t.enemyArmy*rnd(0.4,0.7)); G.soldiers=Math.max(0,G.soldiers-yourLoss);
       G.honor=clamp(G.honor-6,0,100); G.losses++; saveQuiet();
@@ -19253,12 +19254,12 @@ function finishFight(won){
   if(FT.rival){
     if(won){ G.rivals=Math.max(0,G.rivals-1); if(G.emperor) G.approval=clamp(G.approval+10,0,100); G.coin+=800; G.wins++; saveQuiet();
       showResult(true,{glory:40,coin:800,popDelta:0,honorDelta:2,crowdLove:FT.crowd,
-        note: G.emperor?'The usurper lies dead on the Senate floor. Your grip on the purple tightens.':'The rival lies dead. His faction scatters and your provinces are safe.'}); }
+        note: G.emperor?EW('The usurper lies dead on the Senate floor. Your grip on the purple tightens.','The pretender’s head goes up on the palace gate. The Mandate holds.'):'The rival lies dead. His faction scatters and your provinces are safe.'}); }
     else { G.losses++;
       if(G.emperor){ G.approval=clamp(G.approval-18,0,100);
-        if(G.approval<=0){ G.emperor=false; G.plotTier=Math.max(0,PLOT_TARGETS.length-1); saveQuiet();
-          showResult(false,{glory:0,coin:0,popDelta:-20,honorDelta:0,crowdLove:FT.crowd,note:'The conspiracy triumphs — you are dragged from the throne. The purple is lost.'}); }
-        else { saveQuiet(); showResult(false,{glory:0,coin:0,popDelta:0,honorDelta:0,crowdLove:FT.crowd,note:'You are wounded and forced to flee — the rival lives, and Rome doubts you.'}); }
+        if(G.approval<=0){ G.emperor=false; G.plotTier=Math.max(0,plotTargets().length-1); if(G.dynasty){ G.fallenDynasty=G.dynasty; delete G.dynasty; mapStaleAll(); } saveQuiet();
+          showResult(false,{glory:0,coin:0,popDelta:-20,honorDelta:0,crowdLove:FT.crowd,note:EW('The conspiracy triumphs — you are dragged from the throne. The purple is lost.','The pretender’s men are in the palace. Heaven has withdrawn the Mandate, and your house falls with you.')}); }
+        else { saveQuiet(); showResult(false,{glory:0,coin:0,popDelta:0,honorDelta:0,crowdLove:FT.crowd,note:EW('You are wounded and forced to flee — the rival lives, and Rome doubts you.','You are wounded and carried from the field. The pretender lives, and the commanderies are watching.')}); }
       } else {
         // a governor who loses forfeits a province to the rival
         const ks=Object.keys(G.titles); let lost='';
@@ -22380,9 +22381,9 @@ function openCheats(){
   btn(r,'+10 Levels',()=>{ for(let i=0;i<10;i++){ G.level++; G.hpBonus++; if(G.level%2===0)G.dmgBonus++; } });
   // ---- provinces ----
   r=card('🗺 GOVERN THE PROVINCES','— take the titles without the wars');
-  btn(r,'👑 GOVERN EVERY REGION (incl. Parthia)',()=>{ REGIONS.forEach(rg=>{ G.titles[rg.id]=REGION_TITLES[rg.id]||('Dominus '+rg.id); G.cleared[rg.id]=true; G.clears[rg.id]=99; });
+  btn(r,'👑 GOVERN EVERY REGION (incl. Parthia)',()=>{ REGIONS.forEach(rg=>{ G.titles[rg.id]=regionTitle(rg.id); G.cleared[rg.id]=true; G.clears[rg.id]=99; });
     G.wonProvinceByFight=true; toast('🗺 Every province in the empire flies your colours.',3000); });
-  btn(r,'GOVERN THIS REGION',()=>{ const rg=REGION_BY_ID[G.current]; if(rg){ G.titles[rg.id]=REGION_TITLES[rg.id]||('Dominus '+rg.id); G.cleared[rg.id]=true; G.clears[rg.id]=99; G.wonProvinceByFight=true; } });
+  btn(r,'GOVERN THIS REGION',()=>{ const rg=REGION_BY_ID[G.current]; if(rg){ G.titles[rg.id]=regionTitle(rg.id); G.cleared[rg.id]=true; G.clears[rg.id]=99; G.wonProvinceByFight=true; } });
   btn(r,'UNLOCK ALL REGIONS',()=>{ REGIONS.forEach(rg=>{ G.cleared[rg.id]=true; }); G.pop=100; });
   btn(r,'CLEAR ALL TITLES',()=>{ G.titles={}; });
   // ---- power ----
@@ -52129,7 +52130,7 @@ $('btn-create-go').onclick=()=>{
     // Rome's own provinces only. Ctesiphon and Persis were PARTHIAN — Trajan
     // took Ctesiphon for about a year and it was given straight back. No prince
     // is born holding the Great King's capital, and Sogdiana was never even close.
-    ROMAN_REGIONS().forEach(r=>{ G.titles[r.id]=REGION_TITLES[r.id]||('Dominus '+r.id); G.cleared[r.id]=true; });
+    ROMAN_REGIONS().forEach(r=>{ G.titles[r.id]=regionTitle(r.id); G.cleared[r.id]=true; });
     G.regalia=['ring','sceptre']; G.approval=70; G.favor=25; G.soldiers=6000; G.pop=60; G.glory=200;
     G.retired=false;
     if(G.isFemale) G.advocate=true;                       // a princess's power is argued, not fought
@@ -56799,7 +56800,7 @@ function applyHub(){ { const _g=document.getElementById('btn-goddess'); if(_g) _
         ? '戦国 · THE COUNTRY AT WAR · ' + (G&&G.waEra? G.waEra+' ' : '')
           + '· colour = the house that holds it · ⬡ current ⬡ ✓ cleared'
         : east
-        ? '建安 · THE JIAN’AN YEARS · ⬡ current ⬡ ✓ cleared ⬡ ⛔ shut'
+        ? ((G && G.dynasty)? G.dynasty.era[0]+' · THE '+G.dynasty.era[1].toUpperCase()+' YEARS OF '+(G.dynasty.zh? G.dynasty.zh+' ' : '')+G.dynasty.n.toUpperCase()+' · ⬡ current ⬡ ✓ cleared ⬡ ⛔ shut' : '建安 · THE JIAN’AN YEARS · ⬡ current ⬡ ✓ cleared ⬡ ⛔ shut')
         : _w==='ice'
         ? 'THE ICE AGE · c. 10,000 BC · ⬡ current ⬡ ✓ cleared'
         : rk
@@ -57049,11 +57050,23 @@ function villaIncome(){ let coin=G.slaves*12, food=Math.floor(G.slaves/2);
   return {coin, food}; }
 function provinceTribute(){ let s=0; for(const id in (G.titles||{})){ const r=REGION_BY_ID[id]; if(r){ let t=40+r.tier*45; if(KEY_PROVINCES[id]) t=Math.round(t*1.5); s+=t; } } return s; }
 function titlesCount(){ return Object.keys(G.titles||{}).length; }
+/* what a province's lord was called, in the province's own tongue. A Roman governs as Dux or
+   Praeses; the East had its own words, and a Han official taking Luoyang is not its "Dominus". */
+const REGION_TITLE_CUL={han:'太守 Grand Administrator of ', steppe:'大人 Daren of ', korean:'加 Ga of ', kushan:'Kshatrapa of ', tamil:'Raja of ', persian:'Satrap of ', celt:'Rí of ', germanic:'Thiudans of ', numidian:'Aguellid of ', greek:'Strategos of '};
+const REGION_TITLE_PEOPLE={xiongnu:'Shanyu over ', arab:'Malik of ', sabaean:'Mukarrib of ', himyarite:'Malik of ', hadrami:'Malik of ', aksumite:'Negus of ', kushite:'Qore of ', blemmye:'Phylarch of ', armenian:'Nakharar of ', kartvelian:'Eristavi of ', funan:'Kurung of ', sinhala:'Raja of ', yue:'太守 Grand Administrator of ', lelang:'太守 Grand Administrator of ', bod:'Btsanpo of ', zhangzhung:'Lig of '};
+function regionTitle(id){
+  if(REGION_TITLES[id]) return REGION_TITLES[id];
+  const r=(typeof REGION_EAST_BY_ID!=='undefined')? REGION_EAST_BY_ID[id] : null;
+  if(r){ if(/ Province$/.test(id)) return '州牧 Shepherd of '+id.replace(/ Province$/,'');
+    const pe=r.people, cul=(pe && typeof ASIA_PEOPLES!=='undefined' && ASIA_PEOPLES[pe])? ASIA_PEOPLES[pe].cul : (r.cul||'han');
+    return (REGION_TITLE_PEOPLE[pe] || REGION_TITLE_CUL[cul] || '太守 Grand Administrator of ')+id; }
+  return 'Dominus '+id; }
+
 function claimReq(reg){ return 3+reg.tier; }   // wins needed to claim governance
 function canClaim(reg){ return !(G.titles&&G.titles[reg.id]) && (G.clears[reg.id]||0)>=claimReq(reg); }
 function claimProvince(reg){
   if(!canClaim(reg)) return;
-  G.titles[reg.id]=REGION_TITLES[reg.id]||('Dominus '+reg.id);
+  G.titles[reg.id]=regionTitle(reg.id);
   G.wonProvinceByFight=true;                       // governed by PURE fighting — the Warrior-Queen path opens
   G.pop=clamp(G.pop+6,0,100); G.honor=clamp(G.honor+3,0,100);
   bumpStat('provinces'); unlock('governor');
@@ -57076,7 +57089,7 @@ function govBlock(reg){
   if(got>=need){
     return `<div class="panel" style="padding:6px;margin-top:4px;border-color:var(--gold)">
       <div class="small">You have dominated ${reg.id} (${got}/${need} wins). Claim it as your own province:</div>
-      <button class="btn sm gold" id="brief-claim" style="margin-top:4px">♦ CLAIM GOVERNANCE — become ${REGION_TITLES[reg.id]||('Dominus '+reg.id)}</button></div>`;
+      <button class="btn sm gold" id="brief-claim" style="margin-top:4px">♦ CLAIM GOVERNANCE — become ${regionTitle(reg.id)}</button></div>`;
   }
   return `<div class="small muted" style="margin-top:2px">Dominate this province — win here ${need} times (${got}/${need}) to claim a grand title and govern it.</div>`;
 }
@@ -57953,7 +57966,7 @@ function openRegalia(){
     bt.textContent = pw<need? '🔒 THEY WOULD NOT DARE SELL TO YOU' : '💰 BUY THE PROVINCE ('+fmt(price)+'d)';
     bt.disabled = pw<need || G.coin<price;
     bt.onclick=()=>{ if(pw<need||G.coin<price) return; G.coin-=price;
-      G.titles[reg.id]=REGION_TITLES[reg.id]||('Dominus '+reg.id); G.cleared[reg.id]=true;
+      G.titles[reg.id]=regionTitle(reg.id); G.cleared[reg.id]=true;
       G.honor=clamp(G.honor-4,0,100); G.approval=clamp(G.approval+4,0,100);
       bumpStat('provinces'); try{unlock('governor');}catch(e){}
       toast('💰 '+reg.id+' is yours — bought, not bled for. Some senators sneer; none of them govern a province. (−4 honor)',5000);
@@ -64332,13 +64345,15 @@ function openIntrigue(){
     const bt=document.createElement('button'); bt.className='btn sm blood'; bt.textContent='⚔ MEET A RIVAL IN COMBAT';
     bt.onclick=()=>startRival(); rc.appendChild(bt); b.appendChild(rc);
   }
+  // ---- a realm of your own (the West's way of founding a nation) ----
+  if(playerWorld()!=='east' && !G.emperor) buildRealmCard(b);
   // ---- imperial rule (after seizing the purple) ----
   if(G.emperor){ buildRule(b); return; }
   // ---- grand plot / overthrow ----
   const ph=document.createElement('div'); ph.className='small'; ph.style.color='var(--blood)'; ph.style.marginTop='6px';
-  ph.textContent='THE GRAND PLOT — MARCH ON THE POWERFUL:'; b.appendChild(ph);
+  ph.textContent=EW('THE GRAND PLOT — MARCH ON THE POWERFUL:','THE GRAND PLOT — MARCH ON THE POWERFUL, UP TO THE THRONE ITSELF:'); b.appendChild(ph);
   const pcard=document.createElement('div'); pcard.className='shopcard';
-  const t=PLOT_TARGETS[G.plotTier];
+  const t=plotTargets()[G.plotTier];
   const ready=G.soldiers>=t.needSold && G.favor>=t.needFav;
   pcard.innerHTML=`<div>Next target: <b style="color:var(--gold)">${t.name}</b> — defended by <b>${fmt(t.enemyArmy)}</b> men.</div>
     <div class="small ${ready?'':'muted'}">Needs an army of <b>${fmt(t.needSold)}</b> &amp; ${t.needFav} favor (you: ${fmt(G.soldiers)} troops · ${G.favor} favor)</div>
@@ -64373,8 +64388,15 @@ function detCost(fromId,toId,size){
   return {days, coin, rations, dist:t.dist, needRange:t.needRange};
 }
 // an army can only march where YOU could travel (islands need a fleet)
+/* the old screens were written in denarii, "200d"; in the East they are rewritten as they appear, in the local cash */
+const _EAST_COIN_RX=/(\d[\d,]*)d\b/g;
+function eastCoinStr(t){ try{ const sh=currencyHere().short||''; return t.replace(_EAST_COIN_RX,(m,n)=>n+(sh==='d'? 'd' : ' '+sh)); }catch(e){ return t; } }
+function eastCoinFix(root){ if(!root || playerWorld()!=='east') return; const w=document.createTreeWalker(root,NodeFilter.SHOW_TEXT,null); const hit=[]; let n; while((n=w.nextNode())){ const p=n.parentNode; if(p && /^(SCRIPT|STYLE|TEXTAREA)$/.test(p.nodeName)) continue; _EAST_COIN_RX.lastIndex=0; if(_EAST_COIN_RX.test(n.nodeValue)) hit.push(n); } hit.forEach(t=>{ t.nodeValue=eastCoinStr(t.nodeValue); }); }
+try{ const _eco=new MutationObserver((ms)=>{ if(typeof G==='undefined' || !G || playerWorld()!=='east') return; for(const m of ms){ if(m.type==='characterData'){ const t=m.target; _EAST_COIN_RX.lastIndex=0; if(_EAST_COIN_RX.test(t.nodeValue||'')) t.nodeValue=eastCoinStr(t.nodeValue); } else m.addedNodes.forEach(a=>{ if(a.nodeType===3){ _EAST_COIN_RX.lastIndex=0; if(_EAST_COIN_RX.test(a.nodeValue)) a.nodeValue=eastCoinStr(a.nodeValue); } else if(a.nodeType===1) eastCoinFix(a); }); } });
+  _eco.observe(document.body,{subtree:true, childList:true, characterData:true}); }catch(e){}
+function campaignRegions(){ return (playerWorld()==='east' && typeof REGIONS_EAST!=='undefined')? REGIONS_EAST.filter(r=>!(typeof regionBlocked==='function' && regionBlocked(r.id))) : REGIONS; }
 function detReachable(toId){
-  const from=REGION_BY_ID[G.current], to=REGION_BY_ID[toId];
+  const from=regionAny(G.current)||REGIONS[0], to=regionAny(toId); if(!to) return {ok:false, why:'No such province.'};
   if((to.sea||from.sea) && !G.boat) return {ok:false, why:to.id+' is across open sea — you need a fleet (buy a ship at the Stable) before an army can cross.'};
   const t=travelCost(G.current,toId);
   if(!to.sea && !from.sea && MOUNTS[G.mount].range<t.needRange) return {ok:false, why:'No road that far — get a stronger mount at the Stable first.'};
@@ -64388,10 +64410,10 @@ function sendDetachment(toId,size,generalIdx,purpose){
   if(purpose==='conquer' && (generalIdx==null || !G.generals[generalIdx])){ toast('Appoint a general to lead a conquest.'); return; }
   if(purpose==='conquer' && G.titles[toId]){ toast('You already govern '+toId+'.'); return; }
   const c=detCost(G.current,toId,size);
-  if(G.coin<c.coin){ toast('Not enough denarii to supply the march ('+c.coin+'d).'); return; }
+  if(G.coin<c.coin){ toast('Not enough '+currencyHere().name+' to supply the march ('+coinShortStr(c.coin)+').'); return; }
   if(G.food<c.rations){ toast('Not enough rations for the march ('+c.rations+').'); return; }
   G.coin-=c.coin; G.food-=c.rations; G.soldiers-=size; syncArmy();
-  const reg=REGION_BY_ID[toId];
+  const reg=regionAny(toId)||{tier:2};
   const reward = { coin:Math.round(size*rnd(0.25,0.5)+reg.tier*300), troops:Math.round(size*rnd(0.05,0.2)+reg.tier*150), slaves:ri(0,2)+reg.tier };
   const gen = purpose==='conquer'? G.generals[generalIdx] : null;
   G.detachments.push({ fromId:G.current, toId, size, day:0, eta:c.days, phase:'out', reward, purpose, gen });
@@ -64536,10 +64558,10 @@ function advanceDay(n){
         if(d.purpose==='conquer'){
           const gearMult=(1+(G.armyGear||0)*0.15)*(1+(G.armyTrain||0)*0.12);
           const yourPower=Math.round(d.size*gearMult*(d.gen?d.gen.power:1));
-          const reg=REGION_BY_ID[d.toId];
+          const reg=regionAny(d.toId)||{tier:2};
           const defense=Math.round((1500+reg.tier*2200)*rnd(0.85,1.15));
           if(yourPower>=defense){ d.won=true; d.loss=Math.round(defense*0.4*(d.gen?d.gen.casualty:1)); d.size=Math.max(0,d.size-d.loss);
-            G.titles[d.toId]=REGION_TITLES[d.toId]||('Dominus '+d.toId);
+            G.titles[d.toId]=regionTitle(d.toId);
             d.msg=(d.gen?d.gen.name:'Your army')+' storms '+d.toId+' — the province is YOURS ('+fmt(d.loss)+' fallen)!';
           } else { d.won=false; d.loss=Math.round(d.size*rnd(0.5,0.8)); d.size=Math.max(0,d.size-d.loss);
             d.msg='The assault on '+d.toId+' is thrown back ('+fmt(d.loss)+' lost).'; if(d.gen&&Math.random()<0.4) d.genDied=true; }
@@ -64645,14 +64667,14 @@ function buildCampaign(b){
   buildGenerals(b);
   // dispatch a new detachment / conquest
   const card=document.createElement('div'); card.className='shopcard';
-  if(!detTargetId||detTargetId===G.current) detTargetId=(REGIONS.find(r=>r.id!==G.current)||{}).id;
+  const _CR=campaignRegions(); if(!detTargetId||detTargetId===G.current||!_CR.find(r=>r.id===detTargetId)) detTargetId=(_CR.find(r=>r.id!==G.current)||{}).id;
   const reach=detReachable(detTargetId);
   const c=detCost(G.current,detTargetId,Math.min(detSize,G.soldiers||detSize));
   const mkSelStyle='background:#000;color:var(--gold);border:2px solid var(--gold);font-family:inherit;font-weight:bold;padding:3px;';
   card.innerHTML=`<div>March from <b>${G.current}</b> → <b style="color:var(--gold)">${detTargetId}</b></div>`;
   const selRow=document.createElement('div'); selRow.className='row gap6'; selRow.style.margin='4px 0'; selRow.style.flexWrap='wrap';
   const sel=document.createElement('select'); sel.style.cssText=mkSelStyle;
-  REGIONS.filter(r=>r.id!==G.current).forEach(r=>{ const o=document.createElement('option'); o.value=r.id; o.textContent=r.id+(G.titles[r.id]?' ♦':''); if(r.id===detTargetId)o.selected=true; sel.appendChild(o); });
+  _CR.filter(r=>r.id!==G.current).forEach(r=>{ const o=document.createElement('option'); o.value=r.id; o.textContent=r.id+(G.titles[r.id]?' ♦':''); if(r.id===detTargetId)o.selected=true; sel.appendChild(o); });
   sel.onchange=()=>{ detTargetId=sel.value; openIntrigue(); };
   const sizeSel=document.createElement('select'); sizeSel.style.cssText=mkSelStyle;
   [500,2000,5000,10000,25000].forEach(s=>{ const o=document.createElement('option'); o.value=s; o.textContent=fmt(s)+' men'; if(s===detSize)o.selected=true; sizeSel.appendChild(o); });
@@ -64674,7 +64696,7 @@ function buildCampaign(b){
   }
   const info=document.createElement('div'); info.className='small muted';
   info.innerHTML = reach.ok
-    ? `March: <b>${c.days} days</b> · supply <b>${c.coin}d</b> + ${c.rations} rations · you have ${fmt(G.soldiers)} troops`+(detPurpose==='conquer'?` · defenders ~${fmt(1500+REGION_BY_ID[detTargetId].tier*2200)}`:'')
+    ? `March: <b>${c.days} days</b> · supply <b>${c.coin}d</b> + ${c.rations} rations · you have ${fmt(G.soldiers)} troops`+(detPurpose==='conquer'?` · defenders ~${fmt(1500+((regionAny(detTargetId)||{tier:2}).tier||2)*2200)}`:'')
     : `<span style="color:var(--blood)">✕ ${reach.why}</span>`;
   card.appendChild(info);
   const row=document.createElement('div'); row.className='row gap6'; row.style.marginTop='4px';
@@ -64750,80 +64772,85 @@ function buildBetrothals(b){
 // ---- THE POLITICAL ARENA: the battles a toga demands ----
 function buildPolitics(b){
   const ph=document.createElement('div'); ph.className='small'; ph.style.color='var(--gold)'; ph.style.marginTop='6px';
-  ph.textContent='🏛 THE POLITICAL ARENA — battles of the Curia:'; b.appendChild(ph);
+  ph.textContent=EW('🏛 THE POLITICAL ARENA — battles of the Curia:','🏯 THE COURT — battles of memorials and patronage:'); b.appendChild(ph);
   const card=document.createElement('div'); card.className='shopcard';
   const cool=(G.day-(G.lastDebateDay===undefined?-9:G.lastDebateDay))<1;
-  card.innerHTML=`<div class="small muted">Word-blades and purse-strings — the only combat a senator is permitted. One political stroke per day.${cool?' <b style="color:var(--gold)">(You have already moved today — END DAY or travel.)</b>':''}</div>`;
+  card.innerHTML=`<div class="small muted">${EW('Word-blades and purse-strings — the only combat a senator is permitted.','Memorials, banquets and gifts: the only weapons a courtier may carry inside the palace.')} One political stroke per day.${cool?' <b style="color:var(--gold)">(You have already moved today — END DAY or travel.)</b>':''}</div>`;
   const row=document.createElement('div'); row.className='row gap6';
   const mk=(label,title,fn,dis)=>{ const bt=document.createElement('button'); bt.className='btn sm'; bt.textContent=label; bt.title=title; bt.disabled=cool||dis; bt.onclick=fn; row.appendChild(bt); };
-  mk('🗣 DEBATE IN THE CURIA (100d)','Cross rhetoric with a rival senator — approval, favor and new clients to the victor.',()=>{
+  mk(EW('🗣 DEBATE IN THE CURIA (100d)','🗣 PURE DISCUSSION — 清議 (100)'),EW('Cross rhetoric with a rival senator — approval, favor and new clients to the victor.','Trade judgements of men with a rival before the scholars. Xu Shao’s Monthly Appraisal made and unmade careers; he called Cao Cao a capable minister in peace and a villain in chaos.'),()=>{
     if(G.coin<100) return; G.coin-=100; G.lastDebateDay=G.day;
     const skill=(G.approval+G.honor)/2 + rnd(-20,20);
     if(skill>=50){ G.approval=clamp(G.approval+6,0,100); G.favor+=2; G.coin+=220;
-      toast('🗣 Your oration brings the Curia to its feet! (+6 approval, +2 favor, +220d in new clients)',3000); }
-    else { G.honor=clamp(G.honor-3,0,100); toast('🗣 The rival orator turns your own words against you — laughter from the benches (−3 honor).',2800); }
+      toast(EW('🗣 Your oration brings the Curia to its feet! (+6 approval, +2 favor, +220d in new clients)','🗣 The scholars repeat your judgement for a month! (+6 approval, +2 favor, +220 in new clients)'),3000); }
+    else { G.honor=clamp(G.honor-3,0,100); toast(EW('🗣 The rival orator turns your own words against you — laughter from the benches (−3 honor).','🗣 It is your rival’s verdict on YOU that the scholars repeat (−3 honor).'),2800); }
     refreshStatbar(); saveQuiet(); openIntrigue();
   }, G.coin<100);
-  mk('🗳 BUY THE BLOC (250d)','Grease a whole voting bloc — approval now, scandal maybe later.',()=>{
+  mk(EW('🗳 BUY THE BLOC (250d)','🎁 GIFTS TO THE GREAT CLANS (250)'),EW('Grease a whole voting bloc — approval now, scandal maybe later.','The great families of the commandery recommend their own. Make yourself their own — approval now, scandal maybe later.'),()=>{
     if(G.coin<250) return; G.coin-=250; G.lastDebateDay=G.day;
     G.approval=clamp(G.approval+8,0,100);
     if(Math.random()<0.25){ G.honor=clamp(G.honor-6,0,100); G.pop=clamp(G.pop-4,0,100);
-      toast('🗳 The bloc votes your way (+8 approval) — but a scribe talks. SCANDAL! (−6 honor, −4 pop)',3200); }
-    else toast('🗳 The bloc votes your way, quiet as coin (+8 approval).',2600);
+      toast(EW('🗳 The bloc votes your way (+8 approval) — but a scribe talks. SCANDAL! (−6 honor, −4 pop)','🎁 The clans send their sons to your gate (+8 approval) — but a clerk talks. SCANDAL! (−6 honor, −4 pop)'),3200); }
+    else toast(EW('🗳 The bloc votes your way, quiet as coin (+8 approval).','🎁 The clans send their sons to your gate, quietly (+8 approval).'),2600);
     refreshStatbar(); saveQuiet(); openIntrigue();
   }, G.coin<250);
-  mk('⚖ PROSECUTE A PRAETOR (3 favor)','Drag a corrupt praetor before the courts — glory or a new enemy.',()=>{
+  mk(EW('⚖ PROSECUTE A PRAETOR (3 favor)','⚖ IMPEACH A MINISTER (3 favor)'),EW('Drag a corrupt praetor before the courts — glory or a new enemy.','Send up a memorial of impeachment (彈劾) against a corrupt minister: glory, or a new enemy.'),()=>{
     if(G.favor<3) return; G.favor-=3; G.lastDebateDay=G.day;
     if(Math.random()<(G.office>=3?0.85:0.6)){ const fine=ri(300,700); G.coin+=fine; G.honor=clamp(G.honor+6,0,100); G.approval=clamp(G.approval+4,0,100);
-      toast('⚖ GUILTY! The praetor is stripped of office — you claim '+fine+'d of his fines (+6 honor, +4 approval).',3200); }
-    else { G.rivals++; toast('⚖ Acquitted! The praetor walks free — and now he wants your head (a new rival stirs).',3000); }
+      toast(EW('⚖ GUILTY! The praetor is stripped of office — you claim '+fine+'d of his fines (+6 honor, +4 approval).','⚖ IMPEACHED! The minister gives up his seal — '+fine+' of his fines are yours (+6 honor, +4 approval).'),3200); }
+    else { G.rivals++; toast(EW('⚖ Acquitted! The praetor walks free — and now he wants your head (a new rival stirs).','⚖ The memorial fails! The minister keeps his seal, and now he wants your head (a new rival stirs).'),3000); }
     refreshStatbar(); saveQuiet(); openIntrigue();
   }, G.favor<3);
   card.appendChild(row); b.appendChild(card);
   // ---- THE ROAD TO THE PURPLE: choose your path once retired ----
   if(G.retired && !G.path && !G.emperor){
     const pc=document.createElement('div'); pc.className='shopcard'; pc.style.borderColor='var(--gold)';
-    pc.innerHTML=`<div><b style="color:var(--gold)">⚜ CHOOSE YOUR ROAD TO THE PURPLE</b></div>
-      <div class="small muted">A retired champion must pick his weapon: the toga or the sword. The choice is forever.</div>`;
+    pc.innerHTML=EW(`<div><b style="color:var(--gold)">⚜ CHOOSE YOUR ROAD TO THE PURPLE</b></div>
+      <div class="small muted">A retired champion must pick his weapon: the toga or the sword. The choice is forever.</div>`,
+      `<div><b style="color:var(--gold)">🐉 CHOOSE YOUR ROAD TO THE THRONE</b></div>
+      <div class="small muted">The brush or the halberd: be recommended up the ladder of office until the Son of Heaven has no choice but to yield, or take the throne by force. The choice is forever.</div>`);
     const pr=document.createElement('div'); pr.className='row gap6';
-    const bp=document.createElement('button'); bp.className='btn sm gold'; bp.textContent='🏛 THE TOGA — cursus honorum';
-    bp.title='Climb the ladder of offices by election: Quaestor → Aedile → Praetor → Consul → acclaimed EMPEROR by the Senate itself.';
-    bp.onclick=()=>{ G.path='politics'; saveQuiet(); toast('You choose the toga. Win elections, climb the cursus honorum, and let the Senate hand you the purple.',3200); openIntrigue(); };
-    const bg2=document.createElement('button'); bg2.className='btn sm blood'; bg2.textContent='🗡 THE SWORD — magister militum';
-    bg2.title='Take supreme command: +15% army power, cheaper campaigns — and the purple seized by force.';
-    bg2.onclick=()=>{ G.path='general'; saveQuiet(); toast('You choose the sword. The legions hail you MAGISTER MILITUM (+15% army power) — take the purple by force.',3200); openIntrigue(); };
+    const bp=document.createElement('button'); bp.className='btn sm gold'; bp.textContent=EW('🏛 THE TOGA — cursus honorum','🖌 THE BRUSH — recommendation and office');
+    bp.title=EW('Climb the ladder of offices by election: Quaestor → Aedile → Praetor → Consul → acclaimed EMPEROR by the Senate itself.','Be recommended up the ladder (察舉): Gentleman of the Palace → Minister → Excellency → Chancellor, and then the Han abdicates to you (禪讓), as it will to Cao Pi.');
+    bp.onclick=()=>{ G.path='politics'; saveQuiet(); toast(EW('You choose the toga. Win elections, climb the cursus honorum, and let the Senate hand you the purple.','You choose the brush. Find patrons, be recommended, rise. In the end the Son of Heaven will hand you the seal himself.'),3200); openIntrigue(); };
+    const bg2=document.createElement('button'); bg2.className='btn sm blood'; bg2.textContent=EW('🗡 THE SWORD — magister militum','🗡 THE HALBERD — the warlord’s road');
+    bg2.title=EW('Take supreme command: +15% army power, cheaper campaigns — and the purple seized by force.','Take a Grand General’s command: +15% army power, cheaper campaigns. Then take the throne by force.');
+    bg2.onclick=()=>{ G.path='general'; saveQuiet(); toast(EW('You choose the sword. The legions hail you MAGISTER MILITUM (+15% army power) — take the purple by force.','You choose the halberd. The armies hail you GRAND GENERAL (+15% army power). Take the throne by force.'),3200); openIntrigue(); };
     pr.appendChild(bp); pr.appendChild(bg2); pc.appendChild(pr); b.appendChild(pc);
   }
   // ---- SENATE ELECTIONS (the toga path) ----
   if(G.path==='politics' && !G.emperor){
     const oc=document.createElement('div'); oc.className='shopcard';
-    const cur=OFFICES[G.office], next=OFFICES[G.office+1];
-    let inner=`<div><b style="color:var(--gold)">🗳 CURSUS HONORUM</b> — you are <b>${cur.name}</b>${G.office>0?` <span class="small muted">(${cur.perk})</span>`:''}</div>`;
+    const cur=officesList()[G.office], next=officesList()[G.office+1];
+    let inner=`<div><b style="color:var(--gold)">${EW('🗳 CURSUS HONORUM','🖌 仕途 THE OFFICIAL’S ROAD')}</b> — you are <b>${cur.name}</b>${G.office>0?` <span class="small muted">(${cur.perk})</span>`:''}</div>`;
     if(next){
       const keyB=keyCount()*6, sonB=G.children.filter(c=>c.sex==='m').length*3;
       const chance=clamp(Math.round(G.approval*0.6 + titlesCount()*4 + keyB + sonB + G.favor),5,95);
-      inner+=`<div class="small">Next: <b>${next.name}</b> — campaign chest <b>${next.cost}d</b> · needs ${next.needApproval} approval
+      inner+=`<div class="small">Next: <b>${next.name}</b> — ${EW('campaign chest','gifts to your patrons')} <b>${next.cost}${EW('d','')}</b> · needs ${next.needApproval} approval
         · your odds ≈ <b style="color:var(--gold)">${chance}%</b>
         <span class="muted">(approval ${G.approval} · provinces +${titlesCount()*4} · key provinces +${keyB} · sons +${sonB} · favor +${G.favor})</span></div>
         <div class="small muted">${next.perk}</div>`;
       oc.innerHTML=inner;
-      const eb=document.createElement('button'); eb.className='btn sm gold'; eb.textContent='🗳 STAND FOR '+next.name.toUpperCase()+' ('+next.cost+'d)';
+      const eb=document.createElement('button'); eb.className='btn sm gold'; eb.textContent=EW('🗳 STAND FOR '+next.name.toUpperCase()+' ('+next.cost+'d)','🖌 SEEK APPOINTMENT AS '+next.name.toUpperCase()+' ('+next.cost+')');
       eb.disabled=cool || G.coin<next.cost || G.approval<next.needApproval;
-      eb.title=G.approval<next.needApproval?'The people must approve of you first ('+next.needApproval+' approval needed).':'Campaign, canvass, and let the centuries vote.';
+      eb.title=G.approval<next.needApproval?'The people must approve of you first ('+next.needApproval+' approval needed).':EW('Campaign, canvass, and let the centuries vote.','Send gifts, find a patron to put your name forward, and let the court weigh it.');
       eb.onclick=()=>{ if(G.coin<next.cost)return; G.coin-=next.cost; G.lastDebateDay=G.day;
         if(Math.random()*100<chance){ G.office++; G.approval=clamp(G.approval+5,0,100); G.glory+=40;
-          toast('🗳 ELECTED! The centuries proclaim you '+next.name.toUpperCase()+'! ('+next.perk+')',3400); }
-        else { G.approval=clamp(G.approval-3,0,100); toast('🗳 Defeat at the polls — your rival takes '+next.name+'. The chest is spent (−3 approval).',3000); }
+          toast(EW('🗳 ELECTED! The centuries proclaim you '+next.name.toUpperCase()+'! ('+next.perk+')','🖌 APPOINTED! The edict names you '+next.name.toUpperCase()+'. ('+next.perk+')'),3400); }
+        else { G.approval=clamp(G.approval-3,0,100); toast(EW('🗳 Defeat at the polls — your rival takes '+next.name+'. The chest is spent (−3 approval).','🖌 Passed over: a rival’s patron spoke louder, and he takes '+next.name+'. The gifts are gone (−3 approval).'),3000); }
         refreshStatbar(); saveQuiet(); openIntrigue(); };
       oc.appendChild(eb);
     } else {
       const keys=keyCount(), ready = G.approval>=75 && titlesCount()>=3;
-      inner+=`<div class="small" style="color:var(--gold)">You have reached the consulship. The purple is one acclamation away:</div>
-        <div class="small muted">Needs 75 approval (you: ${G.approval}) · 3 provinces governed (you: ${titlesCount()}) · key provinces held: ${keys} ${keys?'✓ the Senate fears your granaries':''}</div>`;
+      inner+=EW(`<div class="small" style="color:var(--gold)">You have reached the consulship. The purple is one acclamation away:</div>
+        <div class="small muted">Needs 75 approval (you: ${G.approval}) · 3 provinces governed (you: ${titlesCount()}) · key provinces held: ${keys} ${keys?'✓ the Senate fears your granaries':''}</div>`,
+        `<div class="small" style="color:var(--gold)">You are Chancellor, and the Son of Heaven signs what you set before him. One edict is left to write:</div>
+        <div class="small muted">Needs 75 approval (you: ${G.approval}) · 3 provinces governed (you: ${titlesCount()}). Cao Cao will stop here all his life and leave the last step to his son.</div>`);
       oc.innerHTML=inner;
-      const ab=document.createElement('button'); ab.className='btn sm gold'; ab.textContent='⚜ SENATE ACCLAMATION — TAKE THE PURPLE';
+      const ab=document.createElement('button'); ab.className='btn sm gold'; ab.textContent=EW('⚜ SENATE ACCLAMATION — TAKE THE PURPLE','🐉 THE ABDICATION — LET THE HAN YIELD (禪讓)');
       ab.disabled=!ready;
-      ab.onclick=()=>{ G.emperor=true; G.imperialDone=true; G.approval=clamp(G.approval+10,0,100); G.legions=Math.max(6,Math.round(G.soldiers/5000)+6); G.glory+=600;
+      if(playerWorld()==='east') ab.onclick=()=>{ dynThroneFalls('shanrang'); G.glory+=600; saveQuiet(); toast('🐉 The edict of abdication is written in the emperor’s own hand. Refuse it three times, as the rite demands…',4000); openIntrigue(); };
+      else ab.onclick=()=>{ G.emperor=true; G.imperialDone=true; G.approval=clamp(G.approval+10,0,100); G.legions=Math.max(6,Math.round(G.soldiers/5000)+6); G.glory+=600;
         bumpStat('emperors'); unlock('emperor');
         saveQuiet(); toast('⚜ THE SENATE KNEELS — no war, no blood: IMPERATOR by acclamation! The purple is yours.',4000); openIntrigue(); };
       oc.appendChild(ab);
@@ -64914,6 +64941,7 @@ function buildGenerals(b){
 }
 // Imperial rule panel: public approval, legions, political rivals, retirement
 function buildRule(b){
+  if(playerWorld()==='east'){ buildRuleEast(b); return; }
   const rh=document.createElement('div'); rh.className='small'; rh.style.color='var(--gold)'; rh.style.marginTop='8px';
   rh.textContent='⚜ IMPERIAL RULE — YOU WEAR THE PURPLE:'; b.appendChild(rh);
   const rc=document.createElement('div'); rc.className='shopcard eq';
@@ -64947,6 +64975,226 @@ function buildRule(b){
   const rb=document.createElement('button'); rb.className='btn sm gold'; rb.textContent='🏛 RETIRE INTO POLITICS';
   rb.onclick=()=>retire(); ret.appendChild(rb); b.appendChild(ret);
 }
+/* =====================================================================
+   🐉 THE MANDATE CHANGES HANDS — founding a dynasty
+   ---------------------------------------------------------------------
+   How a Chinese house ended and the next began, which the game follows:
+   · 禪讓 SHANRANG, the abdication. Cao Pi will take the throne this way
+     in 220: Emperor Xian "yields" it three times, and three times it is
+     refused, before the new emperor mounts a terrace built at Fanyang
+     and accepts. Liu Xie becomes Duke of Shanyang (山陽公), keeps the Han
+     rites on his own fief, and dies fourteen years later in his bed.
+   · Or by the sword, as Liu Bang took the world from Qin and Xiang Yu.
+   · 五德 THE FIVE VIRTUES. Each dynasty rules by one of the Five Phases.
+     The Han rules by Fire (red); by the generating cycle Fire makes
+     Earth, so its heir should rule by Earth, which is yellow. The Yellow
+     Turbans sang "the Blue Heaven is dead, the Yellow Heaven shall rise";
+     Wang Mang claimed Earth in AD 9, and Cao Pi will name his first era
+     黃初 Huangchu, "Yellow Beginning". Jin will take Metal, from Wei's
+     Earth.
+   · 國號 THE DYNASTY'S NAME comes from the founder's fief or kingdom: Wei
+     (Cao Cao, Duke of Wei in 213), Jin (the Sima's fief), Wu, Shu.
+   · 年號 ERA NAMES. A reign is counted in eras, proclaimed at accession
+     and changed for omens: 青龍 Qinglong (233) for a dragon seen in a
+     well, 赤烏 Chiwu (238) for a red crow, 甘露 Ganlu for sweet dew.
+   · The Imperial Seal of the Realm, lost when Luoyang burned in 190, was
+     found in a well by Sun Jian; Yuan Shu took it and proclaimed his own
+     Zhong (仲) dynasty in 197. He was dead within two years. The
+     warning stands.
+   ===================================================================== */
+const PLOT_TARGETS_EAST=[
+  {name:'a county magnate in his walled manor (塢堡)', needSold:800,   needFav:4,  buff:1.4, reward:600,  glory:60,  enemyArmy:600},
+  {name:'the Grand Administrator of the commandery',  needSold:3000,  needFav:8,  buff:1.7, reward:1400, glory:120, enemyArmy:2500},
+  {name:'the Chancellor and the garrison at Xu',       needSold:7000,  needFav:14, buff:2.0, reward:3000, glory:220, enemyArmy:6000},
+  {name:'THE HAN THRONE — EMPEROR XIAN',               needSold:15000, needFav:24, buff:2.4, reward:8000, glory:600, enemyArmy:14000},
+];
+function plotTargets(){ return (typeof playerWorld==='function' && playerWorld()==='east')? PLOT_TARGETS_EAST : PLOT_TARGETS; }
+function EW(roman, east){ return (typeof playerWorld==='function' && playerWorld()==='east')? east : roman; }
+const OFFICES_EAST=[
+  {name:'布衣 Commoner',              cost:0,    needApproval:0,  perk:'—'},
+  {name:'郎 Gentleman of the Palace', cost:300,  needApproval:35, perk:'a stipend from the Privy Treasury: +8 after every bout'},
+  {name:'九卿 Minister of State',      cost:700,  needApproval:45, perk:'you run a ministry: +2 renown with every victory'},
+  {name:'三公 Excellency',             cost:1400, needApproval:55, perk:'the memorials pass through your hands: accusations against you seldom stand'},
+  {name:'丞相 Chancellor',             cost:2600, needApproval:65, perk:'you hold the Son of Heaven and command the lords in his name: +12% army power'},
+];
+function officesList(){ return EW(OFFICES, OFFICES_EAST); }
+
+const WUDE=[
+  {id:'earth', zh:'土', n:'Earth', col:'#c9a227', leg:12, note:'Fire makes ash and ash makes earth: the phase that follows the Han. Wang Mang claimed it in 9; the Yellow Turbans sang it; Cao Pi will claim it in 220.'},
+  {id:'metal', zh:'金', n:'Metal', col:'#d6d0c2', leg:4,  note:'White, the west, autumn. Jin will claim it from Wei’s Earth. Straight from the Han’s Fire it skips a step, and the scholars will say so.'},
+  {id:'water', zh:'水', n:'Water', col:'#2e3a4a', leg:0,  note:'Black, the north. The First Emperor’s Qin ruled by Water, by number and by law: a hard thing to claim after four hundred years of Han.'},
+  {id:'wood',  zh:'木', n:'Wood',  col:'#4f8f45', leg:2,  note:'Green, the east, spring. No great house has claimed it yet, so Heaven may find it fresh.'},
+  {id:'fire',  zh:'火', n:'Fire',  col:'#b8321e', leg:-8, liu:16, note:'The Han’s own phase. Only a Liu can claim to carry the Han on, as Liu Bei will in Shu in 221. Anyone else who claims Fire is ruling as a Han that is not one.'},
+];
+const DYN_NAMES=[
+  {zh:'魏', n:'Wei',   note:'the old state of the Central Plains, round Ye and the Yellow River. Cao Cao will be made Duke of Wei in 213.'},
+  {zh:'晉', n:'Jin',   note:'Shanxi, beyond the Taihang. The Sima will take the name in 266.'},
+  {zh:'吳', n:'Wu',    note:'the lower Yangzi, the Sun family’s country of rivers and boats.'},
+  {zh:'蜀', n:'Shu',   note:'the basin behind the passes. Gongsun Shu ruled it as Chengjia for twelve years.'},
+  {zh:'楚', n:'Chu',   note:'the great southern state: Xiang Yu’s banner, and Liu Bang’s own home.'},
+  {zh:'燕', n:'Yan',   note:'the north-east frontier, Ji and the Liao.'},
+  {zh:'趙', n:'Zhao',  note:'the plain of Hebei and old Handan, the country of horse-archers.'},
+  {zh:'齊', n:'Qi',    note:'Shandong: the sea, the salt, and the philosophers.'},
+  {zh:'秦', n:'Qin',   note:'Guanzhong behind its passes. It was the First Emperor’s name, and it still carries his weight.'},
+  {zh:'涼', n:'Liang', note:'the Gansu corridor and the horses of the west.'},
+  {zh:'越', n:'Yue',   note:'the far south, Nanhai and Jiaozhi. Zhao Tuo’s Nanyue held it for ninety years.'},
+  {zh:'周', n:'Zhou',  note:'the oldest Mandate of all. Wu Zetian will take it in 690.'},
+  {zh:'漢', n:'Han',   liu:1, note:'the Han goes on. Only a Liu may say so, as Liu Bei will.'},
+];
+const DYN_HOME={'Luoyang':'Wei','Xuchang':'Wei','Yan Province':'Wei','Ji Province':'Zhao','Qing Province':'Qi','Xu Province':'Chu','Bing Province':'Jin','Chang’an':'Qin','Liang Province':'Liang','Dunhuang':'Liang','Hanzhong':'Han','Yi Province':'Shu','Jing Province':'Chu','Wu':'Wu','Kuaiji':'Wu','Nanhai':'Yue','Jiaozhi':'Yue','Liaodong':'Yan','Wuhuan':'Yan','Xianbei Steppe':'Wei','Ordos':'Zhao'};
+const ERA_NAMES=[['黃初','Huangchu','Yellow Beginning'],['太和','Taihe','Supreme Harmony'],['建興','Jianxing','Founding Prosperity'],['黃武','Huangwu','Yellow Martial'],['章武','Zhangwu','Manifest Martial'],['泰始','Taishi','Grand Beginning'],['永安','Yong’an','Lasting Peace'],['天命','Tianming','Heaven’s Mandate'],['神鳳','Shenfeng','Divine Phoenix'],['甘露','Ganlu','Sweet Dew'],['赤烏','Chiwu','Red Crow'],['青龍','Qinglong','Azure Dragon'],['嘉禾','Jiahe','Auspicious Grain'],['景初','Jingchu','Radiant Beginning']];
+const DYN_CAPS=[['Luoyang','洛陽',112.45,34.68,'the Eastern Capital: burned in 190, half rebuilt'],['Chang’an','長安',108.94,34.26,'the Western Capital of Gaozu, behind the passes'],['Xu','許',113.85,34.03,'where the Emperor is kept this year'],['Ye','鄴',114.35,36.33,'Yuan Shao’s seat, and Cao Cao’s after him'],['Jianye','建業',118.78,32.05,'the Yangzi city the Sun family will build'],['Chengdu','成都',104.07,30.66,'the city of brocade in the western basin'],['Xiangyang','襄陽',112.14,32.04,'Liu Biao’s river fortress'],['Ji','薊',116.4,39.9,'the old capital of Yan, on the northern frontier']];
+const DYN_SEL={};                       // the choices being made on the founding card (not saved until proclaimed)
+function dynLiu(){ const n=(G && (G.name||''))+''; return /\bLiu\b/i.test(n) || /^Liu/i.test(n) || (G.family && /Liu/.test(G.family.surname||'')); }
+function dynKey(){ const D=G && G.dynasty; return D? (D.n+'|'+D.col+'|'+D.cap+'|'+D.era[0]) : 'han'; }
+function dynEraYear(){ const D=G && G.dynasty; if(!D) return 0; return 1+Math.floor(Math.max(0,(G.day||0)-(D.eraDay||D.day||0))/120); }   // the game keeps a short calendar: a hundred and twenty days to the year
+function dynMix(a,b,t){ const h=x=>[parseInt(x.slice(1,3),16),parseInt(x.slice(3,5),16),parseInt(x.slice(5,7),16)]; const A=h(a), B=h(b); return '#'+A.map((v,i)=>Math.round(v+(B[i]-v)*t).toString(16).padStart(2,'0')).join(''); }
+function asiaPolC(P){ const D=G && G.dynasty; return (D && P.han)? dynMix(P.c, D.col, 0.62) : P.c; }
+function mapStaleAll(){ try{ for(const k in _ASIA_CVS) delete _ASIA_CVS[k]; _ASIA_CV=null; }catch(e){} try{ for(const k in MAP_HI) if(k!=='pending') delete MAP_HI[k]; }catch(e){} try{ _mapStatic=null; _mapStaticKey=''; }catch(e){} }
+
+/* the throne has fallen: the Han emperor is in your hands, the dynasty not yet named */
+function dynThroneFalls(how){ G.pendingDynasty={how:how}; G.imperialDone=true; G.emperor=true; G.approval=Math.max(G.approval||0,50); G.legions=Math.max(6,Math.round((G.soldiers||0)/5000)+6); G.rivals=Math.max(G.rivals||0,2);
+  try{ bumpStat('emperors'); unlock('emperor'); }catch(e){} }
+
+function buildFounding(b){
+  const how=G.pendingDynasty.how, liu=dynLiu();
+  const S=DYN_SEL; if(!S.n){ const home=DYN_HOME[G.current] || 'Wei'; S.n=liu? 'Han' : (home==='Han'? 'Wei' : home); S.custom=''; S.ph=(liu && S.n==='Han')? 'fire' : 'earth'; S.era=0; S.cap=0; S.fate='duke'; }
+  const hd=document.createElement('div'); hd.className='small'; hd.style.color='var(--gold)'; hd.style.marginTop='8px';
+  hd.textContent='🐉 THE MANDATE PASSES — NAME YOUR DYNASTY'; b.appendChild(hd);
+  const card=document.createElement('div'); card.className='shopcard eq'; card.style.borderColor='var(--gold)';
+  const intro = how==='shanrang'
+    ? 'Three times the Son of Heaven has sent you the seal and the edict of abdication, and three times, as the rite demands, you have refused. The fourth time you accept. A terrace of beaten earth is raised outside the city for you to mount. Four hundred and six years of Han end with a sacrifice and a change of robes.'
+    : 'The palace guard has thrown down its halberds and the Han emperor waits in the hall, with no one left who will die for him. The court has shaved its old loyalties overnight. Before the ministers can kneel, they need a name to kneel to.';
+  card.innerHTML=`<div class="small">${intro}</div>`;
+  const sec=(t)=>{ const d=document.createElement('div'); d.className='small'; d.style.cssText='color:var(--gold);margin-top:7px'; d.textContent=t; card.appendChild(d); const r=document.createElement('div'); r.className='row gap6'; r.style.cssText='flex-wrap:wrap;margin-top:3px'; card.appendChild(r); return r; };
+  const chip=(row,label,on,title,fn,sw)=>{ const bt=document.createElement('button'); bt.className='btn sm'+(on?' gold':''); bt.innerHTML=(sw? `<span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:${sw};margin-right:4px;vertical-align:-1px;border:1px solid rgba(0,0,0,.4)"></span>` : '')+label; bt.title=title||''; bt.onclick=()=>{ fn(); openIntrigue(); }; row.appendChild(bt); return bt; };
+  // the name
+  const r1=sec('國號 THE NAME OF THE HOUSE — taken from a kingdom of old:');
+  DYN_NAMES.filter(d=>!d.liu || liu).forEach(d=>chip(r1, d.zh+' '+d.n, !S.custom && S.n===d.n, d.note, ()=>{ S.n=d.n; S.custom=''; }));
+  const inp=document.createElement('input'); inp.type='text'; inp.maxLength=12; inp.placeholder='or your own…'; inp.value=S.custom||''; inp.style.cssText='width:110px;font:inherit;font-size:11px;padding:2px 4px;background:#1a120b;color:#f0e0c0;border:1px solid #6a5030';
+  inp.onchange=()=>{ S.custom=inp.value.replace(/[^A-Za-z’' \-]/g,'').trim().slice(0,12); openIntrigue(); }; r1.appendChild(inp);
+  const dn=S.custom? {zh:'', n:S.custom, note:'a name of your own making: Heaven will have to get used to it.'} : (DYN_NAMES.find(d=>d.n===S.n)||DYN_NAMES[0]);
+  const nn=document.createElement('div'); nn.className='small muted'; nn.textContent=(dn.zh? dn.zh+' '+dn.n : dn.n)+': '+dn.note; card.appendChild(nn);
+  // the virtue
+  const r2=sec('五德 THE VIRTUE IT RULES BY, which sets its colour on the map:');
+  WUDE.forEach(p=>chip(r2, p.zh+' '+p.n, S.ph===p.id, p.note, ()=>{ S.ph=p.id; }, p.col));
+  const ph=WUDE.find(p=>p.id===S.ph)||WUDE[0];
+  const pn=document.createElement('div'); pn.className='small muted'; pn.textContent=ph.note+(ph.id==='fire'? (liu? ' You are a Liu: the claim will hold.' : ' You are no Liu, and everyone knows it.') : ''); card.appendChild(pn);
+  // the era
+  const r3=sec('年號 THE FIRST ERA NAME, by which the years will be counted:');
+  ERA_NAMES.slice(0,10).forEach((e,i)=>chip(r3, e[0]+' '+e[1], S.era===i, '“'+e[2]+'”', ()=>{ S.era=i; }));
+  // the capital
+  const r4=sec('都 THE CAPITAL:');
+  DYN_CAPS.forEach((cp,i)=>chip(r4, cp[1]+' '+cp[0], S.cap===i, cp[4], ()=>{ S.cap=i; }));
+  // the last Han emperor
+  if(how!=='shanrang'){
+    const r5=sec('THE LAST HAN EMPEROR, Liu Xie, nineteen years old:');
+    chip(r5,'山陽公 Make him Duke of Shanyang', S.fate==='duke', 'A fief of ten thousand households, the Han rites kept on it, and his own daughters married into your house. It is how Cao Pi will do it. (+legitimacy)', ()=>{ S.fate='duke'; });
+    chip(r5,'Let him “fall ill”', S.fate==='ill', 'Dead men raise no loyalists. But every Liu in the empire will hear of it. (−honor, more pretenders)', ()=>{ S.fate='ill'; });
+  }
+  const pv=document.createElement('div'); pv.className='small'; pv.style.marginTop='8px';
+  const era=ERA_NAMES[S.era], cap=DYN_CAPS[S.cap];
+  pv.innerHTML=`Proclaim: <b style="color:${ph.col==='#2e3a4a'?'#9fb4cc':ph.col}">${dn.zh? dn.zh+' ':''}${dn.n.toUpperCase()}</b>, ruling by ${ph.zh} ${ph.n}, from ${cap[1]} ${cap[0]}, in the first year of ${era[0]} ${era[1]} (“${era[2]}”).`;
+  card.appendChild(pv);
+  const go=document.createElement('button'); go.className='btn gold'; go.style.marginTop='6px'; go.textContent='🐉 MOUNT THE TERRACE — PROCLAIM THE '+dn.n.toUpperCase();
+  go.onclick=()=>proclaimDynasty(); card.appendChild(go);
+  b.appendChild(card);
+}
+function proclaimDynasty(){
+  const S=DYN_SEL, how=(G.pendingDynasty||{}).how||'sword', liu=dynLiu();
+  const dn=S.custom? {zh:'', n:S.custom} : (DYN_NAMES.find(d=>d.n===S.n)||DYN_NAMES[0]);
+  const ph=WUDE.find(p=>p.id===S.ph)||WUDE[0], era=ERA_NAMES[S.era||0], cap=DYN_CAPS[S.cap||0];
+  const fate = how==='shanrang'? 'duke' : (S.fate||'duke');
+  let legit = ph.leg + (ph.id==='fire' && liu? ph.liu : 0) + (how==='shanrang'? 15 : 0) + (fate==='duke'? 6 : -10) + (dn.n==='Han' && liu? 8 : 0);
+  G.dynasty={zh:dn.zh, n:dn.n, ph:ph.id, col:ph.col, era:era.slice(), eras:[era[0]], cap:cap[0], capZh:cap[1], capL:[cap[2],cap[3]], how:how, fate:fate, day:G.day||0, eraDay:G.day||0, legit:legit};
+  delete G.pendingDynasty; for(const k in DYN_SEL) delete DYN_SEL[k];
+  G.emperor=true; G.approval=clamp(50+legit,10,100); G.glory=(G.glory||0)+800;
+  G.rivals=Math.max(1, (how==='sword'? 2 : 1) + (fate==='ill'? 2 : 0) - (ph.id==='earth'? 1 : 0));
+  if(fate==='ill') G.honor=clamp((G.honor||50)-15,0,100);
+  mapStaleAll(); saveQuiet(); refreshStatbar();
+  toast('🐉 '+(dn.zh? dn.zh+' ':'')+dn.n.toUpperCase()+' — the first year of '+era[0]+' '+era[1]+'. Ten thousand years to the Son of Heaven!',4600);
+  openIntrigue();
+}
+/* ruling the new house */
+function buildRuleEast(b){
+  if(G.pendingDynasty){ buildFounding(b); return; }
+  const D=G.dynasty;
+  const rh=document.createElement('div'); rh.className='small'; rh.style.color='var(--gold)'; rh.style.marginTop='8px';
+  rh.textContent='🐉 THE MANDATE — YOU ARE THE SON OF HEAVEN:'; b.appendChild(rh);
+  const rc=document.createElement('div'); rc.className='shopcard eq';
+  const ph=D? (WUDE.find(p=>p.id===D.ph)||WUDE[0]) : null, ey=dynEraYear();
+  rc.innerHTML= D? `<div><b style="color:${D.col==='#2e3a4a'?'#9fb4cc':D.col}">${D.zh? D.zh+' ':''}${D.n.toUpperCase()}</b> · the ${ey===1?'first':ey===2?'second':ey===3?'third':ey+'th'} year of ${D.era[0]} ${D.era[1]} (“${D.era[2]}”)</div>
+      <div class="small">Ruling by ${ph.zh} ${ph.n} · capital ${D.capZh} ${D.cap} · ${D.how==='shanrang'? 'by the abdication of the Han' : 'by the sword'} · ${D.fate==='duke'? 'the last Han emperor lives on as Duke of Shanyang' : 'the last Han emperor is dead'}</div>`
+    : `<div><b style="color:var(--gold)">Son of Heaven ${G.name}</b></div>`;
+  rc.innerHTML+=`<div>民心 The people’s hearts: <b>${G.approval}/100</b> · Armies: <b>${G.legions}</b> (${fmt(G.legions*5000)} men) · Pretenders: <b style="color:var(--blood)">${G.rivals}</b></div>
+    <div class="bar" style="margin-top:4px"><i style="width:${G.approval}%;height:100%;background:linear-gradient(90deg,#8a1d1d,#e8c34a,#5b7a32)"></i></div>
+    <div class="small muted">${G.approval<25?'Heaven is sending omens and the scholars are reading them aloud. A rising is near.':G.approval<55?'The commanderies watch to see whether the Mandate holds.':'The empire believes Heaven has chosen well.'}</div>`;
+  b.appendChild(rc);
+  const acts=document.createElement('div'); acts.className='shopcard';
+  acts.innerHTML='<div class="small" style="color:var(--gold)">EDICTS:</div>';
+  const arow=document.createElement('div'); arow.className='row gap6'; arow.style.cssText='margin-top:4px;flex-wrap:wrap';
+  const ed=(label,title,cost,dis,fn)=>{ const bt=document.createElement('button'); bt.className='btn sm'; bt.textContent=label; bt.title=title; bt.disabled=dis || (cost>0 && G.coin<cost); bt.onclick=()=>{ if(cost>0 && G.coin<cost) return; if(cost>0) G.coin-=cost; fn(); refreshStatbar(); saveQuiet(); openIntrigue(); }; arow.appendChild(bt); };
+  ed('🎋 Sacrifice to Heaven at the Round Altar (600, +hearts)','The suburban sacrifice (郊祀) at the winter solstice: the emperor alone may make it, and the empire watches him make it.',600,false,()=>{ G.approval=clamp(G.approval+14,0,100); toast('The smoke goes straight up. The omen-readers are pleased.'); });
+  ed('🌾 Open the Ever-Normal Granaries (300, +hearts)','Grain bought cheap at harvest and sold cheap in famine (常平倉). The Han invented it, and it works.',300,false,()=>{ G.approval=clamp(G.approval+7,0,100); toast('Grain at the old price. The markets go quiet.'); });
+  ed('🌱 Military farms — 屯田 (800, +1 army)','Cao Cao began it in 196: soldiers settled on abandoned land, farming it in peace and fighting from it in war. Within a few years the granaries of Xu were full.',800,false,()=>{ G.legions++; G.approval=clamp(G.approval+3,0,100); toast('Another army ploughs the abandoned fields of Yu, and eats its own grain.'); });
+  ed('⚖ The Nine Ranks — 九品中正 (1,000, −1 pretender)','Chen Qun will propose it in 220: in every commandery an Impartial Judge grades its gentlemen into nine ranks for office. The great families love it, because it is they who will be graded first.',1000,false,()=>{ G.rivals=Math.max(0,G.rivals-1); G.approval=clamp(G.approval+4,0,100); toast('The great families have their ranks now, and an interest in your dynasty lasting.'); });
+  const canEra = D && ((G.day||0)-(D.eraDay||0))>=120;
+  ed('📜 Proclaim a new era — 改元 (400)','A dragon in a well, sweet dew on the palace trees, a red crow at the gate: a new era marks Heaven’s favour. It can be proclaimed once a year.',400,!canEra,()=>{ const used=new Set(D.eras||[]), nx=ERA_NAMES.find(e=>!used.has(e[0]))||ERA_NAMES[0]; D.era=nx.slice(); D.eras=(D.eras||[]).concat([nx[0]]); D.eraDay=G.day||0; G.approval=clamp(G.approval+6,0,100); mapStaleAll(); toast('📜 The first year of '+nx[0]+' '+nx[1]+', “'+nx[2]+'”. The calendars are recopied.',3400); });
+  ed('💰 Levy the household tax (+1,200, −hearts)','Counted by household, in cloth and grain. The commanderies pay it and remember that they did.',0,false,()=>{ G.coin+=1200; G.approval=clamp(G.approval-10,0,100); toast('The treasury fills. The commanderies grumble.'); });
+  acts.appendChild(arow); b.appendChild(acts);
+  if(G.rivals>0){
+    const rv=document.createElement('div'); rv.className='shopcard';
+    rv.innerHTML=`<div><b style="color:var(--blood)">${D && D.fate==='ill'? 'A Liu kinsman swears to avenge his emperor.' : 'A pretender says the Mandate is still his.'}</b> Meet ${G.rivals>1?'the boldest of them':'him'} with the sword and end the claim.</div>`;
+    const bt=document.createElement('button'); bt.className='btn sm blood'; bt.textContent='⚔ CRUSH THE PRETENDER';
+    bt.onclick=()=>startRival(); rv.appendChild(bt); b.appendChild(rv);
+  }
+  const ret=document.createElement('div'); ret.className='shopcard';
+  ret.innerHTML='<div class="small muted">Leave the armies to your generals and rule from behind the screens of the inner palace.</div>';
+  const rb=document.createElement('button'); rb.className='btn sm gold'; rb.textContent='🏯 RULE FROM THE INNER PALACE';
+  rb.onclick=()=>retire(); ret.appendChild(rb); b.appendChild(ret);
+}
+
+/* =====================================================================
+   ⚜ THE BREAKAWAY EMPIRE — the Roman way of founding a nation
+   ---------------------------------------------------------------------
+   Rome's governors held armies, and sometimes they kept them. Clodius
+   Albinus took Gaul and Britain against Severus and died at Lugdunum in
+   197; Severus rode his horse over the body. Pescennius Niger tried it
+   from Antioch in 193. Later, Postumus will proclaim an Imperium Galliarum
+   at Colonia in 260, with its own consuls and its own senate, and it
+   will last fourteen years. Zenobia will take Egypt and Asia from
+   Palmyra, and Carausius, a Menapian pilot, will rule Britain from 286
+   and strike coins calling himself its Restorer.
+   ===================================================================== */
+const WREALMS=[
+  {n:'Imperium Galliarum',    col:'#3f6fb0', note:'Postumus will proclaim it at Colonia in 260, with its own consuls and its own senate at Treveri. It will last fourteen years.'},
+  {n:'Imperium Britanniarum', col:'#2f8a7a', note:'Carausius will rule Britain from 286 and strike silver as RESTITVTOR BRITANNIAE.'},
+  {n:'Imperium Orientis',     col:'#7a3fa0', note:'Pescennius Niger tried it from Antioch in 193, and Avidius Cassius in 175. Severus remembers both.'},
+  {n:'Regnum Palmyrenum',     col:'#b8661e', note:'Zenobia will take Egypt and Asia from the caravan city in 270 and call her son Augustus.'},
+  {n:'Imperium Hispaniarum',  col:'#a0302a', note:'No one has tried it yet. The silver of the Sierra Morena would pay for it.'},
+  {n:'Regnum Africae',        col:'#c9a227', note:'Gildo will hold Africa’s grain over Rome’s head in 397. Whoever holds Carthage holds the bread of the city.'},
+];
+const WREALM_SEL={};
+function buildRealmCard(b){
+  if(G.realm){ const R=G.realm; const c2=document.createElement('div'); c2.className='shopcard eq'; c2.style.borderColor=R.col;
+    c2.innerHTML=`<div><b style="color:${R.col}">⚜ ${R.n.toUpperCase()}</b>, a realm of your own, from ${R.cap}</div><div class="small muted">${titlesCount()} provinces answer to you and not to Rome. Severus will come, as he came for Albinus. Overthrow him and the two empires become one again under you.</div>`;
+    b.appendChild(c2); return; }
+  if(titlesCount()<3) return;
+  const S=WREALM_SEL; const held=Object.keys(G.titles||{}); if(S.i===undefined){ const has=(re)=>held.some(h=>re.test(h)); S.i=has(/Gallia/)? 0 : has(/Britannia/)? 1 : has(/Syria|Aegyptus|Asia|Mesopotamia/)? 2 : has(/Hispania/)? 4 : has(/Africa/)? 5 : 0; S.cap=held.includes(G.current)? G.current : held[0]; }
+  if(!held.includes(S.cap)) S.cap=held[0];
+  const hd=document.createElement('div'); hd.className='small'; hd.style.cssText='color:var(--gold);margin-top:6px'; hd.textContent='⚜ OR KEEP WHAT YOU HOLD — PROCLAIM A BREAKAWAY EMPIRE:'; b.appendChild(hd);
+  const card=document.createElement('div'); card.className='shopcard';
+  card.innerHTML=`<div class="small">You hold ${held.length} provinces and their legions. Clodius Albinus held Gaul and Britain three years ago, and Severus rode his horse over his body at Lugdunum. It has been done before, and it has failed before.</div>`;
+  const row=(t)=>{ const d=document.createElement('div'); d.className='small'; d.style.cssText='color:var(--gold);margin-top:5px'; d.textContent=t; card.appendChild(d); const r=document.createElement('div'); r.className='row gap6'; r.style.cssText='flex-wrap:wrap;margin-top:3px'; card.appendChild(r); return r; };
+  const r1=row('THE NAME:'); WREALMS.forEach((R,i)=>{ const bt=document.createElement('button'); bt.className='btn sm'+(S.i===i?' gold':''); bt.innerHTML=`<span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:${R.col};margin-right:4px;vertical-align:-1px"></span>${R.n}`; bt.title=R.note; bt.onclick=()=>{ S.i=i; openIntrigue(); }; r1.appendChild(bt); });
+  const nn=document.createElement('div'); nn.className='small muted'; nn.textContent=WREALMS[S.i].note; card.appendChild(nn);
+  const r2=row('THE CAPITAL:'); held.forEach(h=>{ const bt=document.createElement('button'); bt.className='btn sm'+(S.cap===h?' gold':''); bt.textContent=h; bt.onclick=()=>{ S.cap=h; openIntrigue(); }; r2.appendChild(bt); });
+  const go=document.createElement('button'); go.className='btn blood'; go.style.marginTop='6px'; go.textContent='⚜ PROCLAIM THE '+WREALMS[S.i].n.toUpperCase();
+  go.title='Your provinces become a realm with its own colour on the map. Rome will treat it as rebellion: more rivals, and Severus is still the last target of the Grand Plot.';
+  go.onclick=()=>{ const R=WREALMS[S.i]; G.realm={n:R.n, col:R.col, cap:S.cap, day:G.day||0}; G.rivals=(G.rivals||0)+2; G.legions=Math.max(G.legions||0, held.length*2); G.glory=(G.glory||0)+300; G.approval=clamp((G.approval||50)+5,0,100);
+    for(const k in WREALM_SEL) delete WREALM_SEL[k]; mapStaleAll(); saveQuiet(); refreshStatbar(); toast('⚜ '+R.n.toUpperCase()+'! The legions of '+S.cap+' hail you Augustus. Rome calls it rebellion.',4200); openIntrigue(); };
+  card.appendChild(go); b.appendChild(card);
+}
 function startSiege(el,idx){
   G.siegeIdx=idx; // remember which target to consume on win
   startFight(((typeof regionAny==='function')? regionAny(G.current) : REGION_BY_ID[G.current]) || REGIONS[0], {siege:el});
@@ -64959,32 +65207,33 @@ function launchConquest(toId,size,generalIdx){
   const gen=G.generals[generalIdx]; if(!gen){ toast('Appoint a general to lead the conquest.'); return; }
   size=Math.min(size, G.soldiers);
   if(size<500){ toast('A conquest needs at least 500 men.'); return; }
-  const reg=REGION_BY_ID[toId];
+  const reg=regionAny(toId)||{tier:2};
   const cost=Math.round(size*0.12 + travelCost(G.current,toId).dist*3);
-  if(G.coin<cost){ toast('Not enough denarii to supply the campaign ('+cost+'d).'); return; }
+  if(G.coin<cost){ toast('Not enough '+currencyHere().name+' to supply the campaign ('+coinShortStr(cost)+').'); return; }
   G.coin-=cost; G.soldiers-=size; syncArmy();
   const enemyMen=Math.round((1500+reg.tier*2200)*rnd(0.85,1.15));
   armyBattle({ title:'BATTLE FOR '+toId.toUpperCase(), sub:'led by '+gen.name+' — '+gen.label, enemyName:'GARRISON',
     kind: reg.tier>=3? 'siege':'field',
     yourMen:size, enemyMen, general:gen,
-    onWin:(yl)=>{ addTroops('levy', Math.max(0,size-yl)); G.titles[toId]=REGION_TITLES[toId]||('Dominus '+toId);
+    onWin:(yl)=>{ addTroops('levy', Math.max(0,size-yl)); G.titles[toId]=regionTitle(toId);
       G.pop=clamp(G.pop+5,0,100); saveQuiet(); toast('★ '+toId+' is YOURS — you are proclaimed '+G.titles[toId]+'! ('+fmt(yl)+' fallen)',3200); openIntrigue(); },
     onLose:(yl)=>{ addTroops('levy', Math.max(0,size-yl)); if(!gen.son && Math.random()<0.4){ const gi=G.generals.indexOf(gen); if(gi>=0) G.generals.splice(gi,1); }
       saveQuiet(); toast('The assault on '+toId+' is thrown back — '+fmt(yl)+' lost.'+(gen.son?' Your son cuts his way clear — blood does not break.':''),3000); openIntrigue(); } });
 }
 function startPlot(){
-  const t=PLOT_TARGETS[G.plotTier];
+  const t=plotTargets()[G.plotTier];
   const gen=G.generals[0]||null;
   const size=G.soldiers;
   armyBattle({ title:'OVERTHROW — '+t.name.toUpperCase(), sub:gen?('led by '+gen.name+' — '+gen.label):'you lead the assault yourself', enemyName:'LOYALISTS',
     kind: G.plotTier===0? 'ambush' : (G.plotTier>=3? 'siege':'field'),
     yourMen:size, enemyMen:t.enemyArmy, general:gen,
     onWin:(yl)=>{ G.soldiers=Math.max(0,G.soldiers-yl); syncArmy(); G.coin+=t.reward; G.glory+=t.glory; G.pop=clamp(G.pop+15,0,100); G.honor=clamp(G.honor-8,0,100); G.plotTier++; G.wins++;
-      const champ=G.plotTier>=PLOT_TARGETS.length; if(champ){ G.imperialDone=true; G.emperor=true; G.approval=60; G.legions=Math.max(6,Math.round(G.soldiers/5000)+6); G.rivals=2; bumpStat('emperors'); unlock('emperor'); }
-      saveQuiet(); toast(champ?'THE EMPEROR IS SLAIN — the purple is YOURS!':'You have toppled '+t.name+'! (+'+fmt(t.reward)+'d, +'+t.glory+' glory)',3400); openIntrigue(); },
+      const champ=G.plotTier>=plotTargets().length; if(champ && playerWorld()==='east') dynThroneFalls('sword'); else if(champ){ G.imperialDone=true; G.emperor=true; G.approval=60; G.legions=Math.max(6,Math.round(G.soldiers/5000)+6); G.rivals=2; bumpStat('emperors'); unlock('emperor'); }
+      saveQuiet(); toast(champ?EW('THE EMPEROR IS SLAIN — the purple is YOURS!','THE HAN THRONE FALLS — name your dynasty!'):'You have toppled '+t.name+'! (+'+fmt(t.reward)+'d, +'+t.glory+' glory)',3400); openIntrigue(); },
     onLose:(yl)=>{ G.soldiers=Math.max(0,G.soldiers-yl); syncArmy(); G.honor=clamp(G.honor-6,0,100); G.losses++; saveQuiet(); toast('The overthrow of '+t.name+' is crushed — '+fmt(yl)+' lost.',3200); openIntrigue(); } });
 }
 function startRival(){
+  if(playerWorld()==='east'){ const r=(typeof regionAny==='function' && regionAny(G.current)) || REGIONS_EAST[0]; startFight(r,{rival:true}); toast(G.emperor? 'A pretender’s champion comes for the Son of Heaven…' : 'A rival lord sends his best swordsman to settle the matter…',2000); return; }
   startFight(REGION_BY_ID['Italia'],{rival:true});
   toast('A rival senator draws steel to seize your throne…',2000);
 }
@@ -66663,6 +66912,9 @@ const TITLES_EAST=[
    has:()=>true},
 ];
 TITLES_EAST.forEach(t=>{ TITLES.push(t); TITLE_BY_ID[t.id]=t; });
+/* the Son of Heaven of a house you founded is the emperor of that house */
+try{ const _tz=TITLE_BY_ID['e_tianzi']; Object.defineProperty(_tz,'en',{configurable:true, get(){ const D=(typeof G!=='undefined' && G)? G.dynasty : null; return D? 'Son of Heaven: Emperor of '+(D.zh? D.zh+' ' : '')+D.n+', in the era '+D.era[1] : 'Son of Heaven: the Emperor'; }});
+  const _wg=TITLE_BY_ID['e_wang']; Object.defineProperty(_wg,'note',{configurable:true, get(){ const D=(typeof G!=='undefined' && G)? G.dynasty : null; return D? 'Now the kings are your own sons, enfeoffed, and watched.' : 'Since Liu Bang, only the imperial clan is made king. Cao Cao will break that rule in 216 and take Wei.'; }}); }catch(e){}
 /* which registry is yours: the Han's in the east, Rome's everywhere it was before */
 function titleWorldOk(t){ let w='west'; try{ w=playerWorld(); }catch(e){}
   if(t.ice) return w==='ice'; if(w==='ice') return false;
@@ -71306,7 +71558,7 @@ function asiaRamp(h,lat){ const snow=0.93-Math.max(0,lat-30)*0.004;
   return S; }
 const _ASIA_CVS={};
 function asiaStatic(SS){
-  SS=SS||3; if(_ASIA_CVS[SS]) return _ASIA_CVS[SS];
+  SS=SS||3; const _AK=SS+'|'+dynKey(); if(_ASIA_CVS[_AK]) return _ASIA_CVS[_AK];
   const S=SS, w=480, h=216, W=w*S, H=h*S, Pj=MAP_EAST_PROJ, Q=lonlatE, kx=w/(Pj.lonE-Pj.lonW);
   const cv=document.createElement('canvas'); cv.width=W; cv.height=H; const c=cv.getContext('2d'); c.setTransform(S,0,0,S,0,0); c.lineJoin='round'; c.lineCap='round';
   const ring=(P,r,flat)=>{ if(flat){ let q=Q(r[0],r[1]); P.moveTo(q[0],q[1]); for(let i=2;i<r.length;i+=2){ q=Q(r[i],r[i+1]); P.lineTo(q[0],q[1]); } } else { let q=Q(r[0][0],r[0][1]); P.moveTo(q[0],q[1]); for(let i=1;i<r.length;i++){ q=Q(r[i][0],r[i][1]); P.lineTo(q[0],q[1]); } } P.closePath(); };
@@ -71363,8 +71615,8 @@ function asiaStatic(SS){
   for(let lo=40;lo<=150;lo+=10){ const a=Q(lo,Pj.latS); c.fillText(lo+'°E',a[0]+0.6,h-1.2); } for(let la=10;la<=50;la+=10){ const a=Q(Pj.lonW,la); c.fillText(la+'°N',1.2,a[1]-0.6); } c.restore();
   /* ---------------- 3 · THE PEOPLES: a colour wash for each, a band inside its border, and the border ---------------- */
   c.save(); c.clip(land,'evenodd');
-  for(const P of ASIA_POL){ const pp=polyP(P.p); c.globalAlpha=P.han? 0.40 : 0.36; c.fillStyle=P.c; c.fill(pp); c.globalAlpha=1; }
-  for(const P of ASIA_POL){ const pp=polyP(P.p); c.save(); c.clip(pp); c.strokeStyle=P.c; c.globalAlpha=0.55; c.lineWidth=2.4; c.stroke(pp); c.restore(); }
+  for(const P of ASIA_POL){ const pp=polyP(P.p); c.globalAlpha=P.han? 0.40 : 0.36; c.fillStyle=asiaPolC(P); c.fill(pp); c.globalAlpha=1; }
+  for(const P of ASIA_POL){ const pp=polyP(P.p); c.save(); c.clip(pp); c.strokeStyle=asiaPolC(P); c.globalAlpha=0.55; c.lineWidth=2.4; c.stroke(pp); c.restore(); }
   for(const P of ASIA_POL){ if(!P.n) continue; const pp=polyP(P.p); c.strokeStyle=shade(P.c,-70); c.globalAlpha=0.75; c.lineWidth=P.han? 0.32 : 0.4; if(P.dash||P.han) c.setLineDash(P.han? [1.6,0.9] : [2,1.2]); c.stroke(pp); c.setLineDash([]); c.globalAlpha=1; }
   /* the Han, one empire on paper: its outer frontier in a firm line over the eight warlord domains */
   { const HAN_OUTER=[[93,40.5],[94.5,41],[96.5,40.5],[98.5,40],[100.5,39.5],[102.5,38.8],[104,38],[105.5,37.6],[107,37.5],[108.6,37.2],[110.4,36.6],[110.6,38.5],[111,40],[110.5,41],[112,41.5],[114,41.5],[116,41.8],[118,41.2],[119.5,40.2],[121,41.6],[122.5,42.6],[124,42.5],[125,41.3],[124.4,40.1],[125.6,40.3],[126.8,39.6],[127.1,38.6],[126.6,37.8],[125.6,37.6],[124.8,38.1],[124,37],[123,33],[123,29],[121,26],[118.5,23],[112,20.4],[108.6,20.2],[107.2,18.6],[107,17.4],[105.6,17.2],[104.6,18.6],[103.6,20],[103,21.5],[104.5,22.8],[103.8,25],[102.2,25.4],[101.2,26.6],[101.8,28.8],[101,30.2],[100.8,31.6],[101.5,32.5],[103,33.5],[104,34.5],[103,35.5],[102,36.4],[100.5,37.6],[98.8,38.8],[96.8,39.3],[95,39.5],[93.5,39.6]];
@@ -71408,6 +71660,11 @@ function asiaStatic(SS){
   try{ if(!EAST_PIN_POS[REGIONS_EAST[0].id]) layoutEastPins(); for(const id in EAST_PIN_POS){ const P=EAST_PIN_POS[id]; BOX.push([P.x-P.hw-0.4,P.y-P.hh-0.4,P.x+P.hw+0.4,P.y+P.hh+0.4]); BOX.push([P.ax-1.2,P.ay-1.2,P.ax+1.2,P.ay+1.2]); } }catch(e){}
   const PINS=BOX.length;
   /* the cities that are not a province's own seat: a dot, and a name beside it where a name fits */
+  /* the new house's capital: a star in its colour */
+  const _DS=G && G.dynasty;
+  if(_DS && _DS.capL){ const _D=_DS, q=Q(_D.capL[0],_D.capL[1]); c.save(); c.translate(q[0],q[1]); c.beginPath(); for(let i=0;i<10;i++){ const r=i%2? 0.75 : 1.9, a=-Math.PI/2+i*Math.PI/5; c.lineTo(Math.cos(a)*r,Math.sin(a)*r); } c.closePath();
+    c.fillStyle=_D.col; c.fill(); c.strokeStyle='#2a1c12'; c.lineWidth=0.3; c.stroke(); c.restore(); BOX.push([q[0]-2,q[1]-2,q[0]+2,q[1]+2]);
+    const nm=_D.capZh+' '+_D.cap.toUpperCase(); c.font='bold 2.4px Georgia,serif'; c.textAlign='left'; c.lineWidth=0.6; c.strokeStyle='rgba(255,250,240,.85)'; c.strokeText(nm,q[0]+2.2,q[1]-1.1); c.fillStyle='#3a2414'; c.fillText(nm,q[0]+2.2,q[1]-1.1); BOX.push([q[0]+2,q[1]-3.2,q[0]+2.4+nm.length*1.5,q[1]-0.4]); }
   /* the detailed sheet carries the year's battles, crossed swords and a date */
   if(S>=6) ASIA_BATTLES.forEach(([n,lo,la,sd,dy])=>{ const q=Q(lo,la); c.save(); c.strokeStyle='#8a1a12'; c.lineWidth=0.35; c.beginPath(); c.moveTo(q[0]-1,q[1]-1); c.lineTo(q[0]+1,q[1]+1); c.moveTo(q[0]+1,q[1]-1); c.lineTo(q[0]-1,q[1]+1); c.stroke(); c.restore();
     c.font='italic bold 1.6px Georgia,serif'; const lx=q[0]+1.3*sd, ly=q[1]+dy, tw=c.measureText(n).width; c.textAlign=sd>0? 'left' : 'right'; c.lineWidth=0.4; c.strokeStyle='rgba(255,250,240,.8)'; c.strokeText(n,lx,ly); c.fillStyle='#8a1a12'; c.fillText(n,lx,ly);
@@ -71420,8 +71677,10 @@ function asiaStatic(SS){
   /* the peoples: biggest first, each looking for the clear spot nearest its own heart and still inside its own border */
   const OFFS=[]; for(let r=0;r<=10;r+=0.5) for(let k=0;k<Math.max(1,Math.round(r*2.4));k++){ const an=k/Math.max(1,Math.round(r*2.4))*Math.PI*2; OFFS.push([Math.cos(an)*r*1.5,Math.sin(an)*r*0.8]); }
   const PINNAME=new Set((typeof REGIONS_EAST!=='undefined'? REGIONS_EAST : []).map(r=>r.id.toUpperCase()));
-  const PEOPLE=ASIA_POL.filter(P=>P.n && !(PINNAME.has(P.n) && (P.fs||3)<3)).map(P=>({P, L:P.l||centroid(P.p), fs:P.fs||3}));
-  PEOPLE.push({P:{n:'HAN', s:'the Jian’an fifth year · one emperor, eight warlords', c:'#2f5a2c', p:null, col:'#244a22', scol:'#2f5a2c'}, L:[110.6,31.6], fs:7.2, ls:4.6, sfs:2.1});
+  const _D=G && G.dynasty;
+  const PEOPLE=ASIA_POL.filter(P=>P.n && !(PINNAME.has(P.n) && (P.fs||3)<3) && !(_D && P.n==='CAO CAO')).map(P=>({P, L:P.l||centroid(P.p), fs:P.fs||3}));
+  if(_D){ const dc=shade(_D.col,-60); PEOPLE.push({P:{n:_D.n.toUpperCase(), s:'the first year of '+_D.era[1]+' · '+(_D.n==='Han'? 'the Han goes on, in a new branch of the Liu' : 'the Han is ended')+' · '+(_D.how==='shanrang'? 'by abdication' : 'by the sword'), c:dc, p:null, col:dc, scol:dc}, L:[110.6,31.6], fs:7.2, ls:4.6, sfs:2.1}); }
+  else PEOPLE.push({P:{n:'HAN', s:'the Jian’an fifth year · one emperor, eight warlords', c:'#2f5a2c', p:null, col:'#244a22', scol:'#2f5a2c'}, L:[110.6,31.6], fs:7.2, ls:4.6, sfs:2.1});
   PEOPLE.sort((a,b)=>b.fs-a.fs);
   for(const E of PEOPLE){ const P=E.P, fs=E.fs, o={it:!!P.it, ls:E.ls!==undefined? E.ls : (P.ls!==undefined? P.ls : Math.max(0,fs*0.12))};
     const tw=measure(P.n,fs,o), th=fs*0.86, sfs=E.sfs||Math.max(2.0,fs*0.46), so={it:1,b:false}, sw=P.s && fs>=2.8? measure(P.s,sfs,so) : 0, sgap=fs*0.62+sfs*0.55;
@@ -71446,10 +71705,11 @@ function asiaStatic(SS){
     c.save(); c.shadowColor='rgba(0,0,0,.35)'; c.shadowBlur=3; c.fillStyle='#f3e8cc'; c.fillRect(x,y,ww,hh); c.restore();
     c.strokeStyle='#6a4a28'; c.lineWidth=0.6; c.strokeRect(x+0.8,y+0.8,ww-1.6,hh-1.6); c.lineWidth=0.25; c.strokeRect(x+1.6,y+1.6,ww-3.2,hh-3.2);
     c.textAlign='center'; c.fillStyle='#4a2a14'; c.font='bold 5.2px Georgia,serif'; c.fillText('TABVLA ASIAE',x+ww/2,y+8.2); c.font='italic 2.4px Georgia,serif'; c.fillText('the peoples of Asia in the year of Guandu',x+ww/2,y+11.6); c.fillText('anno Domini CC',x+ww/2,y+14.4);
-    const groups=[]; ASIA_POL.forEach(P=>{ if(P.g && !groups.find(g=>g[0]===P.g)) groups.push([P.g,P.c]); });
-    const NAMES={Rome:'Rome & her clients',Caucasus:'The Caucasus',Parthia:'Parthia & vassals',Steppe:'Steppe peoples',['Central Asia']:'Central Asia',Kushan:'The Kushan',India:'Indian kingdoms',Tibet:'The Tibetan plateau',Tarim:'The Tarim oases',Han:'Han warlord domains',['Southeast Asia']:'Southeast Asia',Korea:'Korea & Manchuria',Japan:'The islands',Arabia:'Arabia',Africa:'Africa'};
+    const groups=[]; ASIA_POL.forEach(P=>{ if(P.g && !groups.find(g=>g[0]===P.g)) groups.push([P.g,asiaPolC(P)]); });
+    const _DL=G && G.dynasty;
+    const NAMES={Rome:'Rome & her clients',Caucasus:'The Caucasus',Parthia:'Parthia & vassals',Steppe:'Steppe peoples',['Central Asia']:'Central Asia',Kushan:'The Kushan',India:'Indian kingdoms',Tibet:'The Tibetan plateau',Tarim:'The Tarim oases',Han:_DL? ('The '+_DL.n+' realm, ex-Han') : 'Han warlord domains',['Southeast Asia']:'Southeast Asia',Korea:'Korea & Manchuria',Japan:'The islands',Arabia:'Arabia',Africa:'Africa'};
     c.textAlign='left'; c.font='2.3px Georgia,serif'; groups.forEach((g,i)=>{ const yy=y+19+i*4.5; c.globalAlpha=0.75; c.fillStyle=g[1]; c.fillRect(x+4,yy-2.2,6,3); c.globalAlpha=1; c.strokeStyle=shade(g[1],-70); c.lineWidth=0.25; c.strokeRect(x+4,yy-2.2,6,3); c.fillStyle='#3a2414'; c.fillText(NAMES[g[0]]||g[0],x+12,yy); });
-    const yy=y+19+groups.length*4.5+2; c.strokeStyle='#2f5a2c'; c.lineWidth=0.75; c.beginPath(); c.moveTo(x+4,yy); c.lineTo(x+10,yy); c.stroke(); c.fillStyle='#3a2414'; c.fillText('Han frontier',x+12,yy+0.8);
+    const yy=y+19+groups.length*4.5+2; c.strokeStyle='#2f5a2c'; c.lineWidth=0.75; c.beginPath(); c.moveTo(x+4,yy); c.lineTo(x+10,yy); c.stroke(); c.fillStyle='#3a2414'; c.fillText(_DL? 'the old Han frontier' : 'Han frontier',x+12,yy+0.8);
     c.strokeStyle='rgba(140,90,30,.85)'; c.setLineDash([2.2,1.1]); c.lineWidth=0.45; c.beginPath(); c.moveTo(x+4,yy+4.5); c.lineTo(x+10,yy+4.5); c.stroke(); c.strokeStyle='rgba(40,80,140,.75)'; c.setLineDash([0.6,0.9]); c.beginPath(); c.moveTo(x+4,yy+9); c.lineTo(x+10,yy+9); c.stroke(); c.setLineDash([]);
     c.fillText('the silk road',x+12,yy+5.3); c.fillText('the monsoon road',x+12,yy+9.8); }
   { const q=Q(60,5.6); const km=1000, deg=km/(111.32*Math.cos(10*Math.PI/180)), L=deg*kx; c.fillStyle='#2a1c12';
@@ -71466,7 +71726,7 @@ function asiaStatic(SS){
   { c.save(); c.globalAlpha=0.06; for(let k=0;k<2400;k++){ const x=asiaHash(k,3)*w, y=asiaHash(k,7)*h; c.fillStyle=k%2? '#5a3a1a' : '#fff6e0'; c.fillRect(x,y,0.5,0.5); } c.restore();
     const v=c.createRadialGradient(w/2,h/2,h*0.55,w/2,h/2,w*0.62); v.addColorStop(0,'rgba(60,40,20,0)'); v.addColorStop(1,'rgba(60,40,20,.28)'); c.fillStyle=v; c.fillRect(0,0,w,h);
     c.strokeStyle='#4a3420'; c.lineWidth=1.1; c.strokeRect(0.6,0.6,w-1.2,h-1.2); c.strokeStyle='rgba(74,52,32,.7)'; c.lineWidth=0.3; c.strokeRect(2.2,2.2,w-4.4,h-4.4); }
-  _ASIA_CVS[SS]=cv; if(SS===3) _ASIA_CV=cv; return cv;
+  _ASIA_CVS[_AK]=cv; if(SS===3) _ASIA_CV=cv; return cv;
 }
 /* =====================================================================
    🗺 THE PLATE — one relief engine for every sheet
@@ -71755,7 +72015,7 @@ function layoutEastPins(){
 }
 function drawMapCanvasEast(){
   mapZoomForWorld();
-  const HI=mapHiRes()? mapHiReady('asia6',()=>asiaStatic(6)) : null, R=HI? 6 : 3;
+  const HI=mapHiRes()? mapHiReady('asia6|'+dynKey(),()=>asiaStatic(6)) : null, R=HI? 6 : 3;
   mapSize(480*R,216*R); mctx.setTransform(1,0,0,1,0,0); mctx.imageSmoothingEnabled=true;
   mctx.drawImage(HI||asiaStatic(),0,0);
   /* the seats: an ink dot each, and a hairline to the tag where the tag had to move */
@@ -72991,7 +73251,7 @@ function paintRomeSheet(c, held, cleared, SS){
   for(const id in PROV_SHAPES){ const sh=PROV_SHAPES[id], owned=!!held[id], done=!owned && !!cleared[id];
     if(!owned && !done) continue;
     ringsOf(sh).forEach(r=>{ const P=ringPath(r);
-      c.fillStyle= owned? '#e0b23a' : '#efbb9a'; c.fill(P);
+      c.fillStyle= owned? ((G && G.realm && !G.emperor)? G.realm.col : '#e0b23a') : '#efbb9a'; c.fill(P);
       if(owned){ c.save(); c.clip(P); c.strokeStyle='rgba(255,244,190,.55)'; c.lineWidth=.8;
         for(let d=-h; d<w+h; d+=3.2){ c.beginPath(); c.moveTo(d,0); c.lineTo(d-h,h); c.stroke(); } c.restore();
         c.strokeStyle='#8a5a12'; c.lineWidth=1.1; c.stroke(P); }
@@ -73082,6 +73342,13 @@ function paintRomeSheet(c, held, cleared, SS){
     c.fillStyle='#b0392a'; c.fillRect(p[0],p[1]-4,2.6,1.7); c.fillStyle='#8a2a1d'; c.fillRect(p[0]-1.1,p[1]-.6,2.2,1.5); });
 
   // ===== cities =====
+  /* a breakaway realm writes its own name across the provinces it took from Rome */
+  if(G && G.realm && !G.emperor){ let sx=0, sy=0, n=0; for(const id in PROV_SHAPES){ if(!held[id]) continue; ringsOf(PROV_SHAPES[id]).forEach(r=>{ for(let i=0;i<r.length;i+=2){ const q=Q(r[i],r[i+1]); sx+=q[0]; sy+=q[1]; n++; } }); }
+    if(n){ const nm=G.realm.n.toUpperCase(); c.save(); c.lineJoin='round'; c.textAlign='center'; if('letterSpacing' in c) c.letterSpacing='1.2px';
+      let fs=6; c.font='bold '+fs+'px Georgia,serif'; let tw=c.measureText(nm).width; if(tw>90){ fs=fs*90/tw; c.font='bold '+fs.toFixed(2)+'px Georgia,serif'; tw=c.measureText(nm).width; }
+      const x=Math.max(tw/2+3, Math.min(w-tw/2-3, sx/n)), y=sy/n; c.lineWidth=1.6; c.strokeStyle='rgba(250,242,222,.85)'; c.strokeText(nm,x,y); c.fillStyle=G.realm.col; c.fillText(nm,x,y);
+      c.font='italic 2.8px Georgia,serif'; if('letterSpacing' in c) c.letterSpacing='0px'; const sub='Augustus at '+G.realm.cap+' · in rebellion against Rome'; c.lineWidth=0.8; c.strokeText(sub,x,y+4.2); c.fillStyle='rgba(54,38,22,.9)'; c.fillText(sub,x,y+4.2); c.restore(); } }
+
   /* zoomed in, the great cities' names shrink to make room for the lesser ones */
   const CK=S>=6? 0.62 : 1, MB=[];
   MAP_CITIES.forEach(([nm,lo,la,side,kind])=>{ const p=Q(lo,la);
@@ -73164,7 +73431,7 @@ function drawMapCanvas(){
   mapZoomForWorld();
   const w=MAP_SHEET.W, h=MAP_SHEET.H;
   const held=(G&&G.titles)||{}, cleared=(G&&G.cleared)||{};
-  const key=Object.keys(held).sort().join(',')+'|'+Object.keys(cleared).sort().join(',');
+  const key=Object.keys(held).sort().join(',')+'|'+Object.keys(cleared).sort().join(',')+'|'+((G && G.realm && !G.emperor)? G.realm.n+G.realm.col : '');
   let S=MAP_SHEET.S, sheet=null;
   if(mapHiRes()){ const hk='west6|'+key; sheet=mapHiReady(hk,()=>{ const cv2=document.createElement('canvas'); cv2.width=w*6; cv2.height=h*6; paintRomeSheet(cv2.getContext('2d'), held, cleared, 6); return cv2; }); if(sheet) S=6; }
   mapSize(w*S,h*S);
@@ -73347,7 +73614,7 @@ function drawMapCanvas(){
   // ===== marching army detachments: dotted routes + moving markers =====
   if(G&&G.detachments&&G.detachments.length){
     for(const d of G.detachments){
-      const A=REGION_BY_ID[d.fromId], B=REGION_BY_ID[d.toId]; if(!A||!B) continue;
+      const A=regionAny(d.fromId), B=regionAny(d.toId); if(!A||!B) continue;
       const a=px(A), b=px(B), prog=Math.min(1,d.day/d.eta);
       // dotted line
       mctx.strokeStyle='rgba(30,20,12,.85)'; mctx.lineWidth=1.5; mctx.setLineDash([4,4]);
@@ -75099,7 +75366,7 @@ drawLogo();
 })();
 
 try{ iceMythInit(); iceClothInit(); iceTtsInit(); iceWrap(); }catch(e){ console.error('iceMythInit',e); }
-window.__SS = { roomBackdrop:(T)=>whRoomBackdrop(T), ASIA_PEOPLES, asiaPeopleFor:(e,o)=>asiaPeopleFor(e,o), EAST_PIN_POS, campaignOdds:(cp)=>campaignOdds(cp), updateBattle:(dt)=>updateBattle(dt), drawBattle:()=>drawBattle(), get BT(){ return BT; }, romStyles:()=>ROM_STYLES, startRomanticStyled:(a,b)=>startRomanticStyled(a,b), bgFn:(n)=>({bgPalace,bgWar,bgCoast,bgWoa,bgOpelia,bgIsle,bgReiko,bgForge})[n], setPairSS:(v)=>{ PAIR_SS=v; }, ICE_T:{ get AC(){return AC;}, set AC(v){AC=v;}, iceSlap, iceSkin, iceUlk, iceGulp, iceVoc, iceCrowd, ICE_V, sfx }, ICE_TTS, STRIKES, getDM:()=>DM, drawBridePortrait:(...a)=>drawBridePortrait(...a), rhFig, RH_CAST, openBotWatch, botEnterBeat, getBW:()=>BW, iceGoddessOpen, paintGoddess, startBedScene, regionAny, iceDebug:()=>({here:iceHere(), prey:ICE_PREY_BY_REGION}),
+window.__SS = { roomBackdrop:(T)=>whRoomBackdrop(T), dynThroneFalls:(h)=>dynThroneFalls(h), proclaimDynasty:()=>proclaimDynasty(), plotTargets:()=>plotTargets(), mapZoomTo:(z,x,y)=>mapZoomTo(z,x,y), ASIA_PEOPLES, asiaPeopleFor:(e,o)=>asiaPeopleFor(e,o), EAST_PIN_POS, campaignOdds:(cp)=>campaignOdds(cp), updateBattle:(dt)=>updateBattle(dt), drawBattle:()=>drawBattle(), get BT(){ return BT; }, romStyles:()=>ROM_STYLES, startRomanticStyled:(a,b)=>startRomanticStyled(a,b), bgFn:(n)=>({bgPalace,bgWar,bgCoast,bgWoa,bgOpelia,bgIsle,bgReiko,bgForge})[n], setPairSS:(v)=>{ PAIR_SS=v; }, ICE_T:{ get AC(){return AC;}, set AC(v){AC=v;}, iceSlap, iceSkin, iceUlk, iceGulp, iceVoc, iceCrowd, ICE_V, sfx }, ICE_TTS, STRIKES, getDM:()=>DM, drawBridePortrait:(...a)=>drawBridePortrait(...a), rhFig, RH_CAST, openBotWatch, botEnterBeat, getBW:()=>BW, iceGoddessOpen, paintGoddess, startBedScene, regionAny, iceDebug:()=>({here:iceHere(), prey:ICE_PREY_BY_REGION}),
   openBookViewer:()=>openBookViewer(), openSettings:()=>openSettings(), 
   rhAmbTick:(b)=>rhAmbTick(b), rhAmbHit:(k,n)=>rhAmbHit(k,n), rhAmbStop:()=>rhAmbStop(), rhSting:(b)=>rhSting(b), setMuted:(v)=>{muted=v;}, ambKind:()=>RH_AMB&&RH_AMB.kind, acState:()=>AC&&AC.state,
   WPN_ART, WPN_RANGED, drawRangedIcon, BOWS, wpnStamp, wpnIcon, drawHeldBow, drawHeldPilum, drawHeldBomb, get WPN_DRAWS(){ return WPN_DRAWS; }, setOUTL:(v)=>{ OUTL=!!v; }, drawWeapon2Old,
