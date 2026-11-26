@@ -21639,7 +21639,11 @@ function armyBattle(cfg){
   const yourLoss=(cfg.yourLoss!==undefined)? Math.min(cfg.yourMen, cfg.yourLoss) : Math.min(cfg.yourMen, Math.round(cfg.yourMen*(win?(0.10+(1-r)*0.5):(0.40+(1-r)*0.4))*(cfg.general?cfg.general.casualty:1)*lossMult));
   const enemyLoss=win? cfg.enemyMen : Math.round(cfg.enemyMen*r*0.8);
   cfg.sub=(cfg.sub?cfg.sub+'   ·   ':'')+({field:'PITCHED BATTLE',siege:'SIEGE ASSAULT',ambush:'NIGHT AMBUSH'})[kind];
+  let yS='legion', eS='germanic';
+  try{ yS=cfg.yourStyle||armyStyleMine(); }catch(e){}
+  try{ eS=cfg.enemyStyle || (cfg.enemyName==='CATAPHRACTS'? 'parthian' : (playerWorld()==='east'? armyStyleHere() : (cfg.enemyName==='GARRISON'||cfg.enemyName==='LOYALISTS'? 'usurper' : 'germanic'))); }catch(e){}
   BT={cfg,kind,win,yourPower,enemyPower,yourLoss,enemyLoss,yourMen:cfg.yourMen,enemyMen:cfg.enemyMen,
+      yourS:armyStyle(yS), enemyS:armyStyle(eS),
       t:0,dur:170,parts:[],shake:0,ended:false};
   state='battle';
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('on'));
@@ -21679,7 +21683,21 @@ function drawBattleHorse(sx,sy,facing,col){
   px(sx+3,sy-4,2,4,'#caa06a'); px(sx+2,sy-6,4,2,'#b9c0c8');          // rider + helm
   px(sx+facing*6,sy-8,1,9,'#8a6a44');                                 // lance
 }
-function drawBattleHost(x,men,maxMen,facing,col,crest,advance,shieldC){
+function drawBattleHost(x,men,maxMen,facing,col,crest,advance,shieldC,S){
+  /* ⚔ A PEOPLE'S HOST: its own foot (archers in the far rank where they field them), its elephants standing behind,
+     its horse in a wing that leads the advance in proportion to how much of the army is mounted, and its own standard. */
+  if(nbOn() && S){
+    const hf=S.horse||0, horseN=Math.round(hf*16), eleN=S.elephants||0, ranks=5, files=10, slots=ranks*files;
+    const icons=Math.max(1,Math.min(slots, Math.round(men/maxMen*slots*Math.max(0.25,1-hf))));
+    for(let e=0;e<eleN;e++) drawStyledElephant(x - facing*(26+e*28) + advance*facing*0.8, 132+e*7, facing, S, e, 0.92);
+    for(let r=0;r<ranks;r++){ const sc=0.56+r*0.11, y=134+r*11;
+      for(let f=0;f<files;f++){ const idx=r*files+f; if(idx>=icons) continue;
+        const sx=x + facing*(f*10.5*sc + (r%2)*5*sc) + advance*facing + facing*(ranks-1-r)*4;
+        drawStyledSoldier(sx, y, facing, S, idx, sc, !!(S.archer && r<=1)); } }
+    drawStyledStandard(x+advance*facing+facing*-8, 124, facing, S);
+    const live=horseN? Math.max(1,Math.round(horseN*men/maxMen)) : 0;
+    for(let k=0;k<live;k++){ const row=k%3, cc=(k/3)|0; drawStyledRider(x + facing*(cc*15-14+row*6) + advance*facing*(hf>0.5? 1.1 : 0.7), 184+row*8, facing, S, k, 0.9+row*0.06); }
+    return; }
   /* ⚔ THE NEW SOLDIERS ARE THREE TIMES THE SIZE OF THE OLD 8-PIXEL ONES, and they were being stood on the old
      grid (8 apart, ranks 11 apart): forty-five of them on top of each other in one blob. Now a host is four ranks in
      depth, the far ranks smaller and higher up the field, the files close enough that the shields overlap into a
@@ -21724,6 +21742,7 @@ function drawBattle(){
   if(night){ for(let i=0;i<40;i++) px((i*53)%W,(i*29)%70,1,1,i%4?'#4a4468':'#d8d2ee'); px(W-70,16,10,10,'#e9e7d2'); px(W-68,18,6,6,'#f7f5e6'); }
   else { px(W-74,10,16,16,'#f7d67a'); ctx.fillStyle='rgba(247,214,122,.3)'; ctx.fillRect(W-80,4,28,28);
     for(const [cx,cy,cw] of [[60,18,40],[190,10,30],[330,24,36]]){ px(cx,cy,cw,5,'#e8eef2'); px(cx+6,cy-3,cw-14,4,'#f4f8fa'); } }
+  if(!(t.enemyS && (t.enemyS.land||'west')!=='west' && drawBattleLand(t.enemyS.land, night))){
   // distant hills
   ctx.fillStyle=night?'#1e1a30':'#8fa87c'; ctx.beginPath(); ctx.moveTo(-4,96);
   for(let x=0;x<=W;x+=16) ctx.lineTo(x,88-10*Math.sin(x*0.02)-6*Math.sin(x*0.05));
@@ -21733,7 +21752,8 @@ function drawBattle(){
   for(let i=0;i<160;i++){ const gy=102+((i*47)%(H-108)); px((i*89)%W,gy,1,2,night?'#332d1f':'#6a5a38'); }  // grass tufts
   for(let i=0;i<40;i++) px((i*127)%W,120+((i*67)%80),2,1,night?'#2c2718':'#8a7448');
   // trampled road across the middle
-  px(-4,150,W+8,16,night?'#352e1e':'#6e5e3a'); for(let i=0;i<30;i++)px((i*61)%W,152+((i*37)%12),3,1,night?'#2c2617':'#5e5030');
+  px(-4,150,W+8,16,night?'#352e1e':'#6e5e3a'); }
+  for(let i=0;i<30;i++)px((i*61)%W,152+((i*37)%12),3,1,night?'#2c2617':'#5e5030');
   // ===== battle-kind scenery =====
   if(t.kind==='siege'){
     // the defenders' stone wall + gate + towers on the right
@@ -21762,8 +21782,8 @@ function drawBattle(){
     px(bx2,by2,5,2,i%2?'#8a6a46':'#6a5a6e'); px(bx2+(i%2?4:-1),by2,1,1,'#caa06a'); px(bx2+2,by2+2,2,1,'#7a1414'); }
   // ===== the two hosts =====
   const adv=clamp(p/0.3,0,1)*74;
-  drawBattleHost(56,  t.yourNow||t.yourMen,   t.yourMen,  1,  '#a52828','#e8c34a', adv, '#c8a24a');  // your legion (red+gold)
-  drawBattleHost(W-56,t.enemyNow||t.enemyMen, t.enemyMen, -1, '#4a3a5e','#b070d0', adv, '#7d5aa0');  // enemy host (purple)
+  drawBattleHost(56,  t.yourNow||t.yourMen,   t.yourMen,  1,  '#a52828','#e8c34a', adv, '#c8a24a', t.yourS);   // your host, dressed as your people
+  drawBattleHost(W-56,t.enemyNow||t.enemyMen, t.enemyMen, -1, '#4a3a5e','#b070d0', adv, '#7d5aa0', t.enemyS);  // theirs, dressed as theirs
   // ===== arrow volleys arc overhead during the clash =====
   if(clash>0&&clash<1){
     for(let i=0;i<7;i++){ const ph=(t.t*0.02+i*0.14)%1, from=i%2? W-80-adv:80+adv, to=i%2? 80+adv:W-80-adv;
@@ -21786,7 +21806,7 @@ function drawBattle(){
   ctx.textAlign='center';
   pixelText(t.cfg.title, W/2, 48, '#e8c34a', 1.6);
   if(t.cfg.sub) pixelText(t.cfg.sub, W/2, 63, '#cfe', 1);
-  pixelText('YOUR ARMY  '+fmt(t.yourNow||t.yourMen), W/4+8, 82, '#e8c34a', 1.1);
+  pixelText((t.yourS? t.yourS.name : 'YOUR ARMY')+'  '+fmt(t.yourNow||t.yourMen), W/4+8, 82, '#e8c34a', 1.1);
   pixelText((t.cfg.enemyName||'ENEMY')+'  '+fmt(t.enemyNow||t.enemyMen), W*3/4-8, 82, '#d0a0e0', 1.1);
   if(t.ended){ ctx.fillStyle='rgba(0,0,0,.5)'; ctx.fillRect(0,0,W,H);
     pixelText(t.win?'THE FIELD IS YOURS!':'YOUR ARMY IS BROKEN', W/2, H/2-6, t.win?'#e8c34a':'#e05b5b', 2.2); }
@@ -32323,6 +32343,239 @@ function drawBattleSoldierNB(sx,sy,facing,tunic,shieldC,crest,i,sc){
   const spr=nbSoldierSprite(tunic, shieldC, crest, frame, east && facing<0);
   ctx.save(); ctx.translate(Math.round(sx+1), Math.round(sy+7)); ctx.scale((facing<0? -1 : 1)*k, k);
   ctx.drawImage(spr, -14, -28); ctx.restore();
+}
+/* =====================================================================
+   ⚔ WHOSE ARMY IT IS — every host dressed, armed and flagged as its people
+   ---------------------------------------------------------------------
+   Every battle in the game was the same red legion against the same
+   purple host: the Xianbei came on foot behind oval shields, the Han
+   carried pila, and nobody anywhere in Asia owned a horse. An army is the
+   most legible thing a people makes, so each style below is a real kit:
+
+   THE LEGION     mail, the provincial helmet, the curved scutum, the pilum,
+                  and the vexillum with the eagle over it.
+   THE HAN        lamellar over red, the cloth cap, the tall shield and the
+                  JI halberd, crossbowmen in the rear ranks, tall banners
+                  with the house's character on them.
+   THE STEPPE     no infantry worth the name: horse-archers in lamellar and
+                  fur caps, and the horse-tail standard, the tug.
+   THE PLATEAU    maroon wool, round wicker shields, spears and slings, and
+                  a black yak-tail on the pole.
+   KUSHAN · INDIA lancers, scale, the Kushan helmet; turbans, the long
+                  bamboo bow and the round dhal; and elephants.
+   TAMILAKAM      the tiger flag of the Chola, the fish of the Pandya, the
+                  bow of the Chera — and elephants again.
+   GOGURYEO       armoured horse on armoured horses, as the tomb murals paint
+                  them.
+   PARTHIA        cataphracts, horse-archers, and the dragon windsock.
+   THE YUE        bare-chested, feathered, with the dagger-axe and the tall
+                  shield the bronze drums show.
+   ===================================================================== */
+const ARMY_STYLE={
+  legion:  {name:'THE LEGION', tunic:'#a52828', crest:'#e8c34a', shieldC:'#b8323a', boss:'#e8c34a', armor:'hamata', helm:'galea_prov', shield:'scutum', arm:'pilum', horse:0.12, horseC:['#7a5a38','#5a4028'], rider:'#b9c0c8', std:'vexillum', stdC:'#a52828', stdD:'#e8c34a', land:'west'},
+  usurper: {name:'THE USURPER', tunic:'#5a3a6a', crest:'#c8c8d0', shieldC:'#4a3a6a', boss:'#c8c8d0', armor:'hamata', helm:'galea_prov', shield:'scutum', arm:'pilum', horse:0.12, horseC:['#4a3a3a'], rider:'#9aa0a8', std:'vexillum', stdC:'#5a3a6a', stdD:'#c8c8d0', land:'west'},
+  germanic:{name:'THE WAR-BAND', tunic:'#5a6a3a', crest:'#8a6a3a', shieldC:'#7a4a2a', boss:'#9aa0a8', armor:null, helm:null, shield:'round', arm:'spear', horse:0.08, horseC:['#6a5038'], rider:'#8a6a4a', std:'beast', stdC:'#5a4a3a', land:'forest', bare:true},
+  dacian:  {name:'THE HILLMEN', tunic:'#6a4a3a', crest:'#a8a8b0', shieldC:'#5a5a8a', boss:'#d8d8e0', armor:null, helm:'bone_cap', shield:'oval', arm:'falx', horse:0.1, horseC:['#5a4030'], rider:'#7a5a40', std:'draco', stdC:'#9aa0b0', land:'forest'},
+  desert:  {name:'THE RAIDERS', tunic:'#e0d4b0', crest:'#e0d4b0', shieldC:'#8a5a2a', boss:'#c8a040', armor:null, helm:'pagri', shield:'round', arm:'spear', horse:0.65, horseC:['#c8a060','#b08a50'], camel:true, rider:'#e0d4b0', std:'flag', stdC:'#2a6a3a', land:'desert'},
+  celt:    {name:'THE PAINTED TRIBES', tunic:'#3a5a8a', crest:'#c8642a', shieldC:'#6a3a1a', boss:'#c8a040', armor:null, helm:null, shield:'long', arm:'spear', horse:0.15, horseC:['#6a4a30'], rider:'#3a5a8a', std:'carnyx', stdC:'#8a8a6a', land:'forest', bare:true},
+  parthian:{name:'THE CATAPHRACTS', tunic:'#6a3a9a', crest:'#c8402a', shieldC:'#6a3a9a', boss:'#e8c34a', armor:'kataphraktos', helm:'persian_helm', shield:'none', arm:'lance', horse:0.72, horseC:['#5a4a3a','#3a2e24'], barded:true, rider:'#9aa0a8', std:'draco', stdC:'#c8402a', land:'desert'},
+  han:     {name:'THE HAN HOST', tunic:'#8a2a22', crest:'#1a1a1a', shieldC:'#6a1a14', boss:'#c8a040', armor:'xuanjia', helm:'he_guan', shield:'tall', arm:'ji', archer:'crossbow', horse:0.2, horseC:['#7a5a38','#4a3a2a','#a88a5a'], rider:'#3a3a3a', std:'banner', stdC:'#b02a20', glyph:'漢', land:'loess'},
+  han_cao: {inherit:'han', name:'CAO CAO’S ARMY', stdC:'#2a3040', tunic:'#3a3a4a', glyph:'曹'},
+  han_yuan:{inherit:'han', name:'YUAN SHAO’S HOST', stdC:'#c8a034', tunic:'#7a5a2a', glyph:'袁'},
+  han_sun: {inherit:'han', name:'THE SUN OF WU', stdC:'#b02a20', tunic:'#8a2a22', glyph:'孫', land:'river'},
+  han_liu: {inherit:'han', name:'LIU BIAO’S MEN', stdC:'#2a6a4a', tunic:'#3a5a4a', glyph:'劉', land:'river'},
+  xianbei: {name:'THE XIANBEI HORDE', tunic:'#6a5a3a', crest:'#3a2a1a', shieldC:'#6a4a2a', boss:'#c8a040', armor:'steppe_lamellar', helm:'steppe_cap', shield:'none', arm:'bow', horse:0.82, horseC:['#8a6a3a','#5a4028','#c8b08a','#2a2018'], rider:'#6a5a3a', std:'tug', stdC:'#e8e0d0', land:'steppe'},
+  wuhuan:  {inherit:'xianbei', name:'THE WUHUAN', tunic:'#7a3a2a', std:'tug', stdC:'#c8b088'},
+  xiongnu: {inherit:'xianbei', name:'THE XIONGNU', tunic:'#4a3a2a', std:'tug', stdC:'#1a1410'},
+  plateau: {name:'THE PLATEAU', tunic:'#7a2a2a', crest:'#1a1410', shieldC:'#a8884a', boss:'#e8e0d0', armor:'steppe_coat', helm:null, shield:'round', arm:'spear', sling:true, horse:0.35, horseC:['#3a2e24','#6a5038','#e8e0d0'], rider:'#7a2a2a', std:'yaktail', stdC:'#1a1410', land:'plateau'},
+  kushan:  {name:'THE KUSHAN', tunic:'#c8a34a', crest:'#7a2a6a', shieldC:'#7a2a6a', boss:'#e8c34a', armor:'squamata', helm:'kushan_helm', shield:'round', arm:'lance', horse:0.5, horseC:['#8a6a3a','#5a4028'], barded:false, rider:'#c8a34a', std:'tamgha', stdC:'#7a2a6a', stdD:'#e8c34a', elephants:1, land:'india'},
+  indian:  {name:'THE KINGDOM’S ARMY', tunic:'#e8e0d0', crest:'#c8342a', shieldC:'#7a4a2a', boss:'#e8c34a', armor:'kavacha', helm:'pagri', shield:'round', arm:'bow', horse:0.15, horseC:['#8a6a3a','#e8e0d0'], rider:'#e8e0d0', std:'flag', stdC:'#e8a020', stdD:'#c8342a', elephants:2, land:'india'},
+  tamil:   {name:'THE THREE CROWNED KINGS', tunic:'#e8dcc0', crest:'#c8342a', shieldC:'#5a3418', boss:'#e8c34a', armor:null, helm:'pagri', shield:'long', arm:'spear', horse:0.12, horseC:['#8a6a3a'], rider:'#e8dcc0', std:'tiger', stdC:'#e8a020', elephants:2, land:'tropic', bare:true},
+  cham:    {inherit:'tamil', name:'LINYI', std:'flag', stdC:'#6a2a5a', stdD:'#e8c34a', elephants:2, tunic:'#c8b890'},
+  korean:  {name:'GOGURYEO', tunic:'#2f5a7a', crest:'#c8342a', shieldC:'#3a4a5a', boss:'#c8c8d0', armor:'steppe_lamellar', helm:'dou_mou', shield:'round', arm:'spear', horse:0.48, horseC:['#5a4028','#2a2018'], barded:true, rider:'#2f5a7a', std:'banner', stdC:'#2f5a7a', glyph:'高', land:'hills'},
+  yue:     {name:'THE SHANYUE', tunic:'#5a4a2a', crest:'#2a6a4a', shieldC:'#8a6a3a', boss:'#c8b060', armor:null, helm:null, plume:true, shield:'tall', arm:'ge', horse:0, horseC:['#6a5038'], rider:'#5a4a2a', std:'feather', stdC:'#2a6a4a', land:'tropic', bare:true},
+  sogdian: {inherit:'kushan', name:'THE OASIS LEVY', tunic:'#2a5a8a', helm:'persian_helm', elephants:0, std:'flag', stdC:'#2a5a8a', land:'steppe'},
+};
+function armyStyle(id){
+  let S=ARMY_STYLE[id]||ARMY_STYLE.legion;
+  if(S.inherit){ S=Object.assign({}, ARMY_STYLE[S.inherit], S); delete S.inherit; ARMY_STYLE[id]=Object.assign({id},S); }
+  if(!S.id) S.id=id;
+  return S;
+}
+/* which army is YOURS: the one your people field, wherever you are */
+function armyStyleMine(){
+  let w='west', c='roman'; try{ w=playerWorld(); }catch(e){} try{ c=playerCulture().id; }catch(e){}
+  if(w==='east'){ return ({han:'han_cao', steppe:'xianbei', kushan:'kushan', tamil:'tamil', korean:'korean', persian:'parthian'})[c] || 'han_cao'; }
+  return ({celt:'celt', germanic:'germanic', persian:'parthian', numidian:'desert', egyptian:'legion', greek:'legion'})[c] || 'legion';
+}
+/* whose ground you are standing on, when nobody said whom you are fighting */
+function armyStyleHere(){
+  try{ const R=REGION_EAST_BY_ID[G.current]; if(R){ const P=R.people||'';
+      if(/zhangzhung|bod|sumpa|qiang/.test(P)) return 'plateau'; if(/wuhuan/.test(P)) return 'wuhuan'; if(/xiongnu/.test(P)) return 'xiongnu';
+      if(/yue|lac|dian|ailao/.test(P)) return 'yue'; if(/cham|funan|mon|pyu|malay/.test(P)) return 'cham'; if(/sogdian|tocharian|kroraina|saka|kangju|dayuan/.test(P)) return 'sogdian';
+      return ({han:'han_yuan', steppe:'xianbei', kushan:'indian', tamil:'tamil', korean:'korean', persian:'parthian'})[R.cul] || 'han_yuan'; } }catch(e){}
+  return 'germanic';
+}
+
+/* ---- the foot soldier: the template figure in the people's armour and helmet, then the people's weapon and shield ---- */
+const NB_STYLE_CACHE=new Map();
+function nbStyleSprite(S, frame, archer){
+  const key=S.id+'|'+frame+'|'+(archer?1:0);
+  let cv=NB_STYLE_CACHE.get(key); if(cv) return cv;
+  cv=document.createElement('canvas'); cv.width=34; cv.height=34;
+  const g=cv.getContext('2d',{willReadFrequently:true}); const k=0.27;
+  g.setTransform(k,0,0,k,15,31);
+  const skins=S.id==='tamil'||S.id==='cham'||S.id==='indian'? ['#9a6a3e','#8a5a34','#a87048','#7a4e2a'] : S.id==='yue'? ['#b8885a','#a87a4e','#c89868','#9a6e44'] : ['#caa06a','#b88a5a','#d8b088','#a87a4a'];
+  const C=Object.assign({}, paletteFor({skin:skins[frame%4], tunic:S.tunic}));
+  const look={male:true, skin:skins[frame%4], hair:'#1e1410', beard:'none', body:{legs:6,bust:6,booty:6,waist:6}};
+  const kit={C, loin:S.tunic, belt:C.leather, armor:S.armor||null, helm:S.helm||null, blood:0, t:0};
+  const ph=frame*Math.PI/2, arm=archer? (S.archer||'bow') : S.arm;
+  const hands= arm==='bow'? {near:[10,-46], far:[14,-50]} : arm==='crossbow'? {near:[10,-44], far:[14,-46]} : {near:[6,-40], far:[9,-44]};
+  try{
+    drawMateFig(g, g, {hip:[0,-34.6+Math.abs(Math.sin(ph))*0.8], floor:0, lean:0.06, u:0, aro:0, bare:!!S.bare || !S.armor, look, face:HARD_FACES.intent,
+      cloth:S.tunic, lenIn:0, diaIn:1, pxi:1, walk:1, walkPh:ph, kit, headK:1.25, hands});
+    const steel='#dfe6ee', wood='#8a6a44';
+    // ---- the weapon ----
+    if(arm==='bow'){ g.strokeStyle='#5a3a1a'; g.lineWidth=2.2; g.beginPath(); g.arc(4,-48,22,-1.2,1.2); g.stroke(); g.strokeStyle='#e8e0d0'; g.lineWidth=0.7; g.beginPath(); g.moveTo(4+22*Math.cos(-1.2),-48+22*Math.sin(-1.2)); g.lineTo(4+22*Math.cos(1.2),-48+22*Math.sin(1.2)); g.stroke();
+      g.fillStyle='#6a3a1a'; g.fillRect(-12,-70,6,26); for(let i=0;i<4;i++){ g.fillStyle=i%2? '#e8e0d0' : '#c8342a'; g.fillRect(-12+i*1.5,-76,1.2,7); } }
+    else if(arm==='crossbow'){ g.fillStyle='#5a3a1a'; g.fillRect(0,-48,26,3); g.strokeStyle='#3a2a1a'; g.lineWidth=2.4; g.beginPath(); g.moveTo(22,-60); g.quadraticCurveTo(28,-47,22,-34); g.stroke(); g.fillStyle='#c8a040'; g.fillRect(6,-47,4,3); }
+    else { const top= arm==='lance'? -112 : arm==='ge'? -78 : -90;
+      g.strokeStyle=wood; g.lineWidth=2.2; g.beginPath(); g.moveTo(7,-8); g.lineTo(7,top); g.stroke();
+      if(arm==='pilum'){ g.strokeStyle='#9aa4ae'; g.lineWidth=1.3; g.beginPath(); g.moveTo(7,top); g.lineTo(7,top-16); g.stroke(); g.fillStyle=steel; g.beginPath(); g.moveTo(7,top-22); g.lineTo(8.6,top-15); g.lineTo(5.4,top-15); g.closePath(); g.fill(); g.fillStyle='#5a4028'; g.fillRect(5.6,top-1,2.8,4); }
+      else if(arm==='ji'){ g.fillStyle=steel; g.beginPath(); g.moveTo(7,top-12); g.lineTo(9.2,top); g.lineTo(4.8,top); g.closePath(); g.fill(); g.beginPath(); g.moveTo(7,top+3); g.quadraticCurveTo(18,top+1,20,top+9); g.lineTo(7,top+8); g.closePath(); g.fill(); g.fillStyle='#c8342a'; g.fillRect(5.5,top+9,3,5); }
+      else if(arm==='ge'){ g.fillStyle='#c8b060'; g.beginPath(); g.moveTo(7,top+1); g.lineTo(24,top-2); g.lineTo(26,top+2); g.lineTo(7,top+6); g.closePath(); g.fill(); g.fillStyle='#2a6a4a'; g.fillRect(5.6,top-6,3,6); }
+      else if(arm==='falx'){ g.strokeStyle='#cfd6de'; g.lineWidth=3; g.beginPath(); g.moveTo(7,top+30); g.quadraticCurveTo(10,top-4,24,top+8); g.stroke(); }
+      else if(arm==='lance'){ g.fillStyle=steel; g.beginPath(); g.moveTo(7,top-14); g.lineTo(9.4,top); g.lineTo(4.6,top); g.closePath(); g.fill(); g.fillStyle=S.crest; g.beginPath(); g.moveTo(7,top+4); g.lineTo(18,top+8); g.lineTo(7,top+12); g.closePath(); g.fill(); }
+      else { g.fillStyle=steel; g.beginPath(); g.moveTo(7,top-10); g.lineTo(9.4,top); g.lineTo(4.6,top); g.closePath(); g.fill(); } }
+    // ---- the shield ----
+    const sc=S.shieldC, sh=mixHex(sc,'#ffffff',0.3);
+    if(!archer || arm==='crossbow') switch(S.shield){
+      case 'scutum': g.fillStyle=sc; g.beginPath(); g.roundRect? g.roundRect(1,-66,15,42,3) : g.rect(1,-66,15,42); g.fill(); g.fillStyle=sh; g.fillRect(3,-64,2,38); g.fillStyle=S.boss; g.beginPath(); g.arc(9,-45,3.2,0,7); g.fill();
+        g.strokeStyle=S.boss; g.lineWidth=1; g.beginPath(); g.moveTo(3,-55); g.lineTo(15,-55); g.moveTo(3,-35); g.lineTo(15,-35); g.stroke(); break;
+      case 'oval': g.fillStyle=sc; g.beginPath(); g.ellipse(9,-44,6.5,17,0,0,7); g.fill(); g.fillStyle=sh; g.beginPath(); g.ellipse(8,-50,4,8,0,0,7); g.fill(); g.fillStyle=S.boss; g.beginPath(); g.arc(10,-44,3,0,7); g.fill(); break;
+      case 'round': g.fillStyle=sc; g.beginPath(); g.arc(10,-46,11,0,7); g.fill(); g.strokeStyle=shade(sc,-40); g.lineWidth=1.2; g.beginPath(); g.arc(10,-46,11,0,7); g.stroke(); g.strokeStyle=sh; g.lineWidth=0.8; for(let i=0;i<5;i++){ g.beginPath(); g.arc(10,-46,3+i*1.7,0,7); g.stroke(); } g.fillStyle=S.boss; g.beginPath(); g.arc(10,-46,2.6,0,7); g.fill(); break;
+      case 'tall': g.fillStyle=sc; g.beginPath(); g.moveTo(3,-24); g.lineTo(3,-62); g.lineTo(9.5,-72); g.lineTo(16,-62); g.lineTo(16,-24); g.closePath(); g.fill(); g.fillStyle=sh; g.fillRect(5,-60,1.6,34);
+        g.strokeStyle=S.boss; g.lineWidth=0.9; g.beginPath(); g.moveTo(9.5,-66); g.lineTo(9.5,-28); g.stroke(); g.beginPath(); g.arc(9.5,-50,3,0,7); g.stroke(); break;
+      case 'long': g.fillStyle=sc; g.beginPath(); g.moveTo(9,-74); g.lineTo(16,-62); g.lineTo(16,-28); g.lineTo(9,-16); g.lineTo(2,-28); g.lineTo(2,-62); g.closePath(); g.fill(); g.fillStyle=S.boss; g.fillRect(8,-60,2,30); g.beginPath(); g.ellipse(9,-45,3.4,4.4,0,0,7); g.fill(); break;
+      default: break; }
+    // ---- what is on the head that the helmet table does not have ----
+    if(S.plume){ for(let i=0;i<5;i++){ g.strokeStyle=i%2? '#2a6a4a' : '#e8e0c8'; g.lineWidth=1.6; g.beginPath(); g.moveTo(0,-82); g.quadraticCurveTo(-6+i*3,-96,-10+i*5,-104+Math.abs(i-2)*2); g.stroke(); } g.fillStyle='#c8b060'; g.fillRect(-6,-84,12,3); }
+    else if(!S.helm && S.id==='plateau'){ g.fillStyle='#e8e0d0'; g.fillRect(-7,-84,14,4); g.fillStyle='#2a8a8a'; g.fillRect(-2,-85,3,3); g.fillStyle='#c8342a'; g.fillRect(3,-84,2,2); }
+    else if(!S.helm && S.crest && S.bare){ g.fillStyle=S.crest; g.fillRect(-5,-84,10,3); }
+    else if(S.helm==='galea_prov'){ g.fillStyle=S.crest; g.fillRect(-4,-86,10,5); }
+  }catch(e){}
+  g.setTransform(1,0,0,1,0,0);
+  const im=g.getImageData(0,0,34,34), d=im.data; for(let i=3;i<d.length;i+=4) d[i]= d[i]>=100? 255 : 0; g.putImageData(im,0,0);
+  NB_STYLE_CACHE.set(key, cv); if(NB_STYLE_CACHE.size>220) NB_STYLE_CACHE.delete(NB_STYLE_CACHE.keys().next().value);
+  return cv;
+}
+function drawStyledSoldier(sx,sy,facing,S,i,sc,archer){
+  const k=sc||1, frame=(((BT.t*0.12)+i*0.7)|0)%4;
+  const spr=nbStyleSprite(S, frame, archer);
+  ctx.save(); ctx.translate(Math.round(sx+1), Math.round(sy+7)); ctx.scale((facing<0? -1 : 1)*k, k);
+  ctx.drawImage(spr, -15, -31); ctx.restore();
+}
+/* ---- the rider: a horse at the gallop, barded if the people bard them, and the rider in his people's colours ---- */
+function drawStyledRider(sx,sy,facing,S,i,sc){
+  const k=sc||1, t=BT.t*0.35+i*1.3, gal=Math.sin(t), cols=S.horseC||['#7a5a38'], hc=cols[i%cols.length], hd=shade(hc,-30), f=facing;
+  ctx.save(); ctx.translate(Math.round(sx), Math.round(sy+Math.abs(gal)*-1.2)); ctx.scale(f*k, k);
+  if(S.camel){ // a camel: the long legs, the hump, the neck that curves forward and up
+    ctx.fillStyle=hd; for(const lx of [-6,-3,4,7]){ ctx.fillRect(lx+gal*(lx<0?1:-1),0,1.6,10); }
+    ctx.fillStyle=hc; ctx.beginPath(); ctx.ellipse(0,-2,9,4.2,0,0,7); ctx.fill(); ctx.beginPath(); ctx.ellipse(-1,-6,4,3.6,0,0,7); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(7,-3); ctx.quadraticCurveTo(12,-3,12,-10); ctx.lineTo(14,-10); ctx.lineTo(14,-8); ctx.lineTo(12,-6); ctx.quadraticCurveTo(12,0,7,0); ctx.closePath(); ctx.fill();
+  } else {
+    ctx.fillStyle=hd; const L=[[-6,1],[-3,-1],[4,1],[7,-1]]; for(const [lx,ph] of L){ const a=gal*ph*0.6; ctx.save(); ctx.translate(lx,1); ctx.rotate(a); ctx.fillRect(-0.8,0,1.6,8); ctx.restore(); }
+    ctx.fillStyle=hc; ctx.beginPath(); ctx.ellipse(0,-1,9,4,0,0,7); ctx.fill();                 // the barrel
+    ctx.beginPath(); ctx.moveTo(6,-3); ctx.lineTo(10,-9); ctx.lineTo(13,-8); ctx.lineTo(9,-1); ctx.closePath(); ctx.fill();   // the neck
+    ctx.beginPath(); ctx.ellipse(13,-8,3.2,1.8,0.5,0,7); ctx.fill();                             // the head
+    ctx.fillStyle=hd; ctx.fillRect(8,-10,3,1.2); ctx.beginPath(); ctx.moveTo(-9,-2); ctx.quadraticCurveTo(-13,0,-12,5+gal); ctx.lineTo(-10,4); ctx.closePath(); ctx.fill();   // mane and tail
+    if(S.barded){ ctx.fillStyle=S.rider; ctx.beginPath(); ctx.ellipse(0,-0.5,9.4,4.6,0,0,7); ctx.fill(); ctx.fillStyle=shade(S.rider,-40); for(let yy=-4;yy<4;yy+=1.6) for(let xx=-8;xx<9;xx+=1.8) ctx.fillRect(xx+((yy*1.25)|0)%2*0.9,yy,1.1,0.7);
+      ctx.fillStyle=S.rider; ctx.beginPath(); ctx.moveTo(6,-3); ctx.lineTo(10,-9.5); ctx.lineTo(14,-8.5); ctx.lineTo(9,-1); ctx.closePath(); ctx.fill(); }
+  }
+  // the rider: thighs on the barrel, torso up, head, and the people's headgear and weapon
+  const ry=S.camel? -8 : -4;
+  ctx.fillStyle=S.tunic; ctx.fillRect(-2,ry-2,5,3); ctx.fillRect(-1.5,ry-9,4,8);
+  ctx.fillStyle=S.armor? shade(S.tunic,-25) : S.tunic; if(S.armor){ for(let yy=ry-8;yy<ry-2;yy+=1.4) ctx.fillRect(-1.5,yy,4,0.6); }
+  ctx.fillStyle='#caa06a'; ctx.fillRect(-1,ry-12,3,3);
+  const hcap=S.helm==='steppe_cap'? '#6a4a2a' : S.helm==='pagri'? '#e8e0d0' : S.helm==='he_guan'? '#1a1a1a' : S.helm? '#b9c0c8' : '#1e1410';
+  ctx.fillStyle=hcap; ctx.fillRect(-1.4,ry-13.6,3.8,1.8); if(S.helm==='steppe_cap'){ ctx.fillStyle='#e8e0d0'; ctx.fillRect(-1.6,ry-12.4,4.2,0.8); } if(S.helm && /galea|persian|kushan|dou/.test(S.helm)){ ctx.fillStyle=S.crest; ctx.fillRect(-0.4,ry-15.2,1.8,1.6); }
+  const W_=(S.arm==='bow'||S.archer==='bow')? 'bow' : S.arm;
+  if(W_==='bow'){ ctx.strokeStyle='#4a2e14'; ctx.lineWidth=0.9; ctx.beginPath(); ctx.arc(4,ry-7,4.6,-1.3,1.3); ctx.stroke(); ctx.strokeStyle='#e8e0d0'; ctx.lineWidth=0.4; ctx.beginPath(); ctx.moveTo(4+4.6*Math.cos(-1.3),ry-7+4.6*Math.sin(-1.3)); ctx.lineTo(1,ry-7); ctx.lineTo(4+4.6*Math.cos(1.3),ry-7+4.6*Math.sin(1.3)); ctx.stroke(); }
+  else { ctx.strokeStyle='#8a6a44'; ctx.lineWidth=0.9; ctx.beginPath(); ctx.moveTo(-4,ry-2); ctx.lineTo(16,ry-11); ctx.stroke(); ctx.fillStyle='#dfe6ee'; ctx.beginPath(); ctx.moveTo(18,ry-12); ctx.lineTo(15,ry-12); ctx.lineTo(16,ry-10); ctx.closePath(); ctx.fill(); }
+  ctx.restore();
+}
+/* ---- the elephant: grey, with a caparison in the army's colour, tusks, and a howdah with an archer in it ---- */
+function drawStyledElephant(sx,sy,facing,S,i,sc){
+  const k=(sc||1)*1.1, t=BT.t*0.12+i*1.7, st=Math.sin(t), f=facing;
+  ctx.save(); ctx.translate(Math.round(sx), Math.round(sy)); ctx.scale(f*k, k);
+  ctx.fillStyle='#5a5a5e'; for(const [lx,ph] of [[-8,1],[-4,-1],[5,1],[9,-1]]){ ctx.fillRect(lx,-1+st*ph*0.6,4,10-st*ph*0.6); }
+  ctx.fillStyle='#7a7a80'; ctx.beginPath(); ctx.ellipse(0,-6,13,8,0,0,7); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(12,-9,6,6,0,0,7); ctx.fill();                                       // the head
+  ctx.strokeStyle='#7a7a80'; ctx.lineWidth=2.6; ctx.lineCap='round'; ctx.beginPath(); ctx.moveTo(16,-7); ctx.quadraticCurveTo(20,-2+st,17,5); ctx.stroke(); ctx.lineCap='butt';   // the trunk
+  ctx.strokeStyle='#efe8d8'; ctx.lineWidth=1.2; ctx.beginPath(); ctx.moveTo(15,-5); ctx.quadraticCurveTo(19,-3,20,-6); ctx.stroke();         // the tusk
+  ctx.fillStyle='#6a6a70'; ctx.beginPath(); ctx.ellipse(9,-9,3.4,5,0.3,0,7); ctx.fill();          // the ear
+  ctx.fillStyle=S.stdC||S.tunic; ctx.fillRect(-10,-12,18,9); ctx.fillStyle=S.stdD||'#e8c34a'; ctx.fillRect(-10,-4,18,1.2); for(let x=-9;x<8;x+=3) ctx.fillRect(x,-3,1,2);   // the caparison
+  ctx.fillStyle='#6a4a2a'; ctx.fillRect(-7,-19,12,7); ctx.fillStyle=S.stdD||'#e8c34a'; ctx.fillRect(-7,-19,12,1);   // the howdah
+  ctx.fillStyle='#caa06a'; ctx.fillRect(-3,-23,2.4,4); ctx.fillStyle=S.helm==='pagri'||!S.helm? '#e8e0d0' : '#b9c0c8'; ctx.fillRect(-3.4,-24.4,3.2,1.6);
+  ctx.strokeStyle='#4a2e14'; ctx.lineWidth=0.8; ctx.beginPath(); ctx.arc(1,-21,3.2,-1.3,1.3); ctx.stroke();
+  ctx.restore();
+}
+/* ---- the standard: each people's own ---- */
+function drawStyledStandard(bx,by,facing,S){
+  const f=facing, t=BT.t, wv=(x)=>Math.sin(t*0.18+x*0.5)*1.2;
+  px(bx,by-26,2,38,'#5a4028'); px(bx,by-26,1,38,'#7a5a38');
+  const L=(x)=>bx+(f>0? 2+x : -x);     // a point along the flag, away from the pole
+  switch(S.std){
+    case 'vexillum': px(bx-6,by-24,14,1,'#7a5a38'); ctx.fillStyle=S.stdC; ctx.fillRect(bx-5,by-23,12,11); ctx.fillStyle=S.stdD; ctx.fillRect(bx-5,by-23,12,1); for(let x=-5;x<7;x+=2) ctx.fillRect(bx+x,by-12,1,2);
+      ctx.fillStyle='#e8c34a'; ctx.fillRect(bx-3,by-31,7,2); ctx.fillRect(bx,by-34,2,3); ctx.fillRect(bx-4,by-33,2,2); ctx.fillRect(bx+3,by-33,2,2); break;   // the eagle, wings out
+    case 'banner': { ctx.fillStyle=S.stdC; ctx.beginPath(); ctx.moveTo(L(0),by-30); for(let x=0;x<=15;x+=3) ctx.lineTo(L(x),by-30+wv(x)); for(let x=15;x>=0;x-=3) ctx.lineTo(L(x),by-6+wv(x)); ctx.closePath(); ctx.fill();
+      ctx.fillStyle=shade(S.stdC,50); for(let k2=0;k2<4;k2++) ctx.fillRect(L(15),by-29+k2*6+wv(15),f>0? 2 : -2,3);          // the streamers down the fly
+      if(S.glyph){ ctx.save(); ctx.fillStyle='#f8f0dc'; ctx.strokeStyle=shade(S.stdC,-60); ctx.lineWidth=1; ctx.font='900 13px "Noto Serif CJK SC","Noto Sans CJK SC","Songti SC",serif'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.strokeText(S.glyph, L(7.5), by-18+wv(7)); ctx.fillText(S.glyph, L(7.5), by-18+wv(7)); ctx.restore(); }
+      px(bx-1,by-29,4,3,'#c8a040'); break; }
+    case 'tug': { px(bx-2,by-30,6,2,'#c8a040'); px(bx,by-34,2,4,'#c8a040'); for(let s=0;s<6;s++){ const sx=bx-3+s*1.4, sw=Math.sin(t*0.2+s)*1.5; ctx.strokeStyle=S.stdC; ctx.lineWidth=1.2; ctx.beginPath(); ctx.moveTo(sx,by-28); ctx.quadraticCurveTo(sx+sw,by-20,sx-f*2+sw,by-12); ctx.stroke(); } break; }
+    case 'yaktail': { px(bx-1,by-30,4,3,'#c8a040'); for(let s=0;s<7;s++){ const sx=bx-3+s*1.2, sw=Math.sin(t*0.2+s)*1.5; ctx.strokeStyle=S.stdC; ctx.lineWidth=1.4; ctx.beginPath(); ctx.moveTo(sx,by-27); ctx.quadraticCurveTo(sx+sw,by-19,sx-f*2+sw,by-10); ctx.stroke(); }
+      ctx.fillStyle='#c8342a'; ctx.fillRect(L(0),by-22,f>0? 7 : -7,4); ctx.fillStyle='#e8e0d0'; ctx.fillRect(L(0),by-18,f>0? 7 : -7,2); break; }
+    case 'draco': { ctx.fillStyle='#b9c0c8'; ctx.beginPath(); ctx.ellipse(L(2),by-26,3,2.2,0,0,7); ctx.fill(); ctx.fillStyle='#e8402a'; ctx.fillRect(L(3)-1,by-26,2,1);
+      ctx.strokeStyle=S.stdC; ctx.lineWidth=3; ctx.beginPath(); ctx.moveTo(L(4),by-26); for(let x=4;x<=22;x+=2) ctx.lineTo(L(x),by-26+Math.sin(t*0.3+x*0.4)*2.2+(x-4)*0.2); ctx.stroke(); break; }
+    case 'tamgha': case 'flag': case 'tiger': { ctx.fillStyle=S.stdC; ctx.beginPath(); ctx.moveTo(L(0),by-26); for(let x=0;x<=14;x+=2) ctx.lineTo(L(x),by-26+wv(x)); ctx.lineTo(L(18),by-21); for(let x=14;x>=0;x-=2) ctx.lineTo(L(x),by-16+wv(x)); ctx.closePath(); ctx.fill();
+      if(S.std==='tiger'){ ctx.fillStyle='#1a1410'; for(let x=2;x<14;x+=3) ctx.fillRect(L(x),by-25+wv(x),1,8); }
+      else if(S.std==='tamgha'){ ctx.strokeStyle=S.stdD||'#e8c34a'; ctx.lineWidth=0.9; const cx2=L(7), cy2=by-21+wv(7); ctx.beginPath(); ctx.moveTo(cx2-3,cy2+3); ctx.lineTo(cx2-3,cy2-2); ctx.lineTo(cx2,cy2-4); ctx.lineTo(cx2+3,cy2-2); ctx.lineTo(cx2+3,cy2+3); ctx.moveTo(cx2,cy2-4); ctx.lineTo(cx2,cy2+3); ctx.stroke(); }
+      else if(S.stdD){ ctx.fillStyle=S.stdD; ctx.beginPath(); ctx.arc(L(7),by-21+wv(7),2.2,0,7); ctx.fill(); }
+      px(bx-1,by-29,4,3,'#c8a040'); break; }
+    case 'beast': { ctx.fillStyle='#8a8a90'; ctx.beginPath(); ctx.ellipse(bx+1,by-29,5,2.6,0,0,7); ctx.fill(); ctx.fillRect(bx-3+(f>0?6:-2),by-31,2,2); ctx.fillStyle='#efe8d8'; ctx.fillRect(bx+(f>0?5:-4),by-28,2,1); break; }   // the boar
+    case 'carnyx': { ctx.strokeStyle='#a8905a'; ctx.lineWidth=1.6; ctx.beginPath(); ctx.moveTo(bx+1,by-10); ctx.lineTo(bx+1,by-30); ctx.quadraticCurveTo(bx+1+f*5,by-36,bx+1+f*7,by-31); ctx.stroke(); ctx.fillStyle='#c8642a'; ctx.fillRect(bx+f*6,by-33,3,3); break; }
+    case 'feather': { for(let s=0;s<6;s++){ const a=-1.2+s*0.45, sw=Math.sin(t*0.15+s)*0.1; ctx.strokeStyle=s%2? S.stdC : '#e8e0c8'; ctx.lineWidth=1.6; ctx.beginPath(); ctx.moveTo(bx+1,by-26); ctx.lineTo(bx+1+Math.sin(a+sw)*9,by-26-Math.cos(a+sw)*9); ctx.stroke(); } px(bx-1,by-27,4,3,'#c8b060'); break; }
+  }
+}
+/* ---- the field itself, by whose country it is ---- */
+function drawBattleLand(land, night){
+  const N=(a,b)=>night? b : a;
+  const L={ west:{h:'#8fa87c', g:'#7e6f46', g2:'#8f7d50', tuft:'#6a5a38', road:'#6e5e3a'},
+            forest:{h:'#5a7a5a', g:'#5e6a3e', g2:'#6e7a48', tuft:'#4a5a30', road:'#5e5434'},
+            steppe:{h:'#b8b888', g:'#a8a060', g2:'#b8b070', tuft:'#8a8a48', road:'#9a8a5a'},
+            plateau:{h:'#9a8a7a', g:'#8a7a58', g2:'#9a8a64', tuft:'#6a6044', road:'#7a6a4a'},
+            loess:{h:'#c8a874', g:'#b8945a', g2:'#c8a46a', tuft:'#9a7a44', road:'#a8844a'},
+            river:{h:'#7a9a7a', g:'#6a7a4a', g2:'#7a8a54', tuft:'#5a6a3a', road:'#6a5e3a'},
+            india:{h:'#a89a6a', g:'#a8784a', g2:'#b88a5a', tuft:'#8a6a3a', road:'#9a6a40'},
+            tropic:{h:'#4a7a4a', g:'#6a6a34', g2:'#7a7a40', tuft:'#4a5a2a', road:'#7a5a34'},
+            desert:{h:'#d8b880', g:'#c8a46a', g2:'#d8b47a', tuft:'#a88a54', road:'#b8945a'},
+            hills:{h:'#6a8a6a', g:'#6e7448', g2:'#7e8454', tuft:'#5a6038', road:'#6a5e3a'} }[land] || null;
+  if(!L) return false;
+  // the horizon: peaks on the plateau, long low swells on the steppe, terraced yellow earth, palms, dunes
+  if(land==='plateau'){ ctx.fillStyle=N('#8a9ab0','#2a2a40'); ctx.beginPath(); ctx.moveTo(-4,96); for(let x=0;x<=W;x+=12) ctx.lineTo(x,62+18*Math.abs(Math.sin(x*0.031))+10*Math.sin(x*0.09)); ctx.lineTo(W+4,96); ctx.fill();
+    ctx.fillStyle=N('#f4f6fa','#8a8aa0'); ctx.beginPath(); for(let x=0;x<=W;x+=12){ const y=62+18*Math.abs(Math.sin(x*0.031))+10*Math.sin(x*0.09); if(y<72){ ctx.moveTo(x-6,y+6); ctx.lineTo(x,y); ctx.lineTo(x+6,y+6); } } ctx.fill(); }
+  ctx.fillStyle=N(L.h,'#1e1a30'); ctx.beginPath(); ctx.moveTo(-4,96);
+  for(let x=0;x<=W;x+=16) ctx.lineTo(x, land==='steppe'||land==='desert'? 92-3*Math.sin(x*0.013) : land==='loess'? 86-((x/40|0)%2)*6 : 88-10*Math.sin(x*0.02)-6*Math.sin(x*0.05));
+  ctx.lineTo(W+4,96); ctx.fill();
+  px(-4,96,W+8,H-96,N(L.g,'#3c3626')); px(-4,96,W+8,3,N(L.g2,'#463f2c'));
+  for(let i=0;i<160;i++){ const gy=102+((i*47)%(H-108)); px((i*89)%W,gy,1,2,N(L.tuft,'#332d1f')); }
+  px(-4,150,W+8,16,N(L.road,'#352e1e'));
+  if(land==='tropic'||land==='india'){ for(const x of [24,70,410,452]){ px(x,70,2,28,N('#5a4a2a','#1a1810')); ctx.fillStyle=N('#3a6a2a','#141e14'); for(let a=0;a<5;a++){ ctx.beginPath(); ctx.ellipse(x+1+Math.cos(a*1.26)*6,70+Math.sin(a*1.26)*2,7,2,a*1.26,0,7); ctx.fill(); } } }
+  if(land==='desert'){ ctx.fillStyle=N('#e0c48a','#3a3424'); for(const [x,w2] of [[40,80],[200,120],[380,100]]){ ctx.beginPath(); ctx.ellipse(x,98,w2/2,8,0,Math.PI,0); ctx.fill(); } }
+  if(land==='loess'){ ctx.strokeStyle=N('rgba(120,90,40,.4)','rgba(0,0,0,.3)'); ctx.lineWidth=1; for(let k=0;k<3;k++){ ctx.beginPath(); ctx.moveTo(0,90-k*3); ctx.lineTo(W,90-k*3); ctx.stroke(); } }
+  if(land==='river'){ ctx.fillStyle=N('#6a9ab8','#1a2a3a'); ctx.fillRect(-4,96,W+8,4); ctx.fillStyle=N('#9ac0d8','#2a3a4a'); for(let x=0;x<W;x+=14) ctx.fillRect(x+((BT.t*0.3)%14),97,6,1); }
+  if(land==='steppe'){ ctx.fillStyle=N('rgba(255,255,255,.18)','rgba(0,0,0,0)'); for(let k=0;k<3;k++) ctx.fillRect(0,100+k*30,W,1); }
+  return true;
 }
 /* ---- THE CARD: draw the fighter on the game canvas, lift the pixels off it, put the canvas back ---- */
 function nbCardFighter(cnv, A, fem){
@@ -57408,7 +57661,7 @@ function openLegion(){
      <div style="height:8px;background:#2a1f16;border-radius:4px;margin-top:5px;overflow:hidden">
        <div style="height:100%;width:${nxt?Math.min(100,Math.round(((G.legionRep||0)-R.need)/(nxt.need-R.need)*100)):100}%;background:var(--gold)"></div></div>`;
   const b=$('legion-body'); b.innerHTML='';
-  const list=CAMPAIGNS.slice().sort(()=>Math.random()-0.5).slice(0,3);
+  const list=(((typeof playerWorld==='function') && playerWorld()==='east')? CAMPAIGNS_EAST : CAMPAIGNS).slice().sort(()=>Math.random()-0.5).slice(0,3);
   if(!legionOffers || legionOffersDay!==G.day){ legionOffers=list; legionOffersDay=G.day; }
   legionOffers.forEach(cp=>{
     const card=document.createElement('div'); card.className='shopcard';
@@ -57478,6 +57731,20 @@ function campaignOdds(cp){
   const power=campaignPower(), enemy=campaignEnemy(cp);
   return clamp(power/(power+enemy) + (G.smarts||5)*0.012, 0.08, 0.94);
 }
+/* ⚔ THE EASTERN WARS OF THE YEAR 200. A career in Luoyang was being offered the Chatti and the Dacian hills. */
+const CAMPAIGNS_EAST=[
+  {id:'guandu', name:'THE CROSSING AT GUANDU',   where:'Yan Province',   diff:3, style:'han_yuan', foe:'YUAN SHAO’S HOST', blurb:'Yuan Shao has come over the Yellow River with ten men to every one of yours. His grain is at Wuchao, and it is lightly guarded.'},
+  {id:'xbraid', name:'THE XIANBEI RAID',         where:'Bing Province',  diff:2, style:'xianbei',  foe:'KEBINENG’S RIDERS', blurb:'Kebineng’s horsemen are over the frontier and burning the farms north of Jinyang. They will not stand; make them.'},
+  {id:'qiang',  name:'THE QIANG RISE AGAIN',     where:'Liang Province', diff:2, style:'plateau',  foe:'THE SHAODANG AND XIANLING', blurb:'Two Qiang tribes are out together and Guzang is cut off. Sixty years of this and the treasury still pays for it.'},
+  {id:'wolf',   name:'WHITE WOLF MOUNTAIN',      where:'Wuhuan',         diff:3, style:'wuhuan',   foe:'TADUN’S WUHUAN', kind:'ambush', blurb:'Four hundred miles of roadless hills, and Tadun’s camp at the end of them before he knows you are coming.'},
+  {id:'shanyue',name:'INTO THE SHANYUE HILLS',   where:'Kuaiji',         diff:1, style:'yue',      foe:'SHANYUE HILLMEN', blurb:'The hill Yue have come down on the rice villages again. Go up after them, into country with no roads.'},
+  {id:'river',  name:'THE YANGTZE CROSSING',     where:'Jing Province',  diff:2, style:'han_liu',  foe:'LIU BIAO’S MARINES', blurb:'Liu Biao’s river fleet holds the crossing at Xiakou. Take the bank and the boats are yours.'},
+  {id:'linyi',  name:'THE ELEPHANTS OF LINYI',   where:'Jiaozhi',        diff:2, style:'cham',     foe:'LINYI WAR-ELEPHANTS', blurb:'The kingdom that broke away in 192 has taken the southern counties, and its elephants are on the road to Jiaozhi.'},
+  {id:'liao',   name:'THE LIAODONG FORTS',       where:'Liaodong',       diff:2, style:'korean',   foe:'GOGURYEO ARMOURED HORSE', blurb:'Goguryeo’s armoured lancers are over the Yalu on armoured horses, and the Gongsun want them sent home.'},
+  {id:'roof',   name:'THE ROOF OF THE WORLD',    where:'Zhangzhung',     diff:3, style:'plateau',  foe:'ZHANGZHUNG RIDERS', blurb:'Up past the Kunlun, where the air is too thin for your horses and not for theirs.'},
+  {id:'satrap', name:'THE SAKA SATRAPS',         where:'Malwa',          diff:2, style:'indian',   foe:'THE WESTERN KSHATRAPAS', blurb:'The satraps of Ujjain are pushing east again, with elephants in the van and archers on the elephants.'},
+];
+const CAMPAIGN_STYLE={germ:'germanic', dacia:'dacian', desert:'desert', parth:'parthian', brit:'celt', revolt:'usurper'};
 const CAMPAIGN_FOE={germ:'CHATTI WAR-BAND', dacia:'DACIAN HILLMEN', desert:'CAMEL RAIDERS', parth:'CATAPHRACTS', brit:'PAINTED TRIBES', revolt:'THE USURPER’S LEVIES'};
 /* your losses come off Rome's men first (Rome replaces them) and off yours in proportion to what you brought */
 function legionTakeLosses(lost){ const raised=armySize(), tot=Math.max(1,armyCommand()); let mine=Math.round(lost*raised/tot), left=mine;
@@ -57487,8 +57754,8 @@ function runCampaign(cp){
   if(state==='battle') return;
   const odds=campaignOdds(cp), won=Math.random()<odds, R=milRank(), men=Math.max(1,armyCommand());
   const lost=Math.round(men*(won?rnd(0.05,0.15):rnd(0.2,0.4))), foe=Math.max(60,Math.round(campaignEnemy(cp)/1.45*rnd(0.9,1.1)));
-  const kind=cp.id==='brit'? 'ambush' : cp.id==='revolt'? 'siege' : 'field';
-  armyBattle({title:cp.name, sub:cp.where+' — '+R.name, enemyName:CAMPAIGN_FOE[cp.id]||'THE ENEMY', yourMen:men, enemyMen:foe, kind, night:kind==='ambush',
+  const kind=cp.kind || (cp.id==='brit'? 'ambush' : cp.id==='revolt'? 'siege' : 'field');
+  armyBattle({title:cp.name, sub:cp.where+' — '+R.name, enemyName:cp.foe||CAMPAIGN_FOE[cp.id]||'THE ENEMY', enemyStyle:cp.style||CAMPAIGN_STYLE[cp.id], yourMen:men, enemyMen:foe, kind, night:kind==='ambush',
     forceWin:won, yourLoss:lost, onWin:()=>campaignAfter(cp,true,lost), onLose:()=>campaignAfter(cp,false,lost)});
 }
 function campaignAfter(cp, won, lost){
