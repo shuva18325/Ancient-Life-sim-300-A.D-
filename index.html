@@ -119,6 +119,8 @@
      seat, with a hairline to the label — so the pin's own dot comes off */
   #region-layer.rome .region{transform:translate(-50%,calc(-100% - 4px));}
   #region-layer.rome .region:hover{transform:translate(-50%,calc(-100% - 4px)) scale(1.12);}
+  #region-layer.rome .region.wa{transform:translate(-50%,-50%);}
+  #region-layer.rome .region.wa:hover{transform:translate(-50%,-50%) scale(1.12);}
   .region.wa::after{display:none;}
   .region.wa{padding:0 4px 0 2px;letter-spacing:0;}
   .dot{width:10px;height:10px;background:var(--gold);border:2px solid #000;display:inline-block;}
@@ -3089,7 +3091,7 @@ function localCulture(){
   const byTheatre={ italia:'roman', asia:'greek', persia:'persian',
                     germania:'germanic', gallia:'celt', iberia:'celt',
                     africa:'numidian' };
-  { const RE=(typeof REGION_EAST_BY_ID!=='undefined')? REGION_EAST_BY_ID[G.current] : null;
+  { const RE=((typeof REGION_EAST_BY_ID!=='undefined')? REGION_EAST_BY_ID[G.current] : null) || (R && R.cul? R : null);
     if(!byRegion[G.current] && RE && RE.cul) return cultureById(RE.cul); }
   return cultureById(byRegion[G.current] || byTheatre[th] || playerCulture().id);
 }
@@ -25116,7 +25118,7 @@ const PEOPLE_LORE={ zhangzhung:'plateau', bod:'plateau', sumpa:'plateau', qiang:
 function poseLore(){
   let id='roman';
   try{ id=localCulture().id||'roman'; }catch(e){}
-  try{ const R=(typeof REGION_EAST_BY_ID!=='undefined')? REGION_EAST_BY_ID[G.current] : null, lk=R && R.people && PEOPLE_LORE[R.people];
+  try{ const R=((typeof REGION_EAST_BY_ID!=='undefined')? REGION_EAST_BY_ID[G.current] : null) || ((typeof REGION_BY_ID!=='undefined')? REGION_BY_ID[G.current] : null), lk=R && R.people && PEOPLE_LORE[R.people];
     if(lk && POSE_LORE[lk]){ const L2=POSE_LORE[lk]; return (L2.inherit && !L2.names)? Object.assign({}, POSE_LORE[L2.inherit], {frame:L2.frame, src:L2.src, order:L2.order}) : L2; } }catch(e){}
   const L=POSE_LORE[id]||POSE_LORE.roman;
   if(L.inherit && !L.names) return Object.assign({}, POSE_LORE[L.inherit], {frame:L.frame, src:L.src, order:L.order});
@@ -56885,6 +56887,7 @@ function buildRegions(){
   const _wa = (_pw==='wa');
   if(_wa && typeof layoutWaPins==='function' && !WA_PIN_POS.Yamashiro) layoutWaPins();
   if(_pw==='east' && typeof layoutEastPins==='function' && !EAST_PIN_POS[REGIONS_EAST[0].id]) layoutEastPins();
+  if(_RS===REGIONS && typeof layoutWestPins==='function' && !WEST_PIN_POS[REGIONS[0].id]) layoutWestPins();
   _RS.forEach(r=>{
     const d=document.createElement('div');
     const unlocked=regionUnlocked(r);
@@ -56895,6 +56898,8 @@ function buildRegions(){
     if(_wa && WA_PIN_POS[r.id]){ const PP=WA_PIN_POS[r.id];
       d.style.left=PP.pct.x+'%'; d.style.top=PP.pct.y+'%'; d.classList.add('wa'); }
     else if(_pw==='east' && typeof EAST_PIN_POS!=='undefined' && EAST_PIN_POS[r.id]){ const PP=EAST_PIN_POS[r.id];
+      d.style.left=PP.pct.x+'%'; d.style.top=PP.pct.y+'%'; d.classList.add('wa'); }
+    else if(_RS===REGIONS && typeof WEST_PIN_POS!=='undefined' && WEST_PIN_POS[r.id]){ const PP=WEST_PIN_POS[r.id];
       d.style.left=PP.pct.x+'%'; d.style.top=PP.pct.y+'%'; d.classList.add('wa'); }
     else { d.style.left=r.x+'%'; d.style.top=r.y+'%'; }
     d.textContent=(shut?'⛔ ':'')+(owned?'♦ ':(G.cleared[r.id]?'✓ ':''))+(imperial?'✦ ':'')+r.id;
@@ -65362,8 +65367,8 @@ function asiaPeopleFor(eth, opts){
   if(opts.people===null) return null;
   if(opts.people && ASIA_PEOPLES[opts.people]) return Object.assign({id:opts.people}, ASIA_PEOPLES[opts.people]);
   let w='west'; try{ w=playerWorld(); }catch(e){}
-  if(w!=='east') return null;
-  const here=(typeof G!=='undefined' && G)? G.current : null, R=here && REGION_EAST_BY_ID[here];
+  if(w!=='east' && w!=='west') return null;
+  const here=(typeof G!=='undefined' && G)? G.current : null, R=here && (REGION_EAST_BY_ID[here] || (w==='west' && typeof REGION_BY_ID!=='undefined'? REGION_BY_ID[here] : null));
   const local=R && R.people;
   const pool=[];
   for(const id in ASIA_PEOPLES) if(ASIA_PEOPLES[id].cul===eth) pool.push(id);
@@ -65374,7 +65379,7 @@ function asiaPeopleFor(eth, opts){
   return id? Object.assign({id}, ASIA_PEOPLES[id]) : null;
 }
 function asiaPeopleHere(){
-  try{ const R=REGION_EAST_BY_ID[G.current]; return R && R.people? ASIA_PEOPLES[R.people] : null; }catch(e){ return null; }
+  try{ const R=REGION_EAST_BY_ID[G.current] || REGION_BY_ID[G.current]; return R && R.people? ASIA_PEOPLES[R.people] : null; }catch(e){ return null; }
 }
 /* =====================================================================
    AND THE NATIONS AT THE WESTERN EDGE OF THE SHEET — Parthia and Persis,
@@ -65943,6 +65948,141 @@ const REGION_EAST_BY_ID={}; REGIONS_EAST.forEach(r=>REGION_EAST_BY_ID[r.id]=r);
     try{ if(REPUTATION_REACH[r.id]===undefined) REPUTATION_REACH[r.id]=0.01; }catch(e){}
   }
 })();
+/* =====================================================================
+   THE PEOPLES BEYOND ROME'S FRONTIER — as provinces you can go to, and
+   wives from them. Women's names are real where a source gives one
+   (Medb and Emer of the Irish tales; Fritigil, the Marcomannic queen who
+   wrote to Ambrose; Bissula, Ausonius's Alamannic girl; Gaatha the Gothic
+   queen; Aqmat and Hagar of the Palmyrene busts; Shalmath of Edessa);
+   elsewhere they follow the nearest stock and are flagged.
+   ===================================================================== */
+Object.assign(ASIA_PEOPLES, {
+  caledonian:{cul:'celt', adj:'Caledonian', names:['Uenta','Talorca','Drusta','Nechtana','Cinioda','Morcana','Eithne','Argentea'],
+    surn:['of the Caledonii','of the Maeatae','of the Tay','of the painted ones'], skin:'#eccaa8', hair:['#a8481e','#6a3a1e','#d8a038'], dressN:'#3a5a8a', dressP:'#8a7a5a',
+    note:'North of the Antonine Wall: the Caledonii and the Maeatae, who paint and tattoo themselves. When Julia Domna teased a Caledonian chief’s wife about their free marriages, she answered that Caledonian women take the best men openly, while Roman women are seduced in secret by the worst — Cassius Dio wrote it down.',
+    perk:'Painted spearmen and a woman who has an answer for an empress.'},
+  irish:{cul:'celt', adj:'Irish', names:['Medb','Emer','Deirdre','Macha','Étaín','Gráinne','Niamh','Scáthach'],
+    surn:['of the Ulaid','of the Connachta','of the Laigin','of Mumu','of Tara'], skin:'#f0d0b4', hair:['#a8481e','#3a2412','#c86a2a'], dressN:'#2a6a3a', dressP:'#8a7a5a',
+    note:'Four kingdoms and no Romans: Agricola said he could take the island with one legion and never tried. The law the poets will write down lets a woman own her property, divorce her husband, and claim her own honour-price — and Medb of Connacht, in the tale, starts a war over a bull because her husband owns one better than hers.',
+    perk:'Cattle — the only wealth that counts here — and a druid in the family.'},
+  frisian:{cul:'germanic', adj:'Frisian', names:['Wiba','Frea','Ida','Thiadburg','Reinsuid','Gerburg','Liudgard','Hilda'],
+    surn:['of the terpen','of the Frisii','of the Flevo lake','of the salt marsh'], skin:'#f0d0b4', hair:['#e6c860','#c9a83e','#a87a3a'], dressN:'#4a6a8a', dressP:'#8a7a5a',
+    note:'Frisians live on mounds of turf raised above the tides. They paid Rome a tax in ox-hides until a Roman officer demanded hides the size of an aurochs, and then they hanged the tax-collectors — Tacitus tells it.',
+    perk:'Cattle on the salt marsh and boats that go anywhere the North Sea does.'},
+  jute:{cul:'germanic', adj:'Jutish', names:['Hildeburh','Wealhtheow','Freawaru','Hygd','Eadgyth','Osgifu','Sigrid','Thyra'],
+    surn:['of the Iutae','of the Angli','of the Saxones','of the Jutland halls'], skin:'#f0d0b4', hair:['#e6c860','#d8b84a','#a87a3a'], dressN:'#7a3a2a', dressP:'#8a7a5a',
+    note:'The Jutes, the Angles and the Saxons hold the neck of Jutland and the coast south of it — the Saxons named for the seax, their long knife. In two centuries all three will cross the sea to Britain and give it a new name.',
+    perk:'A hall with a boat-shed, and kin who sail.'},
+  herul:{cul:'germanic', adj:'Herul', names:['Alawina','Hrodlind','Sunild','Gisla','Ingunn','Arnvor','Ragnhild','Vigdis'],
+    surn:['of the Heruli','of the Danish isles','of the rune-carvers','of Zealand'], skin:'#f0d0b4', hair:['#e6c860','#c9a83e'], dressN:'#5a4a6a', dressP:'#8a7a5a',
+    note:'The Heruli are famous as light-armed fighters who go into battle nearly bare — and the oldest rune-stones call their carver erilaz, which may simply be the Heruls’ own name.',
+    perk:'Warriors for hire to anyone, Rome included, and a runemaster at the wedding.'},
+  goth:{cul:'germanic', adj:'Gothic', names:['Gaatha','Duda','Amala','Hildegund','Sunilda','Ostrogotho','Amalaberga','Thiudigotho'],
+    surn:['of the Gutones','of the Amal clan','of the Vistula','of Gothiscandza'], skin:'#f0d0b4', hair:['#e6c860','#c9a83e','#8a5a2a'], dressN:'#6a2a3a', dressP:'#8a7a5a',
+    note:'The Gutones of the Vistula are on the move: within a generation they will stand on the Black Sea and the Romans will call them Goths. Their kings are of the Amal clan, and they say their people came out of an island called Scandza.',
+    perk:'A people on the march, with all the plunder that implies.'},
+  venedi:{cul:'germanic', adj:'Venedian', names:['Mila','Vesna','Lada','Dobra','Zora','Rada','Ljuba','Bela'],
+    surn:['of the Venedi','of the Pripet','of the forest villages','of the Vistula marshes'], skin:'#f0d0b4', hair:['#c9a83e','#8a5a2a','#5a3a1e'], dressN:'#8a6a3a', dressP:'#8a7a5a',
+    note:'Tacitus could not decide whether the Venedi were Germans or Sarmatians: they build houses and fight on foot like Germans, but range and raid like Sarmatians. In four centuries their descendants will be called Slavs.',
+    perk:'Honey, wax, furs, and every forest path between the Vistula and the Dnieper.'},
+  aesti:{cul:'germanic', adj:'Aestian', names:['Laima','Austra','Saule','Rasa','Gabija','Milda','Daina','Jurate'],
+    surn:['of the amber coast','of the Aesti','of the lagoons','of the boar-masks'], skin:'#f0d0b4', hair:['#e6c860','#d8b84a'], dressN:'#c8a034', dressP:'#8a7a5a',
+    note:'The Aesti gather amber on the beach — glaesum, they call it — and sell it raw to Roman traders, astonished at the price they are paid, Tacitus says. They worship the mother of the gods and wear boar-masks in her honour.',
+    perk:'Amber, by the sack, sold at Carnuntum for its weight in silver.'},
+  marcomanni:{cul:'germanic', adj:'Marcomannic', names:['Fritigil','Ramis','Gundrada','Hildeburga','Wiliburg','Theudelinda','Agilburga','Gisela'],
+    surn:['of the Marcomanni','of Bohemia','of the Quadi','of Maroboduus’s line'], skin:'#f0d0b4', hair:['#e6c860','#a87a3a'], dressN:'#5a6a3a', dressP:'#8a7a5a',
+    note:'Bohemia’s Marcomanni fought Marcus Aurelius for fourteen years — the Column in Rome is their war — and two centuries from now their queen, Fritigil, will write to the bishop of Milan asking to be taught the faith.',
+    perk:'A people who fought Rome to a standstill, and the Amber Road through their country.'},
+  alamanni:{cul:'germanic', adj:'Alamannic', names:['Bissula','Ricula','Hrodberga','Swanila','Gerlind','Odila','Hildegard','Liuba'],
+    surn:['of the Main','of the Alamanni','of the Black Forest','of the Neckar'], skin:'#f0d0b4', hair:['#e6c860','#d8b84a'], dressN:'#3a5a7a', dressP:'#8a7a5a',
+    note:'Not yet a name in the books: in thirteen years Caracalla will fight a people beyond the Main called the Alamanni — “all men”, a gathering of tribes. A Roman poet will one day write verses to an Alamannic girl, Bissula, blue-eyed and fair, who would not be made Roman.',
+    perk:'A confederation that is about to be the Rhine frontier’s biggest problem — better inside your house than outside it.'},
+  mauri:{cul:'numidian', adj:'Moorish', names:['Tin Hinan','Tiziri','Tafsut','Thala','Taziri','Tanirt','Lalla','Tasadit'],
+    surn:['of the Baquates','of the Bavares','of the Atlas tents','of Volubilis'], skin:'#9a6a40', hair:['#141014','#2a1a12'], dressN:'#e8e0d0', dressP:'#c8b890',
+    note:'The Moors beyond the frontier sign treaties with the governor of Tingitana on bronze at Volubilis and break them on a schedule; their horsemen ride without bridles, guiding the horse with a stick and their knees.',
+    perk:'Moorish horse, the lightest and fastest in the world, and the Atlas passes.'},
+  gaetuli:{cul:'numidian', adj:'Gaetulian', names:['Tafsut','Tiziri','Thala','Tanirt','Tasadit','Lalla','Tamenzut','Taziri'],
+    surn:['of the M’zab','of the Gaetuli','of the date oases','of the rains'], skin:'#9a6a40', hair:['#141014','#2a1a12'], dressN:'#2a3a6a', dressP:'#c8b890',
+    note:'Nomads of the pre-Sahara and the M’zab, moving their tents with the rains and selling the coast cities their dates and horses; the women wear blue-black tattoos on the chin that their granddaughters will still wear two thousand years from now.',
+    perk:'Horses and dates, and the desert road south.'},
+  garamantes:{cul:'numidian', adj:'Garamantian', names:['Tin Hinan','Takama','Tamtakit','Tagurit','Tilelli','Tamadit','Tagmat','Tanina'],
+    surn:['of Garama','of the Fezzan','of the foggaras','of the four-horse chariots'], skin:'#7a4e2c', hair:['#141014','#1e1410'], dressN:'#c8342a', dressP:'#c8b890',
+    note:'The Garamantes farm the Sahara with tunnels that carry groundwater for miles, drive four-horse chariots, and buy Roman wine and glass with carnelian. Herodotus says their cattle walk backwards as they graze, because their horns curve too far forward.',
+    perk:'Carnelian, salt and the trans-Saharan road, which only Garama controls.'},
+  nasamones:{cul:'numidian', adj:'Nasamonian', names:['Takama','Tiziri','Thala','Tasadit','Lalla','Tagurit','Tanirt','Tafsut'],
+    surn:['of the Syrtes','of Augila','of the ancestor tombs','of the date harvest'], skin:'#8a5a36', hair:['#141014','#2a1a12'], dressN:'#6a4a2a', dressP:'#c8b890',
+    note:'The Nasamones of the Syrtes, Herodotus says, swear by the tombs of their ancestors and sleep on them to dream the future; every summer they go up to the oasis of Augila to bring in the dates.',
+    perk:'The date harvest of Augila and the road from the Syrtes to Egypt.'},
+  osrhoene:{cul:'greek', adj:'Edessan', names:['Shalmath','Amat','Bathsabbai','Marta','Mariam','Shamsha','Nanai','Hanna'],
+    surn:['of Edessa','of the Abgarids','of the Daisan','of the Syriac schools'], skin:'#d4a878', hair:['#1e1410','#2a1a10'], dressN:'#2a4a7a', dressP:'#c8b890',
+    note:'Edessa’s king Abgar VIII keeps his throne under Severus; his court is among the first anywhere to take the Christians seriously, and its Syriac will become the language of half the churches of Asia. The philosopher Bardaisan is writing here about the laws of different countries.',
+    perk:'A royal court with a library, and the road from Antioch to the Tigris.'},
+  palmyrene:{cul:'greek', adj:'Palmyrene', names:['Bat-Zabbai','Aqmat','Hagar','Baaltega','Shalma','Amatlat','Martha','Hadira'],
+    surn:['of Palmyra','of the caravan houses','of the Bel temple','of Tadmor'], skin:'#c8986a', hair:['#141014','#1e1410'], dressN:'#7a2a5a', dressP:'#c8b890',
+    note:'Palmyra, the caravan city in the Syrian desert, carves its dead in limestone with every jewel they owned — Aqmat and Hagar look out from their busts still. Its merchants run the India trade through Charax, and a girl born here in forty years will make herself Empress of the East.',
+    perk:'A caravan house with ships at Charax, and the Palmyrene archers.'},
+});
+Object.assign(PEOPLE_LORE, { caledonian:'celtN', irish:'celtN', frisian:'northsea', jute:'northsea', herul:'northsea', goth:'germanE', venedi:'germanE', aesti:'germanE', marcomanni:'germanE', alamanni:'germanE',
+  mauri:'libya', gaetuli:'libya', garamantes:'libya', nasamones:'libya', osrhoene:'syriac', palmyrene:'syriac' });
+Object.assign(POSE_LORE, {
+  celtN: { frame:'FREE MARRIAGE, OPENLY', src:'Cassius Dio, quoting a Caledonian chief’s wife to an empress: “we consort openly with the best men.”',
+    order:[3,0,2,1,7], names:{3:'she chooses, openly',0:'by the peat fire',2:'as the deer do it',1:'the long highland night',7:'and the rain on the turf roof'} },
+  northsea: { frame:'A LONGHOUSE ON A TERP, AND THE TIDE OUTSIDE', src:'Byre at one end, hearth at the other, and the North Sea coming in round the mound twice a day.',
+    order:[0,3,2,1,7], names:{0:'by the long hearth',3:'she rides',2:'as the cattle in the byre',1:'the long winter night',7:'and the tide going out'} },
+  germanE: { frame:'TACITUS, WHO HAD NEVER BEEN', src:'Tacitus says the Germans marry late, keep one wife, and that the bride brings the groom weapons. He was writing at Rome to shame Rome.',
+    order:[0,2,3,1,7], names:{0:'on the bed of furs',2:'from behind, as he says they do not',3:'she rides, as she rides to the war-wagons',1:'the long forest night',7:'and the shield she gave him on the wall'} },
+  libya: { frame:'A TENT IN THE PRE-SAHARA', src:'Herodotus collected Libyan marriage customs with relish and believed very little of them; this is the night, not the gossip.',
+    order:[0,3,1,2,7], names:{0:'under the goat-hair tent',3:'she rides, as Moorish women ride',1:'the cold desert night',2:'as the horses do it',7:'and the dates for morning'} },
+  syriac: { frame:'A HOUSE IN THE CARAVAN CITY', src:'Palmyrene and Edessan women are carved with their jewels and their names; this house is theirs to order.',
+    order:[0,1,3,2,5,7], names:{0:'on the dining couch',1:'the long evening, and the caravan bells',3:'she rides',2:'the merchant’s haste',5:'lifted from the cushions',7:'and the lamps of the colonnade'} },
+});
+/* real lon/lat → the percentage space the West's pins use */
+function westXY(lon,lat){ const P=MAP_PROJ; return { x:+(((lon-P.lonW)/(P.lonE-P.lonW))*100).toFixed(2), y:+(((P.latN-lat)/(P.latN-P.latS))*100).toFixed(2) }; }
+const REGIONS_FREE=[
+  {id:'Caledonia', tier:3, city:'the Caledonian hill-forts', prov:'beyond the Wall', people:'caledonian', cul:'celt', theatre:'gallia', real:[-4.0,56.55],
+   note:'North of the Antonine Wall. Severus will come here in person in eight years and die at York trying.'},
+  {id:'Hibernia', tier:3, sea:true, city:'Tara', prov:'the island Rome never tried', people:'irish', cul:'celt', theatre:'gallia', real:[-6.6,53.58],
+   note:'Four kingdoms, cattle-raids, poets, and no Romans at all.'},
+  {id:'Frisia', tier:2, sea:true, city:'the terp mounds', prov:'the salt marsh', people:'frisian', cul:'germanic', theatre:'germania', real:[5.9,53.15],
+   note:'Turf mounds above the tide, cattle, and boats; they hanged the last tax-collector.'},
+  {id:'Jutland', tier:3, sea:true, city:'the halls of the Iutae', prov:'Jutes, Angles, Saxons', people:'jute', cul:'germanic', theatre:'germania', real:[9.3,55.7],
+   note:'The three peoples who will one day cross to Britain and name it.'},
+  {id:'Danish Isles', tier:3, sea:true, city:'Zealand', prov:'the Heruli', people:'herul', cul:'germanic', theatre:'germania', real:[11.9,55.45],
+   note:'Light-armed fighters and rune-carvers on the islands between two seas.'},
+  {id:'Gothiscandza', tier:3, sea:true, city:'the Vistula mouth', prov:'the Gutones', people:'goth', cul:'germanic', theatre:'germania', real:[18.7,54.1],
+   note:'The Goths, on the move south. Within a generation they will be on the Black Sea.'},
+  {id:'Aestia', tier:3, sea:true, city:'the amber coast', prov:'the Aesti', people:'aesti', cul:'germanic', theatre:'germania', real:[21.2,55.0],
+   note:'Amber off the beach, sold raw to Roman traders for silver.'},
+  {id:'Venedia', tier:3, city:'the Pripet villages', prov:'the Venedi', people:'venedi', cul:'germanic', theatre:'germania', real:[25.5,52.4],
+   note:'Forest villages between the Vistula and the Dnieper — the people later ages will call Slavs.'},
+  {id:'Marcomannia', tier:2, city:'Bohemia', prov:'the Marcomanni', people:'marcomanni', cul:'germanic', theatre:'germania', real:[14.4,50.0],
+   note:'The people of the Marcomannic Wars, and the Amber Road running through them.'},
+  {id:'Alamannia', tier:2, city:'beyond the Main', prov:'the gathering of tribes', people:'alamanni', cul:'germanic', theatre:'germania', real:[10.4,50.1],
+   note:'A gathering of tribes beyond the Main that will soon have a name, and be the Rhine’s great problem.'},
+  {id:'Iazygia', tier:2, city:'the Tisza camps', prov:'the Iazyges', people:'sarmatian', cul:'steppe', theatre:'germania', real:[20.2,46.9],
+   note:'Sarmatian lancers on the Hungarian plain; Marcus Aurelius sent eight thousand of them to Britain.'},
+  {id:'Roxolania', tier:3, city:'the Black Sea steppe', prov:'the Roxolani', people:'sarmatian', cul:'steppe', theatre:'germania', real:[30.6,46.8],
+   note:'Lancers in scale on armoured horses, north of the Danube mouth.'},
+  {id:'Atlas Mauri', tier:2, city:'the Atlas tents', prov:'the free Moors', people:'mauri', cul:'numidian', theatre:'africa', real:[-5.8,31.4],
+   note:'The Baquates and Bavares beyond the frontier, with their bronze treaties and their bridle-less horses.'},
+  {id:'Gaetulia', tier:2, city:'the M’zab oases', prov:'the Gaetuli', people:'gaetuli', cul:'numidian', theatre:'africa', real:[3.7,32.5],
+   note:'Tents that move with the rains, dates and horses for the coast.'},
+  {id:'Garamantia', tier:3, city:'Garama', prov:'the Fezzan', people:'garamantes', cul:'numidian', theatre:'africa', real:[13.2,26.4],
+   note:'Underground canals, four-horse chariots, and the only road across the Sahara.'},
+  {id:'Nasamonia', tier:3, city:'Augila', prov:'the Syrtes', people:'nasamones', cul:'numidian', theatre:'africa', real:[21.3,29.1],
+   note:'Ancestor-tombs to swear on and sleep on, and the dates of Augila.'},
+  {id:'Osrhoene', tier:2, city:'Edessa', prov:'the kingdom of Abgar', people:'osrhoene', cul:'greek', theatre:'asia', real:[38.79,37.16],
+   note:'King Abgar VIII’s court, the Syriac schools, and Bardaisan writing on the laws of countries.'},
+  {id:'Palmyra', tier:2, city:'Palmyra', prov:'the caravan city', people:'palmyrene', cul:'greek', theatre:'asia', real:[38.27,34.55],
+   note:'Limestone busts, the India trade through Charax, and the city that will one day defy Rome.'},
+  {id:'Arabia Deserta', tier:3, city:'the tent camps', prov:'the tent Arabs', people:'arab', cul:'persian', theatre:'persia', real:[42.4,31.0],
+   note:'Tanukh and the tribes of the Syrian desert, who sell their swords and their camels to whichever empire pays.'},
+];
+REGIONS_FREE.forEach(r=>{ if(REGION_BY_ID[r.id]) return; const o=Object.assign({world:'west'}, r, westXY(r.real[0],r.real[1])); REGIONS.push(o); REGION_BY_ID[r.id]=o;
+  try{ if(!THEATRE_OF[r.id]) THEATRE_OF[r.id]=r.theatre; }catch(e){}
+  try{ if(!VENUE_REGION[r.id]) VENUE_REGION[r.id]=({celt:'feast',germanic:'holt',numidian:'amphitheatre',steppe:'nerge',persian:'maydan',greek:'theatre'})[r.cul]||'amphitheatre'; }catch(e){}
+  try{ if(REPUTATION_REACH[r.id]===undefined) REPUTATION_REACH[r.id]=0.08; }catch(e){} });
+
 /* =====================================================================
    THE RKRAI SHORE — an invented people, held to internal consistency
    ---------------------------------------------------------------------
@@ -71363,6 +71503,7 @@ function plateRelief(cfg){
     let hh=(cfg.floor||0.03)+asiaFbm(lon*0.35*nk,lat*0.35*nk)*(cfg.rough||0.10);
     for(const r of R){ if(lon<r.x0||lon>r.x1||lat<r.y0||lat>r.y1) continue; let d=1e9; for(let k=1;k<r.pts.length;k++){ const a=r.pts[k-1], b=r.pts[k]; const dd=asiaSegD(lon,lat,a[0],a[1],b[0],b[1]); if(dd<d) d=dd; }
       const n=asiaFbm(lon*0.9*nk+7,lat*0.9*nk+3); hh+=r.a*Math.exp(-(d*d)/(r.wd*r.wd*(0.6+0.8*n)))*(0.65+0.6*n); }
+    for(const [pa_,pp_] of (cfg.plateaus||[])){ const ins=asiaInPoly(pp_,lon,lat); if(!ins){ const d=asiaPolyD(pp_,lon,lat); if(d<2) hh+=pa_*0.35*Math.exp(-(d*d)/0.5); } else { const d=asiaPolyD(pp_,lon,lat); hh+=pa_*Math.min(1,d/1.4+0.35)*(0.85+0.3*asiaFbm(lon*0.6,lat*0.6)); } }
     for(const [plo,pla,pa,pr] of PK){ const dd=(lon-plo)*(lon-plo)+(lat-pla)*(lat-pla); if(dd<pr*pr*9) hh+=pa*Math.exp(-dd/(pr*pr)); }
     if(hh>0.16){ const m_=Math.min(1,(hh-0.16)*2.2), r1=1-Math.abs(2*asiaNoise(lon*1.7*nk+11,lat*1.7*nk+5)-1), r2=1-Math.abs(2*asiaNoise(lon*3.6*nk+3,lat*3.6*nk+17)-1), r3=1-Math.abs(2*asiaNoise(lon*7.4*nk,lat*7.4*nk+9)-1);
       hh+=(r1*r1*0.55+r2*r2*0.30+r3*r3*0.15-0.36)*0.30*m_; }
@@ -72633,6 +72774,117 @@ const MAP_PROVN=[ // province names that are not game regions
 ];
 const MAP_RIVERLABEL=['Rhenus','Danuvius','Nilus','Euphrates','Tigris','Rhodanus','Padus','Albis','Iberus','Borysthenes','Tanais','Oxus','Tiberis'];
 
+/* =====================================================================
+   🗺 THE ROMAN SHEET, AS A PLATE — and every people around it
+   ---------------------------------------------------------------------
+   The Roman sheet was a good vector map of the empire with the rest of
+   the world written in as four words: GERMANIA, SARMATIA, ARABIA, LIBYA.
+   But in the year 200 Germania is forty peoples, and every one of them
+   has a name a Roman officer could have told you. This is the world
+   beyond the frontier as the sources give it — Tacitus's Germania, Ptolemy,
+   Cassius Dio, the Antonine and Severan campaigns — each people a wash with
+   a band inside its border, named and placed so no name sits on another.
+   The ground under all of it is the same engraved relief as the Asian
+   sheet, from the same coastline.
+   ===================================================================== */
+const WEST_POL=[
+  /* ---- THE NORTH: the Celts Rome did not take ---- */
+  {n:'CALEDONII', s:'and Maeatae — whom Rome will call Picti', g:'Celts', c:'#8fbf7a', fs:3.4, l:[-4.2,56.7], p:[[-7.5,55.9],[-2.0,56.0],[-1.5,57.2],[-3.0,57.6],[-7.5,57.6]]},
+  {n:'ULAID', g:'Celts', c:'#a8cc8c', fs:2.4, l:[-6.6,54.7], p:[[-8.4,54.05],[-5.3,54.05],[-5.3,55.6],[-8.4,55.6]]},
+  {n:'CONNACHTA', g:'Celts', c:'#96c084', fs:2.4, l:[-9.0,53.75], p:[[-10.8,53.0],[-8.2,53.0],[-8.2,54.4],[-10.8,54.4]]},
+  {n:'LAIGIN', g:'Celts', c:'#b4d29a', fs:2.3, l:[-6.75,52.95], p:[[-7.7,52.0],[-5.8,52.0],[-5.8,54.05],[-7.7,54.05]]},
+  {n:'MUMU', s:'Munster', g:'Celts', c:'#9cc68a', fs:2.4, l:[-9.0,52.2], p:[[-10.8,51.3],[-7.7,51.3],[-7.7,53.0],[-10.8,53.0]]},
+  /* ---- THE NORTH SEA AND THE BALTIC ---- */
+  {n:'FRISII', g:'Germani', c:'#c7a3d4', fs:2.4, l:[5.9,53.15], p:[[4.6,52.5],[7.2,52.5],[7.2,53.7],[4.6,53.7]]},
+  {n:'CHAUCI', g:'Germani', c:'#b896c8', fs:2.3, l:[8.2,53.35], p:[[7.2,52.9],[9.2,52.9],[9.2,54.0],[7.2,54.0]]},
+  {n:'SAXONES', s:'of the seax, the long knife', g:'Germani', c:'#d0b0dc', fs:2.4, l:[9.7,54.0], p:[[8.6,53.3],[10.7,53.3],[10.9,54.5],[8.6,54.5]]},
+  {n:'ANGLI', g:'Germani', c:'#bfa0cf', fs:2.2, l:[9.8,54.85], p:[[8.4,54.5],[10.9,54.5],[10.9,55.25],[8.4,55.25]]},
+  {n:'IUTAE', s:'the Jutes', g:'Germani', c:'#d6bce0', fs:2.6, l:[9.2,56.2], p:[[7.8,55.25],[10.9,55.25],[11.0,57.6],[7.8,57.6]]},
+  {n:'HERULI', s:'the rune-masters', g:'Germani', c:'#c4a2d0', fs:2.3, l:[12.4,55.9], p:[[11.0,54.9],[14.6,54.9],[14.6,57.6],[11.0,57.6]]},
+  {n:'LANGOBARDI', g:'Germani', c:'#b090c4', fs:2.2, l:[11.2,53.25], p:[[10.2,52.7],[12.3,52.7],[12.3,53.8],[10.2,53.8]]},
+  {n:'RUGII', g:'Germani', c:'#d2b4de', fs:2.4, l:[14.8,54.15], p:[[12.3,53.6],[16.8,53.6],[16.8,54.8],[12.3,54.8]]},
+  {n:'GUTONES', s:'the Goths, on the move', g:'Germani', c:'#bf9ad0', fs:2.6, l:[18.6,53.95], p:[[16.8,53.2],[20.2,53.2],[20.2,54.9],[16.8,54.9]]},
+  {n:'AESTI', s:'the amber coast', g:'Balts', c:'#cdcc8e', fs:2.6, l:[22.0,55.4], p:[[20.2,54.0],[24.0,54.0],[24.5,57.6],[20.6,57.6]]},
+  {n:'VENEDI', s:'whom later ages call Slavs', g:'Balts', c:'#bfbf86', fs:3.2, l:[25.2,52.6], p:[[20.2,51.3],[30.0,51.3],[31.0,54.0],[24.0,54.0],[20.2,53.2]]},
+  /* ---- INNER GERMANIA ---- */
+  {n:'BRUCTERI', g:'Germani', c:'#c8a6d6', fs:2.1, l:[7.8,51.95], p:[[6.6,51.4],[8.7,51.4],[8.7,52.5],[6.6,52.5]]},
+  {n:'CHERUSCI', g:'Germani', c:'#b99acb', fs:2.2, l:[10.1,52.05], p:[[8.7,51.5],[11.2,51.5],[11.2,52.7],[8.7,52.7]]},
+  {n:'CHATTI', g:'Germani', c:'#d4b6e0', fs:2.3, l:[9.2,51.0], p:[[8.1,50.45],[10.2,50.45],[10.2,51.5],[8.1,51.5]]},
+  {n:'ALAMANNI', s:'"all men" — a name not yet written', g:'Germani', c:'#c09ad2', fs:2.3, l:[10.4,50.05], it:1, p:[[9.6,49.55],[12.4,49.55],[12.4,50.45],[9.6,50.45]]},
+  {n:'HERMUNDURI', g:'Germani', c:'#cdaedb', fs:2.2, l:[11.8,51.0], p:[[10.2,50.45],[13.2,50.45],[13.2,51.5],[10.2,51.5]]},
+  {n:'SEMNONES', g:'Germani', c:'#b493c6', fs:2.2, l:[13.2,52.3], p:[[11.2,51.5],[14.6,51.5],[14.6,53.2],[12.3,53.2],[11.2,52.7]]},
+  {n:'BURGUNDIONES', g:'Germani', c:'#d0b2dd', fs:2.2, l:[15.9,52.4], p:[[14.6,51.6],[17.6,51.6],[17.6,53.2],[14.6,53.2]]},
+  {n:'VANDALI', s:'the Hasdingi and Silingi', g:'Germani', c:'#bc98ce', fs:2.6, l:[17.2,50.6], p:[[14.8,49.7],[20.2,49.7],[20.2,51.6],[14.8,51.6]]},
+  {n:'MARCOMANNI', s:'Bohemia', g:'Germani', c:'#c8a8d8', fs:2.6, l:[14.1,49.7], p:[[12.3,48.75],[15.6,48.75],[15.6,50.45],[12.3,50.45]]},
+  {n:'QUADI', g:'Germani', c:'#b896ca', fs:2.4, l:[17.4,48.85], p:[[15.6,48.15],[19.3,48.15],[19.3,49.7],[15.6,49.7]]},
+  /* ---- BETWEEN THE CARPATHIANS AND THE DON ---- */
+  {n:'IAZYGES', s:'Sarmatians of the plain', g:'Sarmatae', c:'#e3c98e', fs:2.4, l:[20.2,46.7], p:[[19.1,45.3],[21.2,45.3],[21.4,47.9],[19.1,47.9]]},
+  {n:'COSTOBOCI', g:'Daci', c:'#d8a68a', fs:2.1, l:[24.6,48.8], p:[[22.6,48.0],[26.4,48.0],[26.4,49.6],[22.6,49.6]]},
+  {n:'CARPI', s:'the free Dacians', g:'Daci', c:'#cf9c80', fs:2.3, l:[26.1,47.0], p:[[24.8,46.0],[27.4,46.0],[27.4,48.0],[24.8,48.0]]},
+  {n:'BASTARNAE', g:'Daci', c:'#dbb094', fs:2.2, l:[28.5,48.6], p:[[26.4,47.6],[30.6,47.6],[30.6,49.8],[26.4,49.8]]},
+  {n:'ROXOLANI', s:'lancers in scale', g:'Sarmatae', c:'#e7d098', fs:2.8, l:[31.0,46.9], p:[[27.4,45.4],[34.0,45.4],[35.0,47.6],[27.4,47.6]]},
+  {n:'TAURI', g:'Sarmatae', c:'#d9be86', fs:1.9, l:[34.2,44.7], p:[[33.4,44.4],[35.0,44.4],[35.0,45.0],[33.4,45.0]]},
+  {n:'SARMATAE', s:'the wagon peoples', g:'Sarmatae', c:'#e9d3a0', fs:4.2, l:[37.5,49.6], p:[[30.6,47.6],[35.0,47.6],[40.0,46.6],[46.5,46.6],[48.0,52.0],[31.0,52.0],[30.6,49.8]]},
+  {n:'SIRACES', g:'Sarmatae', c:'#e0c48a', fs:2.4, l:[39.8,45.4], p:[[37.5,44.4],[42.0,44.4],[42.0,46.6],[38.0,46.6]]},
+  {n:'AORSI', g:'Sarmatae', c:'#e6cc94', fs:2.6, l:[48.6,47.6], p:[[46.5,46.6],[53.0,46.0],[55.0,48.5],[50.0,52.0],[48.0,52.0]]},
+  {n:'ALANI', g:'Sarmatae', c:'#ddbe86', fs:2.6, l:[44.6,44.2], p:[[42.0,43.4],[47.6,43.4],[47.0,45.2],[42.0,45.2]]},
+  /* ---- THE CAUCASUS ---- */
+  {n:'IBERIA', s:'Kartli', g:'Caucasus', c:'#c8a2c4', fs:2.3, l:[44.4,41.9], p:[[42.6,41.2],[46.4,41.2],[46.4,42.8],[42.6,42.8]]},
+  {n:'ALBANIA', g:'Caucasus', c:'#bf96bc', fs:2.3, l:[48.0,41.0], p:[[46.4,40.0],[49.6,40.0],[49.4,42.4],[46.4,42.4]]},
+  /* ---- LIBYA AND THE MOORS: beyond the African frontier ---- */
+  {n:'MAURI', s:'the Baquates and Bavares, beyond the frontier', g:'Mauri', c:'#e2b88e', fs:3.4, l:[-6.2,31.0], p:[[-11.0,28.6],[-1.5,28.6],[-1.5,33.6],[-4.0,33.6],[-9.0,32.6],[-11.0,31.0]]},
+  {n:'GAETULI', s:'tents and the M’zab oases', g:'Mauri', c:'#e6c49a', fs:3.2, l:[3.6,31.4], p:[[-1.5,28.6],[9.3,28.6],[9.3,33.0],[6.0,34.0],[-1.5,33.6]]},
+  {n:'GARAMANTES', s:'the desert farmers of Fezzan', g:'Mauri', c:'#d8a886', fs:3.0, l:[13.4,26.2], p:[[10.2,23.2],[17.8,23.2],[17.8,28.4],[10.2,28.4]]},
+  {n:'NASAMONES', g:'Mauri', c:'#e0b892', fs:2.6, l:[21.0,28.4], p:[[17.8,26.8],[24.6,26.8],[24.6,29.8],[17.8,29.8]]},
+  {n:'BLEMMYES', s:'camel raiders of the Eastern Desert', g:'Mauri', c:'#d4a682', fs:2.4, l:[34.4,23.8], p:[[32.8,23.0],[35.6,23.0],[35.4,25.8],[33.0,25.8]]},
+  /* ---- ARABIA ---- */
+  {n:'THAMUD', g:'Arabes', c:'#e6cf96', fs:2.4, l:[38.4,26.6], p:[[36.6,24.6],[40.4,24.6],[40.4,28.4],[37.4,28.4]]},
+  {n:'ARABES SCENITAE', s:'the tent Arabs — Tanukh and the tribes', g:'Arabes', c:'#ead6a0', fs:3.2, l:[43.4,30.2], p:[[39.4,28.4],[47.5,28.4],[47.5,32.4],[41.0,33.6],[39.4,31.0]]},
+  {n:'GERRHA', g:'Arabes', c:'#e2c88e', fs:2.2, l:[49.0,25.4], p:[[47.5,24.0],[51.0,24.0],[51.0,27.0],[47.5,27.0]]},
+  {n:'MAZUN', s:'Oman', g:'Arabes', c:'#dcc088', fs:2.2, l:[56.6,23.7], p:[[55.0,23.0],[59.5,23.0],[57.0,26.2],[55.6,25.6]]},
+  /* ---- PARTHIA'S VASSAL KINGDOMS, inside the Arsacid wash ---- */
+  {n:'HATRA', s:'which beat Severus twice', g:'Vassals', c:'#a7b4e0', fs:2.2, l:[42.6,35.0], p:[[41.6,34.6],[43.4,34.6],[43.4,36.0],[41.6,36.0]]},
+  {n:'ADIABENE', g:'Vassals', c:'#9aa9d8', fs:2.2, l:[44.3,36.6], p:[[43.4,35.7],[45.6,35.7],[45.6,37.3],[43.4,37.3]]},
+  {n:'ATROPATENE', g:'Vassals', c:'#a3b0dc', fs:2.4, l:[47.4,37.0], p:[[45.6,35.8],[49.4,35.8],[49.0,38.8],[45.6,38.4]]},
+  {n:'CHARACENE', g:'Vassals', c:'#9cacd8', fs:2.1, l:[47.5,30.4], p:[[46.4,29.6],[48.8,29.6],[48.8,31.2],[46.4,31.2]]},
+  {n:'ELYMAIS', g:'Vassals', c:'#a7b4e0', fs:2.2, l:[49.6,31.6], p:[[48.6,30.8],[51.0,30.8],[51.0,32.6],[48.6,32.6]]},
+  {n:'PERSIS', s:'the house of Sasan', g:'Vassals', c:'#97a6d6', fs:2.8, l:[53.2,29.4], p:[[51.0,27.2],[56.0,27.2],[56.0,31.2],[51.0,31.2]]},
+  {n:'HYRCANIA', g:'Vassals', c:'#a3b0dc', fs:2.2, l:[54.8,36.8], p:[[52.6,36.0],[57.0,36.0],[57.0,37.8],[52.6,37.8]]},
+  {n:'MARGIANA', s:'Merv', g:'Vassals', c:'#9aa9d8', fs:2.2, l:[61.6,37.4], p:[[59.4,36.2],[63.8,36.2],[63.8,38.6],[59.4,38.6]]},
+  {n:'SAKASTAN', s:'the house of Suren', g:'Vassals', c:'#a7b4e0', fs:2.4, l:[61.6,31.0], p:[[59.2,29.6],[64.0,29.6],[64.0,32.4],[59.2,32.4]]},
+  /* ---- CENTRAL ASIA, at the eastern edge ---- */
+  {n:'CHORASMIA', g:'Steppe', c:'#c8c8a0', fs:2.4, l:[60.6,42.0], p:[[58.6,40.6],[62.6,40.6],[62.6,43.4],[58.6,43.4]]},
+  {n:'DAHAE', g:'Steppe', c:'#d8d0a0', fs:2.4, l:[56.6,39.4], p:[[53.6,38.0],[59.4,38.0],[59.4,40.6],[53.6,40.6]]},
+  {n:'SOGDIANA', g:'Steppe', c:'#cfc89a', fs:2.6, l:[66.6,39.6], p:[[63.8,38.2],[69.8,38.2],[69.8,41.0],[63.8,41.0]]},
+  {n:'KANGJU', s:'the Syr Darya kingdom', g:'Steppe', c:'#d4cfa4', fs:2.6, l:[66.4,43.4], p:[[62.6,41.0],[69.8,41.0],[69.8,45.8],[62.6,45.8]]},
+];
+/* the bits of the world the sheet's frame cuts off, named at the edge so the reader knows they are there */
+function westWander(pp){
+  const out=[], h=(a,b)=>{ const v=Math.sin(a*127.1+b*311.7)*43758.5453; return (v-Math.floor(v))*2-1; };
+  for(let i=0;i<pp.length;i++){ const a=pp[i], b=pp[(i+1)%pp.length]; out.push(a);
+    const fwd=(a[0]<b[0])||(a[0]===b[0]&&a[1]<b[1]), A=fwd? a : b, B=fwd? b : a, dx=B[0]-A[0], dy=B[1]-A[1], L=Math.hypot(dx,dy); if(L<0.25) continue;
+    const n=Math.max(2,Math.min(9,Math.round(L/0.45))), nx=-dy/L, ny=dx/L, pts=[];
+    for(let k=1;k<n;k++){ const t=k/n, off=(h(A[0]+B[0]*0.37+t*3.1, A[1]+B[1]*0.53+t*1.7)*0.6+h(A[0]*2.1+t*7.3, B[1]*1.3+t*5.9)*0.4)*Math.min(0.85,L*0.16)*Math.sin(t*Math.PI); pts.push([A[0]+dx*t+nx*off, A[1]+dy*t+ny*off]); }
+    if(!fwd) pts.reverse(); out.push(...pts); }
+  return out; }
+WEST_POL.forEach(P=>{ P.p0=P.p; P.p=westWander(P.p); });
+const WEST_EDGE_NOTES=[
+  ['SUIONES · GOTHS OF SCANDZA ↑',15.6,56.85],['FENNI ↑',27.4,56.85],['THE FORTUNATE ISLES ←',-11.2,28.2],['KUSH · MEROË ↓',32.4,23.6],['AKSUM ↓',39.2,23.6],['HIMYAR · SABA ↓',45.2,23.6],['KUSHAN ↘',68.4,24.8]];
+/* the ranges the sheet's relief is built from */
+const WEST_PLATE_RANGES=[[0.80,0.55,[[5.6,44.2],[7.0,45.6],[8.6,46.4],[10.5,46.6],[12.5,46.9],[14.4,47.0],[16.0,47.4]]],[0.55,0.45,[[-1.8,43.0],[0.0,42.7],[1.5,42.5],[3.0,42.4]]],
+  [0.40,0.40,[[8.2,44.3],[10.6,44.1],[12.6,43.4],[13.6,42.5],[14.8,41.4],[15.9,40.3],[16.2,39.2]]],[0.55,0.65,[[-8.0,30.8],[-6.0,31.4],[-4.0,32.4],[-1.0,33.6],[2.0,34.6],[5.0,35.2],[7.0,35.2]]],
+  [0.45,0.55,[[17.6,49.6],[20.0,49.3],[23.0,48.5],[25.2,47.4],[26.0,45.8],[25.0,45.5],[22.6,45.4]]],[0.35,0.45,[[22.4,43.4],[24.4,42.8],[26.4,42.7]]],[0.40,0.40,[[14.6,45.6],[16.6,44.2],[18.6,43.0],[20.0,42.0]]],
+  [0.35,0.35,[[20.6,40.6],[21.3,39.6],[21.9,38.6]]],[0.55,0.55,[[29.6,37.0],[32.0,36.8],[34.4,37.2],[36.4,38.0],[38.6,38.4],[40.6,38.8]]],[0.70,0.55,[[44.0,38.4],[45.6,36.6],[47.6,34.8],[50.0,32.6],[52.6,30.4],[54.6,28.6],[57.0,27.6]]],
+  [0.85,0.40,[[37.4,44.6],[40.0,43.4],[42.6,42.8],[45.0,42.2],[47.4,41.6],[49.4,40.8]]],[0.60,0.40,[[48.6,37.4],[50.6,36.4],[52.6,35.8],[55.0,36.6],[57.6,37.2]]],[0.70,0.55,[[66.0,34.6],[68.0,35.2],[70.0,36.0]]],
+  [0.35,0.45,[[-5.6,56.6],[-4.6,57.2],[-3.6,57.4]]],[0.35,0.40,[[-4.0,40.4],[-2.4,40.6],[-1.0,40.8]]],[0.40,0.40,[[-3.8,37.2],[-2.6,37.1]]],[0.30,0.35,[[2.4,45.2],[3.0,44.8]]],
+  [0.30,0.35,[[35.8,33.6],[36.2,34.4],[36.4,35.0]]],[0.35,0.60,[[38.6,22.0],[39.8,25.0],[38.6,28.6],[36.4,30.0]]],[0.30,0.45,[[12.8,49.5],[14.4,50.6],[16.4,50.6]]],[0.35,0.50,[[42.0,45.6],[44.0,44.4]]]];
+const WEST_PLATE_PLATEAUS=[[0.30,[[28,38.4],[36,38.6],[41,39.6],[41,37.6],[34,36.6],[29,37.2]]],[0.35,[[50,32],[56,30],[61,31],[60,35],[54,35.2],[50,34]]],[0.18,[[-6,40],[-2,41.6],[-1,39],[-3,37.8],[-6,38.4]]],[0.22,[[40,22],[46,23],[47,27],[43,28],[40,26]]]];
+const WEST_PLATE=()=>({ key:'west', w:MAP_SHEET.W, h:MAP_SHEET.H, S:MAP_SHEET.S, rings:MAPGEO.land, Q:(lo,la)=>lonlat(lo,la),
+  inv:(x,y)=>{ const P=MAP_PROJ; return [P.lonW+x/MAP_SHEET.W*(P.lonE-P.lonW), P.latN-y/MAP_SHEET.H*(P.latN-P.latS)]; }, nk:1.5, gw:1080, zf:13,
+  sea:{a:'#a9d2e4', b:'#93c3db', c:'#82b5d1'}, ranges:WEST_PLATE_RANGES, plateaus:WEST_PLATE_PLATEAUS, peaks:[[44.3,39.7,0.6,0.35],[42.4,43.35,0.45,0.25],[15.0,37.75,0.35,0.15],[52.1,35.95,0.5,0.25]],
+  base:(lo,la,hh)=>{ const d=(typeof MAP_DESERTS!=='undefined') && MAP_DESERTS.some(p=>asiaInPoly(p,lo,la)); if(d){ const sn=asiaFbm(lo*3,la*3); return [236-sn*14,216-sn*16,166-sn*12]; }
+    const n=asiaFbm(lo*0.7,la*0.7), north=Math.max(0,Math.min(1,(la-38)/14)); return [196-north*30-n*14, 194-north*6-n*10, 150-north*12-n*10]; },
+  ramp:(hh,la)=>{ const snow=0.92-Math.max(0,la-40)*0.008; return [[0.14,null],[0.30,[208,196,150]],[0.48,[190,166,124]],[0.64,[166,136,100]],[0.78,[146,120,98]],[snow,[152,132,116]],[snow+0.14,[244,242,238]]]; } });
 function paintRomeSheet(c, held, cleared){
   const S=MAP_SHEET.S, w=MAP_SHEET.W, h=MAP_SHEET.H, Q=lonlat;
   c.setTransform(S,0,0,S,0,0); c.clearRect(0,0,w,h);
@@ -72651,22 +72903,24 @@ function paintRomeSheet(c, held, cleared){
   let _seed=7; const rnd=()=>{ _seed=(_seed*16807)%2147483647; return _seed/2147483647; };
   const strokeFlat=(a,close)=>{ const P=new Path2D(); let q=Q(a[0],a[1]); P.moveTo(q[0],q[1]); for(let i=2;i<a.length;i+=2){ q=Q(a[i],a[i+1]); P.lineTo(q[0],q[1]); } if(close) P.closePath(); c.stroke(P); };
 
-  // ===== SEA =====
-  const sg=c.createLinearGradient(0,0,0,h); sg.addColorStop(0,'#bfdeec'); sg.addColorStop(.5,'#a8d0e3'); sg.addColorStop(1,'#92c2d9');
-  c.fillStyle=sg; c.fillRect(0,0,w,h);
-  c.fillStyle='rgba(255,255,255,.22)';
-  for(let i=0;i<420;i++){ c.fillRect(rnd()*w, rnd()*h, 2+rnd()*3, .35); }
-  // shoals: pale bands hugging every coast
-  [[8,'rgba(255,255,255,.10)'],[5,'rgba(255,255,255,.14)'],[2.6,'rgba(255,255,255,.22)']].forEach(([lw,col])=>{ c.strokeStyle=col; c.lineWidth=lw; c.stroke(landPath); });
-  c.save(); c.translate(.9,1.2); c.fillStyle='rgba(40,70,85,.26)'; c.fill(landPath,'evenodd'); c.restore();
-  c.fillStyle=LAND; c.fill(landPath,'evenodd');
+  /* ===== THE GROUND: the same engraved relief as the Asian sheet, from the same Natural Earth coast ===== */
+  try{ c.drawImage(plateRelief(WEST_PLATE()),0,0,w,h); }catch(e){ const sg=c.createLinearGradient(0,0,0,h); sg.addColorStop(0,'#bfdeec'); sg.addColorStop(1,'#92c2d9'); c.fillStyle=sg; c.fillRect(0,0,w,h); c.fillStyle=LAND; c.fill(landPath,'evenodd'); }
 
   // ===== TERRITORIES (clipped to the real coast) =====
   c.save(); c.clip(landPath,'evenodd');
+  /* every people beyond the frontier: a wash, a band inside its border, and the border */
+  { const polyP=(pp)=>{ const P=new Path2D(); let q=Q(pp[0][0],pp[0][1]); P.moveTo(q[0],q[1]); for(let i=1;i<pp.length;i++){ q=Q(pp[i][0],pp[i][1]); P.lineTo(q[0],q[1]); } P.closePath(); return P; };
+    for(const P of WEST_POL){ const pp=polyP(P.p); c.globalAlpha=0.40; c.fillStyle=P.c; c.fill(pp); c.globalAlpha=1; }
+    for(const P of WEST_POL){ const pp=polyP(P.p); c.save(); c.clip(pp); c.strokeStyle=P.c; c.globalAlpha=0.6; c.lineWidth=2.0; c.stroke(pp); c.restore(); }
+    for(const P of WEST_POL){ const pp=polyP(P.p); c.strokeStyle=shade(P.c,-75); c.globalAlpha=0.7; c.lineWidth=0.35; c.setLineDash([1.6,1.0]); c.stroke(pp); c.setLineDash([]); c.globalAlpha=1; } }
+  c.globalAlpha=0.62;                                            // the empires washed over the relief so the ground shows through
   for(const k of ['client','parth','kush','rome']) (MAP_EXTRA[k]||[]).forEach(e=>{ c.fillStyle=COL[k]; c.fill(ringPath(e.ring)); });
   const ringsOf=sh=>sh.parts||[sh.ring];
   for(const id in PROV_SHAPES){ const sh=PROV_SHAPES[id], base=sh.base||sh.realm||'rome'; if(base==='barb') continue;
     c.fillStyle=COL[base]; ringsOf(sh).forEach(r=>c.fill(ringPath(r))); }
+  c.globalAlpha=1;
+  { const polyP=(pp)=>{ const P=new Path2D(); let q=Q(pp[0][0],pp[0][1]); P.moveTo(q[0],q[1]); for(let i=1;i<pp.length;i++){ q=Q(pp[i][0],pp[i][1]); P.lineTo(q[0],q[1]); } P.closePath(); return P; };
+    for(const P of WEST_POL.filter(P=>P.g==='Vassals')){ const pp=polyP(P.p); c.strokeStyle='rgba(40,56,110,.55)'; c.lineWidth=0.4; c.setLineDash([1.4,1]); c.stroke(pp); c.setLineDash([]); } }
   for(const id in PROV_SHAPES){ const sh=PROV_SHAPES[id], owned=!!held[id], done=!owned && !!cleared[id];
     if(!owned && !done) continue;
     ringsOf(sh).forEach(r=>{ const P=ringPath(r);
@@ -72675,22 +72929,6 @@ function paintRomeSheet(c, held, cleared){
         for(let d=-h; d<w+h; d+=3.2){ c.beginPath(); c.moveTo(d,0); c.lineTo(d-h,h); c.stroke(); } c.restore();
         c.strokeStyle='#8a5a12'; c.lineWidth=1.1; c.stroke(P); }
     }); }
-
-  // ===== deserts (stippled) =====
-  c.fillStyle='rgba(150,108,56,.34)';
-  MAP_DESERTS.forEach(poly=>{ let x0=1e9,x1=-1e9,y0=1e9,y1=-1e9; poly.forEach(p=>{ x0=Math.min(x0,p[0]);x1=Math.max(x1,p[0]);y0=Math.min(y0,p[1]);y1=Math.max(y1,p[1]); });
-    const n=Math.round((x1-x0)*(y1-y0)*5.5);
-    for(let i=0;i<n;i++){ const lo=x0+rnd()*(x1-x0), la=y0+rnd()*(y1-y0); if(!inPoly(poly,lo,la)) continue; const q=Q(lo,la); c.fillRect(q[0],q[1],.55,.55); } });
-
-  // ===== relief: hachured ranges =====
-  MAP_RIDGES.forEach(([nm,pts,sz])=>{
-    for(let s=0;s<pts.length-1;s++){
-      const a=Q(pts[s][0],pts[s][1]), b=Q(pts[s+1][0],pts[s+1][1]);
-      const len=Math.hypot(b[0]-a[0],b[1]-a[1]), n=Math.max(2,Math.round(len/(2.3*sz)));
-      for(let i=0;i<=n;i++){ const t=i/n, jx=(rnd()-.5)*.9, jy=(rnd()-.5)*.9, x=a[0]+(b[0]-a[0])*t+jx, y=a[1]+(b[1]-a[1])*t+jy, k=sz*(.85+rnd()*.35);
-        c.strokeStyle='rgba(112,78,44,.5)'; c.lineWidth=.5; c.beginPath(); c.moveTo(x-1.7*k,y+1.4*k); c.lineTo(x,y-1.7*k); c.lineTo(x+1.7*k,y+1.4*k); c.stroke();
-        c.strokeStyle='rgba(205,172,128,.55)'; c.beginPath(); c.moveTo(x,y-1.7*k); c.lineTo(x+1.7*k,y+1.4*k); c.stroke(); }
-    } });
 
   // ===== province seams (thin dashes) and the frontiers =====
   c.strokeStyle='rgba(120,70,40,.5)'; c.lineWidth=.45; c.setLineDash([1.6,1.5]);
@@ -72730,15 +72968,31 @@ function paintRomeSheet(c, held, cleared){
   const lab=(t,lo,la,col,font,ls)=>{ const p=Q(lo,la); c.fillStyle=col; c.font=font; c.textAlign='center';
     if(ls){ let x=p[0]-(t.length-1)*ls/2; for(const ch of t){ c.fillText(ch,x,p[1]); x+=ls; } } else c.fillText(t,p[0],p[1]); };
   const SEAC='rgba(36,84,118,.78)', LANDC='rgba(112,84,50,.62)';
-  lab('GERMANIA',14.6,53.0,LANDC,'italic 7px Georgia,serif',4.6);
-  lab('SARMATIA',31,52.6,LANDC,'italic 7px Georgia,serif',4.6);
-  lab('CALEDONIA',-4.4,56.3,LANDC,'italic 4.2px Georgia,serif',2.2);
-  lab('HIBERNIA',-8.2,53.4,LANDC,'italic 4.2px Georgia,serif',2.2);
   lab('ARMENIA',43.2,39.9,'rgba(150,72,40,.8)','italic 4.8px Georgia,serif',2.6);
   lab('PARTHIAN EMPIRE',52.5,34.6,'rgba(31,64,125,.85)','italic 6.6px Georgia,serif',3.4);
   lab('KUSHAN EMPIRE',66.0,31.5,'rgba(40,100,72,.85)','italic 5.2px Georgia,serif',2.8);
-  lab('ARABIA',44.0,25.6,LANDC,'italic 5.4px Georgia,serif',3);
-  lab('LIBYA',13.5,26.6,LANDC,'italic 6px Georgia,serif',3.4);
+  /* ===== THE PEOPLES, NAMED — each placed clear of the province tags, the cities and each other ===== */
+  { const BOX=[], pad=0.3, over=(b)=>{ let s2=0; for(const B of BOX){ const ix=Math.min(b[2],B[2])-Math.max(b[0],B[0]), iy=Math.min(b[3],B[3])-Math.max(b[1],B[1]); if(ix>0&&iy>0) s2+=ix*iy; } return s2; };
+    try{ if(!WEST_PIN_POS[REGIONS[0].id]) layoutWestPins(); for(const id in WEST_PIN_POS){ const P=WEST_PIN_POS[id]; BOX.push([P.x-P.hw-0.4,P.y-P.hh-0.4,P.x+P.hw+0.4,P.y+P.hh+0.4]); BOX.push([P.ax-1.2,P.ay-1.2,P.ax+1.2,P.ay+1.2]); } }catch(e){}
+    try{ MAP_CITIES.forEach(([nm,lo,la,side])=>{ const p=Q(lo,la), tw=nm.length*2.0; BOX.push(side==='l'? [p[0]-tw-3,p[1]-3,p[0]+1,p[1]+2] : [p[0]-1,p[1]-3,p[0]+tw+3,p[1]+2]); }); }catch(e){}
+    { const lx=w-131, ly=5; BOX.push([lx-1,ly-1,w,ly+104]); }
+    const fontOf=(fs,it,b)=>(it? 'italic ' : '')+(b? 'bold ' : '')+fs+'px Georgia,"Times New Roman",serif';
+    const meas=(t,fs,it,b,ls)=>{ c.font=fontOf(fs,it,b); const ch=[...t]; return ch.reduce((s2,k)=>s2+c.measureText(k).width,0)+(ls||0)*Math.max(0,ch.length-1); };
+    const draw=(t,x,y,fs,col,it,b,ls,halo)=>{ c.font=fontOf(fs,it,b); c.textAlign='left'; c.textBaseline='middle'; const ch=[...t], wd=meas(t,fs,it,b,ls); let xx=x-wd/2; c.font=fontOf(fs,it,b);
+      c.lineJoin='round'; c.lineWidth=Math.max(0.5,fs*0.3); c.strokeStyle=halo||'rgba(255,250,238,.8)'; for(const k of ch){ c.strokeText(k,xx,y); xx+=c.measureText(k).width+(ls||0); }
+      xx=x-wd/2; c.fillStyle=col; for(const k of ch){ c.fillText(k,xx,y); xx+=c.measureText(k).width+(ls||0); } c.textBaseline='alphabetic'; };
+    const OFFS=[]; for(let r=0;r<=9;r+=0.5) for(let k=0;k<Math.max(1,Math.round(r*2.4));k++){ const an=k/Math.max(1,Math.round(r*2.4))*Math.PI*2; OFFS.push([Math.cos(an)*r*1.5,Math.sin(an)*r*0.8]); }
+    const L=WEST_POL.slice().sort((a,b2)=>(b2.fs||3)-(a.fs||3));
+    for(const P0 of L){ const P=Object.assign({},P0,{fs:(P0.fs||3)*1.5}); const fs=P.fs, ls=Math.max(0,fs*0.12), tw=meas(P.n,fs,!!P.it,true,ls), th=fs*0.86, sfs=Math.max(2.0,fs*0.5), sw=P.s && fs>=2.3? meas(P.s,sfs,true,false,0) : 0, gap=fs*0.62+sfs*0.55;
+      const q0=Q(P.l[0],P.l[1]); let best=null, bs=1e9, withSub=false;
+      for(const ws of (sw? [true,false] : [false])){ for(const [dx,dy] of OFFS){ const x=q0[0]+dx, y=q0[1]+dy, bb=[x-Math.max(tw,ws?sw:0)/2-pad, y-th/2-pad, x+Math.max(tw,ws?sw:0)/2+pad, y+th/2+(ws? gap+sfs*0.6 : 0)+pad];
+          if(bb[0]<3||bb[1]<3||bb[2]>w-3||bb[3]>h-3) continue; let sc=over(bb)*40+Math.hypot(dx,dy*1.6)*0.6+(ws? 0 : 5); const ll=[MAP_PROJ.lonW+x/w*(MAP_PROJ.lonE-MAP_PROJ.lonW), MAP_PROJ.latN-y/h*(MAP_PROJ.latN-MAP_PROJ.latS)]; if(!asiaInPoly(P.p,ll[0],ll[1])) sc+=fs*2.5;
+          if(sc<bs){ bs=sc; best=[x,y,bb]; withSub=ws; } if(sc<0.5) break; } if(bs<4) break; }
+      if(!best) continue; const col=shade(P.c,-110);
+      draw(P.n,best[0],best[1],fs,col,!!P.it,true,ls); if(withSub) draw(P.s,best[0],best[1]+gap,sfs,shade(P.c,-95),true,false,0);
+      BOX.push(best[2]); }
+    for(const [t,lo,la] of WEST_EDGE_NOTES){ const p=Q(lo,la); draw(t,Math.min(w-34,Math.max(34,p[0])),p[1],3.2,'rgba(90,64,40,.85)',true,false,0.3); }
+  }
   lab('Mediterranean  Sea',19.2,34.3,SEAC,'italic 5.4px Georgia,serif');
   lab('Black  Sea',34.4,43.1,SEAC,'italic 5.4px Georgia,serif');
   lab('Caspian Sea',51.0,39.9,SEAC,'italic 4.2px Georgia,serif');
@@ -72772,7 +73026,7 @@ function paintRomeSheet(c, held, cleared){
     c.fillStyle='rgba(31,85,120,.95)'; c.font='bold 4.4px Georgia,serif'; c.textAlign='left'; c.fillText('Ctesiphon',p[0]+2.6,p[1]+1.4); }
 
   // ===== furniture: legend, compass, scale bar =====
-  const lx=w-131, ly=5, lw=126, lh=71;
+  const lx=w-131, ly=5, lw=126, lh=104;
   c.fillStyle='rgba(255,251,240,.94)'; c.fillRect(lx,ly,lw,lh); c.strokeStyle='#8a6a44'; c.lineWidth=.8; c.strokeRect(lx+.4,ly+.4,lw-.8,lh-.8);
   c.textAlign='left'; c.fillStyle='#5a4326'; c.font='bold 7.4px Georgia,serif'; c.fillText('The Roman Empire',lx+6,ly+11);
   c.font='italic 6px Georgia,serif'; c.fillText('c. 200 A.D. — the Severan frontier',lx+6,ly+18.5);
@@ -72782,6 +73036,10 @@ function paintRomeSheet(c, held, cleared){
   c.strokeStyle='#b0392a'; c.lineWidth=1.3; c.beginPath(); c.moveTo(lx+6,ly+60.5); c.lineTo(lx+16,ly+60.5); c.stroke();
   c.fillStyle='#5a4326'; c.font='5.4px Georgia,serif'; c.fillText('frontier',lx+20,ly+62.5);
   c.strokeStyle='#4a6ea0'; c.lineWidth=1.3; c.beginPath(); c.moveTo(lx+62,ly+60.5); c.lineTo(lx+72,ly+60.5); c.stroke(); c.fillText('Parthian frontier',lx+75,ly+62.5);
+  /* and the peoples beyond, by family */
+  [['#8fbf7a','Celts of the north'],['#c7a3d4','Germanic peoples'],['#cdcc8e','Balts and Venedi'],['#d8a68a','free Dacians'],['#e3c98e','Sarmatians and Alans'],['#c8a2c4','the Caucasus'],['#e2b88e','Moors and Libyans'],['#e6cf96','Arabs'],['#a7b4e0','Parthia’s vassal kings'],['#cfc89a','Central Asia']].forEach(([col,t],i)=>{
+    const xx=lx+6+(i%2)*60, yy=ly+67+((i/2)|0)*7.2; c.globalAlpha=0.75; c.fillStyle=col; c.fillRect(xx,yy,8,4.6); c.globalAlpha=1; c.strokeStyle='#8a6a44'; c.lineWidth=.4; c.strokeRect(xx,yy,8,4.6);
+    c.fillStyle='#5a4326'; c.font='4.4px Georgia,serif'; c.fillText(t,xx+10,yy+4); });
   { const cx=w-18, cy=h-26;
     c.strokeStyle='#8a6a44'; c.lineWidth=.8; c.beginPath(); c.arc(cx,cy,9,0,7); c.stroke(); c.fillStyle='#c9a86a';
     c.beginPath(); c.moveTo(cx-9,cy); c.lineTo(cx,cy-2.5); c.lineTo(cx+9,cy); c.lineTo(cx,cy+2.5); c.closePath(); c.fill();
@@ -72799,6 +73057,33 @@ function paintRomeSheet(c, held, cleared){
   c.strokeStyle='rgba(165,138,92,.85)'; c.lineWidth=.5; c.strokeRect(3.6,3.6,w-7.2,h-7.2);
   c.setTransform(1,0,0,1,0,0);
 }
+/* THE ROMAN SHEET'S TAGS, LAID OUT the way the Asian sheet's are: relaxed apart, each pulled home, with an ink dot at
+   the true seat and a hairline to the tag where it had to move — Germania alone now has fourteen of them. */
+const WEST_PIN_POS={};
+function layoutWestPins(){
+  const W=MAP_SHEET.W, H=MAP_SHEET.H;
+  const N=REGIONS.map(r=>{ const x=r.x*W/100, y=r.y*H/100; return { id:r.id, ax:x, ay:y, hx:x, hy:y-4.2, x:x, y:y-4.2, hw:([...r.id].length*1.74+4.8)/2, hh:2.8 }; });
+  const LEG=[W-133,3,W,112];
+  for(let it=0; it<800; it++){
+    const spring = 0.055 * Math.max(0.05, 1-it/620);
+    for(let i=0;i<N.length;i++) for(let j=i+1;j<N.length;j++){
+      const a=N[i], b=N[j]; const ox=(a.hw+b.hw+1.0)-Math.abs(a.x-b.x), oy=(a.hh+b.hh+0.8)-Math.abs(a.y-b.y);
+      if(ox<=0||oy<=0) continue;
+      if(oy*1.6<ox){ const s2=(a.y<=b.y?-1:1)*oy*0.5; a.y+=s2; b.y-=s2; } else { const s2=(a.x<=b.x?-1:1)*ox*0.5; a.x+=s2; b.x-=s2; } }
+    for(const n of N){ n.x+=(n.hx-n.x)*spring; n.y+=(n.hy-n.y)*spring;
+      if(n.x+n.hw>LEG[0] && n.y-n.hh<LEG[3]) n.x=LEG[0]-n.hw;
+      n.x=Math.max(n.hw+3, Math.min(W-n.hw-3, n.x)); n.y=Math.max(n.hh+4, Math.min(H-n.hh-4, n.y)); } }
+  N.forEach(n=>{ WEST_PIN_POS[n.id]={ x:n.x, y:n.y, ax:n.ax, ay:n.ay, hw:n.hw, hh:n.hh, pct:{ x:+(n.x/W*100).toFixed(2), y:+(n.y/H*100).toFixed(2) } }; });
+  return WEST_PIN_POS;
+}
+function drawWestSeats(){
+  try{ if(!WEST_PIN_POS[REGIONS[0].id]) layoutWestPins(); const c=mctx; c.save(); c.setTransform(MAP_SHEET.S,0,0,MAP_SHEET.S,0,0);
+    for(const r of REGIONS){ const P=WEST_PIN_POS[r.id]; if(!P) continue; const own=G.titles&&G.titles[r.id], done=G.cleared&&G.cleared[r.id], cur=G.current===r.id;
+      const ty=P.y+P.hh*(P.y<P.ay? 1 : -1);
+      if(Math.hypot(P.x-P.ax, ty-P.ay)>1.6){ c.beginPath(); c.moveTo(P.ax,P.ay); c.lineTo(P.x,ty); c.lineWidth=0.32; c.strokeStyle='rgba(58,40,22,.62)'; c.stroke(); }
+      c.beginPath(); c.arc(P.ax,P.ay,cur? 1.25 : 0.95,0,6.2832); c.fillStyle=own? '#c89a1a' : done? '#4c6b3a' : cur? '#a8452f' : '#5a3a1e'; c.fill(); c.lineWidth=0.38; c.strokeStyle='rgba(255,250,238,.95)'; c.stroke(); }
+    c.restore(); }catch(e){}
+}
 function drawMapCanvas(){
   const S=MAP_SHEET.S, w=MAP_SHEET.W, h=MAP_SHEET.H;
   mapSize(w*S,h*S);
@@ -72809,6 +73094,7 @@ function drawMapCanvas(){
     paintRomeSheet(_mapStatic.getContext('2d'), held, cleared); _mapStaticKey=key;
   }
   mctx.setTransform(1,0,0,1,0,0); mctx.imageSmoothingEnabled=true; mctx.drawImage(_mapStatic,0,0);
+  drawWestSeats();
   mctx.setTransform(S,0,0,S,0,0);
   const Q=lonlat;
   // when the King of Kings bays for war, the Roman-Parthian border burns
