@@ -2418,6 +2418,8 @@ const SECRET_SELLERS={
 /* ===== INTRIGUE: Elite Siege targets ===== */
 const ELITE_MEN=['Senator Gaius Metellus','Legate Aulus Varro','Publican Titus Rufus','Magnate Lucius Balbus',
   'Governor Sextus Priscus','Duumvir Marcus Celsus','Eques Decimus Naso','Praetor Quintus Galba'];
+const ELITE_MEN_EAST=['Excellency Yang Biao','General Dong Cheng','Minister Kong Rong','Administrator Wang Lang','Prefect Xun Yu','General Zhang Yang','Minister Hua Xin','Colonel Chen Gong'];
+const ELITE_WOMEN_EAST=['Lady Bian','Lady Ding','Lady Zhen','Lady Liu of the Yuan house','Lady Wu of the Sun house','Lady Gan','Empress Fu Shou'];
 const ELITE_WOMEN=['Domina Fulvia Metella','Matron Livia Sabina','Lady Cornelia Prisca','Domina Claudia Rufina',
   'Priestess Aemilia Vera','Lady Junia Marcella','Domina Valeria Paulla'];
 // grand-plot targets, escalating to the Emperor. needSold in real troops; enemyArmy = defenders.
@@ -2463,7 +2465,8 @@ function makeGeneral(fromSlave){
 }
 function makeElite(region){
   const isWife=Math.random()<0.42;
-  const name=pick(isWife?ELITE_WOMEN:ELITE_MEN);
+  const _eE=(typeof playerWorld==='function'&&playerWorld()==='east');
+  const name=pick(isWife?(_eE?ELITE_WOMEN_EAST:ELITE_WOMEN):(_eE?ELITE_MEN_EAST:ELITE_MEN));
   const t=region.tier;
   return { name, isWife, guardTier:t, guards:ri(1,2),
     loot:   Math.round((400+t*350)*rnd(0.9,1.5)),      // a lot more coin
@@ -6190,7 +6193,10 @@ const NAMES_M=['Marcus','Lucius','Gaius','Titus','Quintus','Publius','Aulus','Se
 const NAMES_F=['Julia','Claudia','Cornelia','Aurelia','Livia','Antonia','Valeria','Octavia','Flavia','Domitia'];
 function makeFamily(social, isFemale){
   const cls = __iceMk? 'ice' : (FATHERS[social]? social : 'citizen');
-  const fa=pick(FATHERS[cls]), mo=pick(MOTHERS[cls]);
+  let fa=pick(FATHERS[cls]), mo=pick(MOTHERS[cls]);
+  /* ✦ an eastern career is born to an eastern family, with eastern names */
+  if(__eastMk && typeof FATHERS_EAST!=='undefined'){ const ec=FATHERS_EAST[cls]? cls : 'citizen'; fa=pick(FATHERS_EAST[ec]).slice(); mo=pick(MOTHERS_EAST[ec]||MOTHERS_EAST.citizen).slice();
+    const cu=__eastCul||'han'; try{ fa[2]=pick(GROOM_NAMES[cu]||GROOM_NAMES.han); mo[2]=pick((BRIDE[cu]||BRIDE.han).names); }catch(e){} }
   const highborn = (cls==='imperial'||cls==='elite');
   const F={
     father:{name: fa[2] || (pick((__iceMk?iceNamePool(true):NAMES_M))+(__iceMk?'':' '+G_GENS())), what:fa[0], note:fa[1],
@@ -6202,7 +6208,8 @@ function makeFamily(social, isFemale){
   };
   const n=ri(1,3);
   const used=[F.father.name.split(' ')[0], F.mother.name.split(' ')[0]];
-  const freshName=(male)=>{ const pool=(male?(__iceMk?iceNamePool(true):NAMES_M):(__iceMk?iceNamePool(false):NAMES_F)).filter(x=>!used.includes(x));
+  const _EP=(male)=>{ try{ return male? (GROOM_NAMES[__eastCul]||GROOM_NAMES.han) : ((BRIDE[__eastCul]||BRIDE.han).names); }catch(e){ return male? NAMES_M : NAMES_F; } };
+  const freshName=(male)=>{ const pool=(male?(__iceMk?iceNamePool(true):(__eastMk?_EP(true):NAMES_M)):(__iceMk?iceNamePool(false):(__eastMk?_EP(false):NAMES_F))).filter(x=>!used.includes(x));
     const nm=pick(pool.length?pool:(male?(__iceMk?iceNamePool(true):NAMES_M):(__iceMk?iceNamePool(false):NAMES_F))); used.push(nm); return nm; };
   // no two siblings share a role either — three identical priests of the
   // imperial cult read like a bug, because it looked like one
@@ -7337,7 +7344,7 @@ const WIFE_TRAITS=[
   {id:'kanvek',   name:'Kanvek',     icon:'✧', min:0, eth:'rkrai', female:true,
    desc:'KAN’S GIVING. Hers to offer and she offers it — and on this coast that picture is about HER, not about him. A husband who looks pleased with himself will be told so.'},
   {id:'smart',    name:'Smart',      icon:'🧠', min:6, desc:'A quick, ordered mind — her children argue like advocates.'},
-  {id:'beauty',   name:'Beautiful',  icon:'🌹', min:6, desc:'Rome turns to look. The mob loves a beautiful house.'},
+  {id:'beauty',   name:'Beautiful',  icon:'🌹', min:6, desc:'Heads turn in the street. People love a beautiful house.'},
   {id:'fierce',   name:'Fierce',     icon:'🔥', min:5, desc:'Steel in her spine — she breeds fighters.'},
   {id:'devoted',  name:'Devoted',    icon:'💞', min:4, desc:'Her heart does not wander; the bond grows faster.'},
   {id:'cunning',  name:'Cunning',    icon:'🗝', min:6, desc:'She hears everything in Rome before you do.'},
@@ -7347,8 +7354,8 @@ const WIFE_TRAITS=[
   {id:'pious',    name:'Pious',      icon:'🕯', min:4, desc:'The gods favour her house — luck in the arena.'},
   {id:'healer',   name:'Healer',     icon:'🌿', min:5, desc:'She knows herbs and bone-setting — your wounds knit faster.'},
   {id:'charming', name:'Charming',   icon:'🎭', min:5, desc:'She works a banquet like a general works a field.'},
-  {id:'thrifty',  name:'Thrifty',    icon:'🏺', min:4, desc:'Not a denarius wasted; the estate simply earns more.'},
-  {id:'literate', name:'Literate',   icon:'📜', min:5, desc:'Greek and Latin both — she writes your letters better than you do.'},
+  {id:'thrifty',  name:'Thrifty',    icon:'🏺', min:4, desc:'Not a coin wasted; the estate simply earns more.'},
+  {id:'literate', name:'Literate',   icon:'📜', min:5, get desc(){ try{ if(playerWorld()==='east') return 'She reads the classics and writes a fine hand — your letters go out better than you could write them.'; }catch(e){} return 'Greek and Latin both — she writes your letters better than you do.'; }},
   {id:'athletic', name:'Athletic',   icon:'🏃', min:5, desc:'She rides, swims and runs; her children are born quick.'},
   {id:'steady',   name:'Steady',     icon:'⚓', min:4, desc:'Nothing rattles her. The bond in this house has a floor under it.'},
   {id:'fearless', name:'Fearless',   icon:'🦁', min:5, desc:'She watches the arena without flinching, and Rome notices which of you blinked.'},
@@ -7546,8 +7553,12 @@ const WIFE_BANES=[
    desc:'He has not forgotten her. That is the entire problem.',
    eff:'the purple watches your house; the risk of a coup rises'},
 ];
-function boonById(id){ return WIFE_BOONS.find(t=>t.id===id); }
-function baneById(id){ return WIFE_BANES.find(t=>t.id===id); }
+/* ✦ in the east the gods and offices in a boon's name are the east's: the Weaver Girl of the Han legend, not Venus */
+const BOON_EAST={ venusborn:{name:'Beloved of the Weaver Girl', icon:'🌌'}, medica:{name:'The Physician’s Daughter', m:{name:'The Physician’s Son', desc:'He grew up grinding his father’s roots.'}},
+  purpleborn:{name:'Born in the Inner Palace'}, mercatrix:{name:'The Salt-Merchant’s Heir'}, accursed:{name:'Cursed by a Shaman'}, watched:{name:'The Emperor’s Old Favourite'} };
+function boonEastly(B){ if(!B) return B; try{ if(playerWorld()!=='east') return B; const o=BOON_EAST[B.id]; return o? Object.assign({}, B, o, o.m? {m:Object.assign({}, B.m||{}, o.m)} : {}) : B; }catch(e){ return B; } }
+function boonById(id){ return boonEastly(WIFE_BOONS.find(t=>t.id===id)); }
+function baneById(id){ return boonEastly(WIFE_BANES.find(t=>t.id===id)); }
 function hasBoon(id){ return !!(G && G.wife && G.wife.boons && G.wife.boons.includes(id)); }
 function hasBane(id){ return !!(G && G.wife && G.wife.banes && G.wife.banes.includes(id)); }
 /* A boon needs a genuinely fine match; a bane is likelier from a poor one,
@@ -12837,21 +12848,23 @@ function rollBrides(minQ){
    to sweetness and honesty. A rich one has been flattered by better liars than
    you and wants to know what you actually ARE.
    ===================================================================== */
+function _ewCourt(){ try{ return playerWorld()==='east'; }catch(e){ return false; } }
 const COURT_RANKS={
   poor:{ id:'poor', label:'someone of your own station', icon:'🌾',
-    blurb:'A freedwoman at the fountain, a smith’s daughter, a soldier off duty. No dowry, no politics — just whether they like you.',
+    get blurb(){ return _ewCourt()? 'A weaver at the well, a smith’s daughter, a garrison man off duty. No dowry, no politics — just whether they like you.' : 'A freedwoman at the fountain, a smith’s daughter, a soldier off duty. No dowry, no politics — just whether they like you.'; },
     mistakes:4, quality:[2,5], noble:false, patience:'They have all evening, and nothing to lose by hearing you out.',
     taste:{sweet:1.35, honest:1.25, wit:1.05, body:0.75, bold:0.90} },
   rich:{ id:'rich', label:'a rich merchant’s child', icon:'💰',
-    blurb:'Grain money, three ships and a father who counts. They have been flattered by professionals — sweet words bounce off. Show them what you ARE.',
+    get blurb(){ return _ewCourt()? 'Salt money, a silk caravan and a father who counts. They have been flattered by professionals — sweet words bounce off. Show them what you ARE.' : 'Grain money, three ships and a father who counts. They have been flattered by professionals — sweet words bounce off. Show them what you ARE.'; },
+    _rb:'Grain money, three ships and a father who counts. They have been flattered by professionals — sweet words bounce off. Show them what you ARE.',
     mistakes:3, quality:[5,8], noble:true, patience:'They are bored, and boredom is not patience.',
     taste:{sweet:0.80, honest:0.90, wit:1.20, body:1.30, bold:1.05} },
-  elite:{ id:'elite', label:'a patrician’s child', icon:'🏛',
-    blurb:'An old name, a seat in the Senate behind them, and absolutely no reason to be standing here talking to you.',
+  elite:{ id:'elite', get label(){ return _ewCourt()? 'a great clan’s child' : 'a patrician’s child'; }, icon:'🏛',
+    get blurb(){ return _ewCourt()? 'Three generations among the Excellencies behind them, and absolutely no reason to be standing here talking to you.' : 'An old name, a seat in the Senate behind them, and absolutely no reason to be standing here talking to you.'; },
     mistakes:2, quality:[7,9], noble:true, patience:'You have perhaps a dozen sentences before they remember somewhere else to be.',
     taste:{sweet:0.65, honest:0.85, wit:1.35, body:1.15, bold:1.00} },
-  imperial:{ id:'imperial', label:'one of the imperial house', icon:'👑',
-    blurb:'Born of the purple. Every word you say will be repeated to somebody who writes things down.',
+  imperial:{ id:'imperial', get label(){ return _ewCourt()? 'one of the Liu clan' : 'one of the imperial house'; }, icon:'👑',
+    get blurb(){ return _ewCourt()? 'A kinsman of the Son of Heaven. Every word you say will be repeated to a eunuch who writes things down.' : 'Born of the purple. Every word you say will be repeated to somebody who writes things down.'; },
     mistakes:1, quality:[9,10], noble:true, patience:'One wrong sentence is a story that outlives you.',
     taste:{sweet:0.55, honest:0.80, wit:1.25, body:1.20, bold:1.15} },
 };
@@ -14157,6 +14170,7 @@ function freshCareer(name,origin,arch,social){
 }
 function freshCareerBase(name,origin,arch,social){
   __iceMk=!!(ARCHETYPES[arch]&&ARCHETYPES[arch].ice);
+  __eastMk=!!(ARCHETYPES[arch]&&ARCHETYPES[arch].east); try{ __eastCul=(typeof ARCH_CULTURE!=='undefined' && ARCH_CULTURE[arch]) || 'han'; }catch(e){ __eastCul='han'; }
   /* THE SILENT DEFAULT. An unknown archetype key came back as a Roman
      legionary in the western world, which is how a chosen samurai ended up
      in the Colosseum. It still has to return something, but it says so. */
@@ -23538,7 +23552,7 @@ function titleIsMasculineOnHer(t){ return !!(G && G.isFemale && t.femTakesMale &
 // every title you currently qualify for, best first
 function earnedTitles(){
   if(!G) return [];
-  return TITLES.filter(t=>{ try{ if(iceHere()? !t.ice : !!t.ice) return false; return (!t.femOnly || G.isFemale) && t.has(); }catch(e){ return false; } })
+  return TITLES.filter(t=>{ try{ if(!titleWorldOk(t)) return false; return (!t.femOnly || G.isFemale) && t.has(); }catch(e){ return false; } })
                .sort((a,b)=>b.rank-a.rank);
 }
 // HOW MANY YOU MAY WEAR AT ONCE. Rome stacked titles on inscriptions, but a
@@ -58554,10 +58568,11 @@ function treeGovernor(b,H,opBar){
 function openTitles(){
   state='titles'; show('scr-titles'); $('statbar').classList.remove('hide'); refreshStatbar();
   grantStartingTitles();
+  try{ const h2=document.querySelector('#scr-titles h2'); if(h2) h2.textContent=titlesHeadline(); }catch(e){}
   const earned=earnedTitles(), worn=equippedTitles(), slots=titleSlots();
   $('title-head').innerHTML =
-    `<div>Rome stacked every honour a man held onto his tombstone, but he introduced himself with the ones that counted.
-      You may wear <b style="color:var(--gold)">${slots}</b> at once${slots<4?' — more slots open with office, the Senate and the purple':''}.</div>
+    `<div>${(typeof playerWorld==='function'&&playerWorld()==='east')? 'The Han listed every office a man had held on his stele, but he was addressed by the highest.' : 'Rome stacked every honour a man held onto his tombstone, but he introduced himself with the ones that counted.'}
+      You may wear <b style="color:var(--gold)">${slots}</b> at once${slots<4?((typeof playerWorld==='function'&&playerWorld()==='east')? ' — more slots open with office, the court and the Mandate' : ' — more slots open with office, the Senate and the purple'):''}.</div>
      <div class="small" style="margin-top:3px">Wearing: ${worn.length? worn.map(t=>`<b style="color:var(--gold)">${titleName(t)}</b>`).join(' · ') : '<span class="muted">nothing</span>'}
        <span class="muted">(${worn.length}/${slots})</span></div>
      ${G.isFemale? `<div class="small" style="margin-top:3px;color:#ff8ad0">♀ Titles marked <b>♂ IN THE MASCULINE</b> are ones a woman historically took in the man’s form — Irene of Athens signed herself BASILEUS, not Basilissa.</div>`:''}`;
@@ -58592,7 +58607,7 @@ function openTitles(){
   const H=(t,col)=>{ const d=document.createElement('div'); d.className='small'; d.style.color=col||'var(--gold)'; d.style.marginTop='6px'; d.innerHTML=t; b.appendChild(d); };
   // BEST TO WORST, exactly as asked
   H('⚜ ALL TITLES — BEST TO WORST');
-  TITLES.slice().sort((a,b2)=> b2.rank-a.rank || catOrder.indexOf(a.cat)-catOrder.indexOf(b2.cat)).forEach(t=>{
+  TITLES.filter(t=>{ try{ return titleWorldOk(t); }catch(e){ return true; } }).sort((a,b2)=> b2.rank-a.rank || catOrder.indexOf(a.cat)-catOrder.indexOf(b2.cat)).forEach(t=>{
     if(t.femOnly && !G.isFemale) return;
     let held=false; try{ held=t.has(); }catch(e){ held=false; }
     const isWorn=(G.titlesWorn||[]).includes(t.id);
@@ -58634,15 +58649,16 @@ let herbBack='map';
 function openHerbs(back){
   herbBack=back||'map';
   state='herbs'; show('scr-herbs'); $('statbar').classList.remove('hide'); refreshStatbar();
+  const HV=(typeof herbHead==='function')? herbHead() : null;
   $('herb-head').innerHTML =
-    `<div>A low room off the forum that smells of resin and vinegar. The <i>herbarius</i> keeps the common plants on the shelf
-     and the <b style="color:#c89af0">famous ones</b> behind the counter, and will tell you at length what each is for.</div>
+    (HV? `<div>${HV.head}</div>` : `<div>A low room off the forum that smells of resin and vinegar. The <i>herbarius</i> keeps the common plants on the shelf
+     and the <b style="color:#c89af0">famous ones</b> behind the counter, and will tell you at length what each is for.</div>`)+`
      <div class="small muted" style="margin-top:2px">Wounds: ${G.injury? '<span style="color:#e0705b">'+G.injury.name+'</span>' : 'none'}
        · fatigue ${Math.round(G.fatigue||0)} · hygiene ${Math.round(G.hygiene===undefined?70:G.hygiene)}
        ${G.ill? '· <span style="color:#e0705b">🤒 '+G.ill.who+' has '+G.ill.name+'</span>':''}</div>`;
   const b=$('herb-body'); b.innerHTML='';
   const H=(t,col)=>{ const d=document.createElement('div'); d.className='small'; d.style.color=col||'var(--gold)'; d.style.marginTop='6px'; d.innerHTML=t; b.appendChild(d); };
-  const mk=(h)=>{
+  const mk=(h0)=>{ const h=(typeof herbView==='function')? herbView(h0) : h0;
     const card=document.createElement('div'); card.className='shopcard mediacard';
     card.style.display='flex'; card.style.flexDirection='row'; card.style.gap='9px'; card.style.alignItems='flex-start';
     if(h.what) card.style.borderColor='#8a5cc0';
@@ -58707,7 +58723,7 @@ function openHerbs(back){
     }
     info.appendChild(row); card.appendChild(info); b.appendChild(card);
   };
-  H('🩹 ON THE SHELF — what a physician of Rome actually carried');
+  H((HV&&HV.shelf)||'🩹 ON THE SHELF — what a physician of Rome actually carried');
   HERBS.filter(h=>!h.what).forEach(mk);
   H('<span style="color:#c89af0">🕯 BEHIND THE COUNTER — the famous ones</span>','#c89af0');
   { const d=document.createElement('div'); d.className='small muted';
@@ -58864,7 +58880,7 @@ function openCoup(){
   const ct=G.court, pf=ct.prefect, risk=purpleRisk(), loy=loyaltyScore();
   const sibs=(G.family&&G.family.siblings)||[];
   const prince=sibs.find(x=>x.male&&x.prince);
-  const claimant = prince? prince.name : pick(ELITE_MEN).replace(/^(Senator|Legate|Publican|Magnate|Governor|Duumvir|Eques|Praetor) /,'');
+  const claimant = prince? prince.name : pick((typeof playerWorld==='function'&&playerWorld()==='east')? ELITE_MEN_EAST : ELITE_MEN).replace(/^(Senator|Legate|Publican|Magnate|Governor|Duumvir|Eques|Praetor|Excellency|General|Minister|Administrator|Prefect|Colonel) /,'');
   // the numbers that decide it
   const guard = pf.loyal, mine = loyaltyScore(), coinPower=clamp((G.coin||0)/220,0,60);
   state='menu'; show('scr-villa'); $('statbar').classList.remove('hide');
@@ -59008,10 +59024,9 @@ const SPOUSE_ASKS=[
 
   { id:'gift', icon:'💎', w:()=>1.4 + (hasQuirk('highmaint')?3.0:0) + (hasFlaw('spendthrift')?2.0:0) + (hasQuirk('generous')?0.8:0),
     ok:()=>G.married && G.wife,
-    title:'THERE IS A JEWELLER ON THE VIA SACRA',
-    line:()=>pick(['“Sardonyx. Set in gold. I am not describing it again.”',
-                   '“Every woman at the baths has one. Every one.”',
-                   '“I am not asking for the villa. I am asking for this.”']),
+    get title(){ let w='west'; try{ w=playerWorld(); }catch(e){} return w==='east'? 'THERE IS A JADE CARVER IN THE EASTERN MARKET' : w==='wa'? 'THERE IS A LACQUER-MAKER IN THE CASTLE TOWN' : w==='rk'? 'THERE IS A CARVER AT THE WEIGH-HOUSE' : w==='ice'? 'A TRADER HAS COME WITH SHELL BEADS' : 'THERE IS A JEWELLER ON THE VIA SACRA'; },
+    line:()=>{ let w='west'; try{ w=playerWorld(); }catch(e){} return w==='east'? pick(['“White jade from Khotan. A hairpin. I am not describing it again.”','“Every wife in this ward has one. Every one.”','“I am not asking for the estate. I am asking for this.”'])
+                 : pick(['“Sardonyx. Set in gold. I am not describing it again.”','“Every woman at the baths has one. Every one.”','“I am not asking for the villa. I am asking for this.”']); },
     cost:()=>clamp(180 + (G.wife&&G.wife.tier==='imperial'?900: G.wife&&G.wife.tier==='elite'?420:0), 120, 1400),
     yes:{lab:'💰 BUY IT', desc:'It costs what it costs. She wears it to the baths tomorrow and everyone hears whose house it came from.'},
     no: {lab:'🚫 “NO.”', desc:'The estate is not a purse. She will remember which it was you chose.', bond:-8},
@@ -63201,7 +63216,7 @@ function openCallout(){
   card.innerHTML=`<div><b style="color:var(--gold)">📣 A CALL-OUT IN THE STREET</b>
       <span class="small muted">— they are talking about your ${partName?partName.name.toLowerCase():'looks'}</span></div>
     <div class="small" style="margin-top:3px">${L.t}</div>
-    <div class="small muted" style="margin-top:3px;font-style:italic">Half the colonnade has stopped to see what you do about it.
+    <div class="small muted" style="margin-top:3px;font-style:italic">Half the ${(()=>{ try{ const w=playerWorld(); return w==='east'? 'ward street' : w==='wa'? 'market street' : w==='rk'? 'weigh-house floor' : w==='ice'? 'camp' : 'colonnade'; }catch(e){ return 'colonnade'; } })()} has stopped to see what you do about it.
       ${married? (G.wife.male?'Your husband is standing right there.':'Your wife is standing right there.') : 'You answer to nobody but the mob.'}</div>
     <div class="small" style="margin-top:4px">🩸 loyalty <b style="color:${loy>=needLoy?'#7ad48a':'#e0705b'}">${loy}</b>
       · ⚖ tolerance <b>${tol}</b> · ⚜ ${bp.title}</div>`;
@@ -64021,7 +64036,7 @@ function openMarry(forced){
   { const M=matchEastForPlayer();
     if(M){
       const t=$('marry-title'); if(t) t.textContent='⚭ '+M.name;
-      $('marry-intro').innerHTML='Not a Roman dowry and not a Roman shortlist. '
+      $('marry-intro').innerHTML='Not a dowry handed over and not a shortlist of houses. '
         +'This is arranged through <b>'+M.broker+'</b>, and the money — if money is what moves at all — '
         +'does not necessarily move toward you.';
       try{ buildEastMatchCard(body); }catch(e){}
@@ -66073,9 +66088,187 @@ function iceCaveCard(){
     T('ice_mammoth',4,'MAMMOTH-KILLER','MAMMOTH-KILLER','Brought down the great one','A name round every fire from the Nile to the Taurus.',()=>(G.wins||0)>=15||(G.iceMammoths||0)>=1,{opinion:8,purse:0.15}),
     T('ice_headman',4,'HEADMAN','HEADWOMAN','The band follows you','Fifty people go where you say.',()=>(G.honor||0)>=72,{opinion:6}),
   ].forEach(t=>{ TITLES.push(t); TITLE_BY_ID[t.id]=t; });
+
 })();
+/* =====================================================================
+   ⚜ THE TITLES OF THE HAN — the eastern registry
+   ---------------------------------------------------------------------
+   An eastern career was being offered the Senate, the consulship and the
+   Vestals. The Han ladder is its own: the Son of Heaven at the top; kings
+   of the imperial clan and marquises with fiefs counted in households; the
+   Chancellor and the Three Excellencies (Cao Cao is Minister of Works in
+   200 and will make himself Chancellor in 208); provincial governors with
+   the new title MU, shepherd, which is what Liu Biao and Liu Zhang hold;
+   Grand Administrators of commanderies; generals and colonels; the nominee
+   "Filial and Incorrupt" through whom every official career began; and at
+   the bottom the soldier and the gentleman. Each is written as the Han
+   wrote it, with what it means in English beside it.
+
+   ON WOMEN: Empress Lü ruled the Han as dowager for fifteen years; Empress
+   Deng ran it for sixteen within living memory of this game; and Wu Zetian
+   will one day take the title of Emperor itself — the masculine, 皇帝 — so
+   where a woman took the man's title, she takes it here.
+   ===================================================================== */
+const TITLES_EAST=[
+  {id:'e_tianzi', world:'east', rank:10, cat:'imperial', name:'天子 TIANZI', fem:'天子 TIANZI', femTakesMale:true,
+   en:'Son of Heaven — the Emperor', em:'laurel', boon:{tolerance:18, opinion:10, capacity:2},
+   note:'The Mandate itself. Wu Zetian will one day take 皇帝, the masculine, because the office has no other word.',
+   has:()=>!!G.emperor || !!G.dynasty},
+  {id:'e_wang', world:'east', rank:9, cat:'imperial', name:'王 WANG', fem:'王后 WANGHOU',
+   en:'King — enfeoffed of a kingdom', em:'oak', boon:{unrest:-10, opinion:8, loyalty:6},
+   note:'Since Liu Bang, only the imperial clan is made king. Cao Cao will break that rule in 216 and take Wei.',
+   has:()=>!!G.emperor || !!G.dynasty || (G.royal && (G.renown||0)>=200)},
+  {id:'e_chengxiang', world:'east', rank:9, cat:'civic', name:'丞相 CHENGXIANG', fem:'丞相 CHENGXIANG', femTakesMale:true,
+   en:'Chancellor — the government itself', em:'scroll', boon:{tolerance:12, income:0.15},
+   note:'Abolished for two centuries; Cao Cao revives it for himself in 208 and nobody mistakes what it means.',
+   has:()=>(G.office||0)>=4},
+  {id:'e_taizi', world:'east', rank:8, cat:'imperial', name:'太子 TAIZI', fem:'公主 GONGZHU',
+   en:'Heir apparent / Princess', em:'diadem', boon:{risk:-8, opinion:5, gift:1},
+   note:'The Crown Prince lives in the Eastern Palace; a princess of the blood has her own estate and her own household officers.',
+   has:()=>G.socialClass==='imperial' || G.royal},
+  {id:'e_dajiangjun', world:'east', rank:8, cat:'legion', name:'大將軍 DA JIANGJUN', fem:'大將軍 DA JIANGJUN', femTakesMale:true,
+   en:'Grand General — supreme command', em:'eagle', boon:{capacity:3, exhaust:-0.6, loyalty:8},
+   note:'He Jin held it in 189 and was murdered in the palace; Yuan Shao holds it now. It outranks the Excellencies.',
+   has:()=>(G.legionRep||0)>=220 || (G.soldiers||0)>=8000},
+  {id:'e_sangong', world:'east', rank:7, cat:'civic', name:'三公 SANGONG', fem:'三公 SANGONG', femTakesMale:true,
+   en:'One of the Three Excellencies', em:'fasces', boon:{tolerance:10, income:0.12},
+   note:'Grand Commandant, Minister over the Masses, Minister of Works. Cao Cao is Minister of Works this year.',
+   has:()=>(G.office||0)>=3},
+  {id:'e_zhoumu', world:'east', rank:7, cat:'province', name:'州牧 ZHOUMU', fem:'州牧 ZHOUMU', femTakesMale:true,
+   en:'Shepherd of a Province — its governor', em:'chair', boon:{income:0.18, unrest:-6},
+   note:'Created in 188 to put down rebellion; it gave governors armies, and the governors kept them.',
+   has:()=>Object.keys(G.titles||{}).length>=3},
+  {id:'e_liehou', world:'east', rank:6, cat:'civic', name:'列侯 LIEHOU', fem:'君 JUN',
+   en:'Marquis — a fief counted in households', em:'scales', boon:{tolerance:8, opinion:4, income:0.06},
+   note:'The fief is measured in taxpaying households, a thousand or ten thousand; the marquis lives at court and collects.',
+   has:()=>(G.renown||0)>=140 || Object.keys(G.titles||{}).length>=2},
+  {id:'e_jiangjun', world:'east', rank:6, cat:'legion', name:'將軍 JIANGJUN', fem:'將軍 JIANGJUN', femTakesMale:true,
+   en:'General — of a named command', em:'eagle', boon:{capacity:2, loyalty:6},
+   note:'General of the Left, of the Rear, Who Pacifies the Waves — the titles multiplied with the wars.',
+   has:()=>(G.legionRep||0)>=140},
+  {id:'e_taishou', world:'east', rank:6, cat:'province', name:'太守 TAISHOU', fem:'太守 TAISHOU', femTakesMale:true,
+   en:'Grand Administrator of a commandery', em:'chair', boon:{income:0.12, unrest:-4},
+   note:'Two thousand bushels a year and a commandery of half a million people. Sun Ce made himself one.',
+   has:()=>Object.keys(G.titles||{}).length>=1},
+  {id:'e_jiuqing', world:'east', rank:5, cat:'civic', name:'九卿 JIUQING', fem:'九卿 JIUQING', femTakesMale:true,
+   en:'One of the Nine Ministers of State', em:'scroll', boon:{tolerance:7, opinion:4},
+   note:'The Minister of the Household, of Ceremonies, of the Guards… nine offices that ran the capital.',
+   has:()=>(G.office||0)>=2},
+  {id:'e_xiaowei', world:'east', rank:5, cat:'legion', name:'校尉 XIAOWEI', fem:'校尉 XIAOWEI', femTakesMale:true,
+   en:'Colonel — a regiment of your own', em:'vexillum', boon:{capacity:1, loyalty:4},
+   note:'Cao Cao began as one of the eight Colonels of the Western Garden in 188.',
+   has:()=>(G.legionRep||0)>=60 || (G.soldiers||0)>=1500},
+  {id:'e_xiaolian', world:'east', rank:4, cat:'civic', name:'孝廉 XIAOLIAN', fem:'孝廉 XIAOLIAN', femTakesMale:true,
+   en:'Filial and Incorrupt — nominated for office', em:'scroll', boon:{tolerance:5, petitions:0.20},
+   note:'Every commandery nominates one man a year for every two hundred thousand people. Every official career begins here.',
+   has:()=>(G.honor||0)>=60 || !!G.advocate},
+  {id:'e_haozu', world:'east', rank:4, cat:'province', name:'豪族 HAOZU', fem:'豪族 HAOZU', femTakesMale:true,
+   en:'Head of a great landed clan', em:'oak', boon:{income:0.10},
+   note:'Walls, tenants, a private militia and a granary — the fortified manor is the real power of the late Han.',
+   has:()=>{ try{ return TITLE_BY_ID.dominus.has(); }catch(e){ return false; } }},
+  {id:'e_lishi', world:'east', rank:3, cat:'arena', name:'力士 LISHI', fem:'女力士 NÜ LISHI',
+   en:'Champion of the jiaodi ground', em:'rudis', boon:{refuseBout:1, opinion:3},
+   note:'The court kept strongmen for the jiaodi shows; a champion was a celebrity with a stipend.',
+   has:()=>{ try{ return TITLE_BY_ID.rudiarius.has(); }catch(e){ return false; } }},
+  {id:'e_youxia', world:'east', rank:3, cat:'arena', name:'遊俠 YOUXIA', fem:'女俠 NÜXIA',
+   en:'Knight-errant — a sword with a reputation', em:'rudis', boon:{opinion:3, risk:-4},
+   note:'Sima Qian wrote a whole chapter on them: men who kept their word and broke the law, admired by everyone but magistrates.',
+   has:()=>{ try{ return TITLE_BY_ID.primuspalus.has() || TITLE_BY_ID.veteranus.has(); }catch(e){ return false; } }},
+  {id:'e_shi', world:'east', rank:2, cat:'civic', name:'士 SHI', fem:'士 SHI', femTakesMale:true,
+   en:'A gentleman — of the educated class', em:'scroll', boon:{opinion:2},
+   note:'The first of the four orders — scholars, farmers, artisans, merchants — and the only one that sits for office.',
+   has:()=>{ try{ return TITLE_BY_ID.civis.has(); }catch(e){ return true; } }},
+  {id:'e_zu', world:'east', rank:1, cat:'arena', name:'卒 ZU', fem:'卒 ZU', femTakesMale:true,
+   en:'A soldier — a recruit on the rolls', em:'rudis', boon:{},
+   note:'Every adult man owes the Han a year in the army and a month of labour; most of them never come home rich.',
+   has:()=>true},
+];
+TITLES_EAST.forEach(t=>{ TITLES.push(t); TITLE_BY_ID[t.id]=t; });
+/* which registry is yours: the Han's in the east, Rome's everywhere it was before */
+function titleWorldOk(t){ let w='west'; try{ w=playerWorld(); }catch(e){}
+  if(t.ice) return w==='ice'; if(w==='ice') return false;
+  if(t.world==='east') return w==='east'; return w!=='east'; }
+function titlesHeadline(){ let w='west'; try{ w=playerWorld(); }catch(e){} return w==='east'? '⚜ THE TITLES OF THE HAN — 漢官' : w==='ice'? '⚜ THE NAMES A BAND GIVES' : '⚜ THE TITLES OF ROME'; }
+/* ---- THE PHYSICIAN OF THE EAST. In the year 200 Hua Tuo is practising and Zhang Zhongjing is writing the
+   Shanghan lun because, his preface says, two-thirds of his clan died of fevers in ten years. Same shelf, same
+   uses — the plants are the ones a Han physician actually reached for. In the Kushan and Tamil countries the
+   shelf is Charaka's and Sushruta's. ---- */
+const HERB_VIEW={
+  han:{ head:'A physician’s room off the ward street, smelling of cinnamon twig and roasting licorice. He takes your pulse at three places on each wrist before he says a word, and quotes Zhang Zhongjing, who is alive and writing it down this decade.',
+    shelf:'🩹 ON THE SHELF — what a Han physician actually reached for', rare:'✦ BEHIND THE COUNTER — the famous ones',
+    garlic:{name:'Ginger & Jujube', latin:'生薑 大棗 shengjiang dazao', note:'In half the prescriptions Zhang Zhongjing is writing down this decade. Warms the middle and settles the stomach.'},
+    willow:{name:'Cinnamon Twig Decoction', latin:'桂枝湯 guizhi tang', note:'The first formula of the Shanghan lun: for the chill and the sweat at the start of a fever.'},
+    wormwood:{name:'Rhubarb Root', latin:'大黃 dahuang', note:'They call it the General — it marches through the gut and clears everything in front of it.'},
+    betony:{name:'Licorice Root', latin:'甘草 gancao', note:'The Elder Statesman of the materia medica: it goes into every formula to make the others agree.'},
+    poppy:{name:'Ephedra', latin:'麻黃 mahuang', note:'Opens the sweat, lifts the breath and keeps a tired man walking. The Shennong classic puts it in the middle grade.'},
+    mandrake:{name:'Hua Tuo’s Mafeisan', latin:'麻沸散 mafeisan', note:'The powder Hua Tuo gives in wine before he opens a belly, the Hou Han shu says. The patient feels nothing; the recipe dies with him.'},
+    theriac:{name:'Ginseng of Shangdang', latin:'人參 renshen', note:'Top grade in the Shennong classic: “long taken, it lightens the body and lengthens life.” Priced accordingly.'},
+    rue:{name:'Chrysanthemum Flower', latin:'菊花 juhua', what:'for the eyes', note:'Brightens the eyes, the classic says. Scholars drink it as tea through the long copying nights.'},
+    pennyroyal:{name:'Apricot Kernel', latin:'杏仁 xingren', what:'for the chest and the cough', note:'Bitter, for the cough and the tight chest; boiled with ephedra for the fever that sits on the lungs.'},
+    silphium:{name:'Lingzhi', latin:'靈芝 lingzhi', what:'the mushroom of immortality', note:'Painted on the tomb walls of men who did not find it. Emperor Wu had a hall built when one grew in the palace.'} },
+  kushan:{ head:'A vaidya’s room by the monastery, a shelf of clay jars and a copy of Charaka’s compendium that he knows by heart. He looks at your tongue, your eyes and your nails, and asks what you ate.',
+    shelf:'🩹 ON THE SHELF — Charaka’s and Sushruta’s', rare:'✦ BEHIND THE COUNTER — the famous ones',
+    garlic:{name:'Turmeric & Ghee', latin:'haridrā · ghṛta', note:'The wound dressing every household knows. Sushruta packs a cut with it.'},
+    willow:{name:'Neem Bark', latin:'nimba', note:'For the fever and the itch. Bitter enough that it must be doing something.'},
+    wormwood:{name:'Triphala', latin:'triphalā — three fruits', note:'Haritaki, bibhitaki, amalaki: the gentle purge that is in every vaidya’s jar.'},
+    betony:{name:'Ashwagandha', latin:'aśvagandhā', note:'“The smell of a horse, and the strength of one.” For the man who has spent himself.'},
+    poppy:{name:'Ginger, Long Pepper & Black Pepper', latin:'trikaṭu', note:'The three pungents, to wake the fire in a cold body. The Romans pay in gold for the third one.'},
+    mandrake:{name:'Sushruta’s Wine', latin:'madya', note:'Sushruta has the patient drink strong wine before the knife, and the surgeon work fast.'},
+    theriac:{name:'Chyawanprash', latin:'cyavanaprāśa', note:'The jam the sage Chyavana ate to grow young again. A rasayana: long life by the spoonful.'},
+    rue:{name:'Triphala Eyewash', latin:'triphalā jala', what:'for the eyes', note:'The same three fruits, steeped and strained, for eyes tired from reading palm-leaf.'},
+    pennyroyal:{name:'Holy Basil', latin:'tulasī', what:'for the chest and the gut', note:'Grown in a pot by every door and chewed for the cough.'},
+    silphium:{name:'Shilajit', latin:'śilājatu', what:'the rock that sweats medicine', note:'Black resin that seeps from the Himalayan cliffs in summer. Charaka says there is no disease it cannot help.'} },
+};
+HERB_VIEW.korean=HERB_VIEW.han; HERB_VIEW.steppe=HERB_VIEW.han; HERB_VIEW.tamil=HERB_VIEW.kushan; HERB_VIEW.persian=null;
+function herbView(h){ let w='west', c='roman'; try{ w=playerWorld(); c=localCulture().id; }catch(e){}
+  if(w!=='east') return h; const V=HERB_VIEW[c]||HERB_VIEW.han; const o=V&&V[h.id]; return o? Object.assign({}, h, o) : h; }
+function herbHead(){ let w='west', c='roman'; try{ w=playerWorld(); c=localCulture().id; }catch(e){}
+  if(w!=='east') return null; return HERB_VIEW[c]||HERB_VIEW.han; }
+/* ---- THE STREET IN THE EAST, AND ON THE STEPPE ---- */
+CALLOUT_CULTURE.steppe={ f:[
+    {p:'face',  t:'A rider reins in so hard his horse sits down. “Tengri made that face on a good day,” he tells the whole camp.'},
+    {p:'legs',  t:'“She could ride from here to the Orkhon without a saddle,” an old herdsman says, and means it as the highest praise there is.'},
+    {p:'hairq', t:'The women at the felting circle stop rolling the felt to discuss your braids, in detail, with diagrams drawn in the dust.'},
+    {p:'booty', t:'“A mare like that wins the race at the spring gathering,” somebody shouts, and the whole camp agrees, loudly, at once.'},
+    {p:'bust',  t:'A boy drops a whole bucket of mare’s milk. Nobody scolds him; the men nearest are nodding.'},
+    {p:'waist', t:'“A bow-string of a waist,” says the bowyer, who would know, and goes back to his work grinning.'} ],
+  m:[
+    {p:'face',  t:'“A face for the gold plaques,” a smith says, and starts sketching you as a stag.'},
+    {p:'bust',  t:'“That chest could stop a Han crossbow bolt,” a rider says. Then, thoughtfully: “Probably.”'},
+    {p:'legs',  t:'“He grips a horse like a wrestler,” the herd-boys say, which on the steppe is the whole of a man’s reputation.'},
+    {p:'booty', t:'The women at the dairy tents go quiet as you pass, and then very much not quiet.'},
+    {p:'waist', t:'“Lean as a wolf in spring,” an old man says approvingly. It is the best thing he has said about anyone all year.'},
+    {p:'hairq', t:'“Braid that and the horde follows it,” calls a girl at the well, and her mother does not tell her to stop.'} ]};
+CALLOUT_CULTURE.persian={ f:[
+    {p:'face',  t:'A poet at the caravanserai gate stops mid-recitation. “The moon has come down to the bazaar,” he says, and begins again on you.'},
+    {p:'hairq', t:'“Hair like the night over Ctesiphon,” a perfumer calls, and offers you a flask for nothing.'},
+    {p:'legs',  t:'A cavalryman whistles through his teeth. “She walks like a mare of Nisaea.” From a Parthian, that is a sonnet.'},
+    {p:'booty', t:'The whole bazaar row of copper-beaters misses a stroke at once, and the silence is louder than the hammering was.'},
+    {p:'bust',  t:'A silk merchant drops a bolt of Chinese silk in the dust and does not even look down at it.'},
+    {p:'waist', t:'“A cypress,” says an old man, which is what Persians call a woman they cannot stop looking at.'} ],
+  m:[
+    {p:'face',  t:'“A face for the coinage,” a moneychanger says, holding a drachm up beside you to compare.'},
+    {p:'bust',  t:'“Built like a cataphract with the armour off,” a stable-master says, admiring.'},
+    {p:'legs',  t:'“Those legs could grip a Nisaean horse at the gallop,” somebody calls. Every horseman in earshot nods.'},
+    {p:'booty', t:'Three women on a rooftop stop pegging out the washing to watch you all the way down the street.'},
+    {p:'waist', t:'“Narrow as a bow,” says a bowyer. In Parthia that is the only compliment that matters.'},
+    {p:'hairq', t:'“Curl it, oil it, and the King of Kings will hire you to stand behind him,” calls a barber.'} ]};
+/* ---- A FAMILY OF THE EAST — fathers and mothers who were never in a Roman ludus ---- */
+const FATHERS_EAST={
+  gladiator:[['a jiaodi wrestler at the market fairs','Threw men for coppers and broke his collarbone twice.'],['a deserter from the northern garrisons','Walked away from the wall one winter and kept walking.'],['a groom in a commandery stable','You were born to the smell of horses.'],['a Yellow Turban who lived','He wore the yellow scarf in 184 and never spoke of it after.'],['a sword-for-hire in the capital wards','A knight-errant, he called himself. The magistrate used another word.']],
+  citizen:[['a tenant on a great family’s land','Paid the rent in grain and the tax in labour, and never once got ahead.'],['a salt-boiler on the coast','The state monopoly took the salt; he kept the cough.'],['a market weigher','Honest weights, he always said, and nobody ever proved otherwise.'],['a potter','Made the jars the whole ward kept its grain in.'],['a garrison soldier','Three years on the frontier and a limp for life.']],
+  upper:[['a county clerk','Copied the household registers in a hand people still recognise.'],['a silk-road merchant','Came home from Dunhuang every other year with a story and less money than he left with.'],['a landholder with a walled manor','Walls, tenants, a private militia, and opinions about the court.']],
+  elite:[['a Grand Administrator of a commandery','Ruled half a million people and was ruined by one letter.'],['a scholar-official of a great clan','Nominated Filial and Incorrupt, and never let anyone forget it.'],['a general of the Han','He fought the Yellow Turbans, and then everybody else.']],
+  imperial:[['a prince of the Liu clan','A kinsman of the Emperor a long way down the line, and all the more insistent about it.'],['a marquis of a thousand households','Collected the rents and the honours and never once saw the fief.']]};
+const MOTHERS_EAST={
+  gladiator:[['a seamstress in the barracks ward','Mended the coats of men who did not pay.'],['a singing girl of Luoyang','She sang in the wine-houses until the city burned.'],['a farmer’s daughter','She could carry two buckets on a pole further than any man in the village.']],
+  citizen:[['a weaver who sold her own silk','The household tax was paid in her cloth.'],['a midwife','Half the ward came into the world through her hands.'],['a farmer’s wife','She kept the granary, the accounts and the peace.']],
+  upper:[['a merchant’s wife who kept the books','The ledgers were in her hand, and so was the money.'],['a woman of letters','She could quote the Classic of Poetry for any occasion, and did.']],
+  elite:[['a daughter of a great clan','She brought a dowry and an alliance and never let your father forget either.'],['a scholar’s daughter','She quoted Ban Zhao’s Lessons for Women and did not follow them.']],
+  imperial:[['a princess of the Liu','A great-niece of an emperor nobody remembers.']]};
+
 /* ---------- the family you are born into ---------- */
-var __iceMk=false;
+var __iceMk=false, __eastMk=false, __eastCul='han';
 FATHERS.ice=[['a mammoth-hunter of the Taurus','Brought down six of the great ones and was crushed by the seventh.'],['a flint-knapper','Could strike a blade from a river cobble in a hundred breaths.'],['a fire-keeper','Never once let the band’s fire go out.'],['a headman of the river clans','Fifty people followed him, and one winter, none did.'],['a reed-boat man of the shore','Fished the shallows and could read the weather in a gull’s flight.']];
 MOTHERS.ice=[['a root-digger who knew every plant','Fed the band through two winters when the herds failed.'],['a hide-scraper','Her hands were the softest and her tempers the shortest in the cave.'],['a shell-bead stringer','Traded her beads from the sea to the mountains.'],['a clan mother nobody argued with','Remembered every marriage for six generations.'],['a berry-gatherer and singer','Sang the way home across three valleys.']];
 SIB_ROLES_M.ice=['a hunter in the line','a flint-knapper','a pack-dog trainer','walked south with a trading band and never heard of again'];
@@ -70522,7 +70715,7 @@ const ASIA_POL=[
  {n:'BOD', s:'the Yarlung kings', g:'Tibet', c:'#e6a8c0', fs:3.4, ls:1, l:[90.6,30.6], p:[[84,30],[85.5,31.5],[86.5,34],[88,33.6],[90,33.2],[93,33],[95.2,31.8],[96.5,30],[95.2,29.2],[93,28.4],[91,28],[88.5,27.9],[86.5,28.1]]},
  {n:'QIANG', s:'the Qiang tribes', g:'Tibet', c:'#dca68e', fs:3.8, ls:1.4, it:1, l:[98.6,34.6], p:[[92,37.2],[93.5,39.6],[95,39.5],[96.8,39.3],[98.8,38.8],[100.5,37.6],[102,36.4],[103,35.5],[104,34.5],[103,33.5],[101.5,32.5],[100.8,31.6],[101,30.2],[101.8,28.8],[99.5,28.2],[98.5,29.5],[96.5,30],[95.2,31.8],[93,33],[95.5,34],[95,36.2]]},
  /* —— the Tarim: the Western Regions —— */
- {n:'WESTERN REGIONS', s:'city-states of the Tarim', g:'Tarim', c:'#e9d6a0', fs:3.4, ls:1.2, l:[84.4,38.6], dash:1, p:[[74.5,39.5],[76,41],[79,41.8],[81,42.2],[83,42.8],[86,43.2],[89,43.6],[91.5,43.3],[93,42.6],[93,40.5],[92,39],[90,38.2],[88,37.6],[86,37],[83,36.4],[80,36.3],[78,36.6],[76.5,37.3],[75.4,38]]},
+ {n:'WESTERN REGIONS', s:'the Han Protectorate — 西域都護', g:'Han', han:1, c:'#9ccb7a', fs:3.4, ls:1.2, l:[84.4,38.6], dash:1, p:[[74.5,39.5],[76,41],[79,41.8],[81,42.2],[83,42.8],[86,43.2],[89,43.6],[91.5,43.3],[93,42.6],[93,40.5],[92,39],[90,38.2],[88,37.6],[86,37],[83,36.4],[80,36.3],[78,36.6],[76.5,37.3],[75.4,38]]},
  /* —— the northern steppe —— */
  {n:'XIANBEI', s:'the hordes after Tanshihuai', g:'Steppe', c:'#e0b27a', fs:7, ls:4, l:[106,47.6],
   p:[[88,52],[95,53],[105,53.5],[112,53.2],[118,53],[122,52.5],[124,50],[125.5,47.5],[124,45.5],[122,43.6],[120,43.6],[118,42.8],[116,41.8],[114,41.5],[112,41.5],[110.5,41],[108,41.2],[106.5,40.2],[104,40.5],[101,41.5],[98,42.6],[95,43.5],[92,45],[90,46.5],[89,48],[88,50]]},
@@ -70695,7 +70888,10 @@ function asiaStatic(){
   for(const P of ASIA_POL){ if(!P.n) continue; const pp=polyP(P.p); c.strokeStyle=shade(P.c,-70); c.globalAlpha=0.75; c.lineWidth=P.han? 0.32 : 0.4; if(P.dash||P.han) c.setLineDash(P.han? [1.6,0.9] : [2,1.2]); c.stroke(pp); c.setLineDash([]); c.globalAlpha=1; }
   /* the Han, one empire on paper: its outer frontier in a firm line over the eight warlord domains */
   { const HAN_OUTER=[[93,40.5],[94.5,41],[96.5,40.5],[98.5,40],[100.5,39.5],[102.5,38.8],[104,38],[105.5,37.6],[107,37.5],[108.6,37.2],[110.4,36.6],[110.6,38.5],[111,40],[110.5,41],[112,41.5],[114,41.5],[116,41.8],[118,41.2],[119.5,40.2],[121,41.6],[122.5,42.6],[124,42.5],[125,41.3],[124.4,40.1],[125.6,40.3],[126.8,39.6],[127.1,38.6],[126.6,37.8],[125.6,37.6],[124.8,38.1],[124,37],[123,33],[123,29],[121,26],[118.5,23],[112,20.4],[108.6,20.2],[107.2,18.6],[107,17.4],[105.6,17.2],[104.6,18.6],[103.6,20],[103,21.5],[104.5,22.8],[103.8,25],[102.2,25.4],[101.2,26.6],[101.8,28.8],[101,30.2],[100.8,31.6],[101.5,32.5],[103,33.5],[104,34.5],[103,35.5],[102,36.4],[100.5,37.6],[98.8,38.8],[96.8,39.3],[95,39.5],[93.5,39.6]];
-    const hp=polyP(HAN_OUTER); c.strokeStyle='#2f5a2c'; c.globalAlpha=0.85; c.lineWidth=0.75; c.stroke(hp); c.globalAlpha=1; }
+    const hp=polyP(HAN_OUTER); c.strokeStyle='#2f5a2c'; c.globalAlpha=0.85; c.lineWidth=0.75; c.stroke(hp);
+    /* and the Western Regions Protectorate, which is the Han's: its frontier drawn in the same firm line */
+    { const WR=ASIA_POL.find(P=>P.n==='WESTERN REGIONS'); if(WR){ c.setLineDash([2.4,0.8]); c.stroke(polyP(WR.p)); c.setLineDash([]); } }
+    c.globalAlpha=1; }
   c.restore();
   /* the oasis kingdoms of the Tarim, green spots on the desert rim */
   ASIA_OASES.forEach(([n,lo,la])=>{ if(!lo) return; const q=Q(lo,la); const g=c.createRadialGradient(q[0],q[1],0,q[0],q[1],2.2); g.addColorStop(0,'rgba(110,160,80,.85)'); g.addColorStop(1,'rgba(110,160,80,0)'); c.fillStyle=g; c.beginPath(); c.arc(q[0],q[1],2.2,0,7); c.fill(); });
