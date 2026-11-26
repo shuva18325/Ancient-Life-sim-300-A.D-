@@ -14975,104 +14975,12 @@ function swingSfx(f){
   else sfx('swing');
 }
 function drawGladiator(f){
-  if(f.beast){ if(nbOn()){ try{ if(drawBeastNB(f)) return; }catch(e){ if(!drawGladiator._bwarned){ drawGladiator._bwarned=true; console.warn('beast body failed, old sprite', e); } } } drawBeast(f); return; }
-  /* ⚔ THE NEW BODY — the woohoo's figure, in his kit (Settings → Bodies to go back to the old rig) */
-  if(nbOn()){ try{ drawGladiatorNB(f); return; }catch(e){ if(!drawGladiator._warned){ drawGladiator._warned=true; console.warn('new body failed, old rig', e); } } }
-  f._nbPiv=null;
-  ctx.save();
-  const lean = clamp(f.vx*0.035,-0.45,0.45) + f.rot;
-  ctx.translate(f.x, f.y);
-  /* THE MAN'S OWN BUILD. Rigging lets you pick an ox or a reed, and it would
-     be a poor joke if they were drawn at identical size. */
-  const _sc=1.35*(f.scale||1);
-  ctx.scale(f.facing*_sc,_sc);
-  ctx.rotate(lean);
-  const C=paletteFor(f);
-  // pass 1: chunky dark outline (every rect stamped 1px larger) — pass 2: the sprite
-  OUTL=true;  drawGladBody(f,C);
-  OUTL=false; drawGladBody(f,C);
-  drawStuck(f);
-  // bright slash swoosh so the attack reads clearly
-  drawSlashFx(f,C);
-  ctx.restore();
+  if(f.beast){ try{ drawBeastNB(f); }catch(e){ if(!drawGladiator._bwarned){ drawGladiator._bwarned=true; console.warn('beast body failed', e); } } return; }
+  /* ⚔ the woohoo's figure, in his kit: the only body there is now */
+  try{ drawGladiatorNB(f); }catch(e){ if(!drawGladiator._warned){ drawGladiator._warned=true; console.warn('fighter body failed', e); } }
 }
 /* A wild beast for the venatio — a chunky pixel quadruped (leopard/lion/bear/bull).
    Local origin = feet, up is -y, faces +x; two-pass dark outline like the gladiators. */
-function drawBeast(f){
-  const b=f.beastType;
-  ctx.save();
-  ctx.translate(f.x, f.y);
-  ctx.rotate(clamp(f.vx*0.02,-0.3,0.3) + (f.rot||0));
-  { const _sz=(b&&b.scale)||1; ctx.scale(f.facing*1.1*_sz, 1.1*_sz); }
-  const P=(x,y,w,h,c)=>{ ctx.fillStyle=c; ctx.fillRect(Math.round(x),Math.round(y),Math.round(w),Math.round(h)); };
-  const hurt = f.hurt>0 && ((f.hurt|0)%4)<2;
-  const body = hurt? shade(b.body,70) : b.body;
-  const dk   = hurt? shade(b.dk,60)   : b.dk;
-  const lt   = shade(body,26);
-  const stride = Math.sin(f.legPhase), air=!f.onGround;
-  const sw = air? 4 : stride*4;                                   // gait swing
-  const fx = air? Math.sin((f.atk?(1-f.atkT/f.atkDur):0)*Math.PI)*6 : 0;  // front reach on a pounce
-  const tsw=Math.sin(f.legPhase*0.6+1)*3;                          // tail sway
-  const pounce = f.atk? Math.sin((1-f.atkT/f.atkDur)*Math.PI) : 0;
-  for(let pass=0; pass<2; pass++){
-    const O = pass===0, e = O?1:0;
-    const c = x=> O? '#160e07' : x;
-    // legs (feet stay planted; swing shifts them fore/aft)
-    P(-14-e+ (sw<0?sw:0), -13-e, 4+2*e, 14+2*e, c(dk));            // back hind
-    P(-8-e - (sw>0?sw:0), -13-e, 4+2*e, 14+2*e, c(body));         // front hind
-    P(8-e+fx+(sw>0?sw:0), -13-e, 4+2*e, 14+2*e, c(dk));           // back fore
-    P(13-e+fx-(sw<0?sw:0),-13-e, 4+2*e, 14+2*e, c(body));         // front fore
-    // tail
-    P(-23-e, -23-e+tsw, 10+2*e, 4+2*e, c(dk));
-    // torso, haunch, chest, neck
-    P(-18-e, -24-e, 33+2*e, 12+2*e, c(body));
-    P(-20-e, -22-e, 8+2*e, 11+2*e, c(dk));
-    P(12-e,  -25-e, 8+2*e, 12+2*e, c(body));
-    P(16-e,  -28-e, 8+2*e, 10+2*e, c(dk));
-    // head
-    const hx=22, hy=-29+pounce*3;
-    P(hx-e, hy-e, 11+2*e, 10+2*e, c(body));
-    if(O) continue;
-    // ---- sprite-only detail ----
-    P(-18,-24,33,3,lt); P(-18,-14,33,2,dk);                       // back highlight / belly shade
-    if(b.hump){ P(-4,-27,11,4,body); P(-4,-27,11,1,lt); }         // bear shoulder hump
-    if(b.id==='lion'){ P(-25,-24+tsw,4,5,'#3a2a12'); }            // lion tail tuft
-    if(b.id==='mammoth'){ P(-8,-31,20,9,body); P(-8,-31,20,1,lt); P(hx-3,hy-9,13,10,body); P(hx-3,hy-9,13,2,lt);   // the domed head and hump
-      P(hx-3,hy+1,5,7,dk);                                                                         // the ear
-      P(hx+8,hy+2,5,12,dk); P(hx+9,hy+13,4,6,dk); P(hx+12,hy+17,4,3,dk);                          // the trunk, curling
-      P(hx+4,hy+6,15,2,'#efe4c4'); P(hx+17,hy+3,3,5,'#efe4c4'); P(hx+19,hy+1,2,3,'#fff6dc');       // the tusk, sweeping up
-      for(let i=0;i<12;i++) P(-18+i*3,-13,2,4+(i%3),dk); }                                         // the shaggy skirt
-    if(b.id==='rhino'){ P(hx+9,hy-4,3,7,'#d8cfb8'); P(hx+7,hy,3,3,'#c8bfa8'); P(-10,-27,10,4,body); }
-    if(b.id==='boar'){ P(hx+8,hy+7,6,2,'#efe4c4'); P(-14,-28,24,3,dk); }
-    if(b.id==='cavelion'){ P(hx+8,hy+7,5,1,'#fff'); }
-    if(b.mane){ P(15,-31,13,17,'#8a5a1e'); P(15,-31,13,3,'#a06a24'); P(14,-20,4,8,'#7a4e18'); }
-    P(hx,hy,11,2,lt);                                             // brow highlight
-    if(b.id==='bull'){
-      // ---- BULL: shoulder hump, broad square muzzle, side ears, big curved horns ----
-      P(-7,-27,14,4,body); P(-7,-27,14,1,lt);                    // muscular withers hump
-      P(hx+7,hy+2,7,7,body); P(hx+7,hy+2,7,1,lt);                // heavy square muzzle
-      P(hx+13,hy+3,1,5,dk);                                       // muzzle front edge
-      P(hx+9,hy+5,2,2,'#161009'); P(hx+12,hy+6,1,1,'#161009');   // nostrils
-      P(hx+6,hy+8,8,1,dk);                                        // heavy jaw
-      P(hx+3,hy+2,3,1,dk);                                        // low angry brow
-      P(hx+4,hy+3,2,2, hurt?'#fff':'#120a06');                   // eye
-      P(hx-1,hy+2,3,2,dk); P(hx+9,hy+1,3,2,dk);                  // ears out to the sides
-      const IV='#e6ddc4', IVd='#c7bd9f', IVt='#f4eede';
-      P(hx+1,hy-2,8,3,IVd); P(hx+1,hy-2,8,1,IV);                 // bony boss across the brow
-      P(hx+1,hy-1,2,3,IV); P(hx-1,hy-4,2,3,IV); P(hx-3,hy-7,2,3,IV); P(hx-5,hy-9,2,2,IVt);   // near horn: sweeps up & back
-      P(hx+7,hy-1,2,3,IV); P(hx+9,hy-4,2,3,IV); P(hx+11,hy-7,2,3,IV); P(hx+13,hy-9,2,2,IVt); // far horn: sweeps up & forward
-      if(f.atk){ P(hx+14,hy+3,2,1,'#d8d0c0'); P(hx+15,hy+5,2,1,'#d8d0c0'); }   // snort puffs when charging
-    } else {
-      P(hx+1,hy-2,3,3,dk); P(hx+6,hy-2,3,3,dk);                  // top ears
-      P(hx+8,hy+3,5,5,body); P(hx+11,hy+5,2,2,dk);              // muzzle + nose
-      P(hx+4,hy+3,2,2, hurt?'#fff':'#120a06');                  // eye
-      if(f.atk){ P(hx+8,hy+7,6,2,'#2a0808'); P(hx+9,hy+6,1,1,'#fff'); P(hx+12,hy+6,1,1,'#fff'); }  // open maw
-    }
-    if(b.spots){ for(const s of [[-13,-22],[-5,-20],[2,-22],[-9,-16],[6,-17],[-1,-18],[9,-21]]) P(s[0],s[1],2,2,dk); }
-  }
-  drawStuck(f);
-  ctx.restore();
-}
 /* =====================================================================
    🦁 THE BEASTS, ON BODIES OF THEIR OWN
    ---------------------------------------------------------------------
@@ -15155,6 +15063,31 @@ const HORSE_COATS={
   chestnut:{base:'#a65a28', lit:'#d98e52', deep:'#5a2a0f', belly:'#86461c', points:null, mane:'#e2b674', maneLit:'#f6dca4', muzzle:'#4a2a1a', nose:'#1e120c', eye:'#1a0e08', hoof:'#3a2a1c', blaze:'blaze', socks:['nf']},
 };
 for(const k in HORSE_COATS) BST_SPEC['horse_'+k]=Object.assign({}, BST_HORSE, {col:HORSE_COATS[k], coat:k});
+/* 🦣 THE ICE AGE'S BEASTS ON THE SAME PAINTED BODIES. They were still the old eight-pixel rig, because the
+   painter had no spec for them; each is now one of the gold beasts, resized and recoloured:
+   · the WOOLLY MAMMOTH on the elephant, in a red-brown winter coat, as the frozen carcasses show it;
+   · the CAVE BEAR on the bear, a fifth bigger and darker: it was a third heavier than a brown bear;
+   · the CAVE LION on the lion with no mane, because the painters at Chauvet drew the males maneless;
+   · the AUROCHS on the bull: the bulls black, with the pale ring round the muzzle Roman writers and the cave
+     painters both noticed;
+   · the WOOLLY RHINO on the bull's frame, shaggy and brown; the WILD BOAR on it at boar size, the horn-colour reading
+     as tusks. */
+function bstScaleSpec(S0, k){
+  const S=JSON.parse(JSON.stringify(S0)), sc=(a,from)=>{ for(let i=from;i<a.length;i++) a[i]*=k; };
+  ['L','hipH','shH','shX','lift'].forEach(n=>{ if(S[n]) S[n]*=k; });
+  S.torso.forEach(t=>t[1]*=k);
+  for(const leg of [S.fore,S.hind]){ sc(leg.j,1); leg.up*=k; leg.lo*=k; leg.ft*=k; sc(leg.r,0); ['paw','hoof','pad'].forEach(n=>{ if(leg[n]) sc(leg[n],0); }); }
+  sc(S.haunch,1); sc(S.shoulder,1); sc(S.neck.b,1); S.neck.len*=k; sc(S.neck.r,0); S.head.L*=k; S.head.H*=k;
+  sc(S.tail.root,1); S.tail.len*=k; sc(S.tail.r,0); if(S.trunk){ S.trunk.len*=k; sc(S.trunk.r,0); }
+  return S; }
+BST_SPEC.mammoth=Object.assign(JSON.parse(JSON.stringify(BST_SPEC.elephant)), {col:{base:'#6a3e22', lit:'#9a6238', deep:'#341c0c', belly:'#56321a', ear:'#4a2a16', earIn:'#6a3e24', tusk:'#f2ead6', tuskTip:'#cfc0a0', eye:'#140c06', nail:'#d8ccb8', wrinkle:'rgba(30,16,6,.5)', tuft:'#1e1208'}});
+BST_SPEC.mammoth.head.H*=1.12; BST_SPEC.mammoth.trunk.len*=1.08;
+BST_SPEC.cavebear=Object.assign(bstScaleSpec(BST_SPEC.bear,1.18), {col:Object.assign({}, BST_SPEC.bear.col, {base:'#4a3222', lit:'#6e4c34', deep:'#22160c', belly:'#3e2a1c', muzzle:'#7a5a3e'})});
+BST_SPEC.cavelion=Object.assign(bstScaleSpec(BST_SPEC.lion,1.08), {col:{base:'#cbab6c', lit:'#ead098', deep:'#8a7040', belly:'#eee0bc', nose:'#7a4a3a', eye:'#e2a936', tuft:'#5a4024'}});
+BST_SPEC.aurochs=Object.assign(bstScaleSpec(BST_SPEC.bull,1.12), {col:Object.assign({}, BST_SPEC.bull.col, {base:'#211a15', lit:'#4e4034', deep:'#0e0a08', muzzle:'#d8ccb0', horn:'#efe6cf', hornTip:'#241c14'})});
+BST_SPEC.rhino=Object.assign(bstScaleSpec(BST_SPEC.bull,1.12), {col:Object.assign({}, BST_SPEC.bull.col, {base:'#6a5236', lit:'#9a7a54', deep:'#3a2c1a', belly:'#5a442c', muzzle:'#5a4a3a', nose:'#2a1e14', horn:'#d8ccb0', hornTip:'#8a7a5a', hoof:'#2a2016'})});
+BST_SPEC.boar=Object.assign(bstScaleSpec(BST_SPEC.bull,0.64), {col:Object.assign({}, BST_SPEC.bull.col, {base:'#3a3026', lit:'#605242', deep:'#18120c', belly:'#2e261e', muzzle:'#4a3e34', nose:'#2a1e18', horn:'#f0e8d4', hornTip:'#d0c4ac', hoof:'#1c1612'})});
+BST_SPEC.boar.tail.len*=0.4; BST_SPEC.boar.tail.hang=true;
 const BST_BW=220, BST_BH=150, BST_OX=132, BST_OY=138;         // the buffer: feet at (132,138), room for a tail behind and a reared bear above
 function bstBuf(f){
   if(!f._bst){ const mk=()=>{ const k=document.createElement('canvas'); k.width=BST_BW; k.height=BST_BH; k.getContext('2d',{willReadFrequently:true}); return k; };
@@ -15769,27 +15702,6 @@ function drawSashimono(f,C){
     drawMon(ctx,-6,-14,3.4,H.mon,'rgba(255,248,228,.94)',null);  // and the crest on it
   ctx.restore();
 }
-function drawGladBody(f,C){
-  const a=f.gear.armor.id;
-  const ocrea=(a==='ocrea');
-  drawSashimono(f,C);
-  const air=!f.onGround;
-  const stride=Math.sin(f.legPhase);
-  const spread= air?3 : 1+Math.abs(stride)*1.4;
-  const lift= air?-2:0;
-  // legs (back first for depth)
-  drawLeg(C, -5-spread, lift,  true,  ocrea);
-  drawLeg(C,  2+spread, 0,     false, ocrea);
-  // loincloth (subligaculum) + balteus belt + pteruges
-  px(-6,-20,12,8,C.cloth); px(-6,-20,12,2,C.clothHi); px(-3,-19,1,7,C.clothSh); px(3,-19,1,6,C.clothSh);
-  for(let i=-6;i<=4;i+=3){ px(i,-13,2,5,C.leather); px(i,-13,2,1,C.leatherHi); }
-  px(-7,-21,14,3,C.leather); px(-7,-21,14,1,C.leatherHi);
-  px(-4,-20,1,1,C.gold); px(0,-20,1,1,C.gold); px(4,-20,1,1,C.gold);
-  drawTorso(f,C);
-  drawHead(f,C);
-  drawShield2(f,C);
-  drawArm2(f,C);
-}
 // arrows & broken blades lodged in a battered fighter (drawn in fighter space)
 function drawStuck(f){
   if(!f.stuck || !f.stuck.length) return;
@@ -15836,16 +15748,6 @@ function drawSlashFx(f,C){
   ctx.globalAlpha=0.95; ctx.fillStyle='#fff'; ctx.fillRect((tx-1)|0,(ty-1)|0,3,3);
   if(f.atkType==='thrust'){ ctx.fillStyle=col; ctx.fillRect((tx)|0,(ty-1)|0,4,2); }
   ctx.restore();
-}
-function drawLeg(C,x,lift,back,greave){
-  const base= back? C.skinSh : C.skin;
-  const sh= back? shade(C.skinSh,-14) : C.skinSh;
-  px(x,-15+lift,5,8,base); px(x+4,-15+lift,1,8,sh); px(x,-15+lift,1,8,C.skinHi);
-  px(x,-8+lift,4,1,sh);
-  if(greave && !back){ px(x,-8,4,7,C.bronze); px(x,-8,1,7,C.bronzeHi); px(x+3,-8,1,7,C.bronzeSh); px(x+1,-5,2,1,C.bronzeHi); }
-  else { px(x,-8,4,7,base); px(x+3,-8,1,7,sh); }
-  px(x-1,-1,6,1,C.leather); px(x,-2,4,1,C.leatherHi);
-  px(x+1,-6,1,5,back?C.leatherSh:C.leather);
 }
 function drawTorso(f,C){
   const a=f.gear.armor.id;
@@ -15981,55 +15883,6 @@ function drawTorso(f,C){
   // blood soaking through as the fight turns against them
   if(f.hp<f.maxHp*0.55){ px(-3,-29,2,4,'#7a1414'); px(3,-25,1,3,'#5a1010'); }
   if(f.hp<f.maxHp*0.3){ px(1,-31,2,5,'#8a1d1d'); px(-5,-23,2,2,'#5a1010'); px(-1,-18,2,3,'#6a1010'); }
-}
-function drawHead(f,C){
-  px(-2,-37,4,3,C.skinSh);
-  const id=f.gear.helmet.id;
-  const fullFace = id==='galea_secutor'||id==='galea_aurea'||id==='menpo';
-  px(-4,-46,8,9,C.skin); px(-4,-46,8,1,C.skinHi); px(3,-45,1,8,C.skinSh);
-  if(id==='none'){
-    px(-4,-47,8,3,'#3a2618'); px(-4,-47,8,1,'#241408'); px(-5,-44,1,4,'#3a2618');
-    px(4,-43,1,3,'#3a2618');
-    if(f.female){ px(4,-45,2,11,'#3a2618'); px(-6,-45,2,7,'#3a2618'); px(-2,-49,5,2,'#3a2618'); }  // her braid falls loose
-    /* =================================================================
-       THE EYES, AND THEY ARE NOT THE SAME EYES EVERYWHERE
-       -----------------------------------------------------------------
-       A 2x2 block of white with a dark 1x2 pupil sitting in the middle of
-       it reads as a cartoon googly eye at this size, and on a bare-headed
-       samurai or a Han halberdier it looked ridiculous — round staring
-       whites on a face that should be reading as a woodblock print.
-       Eastern and Japanese figures get the line the art they come from
-       actually uses: a dark horizontal STROKE for the eye with the lid
-       above it and no white showing, which is how a face is drawn in an
-       ukiyo-e or a Han tomb tile. Western figures keep the wide staring
-       eye, because a Roman mosaic really does draw it that way.
-       ================================================================= */
-    const _ec=(typeof localCulture==='function')? (localCulture().id||'roman') : 'roman';
-    const _ink = ['han','korean','wa','ming','steppe','kushan','tamil'].indexOf(_ec)>=0;
-    if(_ink){
-      px(-3,-43,3,1,'#1a1006'); px(1,-43,3,1,'#1a1006');                       // the eye, as a stroke
-      px(-3,-44,3,1,C.skinSh);  px(1,-44,3,1,C.skinSh);                        // the lid above it
-      if(f.atk||f.hurt>0){ px(-3,-45,3,1,'#241408'); px(1,-45,3,1,'#241408'); } // the brow drops
-      px(-1,-40,1,1,C.skinSh);                                                  // and the smallest mouth
-      px(-1,-39,3,1,f.hurt>0?'#5a1010':C.skinSh);
-    } else {
-      // expressive face: whites + pupils, brows angle with fury when attacking
-      px(-3,-43,2,2,'#f2ead8'); px(1,-43,2,2,'#f2ead8');
-      px(-2,-43,1,2,'#1a1006'); px(2,-43,1,2,'#1a1006');
-      if(f.atk||f.hurt>0){ px(-3,-45,3,1,'#241408'); px(1,-44,3,1,'#241408'); } // furious brows
-      else { px(-3,-44,2,1,C.skinSh); px(1,-44,2,1,C.skinSh); }
-      px(-1,-39,3,1,f.hurt>0?'#5a1010':C.skinSh);                                // mouth (snarls when hit)
-    }
-  } else drawHelmet2(id,C);
-  // her braid escapes even a helm
-  if(f.female && !fullFace && id!=='none'){ px(4,-42,2,10,'#2a1a10'); }
-  // beard on the bare jaw (any helm that leaves the chin open)
-  if(f.beard && !fullFace){
-    px(-4,-40,8,3,f.beardC); px(-4,-40,8,1,shade(f.beardC,18));
-    px(-3,-37,6,1,f.beardC); px(-1,-39,3,1,'#1a1006');                         // beard + dark mouth line
-  }
-  // battle wounds: a bleeding cut over the brow when badly hurt
-  if(f.hp<f.maxHp*0.4){ px(2,-45,1,3,'#8a1d1d'); px(2,-42,1,1,'#b52a2a'); }
 }
 function drawHelmet2(id,C){
   const m=C.metal,mh=C.metalHi,ms=C.metalSh,gold=C.gold;
@@ -16310,40 +16163,6 @@ function drawShield2(f,C){
   }
   ctx.restore();
 }
-function drawArm2(f,C){
-  const wp=f.gear.weapon.id;
-  const seg=(f.gear.armor.id==='manica'||f.gear.armor.id==='lorica');
-  // ---- ranged: wind the arm back (charging), then whip it forward (throwT) ----
-  if(f.charging>0 || f.throwT>0){ drawThrowArm(f,C,seg); return; }
-  /* AND A GUN IS HELD EVERY FRAME. The arm only routed here while a shot was
-     winding up or flying, so for the whole two and a half seconds of the
-     reload the gunner stood there empty-handed with a sword animation. The
-     reload IS the weapon — it has to be visible. */
-  { const _g = f.isPlayer? (G.bow && !G.drawnBlade? bowOf(G.bow) : null)
-                          : (f.bwDrawn? f.bw : null);
-    if(_g && _g.gun && !f.atk){ drawThrowArm(f,C,seg); return; } }
-  let ang, lunge=0, elbow=false;
-  if(f.atk){
-    const p=1-(f.atkT/f.atkDur);
-    if(f.atkType==='slash') ang=lerp(-1.5,1.0,Math.min(1,p*1.5));
-    else if(f.atkType==='thrust'){ ang=-0.05; lunge=Math.sin(Math.min(1,p*1.6)*Math.PI)*12; }
-    else { ang=lerp(-0.7,0.45,Math.min(1,p*2)); elbow=true; }
-  } else { ang= f.stance==='high'?-0.85 : f.stance==='low'?0.55 : -0.12; }
-  ctx.save();
-  ctx.translate(5,-32); ctx.rotate(ang);
-  const seg2=seg;
-  px(0,-2,6,5, seg2?C.metal:C.skin); px(0,-2,6,1, seg2?C.metalHi:C.skinHi); px(0,2,6,1, seg2?C.metalSh:C.skinSh);
-  if(seg2){ px(2,-2,1,5,C.metalSh); px(4,-2,1,5,C.metalSh); }
-  ctx.translate(6+lunge,0);
-  if(elbow){
-    px(-1,-3,5,6, seg2?C.metal:C.skin); px(-1,-3,5,1, seg2?C.metalHi:C.skinHi); px(3,-4,3,3,C.metalHi);
-  } else {
-    px(0,-2,5,4, seg2?C.metal:C.skin); px(0,-2,5,1, seg2?C.metalHi:C.skinHi); if(seg2) px(2,-2,1,4,C.metalSh);
-    ctx.translate(5,0); px(0,-2,3,4,C.skin); px(0,-2,3,1,C.skinHi);
-    ctx.translate(2,0); drawWeapon2(wp,C);
-  }
-  ctx.restore();
-}
 /* =====================================================================
    YOU DO NOT WIND UP A MATCHLOCK
    ---------------------------------------------------------------------
@@ -16397,37 +16216,6 @@ function drawGunArms(f,C,seg,bw,cp,rel){
   }
 }
 // arm posed for a javelin throw: cocked high & back while charging, snapping forward on release
-function drawThrowArm(f,C,seg){
-  const cp = f.charging>0 ? (1 - f.charging/(f.chargeMax||12)) : 1;   // 0→1 wind-up
-  const rel = f.throwT>0 ? (f.throwT/9) : 0;                          // 1→0 release whip
-  /* A GUN LEAVES THIS ROUTINE IMMEDIATELY. It is not thrown, so it does not
-     get the throwing arm — and it is drawn EVERY frame, not only while
-     charging, because a man reloading is still holding the thing. */
-  { const _g = (f.chargeData && f.chargeData.bw)
-             || (f.isPlayer? (G.bow? bowOf(G.bow) : null) : (f.bwDrawn? f.bw : null));
-    if(_g && _g.gun && !(f.isPlayer && G.drawnBlade)){ drawGunArms(f,C,seg,_g,cp,rel); return; } }
-  const trem = f.charging>0 ? rnd(-0.05,0.05)*cp : 0;                 // it shakes as it charges
-  const ang = f.charging>0 ? lerp(-0.7,-2.35,cp)+trem : lerp(0.7,-0.15,rel);
-  ctx.save(); ctx.translate(5,-32); ctx.rotate(ang);
-  px(0,-2,6,5, seg?C.metal:C.skin); px(0,-2,6,1, seg?C.metalHi:C.skinHi);   // upper arm
-  ctx.translate(6,0);
-  px(0,-2,5,4, seg?C.metal:C.skin); px(0,-2,5,1, seg?C.metalHi:C.skinHi);   // forearm
-  ctx.translate(5,0); px(0,-2,3,4,C.skin); px(0,-2,3,1,C.skinHi);            // hand
-  ctx.translate(3,0);
-  /* WHAT IS ACTUALLY IN THE FIST. This drew a Roman javelin no matter what
-     was slung — so a man aiming a matchlock, a horse pistol or a clay bomb
-     was holding a pilum in every frame of the wind-up. */
-  if(f.charging>0 || f.throwT>4){ ctx.save(); ctx.rotate(-0.15);
-    const _bw = (f.chargeData && f.chargeData.bw) || (f.isPlayer && G.bow? bowOf(G.bow) : null);
-    if(_bw && _bw.bomb) drawHeldBomb(_bw);
-    else if(_bw && _bw.gun) drawHeldGun(_bw);
-    else if(_bw) drawHeldBow(_bw);
-    else drawHeldPilum(f.gear.weapon.gold);
-    ctx.restore(); }
-  // a charge glimmer building at the head
-  if(f.charging>0 && cp>0.4){ ctx.save(); ctx.rotate(-0.15); ctx.globalAlpha=cp; px(16,-1,2,2,'#fff'); px(17,-2,1,1,'#ffe9a0'); ctx.globalAlpha=1; ctx.restore(); }
-  ctx.restore();
-}
 /* =====================================================================
    ⚔ THE ARMOURY, REDRAWN
    ---------------------------------------------------------------------
@@ -20732,13 +20520,7 @@ function drawArena(){
   if(t.wifeWatch && G.wife){
     const wfx = t.pit? 60 : W/2-86, wfy = t.pit? GROUND-44 : 13;
     const wave=((t.time*0.13)|0)%2;
-    if(nbOn() && !G.wife.male && drawStandsWifeNB(wfx+3, wfy+8, wave)){ if((t.time|0)%80<36) pixelText('♥',wfx+3,wfy-12,'#e26a8a',1); }
-    else {
-    px(wfx-1,wfy+2,8,9,G.wife.dress); px(wfx-1,wfy+2,8,2,shade(G.wife.dress,26));   // her gown stands out
-    px(wfx+1,wfy-1,5,4,G.wife.skin); px(wfx+1,wfy-2,5,2,G.wife.hair);
-    px(wfx-2,wfy-3-(wave?2:0),2,5,G.wife.skin); px(wfx+6,wfy-3-(wave?0:2),2,5,G.wife.skin); // waving to you
-    if((t.time|0)%80<36) pixelText('♥',wfx+3,wfy-7,'#e26a8a',1);
-    }
+    if(drawStandsWifeNB(wfx+3, wfy+8, wave) && (t.time|0)%80<36) pixelText('♥',wfx+3,wfy-12,'#e26a8a',1);
   }
   // blood decals soaked into the sand
   for(const d of t.decals){ ctx.globalAlpha=d.a; px(d.x,d.y,d.w,d.h,d.c); }
@@ -21685,29 +21467,9 @@ function updateBattle(dt){
   if(t.t>=t.dur && !t.ended){ t.ended=true; setTimeout(finishBattle,700); }
 }
 // one detailed mini-legionary (8px): helm, face, tunic, shield, spear; ranks bob as they march
-function drawBattleSoldier(sx,sy,facing,tunic,shieldC,crest,i){
-  if(nbOn()){ try{ drawBattleSoldierNB(sx,sy,facing,tunic,shieldC,crest,i); return; }catch(e){} }   // ⚔ the template, in the field
-  const bob=Math.sin((BT.t*0.25)+i*1.7)*0.8;
-  sy+=bob;
-  px(sx,sy+4,1,3,'#6a4a2e'); px(sx+2,sy+4,1,3,'#5a3c24');            // legs
-  px(sx,sy,3,4,tunic); px(sx,sy,3,1,shade(tunic,24));                // tunic
-  px(sx,sy-3,3,3,'#caa06a'); px(sx+(facing>0?2:0),sy-3,1,1,'#241408'); // head + eye
-  px(sx-1,sy-4,5,2,'#b9c0c8'); px(sx-1,sy-5,5,1,crest);              // helm + crest
-  px(sx+facing*3,sy-7,1,10,'#8a6a44'); px(sx+facing*3,sy-7,1,2,'#dfe6ee'); // spear + point
-  px(sx-facing*1-1,sy-1,2,5,shieldC); px(sx-facing*1-1,sy-1,2,1,shade(shieldC,30)); // shield
-  px(sx-facing*1-1,sy+1,1,1,'#e8c34a');                              // boss
-}
 // a cavalry rider on the flank
-function drawBattleHorse(sx,sy,facing,col){
-  const bob=Math.sin(BT.t*0.4+sx)*1;
-  sy+=bob;
-  px(sx,sy,8,4,col); px(sx+(facing>0?7:-1),sy-2,2,3,col);            // horse body + neck
-  px(sx+(facing>0?8:-2),sy-3,2,2,shade(col,-20));                    // head
-  px(sx+1,sy+4,1,3,shade(col,-30)); px(sx+5,sy+4,1,3,shade(col,-30)); // legs
-  px(sx+3,sy-4,2,4,'#caa06a'); px(sx+2,sy-6,4,2,'#b9c0c8');          // rider + helm
-  px(sx+facing*6,sy-8,1,9,'#8a6a44');                                 // lance
-}
 function drawBattleHost(x,men,maxMen,facing,col,crest,advance,shieldC,S){
+  if(!S){ try{ S=armyStyle(facing>0? 'legion' : 'germanic'); }catch(e){} }
   /* ⚔ A PEOPLE'S HOST: its own foot (archers in the far rank where they field them), its elephants standing behind,
      its horse in a wing that leads the advance in proportion to how much of the army is mounted, and its own standard. */
   if(nbOn() && S){
@@ -21722,38 +21484,6 @@ function drawBattleHost(x,men,maxMen,facing,col,crest,advance,shieldC,S){
     const live=horseN? Math.max(1,Math.round(horseN*men/maxMen)) : 0;
     for(let k=0;k<live;k++){ const row=k%3, cc=(k/3)|0; drawStyledRider(x + facing*(cc*18-14+row*7) + advance*facing*(hf>0.5? 1.1 : 0.7), 176+row*9, facing, S, k, 0.92+row*0.06); }
     return; }
-  /* ⚔ THE NEW SOLDIERS ARE THREE TIMES THE SIZE OF THE OLD 8-PIXEL ONES, and they were being stood on the old
-     grid (8 apart, ranks 11 apart): forty-five of them on top of each other in one blob. Now a host is four ranks in
-     depth, the far ranks smaller and higher up the field, the files close enough that the shields overlap into a
-     wall; men come off the front rank as they fall. */
-  if(nbOn()){
-    const ranks=4, files=8, icons=Math.max(1,Math.min(ranks*files, Math.round(men/maxMen*ranks*files)));
-    for(let r=0;r<ranks;r++){ const sc=0.60+r*0.13, y=138+r*12;
-      for(let f=0;f<files;f++){ const idx=r*files+f; if(idx>=icons) continue;
-        const sx=x + facing*(f*12*sc + (r%2)*5*sc) + advance*facing + facing*(ranks-1-r)*5;
-        drawBattleSoldierNB(sx, y, facing, col, shieldC, crest, idx, sc); } }
-    const bx=x+advance*facing+facing*-8, by=124;
-    px(bx,by-22,2,34,'#5a4028'); px(bx,by-22,1,34,'#7a5a38');
-    px(bx+(facing>0?2:-11),by-22,11,8,crest); px(bx+(facing>0?2:-11),by-22,11,1,shade(crest,40)); px(bx+(facing>0?5:-8),by-20,5,4,shade(crest,-40)); px(bx-1,by-24,4,2,'#e8c34a');
-    for(let k=0;k<3;k++) drawBattleHorse(x - facing*(22+k*15), 182+((k%2)*6), facing, facing>0?'#7a5a38':'#4a3a4e');
-    return; }
-  const cols=9, rows=5, icons=Math.max(1,Math.min(cols*rows, Math.round(men/maxMen*cols*rows)));
-  /* the new men are taller than a rank's spacing, so the far rank goes down first and the near ranks stand in front of it */
-  const NBo=nbOn();
-  for(let j=0;j<icons;j++){ const i= NBo? j : icons-1-j;
-    const cc=i%cols, rr=(i/cols)|0;
-    const sx=x + facing*(cc*8) + advance*facing + (rr%2)*2*facing;
-    const sy=132 + rr*11;
-    drawBattleSoldier(sx,sy,facing,col,shieldC,crest,i);
-  }
-  // standard bearer at the front: tall pole + banner
-  const bx=x+advance*facing+facing*-6, by=126;
-  px(bx,by-18,2,30,'#5a4028'); px(bx,by-18,1,30,'#7a5a38');
-  px(bx+(facing>0?2:-9),by-18,9,7,crest); px(bx+(facing>0?2:-9),by-18,9,1,shade(crest,40));
-  px(bx+(facing>0?4:-7),by-16,5,3,shade(crest,-40));                  // device on the banner
-  px(bx-1,by-20,4,2,'#e8c34a');                                        // gilt finial
-  // cavalry wing behind
-  for(let k=0;k<3;k++) drawBattleHorse(x - facing*(18+k*14), 178+((k%2)*6), facing, facing>0?'#7a5a38':'#4a3a4e');
 }
 function drawBattle(){
   const t=BT, shk=SETTINGS.shake?t.shake:0, sx=(Math.random()-0.5)*shk, sy=(Math.random()-0.5)*shk;
@@ -21926,29 +21656,36 @@ function updateRace(dt){
   if(you.finished && !r.over){ r.over=true; setTimeout(()=>{ if(RC) finishRace(); }, 1600); }
 }
 function racePosition(c){ return 1 + RC.cars.filter(o=>o!==c && (o.finished? true : o.dist>c.dist)).length; }
-function drawRaceHorse(x,y,ph,col){
-  const g=Math.sin(ph)*2, g2=Math.sin(ph+2)*2;
-  px(x,y-6,9,4,col); px(x+8,y-8,3,4,col); px(x+9,y-10,3,3,col);        // body, neck, head
-  px(x+11,y-9,1,2,shade(col,-20));                                     // muzzle
-  px(x+1,y-2,2,4+g,shade(col,-16)); px(x+6,y-2,2,4+g2,shade(col,-16)); // near legs
-  px(x+3,y-2,2,4+g2,col); px(x+8,y-2,2,4+g,col);                       // far legs
-  px(x-1,y-9,3,4,shade(col,14));                                       // mane/tail hint
-}
+/* 🏇 THE CIRCUS ON THE PAINTED PAIR. The race was the last place still run on the old eight-pixel horses.
+   Now the pair is the game's own horse (the one the cavalry rides), the far one half a length up and a
+   shade darker; the car is a biga with a high breastwork in the faction's colour and two spoked wheels; and
+   the driver is the new body, in the faction tunic with the leather strapping (fasciae) round his ribs that
+   charioteers wore, the reins knotted round his waist so a crash could drag him unless he cut them. */
+const RACE_COATS={blue:['grey','black'], green:['chestnut','bay'], red:['bay','black'], white:['grey','chestnut']};
 function drawChariot(x,y,c){
-  const F=FACTIONS[c.faction]||FACTIONS.white;
-  const tilt = c.spin>0? Math.sin(c.spin*2)*3 : 0;
-  drawRaceHorse(x-2,y+tilt,c.phase,'#6a4a30'); drawRaceHorse(x+3,y+2+tilt,c.phase+1.4,'#4a3524');  // the pair
-  px(x+9,y-3+tilt,10,1,'#2a1c10');                                     // traces to the cart
-  // the biga (cart)
-  px(x+17,y-9+tilt,11,9,'#5a3a1e'); px(x+17,y-9+tilt,11,2,'#7a5230'); px(x+18,y-8+tilt,9,6,F.col);
-  px(x+18,y-8+tilt,9,1,F.col2);
-  // wheel
-  ctx.strokeStyle='#2a1c10'; ctx.lineWidth=1.4; ctx.beginPath(); ctx.arc(x+22,y+1+tilt,5,0,7); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(x+17,y+1+tilt); ctx.lineTo(x+27,y+1+tilt); ctx.moveTo(x+22,y-4+tilt); ctx.lineTo(x+22,y+6+tilt); ctx.stroke();
-  // driver, in his colours
-  px(x+20,y-18+tilt,4,9,F.col2); px(x+20,y-20+tilt,4,3,c.isPlayer?'#e8c34a':'#caa06a'); // body + head
-  px(x+23,y-16+tilt,4,1,'#3a2a18');                                    // the reins/whip arm
-  if(c.whip) px(x+26,y-19+tilt,3,1,'#2a1c10');                         // the whip cracks forward
+  const F=FACTIONS[c.faction]||FACTIONS.white, tilt=c.spin>0? Math.sin(c.spin*2)*3 : 0, k=0.24, yy=y+tilt;
+  const coats=RACE_COATS[c.faction]||['bay','black'], fr=((c.phase*1.25)|0);
+  // the far horse first, a little ahead and higher, then the near one
+  for(const [dx,dy,j] of [[5,-4,1],[0,0,0]]){ const M=btMountSprite('horse_'+coats[j], (fr+j*3)%BT_MOUNT_NF);
+    ctx.save(); ctx.translate(Math.round(x+36+dx), Math.round(yy+dy)); ctx.scale(k,k); if(j) ctx.globalAlpha=0.92; ctx.drawImage(M.cv,-BST_OX,-BST_OY); ctx.restore(); }
+  // the pole and the traces, from the car's front to the yoke
+  ctx.strokeStyle='#3a2a18'; ctx.lineWidth=1.4; ctx.beginPath(); ctx.moveTo(x+17,yy-4); ctx.lineTo(x+38,yy-10); ctx.stroke();
+  ctx.strokeStyle='rgba(30,20,10,.8)'; ctx.lineWidth=0.7; ctx.beginPath(); ctx.moveTo(x+12,yy-15); ctx.lineTo(x+42,yy-14); ctx.moveTo(x+12,yy-15); ctx.lineTo(x+46,yy-17); ctx.stroke();
+  // the driver, leaning into it, in his colours
+  try{ const look=c.isPlayer? playerLook() : {male:true, skin:['#caa06a','#b88a5a','#d8b088','#a87a4a'][c.lane%4], hair:'#2a1a10', beard:'none', body:{legs:6,bust:6,booty:6,waist:6}};
+    drawManProfile(ctx, x+9, yy-5, look, {k:0.27, u:0, aro:0, cloth:F.col, face:HARD_FACES.intent, lean:0.28, noShadow:true, near:[10,-30], far:[13,-32]}, 1);
+    ctx.fillStyle=c.isPlayer? '#e8c34a' : '#6a4a2a'; ctx.beginPath(); ctx.ellipse(x+11.2, yy-25.6, 2.6, 1.5, 0, Math.PI, 0); ctx.fill();   // the leather cap
+  }catch(e){}
+  if(c.whip){ ctx.strokeStyle='#2a1c10'; ctx.lineWidth=0.8; ctx.beginPath(); ctx.moveTo(x+13,yy-24); ctx.quadraticCurveTo(x+24,yy-34,x+34,yy-22); ctx.stroke(); }
+  // the car: a breastwork that rises to the front, painted, with the rim in the second colour
+  ctx.fillStyle=shade(F.col,-25); ctx.beginPath(); ctx.moveTo(x+1,yy-2); ctx.lineTo(x+18,yy-2); ctx.quadraticCurveTo(x+20,yy-12,x+16,yy-16); ctx.lineTo(x+12,yy-16); ctx.quadraticCurveTo(x+12,yy-8,x+3,yy-8); ctx.closePath(); ctx.fill();
+  ctx.fillStyle=F.col; ctx.beginPath(); ctx.moveTo(x+3,yy-3); ctx.lineTo(x+17,yy-3); ctx.quadraticCurveTo(x+18.5,yy-11,x+15.5,yy-14.5); ctx.lineTo(x+13,yy-14.5); ctx.quadraticCurveTo(x+13,yy-7,x+4,yy-7); ctx.closePath(); ctx.fill();
+  ctx.strokeStyle=F.col2; ctx.lineWidth=0.9; ctx.beginPath(); ctx.moveTo(x+3,yy-7); ctx.quadraticCurveTo(x+13,yy-7,x+13,yy-14.5); ctx.lineTo(x+15.5,yy-14.5); ctx.stroke();
+  // the wheel, six spokes turning
+  const wx=x+9, wy=yy-1, rr=5.2, an=c.phase*0.9; ctx.strokeStyle='#2a1c10'; ctx.lineWidth=1.5; ctx.beginPath(); ctx.arc(wx,wy,rr,0,7); ctx.stroke(); ctx.strokeStyle='#5a3a1e'; ctx.lineWidth=0.8;
+  for(let i=0;i<3;i++){ const a=an+i*Math.PI/3; ctx.beginPath(); ctx.moveTo(wx+Math.cos(a)*rr,wy+Math.sin(a)*rr); ctx.lineTo(wx-Math.cos(a)*rr,wy-Math.sin(a)*rr); ctx.stroke(); }
+  ctx.fillStyle='#c8a040'; ctx.beginPath(); ctx.arc(wx,wy,1.2,0,7); ctx.fill();
+  if(c.spin>0){ ctx.fillStyle='rgba(216,178,113,.6)'; for(let i=0;i<4;i++){ ctx.beginPath(); ctx.arc(x-2-i*4, yy-1-i, 2+i, 0, 7); ctx.fill(); } }   // the sand thrown up in a skid
 }
 function drawRace(){
   const r=RC, you=r.you, c=ctx;
@@ -22918,48 +22655,6 @@ function drawHusbandFig(c,x,y,bond,skinOv,tunOv,w,ph,mode){
   if(bond>=90){ P(-shW-3,-40,3,3,skin); }                            // his hand reaches toward her
   if(turning) c.restore();
 }
-function drawKidFig(c,x,y,sex,age){
-  const P=(a,b2,w,h,col)=>{c.fillStyle=col;c.fillRect(Math.round(x+a),Math.round(y+b2),Math.round(w),Math.round(h));};
-  const h=Math.min(40, 22+Math.round(age/4));                        // they grow
-  const K=arguments[5]||{}, KB=K.body||{};                            // the child's OWN inherited scores
-  const kfa=KB.face===undefined?5:KB.face, kha=KB.hairq===undefined?5:KB.hairq;
-  const skin=K.skin||G.skin||'#caa06a', sSh=shade(skin,-28), sHi=shade(skin,20);
-  const boy = sex==='m';
-  const cloth= boy ? shade(G.tunic||'#7a2f22',12) : shade((G.wife&&G.wife.dress)||'#8a2f5a',16);
-  const clSh=shade(cloth,-22), clHi=shade(cloth,24);
-  const hairC = K.hair || (boy ? '#3a2618' : ((G.wife&&G.wife.hair)||'#5a3a1e')), hairHi=shade(hairC,22);
-  // legs + little sandals
-  P(-2,-9,2,7,skin); P(1,-9,2,7,skin); P(-2,-9,1,7,sHi); P(2,-9,1,7,sSh);
-  P(-3,-2,3,2,'#6a4426'); P(1,-2,3,2,'#6a4426');
-  if(boy){                                                           // a son: a belted tunic, modelled
-    P(-4,-h+9,8,h-16,cloth); P(-4,-h+9,8,2,clHi); P(3,-h+9,1,h-16,clSh); P(-4,-h+9,1,h-16,clHi);
-    P(-4,-14,8,1,'#6a4426');                                        // belt
-    for(let yy=-h+13;yy<-15;yy+=3) P(-1,yy,1,2,clSh);              // a drape fold
-  } else {                                                           // a daughter: bodice → flared stola
-    P(-4,-h+9,8,4,cloth); P(-4,-h+9,8,2,clHi); P(3,-h+9,1,4,clSh);
-    P(-3,-h+13,6,1,clSh);                                            // cinched waist
-    const top=-h+14, bot=-2;
-    for(let yy=top; yy<bot; yy++){ const f=(yy-top)/Math.max(1,bot-top); const wdt=6+Math.round(f*6); P(-Math.round(wdt/2),yy,wdt,1,cloth); if(yy%3===0) P(1,yy,1,1,clSh); }
-    P(-6,bot-1,12,1,clSh);                                          // hem
-  }
-  // arms, shaded
-  P(-6,-h+10,2,7,skin); P(4,-h+10,2,7,skin); P(-6,-h+10,1,7,sHi); P(5,-h+10,1,7,sSh);
-  // head, modelled
-  P(-3,-h,7,8,skin); P(-3,-h,7,1,sHi); P(3,-h,1,8,sSh); P(-3,-h+7,7,1,sSh);
-  if(boy){ P(-3,-h-1,7,2,hairC); P(-3,-h-1,7,1,hairHi); }            // short crop
-  else { P(-3,-h-1,7,2,hairC); P(-3,-h-1,7,1,hairHi); P(-5,-h+1,2,8,hairC); P(4,-h+1,2,8,hairC); P(-4,-h+8,1,2,hairC); P(3,-h+8,1,2,hairC); }  // long framing hair
-  // face — tiny nose, grin, and the eye the child's own country draws
-  if(!inkEyesOver(P,-2,1,-h+3,2,2,skin,sSh)){
-    P(-2,-h+3,2,2,'#f2ead8'); P(1,-h+3,2,2,'#f2ead8');
-    P(-2,-h+3,1,2,'#241408'); P(1,-h+3,1,2,'#241408'); }
-  P(0,-h+5,1,1,sSh); P(-1,-h+6,3,1,'#8a4038');                      // nose + grin
-  // even at this size the inherited face reads: a fine-featured child is drawn finer
-  if(kfa>=8){ P(-3,-h+2,2,1,shade(hairC,-10)); P(2,-h+2,2,1,shade(hairC,-10));   // clear brows
-              P(-1,-h+6,3,1,'#a8524a'); }
-  else if(kfa<=3){ P(-1,-h+5,3,2,sSh); P(-2,-h+7,5,1,shade(skin,-16)); }         // heavier features
-  if(kha>=8 && !boy){ P(-6,-h+1,2,10,hairC); P(5,-h+1,2,10,hairC); }             // her mother's hair
-  if(kha<=2 && boy){ P(-3,-h-1,7,1,skin); }                                       // a thin crop
-}
 /* 📸 THE FAMILY, ON THE NEW BODIES: the domina in the middle, her lord beside her, the grown
    children as the adults they are — full length, facing the painter, each in their own pose and
    their own people's garment. The little ones are still the little ones. */
@@ -22990,32 +22685,7 @@ function openPortrait(){
   c.fillStyle='#3a2c1e'; c.fillRect(0,222,480,28); for(let fx=0;fx<480;fx+=24){c.fillStyle='#2c2014';c.fillRect(fx,222,1,28);}
   // the family, gathered
   const bond=G.wifeRel|0, spouseMale=!!(G.wife&&G.wife.male);
-  if(portraitsNew() && familyPortraitNew(c, bond, spouseMale)){}
-  else {
-  if(G.wife && !spouseMale){ const wc=document.createElement('canvas'); wc.width=wc.height=148; drawBridePortrait(wc,G.wife,true,wifePregMonth());
-    c.drawImage(wc, 186,106, 148*0.78,148*0.78); }                                                       // the domina
-  else if(G.isFemale){ // the head of the house is herself the domina — paint HER at the center, on HER OWN scores
-    const me=Object.assign(playerLook(), {build:'curvy',neckline:'fine',rank:'noble',adj:'Roman',jewel:true});
-    const wc=document.createElement('canvas'); wc.width=wc.height=148; drawBridePortrait(wc,me,true,selfPregMonth());
-    c.drawImage(wc, 186,106, 148*0.78,148*0.78); }
-  // her lord at her side — drawn on HIS measurements, face tier and all
-  if(spouseMale){ c.save(); c.translate(324,224); c.scale(1.95,1.95);
-    drawHusbandFig(c,0,0,bond,G.wife.skin,G.wife.dress,G.wife,0,'idle'); c.restore(); }
-  else if(!G.isFemale){ c.save(); c.translate(324,224); c.scale(1.95,1.95);
-    drawHusbandFig(c,0,0,bond,null,null,playerLook(),0,'idle'); c.restore(); }
-  const kids=G.children.slice(0,6);
-  // A CHILD WHO HAS GROWN UP IS DRAWN AS AN ADULT — with the face they inherited,
-  // not the same round-cheeked sprite they were painted as at three years old.
-  kids.forEach((k,i)=>{ const days=G.day-k.born; c.save(); c.translate(168-i*34,222);
-    if(kGrownDraw(k,days)){
-      const subj={body:k.body, skin:k.skin||G.skin, dress:(k.sex==='m'? (G.tunic||'#eae4d6') : ((G.wife&&G.wife.dress)||'#8a2f5a')),
-                  hair:k.hair||'#3a2618', male:k.sex==='m'};
-      c.scale(1.05,1.05);
-      if(k.sex==='m') drawHusbandFig(c,0,0,0,subj.skin,subj.dress,subj,0,'idle');
-      else drawWifeFig(c,0,0,subj,0,'idle');
-    } else { c.scale(1.45,1.45); drawKidFig(c,0,0,k.sex,days,k); }
-    c.restore(); });
-  }
+  familyPortraitNew(c, bond, spouseMale);
   if(bond>=90){ c.fillStyle='#e26a8a'; c.font='14px monospace'; c.fillText('♥', 272, 96); }            // devoted
   if(G.familyMan){ c.fillStyle='#e8c34a'; c.font='bold 10px Georgia,serif'; c.textAlign='center';
     c.fillText('· FAMILY MAN OF THE HOUSE ·', 240, 20); }                                                // the earned title, in gold
@@ -24584,12 +24254,9 @@ function drawRoomPlace(s,T,dx,dw,place){
     const sxx= caught? kx-6 : 90+clamp((T-575)/67,0,1)*(300-90);
     if(nbOn()) drawManProfile(ctx, sxx, 216, {male:true, skin:'#b07a4a', hair:'#2a1a10', body:{bust:6,booty:6,waist:6,legs:6,face:5,hairq:5}}, {k:BED_FIG_K, cloth:'#8a8a72', face:HARD_FACES.stoic, walk:1, walkPh:sxx*0.12, near:caught? [7,-26] : null, far:caught? [6,-27] : null}, caught? -1 : 1);   // the long-suffering slave, on the new body
     else { ctx.save(); ctx.translate(sxx,216); ctx.scale(1.2,1.2); drawHusbandFig(ctx,0,0,0,'#b07a4a','#8a8a72'); ctx.restore(); }  // the long-suffering slave
-    if(caught && nbOn()){ drawKidProfile(ctx, kx, 188, {sex:'m'}, {age:2, k:BED_FIG_K, expr:'pout', noShadow:true}, -1);
+    if(caught){ drawKidProfile(ctx, kx, 188, {sex:'m'}, {age:2, k:BED_FIG_K, expr:'pout', noShadow:true}, -1);
       if((T|0)%16<1.5) pixelText('!',kx+6,150,'#e8c34a',1); }
-    else if(!caught && nbOn()) drawKidProfile(ctx, kx, 216, {sex:'m'}, {age:2, k:BED_FIG_K, mode:'walk', ph:T*0.3, expr:'laugh'}, 1);
-    else if(caught){ ctx.save(); ctx.translate(kx,178); ctx.scale(1.1,1.1); drawKidFig(ctx,0,0,'m',16); ctx.restore();          // held aloft, protesting
-      if((T|0)%16<1.5) pixelText('!',kx+6,160,'#e8c34a',1); }
-    else { ctx.save(); ctx.translate(kx,216); ctx.scale(1.1,1.1); drawKidFig(ctx,0,0,'m',16); ctx.restore(); }
+    else drawKidProfile(ctx, kx, 216, {sex:'m'}, {age:2, k:BED_FIG_K, mode:'walk', ph:T*0.3, expr:'laugh'}, 1);
   }
 }
 function drawFlungProp(p){ if(iceHere()){ iceFlungProp(p); return; } ctx.save(); ctx.translate(p.x,p.y); ctx.rotate(p.r);
@@ -32206,7 +31873,7 @@ function nbKit(oc, K, Q, kit, part){
 const NB_K=0.62;
 const NB_BW=128, NB_BH=124, NB_OX=64, NB_OY=110;          // the per-fighter buffer: feet at (64,110)
 const NB_DRAWS={fighter:0, soldier:0, card:0, last:null};  // for the tests
-function nbOn(){ try{ return !(typeof SETTINGS!=='undefined' && SETTINGS && SETTINGS.classicBodies); }catch(e){ return true; } }
+function nbOn(){ return true; }   // the old block rig is gone: everything is drawn on the posable figures
 const NB_TWO_HANDED=['fire_spear','bone_harpoon','flint_spear','obsidian_lance','atlatl','hasta','fuscina','hasta_argentea','ji','qiang','kontos','ankusha','harpuun','herd_spear','torv_spear','reach_pole','weigh_rod',
   'takeyari','take_naginata','kuwa','ono','konbo','bo','bian_dan','bidens','venabulum','yari','nagae_yari','naginata','odachi','nagamaki','kanabo','nu','steppe_bow','bipennis','sagaris',
   'contus','ge','vel','otsuchi','ice_chisel'];
@@ -32834,7 +32501,9 @@ function drawStandsWifeNB(x, y, frame){
   if(!NB_WIFE_WAVE[frame] || NB_WIFE_WAVE[frame]._w!==w){
     const cv2=document.createElement('canvas'); cv2.width=24; cv2.height=30; const g=cv2.getContext('2d',{willReadFrequently:true});
     const k=0.36; g.setTransform(k,0,0,k,12,29);
-    try{ drawFemFig(g, g, {look:w, hip:[0,-35], floor:0, lean:0.02, headAng:-0.05, expr:'pleased', t:0,
+    try{ if(w.male) drawMateFig(g, g, {look:Object.assign({}, w, {male:true}), hip:[0,-35], floor:0, lean:0.02, u:0, aro:0, face:HARD_FACES.smirk, cloth:w.dress||'#7a2f22', lenIn:0, diaIn:1, pxi:1, headK:1.15,
+           hands:{near: frame? [8,-78] : [11,-74], far:[-3,-50]}});                // her husband, waving from the same bench
+         else drawFemFig(g, g, {look:w, hip:[0,-35], floor:0, lean:0.02, headAng:-0.05, expr:'pleased', t:0,
       hands:{near: frame? [8,-78] : [11,-74], far:[-3,-50]}, dress:{col:w.dress||'#8a2f5a', cut:(typeof rkHere==='function' && rkHere())? 'ulvik' : 'stola', u:0}}); }catch(e){}
     g.setTransform(1,0,0,1,0,0);
     const im=g.getImageData(0,0,24,30), d=im.data; for(let i=3;i<d.length;i+=4) d[i]= d[i]>=100? 255 : 0; g.putImageData(im,0,0);
@@ -34223,99 +33892,8 @@ function drawSteamVeil(c, x, FY, T, w){
    legs is just a chart with a broken toggle. */
 /* the robe dropped at the pool — on the new body (the steam veil still goes over it) */
 function drawBareFig(c,x,y,w,dir){
-  if(!nbOn()) return drawUndressedFig(c,x,y,w);
   try{ if(w.male) return drawManProfile(c, x, y, w, {u:1, bare:true, aro:0, face:(typeof hardFace==='function'? hardFace(w,'hall') : HARD_FACES.smirk), noShadow:true}, dir||-1);
-       return drawFemProfile(c, x, y, w, {dress:null, expr:'pleased', t:(DM&&DM.t)||0, noShadow:true}, dir||-1); }catch(e){ return drawUndressedFig(c,x,y,w); }
-}
-function drawUndressedFig(c,x,y,w,ph){
-  const P=(a,b2,ww,h,col)=>{c.fillStyle=col;c.fillRect(Math.round(x+a),Math.round(y+b2),Math.round(ww),Math.round(h));};
-  const skin=w.skin||'#e6bd94', hair=w.hair||'#5a3a1e', sh=shade(skin,-24), hi=shade(skin,20);
-  const hHi=shade(hair,26), hSh=shade(hair,-24);
-  const B=w.body||{}, gv=(id,d)=>B[id]===undefined?d:B[id];
-  const bu=gv('bust',6), be=gv('booty',6), wa=gv('waist',6), lg=gv('legs',6), fa=gv('face',6), hq=gv('hairq',6);
-  const cut=w.hairStyle||hairStyleFallback(w);
-  if(w.male){
-    const shW  = Math.round(6 + be*0.52);                     // shoulder half-width
-    const chW  = Math.round(5 + bu*0.42);                     // the chest slab
-    const gut  = Math.round((10-wa)*0.34);                    // a soft middle pushes out
-    const legL = Math.round(12 + lg*0.52);
-    const legW = Math.round(3 + lg*0.12);
-    const hdW  = Math.round(9 + fa*0.24), hdH = 9 + (fa>=9?2:fa>=7?1:0);
-    const top  = -18-legL;                                    // where the hips sit
-    /* SEEN HEAD-ON a stride is a scissor, not a slide: the legs part and close,
-       and the trailing one comes off the floor. Two and a half pixels of travel
-       was true and invisible; this is four, and the lift is what sells it. */
-    const _sw = ph===undefined? 0 : Math.sin(ph);
-    const STRm = _sw*(2.6+lg*0.20);
-    const lfL = Math.max(0,-_sw)*2.2, lfR = Math.max(0,_sw)*2.2;
-    P(-legW-1-STRm,-legL-2,legW,legL-lfL,skin); P(1+STRm,-legL-2,legW,legL-lfR,sh);
-    P(-legW-2-STRm,-2-lfL,legW+2,2,'#8a5c34'); P(1+STRm,-2-lfR,legW+2,2,'#8a5c34');
-    /* HIS PELVIS. Both sexes were drawing the identical plain block here, which
-       is simply wrong: a man's hips are NARROWER than his shoulders and run
-       square, and the abdomen tapers into them in a V. Hers flare wider than
-       her waist and are round. They are two different shapes now. */
-    { const hipM=Math.max(3,Math.round(shW*0.72))+Math.round(gut*0.5);      // narrower than the yoke
-      P(-hipM,top-9,hipM*2,10,skin); P(-hipM,top-9,hipM*2,1,hi);           // square hips
-      P(hipM-1,top-8,1,9,sh);
-      // the V of the lower abdomen running down into them
-      P(-hipM+1,top-11,hipM*2-2,2,skin);
-      P(-hipM+2,top-10,1,3,sh); P(hipM-3,top-10,1,3,sh);
-      P(-2,top-3,5,3,mixHex(skin,'#6a4430',0.45)); }                        // and the groin, squared
-    for(let ry=0;ry<15;ry++){ const t=ry/14;                               // the trunk, tapered row by row
-      const hw=Math.round(shW + ((shW*0.62+gut)-shW)*t);
-      P(-hw,top-24+ry,hw*2,1,skin); P(-hw,top-24+ry,1,1,hi); P(hw-1,top-24+ry,1,1,sh); }
-    P(-chW,top-23,chW*2,6,shade(skin,6)); P(-1,top-23,2,6,sh);             // the pectorals
-    if(bu>=8) P(-chW,top-24,chW*2,1,hi);
-    if(wa>=8){ P(-3,top-14,7,1,sh); P(-3,top-11,7,1,sh); }                 // and a cut midriff
-    P(-2,top-28,5,5,skin);                                                  // neck
-    P(-shW-3,top-24,3,14,skin); P(shW,top-24,3,14,skin);                    // arms
-    P(-hdW/2,top-28-hdH,hdW,hdH,skin); P(-hdW/2,top-28-hdH,hdW,1,hi);       // head
-    drawHairM(P,{hair,hHi,hSh},cut,-hdW/2,top-28-hdH,hdW,{fall:0.5});
-    if(w.scars&&w.scars.length) drawScarsOn(P,w.scars,{                     // nothing to hide them here
-      face:[-hdW/2+1,top-26-hdH,hdW-2,7], torso:[-shW+2,top-23,shW*2-4,20],
-      arm:[-shW-3,top-23,3,12], leg:[-legW-1,-legL-2,legW,legL-2] },
-      mixHex(skin,'#7a4038',0.6), skin);
-    return;
-  }
-  const bustW = Math.round(1 + bu*0.62), bustH = Math.round(2 + bu*0.40);
-  const hipW  = Math.round(4 + be*0.56);
-  const waistW= Math.round(6 - wa*0.30);
-  const legL  = Math.round(11 + lg*0.52);
-  const hdW   = Math.round(8 - (fa>=9?1:0)), hdH = 8 + (fa>=7?1:0);
-  const top   = -16-legL;
-  P(-3,top-2,7,13,skin);                                                    // seat
-  const _swf = ph===undefined? 0 : Math.sin(ph);
-  const STRf = _swf*(2.4+lg*0.18);
-  const lfLf = Math.max(0,-_swf)*2.0, lfRf = Math.max(0,_swf)*2.0;
-  P(-waistW/2-2-STRf,-legL-2,legL>0?4:0,legL-lfLf,skin); P(1+STRf,-legL-2,4,legL-lfRf,sh);
-  P(-5-STRf,-2-lfLf,5,2,'#8a5c34'); P(0+STRf,-2-lfRf,5,2,'#8a5c34');
-  // HER PELVIS — flaring out from a narrow waist and rounded off, not a slab
-  P(-hipW+1,top-11,hipW*2-2,2,skin);                                        // the waist meeting the hip
-  P(-hipW,top-9,hipW*2,9,skin); P(-hipW,top-9,hipW*2,1,hi);                 // the widest point
-  P(-hipW-1,top-7,1,5,skin); P(hipW,top-7,1,5,skin);                        // and it swings wider still
-  P(-hipW+1,top,hipW*2-2,2,skin);                                           // rounding back in below
-  P(hipW-2,top-7,2,8,sh);
-  P(-2,top-2,5,2,mixHex(skin,'#7a4a44',0.40));                              // the pelvic triangle
-  P(-waistW/2,top-14,waistW,6,skin);                                        // and the waist she has
-  P(-5,-0-legL-11,10,9,skin);
-  P(-5,top-24,10,11,skin); P(-5,top-24,10,1,hi);                            // ribcage
-  if(bu>=3){                                                                // THE BUST, on the same five rungs
-    const uT = bu>=9?4 : bu>=7?3 : bu>=5?2 : 1;
-    P(-bustW-2,top-24,bustW,bustH+uT,skin); P(2,top-24,bustW,bustH+uT,skin);
-    P(-bustW-2,top-24,bustW,1,hi);          P(2,top-24,bustW,1,hi);
-    P(0,top-24,1,bustH+uT-1,sh);                                            // the line between
-    P(-bustW-2,top-24+bustH+uT,bustW,1,sh); P(2,top-24+bustH+uT,bustW,1,sh);
-    if(uT>=3){ P(-bustW-3,top-23,1,bustH+uT-2,skin); P(2+bustW,top-23,1,bustH+uT-2,skin); }
-  } else { P(-5,top-19,10,1,sh); }                                          // flat is drawn flat
-  P(-2,top-28,5,5,skin);                                                    // neck
-  P(-7,top-24,3,12,skin); P(4,top-24,3,12,skin);                            // arms
-  P(-hdW/2,top-28-hdH,hdW,hdH,skin); P(-hdW/2,top-28-hdH,hdW,1,hi);         // head
-  drawHairF(P,{hair,hHi,hSh,gold:'#e8c34a',goldHi:'#fff0b0',dress:w.dress||'#7a2d9a'},
-            cut,-hdW/2,top-28-hdH,hdW,{fall:0.34});
-  if(w.scars&&w.scars.length) drawScarsOn(P,w.scars,{
-    face:[-hdW/2+1,top-26-hdH,hdW-2,7], torso:[-5,top-23,10,20],
-    arm:[-7,top-23,3,11], leg:[-4,-legL-2,4,legL-2] },
-    mixHex(skin,'#7a4038',0.6), skin);
+       return drawFemProfile(c, x, y, w, {dress:null, expr:'pleased', t:(DM&&DM.t)||0, noShadow:true}, dir||-1); }catch(e){ console.warn('bare figure', e); }
 }
 /* ---- ONE DESCRIPTION OF YOU, used by the villa, the portrait and the plates,
    so the person walking your halls is the person in your family portrait. ---- */
@@ -35503,7 +35081,6 @@ function drawGaze(){
     const r=2+Math.abs(Math.sin(T*0.2))*2; ctx.globalAlpha=0.6*a; ctx.strokeStyle='#ffc0e0'; ctx.lineWidth=1; ctx.beginPath(); ctx.ellipse(tx,ty,r+2,r,0,0,7); ctx.stroke();
     ctx.globalAlpha=1;
   }
-  if(!X.caught && X.kind==='front' && !G.isFemale && !nbOn()){ const st=Math.min(RISE_STAGES-1, X.t/40); drawTunicBump(D.x, FY, playerLook(), st, T, D.face||1, houseIsWatching()); }   // and your tunic answers her (the new figure does it in its own cloth)
   ctx.textAlign='center'; ctx.globalAlpha=a;
   pixelText(X.caught? '😳' : '👀', sx, FY-80-Math.abs(Math.sin(T*0.12))*2, '#ffffff', 1.0);
   const cap = X.caught? (X.kind==='seat'? (X.greedy? (X.male? '😏 Caught — and he does not look away.' : '😏 Caught — and she does not look away.')
@@ -35603,7 +35180,6 @@ function drawPlayerLook(){
   ctx.globalAlpha=0.75*a; for(let i=0;i<n;i++){ const u=(i+off)/n; if(u>1) continue; px(Math.round(ex+(tx-ex)*u), Math.round(ey+(ty-ey)*u), 2, 1, '#9ad4ff'); }
   const r=2+Math.abs(Math.sin(T*0.2))*2; ctx.strokeStyle='#c8e8ff'; ctx.lineWidth=1; ctx.beginPath(); ctx.ellipse(tx,ty,r+2,r,0,0,7); ctx.stroke(); ctx.globalAlpha=1;
   /* the front of his tunic, looked at, does what it does */
-  if(X.kind==='tunic' && G.wife.male && !nbOn()){ const st=Math.min(RISE_STAGES-1, X.t/42); drawTunicBump(D.wifeX, FY, G.wife, st, T, D.wifeDir||1, houseIsWatching()); }
   const him=G.wife.male, who=him? 'his' : 'her';
   const line = !X.noticed ? (X.kind==='tunic'? '👀 You are looking at the front of his tunic.' + (X.t>60? ' It is looking back.' : '') : X.kind==='front'? '👀 You are looking at her front.' : '👀 You are looking at '+who+' seat.')
              : X.react==='bold'? (him? '😏 He noticed — and he is not shy about it.' : '😉 She noticed — and she winked.')
@@ -36351,64 +35927,6 @@ function pxLengthUp(P, hardIn, k, skin, rootY, T){
   P(tx-1, ty-3, th+1+pulse, 3, gl); P(tx-1, ty-3, th, 1, glHi); P(tx, ty-3, 1, 1, mixHex(glHi,'#ffffff',0.4));  // the glans
   P(tx+th-1+pulse, ty-2, 1, 2, glSh); P(tx-1, ty, th+1, 1, glSh);                   // and the corona under it
 }
-function drawTunicBump(x, y, w, stage, T, dir, decent){
-  if(!(stage>0)) return;
-  dir = (dir===-1)? -1 : 1;                        // it leans toward the side he is facing
-  if(typeof rkHere==='function' && rkHere()){ drawKiltLift(x,y,w,stage,T,dir,decent); return; }
-  /* NOT IN FRONT OF THE HOUSEHOLD. The last stage is the one where the hem
-     gives up and there is skin — which is fine behind a door and is not fine
-     in an atrium with three children and the kitchen staff in it. `decent`
-     holds it short of that: the tunic is doing a great deal of work, and
-     it is still a tunic. */
-  const TOPS=RISE_STAGES-1;
-  if(decent) stage=Math.min(stage, TOPS-1);
-  const B=(w&&w.body)||{}, gv=(id,d)=>B[id]===undefined?d:B[id];
-  const len=gv('secret',5);
-  const tun=hexOf(w.dress||w.tunic||'#7a2f22'), skin=hexOf(w.skin||'#caa06a');
-  const lit =mixHex(tun,'#ffffff',0.34), mid=mixHex(tun,'#120a06',0.22), dark=mixHex(tun,'#120a06',0.48);
-  const P=(a,b2,ww,h,c2)=>{ ctx.fillStyle=c2;
-    const ax = dir>0? (x+a) : (x-a-ww);
-    ctx.fillRect(Math.round(ax),Math.round(y+b2),Math.round(ww),Math.round(h)); };
-  const kk=clamp(stage/(TOPS-1),0,1);              // the tent, stages 1..3
-  const bare=stage>=TOPS-0.02;
-  const hemY=-24;
-  if(!bare){
-    const lift=Math.round(kk*4.6);                 // the hem rises in the middle
-    const apexY=hemY-2-Math.round(kk*6.2), apexX=Math.round(kk*1.6);
-    const lit=mixHex(tun,'#ffffff',0.46), dark=mixHex(tun,'#0a0604',0.58);
-    // the underside of the hem, lifted: dark cloth, and under it a sliver of thigh
-    for(let j=0;j<lift;j++){ const hw=lift-j;
-      P(apexX-hw, hemY+1-j, hw*2+1, 1, j===0? mixHex(skin,'#1a0a06',0.35) : dark); }
-    // THE TENT: a wedge standing out of the cloth, lit on the near face
-    const baseY=hemY-lift;
-    for(let yy=apexY; yy<=baseY; yy++){ const t=(yy-apexY)/Math.max(1,baseY-apexY);
-      const hw=1+Math.round(t*(1.8+kk*3.0));
-      for(let q=-hw;q<=hw;q++){ const u=(q+hw)/Math.max(1,hw*2);
-        P(apexX+q, yy, 1, 1, u<0.34? lit : u>0.66? dark : tun); }
-      P(apexX+hw+1, yy+1, 1, 1, mixHex(tun,'#0a0604',0.70)); }                    // its shadow, thrown to the side
-    P(apexX-1, apexY-1, 3, 1, mixHex(lit,'#ffffff',0.35));                        // the light on its peak
-    // THE CLOTH PULLED TAUT from the belt down to it — the tell at any distance
-    const beltY2=-36, nF=Math.max(2, Math.round((apexY-beltY2)*kk));
-    for(let i=1;i<=nF;i++){ const f=i/Math.max(1,apexY-beltY2);
-      P(apexX-1-Math.round(i*0.62), apexY-i, 1, 1, dark);
-      P(apexX+1+Math.round(i*0.55), apexY-i, 1, 1, mid); }
-    if(kk>0.5) for(let i=1;i<=2;i++) P(apexX-1-i*2, baseY-i, 1, 1, dark);            // and slack gathering below it
-  } else {
-    /* THE HEM HAS GIVEN UP. Lifted high in the middle into an arch, its dark
-       underside showing, and what it was covering standing out of it. */
-    const archH=9;
-    for(let j=0;j<archH;j++){ const hw=Math.round(1+(archH-j)*0.62);
-      P(-hw, hemY+1-j, hw*2+1, 1, j===archH-1? dark : mixHex(skin,'#1a0a06',0.10+0.02*j)); }
-    for(let j=0;j<archH;j++){ const hw=Math.round(1+(archH-j)*0.62);                  // the edge of the lifted cloth
-      P(-hw-1, hemY+1-j, 1, 1, dark); P(hw+1, hemY+1-j, 1, 1, dark); }
-    pxLengthUp(P, lengthInches(w,1).hard, 1, skin, hemY+1, T);
-  }
-  // and he is aware of it: a bead of sweat from stage two, a look away from three
-  if(stage>=2 && ((T|0)%40)<20){ ctx.textAlign='center';
-    pixelText('💧', x-9*dir, y-44, 'rgba(190,220,255,.75)', 0.9); ctx.textAlign='left'; }
-  if(stage>=3 && ((T|0)%30)<16){ ctx.textAlign='center';
-    pixelText('…', x+11*dir, y-48, 'rgba(255,214,190,.8)', 1); ctx.textAlign='left'; }
-}
 function riseDue(){
   if(!G || !G.isFemale || !G.married || !G.wife || !G.wife.male || !ADULT) return false;
   if(!hasTrait('priapic')) return false;
@@ -36495,7 +36013,6 @@ function drawRise(){
   ctx.restore();
   if(X.ph==='build' && X.stage<4){                  // the scroll, until he puts it down
     px(hx-4,FY-40,9,6,'#e6dcc2'); px(hx-4,FY-40,9,1,'#f6efdc'); px(hx-4,FY-40,1,6,'#b8a882'); }
-  if(!nbOn()) drawTunicBump(hx, FY, w, riseSt, T, D.x<hx? -1 : 1, decent);
   // ---- YOU ----
   withFace(X.x>=D.x? 1 : -1, D.x, ()=>drawWifeFig(ctx, D.x, FY, playerLook(), 0, 'idle'));
   ctx.textAlign='center';
@@ -44997,14 +44514,8 @@ function drawDomusInner(){
       const bx=clamp(300-T3*0.55, 40, 300), sx=bx-14;
       const ab=Math.max(0,Math.min(1,T3/20))*Math.max(0,Math.min(1,(270-T3)/30));
       ctx.globalAlpha=ab;
-      if(nbOn()){ withFace(-1, bx, ()=>drawKidProfile(ctx, bx, FY, S2.big, {mode:'walk', near:[-6,-12]}));
-                  withFace(-1, sx, ()=>drawKidProfile(ctx, sx, FY, S2.small, {mode:'walk', near:[5,-9]})); }
-      else {
-      ctx.save(); ctx.translate(bx,FY); ctx.scale(0.9,0.9);
-      drawKidFig(ctx,0,0,S2.big.sex,Math.max(40,(G.day-(S2.big.born||0))/3),S2.big); ctx.restore();
-      ctx.save(); ctx.translate(sx,FY); ctx.scale(0.66,0.66);
-      drawKidFig(ctx,0,0,S2.small.sex,Math.max(40,(G.day-(S2.small.born||0))/3),S2.small); ctx.restore(); }
-      if(!nbOn()) px(sx+4,FY-22,bx-sx-8,2,(S2.big.skin||'#e6bd94'));            // holding the little one's hand (the new bodies do it with their own hands)
+      withFace(-1, bx, ()=>drawKidProfile(ctx, bx, FY, S2.big, {mode:'walk', near:[-6,-12]}));
+      withFace(-1, sx, ()=>drawKidProfile(ctx, sx, FY, S2.small, {mode:'walk', near:[5,-9]}));
       ctx.globalAlpha=1;
       ctx.textAlign='center';
       const line = T3<95? S2.l[0] : T3<180? S2.l[1] : S2.l[2];
@@ -49678,12 +49189,6 @@ function buildSettings(){
     ()=>{ SETTINGS.shake=!SETTINGS.shake; saveSettings(); buildSettings(); });
   if(ADULT) mkRow('👁 First-person bend view','OFF plays the normal side view in every bend, slap and scene. (In a scene you can also press V.)', POV.on?'ON':'OFF', !!POV.on,
     ()=>{ POV.on=!POV.on; povSave(); try{ if(POV_EL) POV_EL.refresh(); }catch(e){} buildSettings(); });
-  mkRow('⚔ Bodies',
-    'Fighters, soldiers and the enrolment cards are drawn on the same posable figures as the villa and the '
-    + 'bedchamber — a real skeleton, the kit built over it, helmets drawn in profile on the head. '
-    + 'CLASSIC puts the old block rig back.',
-    SETTINGS.classicBodies?'CLASSIC':'NEW', !SETTINGS.classicBodies,
-    ()=>{ SETTINGS.classicBodies=!SETTINGS.classicBodies; saveSettings(); buildSettings(); });
   if(ADULT) mkRow('📏 Impossible size',
     'IMPOSSIBLE (the cheats console only) is a step past IMMENSE — 22–26in on a 70in frame. COMIC puts back the cartoon 26–34in.',
     SETTINGS.comicSize?'COMIC':'STEP', !!SETTINGS.comicSize,
@@ -51179,7 +50684,7 @@ function drawStandingFigure(c, x, floorY, tall, w, opt){
   catch(e){ c.restore(); CHART_FACE=f0; return false; }
   c.restore(); CHART_FACE=f0; return true;
 }
-function portraitsNew(){ try{ return !(typeof SETTINGS!=='undefined' && SETTINGS.classicBodies); }catch(e){ return true; } }
+function portraitsNew(){ return true; }
 function drawBridePortrait(cnv,b,bare,preg){
   if(!ADULT) bare=false;   // never render the unclothed variant with mature content off
   preg=preg||0;
@@ -59536,16 +59041,7 @@ function drawChildFigure(c2d, x, y, ch, ph, mode){
          else drawWifeFig(c2d, x, y, look, ph||0, mode||'idle'); } finally { NB_HALL=h0; }
     return;
   }
-  if(nbOn()){ drawKidProfile(c2d, x, y, ch, {mode:mode||'idle', ph}); return; }
-  c2d.save(); c2d.translate(x,y);
-  const sc=kidDrawScale(ch); c2d.scale(sc,sc);
-  /* drawKidFig sizes its body with `22 + age/4`, and every caller was handing
-     it (G.day - born)/3 as "months". In THIS calendar a year is 2.4 days, so
-     that expression yields years*0.8 — an eighteen-year-old arrived as 14,
-     and the ramp topped out around 25 of its 40. Feed it years*4 and the same
-     expression becomes 22+years, which is what it was always shaped for. */
-  drawKidFig(c2d, 0, 0, ch.sex, kidAgeYears(ch)*4, ch);
-  c2d.restore();
+  drawKidProfile(c2d, x, y, ch, {mode:mode||'idle', ph});
 }
 
 function kidsOfBand(b){ return livingKids().filter(c=>kidBand(c)===b); }
@@ -75743,7 +75239,7 @@ drawLogo();
 })();
 
 try{ iceMythInit(); iceClothInit(); iceTtsInit(); iceWrap(); }catch(e){ console.error('iceMythInit',e); }
-window.__SS = { roomBackdrop:(T)=>whRoomBackdrop(T), poseLoreNow:()=>poseLore(), nbStyleSprite:(S,f,a)=>nbStyleSprite(S,f,a), armyStyle:(id)=>armyStyle(id), dynThroneFalls:(h)=>dynThroneFalls(h), proclaimDynasty:()=>proclaimDynasty(), plotTargets:()=>plotTargets(), mapZoomTo:(z,x,y)=>mapZoomTo(z,x,y), ASIA_PEOPLES, asiaPeopleFor:(e,o)=>asiaPeopleFor(e,o), EAST_PIN_POS, campaignOdds:(cp)=>campaignOdds(cp), updateBattle:(dt)=>updateBattle(dt), drawBattle:()=>drawBattle(), get BT(){ return BT; }, romStyles:()=>ROM_STYLES, startRomanticStyled:(a,b)=>startRomanticStyled(a,b), bgFn:(n)=>({bgPalace,bgWar,bgCoast,bgWoa,bgOpelia,bgIsle,bgReiko,bgForge})[n], setPairSS:(v)=>{ PAIR_SS=v; }, ICE_T:{ get AC(){return AC;}, set AC(v){AC=v;}, iceSlap, iceSkin, iceUlk, iceGulp, iceVoc, iceCrowd, ICE_V, sfx }, ICE_TTS, STRIKES, getDM:()=>DM, drawBridePortrait:(...a)=>drawBridePortrait(...a), rhFig, RH_CAST, openBotWatch, botEnterBeat, getBW:()=>BW, iceGoddessOpen, paintGoddess, startBedScene, regionAny, iceDebug:()=>({here:iceHere(), prey:ICE_PREY_BY_REGION}),
+window.__SS = { roomBackdrop:(T)=>whRoomBackdrop(T), btMountSprite:(id,f)=>btMountSprite(id,f), poseLoreNow:()=>poseLore(), nbStyleSprite:(S,f,a)=>nbStyleSprite(S,f,a), armyStyle:(id)=>armyStyle(id), dynThroneFalls:(h)=>dynThroneFalls(h), proclaimDynasty:()=>proclaimDynasty(), plotTargets:()=>plotTargets(), mapZoomTo:(z,x,y)=>mapZoomTo(z,x,y), ASIA_PEOPLES, asiaPeopleFor:(e,o)=>asiaPeopleFor(e,o), EAST_PIN_POS, campaignOdds:(cp)=>campaignOdds(cp), updateBattle:(dt)=>updateBattle(dt), drawBattle:()=>drawBattle(), get BT(){ return BT; }, romStyles:()=>ROM_STYLES, startRomanticStyled:(a,b)=>startRomanticStyled(a,b), bgFn:(n)=>({bgPalace,bgWar,bgCoast,bgWoa,bgOpelia,bgIsle,bgReiko,bgForge})[n], setPairSS:(v)=>{ PAIR_SS=v; }, ICE_T:{ get AC(){return AC;}, set AC(v){AC=v;}, iceSlap, iceSkin, iceUlk, iceGulp, iceVoc, iceCrowd, ICE_V, sfx }, ICE_TTS, STRIKES, getDM:()=>DM, drawBridePortrait:(...a)=>drawBridePortrait(...a), rhFig, RH_CAST, openBotWatch, botEnterBeat, getBW:()=>BW, iceGoddessOpen, paintGoddess, startBedScene, regionAny, iceDebug:()=>({here:iceHere(), prey:ICE_PREY_BY_REGION}),
   openBookViewer:()=>openBookViewer(), openSettings:()=>openSettings(), 
   rhAmbTick:(b)=>rhAmbTick(b), rhAmbHit:(k,n)=>rhAmbHit(k,n), rhAmbStop:()=>rhAmbStop(), rhSting:(b)=>rhSting(b), setMuted:(v)=>{muted=v;}, ambKind:()=>RH_AMB&&RH_AMB.kind, acState:()=>AC&&AC.state,
   WPN_ART, WPN_RANGED, drawRangedIcon, BOWS, wpnStamp, wpnIcon, drawHeldBow, drawHeldPilum, drawHeldBomb, get WPN_DRAWS(){ return WPN_DRAWS; }, setOUTL:(v)=>{ OUTL=!!v; }, drawWeapon2Old,
@@ -75781,7 +75277,7 @@ window.__SS = { roomBackdrop:(T)=>whRoomBackdrop(T), poseLoreNow:()=>poseLore(),
   drawRealFig, realAnchors, drawLength, lengthPose, lengthDigits, girthDigits, ROUSED_NAMES, rousedName, restName, tierIdxOf,
   drawBedPose, drawFemFig, femPregMonth, BED_UNDRESS, drawBreedPlace, rkBreedOn, rkPoorHouse, rkBreedKids, rkSendKidsToBreed, RK_BREED_FEE, RK_HUB_COST,
   makeFighter, paletteFor,
-  nbSoldierSprite, drawBattleSoldierNB, nbCardFighter, drawFallenNB, drawStandsWifeNB, drawCardPortrait, drawBattleSoldier,
+  nbSoldierSprite, drawBattleSoldierNB, nbCardFighter, drawFallenNB, drawStandsWifeNB, drawCardPortrait,
   nbOn, drawGladiatorNB, nbFighterLook, nbFighterPose, nbArmState, nbKitFor, NB_ARMOR, NB_HELM, nbKit, nbDrawHelm, NB_DRAWS, NB_K, nbCol,
   RK_HUB_DOOR, rkHubInHouse, rkPlaceOk, rkHubPlotHere, nearHubPlot, tryHubPlot, drawHubPlot, drawHubMarker,
   bedStage, BED_STAGES, bedSessionDur, BED_INTRO, BED_STEP, drawBedStageUI, bedRestPose, BED_FIG_K, sanitizeBedPlace, rkBuildHub, nearHubDoor, tryHubDoor, drawHubDoor, get bedPlace(){return bedPlace;}, RK_BREED_POSES, drawHubRoom, drawQuayHall, drawQuayExterior, BRD_DRAWS, drawSilhouette, drawPreludeRunner, get SIL_DRAWS(){return SIL_DRAWS;}, get BEDPOSE_DRAWS(){return BEDPOSE_DRAWS;}, get BEDPOSE_LAST(){return BEDPOSE_LAST;},
@@ -75820,7 +75316,7 @@ window.__SS = { roomBackdrop:(T)=>whRoomBackdrop(T), poseLoreNow:()=>poseLore(),
   drawElbowOver, drawSlapAfter, startRefusal, updateRefusal, drawRefusal,
   drawSlapArm, beckonHusband, SETTINGS, saveSettings, buildSettings, bluntBrief,
   drawChartFig, chartLandmarks,
-  RISE_STAGES, RISE_NEED, RISE_LINES, riseDue, startRise, updateRise, drawRise, drawTunicBump,
+  RISE_STAGES, RISE_NEED, RISE_LINES, riseDue, startRise, updateRise, drawRise,
   updateDomus,
   ARDOR_LINES, ARDOR_HOLD, ardorLen, ardorNeed, ardorDrain, ardorReady, tryArdor,
   ardorFav, ardorSpots, updateArdor, drawArdor, ardorResolve, hasMyTrait, ardorAvailableNow, drawArdorIcon, ardorBlockedWhy,
@@ -76037,7 +75533,7 @@ window.__SS = { roomBackdrop:(T)=>whRoomBackdrop(T), poseLoreNow:()=>poseLore(),
   bodyHpBonus, bodyMitBonus, bodyDmgBonus, courtCultivateCost, COURT_LEVERS, SHADOW_STAGES, shadowStage,
   drawHusbandFigTest:drawHusbandFig, drawGroomPortrait, briadeImg, openPortrait,
   drawKinPortrait, kinLook, kinInherit, kinAge, ageMarks, greyHair, agedSkin, mixHex,
-  drawWifeFigTest:drawWifeFig, drawKidFig, inheritDNA, childYears, makeBride,
+  drawWifeFigTest:drawWifeFig, inheritDNA, childYears, makeBride,
   drawBridePortrait, setSecretSub:(v)=>{ secretSub=v; }, setSecretAroused:(v)=>{ secretAroused=!!v; },
   HAIR_M, HAIR_F, BEARD_M, OUTFITS_M, HAIR_COL_M, HAIR_M_BY_ETH, HAIR_F_BY_ETH, BEARD_BY_ETH, OUTFIT_BY_ETH,
   drawHairM, drawHairF, drawBeardM, drawOutfitM, hairStyleName, beardName, outfitName,
@@ -76048,7 +75544,7 @@ window.__SS = { roomBackdrop:(T)=>whRoomBackdrop(T), poseLoreNow:()=>poseLore(),
      needs a way past it — the same reason setBCT exists */
   setWH:(v)=>{ WH=v; }, get WH(){ return WH; },
   get state(){return state;},
-  rollBrides, drawUndressedFig, drawWaterCouple, waterMetrics, drawSteamVeil,
+  rollBrides, drawWaterCouple, waterMetrics, drawSteamVeil,
   COURT_RANKS, COURT_PROMPTS, COURT_BOASTS, courtAccess, courtOnly, startCourtship,
   courtChoose, courtShow, courtBackDown, courtFinish, renderCourt, get CT(){return CT;},
   courtAsk, courtGift, courtHand, courtTick, courtWeight, drawBeastNB, BST_SPEC, bstPose, makeBeast, BEASTS, get BST_DRAWS(){ return BST_DRAWS; }, courtNextBeat, updateDomus, wifeExpr, drawCourtVenue,

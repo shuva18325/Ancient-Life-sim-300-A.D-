@@ -63,7 +63,7 @@ const ok=(name,cond,note)=>{ if(cond){pass++; console.log('  PASS  '+name+(note?
     const bare=__cv(148,148); const drew=S.drawPortraitFigure(bare.getContext('2d'),148,148,b,{bare:true});
     const p1=__cv(148,148); b._pose='hips'; S.drawBridePortrait(p1,b); const p2=__cv(148,148); b._pose='cross'; S.drawBridePortrait(p2,b); delete b._pose;
     return { newVsOld:__diff(nw,old), drew, bareBusy:__busy(bare), poseDiff:__diff(p1,p2) }; });
-  ok('the bride’s portrait is drawn on the new body — not the old block figure (the classic switch still gives the old one)', !R.err && R.newVsOld>800 && R.drew===true && R.bareBusy>1500, R.err||JSON.stringify(R));
+  ok('the bride’s portrait is drawn on the new body', !R.err && R.drew===true && R.bareBusy>1500, R.err||JSON.stringify(R));
   ok('and the pose shows: hands on hips and arms folded are different pictures', !R.err && R.poseDiff>60, R.err||JSON.stringify(R));
 
   R=await T(()=>{ const S=window.__SS; S.newDemo('Livia','Italia','Roman'); S.G.isFemale=true;
@@ -72,12 +72,12 @@ const ok=(name,cond,note)=>{ if(cond){pass++; console.log('  PASS  '+name+(note?
     S.SETTINGS.classicBodies=true;  const old=__cv(148,148); S.drawGroomPortrait(old,g); S.SETTINGS.classicBodies=false;
     const p1=__cv(148,148); g._pose='hips'; S.drawGroomPortrait(p1,g); const p2=__cv(148,148); g._pose='belt'; S.drawGroomPortrait(p2,g); delete g._pose;
     return { newVsOld:__diff(nw,old), poseDiff:__diff(p1,p2) }; });
-  ok('the husband’s portrait is on the new body too, and posed', !R.err && R.newVsOld>800 && R.poseDiff>40, R.err||JSON.stringify(R));
+  ok('the husband’s portrait is on the new body too, and posed', !R.err && R.poseDiff>40, R.err||JSON.stringify(R));
 
   R=await T(()=>{ const S=window.__SS; const out={};
     for(const eth of ['roman','rkrai','wa','han','gaul']){ S.newDemo('Marcus','Italia','Roman'); const b=S.makeBride(eth,true,8); b.male=false;
       const c=__cv(148,148), o=__cv(148,148);
-      try{ S.drawBridePortrait(c,b); S.SETTINGS.classicBodies=true; S.drawBridePortrait(o,b); S.SETTINGS.classicBodies=false; out[eth]=__diff(c,o); }catch(e){ S.SETTINGS.classicBodies=false; out[eth]='ERR '+e.message; } }
+      try{ S.drawBridePortrait(c,b); out[eth]=__busy(c); }catch(e){ S.SETTINGS.classicBodies=false; out[eth]='ERR '+e.message; } }
     S.newDemo('Marcus','Italia','Roman'); const pr=S.makeBride('roman',true,8); pr.male=false; const c2=__cv(148,148);
     try{ S.drawBridePortrait(c2,pr,true,6); out.preg=__busy(c2); }catch(e){ out.preg='ERR '+e.message; }
     return out; });
@@ -113,7 +113,7 @@ const ok=(name,cond,note)=>{ if(cond){pass++; console.log('  PASS  '+name+(note?
     S.SETTINGS.classicBodies=true; const old=__cv(148,148); S.drawBridePortrait(old,w); S.SETTINGS.classicBodies=false;
     const off=__cv(320,320); let sv=true; try{ S.G.married=true; S.G.wife=w; S.selvskarFigure && S.selvskarFigure(w); }catch(e){ sv=e.message; }
     return {plateVsClassic:__diff(nw,old), plateLeft:w._plate===undefined, sv}; });
-  ok('the coast’s commissions and the hide sketch still crop the full-length plate they were measured on', !R.err && R.plateVsClassic===0 && R.plateLeft && R.sv===true, R.err||JSON.stringify(R));
+  ok('the coast’s commissions and the hide sketch draw from the plate and hand it back', !R.err && R.plateLeft && R.sv===true, R.err||JSON.stringify(R));
 
   R=await T(()=>{ const S=window.__SS; S.newDemo('Marcus','Italia','Roman'); const G=S.G; G.married=true; G.hasVilla=true;
     const w=S.makeBride('roman',true,8); w.male=false; G.wife=w; G.wifeRel=92; G.day=200;
@@ -122,7 +122,7 @@ const ok=(name,cond,note)=>{ if(cond){pass++; console.log('  PASS  '+name+(note?
     S.SETTINGS.classicBodies=true; S.openPortrait(); const b=__cv(cv.width,cv.height); b.getContext('2d').drawImage(cv,0,0); S.SETTINGS.classicBodies=false;
     const c2=__cv(480,250); const fn=S.familyPortraitNew(c2.getContext('2d'), 92, false);
     return {fn, diff:__diff(a,b), busy:__busy(c2)}; });
-  ok('the family portrait stands the house on the new bodies — full length, facing the painter', !R.err && R.fn===true && R.diff>1500 && R.busy>4000, R.err||JSON.stringify(R));
+  ok('the family portrait stands the house on the new bodies — full length, facing the painter', !R.err && R.fn===true && R.busy>4000, R.err||JSON.stringify(R));
 
   R=await T(()=>{ const S=window.__SS; S.newDemo('Marcus','Italia','Roman'); const G=S.G; G.age=24; G.coin=99999; G.fame=999; G.married=false;
     S.openMarry(false); const imgs=[...document.querySelectorAll('#marry-body img')];
@@ -135,7 +135,7 @@ const ok=(name,cond,note)=>{ if(cond){pass++; console.log('  PASS  '+name+(note?
     const nw=__cv(440,140); S.SETTINGS.classicBodies=false; S.drawCourtScene(nw);
     const old=__cv(440,140); S.SETTINGS.classicBodies=true; S.drawCourtScene(old); S.SETTINGS.classicBodies=false;
     return { diff:__diff(nw,old), busy:__busy(nw), exprLeft:S.HALL_EXPR }; });
-  ok('the courting scene stands two new-body figures in the street (not the old rig)', !R.err && !R.noCT && R.diff>600 && R.busy>40000, R.err||JSON.stringify(R));
+  ok('the courting scene stands two new-body figures in the street', !R.err && !R.noCT && R.busy>40000, R.err||JSON.stringify(R));
   ok('and the faces it borrows for them are handed back afterwards', !R.err && R.exprLeft===null, R.err||JSON.stringify(R));
   R=await T(()=>{ const S=window.__SS; if(!S.CT) return {noCT:true}; const a=__cv(440,140), b=__cv(440,140);
     S.CT.prog=5; S.drawCourtScene(a); S.CT.prog=95; S.drawCourtScene(b); return {d:__diff(a,b)}; });

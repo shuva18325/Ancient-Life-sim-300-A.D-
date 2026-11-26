@@ -108,7 +108,7 @@ const ok=(name,cond,note)=>{ if(cond){pass++; console.log('  PASS  '+name+(note?
     const outside=S.nbHallOn();
     return {fem, man, femC, manC, outside}; });
   ok('the wife and you are drawn as the woohoo figures in the hall', !R.err && R.fem>=1 && R.man>=1, R.err||JSON.stringify(R));
-  ok('the classic switch still brings back the old sprites, and outside the hall nothing changes', !R.err && R.femC===0 && R.manC===0 && R.outside===false, R.err||JSON.stringify(R));
+  ok('the old CLASSIC setting changes nothing now — the hall stays on the new bodies — and outside the hall nothing changes', !R.err && R.femC>=1 && R.manC>=1 && R.outside===false, R.err||JSON.stringify(R));
   R=await T(()=>{ const S=window.__SS; const out={};
     const cv=document.getElementById('game'), c=cv.getContext('2d');
     const probe=(dir)=>{ S.NB_HALL=true; c.setTransform(1,0,0,1,0,0); c.clearRect(0,0,480,270);

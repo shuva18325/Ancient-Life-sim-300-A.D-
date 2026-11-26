@@ -80,7 +80,7 @@ const ok=(name,cond,note)=>{ if(cond){pass++; console.log('  PASS  '+name+(note?
   ok('and her bust is the band’s cloth — no bare tip drawn (the same figure out of kit has one)', !R.err && R.hits===0 && R.bare>0, R.err||(R.hits+' px in kit · '+R.bare+' px bare'));
   R=await T(()=>{ const S=window.__SS; const n0=S.NB_DRAWS.fighter; S.SETTINGS.classicBodies=true;
     const f=S.makeFighter({x:240,y:230}); S.drawGladiator(f); const n1=S.NB_DRAWS.fighter; S.SETTINGS.classicBodies=false; S.drawGladiator(f); return {classic:n1-n0, back:S.NB_DRAWS.fighter-n1}; });
-  ok('Settings → Bodies: CLASSIC puts the old rig back, NEW is the template', !R.err && R.classic===0 && R.back===1, R.err||JSON.stringify(R));
+  ok('the CLASSIC switch is gone: the template draws even with the old setting left on', !R.err && R.classic===1 && R.back===1, R.err||JSON.stringify(R));
   R=await T(()=>{ const S=window.__SS; const cv=document.createElement('canvas'); cv.width=80; cv.height=30; const out=new Set();
     const C=S.paletteFor({});
     for(const id of ['harpuun','herd_spear','torv_spear','ulaq','adze','flenser','talk_staff','tally_baton','reach_pole','weigh_rod','nagamaki','uchigatana','bokuto']){

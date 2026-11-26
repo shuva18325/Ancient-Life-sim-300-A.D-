@@ -192,7 +192,7 @@ const ok=(name,cond,note)=>{ if(cond){pass++; console.log('  PASS  '+name+(note?
   R=await T(()=>{ const S=window.__SS; S.SETTINGS.classicBodies=false; const sel=S.sel; sel.world='west'; sel.sex='f'; sel.social='elite'; sel.arch=null; S.openCreate();
     const imgs=[...document.querySelectorAll('#scr-create img')].map(i=>i.src); S.SETTINGS.classicBodies=true; S.openCreate(); const old=[...document.querySelectorAll('#scr-create img')].map(i=>i.src); S.SETTINGS.classicBodies=false;
     let diff=0; for(let i=0;i<Math.min(imgs.length,old.length);i++) if(imgs[i]!==old[i]) diff++; return {n:imgs.length, diff}; });
-  ok('the creation cards stand the new figure — women who are not fighters in their people’s garment too', !R.err && R.n>=4 && R.diff>=Math.floor(R.n*0.75), R.err||JSON.stringify(R));
+  ok('the creation cards stand the new figure — the only figure there is now', !R.err && R.n>=4, R.err||JSON.stringify(R));
 
   console.log('\n=== 🚪 AND THE REST ===');
   R=await T(()=>window.__SS.BUILD_STAMP);

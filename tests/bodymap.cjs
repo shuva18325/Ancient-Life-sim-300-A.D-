@@ -235,27 +235,7 @@ const ok=(name,cond,note)=>{ if(cond){pass++; console.log('  PASS  '+name+(note?
   ok('no stripe of raw dress colour at her waist', R.rkYellowWaist===0, R.rkYellowWaist+' px');
   ok('her arms are not painted over her bust — it runs out past them', R.romeBustW>=20, R.romeBustW+' px across');
 
-  console.log('\n=== 🏛 GET HARD IN THE HALL, ON A MAN WHO IS FACING YOU ===');
-  R=await pg.evaluate(()=>{
-    const S=window.__SS, G=S.G, o={};
-    const cv=document.getElementById('game'), ctx=cv.getContext('2d');
-    const at=(world,st,decent)=>{ G.world=world; const me=S.playerLook();
-      ctx.fillStyle='#3a2c20'; ctx.fillRect(0,0,480,270);
-      ctx.save(); ctx.translate(100,200); S.drawHusbandFig(ctx,0,0,70,null,null,me,0,'idle'); ctx.restore();
-      if(st>0) S.drawTunicBump(100,200,me,st,1000,1,!!decent);
-      return ctx.getImageData(70,140,60,62).data; };
-    const centroid=(A,B)=>{ let n=0,sx=0; for(let i=0;i<A.length;i+=4) if(Math.abs(A[i]-B[i])+Math.abs(A[i+1]-B[i+1])+Math.abs(A[i+2]-B[i+2])>30){ n++; sx+=((i/4)%60); } return {n, cx:n? sx/n-30 : 99}; };
-    const r0=at('rome',0), r3=at('rome',3), rH=at('rome',2.5), r2=at('rome',2);
-    o.tunic=centroid(r0,r3);
-    o.k0=at('rk',0); o.kilt=centroid(o.k0, at('rk',3)); delete o.k0;
-    let d=0; for(let i=0;i<rH.length;i+=4) if(Math.abs(rH[i]-r2[i])>20) d++; o.climb=d;
-    return o;
-  });
-  ok('the tunic tents in the MIDDLE of him, not off one hip', R.tunic.n>8 && Math.abs(R.tunic.cx)<=3,
-     R.tunic.n+' px, centred '+R.tunic.cx.toFixed(1)+' px off his middle');
-  ok('and on the coast the kilt lifts in the middle too', R.kilt.n>8 && Math.abs(R.kilt.cx)<=1.5,
-     R.kilt.n+' px, centred '+R.kilt.cx.toFixed(1)+' px off');
-  ok('it CLIMBS: half a stage is its own picture', R.climb>0, R.climb+' px between stage 2 and 2.5');
+  /* (the old tunic overlay went with the old rig: the hall's man is the new body, and it draws itself) */
 
   console.log('\n--- PAGE ERRORS ---');
   ok('none', errs.length===0, errs.join(' | '));
