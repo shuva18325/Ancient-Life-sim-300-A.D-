@@ -65887,15 +65887,75 @@ function drawMapCanvasIce(){
   mctx.setTransform(1,0,0,1,0,0); mctx.imageSmoothingEnabled=true;
   if(!ICE_MAP_IMG){ ICE_MAP_IMG=new Image(); ICE_MAP_IMG.src='data:image/jpeg;base64,'+ICE_MAP_B64; }
   mctx.fillStyle='#1a2230'; mctx.fillRect(0,0,760,688);
-  if(ICE_MAP_IMG.complete && ICE_MAP_IMG.naturalWidth) mctx.drawImage(ICE_MAP_IMG,0,0,760,688);
-  mctx.fillStyle='rgba(255,255,255,.12)'; mctx.fillRect(0,0,760,688);
+  if(ICE_MAP_IMG.complete && ICE_MAP_IMG.naturalWidth) mctx.drawImage(iceMapPlate()||ICE_MAP_IMG,0,0,760,688);
   REGIONS_ICE.forEach(R=>{ const px=R.x/100*760, py=R.y/100*688, cur=(G&&G.current===R.id);
     mctx.lineWidth=2; mctx.strokeStyle='#2a1208'; mctx.fillStyle=cur?'#ffd070':(R.capital?'#ff8a4a':'#fff0d0');
     mctx.beginPath(); mctx.arc(px,py,cur?9:6,0,7); mctx.fill(); mctx.stroke();
     if(cur){ mctx.strokeStyle='rgba(255,208,112,.6)'; mctx.beginPath(); mctx.arc(px,py,15+Math.sin(performance.now()/300)*3,0,7); mctx.stroke(); } });
-  mctx.font='bold 15px Georgia,serif'; mctx.textAlign='left'; mctx.fillStyle='rgba(20,10,4,.75)'; mctx.fillRect(10,10,300,26);
-  mctx.fillStyle='#f6e8c8'; mctx.fillText('THE ICE AGE · c. 10,000 BC',18,28);
   mctx.setTransform(1,0,0,1,0,0);
+}
+/* =====================================================================
+   🗺 THE ICE AGE SHEET, AS A PLATE. The relief was a good photograph of
+   the modern Near East with five dots on it — and it showed the modern
+   sea. At ten thousand years before Christ the sea stands forty to fifty
+   metres lower: the Gulf is a dry river valley that the water will take
+   over the next four thousand years, the coasts sit further out, and the
+   Empty Quarter is drying grassland between wet phases. So the Gulf's
+   shallow water is found in the picture itself and painted back to land,
+   the old river is drawn down the middle of it, and the sheet gets its
+   names, a cartouche, a legend, a rose and a scale.
+   ===================================================================== */
+let ICE_PLATE_CV=null;
+function iceMapPlate(){
+  if(ICE_PLATE_CV) return ICE_PLATE_CV;
+  if(!(ICE_MAP_IMG && ICE_MAP_IMG.complete && ICE_MAP_IMG.naturalWidth)) return null;
+  const W=760, H=688, cv2=document.createElement('canvas'); cv2.width=W; cv2.height=H; const c=cv2.getContext('2d',{willReadFrequently:true});
+  c.drawImage(ICE_MAP_IMG,0,0,W,H);
+  /* the land is already lit; the plate is a touch warmer, like vellum */
+  c.fillStyle='rgba(255,246,226,.10)'; c.fillRect(0,0,W,H);
+  /* ---- THE DRY GULF: the shallow water west of the deep eastern basin goes back to land ---- */
+  try{ const x0=430, y0=200, x1=612, y1=372, id=c.getImageData(x0,y0,x1-x0,y1-y0), d=id.data, w=x1-x0, cols={};
+    const water=(i)=>{ const r=d[i], g=d[i+1], b=d[i+2]; return g>196 && b>188 && r>170 && g>=r; };
+    for(let y=0;y<y1-y0;y++) for(let x=0;x<w;x++){ const i=(y*w+x)*4; if(!water(i)) continue;
+      const X=x0+x, n=asiaFbm(X*0.05,(y0+y)*0.05), e=Math.max(0,1-(x1-X)/26);       // the last few pixels shade back toward the sea
+      if(Math.random()<e*0.6) continue;
+      d[i]=196-n*26; d[i+1]=186-n*22; d[i+2]=142-n*18; (cols[X]=cols[X]||[]).push(y0+y); }
+    c.putImageData(id,x0,y0);
+    /* the old river down the middle of it — the Tigris and Euphrates, one stream, running out to the sea at Hormuz */
+    const line=[]; for(let X=x0;X<x1;X+=6){ const a=cols[X]; if(a && a.length>6){ const m=a.reduce((p,q)=>p+q,0)/a.length; line.push([X,m]); } }
+    if(line.length>3){ c.strokeStyle='rgba(232,244,248,.6)'; c.lineWidth=3; c.lineJoin='round'; c.beginPath(); line.forEach((p,i)=> i? c.lineTo(p[0],p[1]) : c.moveTo(p[0],p[1])); c.stroke();
+      c.strokeStyle='#4f86a8'; c.lineWidth=1.6; c.beginPath(); line.forEach((p,i)=> i? c.lineTo(p[0],p[1]) : c.moveTo(p[0],p[1])); c.stroke(); }
+    c.strokeStyle='rgba(60,96,118,.55)'; c.lineWidth=0.8; c.setLineDash([3,2]); c.beginPath(); c.moveTo(x1+2,300); c.quadraticCurveTo(x1-6,330,x1+4,362); c.stroke(); c.setLineDash([]);
+  }catch(e){}
+  /* ---- THE NAMES ---- */
+  const T=(t,x,y,fs,col,o)=>{ o=o||{}; c.save(); c.translate(x,y); if(o.rot) c.rotate(o.rot); c.font=(o.it? 'italic ' : '')+(o.b? 'bold ' : '')+fs+'px Georgia,"Times New Roman",serif'; c.textAlign='center'; c.textBaseline='middle';
+    const ch=[...t], ls=o.ls||0, wd=ch.reduce((a,k)=>a+c.measureText(k).width,0)+ls*(ch.length-1); let xx=-wd/2; c.lineJoin='round'; c.lineWidth=Math.max(2,fs*0.28); c.strokeStyle=o.halo||'rgba(255,248,232,.7)';
+    for(const k of ch){ const cw=c.measureText(k).width; c.strokeText(k,xx+cw/2,0); xx+=cw+ls; } xx=-wd/2; c.fillStyle=col; for(const k of ch){ const cw=c.measureText(k).width; c.fillText(k,xx+cw/2,0); xx+=cw+ls; } c.restore(); };
+  const SEA='rgba(36,78,104,.85)', SH='rgba(214,236,244,.6)';
+  T('THE MIDDLE SEA',62,104,11,SEA,{it:1,ls:1.5,halo:SH}); T('its coast further out',62,119,8,SEA,{it:1,halo:SH});
+  T('THE RED SEA',214,420,13,SEA,{it:1,ls:3,rot:1.05,halo:SH});
+  T('THE GULF VALLEY',520,262,12,'rgba(96,66,30,.95)',{it:1,b:1,ls:2,rot:0.45}); T('dry land — the sea takes it over the next four thousand years',540,290,7.5,'rgba(96,66,30,.9)',{it:1,rot:0.45});
+  T('GULF OF OMAN',700,392,10,SEA,{it:1,ls:2,halo:SH}); T('ARABIAN SEA',650,600,13,SEA,{it:1,ls:3,halo:SH});
+  T('A R A B I A',420,420,22,'rgba(90,60,28,.55)',{b:1,ls:6}); T('drying grassland and seasonal lakes between the wet phases',420,446,8.5,'rgba(90,60,28,.75)',{it:1});
+  T('THE EMPTY QUARTER',560,520,10,'rgba(110,70,30,.6)',{it:1,ls:2}); T('ZAGROS',600,150,13,'rgba(88,58,30,.8)',{it:1,ls:4,rot:0.62}); T('TAURUS',230,40,13,'rgba(88,58,30,.8)',{it:1,ls:4,rot:-0.12});
+  T('the mammoth country',230,58,8,'rgba(88,58,30,.8)',{it:1}); T('THE TWO RIVERS',380,110,10,'rgba(40,70,96,.9)',{it:1,b:1,ls:1.5,rot:0.55}); T('aurochs by the thousand',395,128,7.5,'rgba(40,70,96,.85)',{it:1,rot:0.55});
+  T('THE NILE',38,290,10,'rgba(40,70,96,.9)',{it:1,b:1,ls:1.5,rot:1.4}); T('THE LEVANT',178,226,9,'rgba(88,58,30,.9)',{it:1,b:1,ls:1.5}); T('oak woods, wild wheat, the big caves',178,240,7,'rgba(88,58,30,.85)',{it:1});
+  T('SINAI',150,260,8,'rgba(88,58,30,.75)',{it:1,ls:2}); T('YEMEN',330,570,9,'rgba(88,58,30,.8)',{it:1,ls:2}); T('CASPIAN',680,32,10,SEA,{it:1,ls:2,halo:SH});
+  /* ---- THE FURNITURE: cartouche, legend, rose, scale, and a plate border ---- */
+  { const x=14, y=H-106, w2=300, h2=92; c.save(); c.shadowColor='rgba(0,0,0,.35)'; c.shadowBlur=6; c.fillStyle='rgba(244,232,206,.94)'; c.fillRect(x,y,w2,h2); c.restore();
+    c.strokeStyle='#5a3a1a'; c.lineWidth=1.6; c.strokeRect(x+3,y+3,w2-6,h2-6); c.lineWidth=0.6; c.strokeRect(x+7,y+7,w2-14,h2-14);
+    c.textAlign='center'; c.fillStyle='#3a2410'; c.font='bold 17px Georgia,serif'; c.fillText('THE ICE AGE', x+w2/2, y+30);
+    c.font='italic 11px Georgia,serif'; c.fillText('the Near East, c. 10,000 BC — the sea fifty metres down', x+w2/2, y+48);
+    c.font='10px Georgia,serif'; c.textAlign='left';
+    c.fillStyle='#fff0d0'; c.strokeStyle='#2a1208'; c.lineWidth=1.4; c.beginPath(); c.arc(x+22,y+64,4,0,7); c.fill(); c.stroke(); c.fillStyle='#3a2410'; c.fillText('a band’s grounds', x+32, y+68);
+    c.fillStyle='#ff8a4a'; c.beginPath(); c.arc(x+150,y+64,4,0,7); c.fill(); c.stroke(); c.fillStyle='#3a2410'; c.fillText('the meeting cave', x+160, y+68);
+    c.fillStyle='rgba(196,186,142,1)'; c.fillRect(x+16,y+76,12,7); c.strokeRect(x+16,y+76,12,7); c.fillStyle='#3a2410'; c.fillText('land the sea has not yet taken', x+32, y+83); }
+  { const cx=712, cy=640, R0=22; c.save(); c.translate(cx,cy); for(let k=0;k<8;k++){ const an=k*Math.PI/4, rr=k%2? R0*0.5 : R0; c.fillStyle=k%2? '#c8b58a' : (k===0? '#8a2a1a' : '#4a3a24'); c.beginPath(); c.moveTo(0,0); c.lineTo(Math.cos(an-Math.PI/2-0.16)*rr*0.32,Math.sin(an-Math.PI/2-0.16)*rr*0.32); c.lineTo(Math.cos(an-Math.PI/2)*rr,Math.sin(an-Math.PI/2)*rr); c.lineTo(Math.cos(an-Math.PI/2+0.16)*rr*0.32,Math.sin(an-Math.PI/2+0.16)*rr*0.32); c.closePath(); c.fill(); }
+    c.strokeStyle='#4a3a24'; c.lineWidth=0.8; c.beginPath(); c.arc(0,0,R0*0.62,0,7); c.stroke(); c.font='bold 10px Georgia,serif'; c.textAlign='center'; c.fillStyle='#4a2a14'; c.fillText('N',0,-R0-4); c.restore(); }
+  { const x=440, y=668, L=124; for(let k=0;k<4;k++){ c.fillStyle=k%2? '#f3e8cc' : '#3a2a1c'; c.fillRect(x+k*L/4,y,L/4,5); } c.strokeStyle='#3a2a1c'; c.lineWidth=0.8; c.strokeRect(x,y,L,5);
+    c.font='9px Georgia,serif'; c.textAlign='center'; c.fillStyle='#2a1c12'; c.fillText('0',x,y-3); c.fillText('500 km',x+L,y-3); }
+  c.strokeStyle='#4a3420'; c.lineWidth=3; c.strokeRect(1.5,1.5,W-3,H-3); c.strokeStyle='rgba(74,52,32,.7)'; c.lineWidth=1; c.strokeRect(6,6,W-12,H-12);
+  ICE_PLATE_CV=cv2; return cv2;
 }
 /* ---------- THE HUNT: what is out there, by country ---------- */
 const ICE_PREY_BY_REGION={
