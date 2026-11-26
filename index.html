@@ -21621,16 +21621,16 @@ let BT=null;
 function armyBattle(cfg){
   // cfg: {title, sub, yourMen, enemyMen, general, night, kind:'field'|'siege'|'ambush', onWin, onLose}
   const kind=cfg.kind||'field';
-  const gearMult=(1+G.armyGear*0.15)*(1+G.armyTrain*0.12);
+  const gearMult=(1+(G.armyGear||0)*0.15)*(1+(G.armyTrain||0)*0.12);
   const gp = cfg.general? cfg.general.power : 1;
   const yourPower=Math.round(cfg.yourMen*gearMult*gp);
   let enemyPower=Math.round(cfg.enemyMen*rnd(0.85,1.15));
   let lossMult=1;
   if(kind==='siege'){ enemyPower=Math.round(enemyPower*((cfg.general&&cfg.general.smart>=8)?1.06:1.22)); lossMult=1.15; } // walls favour the defender — unless your general is a genius engineer
   if(kind==='ambush'){ enemyPower=Math.round(enemyPower*0.76); lossMult=0.8; cfg.night=true; }                            // total surprise
-  const win = yourPower>=enemyPower;
+  const win = (cfg.forceWin!==undefined)? !!cfg.forceWin : yourPower>=enemyPower;
   const r = yourPower/(yourPower+enemyPower);
-  const yourLoss=Math.min(cfg.yourMen, Math.round(cfg.yourMen*(win?(0.10+(1-r)*0.5):(0.40+(1-r)*0.4))*(cfg.general?cfg.general.casualty:1)*lossMult));
+  const yourLoss=(cfg.yourLoss!==undefined)? Math.min(cfg.yourMen, cfg.yourLoss) : Math.min(cfg.yourMen, Math.round(cfg.yourMen*(win?(0.10+(1-r)*0.5):(0.40+(1-r)*0.4))*(cfg.general?cfg.general.casualty:1)*lossMult));
   const enemyLoss=win? cfg.enemyMen : Math.round(cfg.enemyMen*r*0.8);
   cfg.sub=(cfg.sub?cfg.sub+'   ·   ':'')+({field:'PITCHED BATTLE',siege:'SIEGE ASSAULT',ambush:'NIGHT AMBUSH'})[kind];
   BT={cfg,kind,win,yourPower,enemyPower,yourLoss,enemyLoss,yourMen:cfg.yourMen,enemyMen:cfg.enemyMen,
@@ -21674,6 +21674,21 @@ function drawBattleHorse(sx,sy,facing,col){
   px(sx+facing*6,sy-8,1,9,'#8a6a44');                                 // lance
 }
 function drawBattleHost(x,men,maxMen,facing,col,crest,advance,shieldC){
+  /* ⚔ THE NEW SOLDIERS ARE THREE TIMES THE SIZE OF THE OLD 8-PIXEL ONES, and they were being stood on the old
+     grid (8 apart, ranks 11 apart): forty-five of them on top of each other in one blob. Now a host is four ranks in
+     depth, the far ranks smaller and higher up the field, the files close enough that the shields overlap into a
+     wall; men come off the front rank as they fall. */
+  if(nbOn()){
+    const ranks=4, files=8, icons=Math.max(1,Math.min(ranks*files, Math.round(men/maxMen*ranks*files)));
+    for(let r=0;r<ranks;r++){ const sc=0.60+r*0.13, y=138+r*12;
+      for(let f=0;f<files;f++){ const idx=r*files+f; if(idx>=icons) continue;
+        const sx=x + facing*(f*12*sc + (r%2)*5*sc) + advance*facing + facing*(ranks-1-r)*5;
+        drawBattleSoldierNB(sx, y, facing, col, shieldC, crest, idx, sc); } }
+    const bx=x+advance*facing+facing*-8, by=124;
+    px(bx,by-22,2,34,'#5a4028'); px(bx,by-22,1,34,'#7a5a38');
+    px(bx+(facing>0?2:-11),by-22,11,8,crest); px(bx+(facing>0?2:-11),by-22,11,1,shade(crest,40)); px(bx+(facing>0?5:-8),by-20,5,4,shade(crest,-40)); px(bx-1,by-24,4,2,'#e8c34a');
+    for(let k=0;k<3;k++) drawBattleHorse(x - facing*(22+k*15), 182+((k%2)*6), facing, facing>0?'#7a5a38':'#4a3a4e');
+    return; }
   const cols=9, rows=5, icons=Math.max(1,Math.min(cols*rows, Math.round(men/maxMen*cols*rows)));
   /* the new men are taller than a rank's spacing, so the far rank goes down first and the near ranks stand in front of it */
   const NBo=nbOn();
@@ -32060,11 +32075,11 @@ function nbSoldierSprite(tunic, shieldC, crest, frame, east){
   NB_SOLDIER_CACHE.set(key, cv); NB_DRAWS.soldier++;
   return cv;
 }
-function drawBattleSoldierNB(sx,sy,facing,tunic,shieldC,crest,i){
-  const east=(typeof BT!=='undefined' && BT && BT.east) || false;
+function drawBattleSoldierNB(sx,sy,facing,tunic,shieldC,crest,i,sc){
+  const east=(typeof BT!=='undefined' && BT && BT.east) || false, k=sc||1;
   const frame=(((BT.t*0.12)+i*0.7)|0)%4;
   const spr=nbSoldierSprite(tunic, shieldC, crest, frame, east && facing<0);
-  ctx.save(); ctx.translate(Math.round(sx+1), Math.round(sy+7)); if(facing<0) ctx.scale(-1,1);
+  ctx.save(); ctx.translate(Math.round(sx+1), Math.round(sy+7)); ctx.scale((facing<0? -1 : 1)*k, k);
   ctx.drawImage(spr, -14, -28); ctx.restore();
 }
 /* ---- THE CARD: draw the fighter on the game canvas, lift the pixels off it, put the canvas back ---- */
@@ -41806,6 +41821,38 @@ function drawRomanticFig(x, y, w, k, T, male){
 /* the two names the rest of the game already calls */
 function drawRomanticFem(x,y,w,k,T){ return drawRomanticFig(x,y,w,k,T,false); }
 function drawRomanticMale(x,y,w,k,T){ return drawRomanticFig(x,y,w,k,T,true); }
+/* 👋 THE SLAP, PAINTED — one painter for every slap in the game (the villa's romantic slaps in all their styles,
+   the casual swat, the forty in the Life of Rhuna). It was a ring of square dots, a pink rectangle for a mark, a
+   15×10 block of "flash" and square sparks. Now: a soft flash, two smooth shock rings, speed lines, little
+   four-point sparkles for the hard ones, a ripple that runs through the curve of her seat, and a mark that blooms
+   hot and settles into a real print (a palm and four fingers for a hand, a stripe for anything else) and fades. */
+function slapPal(p){ return p==='ice'? ['#d8f4ff','#8ad0ff'] : p==='fire'? ['#fff0b0','#ffb050'] : (p==='gold'||p==='amber')? ['#fff4c0','#ffd060'] : ['#fff4ea','#ffb0b8']; }
+function slapImpactPaint(c, x, y, hit, o){ o=o||{}; if(!(hit>0.01)) return; const e=1-hit, C=slapPal(o.pal), s=o.s||1;
+  c.save();
+  { c.globalCompositeOperation='lighter'; const r=(6+e*12)*s, g=c.createRadialGradient(x,y,0,x,y,r); g.addColorStop(0,rgbaHexA(C[0],(0.55*hit).toFixed(3))); g.addColorStop(0.5,rgbaHexA(C[1],(0.20*hit).toFixed(3))); g.addColorStop(1,rgbaHexA(C[1],0)); c.fillStyle=g; c.fillRect(x-r,y-r,r*2,r*2); c.globalCompositeOperation='source-over'; }
+  c.lineCap='round';
+  for(let k=0;k<2;k++){ const ek=clamp(e*1.25-k*0.22,0,1); if(ek<=0||ek>=1) continue; const r=(3+ek*16)*s; c.globalAlpha=(1-ek)*0.75; c.strokeStyle=C[0]; c.lineWidth=Math.max(0.3,(1.4-ek))*s; c.beginPath(); c.ellipse(x,y,r,r*0.6,o.tilt||0,0,7); c.stroke(); }
+  if(e<0.6){ const n=o.lines||7; for(let i=0;i<n;i++){ const a=(i/n)*Math.PI*2+0.3, r0=(4+e*10)*s, r1=r0+(5-e*6)*s; c.globalAlpha=(1-e/0.6)*0.8; c.strokeStyle=C[0]; c.lineWidth=0.8*s; c.beginPath(); c.moveTo(x+Math.cos(a)*r0,y+Math.sin(a)*r0*0.7); c.lineTo(x+Math.cos(a)*r1,y+Math.sin(a)*r1*0.7); c.stroke(); } }
+  if((o.spark||0)>0 && e<0.7){ const n=Math.round(3+3*o.spark); for(let i=0;i<n;i++){ const a=i*2.39+0.7, d=(5+e*14)*s*(0.7+0.3*((i*37)%10)/10), sx=x+Math.cos(a)*d, sy=y+Math.sin(a)*d*0.7-e*4, z=Math.max(0.3,(1.6-e*1.4))*s;
+      c.globalAlpha=(1-e/0.7); c.fillStyle=C[0]; c.beginPath(); c.moveTo(sx,sy-z*1.6); c.lineTo(sx+z*0.4,sy-z*0.4); c.lineTo(sx+z*1.6,sy); c.lineTo(sx+z*0.4,sy+z*0.4); c.lineTo(sx,sy+z*1.6); c.lineTo(sx-z*0.4,sy+z*0.4); c.lineTo(sx-z*1.6,sy); c.lineTo(sx-z*0.4,sy-z*0.4); c.closePath(); c.fill(); } }
+  c.restore(); c.globalAlpha=1; }
+function slapRipplePaint(c, sx, sy, rs, hx, hy, since, s){ if(!(since>=0) || since>24 || !rs) return; c.save(); c.beginPath(); c.arc(sx,sy,rs*0.98,0,7); c.clip(); c.lineCap='round';
+  for(let k=0;k<3;k++){ const t=since-k*4; if(t<0) continue; const q=clamp(1-t/18,0,1); if(q<=0) continue; const r=2+t*rs*0.09;
+    c.globalAlpha=q*0.25; c.strokeStyle='#8a4a3a'; c.lineWidth=0.9*(s||1); c.beginPath(); c.arc(hx+0.5*(s||1),hy+0.5*(s||1),r,0,7); c.stroke();
+    c.globalAlpha=q*0.5; c.strokeStyle='#fff2e8'; c.beginPath(); c.arc(hx,hy,r,0,7); c.stroke(); }
+  c.restore(); c.globalAlpha=1; }
+function slapMarkPaint(c, x, y, age, o){ o=o||{}; const s=o.s||1, kind=o.kind||'hand', skin=hexOf(o.skin||'#e0b890');
+  const hot=clamp(1-age/12,0,1), settle=clamp(1-age/(o.life||170),0,1); if(settle<=0) return;
+  const red=mixHex(skin,'#d8404a',0.55), pink=mixHex(skin,'#ff8a9a',0.45);
+  c.save(); c.translate(x,y); c.rotate(o.ang||0); c.scale(o.dir||1,1);
+  { const g=c.createRadialGradient(0,0,0,0,0,7*s); g.addColorStop(0,rgbaHexA(pink,(0.50*settle).toFixed(3))); g.addColorStop(1,rgbaHexA(pink,0)); c.fillStyle=g; c.fillRect(-8*s,-8*s,16*s,16*s); }
+  c.globalAlpha=0.55*settle; c.fillStyle=red;
+  if(kind==='len'){ c.beginPath(); c.ellipse(0,0,4.6*s,1.3*s,0,0,7); c.fill(); }
+  else { c.beginPath(); c.ellipse(0,0.8*s,2.3*s,1.9*s,0,0,7); c.fill(); for(let f=0;f<4;f++){ const fx=-1.7*s+f*1.15*s; c.beginPath(); c.ellipse(fx,-2.2*s+Math.abs(f-1.5)*0.35*s,0.42*s,1.55*s,-0.12+f*0.06,0,7); c.fill(); } c.beginPath(); c.ellipse(2.6*s,0.6*s,0.45*s,1.2*s,0.9,0,7); c.fill(); }
+  if(hot>0){ c.globalAlpha=hot*0.6; c.fillStyle='#fff0e6'; c.beginPath(); c.ellipse(0,0,4*s,3*s,0,0,7); c.fill(); }
+  c.restore(); c.globalAlpha=1; }
+function slapArcPaint(c, pts, col){ if(!pts || pts.length<2) return; c.save(); c.lineCap='round'; for(let i=1;i<pts.length;i++){ const t=i/pts.length; c.globalAlpha=(1-t)*(1-t)*0.7; c.strokeStyle=col||'#ffe9cf'; c.lineWidth=2.2*(1-t)+0.4; c.beginPath(); c.moveTo(pts[i-1][0],pts[i-1][1]); c.lineTo(pts[i][0],pts[i][1]); c.stroke(); } c.restore(); c.globalAlpha=1; }
+function slapSparkPaint(c,x,y,a,big,col){ if(!(a>0)) return; const r=big? 1.1 : 0.7, cc=(typeof col==='string' && col[0]==='#' && col.length===7)? col : '#fff0dc', g=c.createRadialGradient(x,y,0,x,y,r*2.6); g.addColorStop(0,rgbaHexA(cc,(0.9*a).toFixed(3))); g.addColorStop(1,rgbaHexA(cc,0)); c.fillStyle=g; c.fillRect(x-r*3,y-r*3,r*6,r*6); }
 function drawRomantic(){
   const D=DM, S=D.rslap; if(!S) return; const FY=214, T=S.t, w=G.wife, X=S.x+romSway(S);
   // the room draws in around them, exactly as the villa scene does
@@ -41867,18 +41914,9 @@ function drawRomantic(){
      been is the thing that actually makes a strike read as a strike. */
   if(PAIRED && RP && RP.hisRoot && SW.d>=-7 && SW.d<12){             // the arc its tip has just swept
     const IN=lengthInches(pairHimLook(),1), L=IN.now*1.0;
-    for(let n=1;n<=9;n++){ const pa=romanticSwing(T-n*1.1).a, fade=(1-n/10);
-      const tx=RP.hisRoot[0]+Math.cos(pa)*L*RP.dir, ty=RP.hisRoot[1]+Math.sin(pa)*L;
-      ctx.globalAlpha=fade*fade*0.6; px(Math.round(tx), Math.round(ty), 2, 2, '#ffe9cf'); }
-    ctx.globalAlpha=1; }
+    const pts=[]; for(let n=0;n<=9;n++){ const pa=romanticSwing(T-n*1.1).a; pts.push([RP.hisRoot[0]+Math.cos(pa)*L*RP.dir, RP.hisRoot[1]+Math.sin(pa)*L]); } slapArcPaint(ctx,pts,'#ffe9cf'); }
   if(!PAIRED && SW.d>=-7 && SW.d<12 && VM_SHAFT.r){
-    for(let n=1;n<=9;n++){
-      const pa=romanticSwing(T-n*1.1).a, fade=(1-n/10);
-      const tx=VM_SHAFT.x+Math.cos(pa)*VM_SHAFT.r, ty=VM_SHAFT.y+Math.sin(pa)*VM_SHAFT.r;
-      ctx.globalAlpha=fade*fade*0.6;
-      px(Math.round(tx), Math.round(ty), 2, 2, '#ffe9cf');
-    }
-    ctx.globalAlpha=1;
+    const pts=[]; for(let n=0;n<=9;n++){ const pa=romanticSwing(T-n*1.1).a; pts.push([VM_SHAFT.x+Math.cos(pa)*VM_SHAFT.r, VM_SHAFT.y+Math.sin(pa)*VM_SHAFT.r]); } slapArcPaint(ctx,pts,'#ffe9cf');
   }
   // his OTHER hand holds her hip through all of it — it is the near one that swings
   if(!PAIRED && T>150){ const ha=clamp((T-150)/40,0,1)*clamp((404-T)/40,0,1);
@@ -41892,20 +41930,11 @@ function drawRomantic(){
      across the join for a hundred and eighty ticks — which covered the entire
      swing it was there to cover the end of. You cannot watch a strike through
      a sheet. It flashes on the crack and is gone again with it. */
-  if(!PAIRED && SW.hit>0.02){ const a=SW.hit;
-    ctx.globalAlpha=0.62*a; ctx.fillStyle='#efe6d6';
-    ctx.fillRect(Math.round(X-13+shift), Math.round(FY-31), 17, 7);
-    ctx.globalAlpha=0.30*a; ctx.fillRect(Math.round(X-16+shift), Math.round(FY-30), 23, 5);
-    ctx.globalAlpha=1; }
+  /* (the flat band that flashed at contact is now part of the painted impact below) */
   // ---- THE CRACK: the ring, the sting on her, and the word for it ----
   if(SW.hit>0.02){
     const IX=(PAIRED && S.hitX!==undefined)? S.hitX : X+1, IY=(PAIRED && S.hitY!==undefined)? S.hitY : FY-29;
-    ctx.globalAlpha=SW.hit;                                            // the impact ring
-    for(let i=0;i<10;i++){ const a2=(i/10)*6.283, r=3+(1-SW.hit)*16;
-      px(IX+Math.cos(a2)*r, IY+Math.sin(a2)*r*0.58, 2,2,(S.style&&S.style.pal==='ice')?'#d0f0ff':(S.style&&S.style.pal==='fire')?'#ffe0a0':'#fff0dc'); }
-    ctx.globalAlpha=SW.hit*0.85;                                       // and the mark it leaves
-    px(IX-4, IY-1, 9, 4, 'rgba(255,150,150,.55)');
-    ctx.globalAlpha=1;
+    slapImpactPaint(ctx, IX, IY, SW.hit, {pal:S.style&&S.style.pal, spark:(S.style&&S.style.spark)||1, s:1});
     if(SW.hit>0.45){ ctx.textAlign='center';
       /* AND THE WORD FOR IT. Three English comic-book noises were being
          printed over a Sengoku bedchamber. Japanese has a whole grammar of
@@ -41917,27 +41946,12 @@ function drawRomantic(){
   }
   /* ---- THE WARM SPARKS, drifting UP. The angry slap throws grey debris
      along the tangent and it falls; this one does the opposite, on purpose. ---- */
-  if(S.sparks) S.sparks.forEach(pt=>{
-    const life=clamp(1-pt.t/62,0,1); if(life<=0) return;
-    ctx.globalAlpha=life*life*0.9;
-    px(Math.round(pt.x), Math.round(pt.y), 1+(life>0.6?1:0), 1+(life>0.6?1:0), pt.c);
-    ctx.globalAlpha=1; });
+  if(S.sparks) S.sparks.forEach(pt=>{ const life=clamp(1-pt.t/62,0,1); if(life<=0) return; slapSparkPaint(ctx, pt.x, pt.y, life*life, life>0.6, pt.c); });
   /* ---- THE MARK. It blooms hot on contact and settles to a warm print. ---- */
   if(S.mark){ const m=S.mark.t;
-    const hot=clamp(1-m/14,0,1), settle=clamp(1-m/150,0,1);
-    const my=(PAIRED && S.hitY!==undefined)? S.hitY-2 : FY-30, mx=(PAIRED && S.hitX!==undefined)? S.hitX-4 : X-4;
-    if(settle>0){
-      ctx.globalAlpha=settle*0.42;
-      px(mx-1, my-1, 11, 6, 'rgba(226,138,150,1)');
-      ctx.globalAlpha=settle*0.30;
-      px(mx, my, 9, 4, 'rgba(255,178,190,1)');
-      /* four fingers, for the first fifty ticks, before it spreads */
-      if(m<50){ ctx.globalAlpha=settle*0.34;
-        for(let f=0;f<4;f++) px(mx+1+f*2, my, 1, 4, 'rgba(255,200,206,1)'); }
-      ctx.globalAlpha=1; }
-    if(hot>0){ ctx.globalAlpha=hot*0.8;
-      px(mx-3, my-3, 15, 10, 'rgba(255,226,208,1)'); ctx.globalAlpha=1; }
-  }
+    const my=(PAIRED && S.hitY!==undefined)? S.hitY : FY-28, mx=(PAIRED && S.hitX!==undefined)? S.hitX : X+1;
+    if(PAIRED && RP && RP.seat) slapRipplePaint(ctx, RP.seat[0], RP.seat[1], RP.rs||6, mx, my, m, 1);      // the ripple running through her
+    slapMarkPaint(ctx, mx, my, m, {kind:PAIRED? 'len' : 'hand', skin:(BENT&&BENT.skin)||'#e0b890', ang:PAIRED? -0.35 : 0, dir:(D.x<=X)? 1 : -1, life:150, s:0.9}); }
   // HER FACE, over her shoulder, for whichever strike just landed
   if(!PAIRED && SW.d>=0 && RF_HEAD)
     drawReactFace(X, FY, w, reactKindFor(S.v, true), SW.d, RF_HEAD);
@@ -42394,9 +42408,7 @@ function drawSlap(){
     ctx.restore();
   }
   if(hit && S.sparks){                                   // the debris, thrown along the tangent
-    S.sparks.forEach(p=>{ const a=clamp(1-p.t/17,0,1); if(a<=0) return;
-      ctx.globalAlpha=a; px(p.x, p.y, p.t<5?2:1, p.t<5?2:1, a>0.6?'#fff4e0':'#e8b884'); });
-    ctx.globalAlpha=1;
+    S.sparks.forEach(p=>{ const a=clamp(1-p.t/17,0,1); if(a<=0) return; slapSparkPaint(ctx, p.x, p.y, a, p.t<5, a>0.6? '#fff4e0' : '#e8b884'); });
   }
   if(hit && S.dust){                                     // and the tiles letting go
     S.dust.forEach(p=>{ const a=clamp(1-p.t/34,0,1)*0.42; if(a<=0) return;
@@ -42424,9 +42436,8 @@ function drawSlap(){
       ctx.beginPath(); ctx.ellipse(H.hx, H.hy, 6, 4, 0,0,6.284); ctx.fill();
       ctx.globalAlpha=1;
     }
-    if(S.pair){ if(S.hitX!==undefined && since<90){                          // the print it leaves, where it landed
-        ctx.globalAlpha=clamp(1-since/90,0,1)*0.55; ctx.fillStyle=mixHex(w.skin||'#e6bd94','#d0574a',0.55);
-        ctx.beginPath(); ctx.ellipse(S.hitX, S.hitY, 3.2, 2.2, 0,0,7); ctx.fill(); ctx.globalAlpha=1; } }
+    if(S.pair){ if(S.hitX!==undefined && since<160){                         // the print it leaves, where it landed: a palm and four fingers
+        slapMarkPaint(ctx, S.hitX, S.hitY, since, {kind:'hand', skin:w.skin||'#e6bd94', life:160, s:0.85}); } }
     else { drawSlapAfter(S.x, FY, w, since, 'hand', !!(S.v && (S.v.bond||0)>=0));
       drawReactFace(S.x+recoil, FY, w, reactKindFor(S.v,false), since); }
   }
@@ -46150,8 +46161,20 @@ function rhWooDraw(c,b,T,u,dt){
   if(b.p==='vorgan' && R2.hisHead){ c.fillStyle='#d02020'; c.fillRect(R2.hisHead[0]-1,R2.hisHead[1]-12,2,8); }
   if(b.p==='kharn' && R2.hisHead){ [-1,1].forEach(s=>{ c.strokeStyle='#efe6d0'; c.lineWidth=1.9; c.lineCap='round'; c.beginPath(); c.moveTo(R2.hisHead[0]+s*3.5,R2.hisHead[1]-3); c.quadraticCurveTo(R2.hisHead[0]+s*8,R2.hisHead[1]-5,R2.hisHead[0]+s*6.5,R2.hisHead[1]-12); c.stroke(); }); }
   if(b.p==='tavrek' && R2.hisHead){ for(let i=-3;i<=3;i++){ c.fillStyle=i%2? '#4a8a2a' : '#6aaa3a'; c.fillRect(R2.hisHead[0]+i*1.4-0.5,R2.hisHead[1]-7+Math.abs(i)*0.3,1.6,1.6); } }
-  // impact: a ring, and the colour of how hard
-  if(slapping && R2.seat){ const e=ph0-sw; if(e>=0 && e<16){ c.save(); c.globalAlpha=(1-e/16)*(0.45+0.5*strong); c.strokeStyle=b.p==='rekop'? '#ffe898' : '#fff0e0'; c.lineWidth=1.4; c.beginPath(); c.arc(R2.seat[0],R2.seat[1],(R2.rs||7)*0.5+e*1.1,0,7); c.stroke(); if(strong>0.6){ c.beginPath(); c.arc(R2.seat[0],R2.seat[1],(R2.rs||7)*0.5+e*1.6,0,7); c.stroke(); } c.restore(); } }
+  /* 👋 the slap, painted (a flash, shock rings, speed lines, sparkles for the hard ones), the ripple through her seat,
+     and the print it leaves, hot and then settling, under every stroke that follows */
+  if(R2.seat && !R2.pov){ const rsx=R2.rs||7, hx=R2.seat[0]-rsx*0.55, hy=R2.seat[1]-rsx*0.2;
+    if(impact) b._slapAt=T;
+    if(slapping){ const e=ph0-sw; if(e>=0 && e<16) slapImpactPaint(c,hx,hy,1-e/16,{pal:b.p==='rekop'? 'gold' : b.p==='vorgan'? 'fire' : 'rose', spark:strong, s:0.55}); }
+    if(b._slapAt!==undefined){ const age=T-b._slapAt; if(age>=0 && age<220){ slapRipplePaint(c,R2.seat[0],R2.seat[1],rsx,hx,hy,age,0.55); slapMarkPaint(c,hx,hy,age,{kind:'hand', skin:herLook.skin||'#d8a87a', s:0.6, life:220}); } } }
+  /* 🌾 AND HOW EACH OF THE FORTY ENDS: held — he stays, four warm pulses where they are joined with gold rings
+     going out from it, and when he draws back at the very end a little of it follows */
+  if(finish>0.001 && !R2.pov){ const rsx=R2.rs||7, J=R2.entry||R2.join||(R2.seat? [R2.seat[0]-rsx*0.6, R2.seat[1]+rsx*0.45] : null);
+    if(J){ const k=clamp((u-0.90)/0.07,0,1), pulse=Math.max(0,Math.sin(k*4*Math.PI));
+      c.save(); c.globalCompositeOperation='lighter'; const r=3+pulse*5, g=c.createRadialGradient(J[0],J[1],0,J[0],J[1],r*2);
+      g.addColorStop(0,'rgba(255,214,150,'+(0.5*pulse*finish+0.12*finish).toFixed(3)+')'); g.addColorStop(1,'rgba(255,200,120,0)'); c.fillStyle=g; c.fillRect(J[0]-r*2,J[1]-r*2,r*4,r*4); c.restore();
+      for(let q=0;q<4;q++){ const e=k-q/4; if(e<0||e>0.4) continue; const rr=2+e*40; c.globalAlpha=(1-e/0.4)*0.7; c.strokeStyle='#ffd9a0'; c.lineWidth=0.6; c.beginPath(); c.ellipse(J[0],J[1],rr,rr*0.7,0,0,7); c.stroke(); }
+      c.globalAlpha=1; if(u>0.95) flTrickle(c,J[0]+0.5,J[1]+0.6,clamp((u-0.95)/0.05,0,1)*7,0.8,0.9); } }
   c.restore();
   if(drive>0.85){ c.save(); c.globalCompositeOperation='lighter'; const gp=(drive-0.85)/0.15, sp=(b._R&&b._R.seat)? [cx+b._R.seat[0]*zoom*sg, FL+b._R.seat[1]*zoom] : [240,150]; const gr=c.createRadialGradient(sp[0],sp[1],4,sp[0],sp[1],150); gr.addColorStop(0,'rgba(255,220,150,'+(0.22*gp).toFixed(3)+')'); gr.addColorStop(1,'rgba(255,200,120,0)'); c.fillStyle=gr; c.fillRect(0,12,480,218); c.restore(); }
   if(ST.flash && slapping && impact){ c.fillStyle=ST.flash; c.globalAlpha=0.28; c.fillRect(0,12,480,218); c.globalAlpha=1; }
@@ -57075,25 +57098,33 @@ const UNIT_TYPES=[
 function unitCount(id){ return (G.units&&G.units[id])||0; }
 function armySize(){ return UNIT_TYPES.reduce((a,U)=>a+unitCount(U.id),0); }
 function armyUpkeep(){ return UNIT_TYPES.reduce((a,U)=>a+unitCount(U.id)*U.upkeep,0); }
+/* 🦅 THE COMMAND YOUR RANK GIVES YOU IS A REAL FORCE. "Command 600 men" sat in the header while YOUR FORCE said
+   0 men, fought at 55% because it was "starving", and every campaign was 12–26% to win. Your rank's men are Rome's:
+   cohorts of legionaries and auxilia with a little horse and a few bowmen, paid and fed by the state. The troops you
+   raise yourself stand beside them — those you pay, and those eat your stores. */
+function rankForce(){ const m=(typeof milRank==='function'? milRank().men : 600)||0; return {legionary:Math.round(m*0.55), auxilia:Math.round(m*0.35), cavalry:Math.round(m*0.06), archers:Math.round(m*0.04), engineers:0}; }
+function rankSize(){ const F=rankForce(); return F.legionary+F.auxilia+F.cavalry+F.archers+F.engineers; }
+function armyCommand(){ return rankSize()+armySize(); }
 // composition matters: a balanced force fights better than a mob
 function armyPowerDetail(){
-  let atk=0, def=0, siege=0;
-  UNIT_TYPES.forEach(U=>{ const n=unitCount(U.id); atk+=n*U.atk; def+=n*U.def; siege+=n*U.siege; });
+  let atk=0, def=0, siege=0; const RF=rankForce(), supplyMul=supplyState().mul;
+  UNIT_TYPES.forEach(U=>{ const r=RF[U.id]||0, n=unitCount(U.id)*supplyMul;            // your own men fight as well as they are fed; Rome's are fed by Rome
+    atk+=(r+n)*U.atk; def+=(r+n)*U.def; siege+=(r+n)*U.siege; });
   const gear=1+(G.armyGear||0)*0.12, drill=1+(G.armyTrain||0)*0.10;
-  const supplyMul = supplyState().mul;
   // TIRED MEN FIGHT WORSE. Up to a third comes straight off the top.
   const ex=exhaustState(), exMul=ex.fightMul;
-  return {atk:Math.round(atk*gear*drill*supplyMul*exMul), def:Math.round(def*gear*drill*supplyMul*exMul),
-          siege:Math.round(siege*gear*supplyMul*exMul), size:armySize(),
+  return {atk:Math.round(atk*gear*drill*exMul), def:Math.round(def*gear*drill*exMul),
+          siege:Math.round(siege*gear*exMul), size:armyCommand(), raised:armySize(), rome:rankSize(),
           exhaust:ex.e, exhaustName:ex.name, exhaustCol:ex.col, over:ex.ov};
 }
 // SUPPLY — an army eats. Starve it and everything degrades.
 function supplyState(){
-  const need=Math.max(1,Math.ceil(armySize()/120));
+  const raised=armySize(), need=Math.max(1,Math.ceil(raised/120));
   const have=G.supply||0;
   const days=Math.floor(have/Math.max(1,need));
   let mul=1, label='WELL SUPPLIED', col='#8ad48a';
-  if(have<=0){ mul=0.55; label='STARVING'; col='#e05b5b'; }
+  if(raised<=0){ label='FED BY ROME'; }                                   // nothing of your own to feed
+  else if(have<=0){ mul=0.55; label='STARVING'; col='#e05b5b'; }
   else if(days<3){ mul=0.78; label='SHORT RATIONS'; col='#e8c34a'; }
   return {need, have, days, mul, label, col};
 }
@@ -57146,17 +57177,17 @@ function openLegion(){
   // ================= THE ARMY IN DETAIL =================
   const P=armyPowerDetail(), SUP=supplyState();
   const ac=document.createElement('div'); ac.className='shopcard'; ac.style.borderColor='#c8a24a';
-  ac.innerHTML=`<div><b style="color:var(--gold)">⚔ YOUR FORCE — ${fmt(P.size)} men</b>
+  ac.innerHTML=`<div><b style="color:var(--gold)">⚔ YOUR FORCE — ${fmt(P.size)} men</b> <span class="small muted">(${fmt(P.rome)} of Rome’s, ${fmt(P.raised)} raised by you)</span>
       <span class="small muted">· attack <b style="color:#e0907a">${fmt(P.atk)}</b> · defence <b style="color:#8ab4e0">${fmt(P.def)}</b> · siege <b style="color:#e8c34a">${fmt(P.siege)}</b></span></div>
     <div class="small">🌾 Supply: <b style="color:${SUP.col}">${SUP.label}</b> — ${fmt(SUP.have)} stores, burning ${SUP.need}/day (${SUP.days} days left)
       ${SUP.mul<1?`<span style="color:${SUP.col}">· fighting at ${Math.round(SUP.mul*100)}%</span>`:''}</div>
     <div class="small muted">Upkeep ${fmt(armyUpkeep())}d per campaign. A balanced force beats a bigger mob.</div>`;
   const urow=document.createElement('div'); urow.className='col gap6';
   UNIT_TYPES.forEach(U=>{
-    const n=unitCount(U.id), buy=50, cost=U.cost*buy;
+    const n=unitCount(U.id), rn=(rankForce()[U.id]||0), buy=50, cost=U.cost*buy;
     const line=document.createElement('div'); line.className='row gap6'; line.style.alignItems='center'; line.style.flexWrap='wrap';
     const lbl=document.createElement('div'); lbl.className='small'; lbl.style.flex='1'; lbl.style.minWidth='190px';
-    lbl.innerHTML=`${U.icon} <b>${U.name}</b> <b style="color:var(--gold)">${fmt(n)}</b> <span class="muted">— ${U.desc}</span>`;
+    lbl.innerHTML=`${U.icon} <b>${U.name}</b> <b style="color:var(--gold)">${fmt(n+rn)}</b> <span class="muted">${rn? '('+fmt(rn)+' Rome’s'+(n? ' + '+fmt(n)+' yours' : '')+') ' : ''}— ${U.desc}</span>`;
     line.appendChild(lbl);
     const bt=document.createElement('button'); bt.className='btn sm'; bt.textContent='+'+buy+' ('+fmt(cost)+'d)';
     bt.disabled=G.coin<cost;
@@ -57185,7 +57216,7 @@ function openLegion(){
     your siege power <b style="color:#e8c34a">${fmt(P.siege)}</b> · prospects <b style="color:${odds>0.6?'#8ad48a':odds>0.35?'#e8c34a':'#e05b5b'}">${Math.round(odds*100)}%</b>`;
   sc2.appendChild(fd);
   const sb2=document.createElement('button'); sb2.className='btn sm gold'; sb2.textContent='🏰 INVEST THE FORTRESS';
-  sb2.disabled = P.size<200;
+  sb2.disabled = P.size<200 || state==='battle';
   sb2.title = P.size<200? 'You need at least 200 men to invest a fortress.' : 'Sit down before the walls and begin.';
   sb2.onclick=()=>runSiege(F,odds); sc2.appendChild(sb2); b.appendChild(sc2);
   const dc=document.createElement('div'); dc.className='shopcard';
@@ -57196,20 +57227,30 @@ function openLegion(){
   dc.appendChild(db); b.appendChild(dc);
 }
 let legionOffers=null, legionOffersDay=-1;
+function campaignPower(){ const P=armyPowerDetail(); return P.atk*0.9 + P.def*0.5; }
+function campaignEnemy(cp){ const R=milRank(); return (300+400*cp.diff*cp.diff)*Math.pow(Math.max(1,R.men)/600,0.85); }   // a bigger command is sent against bigger enemies
 function campaignOdds(cp){
-  const R=milRank(), P=armyPowerDetail();
-  // your rank grants a nominal command; the troops you actually raised add to it
-  const power = R.men*(1+(G.armyTrain||0)*0.10)*(1+(G.armyGear||0)*0.08) + P.atk*0.9 + P.def*0.5;
-  const enemy = 900*cp.diff*cp.diff + 1400;
+  const power=campaignPower(), enemy=campaignEnemy(cp);
   return clamp(power/(power+enemy) + (G.smarts||5)*0.012, 0.08, 0.94);
 }
+const CAMPAIGN_FOE={germ:'CHATTI WAR-BAND', dacia:'DACIAN HILLMEN', desert:'CAMEL RAIDERS', parth:'CATAPHRACTS', brit:'PAINTED TRIBES', revolt:'THE USURPER’S LEVIES'};
+/* your losses come off Rome's men first (Rome replaces them) and off yours in proportion to what you brought */
+function legionTakeLosses(lost){ const raised=armySize(), tot=Math.max(1,armyCommand()); let mine=Math.round(lost*raised/tot), left=mine;
+  ['auxilia','legionary','archers','cavalry','engineers'].forEach(id=>{ const n=unitCount(id); if(!n||left<=0) return; const take=Math.min(n,Math.round(mine*n/Math.max(1,raised))+0); G.units[id]=n-Math.min(take,left); left-=Math.min(take,left); });
+  G.soldiers=armySize(); try{ syncArmy(); }catch(e){} return mine; }
 function runCampaign(cp){
-  const odds=campaignOdds(cp), won=Math.random()<odds;
-  const R=milRank();
+  if(state==='battle') return;
+  const odds=campaignOdds(cp), won=Math.random()<odds, R=milRank(), men=Math.max(1,armyCommand());
+  const lost=Math.round(men*(won?rnd(0.05,0.15):rnd(0.2,0.4))), foe=Math.max(60,Math.round(campaignEnemy(cp)/1.45*rnd(0.9,1.1)));
+  const kind=cp.id==='brit'? 'ambush' : cp.id==='revolt'? 'siege' : 'field';
+  armyBattle({title:cp.name, sub:cp.where+' — '+R.name, enemyName:CAMPAIGN_FOE[cp.id]||'THE ENEMY', yourMen:men, enemyMen:foe, kind, night:kind==='ambush',
+    forceWin:won, yourLoss:lost, onWin:()=>campaignAfter(cp,true,lost), onLose:()=>campaignAfter(cp,false,lost)});
+}
+function campaignAfter(cp, won, lost){
   G.campaigns=(G.campaigns||0)+1; G.lastCampaignDay=G.day;
   G.supply=Math.max(0,(G.supply||0)-supplyState().need*ri(5,10));      // a campaign eats the stores
   G.coin=Math.max(0,G.coin-armyUpkeep());                              // and the men expect to be paid
-  const lost=Math.round(R.men*(won?rnd(0.05,0.15):rnd(0.2,0.4)));
+  legionTakeLosses(lost);
   if(won){
     const rep=10+cp.diff*9, coin=200+cp.diff*260;
     G.legionRep=(G.legionRep||0)+rep; G.coin+=coin; G.honor=clamp(G.honor+4,0,100); G.pop=clamp(G.pop+4,0,100);
@@ -57218,25 +57259,23 @@ function runCampaign(cp){
     toast('🦅 VICTORY on campaign — '+cp.name+' is broken. '+fmt(lost)+' of your men fall. (+'+rep+' standing, +'+coin+'d, +honor)',4400);
   } else {
     G.legionRep=Math.max(0,(G.legionRep||0)-8); G.honor=clamp(G.honor-3,0,100);
-    if(!G.injury) G.injury=makeWound(cp.diff>=3?3:2);
-    toast('🦅 THE CAMPAIGN FAILS. You are driven back with '+fmt(lost)+' dead and carried from the field wounded. (−8 standing)',4600);
+    const hurt=!G.injury && Math.random()<0.5; if(hurt) G.injury=makeWound(cp.diff>=3?3:2);                    // a commander is not ALWAYS carried off
+    toast('🦅 THE CAMPAIGN FAILS. You are driven back with '+fmt(lost)+' dead'+(hurt? ' and carried from the field wounded' : '')+'. (−8 standing)',4600);
   }
   advanceDay(2); checkMilRank(); refreshStatbar(); saveQuiet(); openLegion();
 }
 function runSiege(F,odds){
+  if(state==='battle') return;
+  const won=Math.random()<odds, men=Math.max(1,armyCommand()), lostV=Math.round(men*(won?rnd(0.06,0.16):rnd(0.18,0.34)));
+  armyBattle({title:'THE SIEGE OF '+F.name.replace(/^(A|AN) /,''), sub:milRank().name, enemyName:'GARRISON', yourMen:men, enemyMen:F.garrison, kind:'siege',
+    forceWin:won, yourLoss:lostV, onWin:()=>siegeAfter(F,true,lostV), onLose:()=>siegeAfter(F,false,lostV)});
+}
+function siegeAfter(F, won, lostV){
   addExhaustion(9,'the siege of '+(F&&F.name||'a fortress'));
-  const P=armyPowerDetail();
-  const won=Math.random()<odds;
   // a siege eats stores and men whatever happens
   const days=ri(4,9);
   G.supply=Math.max(0,(G.supply||0)-days*supplyState().need);
-  const losses=Math.round(P.size*(won?rnd(0.06,0.16):rnd(0.18,0.34)));
-  // losses fall hardest on whoever stood at the wall
-  let left=losses;
-  ['auxilia','legionary','archers','cavalry','engineers'].forEach(id=>{
-    const n=unitCount(id); const take=Math.min(n, Math.round(left*(id==='auxilia'?0.5:id==='legionary'?0.3:0.1)));
-    G.units[id]=n-take; left-=take; });
-  G.soldiers=armySize(); syncArmy();
+  const losses=lostV; G.units=G.units||{}; legionTakeLosses(losses);
   G.sieges=(G.sieges||0)+1;
   if(won){
     G.coin+=F.loot; G.legionRep=(G.legionRep||0)+F.rep; G.glory+=F.rep*2; G.honor=clamp(G.honor+3,0,100);
@@ -63929,7 +63968,7 @@ function advanceDay(n){
     for(const d of G.detachments){ d.day++;
       if(d.day>=d.eta && d.phase==='out'){
         if(d.purpose==='conquer'){
-          const gearMult=(1+G.armyGear*0.15)*(1+G.armyTrain*0.12);
+          const gearMult=(1+(G.armyGear||0)*0.15)*(1+(G.armyTrain||0)*0.12);
           const yourPower=Math.round(d.size*gearMult*(d.gen?d.gen.power:1));
           const reg=REGION_BY_ID[d.toId];
           const defense=Math.round((1500+reg.tier*2200)*rnd(0.85,1.15));
@@ -72672,7 +72711,7 @@ drawLogo();
 })();
 
 try{ iceMythInit(); iceClothInit(); iceTtsInit(); iceWrap(); }catch(e){ console.error('iceMythInit',e); }
-window.__SS = { bgFn:(n)=>({bgPalace,bgWar,bgCoast,bgWoa,bgOpelia,bgIsle,bgReiko,bgForge})[n], setPairSS:(v)=>{ PAIR_SS=v; }, ICE_T:{ get AC(){return AC;}, set AC(v){AC=v;}, iceSlap, iceSkin, iceUlk, iceGulp, iceVoc, iceCrowd, ICE_V, sfx }, ICE_TTS, STRIKES, getDM:()=>DM, drawBridePortrait:(...a)=>drawBridePortrait(...a), rhFig, RH_CAST, openBotWatch, botEnterBeat, getBW:()=>BW, iceGoddessOpen, paintGoddess, startBedScene, regionAny, iceDebug:()=>({here:iceHere(), prey:ICE_PREY_BY_REGION}),
+window.__SS = { campaignOdds:(cp)=>campaignOdds(cp), updateBattle:(dt)=>updateBattle(dt), drawBattle:()=>drawBattle(), get BT(){ return BT; }, romStyles:()=>ROM_STYLES, startRomanticStyled:(a,b)=>startRomanticStyled(a,b), bgFn:(n)=>({bgPalace,bgWar,bgCoast,bgWoa,bgOpelia,bgIsle,bgReiko,bgForge})[n], setPairSS:(v)=>{ PAIR_SS=v; }, ICE_T:{ get AC(){return AC;}, set AC(v){AC=v;}, iceSlap, iceSkin, iceUlk, iceGulp, iceVoc, iceCrowd, ICE_V, sfx }, ICE_TTS, STRIKES, getDM:()=>DM, drawBridePortrait:(...a)=>drawBridePortrait(...a), rhFig, RH_CAST, openBotWatch, botEnterBeat, getBW:()=>BW, iceGoddessOpen, paintGoddess, startBedScene, regionAny, iceDebug:()=>({here:iceHere(), prey:ICE_PREY_BY_REGION}),
   openBookViewer:()=>openBookViewer(), openSettings:()=>openSettings(), 
   rhAmbTick:(b)=>rhAmbTick(b), rhAmbHit:(k,n)=>rhAmbHit(k,n), rhAmbStop:()=>rhAmbStop(), rhSting:(b)=>rhSting(b), setMuted:(v)=>{muted=v;}, ambKind:()=>RH_AMB&&RH_AMB.kind, acState:()=>AC&&AC.state,
   WPN_ART, WPN_RANGED, drawRangedIcon, BOWS, wpnStamp, wpnIcon, drawHeldBow, drawHeldPilum, drawHeldBomb, get WPN_DRAWS(){ return WPN_DRAWS; }, setOUTL:(v)=>{ OUTL=!!v; }, drawWeapon2Old,
