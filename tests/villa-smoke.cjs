@@ -296,8 +296,8 @@ const ok=(name,cond,detail)=>{
     X.ph='bend'; X.slaps=0; out.bend=grab();
     return out;
   });
-  ok('the call offers going or not', bar.call.length===2, bar.call.join(' / '));
-  ok('the hold names all four',      bar.hold.length===4, bar.hold.join(' / '));
+  ok('the call offers going or not (and the live version\u2019s extra ways in)', bar.call.length>=2 && bar.call.some(t=>/GO TO HER/.test(t)) && bar.call.some(t=>/NOT NOW/.test(t)), bar.call.join(' / '));
+  ok('the hold names its moves (four or more)', bar.hold.length>=4, bar.hold.join(' / '));
   ok('the contest names its two',    bar.grab.length===2, bar.grab.join(' / '));
   ok('and the bend counts them down',bar.bend.length===1, bar.bend.join(' / '));
 

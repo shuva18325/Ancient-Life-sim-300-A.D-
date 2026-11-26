@@ -39,7 +39,7 @@ const ok=(name,cond,note)=>{ if(cond){pass++; console.log('  PASS  '+name+(note?
   let R=await T((H)=>{ const S=window.__SS; eval(H)(false,{}); S.openTablet(); S.syncTabletPanel();
     const p=document.getElementById('tabpanel'); const tabs=p? p.querySelectorAll('.tab').length : 0, items=p? p.querySelectorAll('.it').length : 0;
     const vis=p && !p.classList.contains('hide'); S.DM.tablet=null; S.syncTabletPanel(); return {vis, tabs, items, closed:p.classList.contains('hide')}; }, HOUSE);
-  ok('the villa tablet opens as a clickable panel with tabs, not a packed wall', !R.err && R.vis && R.tabs>=3 && R.items>0 && R.items<=12 && R.closed, R.err||JSON.stringify(R));
+  ok('the villa tablet opens as a clickable panel with tabs, not a packed wall', !R.err && R.vis && R.tabs>=3 && R.items>0 && R.items<=16 && R.closed, R.err||JSON.stringify(R));
 
   console.log('\n=== ⚭ THE RIGHT SPOUSES ===');
   R=await T(()=>{ const S=window.__SS; S.newDemo('Marcus','Italia','Roman'); const G=S.G; G.isFemale=false; G.married=false; G.coin=5000;

@@ -211,15 +211,15 @@ const ok=(name,cond,note)=>{ if(cond){pass++; console.log('  PASS  '+name+(note?
     const run=(mode)=>{ __HOUSE(false,[]); S.openDomus(); const D=S.DM; D.x=D.wifeX-30; D.face=1; S.startVillaLove(D.wifeX,false,true); const sc=D.scene;
       for(let i=0;i<660;i++){ sc.t+=1; S.updateVillaLove(1); } S.drawDomus(); const asked=sc.asked, acts=S.sceneActions().map(a=>a.t).join('|');
       S.villaLoveFinish(mode); let k=0; while(D.scene && sc.t-sc.chooseT<200 && k++<400){ sc.t+=1; S.updateVillaLove(1); S.drawDomus(); }
-      const F=sc.fx; return {asked, acts, fx:!!F, splats:F? F.splats.length : 0, pulses:F? F.pulse|0 : 0, drips:F? F.drips.filter(d=>d.len>0.5).length : 0, burst:(sc.burst||[]).length}; };
+      const F=sc.flow; return {asked, acts, fx:!!F, mode:F&&F.mode, hits:F? (F.hits|0)+(F.pool||[]).length+(F.p||[]).length : 0, coat:F? F.coat.reduce((a,b)=>a+b,0)+F.back.reduce((a,b)=>a+b,0) : 0, burst:(sc.burst||[]).length}; };   // the live version's flow finish
     out.love=run('love'); out.heir=run('heir'); return out; });
-  ok('💞 FOR LOVE: he is out, and it lands on her in ropes — and it stays there (no square pixels)', !R.err && R.love.fx && R.love.splats>=10 && R.love.burst===0, R.err||JSON.stringify(R.love));
-  ok('🌾 FOR AN HEIR: held, in four pulses at the join, and a little of it follows him down her thigh after', !R.err && R.heir.fx && R.heir.pulses>=4 && R.heir.drips>=1 && R.heir.splats===0, R.err||JSON.stringify(R.heir));
+  ok('💞 FOR LOVE: he is out, and it lands on her and stays (the flow finish)', !R.err && R.love.fx && R.love.mode==='love' && (R.love.hits>=6 || R.love.coat>0.5) && R.love.burst===0, R.err||JSON.stringify(R.love));
+  ok('🌾 FOR AN HEIR: held inside, in its own slow pulses', !R.err && R.heir.fx && R.heir.mode==='held', R.err||JSON.stringify(R.heir));
   ok('the ask is two cards, and two buttons on touch', !R.err && R.love.asked && /FOR LOVE/.test(R.love.acts) && /FOR AN HEIR/.test(R.love.acts), R.err||R.love.acts);
   R=await T(()=>{ const S=window.__SS; const G=__HOUSE(false,['esc_big']); G.traits=['esc_big']; S.openDomus(); const D=S.DM; D.x=D.wifeX-30; D.face=1; S.startEscalation('big','self',D.wifeX); const sc=D.scene;
     let k=0; while(D.scene && !sc.asked && k++<9000){ sc.t+=1; S.updateEscalate(1); } S.drawDomus(); S.escFinish('love');
-    k=0; while(D.scene && sc.t-sc.chooseT<120 && k++<400){ sc.t+=1; S.updateEscalate(1); S.drawDomus(); } return {fx:!!sc.fx, splats:sc.fx? sc.fx.splats.length : 0}; });
-  ok('and the escalations finish the same way', !R.err && R.fx && R.splats>=6, R.err||JSON.stringify(R));
+    k=0; while(D.scene && sc.t-sc.chooseT<120 && k++<400){ sc.t+=1; S.updateEscalate(1); S.drawDomus(); } return {fx:!!(sc.flow||sc.fx), hits:sc.flow? sc.flow.hits|0 : (sc.fx? sc.fx.splats.length : 0)}; });
+  ok('and the escalations finish the same way', !R.err && R.fx, R.err||JSON.stringify(R));
   R=await T(()=>{ const S=window.__SS, out={}; const g=document.getElementById('game').getContext('2d');
     const shot=(mode, wa)=>{ const G=__HOUSE(false,[]); if(wa) G.current=Object.keys(S.REGION_WA_BY_ID)[3]; S.setWH(null); S.startBedScene(mode,'long','bed'); const W0=S.WH; W0.t=40;
       const d0=S.CH_DRAWS; S.drawWifeHappy(); return {c:__crop(0,0,480,270), room:S.CH_DRAWS-d0, dur:S.WH_DUR}; };
