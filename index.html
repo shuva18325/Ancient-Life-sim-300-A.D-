@@ -18812,7 +18812,7 @@ function chAI(f, opp, dt){
   c.whip= c.want===c.dir && adx>46;
   const reach=weaponReach(f);
   if(!f.atk && ai.think<=0 && adx<reach+22){ ai.think=ri(6,16)*(1.25-(ai.aggr||0.6)*0.5);
-    f.stance= (opp.mounted && Math.random()<0.42)? 'low' : pick(['high','mid','mid']);
+    f.stance= (opp.mounted && Math.random()<0.58)? 'low' : pick(['high','mid','mid']);          // a driver goes for your wheel more often than not
     doAttack(f, Math.random()<0.45? 'thrust' : 'slash'); }
   // and when he has you on foot, or he is hurt, he gets down to finish it — as they did
   c.footT= opp.mounted? 0 : (c.footT||0)+dt;                                     // and he will not ride circles round a man on foot for long
@@ -39627,6 +39627,7 @@ function flowStick(sc, f, p){
 }
 function flowUpdate(sc, dt){
   const f=sc.flow; if(!f) return; f.t+=dt; const D=(typeof DM!=='undefined')? DM : null;
+  if(f.mode!=='held' && sc.tipX!==undefined && sc.tipY!==undefined){ f.sx=sc.tipX; f.sy=sc.tipY; }
   if(f.mode==='lak'){ f.amp=f.glow; f.glow=Math.max(0,f.glow-0.025*dt); }
   else if(f.mode==='held'){
     const k=f.t/f.len; f.amp=(f.t<f.len)? 0.5+0.5*Math.sin(f.t*0.075-1.2) : 0;
@@ -39636,19 +39637,26 @@ function flowUpdate(sc, dt){
   } else if(f.t<f.len){
     const k=f.t/f.len, beat=Math.pow(Math.max(0,Math.sin(f.t*0.40)),1.4), amp=(1-k*0.70)*(0.18+0.82*beat)*(f.t<20? 1.0 : 0.85);
     f.amp=amp; let n=amp*2.6*dt; n=Math.floor(n)+(Math.random()<(n%1)?1:0);
-    for(let i=0;i<n && f.p.length<90;i++){
+    const sx=(f.sx!==undefined? f.sx : f.jx), sy=(f.sy!==undefined? f.sy : f.jy);
+    /* a ROPE is one pulse: it picks one place on her and every drop of that pulse flies the same arc to it (a little
+       spread), so the drops, joined in the order they left him, draw a continuous rope that lays itself down on her */
+    if(beat>0.45 && !f.inPulse){ f.inPulse=true; f.pid=(f.pid|0)+1; f.curT=flowPick(sc,f); f.curTf=(f.mode==='across'? 11 : 13)+Math.random()*8; }
+    if(beat<0.15) f.inPulse=false;
+    for(let i=0;i<n && f.p.length<120;i++){
       const lo=(f.mode==='across');
-      if(lo){ f.p.push({x:f.jx, y:f.jy, vx:0, vy:0, g:0.07, life:90, tr:[], r:amp>0.55? 2 : 1, tgt:flowPick(sc,f), tf0:11+Math.random()*10}); continue; }
-      const sp=f.dir*((0.9)+amp*(1.5)+Math.random()*0.35);
-      f.p.push({x:f.jx+rnd(-0.5,0.5), y:f.jy+rnd(-0.5,0.5), vx:sp, vy:-((0.15)+amp*(1.0)+Math.random()*0.25), life:90, tr:[], r:amp>0.55? 2 : 1}); }
+      if(f.curT && (lo || Math.random()<0.9)){ const t0=f.curT, tg=Object.assign({},t0);
+        if(tg.kind==='seat') tg.a=t0.a+(Math.random()-0.5)*0.22+(f.t%20)*0.004; else if(tg.kind==='back') tg.u=clamp(t0.u+(Math.random()-0.5)*0.10+((f.t%20)-10)*0.006,0.1,1); else if(tg.kind==='thigh') tg.u=clamp(t0.u+(Math.random()-0.5)*0.12,0,1); else if(tg.kind==='hair'){ tg.dx=t0.dx+(Math.random()-0.5)*2; tg.dy=t0.dy+(Math.random()-0.5)*2; }
+        f.p.push({x:sx, y:sy, vx:0, vy:0, g:0.07, life:90, tr:[], r:amp>0.55? 2 : 1, tgt:tg, tf0:f.curTf*(0.95+Math.random()*0.1), pid:f.pid, bt:f.t}); continue; }
+      const sp=f.dir*(0.04+Math.random()*0.22);                                 // a few just drop, between the two of them
+      f.p.push({x:sx+rnd(-0.4,0.4), y:sy+rnd(-0.4,0.4), vx:sp, vy:-(0.05+Math.random()*0.2), life:90, tr:[], r:1, pid:-1}); }
     if(f.mode==='both' && D && D.hearts && beat>0.97 && Math.random()<0.6) D.hearts.push({x:f.jx+rnd(-14,14), y:f.jy-10, vy:0.55, life:50});
   } else f.amp=0;
   for(const p of f.p){
     if(p.wait>0){ p.wait-=dt; continue; }
     if(p.tgt && !p.l){ const G2=flowHerGeo(sc), T2=flowTargetPos(G2,p.tgt), g=p.g||0.07, tf=Math.max(8,p.tf0||14);
-      p.x=f.jx; p.y=f.jy; p.tf=tf; p.vx=(T2[0]-p.x)/tf; p.vy=(T2[1]-p.y-0.5*g*tf*tf)/tf; p.l=1; p.age=0; }
+      p.x=(f.sx!==undefined? f.sx : f.jx); p.y=(f.sy!==undefined? f.sy : f.jy); p.tf=tf; p.vx=(T2[0]-p.x)/tf; p.vy=(T2[1]-p.y-0.5*g*tf*tf)/tf; p.l=1; p.age=0; }
     if(p.tgt){ p.age+=dt; if(p.age>=p.tf){ flowStick(sc,f,p); p.dead=true; continue; } }
-    if(!p.drip){ p.tr.unshift([p.x,p.y]); if(p.tr.length>6) p.tr.pop(); }
+    if(!p.drip){ p.tr.unshift([p.x,p.y]); if(p.tr.length>8) p.tr.pop(); }
     p.x+=p.vx*dt; p.y+=p.vy*dt; p.vy+=(p.g||0.075)*dt; if(p.drip) p.vy=Math.min(p.vy,0.5); else p.vx*=Math.pow(0.992,dt); p.life-=dt;
     if(false && f.mode==='across' && !p.drip && p.vy>0 && p.dead!==true){ const rx=(p.x-f.jx)*f.dir;
       if(rx>3 && rx<24 && p.y>=f.jy-7 && p.y<f.jy+9 && f.stick.length<120){ f.stick.push({x:Math.round(p.x), y:p.y, l:1, a:0.95, v:0.018+Math.random()*0.03, w:Math.random()<0.4?2:1}); p.dead=true; continue; } }
@@ -39665,57 +39673,97 @@ function flowUpdate(sc, dt){
 function _flLine(x0,y0,x1,y1,c,s){
   const n=Math.max(1,Math.ceil(Math.max(Math.abs(x1-x0),Math.abs(y1-y0))));
   ctx.fillStyle=c; for(let i=0;i<=n;i++){ const x=x0+(x1-x0)*i/n, y=y0+(y1-y0)*i/n; ctx.fillRect(Math.round(x),Math.round(y),s,s); } }
+/* 💦 THE FINISH, PAINTED. It was square pixels: a white outline ring traced round her seat, flat
+   rectangles for streaks, one-pixel dashes in the air and a row of white bricks on the floor. Now every
+   rope in the air is a smooth tapering stroke with a wet shine along it and a rounded head; what lands
+   on her is a glossy splat that sits ON her (inside her outline, with satellites and a highlight, the
+   biggest where the most landed), the coats on her back and thigh are soft glazed strokes, every run
+   is a tapered trickle with a bead at the end, and the floor gets a shining puddle. Pearl-white with a
+   warm edge, translucent where it is thin. */
+const FL_COL={body:'#f3eee3', edge:'rgba(196,182,160,.55)', shine:'#ffffff', warm:'rgba(255,236,214,.5)'};
+function flSplat(c,x,y,s,ang,seed,a){ if(a<=0.01) return; const R=(k)=>{ const v=Math.sin(seed*12.9898+k*78.233)*43758.5453; return v-Math.floor(v); };
+  c.globalAlpha=a*0.55; c.fillStyle=FL_COL.edge; c.beginPath(); c.ellipse(x+0.25,y+0.35,s*1.3,s*0.85,ang,0,7); c.fill();          // its thickness: a soft darker edge under it
+  c.globalAlpha=a*0.94; c.fillStyle=FL_COL.body; c.beginPath(); c.ellipse(x,y,s*1.25,s*0.8,ang,0,7); c.fill();
+  for(let k=0;k<3;k++){ const d=(0.9+R(k)*0.9)*s, an=ang+(R(k+3)-0.5)*2.6+(k===2? Math.PI : 0), r=s*(0.25+R(k+6)*0.35); c.beginPath(); c.ellipse(x+Math.cos(an)*d,y+Math.sin(an)*d,r*1.2,r,an,0,7); c.fill(); }
+  c.globalAlpha=a*0.9; c.fillStyle=FL_COL.shine; c.beginPath(); c.ellipse(x-s*0.35,y-s*0.28,Math.max(0.35,s*0.42),Math.max(0.25,s*0.24),ang,0,7); c.fill(); }
+function flTrickle(c,x,y,len,w,a){ if(a<=0.01 || len<0.4) return; const L=len;
+  c.globalAlpha=a*0.9; c.fillStyle=FL_COL.body; c.beginPath(); c.moveTo(x-w*0.55,y); c.quadraticCurveTo(x-w*0.4,y+L*0.55,x-w*0.22,y+L); c.lineTo(x+w*0.22,y+L); c.quadraticCurveTo(x+w*0.35,y+L*0.55,x+w*0.55,y); c.closePath(); c.fill();
+  const br=Math.max(0.55,w*0.62); c.beginPath(); c.arc(x,y+L+br*0.6,br,0,7); c.fill();                                            // the bead gathering at the end
+  c.globalAlpha=a*0.75; c.fillStyle=FL_COL.shine; c.fillRect(x-w*0.3,y+0.3,Math.max(0.3,w*0.22),L*0.7); c.beginPath(); c.arc(x-br*0.3,y+L+br*0.35,br*0.32,0,7); c.fill(); }
 function flowDrawCoat(sc, f){
   if(!f.hits) return;
-  const G2=flowHerGeo(sc), N=f.coat.length, TAU=Math.PI*2; let cov=0; for(const c of f.coat) cov+=c; cov/=N;
-  ctx.save(); ctx.lineCap='butt';
-  if(cov>0.01){ ctx.globalAlpha=clamp(cov*0.35,0,0.2); ctx.fillStyle='#f3ecdc'; ctx.beginPath(); ctx.ellipse(G2.seat[0],G2.seat[1],G2.rs+0.3,G2.rs*0.95,0,0,TAU); ctx.fill(); }
-  for(let i=0;i<N;i++){ const c=f.coat[i]; if(c<0.02) continue; const a0=i/N*TAU, a1=(i+1)/N*TAU+0.02;
-    ctx.globalAlpha=clamp(c*0.8,0,0.8); ctx.strokeStyle='#efe8d8'; ctx.lineWidth=1.7; ctx.beginPath(); ctx.ellipse(G2.seat[0],G2.seat[1],G2.rs+0.5,G2.rs*0.95+0.5,0,a0,a1); ctx.stroke();
-    ctx.globalAlpha=clamp(c*0.8,0,0.9); ctx.strokeStyle='#ffffff'; ctx.lineWidth=0.9; ctx.beginPath(); ctx.ellipse(G2.seat[0],G2.seat[1],G2.rs-0.6,G2.rs*0.95-0.6,0,a0+0.05,a1-0.05); ctx.stroke(); }
-  const M=f.back.length;
-  for(let k=0;k<M;k++){ const c=f.back[k]; if(c<0.02) continue; const u=(k+0.5)/M, x=G2.seat[0]+(G2.waist[0]-G2.seat[0])*u+G2.nx*2.4, y=G2.seat[1]+(G2.waist[1]-G2.seat[1])*u+G2.ny*2.4, w=2+c*5;
-    ctx.globalAlpha=clamp(c*1.0,0,0.92); px(Math.round(x-w/2),Math.round(y-1),Math.round(w),2,'#efe8d8'); ctx.globalAlpha=clamp(c*0.8,0,0.9); px(Math.round(x-w/2+1),Math.round(y-1),Math.max(1,Math.round(w-3)),1,'#ffffff'); }
-  ctx.restore(); ctx.save();
-  { const M=f.thigh.length; for(let k=0;k<M;k++){ const c=f.thigh[k]; if(c<0.02) continue; const u=(k+0.5)/M, x=G2.seat[0]+G2.dir*3, y=G2.seat[1]+G2.rs*0.55+u*18, w=2+c*3;
-      ctx.globalAlpha=clamp(c*0.95,0,0.9); px(Math.round(x-w/2),Math.round(y-1),Math.round(w),3,'#efe8d8'); ctx.globalAlpha=clamp(c*0.75,0,0.85); px(Math.round(x-w/2),Math.round(y-1),1,3,'#ffffff'); } }
-  if(f.hairC>0.02){ ctx.globalAlpha=clamp(f.hairC*0.6,0,0.6); ctx.fillStyle='#efe8d8'; ctx.beginPath(); ctx.ellipse(G2.head[0],G2.head[1]-1,4.4,3.6,0,0,Math.PI*2); ctx.fill(); }
-  for(const b of f.blobs){ let x,y; if(b.k==='t'){ x=G2.seat[0]+G2.dir*(3+b.off); y=G2.seat[1]+G2.rs*0.55+b.u*18; }
-    else if(b.k==='h'){ x=G2.head[0]+b.dx; y=G2.head[1]+b.dy; }
-    else if(b.k==='s'){ x=G2.seat[0]+Math.cos(b.a)*(G2.rs+0.4+b.r); y=G2.seat[1]+Math.sin(b.a)*(G2.rs*0.95+0.4+b.r); }
-    else { x=G2.seat[0]+(G2.waist[0]-G2.seat[0])*b.u+G2.nx*(2.2+b.off); y=G2.seat[1]+(G2.waist[1]-G2.seat[1])*b.u+G2.ny*(2.2+b.off); }
-    ctx.globalAlpha=0.95; px(Math.round(x)-(b.sz>1?1:0),Math.round(y)-(b.sz>1?1:0),b.sz+(b.sz>1?1:0),b.sz,'#f8f3e8'); px(Math.round(x)-(b.sz>1?1:0),Math.round(y)-(b.sz>1?1:0),1,1,'#ffffff'); }
-  for(const d of f.drips){ let x,y; if(d.k==='t'){ x=G2.seat[0]+G2.dir*(3+d.off); y=G2.seat[1]+G2.rs*0.55+d.u*18; }
+  const c=ctx, G2=flowHerGeo(sc), N=f.coat.length, TAU=Math.PI*2, S=G2.seat, rs=G2.rs;
+  c.save(); c.lineCap='round'; c.lineJoin='round';
+  // the glaze on her seat: where the most landed, a wet sheen spread over the curve (inside her, not a ring round her)
+  for(let i=0;i<N;i++){ const k=f.coat[i]; if(k<0.04) continue; const a=(i+0.5)/N*TAU, rr=rs*(0.86-0.10*k);
+    const x=S[0]+Math.cos(a)*rr, y=S[1]+Math.sin(a)*rr*0.95, g=c.createRadialGradient(x,y,0,x,y,1.8+k*3.4);
+    g.addColorStop(0,'rgba(248,244,236,'+(0.55*k).toFixed(3)+')'); g.addColorStop(1,'rgba(248,244,236,0)'); c.globalAlpha=1; c.fillStyle=g; c.fillRect(x-6,y-6,12,12); }
+  // the coat along her back: one soft glazed stroke, as thick as the coat is deep
+  { const M=f.back.length; for(let k=0;k<M;k++){ const v=f.back[k]; if(v<0.03) continue; const u0=k/M, u1=(k+1)/M, P=(u)=>[S[0]+(G2.waist[0]-S[0])*u+G2.nx*2.0, S[1]+(G2.waist[1]-S[1])*u+G2.ny*2.0];
+      const A=P(u0), B=P(u1); c.globalAlpha=clamp(v*0.9,0,0.88); c.strokeStyle=FL_COL.body; c.lineWidth=0.9+v*1.9; c.beginPath(); c.moveTo(A[0],A[1]); c.lineTo(B[0],B[1]); c.stroke();
+      c.globalAlpha=clamp(v*0.8,0,0.8); c.strokeStyle=FL_COL.shine; c.lineWidth=0.4; c.beginPath(); c.moveTo(A[0]-G2.nx*0.3,A[1]-0.5); c.lineTo(B[0]-G2.nx*0.3,B[1]-0.5); c.stroke(); } }
+  // down the back of her thigh
+  { const M=f.thigh.length; for(let k=0;k<M;k++){ const v=f.thigh[k]; if(v<0.03) continue; const x=S[0]+G2.dir*3, y0=S[1]+rs*0.55+k/M*18, y1=S[1]+rs*0.55+(k+1)/M*18;
+      c.globalAlpha=clamp(v*0.9,0,0.88); c.strokeStyle=FL_COL.body; c.lineWidth=0.9+v*1.6; c.beginPath(); c.moveTo(x,y0); c.lineTo(x+0.2,y1); c.stroke(); c.globalAlpha=clamp(v*0.7,0,0.7); c.strokeStyle=FL_COL.shine; c.lineWidth=0.35; c.beginPath(); c.moveTo(x-0.4,y0); c.lineTo(x-0.3,y1); c.stroke(); } }
+  if(f.hairC>0.02){ const g=c.createRadialGradient(G2.head[0],G2.head[1]-1,0,G2.head[0],G2.head[1]-1,5); g.addColorStop(0,'rgba(248,244,236,'+(0.5*f.hairC).toFixed(3)+')'); g.addColorStop(1,'rgba(248,244,236,0)'); c.globalAlpha=1; c.fillStyle=g; c.fillRect(G2.head[0]-6,G2.head[1]-7,12,12); }
+  // every splat where it landed
+  f.blobs.forEach((b,i)=>{ let x,y,ang=0;
+    if(b.k==='t'){ x=S[0]+G2.dir*(3+b.off); y=S[1]+rs*0.55+b.u*18; ang=Math.PI/2; }
+    else if(b.k==='h'){ x=G2.head[0]+b.dx; y=G2.head[1]+b.dy; ang=0.3; }
+    else if(b.k==='s'){ const rr=rs-0.7-Math.abs(b.r)*1.3-(b.sz>1? 0.5 : 0); x=S[0]+Math.cos(b.a)*rr; y=S[1]+Math.sin(b.a)*rr*0.95; ang=b.a+Math.PI/2; }
+    else { x=S[0]+(G2.waist[0]-S[0])*b.u+G2.nx*(1.8+b.off*0.6); y=S[1]+(G2.waist[1]-S[1])*b.u+G2.ny*(1.8+b.off*0.6); ang=G2.phiW; }
+    flSplat(c,x,y,b.sz>1? 1.05 : 0.7,ang,i+1,0.95); });
+  // and every run, a trickle with its bead
+  for(const d of f.drips){ let x,y;
+    if(d.k==='t'){ x=S[0]+G2.dir*(3+d.off); y=S[1]+rs*0.55+d.u*18; }
     else if(d.k==='h'){ x=G2.head[0]+d.dx; y=G2.head[1]+d.dy; }
-    else if(d.k==='s'){ x=G2.seat[0]+Math.cos(d.a)*(G2.rs+0.4); y=G2.seat[1]+Math.sin(d.a)*(G2.rs*0.95+0.4); }
-    else { x=G2.seat[0]+(G2.waist[0]-G2.seat[0])*d.u+G2.nx*(2.2+d.off); y=G2.seat[1]+(G2.waist[1]-G2.seat[1])*d.u+G2.ny*(2.2+d.off); }
-    ctx.globalAlpha=0.9; px(Math.round(x),Math.round(y),1,Math.max(1,Math.round(d.len)),'#efe8d8'); px(Math.round(x),Math.round(y+d.len),2,1,'#fbf7ee'); }
-  ctx.restore();
+    else if(d.k==='s'){ x=S[0]+Math.cos(d.a)*(rs-0.8); y=S[1]+Math.sin(d.a)*(rs*0.95-0.8); }
+    else { x=S[0]+(G2.waist[0]-S[0])*d.u+G2.nx*(1.8+d.off*0.6); y=S[1]+(G2.waist[1]-S[1])*d.u+G2.ny*(1.8+d.off*0.6); }
+    flTrickle(c,x,y,d.len,0.95,0.92); }
+  c.restore(); c.globalAlpha=1;
 }
 function flowDraw(sc, T){
-  const f=sc.flow; if(!f) return;
-  // the floor first: a pooling, flat and slowly spreading
-  for(const q of f.pool){ ctx.globalAlpha=clamp(q.a,0,1)*0.9; px(Math.round(q.x-q.w/2),211,Math.round(q.w),2,'#e9e1d2'); px(Math.round(q.x-q.w/2+1),211,Math.max(1,Math.round(q.w-3)),1,'#fbf7ee'); }
-  // what landed on her, and is running
-  for(const s of f.stick){ ctx.globalAlpha=clamp(s.a,0,1); px(s.x,Math.round(s.y),s.w,Math.max(1,Math.round(s.l)),'#efe8da'); px(s.x,Math.round(s.y+s.l),s.w+1,1,'#fbf7ee'); }
-  // the stream: every drop drags its own short trail, so it reads as a rope in the air
+  const f=sc.flow; if(!f) return; const c=ctx;
+  c.save(); c.lineCap='round'; c.lineJoin='round';
+  // the floor: a shining puddle, spreading
+  for(const q of f.pool){ const a=clamp(q.a,0,1); if(a<0.02) continue; const rx=Math.max(1,q.w*0.6);
+    c.globalAlpha=a*0.5; c.fillStyle=FL_COL.edge; c.beginPath(); c.ellipse(q.x,212.9,rx+0.5,1.4,0,0,7); c.fill();
+    c.globalAlpha=a*0.9; c.fillStyle=FL_COL.body; c.beginPath(); c.ellipse(q.x,212.5,rx,1.1,0,0,7); c.fill();
+    c.globalAlpha=a*0.85; c.fillStyle=FL_COL.shine; c.beginPath(); c.ellipse(q.x-rx*0.3,212.1,rx*0.35,0.35,0,0,7); c.fill(); }
+  // what landed on him/the wall and is running
+  for(const s of f.stick) flTrickle(c,s.x,s.y,s.l,s.w>1? 1.3 : 0.9,clamp(s.a,0,1));
+  // the ropes in the air: the drops of one pulse joined in the order they left him — one continuous, glossy rope
+  { const L=f.p.filter(p=>!p.drip && !(p.wait>0) && p.pid>0); const src=[(f.sx!==undefined? f.sx : f.jx),(f.sy!==undefined? f.sy : f.jy)];
+    const seg=(A,B,w,a)=>{ c.globalAlpha=a; c.strokeStyle=FL_COL.body; c.lineWidth=w; c.beginPath(); c.moveTo(A[0],A[1]); c.lineTo(B[0],B[1]); c.stroke(); };
+    for(let i=1;i<L.length;i++){ const A=L[i-1], B=L[i]; if(A.pid!==B.pid || Math.abs(A.bt-B.bt)>3.5) continue; const d=Math.hypot(A.x-B.x,A.y-B.y); if(d>12) continue;
+      const a=clamp(Math.min(A.life,B.life)/30,0,1)*0.95, w=(A.r>1&&B.r>1? 1.55 : 1.1);
+      seg([A.x+0.25,A.y+0.35],[B.x+0.25,B.y+0.35],w+0.4,a*0.35);                                 // its underside
+      seg([A.x,A.y],[B.x,B.y],w,a); c.globalAlpha=a*0.7; c.strokeStyle=FL_COL.shine; c.lineWidth=0.38; c.beginPath(); c.moveTo(A.x-0.3,A.y-0.4); c.lineTo(B.x-0.3,B.y-0.4); c.stroke(); }
+    // the live rope is still joined to him while the pulse lasts
+    if(f.inPulse && f.t<f.len){ const last=L.filter(p=>p.pid===f.pid).pop(); if(last && Math.hypot(last.x-src[0],last.y-src[1])<10){ seg(src,[last.x,last.y],1.5,0.9); } } }
   for(const p of f.p){
+    if(p.pid>0 && !p.drip){ const a=clamp(p.life/30,0,1), r=p.r>1? 0.9 : 0.68; c.globalAlpha=a; c.fillStyle=FL_COL.body; c.beginPath(); c.arc(p.x,p.y,0.8*r+0.25,0,7); c.fill(); continue; }
     if(p.wait>0) continue;
-    const a=clamp(p.life/30,0,1);
-    if(p.drip){ ctx.globalAlpha=a; px(Math.round(p.x),Math.round(p.y),1,2,'#f2ece0'); px(Math.round(p.x),Math.round(p.y),1,1,'#ffffff'); continue; }
-    for(let i=0;i<p.tr.length;i++){ const A=(i===0? [p.x,p.y] : p.tr[i-1]), B=p.tr[i];
-      ctx.globalAlpha=a*(1-i/p.tr.length)*0.95; _flLine(A[0],A[1],B[0],B[1],'#efe8da',p.r>1? 2 : 1); }
-    ctx.globalAlpha=a; px(Math.round(p.x),Math.round(p.y),p.r,p.r,'#fbf7ee'); }
+    const a=clamp(p.life/30,0,1), r=p.r>1? 1 : 0.72;
+    if(p.drip){ c.globalAlpha=a; c.fillStyle=FL_COL.body; c.beginPath(); c.ellipse(p.x,p.y,0.6,1.0,0,0,7); c.fill(); c.fillStyle=FL_COL.shine; c.fillRect(p.x-0.3,p.y-0.6,0.35,0.6); continue; }
+    const pts=[[p.x,p.y]].concat(p.tr.slice(0,3));
+    if(pts.length>1){ for(let i=0;i<pts.length-1;i++){ const A=pts[i], B=pts[i+1], t=i/(pts.length-1);
+        c.globalAlpha=a*(1-t*0.75)*0.95; c.strokeStyle=FL_COL.body; c.lineWidth=(1.7*r)*(1-t*0.6); c.beginPath(); c.moveTo(A[0],A[1]); c.lineTo(B[0],B[1]); c.stroke(); }
+      c.globalAlpha=a*0.7; c.strokeStyle=FL_COL.shine; c.lineWidth=0.4*r; c.beginPath(); c.moveTo(pts[0][0]-0.3,pts[0][1]-0.4); for(let i=1;i<Math.min(pts.length,5);i++) c.lineTo(pts[i][0]-0.3,pts[i][1]-0.4); c.stroke(); }
+    const ang=Math.atan2(p.vy||0,p.vx||1); c.globalAlpha=a; c.fillStyle=FL_COL.body; c.beginPath(); c.ellipse(p.x,p.y,1.2*r,0.85*r,ang,0,7); c.fill();
+    c.fillStyle=FL_COL.shine; c.beginPath(); c.arc(p.x-0.3*r,p.y-0.3*r,0.35*r,0,7); c.fill(); }
+  c.restore();
   flowDrawCoat(sc, f);
-  // gold rings and sparks: the held one
-  for(const r of f.rings){ ctx.globalAlpha=clamp(r.a,0,1)*0.8; const n=Math.max(12,Math.round(r.r*3.2));
-    for(let i=0;i<n;i++){ const an=i/n*Math.PI*2; px(Math.round(f.jx+Math.cos(an)*r.r), Math.round(f.jy+Math.sin(an)*r.r*0.72), 1, 1, i%3? '#ffd9a0' : '#fff2cc'); } }
-  for(const m of f.motes){ ctx.globalAlpha=clamp(m.life/40,0,1)*0.9; px(Math.round(m.x),Math.round(m.y),1,1,'#ffe3a0'); if(((m.life|0)%14)<4) px(Math.round(m.x)-1,Math.round(m.y),3,1,'rgba(255,230,160,.5)'); }
-  ctx.globalAlpha=1;
-  // a warm glow at the source that beats with it — and nothing else lights the room
-  if(f.t<f.len+30 || f.mode==='lak'){ const g=Math.max(0.0,(f.amp||0)); if(g>0.02){ const r=(f.mode==='held'? 14 : 9)+g*10; const gr=ctx.createRadialGradient(f.jx,f.jy,0,f.jx,f.jy,r);
+  c.save();
+  // the held one: warm gold rings out from where they are joined, and motes
+  for(const r of f.rings){ c.globalAlpha=clamp(r.a,0,1)*0.75; c.strokeStyle='#ffd9a0'; c.lineWidth=0.8; c.beginPath(); c.ellipse(f.jx,f.jy,r.r,r.r*0.72,0,0,7); c.stroke();
+    c.globalAlpha=clamp(r.a,0,1)*0.4; c.strokeStyle='#fff2cc'; c.lineWidth=2; c.beginPath(); c.ellipse(f.jx,f.jy,r.r*0.96,r.r*0.69,0,0,7); c.stroke(); }
+  for(const m of f.motes){ const a=clamp(m.life/40,0,1)*0.9, g=c.createRadialGradient(m.x,m.y,0,m.x,m.y,2.2); g.addColorStop(0,'rgba(255,232,170,'+a.toFixed(2)+')'); g.addColorStop(1,'rgba(255,220,150,0)'); c.globalAlpha=1; c.fillStyle=g; c.fillRect(m.x-2.5,m.y-2.5,5,5); }
+  c.restore(); c.globalAlpha=1;
+  // a warm glow at the source that beats with it
+  if(f.t<f.len+30 || f.mode==='lak'){ const g=Math.max(0.0,(f.amp||0)); if(g>0.02){ const sx=(f.sx!==undefined? f.sx : f.jx), sy=(f.sy!==undefined? f.sy : f.jy), r=(f.mode==='held'? 14 : 9)+g*10; const gr=ctx.createRadialGradient(sx,sy,0,sx,sy,r);
     const tint= f.mode==='lak'? '200,236,255' : f.mode==='held'? '255,208,130' : f.mode==='both'? '255,190,214' : '255,226,196';
-    gr.addColorStop(0,'rgba('+tint+','+(0.10+g*0.26).toFixed(2)+')'); gr.addColorStop(1,'rgba(0,0,0,0)'); ctx.fillStyle=gr; ctx.fillRect(f.jx-r-2,f.jy-r-2,r*2+4,r*2+4); } }
+    gr.addColorStop(0,'rgba('+tint+','+(0.10+g*0.26).toFixed(2)+')'); gr.addColorStop(1,'rgba(0,0,0,0)'); ctx.fillStyle=gr; ctx.fillRect(sx-r-2,sy-r-2,r*2+4,r*2+4); } }
 }
 /* =====================================================================
    BEND SPEED · THE CLENCH, THRUST BY THRUST · THE OWED BEND · LAKLIRIO
@@ -39784,75 +39832,73 @@ function lakWifeDraw(x, FY, dir, T, fn){
   /* the drops that leave the hem and the legs, and the little pool that grows under her */
   const lvl=G.lakLevel||1, fade=0.06+0.94*clamp((G.lakLeft||0)/6000,0,1), bk=-dir;
   ctx.save();
-  const pw=Math.round(8+lvl*3*fade); ctx.globalAlpha=0.5*fade; px(Math.round(x-pw/2+bk*3), FY-1, pw, 2, '#efe8da'); ctx.globalAlpha=0.7*fade; px(Math.round(x-pw/2+bk*3)+1, FY-1, Math.max(1,pw-3), 1, '#ffffff');
-  for(let i=0;i<2+lvl;i++){ const ph=((T||0)*0.045+i*0.37+_lh(i,5))%1, dx=x+bk*(2+_lh(i+9,5)*6)+Math.round((_lh(i+21,5)-0.5)*6), dy=FY-20+ph*19;
-    ctx.globalAlpha=(1-ph*0.4)*0.9*fade; px(Math.round(dx), Math.round(dy), 1, ph<0.85? 2 : 1, '#efe8da'); }
+  const pw=8+lvl*3*fade, pcx=x+bk*3;
+  ctx.globalAlpha=0.45*fade; ctx.fillStyle='rgba(150,170,190,.6)'; ctx.beginPath(); ctx.ellipse(pcx,FY-0.2,pw/2+0.6,1.5,0,0,7); ctx.fill();
+  ctx.globalAlpha=0.75*fade; ctx.fillStyle='#e8f2fa'; ctx.beginPath(); ctx.ellipse(pcx,FY-0.5,pw/2,1.1,0,0,7); ctx.fill(); ctx.globalAlpha=0.85*fade; ctx.fillStyle='#ffffff'; ctx.beginPath(); ctx.ellipse(pcx-pw*0.15,FY-0.9,pw*0.16,0.35,0,0,7); ctx.fill();
+  { const Hm=_LAKHEM||{y:FY-20, x0:x-6, x1:x+6}; for(let i=0;i<3+lvl;i++){ const ph=((T||0)*0.045+i*0.37+_lh(i,5))%1, hx=Hm.x0+(Hm.x1-Hm.x0)*_lh(i+9,5), hy=Hm.y+ph*(FY-Hm.y);
+      ctx.globalAlpha=(1-ph*0.35)*0.9*fade; ctx.fillStyle='#eaf4fc'; ctx.beginPath(); ctx.ellipse(hx,hy,0.55,0.55+Math.min(1.2,ph*2),0,0,7); ctx.fill(); ctx.fillStyle='#ffffff'; ctx.fillRect(hx-0.3,hy-0.4,0.35,0.5); } }
   for(let r=0;r<3;r++){ const ph=(((T||0)*0.018)+r/3)%1; ctx.globalAlpha=(1-ph)*0.38*fade; ctx.strokeStyle='#e6f4ff'; ctx.lineWidth=0.8; ctx.beginPath(); ctx.ellipse(x+bk*3, FY-0.5, pw/2+ph*7, 1+ph*1.6, 0, 0, 7); ctx.stroke(); }      // ripples
   ctx.restore();
 }
+/* 💧 HER, DRENCHED — painted. The old pass laid single dark and white pixels down her outline and darkened her skin
+   along with the cloth. Now her own pixels are read and sorted: CLOTH (closer to her dress than her skin) goes
+   soaked: darker and richer, heavier toward the hem, and sheer where it clings, her skin showing through it most
+   near her outline, where it is pulled tight; SKIN gets a wet shine on the edge the light is on; HAIR goes dark and
+   plastered. Then, on top: a bright highlight riding every curve of her back and seat, creases where the wet cloth
+   drags at the hip, a running film of water, and what is left on her as glossy splats with trickles running off them. */
+let _LAKHEM=null;
 function lakWet(c, x, FY, dir, lvl, T){
-  const fade=0.06+0.94*clamp((G.lakLeft||0)/6000,0,1), bk=-dir, top=FY-76, tf=c.getTransform(), sc=tf.a||1;
-  const X0=Math.floor(x-24), Y0=top-2, RW=48, RH=82;
-  const dx=Math.round(tf.e+X0*sc), dy=Math.round(tf.f+Y0*sc), dw=Math.round(RW*sc), dh=Math.round(RH*sc);
-  let orig=null; try{ orig=c.getImageData(dx,dy,dw,dh); }catch(e){}
-  /* her outline, row by row: where the back of her actually is */
-  const ext={};
-  if(orig){ for(let ry=0;ry<RH;ry++){ let lo=1e9, hi=-1e9; const py=Math.min(dh-1,Math.round(ry*sc));
-      for(let rx=0;rx<RW;rx++){ const pxi=Math.min(dw-1,Math.round(rx*sc)); if(orig.data[(py*dw+pxi)*4+3]>=140){ if(rx<lo) lo=rx; if(rx>hi) hi=rx; } }
-      if(hi>=0) ext[ry]=[lo+X0, hi+X0]; } }
-  const edge=(wy)=>{ const e=ext[Math.round(wy-Y0)]; if(!e) return null; return bk>0? e[1] : e[0]; };
-  c.save(); c.globalCompositeOperation='source-atop';
-  /* the cloth is soaked: dark, heavier toward the hem, and it clings */
-  { const g=c.createLinearGradient(0,top,0,FY); g.addColorStop(0,'rgba(24,16,36,'+(0.08*fade)+')'); g.addColorStop(0.5,'rgba(24,16,36,'+((0.20+lvl*0.02)*fade)+')'); g.addColorStop(1,'rgba(14,10,26,'+((0.34+lvl*0.03)*fade)+')');
-    c.fillStyle=g; c.fillRect(X0,top,RW,80); }
-  /* ✦ THE WET SUIT — soaked cloth is richer and heavier, it clings and shows every curve, it creases at the hip,
-     the outline goes dark where the water is pooling in it, and a bright line of light rides the curve of her seat */
-  { const edgeF=(wy)=>{ const e=ext[Math.round(wy-Y0)]; if(!e) return null; return bk>0? e[0] : e[1]; };
-    for(let wy=top+2; wy<FY; wy++){                                                       // the soaked contour, back and front
-      const eb=edge(wy), ef=edgeF(wy); if(eb===null) continue; const lowish=clamp((wy-top)/76,0,1);
-      c.globalAlpha=(0.34+0.30*lowish)*fade; c.fillStyle='#120a22'; c.fillRect(eb-(bk>0? 0 : 0),wy,1,1); c.fillRect(eb-bk,wy,1,1);
-      c.globalAlpha=(0.20+0.18*lowish)*fade; c.fillRect(ef,wy,1,1); }
-    [FY-43,FY-37,FY-31,FY-25].forEach((wy,i)=>{ const eb=edge(wy); if(eb===null) return;                         // creases where the cloth is dragged tight
-      c.globalAlpha=0.34*fade; c.fillStyle='#160c26'; for(let k=0;k<7;k++) c.fillRect(eb-bk*(1+k)+(i%2? bk*0.5 : 0),wy+Math.floor(k*0.25*(i%2? -1 : 1)),1,1);
-      c.globalAlpha=0.30*fade; c.fillStyle='#e4f2ff'; for(let k=0;k<5;k++) c.fillRect(eb-bk*(2+k),wy+1+Math.floor(k*0.25*(i%2? -1 : 1)),1,1); });
-    for(let wy=FY-50; wy<=FY-26; wy++){ const eb=edge(wy); if(eb===null) continue;                              // the shine on the curve of her seat
-      const gl=0.55+0.30*Math.sin((T||0)*0.06+wy*0.35), cx2=eb-bk*(3+Math.round(Math.sin((wy-FY)*0.22)*1.6));
-      c.globalAlpha=0.62*gl*fade; c.fillStyle='#f6fbff'; c.fillRect(cx2,wy,1,1);
-      c.globalAlpha=0.26*gl*fade; c.fillStyle='#bfe0ff'; c.fillRect(cx2-bk,wy,1,1); }
-    for(let k=0;k<3;k++){ const yy=top+6+Math.floor((((T||0)*0.4+k*26)%70)), e=ext[Math.round(yy-Y0)]; if(!e) continue;      // a film of water, running down
-      c.globalAlpha=0.10*fade; c.fillStyle='#e4f2ff'; c.fillRect(e[0],yy,e[1]-e[0]+1,2); }
-    for(let i=0;i<9;i++){ const ry=top+2+Math.floor(_lh(i+5,13)*13), e=ext[Math.round(ry-Y0)]; if(!e) continue;                        // her hair, plastered in dark wet clumps
-      const rx=e[0]+Math.floor(_lh(i+9,13)*(e[1]-e[0]+1)); c.globalAlpha=0.42*fade; c.fillStyle='#0e0816'; c.fillRect(rx,ry,1,3+Math.floor(_lh(i+13,13)*4));
-      c.globalAlpha=0.30*fade; c.fillStyle='#cfe6ff'; c.fillRect(rx+1,ry+1,1,2); } }
-  /* a sheen runs down where the light is: skin and cloth both */
-  for(let i=0;i<14;i++){ const yy=top+6+Math.floor(_lh(i,2)*64), hh=2+Math.floor(_lh(i+61,2)*5), e=ext[Math.round(yy-Y0)]; if(!e) continue;
-    const xx=e[0]+Math.floor(_lh(i+31,2)*(e[1]-e[0]+1));
-    c.globalAlpha=(0.24+0.16*Math.sin((T||0)*0.05+i))*fade; c.fillStyle='#e4f2ff'; c.fillRect(xx,yy,1,hh); }
-  /* the cream: thickest across her seat and the small of the back, then down the backs of her legs.
-     Each one is placed on the real edge of her, so it is ON her and nowhere else. */
-  const Z=G.lakZones||{}, ws=1.4+(Z.seat|0)*0.35, wb=0.5+(Z.back|0)*0.30, wl=0.25+(Z.thigh|0)*0.45, wt=ws+wb+wl, n=12+lvl*10+Math.min(14,(Z.thigh|0));
-  for(let i=0;i<n;i++){
-    const zone=_lh(i,7)*wt; let ry, zs=false;
-    if(zone<ws){ ry=FY-37+Math.floor(_lh(i+17,7)*13); zs=true; }               // the seat
-    else if(zone<ws+wb) ry=FY-50+Math.floor(_lh(i+17,7)*13);                  // the small of the back
-    else ry=FY-22+Math.floor(_lh(i+17,7)*20);                                 // the backs of her legs
-    const eg=edge(ry); if(eg===null) continue;
-    const rx=Math.round(eg - bk*Math.floor(_lh(i+11,7)*(zs? 5 : 3)));
-    const w=1+Math.floor(_lh(i+41,7)*3), h=1+Math.floor(_lh(i+51,7)*2);
-    c.globalAlpha=0.32*fade; c.fillStyle='#2a2230'; c.fillRect(rx-1,ry-1,w+2,h+2);                  // the wet shadow round it
-    c.globalAlpha=0.95*fade; c.fillStyle='#efe8da'; c.fillRect(rx,ry,w,h);
-    c.globalAlpha=0.9*fade; c.fillStyle='#ffffff'; c.fillRect(rx,ry,1,1);
-    /* and each one runs, slowly, a little further than the last */
-    const rl=3+Math.floor(_lh(i+71,7)*(8+lvl*2)), off=(((T||0)*0.012+_lh(i+81,7)*3)%1)*2;
-    c.globalAlpha=0.85*fade; c.fillStyle='#e8e0cf'; c.fillRect(rx,ry+h,1,Math.round(rl+off));
-    c.globalAlpha=0.65*fade; c.fillStyle='#ffffff'; c.fillRect(rx,ry+h+Math.round(rl+off)-1,1,1); }
-  /* and what went in her hair stays in her hair */
-  for(let i=0;i<Math.min(9,(Z.hair|0)*2);i++){ const ry=FY-71+Math.floor(_lh(i+5,11)*10), e=ext[Math.round(ry-Y0)]; if(!e) continue;
-    const rx=e[0]+Math.floor(_lh(i+9,11)*(e[1]-e[0]+1)); c.globalAlpha=0.95*fade; c.fillStyle='#efe8da'; c.fillRect(rx,ry,2,1); c.fillStyle='#ffffff'; c.fillRect(rx,ry,1,1);
-    c.globalAlpha=0.8*fade; c.fillStyle='#e8e0cf'; c.fillRect(rx,ry+1,1,2+Math.floor(_lh(i+13,11)*4)); }
-  c.restore();
-  /* anything that landed outside her outline goes back to what it was */
-  if(orig){ try{ const cur=c.getImageData(dx,dy,dw,dh); for(let i=0;i<cur.data.length;i+=4){ if(orig.data[i+3]<140){ cur.data[i]=orig.data[i]; cur.data[i+1]=orig.data[i+1]; cur.data[i+2]=orig.data[i+2]; cur.data[i+3]=orig.data[i+3]; } } c.putImageData(cur,dx,dy); }catch(e){} }
+  const fade=0.06+0.94*clamp((G.lakLeft||0)/6000,0,1), bk=-dir, top=FY-80, tf=c.getTransform(), sc=tf.a||1;
+  const X0=Math.floor(x-28), Y0=top-2, RW=56, RH=86;
+  const dx=Math.round(tf.e+X0*sc), dy=Math.round(tf.f+Y0*sc), dw=Math.max(1,Math.round(RW*sc)), dh=Math.max(1,Math.round(RH*sc));
+  let im=null; try{ im=c.getImageData(dx,dy,dw,dh); }catch(e){ return; }
+  const d=im.data, W0=(G&&G.wife)||{}, rgb=(h)=>{ const n=parseInt(String(hexOf(h)).slice(1),16); return [(n>>16)&255,(n>>8)&255,n&255]; };
+  const SK=rgb(W0.skin||'#d8a87a'), DR=rgb(W0.dress||'#8a2a3a'), HR=rgb(W0.hair||'#2a1a10');
+  const cd=(r,g,b,C)=>{ const s=r+g+b+1, S=C[0]+C[1]+C[2]+1; return Math.abs(r/s-C[0]/S)*900+Math.abs(g/s-C[1]/S)*900+Math.abs(b/s-C[2]/S)*900+Math.abs(s-S)*0.18; };
+  // her outline, row by row (device pixels), and where the cloth ends at the bottom
+  const lo=new Int32Array(dh).fill(-1), hi=new Int32Array(dh).fill(-1); let hemY=-1, hemL=1e9, hemR=-1e9;
+  for(let py=0;py<dh;py++){ for(let px2=0;px2<dw;px2++){ if(d[(py*dw+px2)*4+3]>=140){ if(lo[py]<0) lo[py]=px2; hi[py]=px2; } } }
+  const K=fade*clamp(0.62+lvl*0.08,0,1);
+  for(let py=0;py<dh;py++){ if(lo[py]<0) continue; const rowT=py/dh;
+    for(let px2=lo[py];px2<=hi[py];px2++){ const i=(py*dw+px2)*4; if(d[i+3]<140) continue; const r=d[i], g=d[i+1], b=d[i+2];
+      const dS=cd(r,g,b,SK), dD=cd(r,g,b,DR), dH=cd(r,g,b,HR), ed=Math.min(px2-lo[py], hi[py]-px2)/sc, back=(bk>0? hi[py]-px2 : px2-lo[py])/sc;
+      if(dH<dS && dH<dD && rowT<0.3){ const m=1-0.30*K; d[i]=r*m; d[i+1]=g*m; d[i+2]=b*m*1.04; continue; }               // wet hair: darker, a little cool
+      if(dD<=dS){                                                                                                  // SOAKED CLOTH
+        const lum=(DR[0]*0.3+DR[1]*0.59+DR[2]*0.11), pale=clamp((lum-150)/80,0,1), dark=1-(0.30+0.16*rowT)*K*(1-0.45*pale), sheer=clamp(((ed<1.8? 0.20 : ed<3.6? 0.10 : 0.03)+0.30*pale)*K,0,0.5);   // a pale cloth, soaked, goes see-through
+        let nr=r*dark, ng=g*dark, nb=b*dark; const gr=(nr+ng+nb)/3; nr=gr+(nr-gr)*1.30; ng=gr+(ng-gr)*1.30; nb=gr+(nb-gr)*1.30;   // richer
+        nr=nr+(SK[0]*0.92-nr)*sheer; ng=ng+(SK[1]*0.86-ng)*sheer; nb=nb+(SK[2]*0.84-nb)*sheer;                   // and sheer, where it clings
+        if(back<1.6){ nr*=0.82; ng*=0.82; nb*=0.86; }                                                              // the dark line of water pooled at her outline
+        d[i]=clamp(nr,0,255); d[i+1]=clamp(ng,0,255); d[i+2]=clamp(nb,0,255);
+        if(py>hemY && rowT>0.45){ hemY=py; } if(rowT>0.45 && py>=hemY-1){ hemL=Math.min(hemL,px2); hemR=Math.max(hemR,px2); } }
+      else {                                                                                                        // WET SKIN: a sheen, brightest on the lit edge
+        const sh=(back<1.4? 0.30 : back<3? 0.12 : 0.04)*K; d[i]=r+(255-r)*sh; d[i+1]=g+(250-g)*sh; d[i+2]=b+(246-b)*sh; } } }
+  try{ c.putImageData(im,dx,dy); }catch(e){}
+  _LAKHEM=(hemY>=0)? {y:(dy+hemY-tf.f)/sc, x0:(dx+hemL-tf.e)/sc, x1:(dx+hemR-tf.e)/sc} : null;
+  // vector work, in game units, only on her
+  const G2x=(px2)=>(dx+px2-tf.e)/sc, G2y=(py)=>(dy+py-tf.f)/sc, rowAt=(wy)=>clamp(Math.round((wy*sc+tf.f)-dy),0,dh-1);
+  const backEdge=(wy)=>{ const py=rowAt(wy); if(lo[py]<0) return null; return G2x(bk>0? hi[py] : lo[py]); }, frontEdge=(wy)=>{ const py=rowAt(wy); if(lo[py]<0) return null; return G2x(bk>0? lo[py] : hi[py]); };
+  c.save(); c.globalCompositeOperation='source-atop'; c.lineCap='round'; c.lineJoin='round';
+  // the highlight riding her back and the curve of her seat (and the front of her, softer)
+  { const path=(fn,ins,a,w,col)=>{ c.globalAlpha=a*fade; c.strokeStyle=col; c.lineWidth=w; c.beginPath(); let on=false; for(let wy=top+8; wy<FY-4; wy+=1){ const e=fn(wy); if(e===null){ on=false; continue; } const xx=e-(fn===backEdge? bk : -bk)*ins+Math.sin(wy*0.21+(T||0)*0.02)*0.25; if(!on){ c.moveTo(xx,wy); on=true; } else c.lineTo(xx,wy); } c.stroke(); };
+    path(backEdge,1.5,0.42,0.7,'#f4faff'); path(backEdge,2.8,0.16,1.2,'#cfe6ff'); path(frontEdge,1.3,0.26,0.6,'#eaf4ff'); }
+  // the creases where the wet cloth drags tight across the hip
+  [FY-44,FY-38,FY-32,FY-27].forEach((wy,i)=>{ const e=backEdge(wy); if(e===null) return; const len=5+i, cv=(i%2? 1.4 : -1.2);
+    c.globalAlpha=0.38*fade; c.strokeStyle='#1a1028'; c.lineWidth=0.7; c.beginPath(); c.moveTo(e-bk*0.8,wy); c.quadraticCurveTo(e-bk*len*0.5,wy+cv,e-bk*len,wy+cv*0.4); c.stroke();
+    c.globalAlpha=0.32*fade; c.strokeStyle='#eaf4ff'; c.lineWidth=0.5; c.beginPath(); c.moveTo(e-bk*1.2,wy+0.9); c.quadraticCurveTo(e-bk*len*0.5,wy+cv+0.9,e-bk*(len-1),wy+cv*0.4+0.9); c.stroke(); });
+  // a film of water running down her
+  for(let k=0;k<4;k++){ const yy=top+6+((((T||0)*0.35)+k*22)%72), e0=backEdge(yy), e1=frontEdge(yy); if(e0===null||e1===null) continue; c.globalAlpha=0.10*fade; c.fillStyle='#e4f2ff'; c.fillRect(Math.min(e0,e1),yy,Math.abs(e1-e0)+1,1.6); }
+  for(let i=0;i<10;i++){ const yy=top+8+_lh(i,2)*62, e0=backEdge(yy), e1=frontEdge(yy); if(e0===null||e1===null) continue; const xx=e0+(e1-e0)*(0.15+_lh(i+31,2)*0.7), hh=2+_lh(i+61,2)*6;
+    c.globalAlpha=(0.22+0.14*Math.sin((T||0)*0.05+i))*fade; c.strokeStyle='#eaf4ff'; c.lineWidth=0.45; c.beginPath(); c.moveTo(xx,yy); c.lineTo(xx+0.3,yy+hh); c.stroke(); }
+  // what is left on her: glossy splats where it landed, each with its trickle
+  const Z=G.lakZones||{}, ws=1.4+(Z.seat|0)*0.35, wb=0.5+(Z.back|0)*0.30, wl=0.25+(Z.thigh|0)*0.45, wt=ws+wb+wl, n=6+lvl*3+Math.min(6,(Z.thigh|0)>>1);
+  for(let i=0;i<n;i++){ const zone=_lh(i,7)*wt; let ry, zs=false;
+    if(zone<ws){ ry=FY-38+_lh(i+17,7)*13; zs=true; } else if(zone<ws+wb) ry=FY-51+_lh(i+17,7)*13; else ry=FY-22+_lh(i+17,7)*18;
+    const eg=backEdge(ry); if(eg===null) continue; const rx=eg-bk*(0.9+_lh(i+11,7)*(zs? 4 : 2.4));
+    flSplat(c,rx,ry,0.45+_lh(i+41,7)*0.45,Math.PI/2+(_lh(i+3,7)-0.5)*0.8,i+3,0.92*fade);
+    if(_lh(i+91,7)<0.6){ const rl=1.5+_lh(i+71,7)*(3+lvl), off=(((T||0)*0.012+_lh(i+81,7)*3)%1)*1.6; flTrickle(c,rx,ry+0.5,rl+off,0.6,0.85*fade); } }
+  for(let i=0;i<Math.min(9,(Z.hair|0)*2);i++){ const ry=top+8+_lh(i+5,11)*10, e0=backEdge(ry), e1=frontEdge(ry); if(e0===null||e1===null) continue; const rx=e0+(e1-e0)*_lh(i+9,11);
+    flSplat(c,rx,ry,0.6,0.4,i+40,0.95*fade); flTrickle(c,rx,ry+0.5,2+_lh(i+13,11)*4,0.6,0.85*fade); }
+  c.restore(); c.globalAlpha=1;
 }
 function drawLakBadge(){
   if(!lakActive()) return;
@@ -39905,8 +39951,9 @@ function flowLakFire(sc){
   const f=sc.flow; if(!f || f.mode!=='lak' || f.vol>=5) return false;
   f.vol++; f.glow=1; f.idle=0;
   { const zz=(sc.lakZone==='mix'? 'seat' : (sc.lakZone||'seat')); sc.lakReact={zone:zz, t0:sc.t, say:pick(LAK_SAY[zz]||LAK_SAY.seat)}; }
-  for(let j=0;j<5;j++) for(let m=0;m<8;m++){
-    f.p.push({x:f.jx, y:f.jy, vx:0, vy:0, g:0.07, life:100, tr:[], r:(j===2? 2 : 1), wait:m*1.3+j*0.5, tgt:flowPick(sc,f,j), tf0:12+j*1.6+Math.random()*3}); }
+  for(let j=0;j<5;j++){ const t0=flowPick(sc,f,j), tf=12+j*1.6+Math.random()*3; for(let m=0;m<8;m++){ const tg=Object.assign({},t0);
+      if(tg.kind==='seat') tg.a=t0.a+(m-3.5)*0.035; else if(tg.kind==='back'||tg.kind==='thigh') tg.u=clamp(t0.u+(m-3.5)*0.025,0,1); else if(tg.kind==='hair'){ tg.dx=t0.dx+(m-3.5)*0.4; }
+      f.p.push({x:(f.sx!==undefined? f.sx : f.jx), y:(f.sy!==undefined? f.sy : f.jy), vx:0, vy:0, g:0.07, life:100, tr:[], r:(j===2? 2 : 1), wait:m*1.3+j*0.5, tgt:tg, tf0:tf*(0.97+m*0.008), pid:1000+f.vol*10+j, bt:f.t+m*1.3+j*0.5}); } }
   try{ sfx('moan'); }catch(e){} try{ kickShake(1.2+f.vol*0.25, 14); }catch(e){}
   try{ for(let h=0;h<2;h++) DM.hearts.push({x:f.jx+rnd(-12,12), y:f.jy-12, vy:0.5, life:46}); }catch(e){}
   return true;
@@ -42771,11 +42818,11 @@ function drawVillaLove(){
      is actually free of it, and then it ramps in rather than snapping on. */
   const READY=190;
   const ramp=clamp((T-READY)/70,0,1);
-  const after = sc.choice? (T-sc.chooseT) : -1, LOVE=(sc.choice==='love'), HEIR=(sc.choice==='heir');
+  const after = sc.choice? (T-sc.chooseT) : -1, LOVE=(sc.choice==='love'||sc.choice==='across'||sc.choice==='both'||sc.choice==='laklirio'), HEIR=(sc.choice==='heir');   // across her and together, he is out too
   const cool = after>=0? clamp((after-(LOVE? 112 : 124))/150,0,1) : 0;      // the wind-down, 0 → 1 (after the finish has played)
   /* 💦 FOR LOVE he is out — a step back, and aimed up over her; FOR AN HEIR he stays in, and it comes in four pulses */
   const throb = (HEIR && after>=0 && after<64)? Math.max(0,Math.sin((after-2)*0.44))*(1-after/70) : 0;
-  const outK  = LOVE? clamp(after/9,0,1)*(1-clamp((cool-0.15)*2.2,0,1)) : 0;
+  const outK  = LOVE? clamp((sc.choice==='laklirio'? T-(sc.lakT0||(sc.lakT0=T)) : after)/9,0,1)*(1-clamp((cool-0.15)*2.2,0,1)) : 0;   // laklirio: out once, and he stays out for all five
   const dr = (after>=0? (HEIR? 1-cool : 0) : beat*ramp) * (1-cool);
   // the room dims to a pool of lamplight around the two of them
   ctx.globalAlpha=0.30+heat*0.26; px(-4,-4,W+8,H+8,'#160b12'); ctx.globalAlpha=1;
@@ -42820,7 +42867,7 @@ function drawVillaLove(){
          cloth: coastV? mixHex((G&&G.tunic)||'#6a4a2e','#5a4028',0.35) : ((G&&G.tunic)||'#7a2f22'),
          band:(typeof rkOfficeBand==='function')? rkOfficeBand(G&&G.wife) : '#8a6a3a' }});
   if(PR && PR.rs) sc.rsV=PR.rs;
-  if(PR && PR.join){ sc.jx=PR.join[0]; sc.jy=PR.join[1]; sc.fdir=dirV; sc.herSeat=PR.seat; sc.herRs=PR.rs; sc.herWaist=PR.waist; sc.herHead=PR.head;
+  if(PR && PR.join){ sc.jx=PR.join[0]; sc.jy=PR.join[1]; sc.fdir=dirV; sc.herSeat=PR.seat; sc.herRs=PR.rs; sc.herWaist=PR.waist; sc.herHead=PR.head; if(PR.hisTip && outK>0.3){ sc.tipX=PR.hisTip[0]; sc.tipY=PR.hisTip[1]; } else if(PR.entry){ sc.tipX=PR.entry[0]; sc.tipY=PR.entry[1]; }
     if(inK>0.1 && cool<0.9){ const [jx,jy]=PR.join;                    // a warm bloom where they meet, pulsing with the beat
       const g=ctx.createRadialGradient(jx,jy,0,jx,jy,8+dr*5); g.addColorStop(0,'rgba(255,214,190,'+(0.10+dr*0.16*inK).toFixed(2)+')');
       g.addColorStop(1,'rgba(0,0,0,0)'); ctx.fillStyle=g; ctx.fillRect(jx-14,jy-14,28,28); } }
