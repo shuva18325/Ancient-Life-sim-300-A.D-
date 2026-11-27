@@ -11,7 +11,7 @@ const SETUP=()=>{ const S=window.__SS; S.newDemo('Marcus','Italia','Roman'); con
  await pg.goto('file://'+require('path').resolve(__dirname,'../index.html')); await pg.evaluate(()=>localStorage.setItem('SANDSTEEL_ADULT','1')); await pg.reload(); await pg.waitForTimeout(400);
  let fail=0; const ok=(c,m)=>{ console.log((c?'  PASS  ':'  FAIL  ')+m); if(!c) fail++; };
  const r=await pg.evaluate((src)=>{ const S=window.__SS; eval(src)(); const out={};
-   const KINDS={27:'away',28:'squat',29:'shoulders',30:'flat',31:'lotus',32:'knelt',33:'floorbend',34:'wrapped',35:'swing'};
+   const KINDS={27:'away',28:'squat',29:'shoulders',30:'flat',31:'lotus',32:'knelt',33:'floorbend',34:'wrapped',35:'swing',36:'kotatsu',37:'chausu',38:'divan'};
    // every new position draws two bodies, for every sheet that plays it, and gets that sheet's name for it
    out.draw=[]; out.named=[]; out.joined=[];
    for(const key of Object.keys(S.POSE_LORE)){ const L=S.POSE_LORE[key]; const order=L.order||[]; S.setBedKey(key);
