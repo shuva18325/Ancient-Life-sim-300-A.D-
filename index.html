@@ -23294,7 +23294,7 @@ function familyPortraitNew(c, bond, spouseMale){
     G.children.slice(0,6).forEach((k,i)=>{ const days=G.day-k.born; c.save();
       if(kGrownDraw(k,days)){
         const subj={body:k.body, skin:k.skin||G.skin, dress:(k.sex==='m'? (G.tunic||'#eae4d6') : ((G.wife&&G.wife.dress)||'#8a2f5a')),
-                    hair:k.hair||'#3a2618', male:k.sex==='m', name:k.name, eth:(G.wife&&G.wife.eth)||'roman', age:Math.max(16, kidAgeYears(k)|0)};
+                    hair:k.hair||'#3a2618', male:k.sex==='m', name:k.name, eth:(G.wife&&G.wife.eth)||'roman', people:(G.wife&&G.wife.people)||null, age:Math.max(16, kidAgeYears(k)|0)};
         c.restore(); drawStandingFigure(c, 176-i*30, 222, 94, subj, {face:'pleased'}); return; }
       c.restore(); drawKidProfile(c, 168-i*34, 222, k, {k:1.55}, 1); });
     return true;
@@ -33455,8 +33455,11 @@ function drawHallFem(c, x, y, w, ph, mode, preg){
   if(!FACE_EX[expr]) expr='flat';
   const inLit=!!(_LITB && c===_LITB.fig.g);
   const gz=(DM && DM.gaze && !DM.gaze.caught && G && w===G.wife)? (DM.gaze.kind==='seat'? 0.36 : 0.22) : undefined;
-  return drawFemProfile(c, x, y, w, {mode:(mode==='turn'? 'idle' : mode), ph:phW, t:HALL_NOW(), expr, headAng:gz,
+  const R=drawFemProfile(c, x, y, w, {mode:(mode==='turn'? 'idle' : mode), ph:phW, t:HALL_NOW(), expr, headAng:gz,
     blush:(expr==='flush'? 0.7 : expr==='smitten'? 0.5 : 0), dress:hallDressOf(w), noShadow:inLit, sx, preg:(preg>0? preg : 0)}, dir);
+  /* 👤 her people's headwear, on the figure you actually walk beside */
+  if(R && R.head && sx>0.6 && !(typeof rkHere==='function' && rkHere())) try{ drawFolkProfile(c, w, R.head, (R.rs||6)*0.70, dir<0? -1 : 1); }catch(e){}
+  return R;
 }
 /* and his */
 const HALL_MAN_FACE={pleased:'smirk', smug:'smirk', flush:'sheepish', cross:'intent', sulk:'intent', brace:'intent', bite:'smirk', absorbed:'stoic'};
@@ -33512,6 +33515,8 @@ function drawHallMan(c, x, y, bond, skinOv, tunOv, w, ph, mode){
     face:hallManFace(look,bond), coast, cloth, band, noShadow:inLit, leaf,
     headAng:(DM && DM.gaze && !DM.gaze.caught && G && look===G.wife)? (DM.gaze.kind==='seat'? 0.36 : 0.22) : undefined}, dir); }catch(e){ R=null; }
   c.restore();
+  /* 👤 and his people's headwear — a Parthian's diadem, a Han official's guan, a Goguryeo cap and its feathers */
+  if(R && R.head && sx===1 && !coast && !look.crown) try{ drawFolkProfile(c, look, R.head, 4.4, dir<0? -1 : 1); }catch(e){}
   return R;
 }
 /* =====================================================================
@@ -51303,7 +51308,8 @@ const FRONT_GARMENTS={kimono:1, hanfu:1, hanbok:1, sari:1, gown:1, kaftan:1, par
 /* what you bought from the clothier, as the front figure's garment */
 const OUTFIT_GARMENT={kosode:'kimono', eastern:'hanfu', steppe:'kaftan', doublet:'kaftan', toga:'toga', himation:'toga', military:'cuirass'};
 const PORTRAIT_GARMENT_F={wa:'kimono', han:'hanfu', ming:'hanfu', korean:'hanbok', kushan:'sari', tamil:'sari', nanban:'gown', steppe:'kaftan'};
-const PORTRAIT_GARMENT_M={wa:'kimono', han:'hanfu', ming:'hanfu', korean:'hanfu', steppe:'kaftan'};
+const PORTRAIT_GARMENT_M={wa:'kimono', han:'hanfu', ming:'hanfu', korean:'hanfu', steppe:'kaftan', persian:'kaftan'};
+const PORTRAIT_GARMENT_PEOPLE_M={palmyrene:'kaftan', osrhoene:'kaftan', hatran:'kaftan', adiabenian:'kaftan'};
 /* what a portrait dresses them in: their people's garment, the coast's ulvik indoors — and, with
    mature content off, a coast woman in her parka rather than a cut that shows her */
 function portraitDressInfo(w){
@@ -51317,6 +51323,8 @@ function portraitDressInfo(w){
     else if(w.outfit==='himation') D.toga=mixHex(D.cloth,'#f4ecd8',0.35);
     return D; }
   D.garment=(w.male? PORTRAIT_GARMENT_M : PORTRAIT_GARMENT_F)[w.eth]||null;
+  /* a Palmyrene or Edessene man sits for his bust in the Parthian coat and trousers, not a Greek tunic */
+  if(!D.garment && w.male && w.people && PORTRAIT_GARMENT_PEOPLE_M[w.people]) D.garment=PORTRAIT_GARMENT_PEOPLE_M[w.people];
   return D;
 }
 const PORTRAIT_POSES_F=['hips','hip','cross','hair','clasp','wave','hang'];
@@ -51352,6 +51360,310 @@ function portraitArm(pose, s, g){
   }
   return null;
 }
+/* =====================================================================
+   👤 WHAT A PERSON WEARS ON THEIR HEAD, AND ROUND THEIR NECK
+   ---------------------------------------------------------------------
+   The portrait and the family picture dressed everyone in their people's
+   GARMENT where the East had one, and otherwise in a colour. So a
+   Palmyrene, a Parthian, an Arab, a Caledonian and a Roman were the same
+   woman in five dyes. A person is recognised from across a room by the
+   head and the neck, and these are what the sources and the finds show:
+
+   PALMYRA    the funerary busts: an embroidered turban-band, a veil over
+              it to the shoulders, a pendant on the brow, chains of
+              necklaces, and the big trapezoid brooch on the left shoulder
+   EDESSA     the Edessa mosaics: a tall hat under a veil
+   PARTHIA    Queen Musa's coins: a tall jewelled tiara; the men wear the
+              Arsacid diadem, its ribbons falling behind
+   ARABIA     the head-shawl and a band of coins; the men a head-cloth
+   HAN        the high chignon with long pins and the buyao that shakes as
+              she walks; the men the black lacquered guan and its cords
+   XIANBEI    the Hou Hanshu: married women grow out their hair and wear
+              the gouyue, "decorated with gold and jade, like the buyao of
+              the Middle Kingdom" — and the gold-leaf crowns are in the graves
+   XIONGNU    the braids buried in the Noin-Ula kurgans; felt and fur caps
+   PLATEAU    many thin braids, turquoise and coral
+   SARMATIA   the gold diadems of the Don graves; the pointed felt hood
+   CALEDONIA  woad — Caesar and Pliny both — and the torc
+   GAUL       the torc
+   GERMANIA   the knotted head-cloth the women wear on the Column of Marcus
+              Aurelius, and the paired brooches of the peplos; the Suebian
+              knot on a Marcomannic man
+   EGYPT      the Fayum portraits: gold hoops with pearl drops, a gold chain
+   LIBYA      the chin tattoo and the great triangular fibula
+   INDIA      heavy ear-discs and the jewel on the parting; the men the
+              Gandharan turban with its jewelled crest
+   TAMILAKAM  jasmine in the hair
+   GOGURYEO   the great looped chignon of the tomb murals; the men the
+              peaked cap with bird feathers stuck in it
+   THE LAC    the feathered headdress of the Dong Son drums
+   Rome, Greece and Wa wear what they already wore: theirs is the baseline
+   the others are being told apart from.
+   ===================================================================== */
+const FOLK_LOOK_OF={ palmyrene:'palmyra', osrhoene:'edessa', hatran:'edessa', adiabenian:'edessa',
+  parthian:'parthian', pars:'parthian', elymaean:'parthian', mesene:'parthian', sakastani:'parthian', armenian:'parthian', chorasmian:'parthian', sogdian:'parthian', kangju:'parthian', dayuan:'parthian',
+  arab:'arab', gerrhaean:'arab', omani:'arab', sabaean:'arab', himyarite:'arab', hadrami:'arab',
+  bod:'plateau', sumpa:'plateau', zhangzhung:'plateau', qiang:'plateau',
+  xiongnu:'xiongnu', hun:'xiongnu', dingling:'xiongnu', wusun:'xiongnu', jiankun:'xiongnu', dahae:'xiongnu',
+  wuhuan:'xianbei', shiwei:'xianbei', alan:'sarmatian', sarmatian:'sarmatian',
+  caledonian:'caledonian', irish:'celt',
+  frisian:'germanic', jute:'germanic', herul:'germanic', goth:'germanic', venedi:'germanic', aesti:'germanic', marcomanni:'suebi', alamanni:'suebi',
+  mauri:'libya', gaetuli:'libya', garamantes:'libya', nasamones:'libya',
+  yue:'lac', lac:'lac', buyeo:'korean', okjeo:'korean', samhan:'korean',
+  tocharian:'parthian', kroraina:'parthian', saka:'sarmatian',
+  kalinga:'india', vanga:'india', kamarupa:'india', kuninda:'india', magadhan:'india', naga:'india', kosalan:'india' };
+const FOLK_LOOK_OF_CULT={ egyptian:'egypt', persian:'parthian', celt:'celt', germanic:'germanic', numidian:'libya', gaul:'celt', german:'germanic', indian:'india',
+  han:'han', ming:'han', steppe:'xianbei', kushan:'india', tamil:'tamil', korean:'korean' };
+function folkLookId(w){
+  if(!w || w.eth==='rkrai') return null;
+  try{ if(typeof iceHere==='function' && iceHere()) return null; }catch(e){}
+  if(w.folkLook!==undefined) return w.folkLook;
+  if(w.people && FOLK_LOOK_OF[w.people]!==undefined) return FOLK_LOOK_OF[w.people];
+  let id=w.eth;
+  if(w.self){ try{ id=playerCulture().id; }catch(e){} }
+  return FOLK_LOOK_OF_CULT[id]||null;
+}
+const FOLK_LOOK_NAME={ palmyra:'the Palmyrene veil and brooch', edessa:'the tall Edessene hat and veil', parthian:'the Arsacid tiara',
+  arab:'the head-shawl and coin band', han:'the chignon and the buyao pins', xianbei:'the gold-leaf gouyue', xiongnu:'the braids and the felt cap',
+  plateau:'braids, turquoise and coral', sarmatian:'the gold diadem', caledonian:'woad and the torc', celt:'the torc', germanic:'the knotted head-cloth and paired brooches',
+  suebi:'the knotted head-cloth and paired brooches', egypt:'gold hoops and pearls', libya:'the chin tattoo and the fibula', india:'ear-discs and the parting jewel',
+  tamil:'jasmine in the hair', korean:'the looped chignon', lac:'the feathered headdress' };
+/* draw it over the front figure, in the figure's own units */
+function drawFolkLook(c, w, opt){
+  const id=folkLookId(w); if(!id) return null;
+  opt=opt||{};
+  const M=chartLandmarks(w), male=!!w.male, ny=M.headY, HH=M.headH, HR=M.headW*0.80, top=ny-HH, sy=M.shY;
+  const SW=male? M.shW*0.92 : Math.max(M.shW*0.95, M.chestW*0.98+0.5);
+  const hair=hexOf(w.hair||'#3a2618'), GOLD='#d8b04a', GOLD_D='#8a6a22';
+  const fill=(col,fn)=>{ c.fillStyle=col; c.beginPath(); fn(); c.fill(); };
+  const poly=(col,P)=>fill(col,()=>{ c.moveTo(P[0][0],P[0][1]); for(let i=1;i<P.length;i++) c.lineTo(P[i][0],P[i][1]); c.closePath(); });
+  const dot=(x,y,r,col)=>fill(col,()=>c.arc(x,y,r,0,Math.PI*2));
+  const ell=(x,y,rx,ry,col)=>fill(col,()=>c.ellipse(x,y,rx,ry,0,0,Math.PI*2));
+  const line=(P,col,lw)=>{ c.strokeStyle=col; c.lineWidth=lw||0.3; c.lineCap='round'; c.beginPath(); c.moveTo(P[0][0],P[0][1]); for(let i=1;i<P.length;i++) c.lineTo(P[i][0],P[i][1]); c.stroke(); };
+  const curve=(a,b,cc,col,lw)=>{ c.strokeStyle=col; c.lineWidth=lw||0.3; c.lineCap='round'; c.beginPath(); c.moveTo(a[0],a[1]); c.quadraticCurveTo(cc[0],cc[1],b[0],b[1]); c.stroke(); };
+  const earY=ny-HH*0.40, earX=HR*0.99;
+  const earrings=(col,r,drop)=>[-1,1].forEach(q=>{ line([[q*earX,earY],[q*earX,earY+(drop||1.2)]],col,0.18); dot(q*earX,earY+(drop||1.2)+r*0.6,r,col); });
+  const necklace=(dy,wd,col,beads)=>{ curve([-wd,sy-0.6],[wd,sy-0.6],[0,sy+dy*2],col,0.32);
+    if(beads) for(let i=1;i<beads;i++){ const t=i/beads, x=-wd+2*wd*t, y=(1-t)*(1-t)*(sy-0.6)+2*(1-t)*t*(sy+dy*2)+t*t*(sy-0.6); dot(x,y,0.28,col); } };
+  const torc=()=>{ curve([-HR*0.62,ny+1.2],[HR*0.62,ny+1.2],[0,ny+3.0],GOLD,0.62); curve([-HR*0.62,ny+1.2],[HR*0.62,ny+1.2],[0,ny+3.0],'rgba(255,240,180,.55)',0.18);
+    [-1,1].forEach(q=>dot(q*HR*0.64,ny+1.1,0.55,GOLD)); };
+  const veilSides=(col)=>{ [-1,1].forEach(q=>poly(col,[[q*(HR*0.86),top+0.6],[q*(HR*1.30),top+0.9],[q*(HR*1.55),ny-1],[q*(SW+0.6),sy+2.6],[q*(SW-1.6),sy+3.4],[q*(HR*0.96),ny-0.6],[q*(HR*0.98),ny-HH*0.55]])); };
+  c.save();
+  switch(id){
+    case 'palmyra': if(male) break;
+      veilSides('rgba(232,222,198,.94)');
+      fill('rgba(232,222,198,.96)',()=>c.ellipse(0,top+0.4,HR*1.30,2.6,0,Math.PI,Math.PI*2));
+      poly('#8a2a3a',[[-HR*1.05,top+0.5],[HR*1.05,top+0.5],[HR*0.98,top+2.3],[-HR*0.98,top+2.3]]);
+      for(let i=-3;i<=3;i++) dot(i*HR*0.28,top+1.4,0.28,GOLD);
+      line([[0,top+2.3],[0,top+3.4]],GOLD,0.16); dot(0,top+3.7,0.45,GOLD); dot(0,top+3.7,0.2,'#a8323a');
+      earrings(GOLD,0.42,1.5); necklace(1.1,HR*0.72,GOLD,7); necklace(2.2,HR*1.05,GOLD,0); dot(0,sy+3.2,0.55,'#3a8a6a');
+      poly(GOLD,[[-SW*0.55-1.1,sy+0.6],[-SW*0.55+1.1,sy+0.6],[-SW*0.55+0.7,sy+2.4],[-SW*0.55-0.7,sy+2.4]]);
+      [-0.5,0,0.5].forEach(d=>line([[-SW*0.55+d,sy+2.4],[-SW*0.55+d,sy+3.6]],GOLD,0.14));
+      break;
+    case 'edessa': if(male) break;
+      veilSides('rgba(220,206,180,.92)');
+      poly('#4a2a3a',[[-HR*0.82,top+1.0],[-HR*0.90,top-5.6],[HR*0.90,top-5.6],[HR*0.82,top+1.0]]);
+      poly('rgba(220,206,180,.92)',[[-HR*0.98,top-5.2],[HR*0.98,top-5.2],[HR*1.25,top-3.2],[-HR*1.25,top-3.2]]);
+      line([[-HR*0.86,top-0.4],[HR*0.86,top-0.4]],GOLD,0.4); earrings(GOLD,0.35,1.2); necklace(1.4,HR*0.8,GOLD,6);
+      break;
+    case 'parthian':
+      if(male){ poly('#ece4d0',[[-HR*1.02,top+1.6],[HR*1.02,top+1.6],[HR*1.0,top+2.8],[-HR*1.0,top+2.8]]);
+        [-1,1].forEach(q=>{ curve([q*HR*1.0,top+2.3],[q*(HR*1.22),ny-HH*0.10],[q*(HR*1.30),top+5.5],'#ece4d0',0.36);
+          curve([q*HR*1.0,top+2.3],[q*(HR*1.36),ny-HH*0.32],[q*(HR*1.46),top+4.6],'#d8d0bc',0.30); });
+        earrings(GOLD,0.32,0.8); break; }
+      veilSides('rgba(200,180,150,.9)');
+      poly(GOLD,[[-HR*0.86,top+1.4],[-HR*1.0,top-6.2],[HR*1.0,top-6.2],[HR*0.86,top+1.4]]);
+      poly(GOLD_D,[[-HR*1.0,top-6.2],[HR*1.0,top-6.2],[HR*0.96,top-5.4],[-HR*0.96,top-5.4]]);
+      [top-4.2,top-2.0,top+0.2].forEach((y,j)=>{ for(let i=-2;i<=2;i++) dot(i*HR*0.36,y,0.36,(i+j)%2? '#a8323a' : '#3a5aa8'); });
+      earrings(GOLD,0.4,1.4); necklace(1.3,HR*0.8,GOLD,8);
+      break;
+    case 'arab':
+      if(male){ fill('#ddd2b8',()=>{ c.moveTo(-HR*1.15,ny-HH*0.40); c.quadraticCurveTo(-HR*1.25,top-1.6,0,top-1.6); c.quadraticCurveTo(HR*1.25,top-1.6,HR*1.15,ny-HH*0.40);
+          c.lineTo(HR*1.45,sy+1.4); c.lineTo(HR*0.95,sy+1.8); c.lineTo(HR*0.92,ny-HH*0.62); c.quadraticCurveTo(0,top+0.4,-HR*0.92,ny-HH*0.62); c.lineTo(-HR*0.95,sy+1.8); c.lineTo(-HR*1.45,sy+1.4); c.closePath(); });
+        line([[-HR*1.0,top+0.6],[HR*1.0,top+0.6]],'#2a2018',0.55); break; }
+      fill('#2c2a4a',()=>{ c.moveTo(-HR*1.15,ny-HH*0.40); c.quadraticCurveTo(-HR*1.25,top-1.4,0,top-1.4); c.quadraticCurveTo(HR*1.25,top-1.4,HR*1.15,ny-HH*0.40);
+        c.lineTo(SW*0.95,sy+3.0); c.lineTo(SW*0.55,sy+3.6); c.lineTo(HR*0.92,ny-HH*0.55); c.quadraticCurveTo(0,top+0.6,-HR*0.92,ny-HH*0.55); c.lineTo(-SW*0.55,sy+3.6); c.lineTo(-SW*0.95,sy+3.0); c.closePath(); });
+      for(let i=-4;i<=4;i++) dot(i*HR*0.21,top+0.9+Math.abs(i)*0.12,0.34,GOLD);
+      necklace(1.2,HR*0.7,'#c8c8d0',7);
+      break;
+    case 'han':
+      if(male){ poly('#16120e',[[-HR*0.42,top+0.2],[-HR*0.30,top-3.6],[HR*0.55,top-4.4],[HR*0.50,top+0.2]]);
+        line([[-HR*0.8,top-1.4],[HR*0.9,top-1.8]],'#c8b06a',0.25);
+        [-1,1].forEach(q=>line([[q*HR*0.46,top+0.4],[q*HR*0.86,ny-HH*0.25],[q*HR*0.5,ny+0.4]],'rgba(20,16,12,.8)',0.16)); break; }
+      ell(0,top-1.4,HR*0.66,2.5,hair); ell(-HR*0.18,top-1.9,HR*0.30,1.2,'rgba(255,255,255,.12)');
+      line([[-HR*1.15,top-0.2],[HR*1.05,top-3.2]],GOLD,0.26); line([[HR*1.1,top-0.4],[-HR*0.9,top-3.4]],'#c8c8d0',0.22);
+      line([[HR*1.05,top-3.2],[HR*1.25,top-1.8]],GOLD,0.12); dot(HR*1.25,top-1.5,0.32,GOLD); dot(HR*1.35,top-0.8,0.26,'#3a8a6a');
+      break;
+    case 'xianbei':
+      if(male){ fill('#5a3e24',()=>c.ellipse(0,top+0.6,HR*1.06,3.1,0,Math.PI,Math.PI*2));
+        poly('#c8b090',[[-HR*1.12,top+0.2],[HR*1.12,top+0.2],[HR*1.10,top+1.6],[-HR*1.10,top+1.6]]);
+        [-1,1].forEach(q=>poly('#c8b090',[[q*HR*1.0,top+1.4],[q*HR*1.18,top+1.4],[q*HR*1.16,ny-HH*0.25],[q*HR*0.96,ny-HH*0.30]])); break; }
+      poly(GOLD,[[-HR*0.86,top+0.2],[HR*0.86,top+0.2],[HR*0.80,top+1.5],[-HR*0.80,top+1.5]]);
+      [[0,-6.2],[-HR*0.55,-4.6],[HR*0.55,-4.6]].forEach(([x,h])=>{ line([[x*0.6,top+0.2],[x,top+h]],GOLD,0.28);
+        for(let k=1;k<=4;k++){ const t=k/4.4, xx=x*0.6+(x-x*0.6)*t, yy=top+0.2+h*t; dot(xx-0.55,yy+0.4,0.36,GOLD); dot(xx+0.55,yy+0.2,0.36,'#f0d070'); } });
+      dot(0,top+0.85,0.42,'#3a8a6a');
+      break;
+    case 'xiongnu':
+      if(male){ fill('#3a2a1c',()=>c.ellipse(0,top+0.8,HR*1.04,3.6,0,Math.PI,Math.PI*2));
+        poly('#8a7050',[[-HR*1.1,top+0.4],[HR*1.1,top+0.4],[HR*1.08,top+1.7],[-HR*1.08,top+1.7]]); break; }
+      [-1,1].forEach(q=>{ for(let k=0;k<7;k++){ const y=ny-HH*0.35+k*1.55; ell(q*(HR*0.92+k*0.18),y,0.62,0.95,k%2? hair : mixHex(hair,'#000',0.25)); } dot(q*(HR*0.92+7*0.18),ny-HH*0.35+7*1.55,0.45,'#a8323a'); });
+      fill('#6a2a22',()=>c.ellipse(0,top+0.5,HR*0.82,2.2,0,Math.PI,Math.PI*2));
+      dot(0,top-0.6,0.62,GOLD);
+      break;
+    case 'plateau':
+      if(male){ earrings('#3aa8a0',0.55,0.6); break; }
+      [-1,1].forEach(q=>{ for(let s=0;s<4;s++) line([[q*(HR*0.70+s*0.18),top+1.2],[q*(HR*1.05+s*0.22),ny-1],[q*(HR*0.95+s*0.55),sy+3.4]],mixHex(hair,'#000',s%2?0.25:0),0.34); });
+      for(let i=-4;i<=4;i++) dot(i*HR*0.22,top+0.9+Math.abs(i)*0.1,0.38,i%3===0? '#c8402a' : '#3aa8a0');
+      dot(0,top-0.6,0.7,'#3aa8a0'); earrings('#3aa8a0',0.45,0.8); necklace(1.4,HR*0.8,'#c8402a',7);
+      break;
+    case 'sarmatian':
+      if(male){ c.fillStyle='#6a4a2a'; c.beginPath(); c.moveTo(-HR*1.2,sy-0.4); c.lineTo(-HR*1.25,top+0.4); c.quadraticCurveTo(-HR*0.6,top-4.6,HR*0.6,top-7.0);
+        c.quadraticCurveTo(HR*0.9,top-3.4,HR*1.25,top+0.4); c.lineTo(HR*1.2,sy-0.4); c.closePath();
+        c.ellipse(0,ny-HH*0.50,HR*0.86,HH*0.52,0,0,Math.PI*2); c.fill('evenodd'); break; }
+      poly(GOLD,[[-HR*0.95,top+0.4],[HR*0.95,top+0.4],[HR*0.90,top+1.9],[-HR*0.90,top+1.9]]);
+      for(let i=-3;i<=3;i++) poly(GOLD,[[i*HR*0.27-0.5,top+0.5],[i*HR*0.27,top-1.2-(i===0?0.8:0)],[i*HR*0.27+0.5,top+0.5]]);
+      dot(0,top+1.15,0.5,'#a8323a'); earrings(GOLD,0.42,1.2);
+      break;
+    case 'caledonian': {
+      const W='rgba(44,74,160,.82)';
+      [-1,1].forEach(q=>{ c.strokeStyle=W; c.lineWidth=0.26; c.beginPath(); c.arc(q*HR*0.52,ny-HH*0.30,0.85,0,Math.PI*1.6); c.stroke();
+        c.beginPath(); c.arc(q*HR*0.52,ny-HH*0.30,0.35,0,Math.PI*1.7); c.stroke(); });
+      line([[-HR*0.30,top+1.4],[0,top+2.4],[HR*0.30,top+1.4]],W,0.26);
+      [-0.8,0,0.8].forEach(x=>dot(x,ny-HH*0.08,0.18,W));
+      torc(); break; }
+    case 'celt': torc(); break;
+    case 'germanic': case 'suebi':
+      if(male){ if(id==='suebi'){ ell(HR*0.86,top+1.0,1.25,1.05,hair); c.strokeStyle=mixHex(hair,'#000',0.35); c.lineWidth=0.18; c.beginPath(); c.arc(HR*0.86,top+1.0,0.6,0,Math.PI*1.6); c.stroke(); } break; }
+      fill('#d8ccb0',()=>c.ellipse(0,top+0.3,HR*1.12,3.0,0,Math.PI*0.98,Math.PI*2.02));
+      poly('#d8ccb0',[[-HR*1.12,top+0.3],[HR*1.12,top+0.3],[HR*1.0,top+1.5],[-HR*1.0,top+1.5]]);
+      curve([-HR*0.9,top-1.2],[HR*0.7,top-0.6],[0,top-2.6],'rgba(120,100,70,.6)',0.2);
+      dot(HR*0.95,top-0.4,0.9,'#c8bca0');
+      [-1,1].forEach(q=>{ dot(q*SW*0.52,sy+0.9,0.85,'#c8a040'); dot(q*SW*0.52,sy+0.9,0.35,'#8a3a2a'); });
+      curve([-SW*0.52,sy+1.5],[SW*0.52,sy+1.5],[0,sy+4.2],'#c8a040',0.16);
+      break;
+    case 'egypt':
+      if(male) break;
+      [-1,1].forEach(q=>{ c.strokeStyle=GOLD; c.lineWidth=0.24; c.beginPath(); c.arc(q*earX,earY+1.0,0.75,0,Math.PI*2); c.stroke(); dot(q*earX,earY+2.2,0.36,'#f4f0e6'); });
+      necklace(1.2,HR*0.72,GOLD,0); dot(0,sy+2.2,0.6,'#2a8a6a'); dot(0,sy+2.2,0.25,GOLD);
+      break;
+    case 'libya':
+      if(male) break;
+      line([[0,ny-0.9],[0,ny+0.05]],'rgba(30,70,80,.85)',0.2); [-0.5,0.5].forEach(x=>dot(x,ny-0.4,0.14,'rgba(30,70,80,.85)'));
+      dot(0,top+2.6,0.2,'rgba(30,70,80,.85)');
+      poly('#c8c8d0',[[0,sy+0.6],[1.3,sy+3.0],[-1.3,sy+3.0]]); dot(0,sy+0.6,0.45,'#c8c8d0');
+      [-0.8,0,0.8].forEach(x=>line([[x,sy+3.0],[x,sy+4.2]],'#c8c8d0',0.14));
+      break;
+    case 'india':
+      if(male){ fill('#ece4cc',()=>c.ellipse(0,top+0.3,HR*1.16,3.4,0,Math.PI*0.96,Math.PI*2.04));
+        poly('#ece4cc',[[-HR*1.16,top+0.3],[HR*1.16,top+0.3],[HR*1.06,top+1.6],[-HR*1.06,top+1.6]]);
+        [0.4,1.4].forEach(d=>curve([-HR*1.0,top+d-1.6],[HR*1.0,top+d-1.6],[0,top+d-3.0],'rgba(140,120,90,.55)',0.18));
+        ell(0,top-1.2,1.3,1.6,GOLD); dot(0,top-1.2,0.55,'#a8323a'); earrings(GOLD,0.55,0.5); break; }
+      line([[0,top-1.0],[0,top+1.2]],GOLD,0.2); dot(0,top+1.6,0.55,GOLD); dot(0,top+1.6,0.25,'#a8323a');
+      [-1,1].forEach(q=>{ dot(q*earX,earY+0.9,0.85,GOLD); dot(q*earX,earY+0.9,0.35,'#a8323a'); });
+      necklace(1.4,HR*0.85,GOLD,8);
+      break;
+    case 'tamil':
+      if(male) break;
+      for(let k=0;k<7;k++){ const a=Math.PI*(1.05+k*0.12), x=Math.cos(a)*HR*1.06, y=top+HH*0.30+Math.sin(a)*HH*0.42; dot(x,y,0.48,'#f6f2e8'); dot(x,y,0.16,'#e8d070'); }
+      earrings(GOLD,0.5,0.9);
+      break;
+    case 'korean':
+      if(male){ poly('#2a2018',[[-HR*0.72,top+1.0],[-0.4,top-4.6],[0.4,top-4.6],[HR*0.72,top+1.0]]);
+        [-1,1].forEach(q=>curve([q*0.7,top-2.6],[q*HR*0.75,top-7.6],[q*HR*0.2,top-6.4],'#ece4d0',0.40));
+        [-1,1].forEach(q=>line([[q*HR*0.66,top+1.0],[q*HR*0.7,ny+0.2]],'rgba(20,16,12,.8)',0.16)); break; }
+      ell(-HR*0.42,top-1.6,HR*0.50,2.0,hair); ell(HR*0.42,top-1.6,HR*0.50,2.0,hair);
+      ell(-HR*0.42,top-1.6,HR*0.22,0.9,mixHex(hair,'#000',0.45)); ell(HR*0.42,top-1.6,HR*0.22,0.9,mixHex(hair,'#000',0.45));
+      line([[-HR*1.1,top-0.4],[HR*1.1,top-0.4]],GOLD,0.24);
+      break;
+    case 'lac':
+      [-0.6,0,0.6].forEach((d,i)=>curve([d*HR,top+0.4],[d*HR*2.2,top-(male?7.4:5.6)],[d*HR*1.4-0.6,top-4],i===1? '#e8d8a8' : '#a8823a',male? 0.6 : 0.45));
+      if(!male) [-1,1].forEach(q=>{ c.strokeStyle='#a87a3a'; c.lineWidth=0.4; c.beginPath(); c.arc(q*earX,earY+1.2,0.95,0,Math.PI*2); c.stroke(); });
+      break;
+  }
+  c.restore();
+  return id;
+}
+/* 👤 THE SAME, IN PROFILE — the wife and the husband walking the house. The
+   portrait knew her people; the figure you actually spend the game beside
+   did not. Head centre h, head radius r, facing d (+1 right). */
+function drawFolkProfile(c, w, h, r, d){
+  const id=folkLookId(w); if(!id || !h) return null;
+  const male=!!(w&&w.male), hx=h[0], hy=h[1], F=(dx)=>hx+d*dx*r, Y=(dy)=>hy+dy*r;
+  const hair=hexOf((w&&w.hair)||'#2a1a10'), GOLD='#d8b04a';
+  const poly=(col,P)=>{ c.fillStyle=col; c.beginPath(); c.moveTo(F(P[0][0]),Y(P[0][1])); for(let i=1;i<P.length;i++) c.lineTo(F(P[i][0]),Y(P[i][1])); c.closePath(); c.fill(); };
+  const dot=(dx,dy,rr,col)=>{ c.fillStyle=col; c.beginPath(); c.arc(F(dx),Y(dy),Math.max(0.5,rr*r),0,Math.PI*2); c.fill(); };
+  const ln=(P,col,lw)=>{ c.strokeStyle=col; c.lineWidth=Math.max(0.6,lw*r); c.lineCap='round'; c.beginPath(); c.moveTo(F(P[0][0]),Y(P[0][1])); for(let i=1;i<P.length;i++) c.lineTo(F(P[i][0]),Y(P[i][1])); c.stroke(); };
+  const veilBack=(col)=>poly(col,[[0.35,-1.08],[-0.4,-1.16],[-1.05,-0.7],[-1.25,0.4],[-1.55,2.9],[-0.55,2.7],[-0.35,0.9],[-0.1,0.2],[0.05,-0.6]]);
+  const torc=()=>{ ln([[-0.55,1.30],[0.1,1.55],[0.6,1.25]],GOLD,0.22); dot(0.6,1.22,0.13,GOLD); };
+  c.save();
+  switch(id){
+    case 'palmyra': if(male) break; veilBack('#e8dec6'); poly('#8a2a3a',[[0.62,-0.86],[-0.7,-1.02],[-0.62,-0.72],[0.68,-0.6]]); dot(0.6,-0.45,0.12,GOLD); dot(-0.12,0.55,0.13,GOLD); break;
+    case 'edessa': if(male) break; veilBack('#dccdb4'); poly('#4a2a3a',[[0.55,-0.86],[-0.6,-0.92],[-0.66,-2.3],[0.5,-2.3]]); ln([[0.55,-1.0],[-0.62,-1.05]],GOLD,0.14); break;
+    case 'parthian':
+      if(male){ ln([[0.7,-0.62],[-0.85,-0.7]],'#ece4d0',0.24); ln([[-0.85,-0.7],[-1.3,0.4],[-1.5,1.2]],'#ece4d0',0.16); ln([[-0.85,-0.7],[-1.05,0.7]],'#d8d0bc',0.14); break; }
+      veilBack('#c8b496'); poly(GOLD,[[0.55,-0.82],[-0.62,-0.88],[-0.72,-2.6],[0.62,-2.6]]); [-2.2,-1.6,-1.05].forEach((y,j)=>dot(0.05,y,0.12,j%2? '#a8323a' : '#3a5aa8')); dot(-0.12,0.6,0.13,GOLD); break;
+    case 'arab':
+      poly(male? '#ddd2b8' : '#2c2a4a',[[0.62,-0.9],[0.1,-1.22],[-0.8,-1.0],[-1.2,0.2],[-1.4,2.6],[-0.45,2.5],[-0.2,0.8],[0.05,0.0],[0.25,-0.62]]);
+      if(male) ln([[0.6,-0.8],[-0.95,-0.82]],'#2a2018',0.2); else [0.5,0.2,-0.1,-0.4].forEach(x=>dot(x,-0.86,0.09,GOLD)); break;
+    case 'han':
+      if(male){ poly('#16120e',[[0.2,-0.9],[-0.55,-0.95],[-0.62,-1.75],[0.32,-1.55]]); ln([[0.25,-0.85],[0.35,0.4]],'rgba(20,16,12,.85)',0.07); break; }
+      c.fillStyle=hair; c.beginPath(); c.ellipse(F(-0.28),Y(-1.15),0.62*r,0.5*r,0,0,Math.PI*2); c.fill();
+      ln([[0.45,-1.0],[-1.0,-1.45]],GOLD,0.10); ln([[-1.0,-1.45],[-1.08,-1.05]],GOLD,0.06); dot(-1.08,-0.95,0.12,'#3a8a6a'); break;
+    case 'xianbei':
+      if(male){ poly('#5a3e24',[[0.65,-0.62],[0.35,-1.2],[-0.4,-1.25],[-0.95,-0.7]]); poly('#c8b090',[[0.75,-0.7],[-1.0,-0.78],[-1.0,-0.42],[0.75,-0.38]]); poly('#c8b090',[[-0.55,-0.5],[-0.95,-0.5],[-0.9,0.5],[-0.6,0.45]]); break; }
+      ln([[0.4,-0.95],[-0.55,-1.0]],GOLD,0.16); [[0.15,-2.2],[-0.35,-1.9],[0.55,-1.7]].forEach(([x,y])=>{ ln([[x*0.4,-1.0],[x,y]],GOLD,0.08); dot(x,y,0.14,GOLD); dot(x*0.7,(y-1)*0.6-0.5,0.12,'#f0d070'); }); break;
+    case 'xiongnu':
+      if(male){ poly('#3a2a1c',[[0.65,-0.6],[0.35,-1.3],[-0.45,-1.3],[-0.95,-0.62]]); poly('#8a7050',[[0.72,-0.66],[-1.0,-0.72],[-1.0,-0.4],[0.72,-0.36]]); break; }
+      for(let k=0;k<6;k++) dot(-0.95-k*0.04,0.1+k*0.42,0.17,k%2? hair : '#120c08'); dot(-1.2,2.7,0.12,'#a8323a');
+      poly('#6a2a22',[[0.55,-0.8],[0.2,-1.18],[-0.5,-1.12],[-0.8,-0.75]]); dot(0.1,-1.12,0.13,GOLD); break;
+    case 'plateau':
+      if(male){ dot(-0.08,0.7,0.16,'#3aa8a0'); break; }
+      for(let s=0;s<3;s++) ln([[-0.6-s*0.15,-0.6],[-1.0-s*0.12,0.8],[-0.9-s*0.2,2.6]],s%2? '#120c08' : hair,0.07);
+      [0.5,0.25,0,-0.25,-0.5].forEach((x,i)=>dot(x,-0.92-Math.abs(x)*0.1,0.1,i%2? '#c8402a' : '#3aa8a0')); dot(-0.1,0.65,0.12,'#3aa8a0'); break;
+    case 'sarmatian':
+      if(male){ c.fillStyle='#6a4a2a'; c.beginPath(); c.moveTo(F(0.55),Y(-0.6)); c.quadraticCurveTo(F(0.2),Y(-2.0),F(-0.6),Y(-2.7)); c.quadraticCurveTo(F(-0.9),Y(-1.4),F(-1.15),Y(-0.5));
+        c.lineTo(F(-1.2),Y(1.3)); c.lineTo(F(-0.45),Y(1.25)); c.lineTo(F(-0.35),Y(0.2)); c.quadraticCurveTo(F(0.15),Y(-0.95),F(0.55),Y(-0.6)); c.fill(); break; }
+      ln([[0.55,-0.86],[-0.7,-0.95]],GOLD,0.2); [0.4,0,-0.4].forEach(x=>poly(GOLD,[[x+0.12,-0.92],[x,-1.35],[x-0.12,-0.92]])); dot(0.55,-0.86,0.1,'#a8323a'); break;
+    case 'caledonian': dot(0.35,0.18,0.12,'rgba(44,74,160,.85)'); dot(0.48,-0.05,0.08,'rgba(44,74,160,.85)'); torc(); break;
+    case 'celt': torc(); break;
+    case 'germanic': case 'suebi':
+      if(male){ if(id==='suebi'){ c.fillStyle=hair; c.beginPath(); c.arc(F(-0.05),Y(-1.05),0.36*r,0,Math.PI*2); c.fill(); } break; }
+      poly('#d8ccb0',[[0.62,-0.62],[0.4,-1.15],[-0.4,-1.25],[-1.0,-0.7],[-0.95,-0.35],[0.66,-0.38]]); dot(-1.05,-0.55,0.24,'#c8bca0');
+      dot(0.25,1.55,0.15,'#c8a040'); break;
+    case 'egypt': if(male) break; c.strokeStyle=GOLD; c.lineWidth=Math.max(0.6,0.07*r); c.beginPath(); c.arc(F(-0.1),Y(0.72),0.2*r,0,Math.PI*2); c.stroke(); dot(-0.1,0.98,0.08,'#f4f0e6'); break;
+    case 'libya': if(male) break; ln([[0.6,0.65],[0.62,0.9]],'rgba(30,70,80,.9)',0.06); dot(0.2,1.75,0.18,'#c8c8d0'); break;
+    case 'india':
+      if(male){ poly('#ece4cc',[[0.7,-0.55],[0.45,-1.25],[-0.4,-1.35],[-1.0,-0.8],[-0.95,-0.35]]); dot(0.55,-0.85,0.16,GOLD); dot(0.55,-0.85,0.07,'#a8323a'); break; }
+      dot(-0.1,0.68,0.2,GOLD); dot(0.62,-0.72,0.1,GOLD); ln([[0.6,-0.95],[0.62,-0.75]],GOLD,0.05); break;
+    case 'tamil': if(male) break; for(let k=0;k<5;k++) dot(-0.75-0.1*Math.sin(k),-0.75+k*0.28,0.12,'#f6f2e8'); dot(-0.1,0.68,0.12,GOLD); break;
+    case 'korean':
+      if(male){ poly('#2a2018',[[0.45,-0.85],[0.05,-1.85],[-0.4,-0.9]]); ln([[0.0,-1.4],[-0.3,-2.6]],'#ece4d0',0.12); ln([[0.1,-1.4],[0.35,-2.5]],'#ece4d0',0.12); break; }
+      c.fillStyle=hair; [[-0.15,-1.35],[-0.75,-1.2]].forEach(([x,y])=>{ c.beginPath(); c.ellipse(F(x),Y(y),0.42*r,0.36*r,0,0,Math.PI*2); c.fill(); });
+      ln([[0.3,-1.1],[-1.1,-1.15]],GOLD,0.07); break;
+    case 'lac': [[-0.3,-2.4],[-0.75,-2.1],[-1.1,-1.7]].forEach(([x,y],i)=>ln([[-0.4,-0.9],[x,y]],i===1? '#e8d8a8' : '#a8823a',male? 0.13 : 0.1)); break;
+  }
+  c.restore();
+  return id;
+}
+/* 🧒 AND THE LITTLE ONES, in profile: a Han child's 總角 — the two tufts of
+   hair that are literally the word for childhood — and a Roman child's
+   bulla, worn on a cord until the toga of manhood. */
+function drawKidFolkMark(c, ch, R, k){
+  try{
+    let cult='roman'; try{ cult=playerCulture().id; }catch(e){}
+    if(!R || !R.head) return;
+    const hx=R.head[0], hy=R.head[1], s=(k||1);
+    if(cult==='han' || cult==='ming' || cult==='korean'){
+      c.fillStyle=hexOf((ch&&ch.hair)||'#1e1610');
+      [[-2.2,-6.4],[2.4,-6.0]].forEach(([dx,dy])=>{ c.beginPath(); c.arc(hx+dx*s, hy+dy*s, 1.9*s, 0, Math.PI*2); c.fill(); });
+      c.fillStyle='#a8323a'; [[-2.2,-4.8],[2.4,-4.4]].forEach(([dx,dy])=>c.fillRect(hx+dx*s-0.8*s, hy+dy*s, 1.6*s, 0.6*s));
+    } else if(cult==='roman' && ch && ch.sex==='m'){
+      c.strokeStyle='#5a3a1e'; c.lineWidth=0.5*s; c.beginPath(); c.moveTo(hx-2.6*s, hy+5.2*s); c.quadraticCurveTo(hx, hy+9.2*s, hx+2.6*s, hy+5.2*s); c.stroke();
+      c.fillStyle='#d8b04a'; c.beginPath(); c.arc(hx, hy+8.6*s, 1.7*s, 0, Math.PI*2); c.fill();
+      c.fillStyle='rgba(255,240,180,.6)'; c.beginPath(); c.arc(hx-0.4*s, hy+8.2*s, 0.45*s, 0, Math.PI*2); c.fill();
+    }
+  }catch(e){}
+}
 /* one figure, framed for a portrait: crown to mid-thigh, centred, posed */
 function drawPortraitFigure(c, CW, CH, w, opt){
   opt=opt||{};
@@ -51363,6 +51675,7 @@ function drawPortraitFigure(c, CW, CH, w, opt){
   c.translate(CW/2 + (opt.dx||0), 5 - top*k); c.scale(k,k);
   try{
     drawRealFig(c, w, 'front', undefined, {dressed:true, dressInfo:portraitDressInfo(w), portrait:true, aro:0, pose, preg:opt.preg, t:opt.t||0});
+    if(!opt.noFolk && !opt.bare) try{ drawFolkLook(c, w, opt); }catch(e){}
   }catch(e){ c.restore(); CHART_FACE=f0; return false; }
   c.restore(); CHART_FACE=f0;
   /* a soft light from the lamp side, so it sits in the room rather than on it */
@@ -51376,7 +51689,8 @@ function drawStandingFigure(c, x, floorY, tall, w, opt){
   const pose=opt.pose||portraitPoseOf(w), face=opt.face||portraitFaceOf(w, opt.expr);
   const f0=CHART_FACE; CHART_FACE=(face==='flat'? 'auto' : face);
   c.save(); c.imageSmoothingEnabled=true; c.translate(x, floorY); c.scale(k,k);
-  try{ drawRealFig(c, w, 'front', undefined, {dressed:true, dressInfo:portraitDressInfo(w), portrait:true, aro:0, pose, preg:opt.preg, t:opt.t||0}); }
+  try{ drawRealFig(c, w, 'front', undefined, {dressed:true, dressInfo:portraitDressInfo(w), portrait:true, aro:0, pose, preg:opt.preg, t:opt.t||0});
+    if(!opt.noFolk) try{ drawFolkLook(c, w, opt); }catch(e){} }
   catch(e){ c.restore(); CHART_FACE=f0; return false; }
   c.restore(); CHART_FACE=f0; return true;
 }
@@ -59820,8 +60134,10 @@ function drawKidProfile(c, x, fy, ch, M, dir){
   const dist=(NB_DIST!==null && NB_DIST!==undefined)? NB_DIST*NB_FACE : null;
   const walkPh= walking? (dist!==null? (dist/k)*Math.PI/(2*5.2) : (M.ph||0)*0.62) : 0;
   const face=((typeof faceAsHard==='function')? faceAsHard(M.expr||'pleased') : null) || HARD_FACES.smirk;
-  return drawManProfile(c, x, fy, kidLook(ch), {k, u:0, aro:0, child:CK, girl:!boy, headK:1+0.45*CK, cloth, face,
+  const R=drawManProfile(c, x, fy, kidLook(ch), {k, u:0, aro:0, child:CK, girl:!boy, headK:1+0.45*CK, cloth, face,
     walk: walking? 1 : 0, walkPh, lean: walking? 0.05 : 0.02, noShadow:M.noShadow, near:M.near||null, far:M.far||null}, dir===undefined? NB_FACE : dir);
+  if(age<14 && !M.noFolk) drawKidFolkMark(c, ch, R, k*(1+0.45*CK)*0.9);
+  return R;
 }
 function drawChildFigure(c2d, x, y, ch, ph, mode){
   if(kidBand(ch)==='grown'){
@@ -76423,7 +76739,7 @@ drawLogo();
 })();
 
 try{ iceMythInit(); iceClothInit(); iceTtsInit(); iceWrap(); }catch(e){ console.error('iceMythInit',e); }
-window.__SS = { CUSTOMS, customsHere:()=>customsHere(), customsHers:(w)=>customsHers(w), customsTabooToday:(d)=>customsTabooToday(d), customsConceive:(B)=>customsConceive(B), customsChildName:(s)=>customsChildName(s), customsWeddingLine:(w)=>customsWeddingLine(w), customsJealMul:()=>customsJealMul(), buildCustomsCard:(b)=>buildCustomsCard(b), finishBedNow:()=>finishBed(), getBC:()=>BC, setBC:(v)=>{ BC=v; }, roomBackdrop:(T)=>whRoomBackdrop(T), openEmpire:()=>openEmpire(), empSeason:()=>empSeason(), EMP_UI, silkDbg:()=>{ const c=document.createElement("canvas").getContext("2d"); try{ drawSilkRoadLive(c); return {ok:true, n:silkCaravanCount(), at:silkAt(0.5), arc:silkArc().tot}; }catch(e){ return {err:e.message}; } }, btMountSprite:(id,f)=>btMountSprite(id,f), poseLoreNow:()=>poseLore(), nbStyleSprite:(S,f,a)=>nbStyleSprite(S,f,a), armyStyle:(id)=>armyStyle(id), dynThroneFalls:(h)=>dynThroneFalls(h), proclaimDynasty:()=>proclaimDynasty(), plotTargets:()=>plotTargets(), mapZoomTo:(z,x,y)=>mapZoomTo(z,x,y), ASIA_PEOPLES, asiaPeopleFor:(e,o)=>asiaPeopleFor(e,o), EAST_PIN_POS, campaignOdds:(cp)=>campaignOdds(cp), updateBattle:(dt)=>updateBattle(dt), drawBattle:()=>drawBattle(), get BT(){ return BT; }, romStyles:()=>ROM_STYLES, startRomanticStyled:(a,b)=>startRomanticStyled(a,b), bgFn:(n)=>({bgPalace,bgWar,bgCoast,bgWoa,bgOpelia,bgIsle,bgReiko,bgForge})[n], setPairSS:(v)=>{ PAIR_SS=v; }, ICE_T:{ get AC(){return AC;}, set AC(v){AC=v;}, iceSlap, iceSkin, iceUlk, iceGulp, iceVoc, iceCrowd, ICE_V, sfx }, ICE_TTS, STRIKES, getDM:()=>DM, drawBridePortrait:(...a)=>drawBridePortrait(...a), rhFig, RH_CAST, openBotWatch, botEnterBeat, getBW:()=>BW, iceGoddessOpen, paintGoddess, startBedScene, regionAny, iceDebug:()=>({here:iceHere(), prey:ICE_PREY_BY_REGION}),
+window.__SS = { drawHallMan:(...a)=>drawHallMan(...a), drawFemProfile:(...a)=>drawFemProfile(...a), drawHallFem:(...a)=>drawHallFem(...a), folkLookId:(w)=>folkLookId(w), drawFolkLook:(c,w,o)=>drawFolkLook(c,w,o), drawPortraitFigure:(...a)=>drawPortraitFigure(...a), drawKidProfile:(...a)=>drawKidProfile(...a), CUSTOMS, customsHere:()=>customsHere(), customsHers:(w)=>customsHers(w), customsTabooToday:(d)=>customsTabooToday(d), customsConceive:(B)=>customsConceive(B), customsChildName:(s)=>customsChildName(s), customsWeddingLine:(w)=>customsWeddingLine(w), customsJealMul:()=>customsJealMul(), buildCustomsCard:(b)=>buildCustomsCard(b), finishBedNow:()=>finishBed(), getBC:()=>BC, setBC:(v)=>{ BC=v; }, roomBackdrop:(T)=>whRoomBackdrop(T), openEmpire:()=>openEmpire(), empSeason:()=>empSeason(), EMP_UI, silkDbg:()=>{ const c=document.createElement("canvas").getContext("2d"); try{ drawSilkRoadLive(c); return {ok:true, n:silkCaravanCount(), at:silkAt(0.5), arc:silkArc().tot}; }catch(e){ return {err:e.message}; } }, btMountSprite:(id,f)=>btMountSprite(id,f), poseLoreNow:()=>poseLore(), nbStyleSprite:(S,f,a)=>nbStyleSprite(S,f,a), armyStyle:(id)=>armyStyle(id), dynThroneFalls:(h)=>dynThroneFalls(h), proclaimDynasty:()=>proclaimDynasty(), plotTargets:()=>plotTargets(), mapZoomTo:(z,x,y)=>mapZoomTo(z,x,y), ASIA_PEOPLES, asiaPeopleFor:(e,o)=>asiaPeopleFor(e,o), EAST_PIN_POS, campaignOdds:(cp)=>campaignOdds(cp), updateBattle:(dt)=>updateBattle(dt), drawBattle:()=>drawBattle(), get BT(){ return BT; }, romStyles:()=>ROM_STYLES, startRomanticStyled:(a,b)=>startRomanticStyled(a,b), bgFn:(n)=>({bgPalace,bgWar,bgCoast,bgWoa,bgOpelia,bgIsle,bgReiko,bgForge})[n], setPairSS:(v)=>{ PAIR_SS=v; }, ICE_T:{ get AC(){return AC;}, set AC(v){AC=v;}, iceSlap, iceSkin, iceUlk, iceGulp, iceVoc, iceCrowd, ICE_V, sfx }, ICE_TTS, STRIKES, getDM:()=>DM, drawBridePortrait:(...a)=>drawBridePortrait(...a), rhFig, RH_CAST, openBotWatch, botEnterBeat, getBW:()=>BW, iceGoddessOpen, paintGoddess, startBedScene, regionAny, iceDebug:()=>({here:iceHere(), prey:ICE_PREY_BY_REGION}),
   openBookViewer:()=>openBookViewer(), openSettings:()=>openSettings(), 
   rhAmbTick:(b)=>rhAmbTick(b), rhAmbHit:(k,n)=>rhAmbHit(k,n), rhAmbStop:()=>rhAmbStop(), rhSting:(b)=>rhSting(b), setMuted:(v)=>{muted=v;}, ambKind:()=>RH_AMB&&RH_AMB.kind, acState:()=>AC&&AC.state,
   WPN_ART, WPN_RANGED, drawRangedIcon, BOWS, wpnStamp, wpnIcon, drawHeldBow, drawHeldPilum, drawHeldBomb, get WPN_DRAWS(){ return WPN_DRAWS; }, setOUTL:(v)=>{ OUTL=!!v; }, drawWeapon2Old,
