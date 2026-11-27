@@ -7907,25 +7907,41 @@ function kanvekOn(w){
    read as the tip and nothing else. Now it is hers, it is a fraction of
    HIM, and it grows every time she gives it. */
 const KANVEK_LEVELS=[null,
-  {n:1, name:'KAN’S FIRST GIFT', frac:0.50, note:'She takes what she can and the rest of him is the lamp’s.'},
-  {n:2, name:'PRACTISED',        frac:0.66, note:'Further every time, and she has stopped pretending that is an accident.'},
-  {n:3, name:'KAN’S HOLLOW',     frac:0.82, note:'Most of him, and on down her throat. The district has a word for it and this is the word.'},
-  {n:4, name:'ALL OF IT',        frac:0.97, note:'Every stroke to the root. At the bottom of it there is nothing left in the lamp-light.'},
-  {n:5, name:'KAN’S OWN',        frac:0.97, hold:true, note:'To the root, and she stays there. The coast says Kan himself would be impressed, and it does not say that lightly.'}];
+  {n:1, name:'TIP-TOE TASTER',   frac:0.50, note:'She takes what she can and the rest of him is the lamp’s.'},
+  {n:2, name:'HALFWAY HEROINE',  frac:0.66, note:'Further every time, and she has stopped pretending that is an accident.'},
+  {n:3, name:'DEEP-SEA DIVER',   frac:0.82, note:'Most of him, and on down her throat. The district has a word for it and this is the word.'},
+  {n:4, name:'SWORD-SWALLOWER',  frac:0.97, note:'Every stroke to the root. At the bottom of it there is nothing left in the lamp-light.'},
+  {n:5, name:'BOTTOMLESS WELL',  frac:0.97, hold:true, note:'To the root, and she stays there. The coast says Kan himself would be impressed, and it does not say that lightly.'}];
+/* ✧ AND NOT EVERY WOMAN GOES DEEP. What she is born with is a mini-quirk riding
+   on the trait, and it is the ceiling: practice takes her up to it and no further. */
+const KANVEK_TIERS=[null,
+  {t:1, name:'NEWCOMER',    cap:2, col:'#c9a4ef', note:'Kan gave her the trait and not much instruction. Enthusiastic, polite, and done at halfway.'},
+  {t:2, name:'MIDDLING',    cap:3, col:'#e8c34a', note:'Willing, improving, and honest about where the bottom of it is.'},
+  {t:3, name:'HIGH',        cap:4, col:'#ffb0d0', note:'The district has heard of her, and the district is not wrong.'},
+  {t:4, name:'EXPERIENCED', cap:5, col:'#ff8ad0', note:'There is no bottom of it. She knows; now so do you.'}];
 const KANVEK_XP=[0,0,3,7,12,18];
+function kanvekTier(w){
+  if(!w) return 1;
+  if(w.kanvekTier===undefined){ const s=String(w.name||'x')+'·kt'; let h=0; for(let i=0;i<s.length;i++) h=(h*31+s.charCodeAt(i))|0;
+    const r=(Math.abs(h)%100)/100, tr=(w.traits||[]).concat(w.quirks||[]);
+    let t= r<0.35? 1 : r<0.65? 2 : r<0.87? 3 : 4;
+    if(tr.indexOf('insatiable')>=0||tr.indexOf('gr_greedy')>=0||tr.indexOf('shameless')>=0) t++;
+    if(w.kanvekLv!==undefined) t=Math.max(t, w.kanvekLv-1);              // an older save keeps what she had
+    w.kanvekTier=clamp(t,1,4); }
+  return clamp(w.kanvekTier|0,1,4);
+}
 function kanvekLevel(w){
   if(!w) return 1;
-  if(w.kanvekLv===undefined){ const s=String(w.name||'x'); let h=0; for(let i=0;i<s.length;i++) h=(h*31+s.charCodeAt(i))|0;
-    const tr=(w.traits||[]).concat(w.quirks||[]);
-    w.kanvekLv=clamp(1+(Math.abs(h)%3)+((tr.indexOf('insatiable')>=0||tr.indexOf('gr_greedy')>=0||tr.indexOf('shameless')>=0)? 1 : 0),1,5);
-    w.kanvekXp=KANVEK_XP[w.kanvekLv]; }
-  return clamp(w.kanvekLv|0,1,5);
+  const T=KANVEK_TIERS[kanvekTier(w)];
+  if(w.kanvekLv===undefined){ w.kanvekLv=[0,1,2,2,3][T.t]; w.kanvekXp=KANVEK_XP[w.kanvekLv]; }
+  return clamp(Math.min(w.kanvekLv|0, T.cap),1,5);
 }
-function kanvekLvInfo(w){ const n=kanvekLevel(w), L=KANVEK_LEVELS[n], nx=n<5? KANVEK_XP[n+1]-(w.kanvekXp|0) : 0; return Object.assign({next:Math.max(0,nx)}, L); }
+function kanvekLvInfo(w){ const n=kanvekLevel(w), L=KANVEK_LEVELS[n], T=KANVEK_TIERS[kanvekTier(w)], top=(n>=T.cap), nx=(n<5 && !top)? KANVEK_XP[n+1]-(w.kanvekXp|0) : 0;
+  return Object.assign({next:Math.max(0,nx), tier:T, top}, L); }
 function kanvekGrow(w){
   if(!w || (w.traits||[]).indexOf('kanvek')<0) return null;
-  kanvekLevel(w); w.kanvekXp=(w.kanvekXp|0)+1;
-  const nx=w.kanvekLv+1; if(nx<=5 && w.kanvekXp>=KANVEK_XP[nx]){ w.kanvekLv=nx; return KANVEK_LEVELS[nx]; }
+  const T=KANVEK_TIERS[kanvekTier(w)]; kanvekLevel(w); w.kanvekXp=(w.kanvekXp|0)+1;
+  const nx=w.kanvekLv+1; if(nx<=T.cap && w.kanvekXp>=KANVEK_XP[nx]){ w.kanvekLv=nx; return KANVEK_LEVELS[nx]; }
   return null;
 }
 /* HOW LOUD THE STATEMENT IS. The face is the whole of the reading. */
@@ -8503,7 +8519,7 @@ function traitsHtml(w){
   for(const t of (w.traits||[])){ const T=traitById(t);
     out.push(traitChip('good', T?T.icon:'✦', T?T.name:t, T?T.desc:''));
     if(t==='kanvek' && typeof kanvekLvInfo==='function' && typeof ADULT!=='undefined' && ADULT){ const KI=kanvekLvInfo(w);   // ✧ the mini-quirk that rides on it
-      out.push(traitChip('quirk', '✧'.repeat(Math.min(KI.n,5)), 'LV '+KI.n+' '+KI.name, KI.note+(KI.n<5? '  ▲ '+KI.next+' more to the next level' : '  ▲ the top of it'), '#ff8ad0')); } }
+      out.push(traitChip('quirk', '✧'.repeat(Math.min(KI.n,5)), KI.tier.name+' · LV '+KI.n+' '+KI.name, KI.tier.note+'  ·  '+KI.note+(KI.top? '  ▲ as far as she goes' : '  ▲ '+KI.next+' more to the next level'), KI.tier.col)); } }
   for(const q of (w.quirks||[])){ const Q=quirkById(q);
     if(!Q) continue;
     out.push(traitChip('quirk', Q.icon, qText(Q,'name',w.male), qText(Q,'desc',w.male)+'  ▲ '+qText(Q,'up',w.male)+'   ▼ '+qText(Q,'down',w.male), Q.col)); }
@@ -28412,9 +28428,12 @@ function drawBedPose(vi, E){
       if(SWAL<0 || SWAL<80){ const md=[HR.mouth[0]-root[0], HR.mouth[1]-root[1]], ang=Math.atan2(md[1],md[0]), dI=Math.max(1.6,(IN1.dia||1.6));
         const lipC=mixHex(skn,'#b8405a',0.48), lipD=mixHex(skn,'#5a1422',0.55), pout=0.35+0.45*(1-(s.kanDeep? s.kanDeep.kst||0 : 0));
         c.save(); c.translate(HR.mouth[0]-Math.cos(ang)*0.2, HR.mouth[1]-Math.sin(ang)*0.2); c.rotate(ang);
-        c.fillStyle=lipD; c.beginPath(); c.ellipse(-0.1,0,0.95+pout*0.5,dI*0.5+1.05,0,0,Math.PI*2); c.fill();
-        c.fillStyle=lipC; c.beginPath(); c.ellipse(-0.35,0,0.75+pout*0.45,dI*0.5+0.8,0,0,Math.PI*2); c.fill();
-        c.fillStyle='rgba(255,236,240,.75)'; c.fillRect(-0.9,-(dI*0.5+0.5),0.6,0.5);                       // the light on the upper lip
+        /* ✧ AN UPPER LIP AND A LOWER ONE, either side of him — he goes in BETWEEN them. This was one filled pink
+           disc laid over the end of what was showing, and at any depth it read as the tip and nothing else. */
+        const rr=dI*0.5, pw=0.45+pout*0.35;
+        for(const q of [-1,1]){ c.fillStyle=lipD; c.beginPath(); c.ellipse(-0.15, q*(rr+0.38), pw+0.35, 0.78, 0, 0, Math.PI*2); c.fill();
+          c.fillStyle=lipC; c.beginPath(); c.ellipse(-0.3, q*(rr+0.32), pw+0.1, 0.55, 0, 0, Math.PI*2); c.fill(); }
+        c.fillStyle='rgba(255,236,240,.7)'; c.fillRect(-0.8,-(rr+0.75),0.6,0.4);                           // the light on the upper lip
         c.restore();
         const hol=(s.kanDeep? s.kanDeep.kst||0 : 0);
         if(hol>0.3){ const cx2=HR.mouth[0]+(HR.head[0]-HR.mouth[0])*0.45, cy2=HR.mouth[1]+(HR.head[1]-HR.mouth[1])*0.3+0.8;
@@ -29645,7 +29664,7 @@ function drawShadowPlay(s,T){
       if(s.cust===undefined) s.cust=customsHere()||null;
       if(s.cust){ if(s.cust.rear && REAR_POSES.indexOf(vi)>=0) s.poseSrc=s.cust.rear;
         else if(s.cust.ride && vi===3) s.poseSrc=s.cust.ride; }
-      if(vi===22 && G && G.wife && typeof kanvekLvInfo==='function'){ const KI=kanvekLvInfo(G.wife); s.poseSrc='✧ KANVEK · LEVEL '+KI.n+' — '+KI.name; } } }catch(e){}
+      if(vi===22 && G && G.wife && typeof kanvekLvInfo==='function'){ const KI=kanvekLvInfo(G.wife); s.poseSrc='✧ '+KI.tier.name+' KANVEK · LV '+KI.n+' — '+KI.name; } } }catch(e){}
   s.poseFade = clamp((vt-18)/26,0,1)*clamp((150-vt)/24,0,1);
   s.poseCol  = STG.col||'#e8c34a';
 
@@ -56544,9 +56563,10 @@ function openSeating(){
       +'<div class="small muted" style="margin-top:4px;line-height:1.6">'+RK_KANVEK.sign+'</div>'
       +(S2? '<div class="small" style="margin-top:5px;line-height:1.55;color:'+S2.col+'"><b>'+S2.line+'</b></div>' : '')
       +(function(){ const KI=kanvekLvInfo(w), pct=KI.n>=5? 100 : Math.round(clamp(1-(KI.next/Math.max(1,KANVEK_XP[KI.n+1]-KANVEK_XP[KI.n])),0,1)*100);
-          return '<div class="small" style="margin-top:6px;color:#ff8ad0"><b>'+'✧'.repeat(KI.n)+' LEVEL '+KI.n+' · '+KI.name+'</b> <span class="muted">— '+KI.note+'</span></div>'
-            +'<div class="bar" style="margin-top:3px"><i style="width:'+pct+'%;height:100%;background:linear-gradient(90deg,#8a3a6a,#ff8ad0)"></i></div>'
-            +'<div class="small muted">'+(KI.n<5? KI.next+' more before the next level' : 'There is no level past this one.')+'</div>'; })()
+          return '<div class="small" style="margin-top:6px;color:'+KI.tier.col+'"><b>✧ '+KI.tier.name+' KANVEK</b> <span class="muted">— '+KI.tier.note+'</span></div>'
+            +'<div class="small" style="margin-top:3px;color:#ff8ad0"><b>'+'✧'.repeat(KI.n)+' LEVEL '+KI.n+' · '+KI.name+'</b> <span class="muted">— '+KI.note+'</span></div>'
+            +'<div class="bar" style="margin-top:3px"><i style="width:'+(KI.top? 100 : pct)+'%;height:100%;background:linear-gradient(90deg,#8a3a6a,#ff8ad0)"></i></div>'
+            +'<div class="small muted">'+(KI.top? (KI.n>=5? 'There is no level past this one.' : 'As far as she goes — a '+KI.tier.name.toLowerCase()+' by nature.') : KI.next+' more before the next level')+'</div>'; })()
       , '#ff8ad0');
   }
 
@@ -77641,7 +77661,7 @@ drawLogo();
 })();
 
 try{ iceMythInit(); iceClothInit(); iceTtsInit(); iceWrap(); }catch(e){ console.error('iceMythInit',e); }
-window.__SS = { kanvekLevel:(w)=>kanvekLevel(w), kanvekGrow:(w)=>kanvekGrow(w), KANVEK_LEVELS, drawHallMan:(...a)=>drawHallMan(...a), drawFemProfile:(...a)=>drawFemProfile(...a), drawHallFem:(...a)=>drawHallFem(...a), folkLookId:(w)=>folkLookId(w), drawFolkLook:(c,w,o)=>drawFolkLook(c,w,o), drawPortraitFigure:(...a)=>drawPortraitFigure(...a), drawKidProfile:(...a)=>drawKidProfile(...a), CUSTOMS, customsHere:()=>customsHere(), customsHers:(w)=>customsHers(w), customsTabooToday:(d)=>customsTabooToday(d), customsConceive:(B)=>customsConceive(B), customsChildName:(s)=>customsChildName(s), customsWeddingLine:(w)=>customsWeddingLine(w), customsJealMul:()=>customsJealMul(), buildCustomsCard:(b)=>buildCustomsCard(b), finishBedNow:()=>finishBed(), getBC:()=>BC, setBC:(v)=>{ BC=v; }, roomBackdrop:(T)=>whRoomBackdrop(T), openEmpire:()=>openEmpire(), empSeason:()=>empSeason(), EMP_UI, silkDbg:()=>{ const c=document.createElement("canvas").getContext("2d"); try{ drawSilkRoadLive(c); return {ok:true, n:silkCaravanCount(), at:silkAt(0.5), arc:silkArc().tot}; }catch(e){ return {err:e.message}; } }, btMountSprite:(id,f)=>btMountSprite(id,f), poseLoreNow:()=>poseLore(), nbStyleSprite:(S,f,a)=>nbStyleSprite(S,f,a), armyStyle:(id)=>armyStyle(id), dynThroneFalls:(h)=>dynThroneFalls(h), proclaimDynasty:()=>proclaimDynasty(), plotTargets:()=>plotTargets(), mapZoomTo:(z,x,y)=>mapZoomTo(z,x,y), ASIA_PEOPLES, asiaPeopleFor:(e,o)=>asiaPeopleFor(e,o), EAST_PIN_POS, campaignOdds:(cp)=>campaignOdds(cp), updateBattle:(dt)=>updateBattle(dt), drawBattle:()=>drawBattle(), get BT(){ return BT; }, romStyles:()=>ROM_STYLES, startRomanticStyled:(a,b)=>startRomanticStyled(a,b), bgFn:(n)=>({bgPalace,bgWar,bgCoast,bgWoa,bgOpelia,bgIsle,bgReiko,bgForge})[n], setPairSS:(v)=>{ PAIR_SS=v; }, ICE_T:{ get AC(){return AC;}, set AC(v){AC=v;}, iceSlap, iceSkin, iceUlk, iceGulp, iceVoc, iceCrowd, ICE_V, sfx }, ICE_TTS, STRIKES, getDM:()=>DM, drawBridePortrait:(...a)=>drawBridePortrait(...a), rhFig, RH_CAST, openBotWatch, botEnterBeat, getBW:()=>BW, iceGoddessOpen, paintGoddess, startBedScene, regionAny, iceDebug:()=>({here:iceHere(), prey:ICE_PREY_BY_REGION}),
+window.__SS = { kanvekTier:(w)=>kanvekTier(w), kanvekLvInfo:(w)=>kanvekLvInfo(w), kanvekLevel:(w)=>kanvekLevel(w), kanvekGrow:(w)=>kanvekGrow(w), KANVEK_LEVELS, drawHallMan:(...a)=>drawHallMan(...a), drawFemProfile:(...a)=>drawFemProfile(...a), drawHallFem:(...a)=>drawHallFem(...a), folkLookId:(w)=>folkLookId(w), drawFolkLook:(c,w,o)=>drawFolkLook(c,w,o), drawPortraitFigure:(...a)=>drawPortraitFigure(...a), drawKidProfile:(...a)=>drawKidProfile(...a), CUSTOMS, customsHere:()=>customsHere(), customsHers:(w)=>customsHers(w), customsTabooToday:(d)=>customsTabooToday(d), customsConceive:(B)=>customsConceive(B), customsChildName:(s)=>customsChildName(s), customsWeddingLine:(w)=>customsWeddingLine(w), customsJealMul:()=>customsJealMul(), buildCustomsCard:(b)=>buildCustomsCard(b), finishBedNow:()=>finishBed(), getBC:()=>BC, setBC:(v)=>{ BC=v; }, roomBackdrop:(T)=>whRoomBackdrop(T), openEmpire:()=>openEmpire(), empSeason:()=>empSeason(), EMP_UI, silkDbg:()=>{ const c=document.createElement("canvas").getContext("2d"); try{ drawSilkRoadLive(c); return {ok:true, n:silkCaravanCount(), at:silkAt(0.5), arc:silkArc().tot}; }catch(e){ return {err:e.message}; } }, btMountSprite:(id,f)=>btMountSprite(id,f), poseLoreNow:()=>poseLore(), nbStyleSprite:(S,f,a)=>nbStyleSprite(S,f,a), armyStyle:(id)=>armyStyle(id), dynThroneFalls:(h)=>dynThroneFalls(h), proclaimDynasty:()=>proclaimDynasty(), plotTargets:()=>plotTargets(), mapZoomTo:(z,x,y)=>mapZoomTo(z,x,y), ASIA_PEOPLES, asiaPeopleFor:(e,o)=>asiaPeopleFor(e,o), EAST_PIN_POS, campaignOdds:(cp)=>campaignOdds(cp), updateBattle:(dt)=>updateBattle(dt), drawBattle:()=>drawBattle(), get BT(){ return BT; }, romStyles:()=>ROM_STYLES, startRomanticStyled:(a,b)=>startRomanticStyled(a,b), bgFn:(n)=>({bgPalace,bgWar,bgCoast,bgWoa,bgOpelia,bgIsle,bgReiko,bgForge})[n], setPairSS:(v)=>{ PAIR_SS=v; }, ICE_T:{ get AC(){return AC;}, set AC(v){AC=v;}, iceSlap, iceSkin, iceUlk, iceGulp, iceVoc, iceCrowd, ICE_V, sfx }, ICE_TTS, STRIKES, getDM:()=>DM, drawBridePortrait:(...a)=>drawBridePortrait(...a), rhFig, RH_CAST, openBotWatch, botEnterBeat, getBW:()=>BW, iceGoddessOpen, paintGoddess, startBedScene, regionAny, iceDebug:()=>({here:iceHere(), prey:ICE_PREY_BY_REGION}),
   openBookViewer:()=>openBookViewer(), openSettings:()=>openSettings(), 
   rhAmbTick:(b)=>rhAmbTick(b), rhAmbHit:(k,n)=>rhAmbHit(k,n), rhAmbStop:()=>rhAmbStop(), rhSting:(b)=>rhSting(b), setMuted:(v)=>{muted=v;}, ambKind:()=>RH_AMB&&RH_AMB.kind, acState:()=>AC&&AC.state,
   WPN_ART, WPN_RANGED, drawRangedIcon, BOWS, wpnStamp, wpnIcon, drawHeldBow, drawHeldPilum, drawHeldBomb, get WPN_DRAWS(){ return WPN_DRAWS; }, setOUTL:(v)=>{ OUTL=!!v; }, drawWeapon2Old,
