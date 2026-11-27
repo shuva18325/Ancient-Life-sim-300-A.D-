@@ -19172,13 +19172,14 @@ function finishFight(won){
   // villa & slaves bring passive income after every bout
   let slaveCoin=0, slaveFood=0;
   if((G.hasVilla && G.slaves>0) || (G.wife && (G.wife.tradeCoin||G.wife.tradeFood))){ const inc=villaIncome(); slaveCoin=inc.coin; slaveFood=inc.food; G.coin+=slaveCoin; G.food+=slaveFood;
-    note+=(G.married&&!G.hasVilla?'Your wife’s house sends ':'Your estate sends ')+slaveCoin+' denarii'+(slaveFood?' and '+slaveFood+' rations':'')+'. '; }
+    note+=(G.married&&!G.hasVilla?'Your wife’s house sends ':'Your estate sends ')+coinWord(slaveCoin)+(slaveFood?' and '+slaveFood+' rations':'')+'. '; }
   // provinces you govern pay tribute
   const trib=provinceTribute();
   if(trib>0){ G.coin+=trib; note+='Your provinces render '+coinWord(trib)+' in tribute. '; }
+  { const toll=(typeof silkTolls==='function')? silkTolls() : 0; if(toll>0){ G.coin+=toll; note+='The caravans pay '+coinWord(toll)+' in tolls at your gates. '; } }
   // offices & pacts pay their dues
-  if(G.office>=1){ G.coin+=8; note+='The quaestorship skims +8d. '; }
-  if(G.office>=2 && won){ G.pop=clamp(G.pop+2,0,100); note+='As aedile your games swell the mob (+2 pop). '; }
+  if(G.office>=1){ G.coin+=8; note+=EW('The quaestorship skims +8d. ','Your stipend comes from the Privy Treasury (+8). '); }
+  if(G.office>=2 && won){ G.pop=clamp(G.pop+2,0,100); note+=EW('As aedile your games swell the mob (+2 pop). ','Your ministry spreads your name (+2 renown). '); }
   if(G.parthiaPact){ G.coin+=6; note+='Silk-road tolls +6d. '; }
   if(G.wife&&G.wife.vowed){ G.coin+=2; }
   const dowTrade=(G.children||[]).reduce((s,c)=>s+(c.trade||0),0);
@@ -56762,7 +56763,7 @@ function villaIncome(){ let coin=G.slaves*12, food=Math.floor(G.slaves/2);
   if(hasFlaw('spendthrift'))coin=Math.round(coin*0.85);
   if(hasBane('ruinous'))    coin=Math.round(coin*0.55);      // and no accounting ever finds where it went
   return {coin, food}; }
-function provinceTribute(){ let s=0; for(const id in (G.titles||{})){ const r=REGION_BY_ID[id]; if(r){ let t=40+r.tier*45; if(KEY_PROVINCES[id]) t=Math.round(t*1.5); s+=t; } } return s; }
+function provinceTribute(){ let s=0; for(const id in (G.titles||{})){ const r=REGION_BY_ID[id] || ((typeof playerWorld==='function' && playerWorld()==='east' && typeof regionAny==='function')? regionAny(id) : null); if(r){ let t=40+r.tier*45; if(KEY_PROVINCES[id]) t=Math.round(t*1.5); s+=t; } } return s; }
 function titlesCount(){ return Object.keys(G.titles||{}).length; }
 /* what a province's lord was called, in the province's own tongue. A Roman governs as Dux or
    Praeses; the East had its own words, and a Han official taking Luoyang is not its "Dominus". */
@@ -72094,12 +72095,65 @@ function layoutEastPins(){
     pct:{ x:+(n.x/480*100).toFixed(2), y:+(n.y/216*100).toFixed(2) } }; });
   return EAST_PIN_POS;
 }
+/* =====================================================================
+   🐫 THE SILK ROAD, ON THE MOVE
+   ---------------------------------------------------------------------
+   Strings of camels go both ways along the road on the sheet: west with
+   bales of silk, east with glass, coral, gold and the horses of
+   Ferghana. The towns on the road live off them: govern one and the
+   caravans pay toll at your gate after every bout. The price ladder in
+   the corner is the reason for all of it. Bought by the bolt at Luoyang,
+   silk sells for several times that at Kashgar and for many times it in
+   the Roman East. Pliny complains that India, the Seres and Arabia take
+   a hundred million sesterces a year out of the empire.
+   ===================================================================== */
+const SILK_ROAD_LL=[[108.9,34.3],[104,36],[102.6,37.9],[98.5,39.7],[94.7,40.1],[89.2,42.9],[86.6,42.1],[83,41.7],[79.2,41.2],[76,39.5],[73,40.4],[71,40.4],[68.8,40.1],[67,39.65],[64.4,39.8],[61.8,37.6],[58.4,36.6],[54.4,36.2],[51.4,35.7],[48.5,34.8],[44.6,33.1],[41,34.4],[38.3,34.6],[36.2,36.2]];
+const SILK_TOWNS={'Chang’an':30,'Liang Province':24,'Dunhuang':40,'Loulan':26,'Turfan':26,'Tarim Basin':34,'Khotan':26,'Kashgar':36,'Ferghana':22,'Sogdiana':40,'Bactria':30,'Margiana':30,'Gandhara':28,'Ctesiphon':36,'Luoyang':20};
+const SILK_PRICES=[['Luoyang',1],['Dunhuang',1.6],['Kashgar',3],['Samarkand',4.5],['Merv',6],['Ctesiphon',8],['Antioch',12]];
+function silkSeason(){ const d=(G&&G.day)||0, s=Math.sin(d/17)*0.5+Math.sin(d/5.3)*0.2; return s>0.35? {n:'a great caravan season', m:1.35} : s<-0.35? {n:'a lean season on the road', m:0.7} : {n:'the road is open', m:1}; }
+function silkTolls(){ if(typeof playerWorld!=='function' || playerWorld()!=='east') return 0; let t=0; for(const id in (G.titles||{})) if(SILK_TOWNS[id]) t+=SILK_TOWNS[id];
+  if(!t) return 0; const S=silkSeason(); return Math.round(t*S.m*(G.parthiaPact? 1.4 : 1)); }
+function silkCaravanCount(){ let n=10; for(const id in (G.titles||{})) if(SILK_TOWNS[id]) n++; if(G.parthiaPact) n+=2; n+=Math.min(3,(G.silkRuns||0)>>1); return Math.min(20,n); }
+let _SILK_ARC=null;
+function silkArc(){ if(_SILK_ARC) return _SILK_ARC; const P=SILK_ROAD_LL.map(q=>lonlatE(q[0],q[1])), L=[0]; for(let i=1;i<P.length;i++) L.push(L[i-1]+Math.hypot(P[i][0]-P[i-1][0],P[i][1]-P[i-1][1])); _SILK_ARC={P,L,tot:L[L.length-1]}; return _SILK_ARC; }
+function silkAt(u){ const A=silkArc(), d=((u%1)+1)%1*A.tot; let i=1; while(i<A.L.length-1 && A.L[i]<d) i++; const t=(d-A.L[i-1])/Math.max(1e-6,A.L[i]-A.L[i-1]), a=A.P[i-1], b=A.P[i]; return {x:a[0]+(b[0]-a[0])*t, y:a[1]+(b[1]-a[1])*t, dir:Math.sign(b[0]-a[0])||1}; }
+/* one string of camels, drawn in sheet units under whatever scale the map is at */
+function drawCaravan(c, u, west, i, T){
+  const step=0.0048, cols=west? ['#f4efe2','#f0e6c8','#e8dcc0'] : ['#2f7a8a','#c8452a','#e8c34a'];
+  for(let k=0;k<3;k++){ const q=silkAt(u + (west? k : -k)*step), face=(west? -1 : 1)*q.dir, bob=Math.abs(Math.sin(T*0.004+i+k))*0.12;
+    c.save(); c.translate(q.x, q.y-0.7-bob); c.scale(face*1.35,1.35);
+    c.strokeStyle='#4a3420'; c.lineWidth=0.18; c.beginPath(); for(const lx of [-0.45,-0.2,0.25,0.5]){ c.moveTo(lx,0.25); c.lineTo(lx+Math.sin(T*0.01+lx*7+k)*0.12,0.75); } c.stroke();   // legs
+    c.fillStyle='#9a7448'; c.beginPath(); c.ellipse(0,0,0.62,0.32,0,0,7); c.fill();                                 // body
+    c.beginPath(); c.ellipse(-0.05,-0.28,0.26,0.2,0,0,7); c.fill();                                               // hump
+    c.strokeStyle='#9a7448'; c.lineWidth=0.2; c.beginPath(); c.moveTo(0.5,-0.05); c.quadraticCurveTo(0.85,-0.2,0.82,-0.62); c.stroke();   // neck
+    c.fillStyle='#8a6440'; c.beginPath(); c.ellipse(0.92,-0.64,0.16,0.09,0.3,0,7); c.fill();                       // head
+    c.fillStyle=cols[(i+k)%3]; c.fillRect(-0.32,-0.62,0.42,0.3); c.strokeStyle='rgba(40,24,10,.6)'; c.lineWidth=0.06; c.strokeRect(-0.32,-0.62,0.42,0.3);   // the bale
+    c.restore(); }
+  if(i%3===0){ const q=silkAt(u+(west? -1 : 1)*step); c.fillStyle='#3a2a1c'; c.beginPath(); c.arc(q.x,q.y-0.9,0.22,0,7); c.fill(); c.fillRect(q.x-0.12,q.y-0.7,0.24,0.6); }   // a man on foot leading them
+}
+function drawSilkRoadLive(c){
+  const T=performance.now(), n=silkCaravanCount();
+  for(let i=0;i<n;i++){ const west=(i%2===0), sp=0.0000085*(0.8+(i%3)*0.15), u=west? (1-((T*sp+i/n)%1)) : ((T*sp+i/n+0.37)%1);
+    drawCaravan(c, u, west, i, T); }
+}
+function silkTicker(){
+  let el=document.getElementById('silk-ticker'); const panel=document.getElementById('map-panel'); if(!panel) return;
+  const east=(typeof playerWorld==='function' && playerWorld()==='east');
+  if(!el){ el=document.createElement('div'); el.id='silk-ticker'; el.style.cssText='position:absolute;right:10px;top:8px;z-index:8;background:rgba(24,16,8,.82);border:1px solid #8a6a3a;border-radius:4px;padding:4px 8px;color:#e8dcc2;font:11px Georgia,serif;max-width:340px;pointer-events:none;line-height:1.35'; panel.appendChild(el); }
+  el.style.display=east? '' : 'none'; if(!east) return;
+  const S=silkSeason(), t=silkTolls(), now=(G&&G.day)||0;
+  if(el._d===now && el._t===t) return; el._d=now; el._t=t;
+  el.innerHTML='<b style="color:#e8c34a">🐫 THE SILK ROAD</b> · '+S.n+' · '+silkCaravanCount()+' caravans on the road<br>'
+    +'<span style="opacity:.85">a bolt of silk: '+SILK_PRICES.map(p=>p[0]+' <b>'+p[1]+'×</b>').join(' → ')+'</span>'
+    +(t? '<br>your gates take <b style="color:#8ad07a">'+coinWord(t)+'</b> in tolls after every bout' : '<br><span style="opacity:.7">govern a town on the road and its caravans pay toll at your gate</span>');
+}
 function drawMapCanvasEast(){
   mapZoomForWorld();
   const HI=mapHiRes()? mapHiReady('asia6|'+dynKey(),()=>asiaStatic(6)) : null, R=HI? 6 : 3;
   mapSize(480*R,216*R); mctx.setTransform(1,0,0,1,0,0); mctx.imageSmoothingEnabled=true;
   mctx.drawImage(HI||asiaStatic(),0,0);
   /* the seats: an ink dot each, and a hairline to the tag where the tag had to move */
+  try{ mctx.save(); mctx.setTransform(R,0,0,R,0,0); drawSilkRoadLive(mctx); mctx.restore(); silkTicker(); }catch(e){}
   try{ if(!EAST_PIN_POS[REGIONS_EAST[0].id]) layoutEastPins(); const c=mctx; c.save(); c.setTransform(R,0,0,R,0,0);
     for(const r of REGIONS_EAST){ const P=EAST_PIN_POS[r.id]; if(!P) continue; const own=G.titles&&G.titles[r.id], done=G.cleared&&G.cleared[r.id], cur=G.current===r.id;
       const ty=P.y+P.hh*(P.y<P.ay? 1 : -1);
@@ -73095,6 +73149,7 @@ function mapHiRes(){ return MZ.z>=1.75; }
 })();
 /* the zoom belongs to a sheet: a new atlas starts at the whole map, and only the big two sheets offer it */
 function mapZoomForWorld(){ let w='west'; try{ w=playerWorld(); }catch(e){}
+  try{ const st=document.getElementById('silk-ticker'); if(st && w!=='east') st.style.display='none'; }catch(e){}
   const ctl=document.getElementById('map-zoomctl'); if(ctl) ctl.style.display=(w==='east'||w==='west')? 'flex' : 'none';
   if(MZ.world!==w){ MZ.world=w; mapZoomReset(); } }
 /* building the detailed sheet takes a second; it is done between frames, and the plain sheet shows until it is ready */
@@ -75447,7 +75502,7 @@ drawLogo();
 })();
 
 try{ iceMythInit(); iceClothInit(); iceTtsInit(); iceWrap(); }catch(e){ console.error('iceMythInit',e); }
-window.__SS = { roomBackdrop:(T)=>whRoomBackdrop(T), btMountSprite:(id,f)=>btMountSprite(id,f), poseLoreNow:()=>poseLore(), nbStyleSprite:(S,f,a)=>nbStyleSprite(S,f,a), armyStyle:(id)=>armyStyle(id), dynThroneFalls:(h)=>dynThroneFalls(h), proclaimDynasty:()=>proclaimDynasty(), plotTargets:()=>plotTargets(), mapZoomTo:(z,x,y)=>mapZoomTo(z,x,y), ASIA_PEOPLES, asiaPeopleFor:(e,o)=>asiaPeopleFor(e,o), EAST_PIN_POS, campaignOdds:(cp)=>campaignOdds(cp), updateBattle:(dt)=>updateBattle(dt), drawBattle:()=>drawBattle(), get BT(){ return BT; }, romStyles:()=>ROM_STYLES, startRomanticStyled:(a,b)=>startRomanticStyled(a,b), bgFn:(n)=>({bgPalace,bgWar,bgCoast,bgWoa,bgOpelia,bgIsle,bgReiko,bgForge})[n], setPairSS:(v)=>{ PAIR_SS=v; }, ICE_T:{ get AC(){return AC;}, set AC(v){AC=v;}, iceSlap, iceSkin, iceUlk, iceGulp, iceVoc, iceCrowd, ICE_V, sfx }, ICE_TTS, STRIKES, getDM:()=>DM, drawBridePortrait:(...a)=>drawBridePortrait(...a), rhFig, RH_CAST, openBotWatch, botEnterBeat, getBW:()=>BW, iceGoddessOpen, paintGoddess, startBedScene, regionAny, iceDebug:()=>({here:iceHere(), prey:ICE_PREY_BY_REGION}),
+window.__SS = { roomBackdrop:(T)=>whRoomBackdrop(T), silkDbg:()=>{ const c=document.createElement("canvas").getContext("2d"); try{ drawSilkRoadLive(c); return {ok:true, n:silkCaravanCount(), at:silkAt(0.5), arc:silkArc().tot}; }catch(e){ return {err:e.message}; } }, btMountSprite:(id,f)=>btMountSprite(id,f), poseLoreNow:()=>poseLore(), nbStyleSprite:(S,f,a)=>nbStyleSprite(S,f,a), armyStyle:(id)=>armyStyle(id), dynThroneFalls:(h)=>dynThroneFalls(h), proclaimDynasty:()=>proclaimDynasty(), plotTargets:()=>plotTargets(), mapZoomTo:(z,x,y)=>mapZoomTo(z,x,y), ASIA_PEOPLES, asiaPeopleFor:(e,o)=>asiaPeopleFor(e,o), EAST_PIN_POS, campaignOdds:(cp)=>campaignOdds(cp), updateBattle:(dt)=>updateBattle(dt), drawBattle:()=>drawBattle(), get BT(){ return BT; }, romStyles:()=>ROM_STYLES, startRomanticStyled:(a,b)=>startRomanticStyled(a,b), bgFn:(n)=>({bgPalace,bgWar,bgCoast,bgWoa,bgOpelia,bgIsle,bgReiko,bgForge})[n], setPairSS:(v)=>{ PAIR_SS=v; }, ICE_T:{ get AC(){return AC;}, set AC(v){AC=v;}, iceSlap, iceSkin, iceUlk, iceGulp, iceVoc, iceCrowd, ICE_V, sfx }, ICE_TTS, STRIKES, getDM:()=>DM, drawBridePortrait:(...a)=>drawBridePortrait(...a), rhFig, RH_CAST, openBotWatch, botEnterBeat, getBW:()=>BW, iceGoddessOpen, paintGoddess, startBedScene, regionAny, iceDebug:()=>({here:iceHere(), prey:ICE_PREY_BY_REGION}),
   openBookViewer:()=>openBookViewer(), openSettings:()=>openSettings(), 
   rhAmbTick:(b)=>rhAmbTick(b), rhAmbHit:(k,n)=>rhAmbHit(k,n), rhAmbStop:()=>rhAmbStop(), rhSting:(b)=>rhSting(b), setMuted:(v)=>{muted=v;}, ambKind:()=>RH_AMB&&RH_AMB.kind, acState:()=>AC&&AC.state,
   WPN_ART, WPN_RANGED, drawRangedIcon, BOWS, wpnStamp, wpnIcon, drawHeldBow, drawHeldPilum, drawHeldBomb, get WPN_DRAWS(){ return WPN_DRAWS; }, setOUTL:(v)=>{ OUTL=!!v; }, drawWeapon2Old,
