@@ -20,5 +20,8 @@ const SETUP=()=>{ const S=window.__SS; S.newDemo('Marcus','Italia','Roman'); con
  ok(after.trans && typeof after.trans.from==='number', 'a change of position is a shift: the last one is kept to dissolve out');
  const heat=await pg.evaluate(()=>{ const S=window.__SS, a=S.BC.heat; S.setBCT(S.BC.t+1200); return new Promise(r=>setTimeout(()=>r([a, S.BC.heat]),200)); });
  ok(heat[1]>heat[0], 'and the night builds ('+heat.map(v=>v.toFixed(2)).join(' → ')+')');
+ const man=await pg.evaluate(()=>{ const S=window.__SS; S.setSetting('manualPose', true); S.setWH('done'); S.startBedScene('fun','night','bed'); S.setBCT(900);
+   return new Promise(r=>setTimeout(()=>{ const a=S.BEDPOSE_LAST&&S.BEDPOSE_LAST.vi; S.setBCT(S.BC.t+700); setTimeout(()=>{ const b=S.BEDPOSE_LAST&&S.BEDPOSE_LAST.vi; S.setSetting('manualPose', false); r({a,b,set:S.BC._SET}); },200); },200)); });
+ ok(man.a===man.set[0] && man.b===man.a, 'MANUAL in the settings: it stays on the position until you choose ('+man.a+' → '+man.b+')');
  ok(errs.length===0, 'no page errors'+(errs[0]? ' — '+errs[0] : ''));
  console.log(fail? '✗ '+fail+' FAILED' : 'ALL GREEN'); await br.close(); process.exit(fail?1:0); })();
