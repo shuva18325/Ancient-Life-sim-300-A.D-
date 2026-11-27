@@ -10,6 +10,8 @@ const {chromium}=require('playwright');
    o.seasons=seasons; o.px=px;
    S.G.day=0; S.enterMap(); return o; });
  await pg.waitForTimeout(600);
+ /* a random event can open over the map on arrival; if so, go back to the map and look again */
+ for(let i=0;i<3;i++){ const has=await pg.evaluate(()=>{ const cv=document.getElementById('silk-layer'); return !!cv && cv.style.display!=='none'; }); if(has) break; await pg.evaluate(()=>window.__SS.enterMap()); await pg.waitForTimeout(600); }
  const layer=await pg.evaluate(()=>{ const cv=document.getElementById('silk-layer'); if(!cv) return {ok:false}; const d=cv.getContext('2d').getImageData(0,0,cv.width,cv.height).data; let n=0; for(let i=3;i<d.length;i+=4) if(d[i]>40) n++; return {ok:cv.style.display!=='none', n}; });
  ok(r.ships.every(n=>n>400), 'a Roman merchantman, an Indian ship and a junk are each drawn as a real ship ('+r.ships.join('/')+' px)');
  ok(JSON.stringify(r.seasons)==='[0,1,2,3]', 'the year turns through its four seasons');
