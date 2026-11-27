@@ -64829,11 +64829,155 @@ function buildGenerals(b){
   card.appendChild(rf); b.appendChild(card);
 }
 // Imperial rule panel: public approval, legions, political rivals, retirement
+/* =====================================================================
+   🏛 THE EMPIRE — ruling it, not just wearing the purple
+   ---------------------------------------------------------------------
+   The Body Map's idea with the empire as the body: one sheet, every
+   province on it, a lens to read it by, and a card for the one you have
+   in your hand. Seeded with the year 200 as it was: thirty-three
+   legions (Severus raised three more for the Parthian war, and stationed
+   II Parthica at Alba, twenty miles from Rome: the first legion in Italy
+   in two centuries); Virius Lupus buying peace from the Maeatae in
+   Britain; Marius Maximus in Syria. Each season the fiscus collects what
+   the provinces can bear and pays what the legions cost. Severus has
+   just raised their pay, and his last words to his sons will be "enrich
+   the soldiers, scorn everyone else". Frontiers that are not held get
+   raided. A governor with an army and a grievance becomes the next
+   Severus, Niger or Albinus.
+   ===================================================================== */
+const EMP_SEED={
+  'Britannia':          {leg:3, gov:['Virius Lupus','able'],             threat:'the Caledonii and the Maeatae', th:55, pros:40},
+  'Gallia':             {leg:4, gov:['Claudius Gallus','loyal'],          threat:'the Chatti and the Alamanni across the Rhine', th:45, pros:62},
+  'Hispania Baetica':   {leg:1, gov:['Caecilius Aemilianus','greedy'],    threat:'Moorish raiders over the strait', th:20, pros:66},
+  'Italia':             {leg:1, gov:['Fulvius Plautianus','ambitious'],   threat:null, th:0, pros:72, grain:-3},
+  'Insulae Baleares & Sicilia':{leg:0, gov:['Aemilius Paetinus','loyal'], threat:null, th:0, pros:58, grain:1},
+  'Africa Proconsularis':{leg:1, gov:['Anicius Faustus','able'],          threat:'the Garamantes and the Mauri', th:30, pros:68, grain:2},
+  'Dalmatia':           {leg:0, gov:['Valerius Pudens','loyal'],          threat:null, th:0, pros:50},
+  'Illyricum':          {leg:10, gov:['Fabius Cilo','loyal'],             threat:'the Marcomanni, the Iazyges and the Carpi', th:60, pros:44},
+  'Achaea':             {leg:0, gov:['Claudius Attalus','greedy'],        threat:null, th:0, pros:55},
+  'Creta':              {leg:0, gov:['Iulius Severianus','loyal'],        threat:null, th:0, pros:48},
+  'Asia Minor':         {leg:2, gov:['Atilius Barbarus','able'],          threat:'Armenia, and the passes beyond Cappadocia', th:25, pros:70},
+  'Cyprus':             {leg:0, gov:['Caesernius Statianus','loyal'],     threat:null, th:0, pros:52},
+  'Aegyptus':           {leg:1, gov:['Maecius Laetus','able'],            threat:'the Blemmyes above the cataract', th:20, pros:64, grain:3},
+  'Syria Palaestina':   {leg:5, gov:['Marius Maximus','ambitious'],       threat:'the Arsacid border on the Euphrates', th:40, pros:66},
+  'Arabia Petraea':     {leg:1, gov:['Aurelius Iulianus','loyal'],        threat:'the desert tribes', th:30, pros:46},
+  'Mesopotamia':        {leg:2, gov:['Claudius Subatianus','able'],       threat:'Parthia, and Hatra that would not fall', th:65, pros:36},
+};
+const EMP_TRAITS={able:'governs well: the province grows', loyal:'yours to the bone', greedy:'skims: less of the tax reaches you, and the province resents it', ambitious:'clever, popular with the men, and watching you'};
+const EMP_GOVPOOL=['Cassius Dio','Aiacius Modestus','Alfenus Senecio','Claudius Candidus','Cornelius Anullinus','Septimius Geta','Iulius Pacatianus','Novius Rufus','Sextius Lateranus','Pollienus Auspex','Antistius Burrus','Flavius Secundus','Valerius Messalla','Lollianus Avitus','Pomponius Bassus','Aelius Coeranus'];
+const EMP_PROJECTS=[
+  {id:'road',  name:'Repave the roads',              cost:900,  pros:8,  def:0,  loyal:2, note:'Milestones with your name on them. Trade moves, and so do the legions.'},
+  {id:'wall',  name:'Strengthen the frontier forts', cost:1400, pros:0,  def:15, loyal:0, note:'Stone where there was timber, a ditch in front, a tower every mile.'},
+  {id:'aqua',  name:'Build an aqueduct and baths',   cost:1800, pros:10, def:0,  loyal:8, note:'Water from the hills, and somewhere to spend the afternoon. Nothing buys a city faster.'},
+  {id:'grain', name:'Granaries and a harbour mole',  cost:1200, pros:6,  def:0,  loyal:3, grain:1, note:'More grain for Rome, and less of it rotting on the quay.'},
+];
+const EMP_LENS={loyal:{n:'LOYALTY', c:['#8a1d1d','#e8c34a','#3a8a3a']}, pros:{n:'WEALTH', c:['#5a3a2a','#c8a040','#f0e070']}, unrest:{n:'UNREST', c:['#3a8a3a','#e8c34a','#c82a1a']}, leg:{n:'LEGIONS', c:['#e8dcc0','#c86a3a','#7a1d12']}, threat:{n:'FRONTIER', c:['#3a8a3a','#e8a030','#c81a1a']}};
+const EMP_UI={sel:null, lens:'loyal', log:[]};
+function empProvIds(){ return Object.keys(EMP_SEED).filter(id=>PROV_SHAPES[id]); }
+function empInit(){
+  if(G.empire && G.empire.prov) return G.empire;
+  const E={prov:{}, treasury:6000, season:0, log:[]};
+  for(const id of empProvIds()){ const s=EMP_SEED[id]; E.prov[id]={gov:{name:s.gov[0], trait:s.gov[1]}, leg:s.leg, tax:1, loyal:60+(s.gov[1]==='loyal'? 10 : s.gov[1]==='ambitious'? -8 : 0), pros:s.pros, unrest:12, def:s.leg*12+10, built:[], raided:0}; }
+  G.empire=E; return E; }
+function empThreat(id){ const s=EMP_SEED[id]; return s? s.th+(G.empire? (G.empire.season%4===2? 8 : 0) : 0) : 0; }
+function empDefense(id){ const p=G.empire.prov[id]; return p.leg*12+(p.built.includes('wall')? 15 : 0)+6; }
+function empRevenue(id){ const p=G.empire.prov[id]; let r=p.pros*12*[0.6,1,1.45][p.tax]*(1-p.unrest/200); if(p.gov.trait==='greedy') r*=0.78; return Math.round(r); }
+function empUpkeep(){ let n=0; for(const id in G.empire.prov) n+=G.empire.prov[id].leg; return n*260; }
+function empGrain(){ let g=0; for(const id in G.empire.prov){ const s=EMP_SEED[id], p=G.empire.prov[id]; if(s.grain) g+=s.grain*(p.unrest>60? 0.4 : 1)+(p.built.includes('grain')? 1 : 0); } return Math.round(g*10)/10; }
+function empSummary(){ let rev=0; for(const id in G.empire.prov) rev+=empRevenue(id); const up=empUpkeep(); return {rev, up, net:rev-up}; }
+/* a season passes: taxes in, pay out, and the provinces answer for how they have been treated */
+function empSeason(){
+  const E=G.empire, log=[]; E.season++;
+  const S=empSummary(); E.treasury+=S.net; log.push('The fiscus takes in '+coinWord(S.rev)+' and pays the legions '+coinWord(S.up)+'.');
+  for(const id in E.prov){ const p=E.prov[id], th=empThreat(id), df=empDefense(id), tr=p.gov.trait;
+    p.unrest=clamp(p.unrest+[-6,1,9][p.tax]+(tr==='greedy'? 3 : 0)-(p.built.includes('aqua')? 3 : 0)+Math.round(rnd(-3,3)),0,100);
+    p.loyal=clamp(p.loyal+[4,0,-6][p.tax]+(tr==='loyal'? 3 : tr==='ambitious'? -2 : 0)-Math.round(p.unrest/30)+Math.round(rnd(-2,2)),0,100);
+    p.pros=clamp(p.pros+(tr==='able'? 2 : 0)+(p.unrest>60? -3 : 1)-(p.raided? 2 : 0),5,100); p.raided=0;
+    if(th>df && Math.random()<(th-df)/80){ p.pros=clamp(p.pros-12,5,100); p.loyal=clamp(p.loyal-6,0,100); p.raided=1; log.push('⚔ '+EMP_SEED[id].threat.charAt(0).toUpperCase()+EMP_SEED[id].threat.slice(1)+' raid '+id+': villas burned, the people ask where the legions were.'); }
+    if(p.unrest>=85){ p.leg=Math.max(0,p.leg-1); p.unrest=55; p.pros=clamp(p.pros-10,5,100); log.push('🔥 '+id+' rises: the governor’s palace burns and a legion is needed to put it down.'); }
+    if(p.leg>=3 && !E.usurper && (tr==='ambitious' && p.loyal<36 || p.loyal<20)){ E.usurper={id, name:p.gov.name, leg:p.leg}; log.push('⚜ '+p.gov.name+' is hailed Augustus by the legions of '+id+'!'); } }
+  const gr=empGrain(); if(gr<2){ G.approval=clamp((G.approval||50)-8,0,100); log.push('🌾 The grain fleets are short ('+gr+'): bread riots in Rome (−8 approval).'); } else if(gr>=5){ G.approval=clamp((G.approval||50)+3,0,100); log.push('🌾 The grain fleets come in full: Rome is fed (+3 approval).'); }
+  if(Math.random()<0.06){ for(const id in E.prov){ E.prov[id].pros=clamp(E.prov[id].pros-6,5,100); } log.push('☠ The plague comes back, as it did under Marcus: every province is poorer.'); }
+  if(E.treasury<0){ G.approval=clamp((G.approval||50)-10,0,100); for(const id in E.prov) E.prov[id].loyal=clamp(E.prov[id].loyal-8,0,100); log.push('💀 The fiscus is empty and the legions are paid late. Every province grows colder (−10 approval).'); }
+  E.log=log.concat(E.log||[]).slice(0,14); try{ G.day=(G.day||0)+1; }catch(e){} saveQuiet(); }
+function empCol(stops,t){ t=clamp(t,0,1); const a=t<0.5? stops[0] : stops[1], b=t<0.5? stops[1] : stops[2]; return mixHex(a,b,t<0.5? t*2 : (t-0.5)*2); }
+function empLensVal(id){ const p=G.empire.prov[id]; switch(EMP_UI.lens){ case 'loyal': return p.loyal/100; case 'pros': return p.pros/100; case 'unrest': return p.unrest/100; case 'leg': return Math.min(1,p.leg/8); case 'threat': return clamp((empThreat(id)-empDefense(id)+40)/80,0,1); } return 0.5; }
+function empDraw(cv){
+  const c=cv.getContext('2d'), W=MAP_SHEET.W, H=MAP_SHEET.H, k=cv.width/W;
+  c.setTransform(1,0,0,1,0,0); c.fillStyle='#1a120a'; c.fillRect(0,0,cv.width,cv.height);
+  try{ if(_mapStatic) c.drawImage(_mapStatic,0,0,cv.width,cv.height); }catch(e){}
+  c.setTransform(k,0,0,k,0,0);
+  const ringP=(r)=>{ const P=new Path2D(); for(let i=0;i<r.length;i+=2){ const q=lonlat(r[i],r[i+1]); i? P.lineTo(q[0],q[1]) : P.moveTo(q[0],q[1]); } P.closePath(); return P; };
+  const L=EMP_LENS[EMP_UI.lens];
+  for(const id of empProvIds()){ const sh=PROV_SHAPES[id], rings=sh.parts||[sh.ring];
+    for(const r of rings){ const P=ringP(r); c.globalAlpha=0.55; c.fillStyle=empCol(L.c, empLensVal(id)); c.fill(P); c.globalAlpha=1;
+      c.strokeStyle=EMP_UI.sel===id? '#fff4c0' : 'rgba(40,20,10,.7)'; c.lineWidth=EMP_UI.sel===id? 1.4 : 0.5; c.stroke(P); } }
+  // the eagles: one pip per legion, at the province's heart
+  for(const id of empProvIds()){ const sh=PROV_SHAPES[id], r=(sh.parts||[sh.ring])[0]; let sx=0, sy=0, n=0; for(let i=0;i<r.length;i+=2){ const q=lonlat(r[i],r[i+1]); sx+=q[0]; sy+=q[1]; n++; } const cx=sx/n, cy=sy/n, p=G.empire.prov[id];
+    c.font='bold 4px Georgia,serif'; c.textAlign='center'; c.lineWidth=1.2; c.strokeStyle='rgba(250,242,222,.85)'; c.strokeText(id.split(' ')[0],cx,cy-2); c.fillStyle='#2a1a0e'; c.fillText(id.split(' ')[0],cx,cy-2);
+    for(let i=0;i<p.leg;i++){ c.fillStyle='#e8c34a'; c.strokeStyle='#5a3a12'; c.lineWidth=0.4; c.beginPath(); c.arc(cx-(p.leg-1)*1.6+i*3.2, cy+2.5, 1.2, 0, 7); c.fill(); c.stroke(); }
+    if(EMP_SEED[id].threat && empThreat(id)>empDefense(id)){ c.fillStyle='#c81a1a'; c.font='bold 5px sans-serif'; c.fillText('!',cx+8,cy+3); }
+    if(G.empire.usurper && G.empire.usurper.id===id){ c.fillStyle='#7a3fa0'; c.font='bold 5px sans-serif'; c.fillText('⚜',cx-9,cy+3); } }
+}
+function empHit(cv, ev){ const r=cv.getBoundingClientRect(), x=(ev.clientX-r.left)/r.width*MAP_SHEET.W, y=(ev.clientY-r.top)/r.height*MAP_SHEET.H, c=cv.getContext('2d');
+  for(const id of empProvIds()){ const sh=PROV_SHAPES[id]; for(const ring of (sh.parts||[sh.ring])){ const P=new Path2D(); for(let i=0;i<ring.length;i+=2){ const q=lonlat(ring[i],ring[i+1]); i? P.lineTo(q[0],q[1]) : P.moveTo(q[0],q[1]); } P.closePath(); c.setTransform(1,0,0,1,0,0); if(c.isPointInPath(P,x,y)) return id; } } return null; }
+function openEmpire(){
+  if(!G.emperor){ toast('Only the emperor rules the empire.',2200); return; }
+  const E=empInit();
+  let scr=document.getElementById('scr-empire');
+  if(!scr){ scr=document.createElement('div'); scr.id='scr-empire'; scr.className='screen center';
+    scr.innerHTML='<div class="panel pad col gap scrollbox" style="width:min(97%,1180px);max-height:94%;"><h2 style="color:var(--gold);margin:0">🏛 THE EMPIRE</h2><div id="emp-sub" class="small muted"></div><div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-start"><div style="flex:1 1 560px;min-width:0"><canvas id="emp-cv" width="960" height="520" style="position:relative;inset:auto;display:block;width:100%;height:auto;border:1px solid #6a5030;border-radius:4px;cursor:pointer"></canvas><div id="emp-lens" class="row gap6" style="flex-wrap:wrap;margin-top:4px"></div></div><div id="emp-side" class="col gap" style="flex:1 1 320px;min-width:280px"></div></div><div class="row" style="justify-content:flex-end;gap:6px"><button class="btn sm gold" id="emp-season">⏳ LET A SEASON PASS</button><button class="btn gold" id="emp-back">◀ BACK</button></div></div>';
+    document.getElementById('scr-villa').parentNode.appendChild(scr); }
+  state='villa'; show('scr-empire'); $('statbar').classList.remove('hide'); refreshStatbar();
+  const cv=$('emp-cv'); if(!_mapStatic){ try{ drawMapCanvas(); }catch(e){} }
+  cv.onclick=(ev)=>{ const id=empHit(cv,ev); if(id){ EMP_UI.sel=id; empRender(); } };
+  $('emp-back').onclick=()=>{ openIntrigue(); };
+  $('emp-season').onclick=()=>{ empSeason(); empRender(); refreshStatbar(); };
+  empRender(); }
+function empRender(){
+  const E=G.empire, cv=$('emp-cv'); empDraw(cv);
+  const S=empSummary();
+  $('emp-sub').innerHTML='Season '+(E.season+1)+' of your reign · the fiscus holds <b style="color:'+(E.treasury>=0? '#8ad07a' : '#e0705b')+'">'+coinWord(E.treasury)+'</b> · each season: taxes <b>'+coinWord(S.rev)+'</b> − army pay <b>'+coinWord(S.up)+'</b> = <b style="color:'+(S.net>=0? '#8ad07a' : '#e0705b')+'">'+(S.net>=0?'+':'')+coinWord(S.net)+'</b> · grain for Rome <b>'+empGrain()+'</b> · approval <b>'+(G.approval||0)+'</b>';
+  const lens=$('emp-lens'); lens.innerHTML=''; for(const k in EMP_LENS){ const b=document.createElement('button'); b.className='btn sm'+(EMP_UI.lens===k? ' gold' : ''); b.textContent=EMP_LENS[k].n; b.onclick=()=>{ EMP_UI.lens=k; empRender(); }; lens.appendChild(b); }
+  const side=$('emp-side'); side.innerHTML='';
+  if(E.usurper){ const U=E.usurper, d=document.createElement('div'); d.className='shopcard'; d.style.borderColor='#7a3fa0';
+    d.innerHTML='<div><b style="color:#c89ae0">⚜ '+U.name+' has taken the purple in '+U.id+'</b></div><div class="small">'+U.leg+' legions have hailed him. Severus did exactly this seven years ago.</div>';
+    const b1=document.createElement('button'); b1.className='btn sm blood'; b1.textContent='⚔ MARCH ON THE USURPER'; b1.onclick=()=>{ const p=E.prov[U.id];
+      armyBattle({title:'THE USURPER IN '+U.id.toUpperCase(), sub:U.name+' and '+U.leg+' legions', enemyName:'THE USURPER’S LEGIONS', enemyStyle:'usurper', yourStyle:'legion', yourMen:Math.max(8000,(G.legions||6)*5000), enemyMen:U.leg*5200, kind:'field',
+        onWin:()=>{ p.gov={name:EMP_GOVPOOL[(Math.random()*EMP_GOVPOOL.length)|0], trait:'loyal'}; p.loyal=55; delete E.usurper; G.approval=clamp((G.approval||50)+8,0,100); saveQuiet(); toast('⚜ The usurper’s head goes to Rome on a spear. The legions swear again.',3600); openEmpire(); },
+        onLose:()=>{ G.approval=clamp((G.approval||50)-15,0,100); saveQuiet(); toast('Your army breaks. The usurper marches on.',3200); openEmpire(); } }); };
+    const b2=document.createElement('button'); b2.className='btn sm'; b2.textContent='💰 BUY HIS LEGIONS (2,500)'; b2.disabled=E.treasury<2500; b2.onclick=()=>{ if(E.treasury<2500) return; E.treasury-=2500; const p=E.prov[U.id]; p.loyal=50; p.gov={name:EMP_GOVPOOL[(Math.random()*EMP_GOVPOOL.length)|0], trait:'loyal'}; delete E.usurper; toast('The legions take your donative and hand you his head. It is how these things usually end.',3600); empRender(); };
+    d.appendChild(b1); d.appendChild(b2); side.appendChild(d); }
+  const id=EMP_UI.sel;
+  if(id && E.prov[id]){ const p=E.prov[id], s=EMP_SEED[id], th=empThreat(id), df=empDefense(id);
+    const card=document.createElement('div'); card.className='shopcard eq';
+    const bar=(v,col)=>'<div class="bar" style="margin:2px 0 4px"><i style="width:'+Math.round(clamp(v,0,100))+'%;height:100%;background:'+col+'"></i></div>';
+    card.innerHTML='<div><b style="color:var(--gold)">'+id.toUpperCase()+'</b></div>'
+      +'<div class="small">Governor: <b>'+p.gov.name+'</b>, <i>'+EMP_TRAITS[p.gov.trait]+'</i></div>'
+      +'<div class="small" style="margin-top:4px">Loyalty '+p.loyal+bar(p.loyal,'#3a8a3a')+'Prosperity '+p.pros+bar(p.pros,'#c8a040')+'Unrest '+p.unrest+bar(p.unrest,'#c82a1a')+'</div>'
+      +'<div class="small">Legions: <b>'+p.leg+'</b> · tax: <b>'+['light','fair','heavy'][p.tax]+'</b> → '+coinWord(empRevenue(id))+' a season'+(s.grain? ' · grain '+s.grain : '')+'</div>'
+      +(s.threat? '<div class="small">Frontier: '+s.threat+' — threat <b style="color:'+(th>df? '#e0705b' : '#8ad07a')+'">'+th+'</b> against defence <b>'+df+'</b></div>' : '<div class="small muted">No frontier: the legions here are for show, or for Rome.</div>')
+      +(p.built.length? '<div class="small muted">Built: '+p.built.map(b=>EMP_PROJECTS.find(x=>x.id===b).name.toLowerCase()).join(', ')+'</div>' : '');
+    const row=(btns)=>{ const r=document.createElement('div'); r.className='row gap6'; r.style.cssText='flex-wrap:wrap;margin-top:4px'; btns.forEach(([t,dis,fn,tt])=>{ const b=document.createElement('button'); b.className='btn sm'; b.textContent=t; b.disabled=!!dis; if(tt) b.title=tt; b.onclick=()=>{ fn(); saveQuiet(); empRender(); }; r.appendChild(b); }); card.appendChild(r); };
+    row([['TAX: LIGHT',p.tax===0,()=>{p.tax=0;}],['FAIR',p.tax===1,()=>{p.tax=1;}],['HEAVY',p.tax===2,()=>{p.tax=2;}]]);
+    const other=empProvIds().filter(x=>x!==id && E.prov[x].leg>0).sort((a,b)=>E.prov[b].leg-E.prov[a].leg)[0];
+    row([['+1 LEGION from '+(other||'nowhere'), !other, ()=>{ E.prov[other].leg--; p.leg++; }, 'Move a legion here from the province with the most.'],
+         ['RAISE A NEW LEGION (3,000)', E.treasury<3000, ()=>{ E.treasury-=3000; p.leg++; G.legions=(G.legions||0)+1; }, 'Severus raised three. Each one costs its pay every season, forever.'],
+         ['−1 LEGION (send it to Italy)', p.leg<1 || id==='Italia', ()=>{ p.leg--; E.prov['Italia'].leg++; }]]);
+    row([['REPLACE THE GOVERNOR', false, ()=>{ const n=EMP_GOVPOOL[(Math.random()*EMP_GOVPOOL.length)|0], t=['able','loyal','greedy','ambitious'][(Math.random()*4)|0]; p.gov={name:n, trait:t}; p.loyal=clamp(p.loyal-4,0,100); toast('🏛 '+n+' takes the province: '+EMP_TRAITS[t]+'.',3000); }, 'You do not know what you are getting. Nobody ever does.'],
+         ['A DONATIVE TO ITS LEGIONS (800)', E.treasury<800 || !p.leg, ()=>{ E.treasury-=800; p.loyal=clamp(p.loyal+12,0,100); }],
+         ['GAMES AND BREAD (500)', E.treasury<500, ()=>{ E.treasury-=500; p.unrest=clamp(p.unrest-15,0,100); }]]);
+    row(EMP_PROJECTS.map(P=>[P.name+' ('+fmt(P.cost)+')', p.built.includes(P.id) || E.treasury<P.cost, ()=>{ E.treasury-=P.cost; p.built.push(P.id); p.pros=clamp(p.pros+P.pros,5,100); p.loyal=clamp(p.loyal+P.loyal,0,100); toast('🏗 '+P.note,3000); }, P.note]));
+    side.appendChild(card); }
+  else { const d=document.createElement('div'); d.className='shopcard'; d.innerHTML='<div class="small">Click a province on the sheet. The lens buttons recolour the empire by loyalty, wealth, unrest, legions or frontier danger; the gold pips are legions; a red <b>!</b> is a frontier its garrison cannot hold.</div>'; side.appendChild(d); }
+  const lg=document.createElement('div'); lg.className='shopcard'; lg.innerHTML='<div class="small" style="color:var(--gold)">DISPATCHES</div>'+((E.log&&E.log.length)? E.log.map(t=>'<div class="small">'+t+'</div>').join('') : '<div class="small muted">Nothing yet. Let a season pass.</div>');
+  side.appendChild(lg); }
 function buildRule(b){
   if(playerWorld()==='east'){ buildRuleEast(b); return; }
   const rh=document.createElement('div'); rh.className='small'; rh.style.color='var(--gold)'; rh.style.marginTop='8px';
   rh.textContent='⚜ IMPERIAL RULE — YOU WEAR THE PURPLE:'; b.appendChild(rh);
   const rc=document.createElement('div'); rc.className='shopcard eq';
+  { const eb=document.createElement('button'); eb.className='btn gold'; eb.style.margin='6px 0'; eb.textContent='🏛 THE EMPIRE — RULE IT PROVINCE BY PROVINCE'; eb.onclick=()=>openEmpire(); b.appendChild(eb); }
   rc.innerHTML=`<div><b style="color:var(--gold)">Imperator ${G.name}</b></div>
     <div>Public approval: <b>${G.approval}/100</b> · Legions: <b>${G.legions}</b> (${fmt(G.legions*5000)} men) · Plotting rivals: <b style="color:var(--blood)">${G.rivals}</b></div>
     <div class="bar" style="margin-top:4px"><i style="width:${G.approval}%;height:100%;background:linear-gradient(90deg,#8a1d1d,#e8c34a,#5b7a32)"></i></div>
@@ -75502,7 +75646,7 @@ drawLogo();
 })();
 
 try{ iceMythInit(); iceClothInit(); iceTtsInit(); iceWrap(); }catch(e){ console.error('iceMythInit',e); }
-window.__SS = { roomBackdrop:(T)=>whRoomBackdrop(T), silkDbg:()=>{ const c=document.createElement("canvas").getContext("2d"); try{ drawSilkRoadLive(c); return {ok:true, n:silkCaravanCount(), at:silkAt(0.5), arc:silkArc().tot}; }catch(e){ return {err:e.message}; } }, btMountSprite:(id,f)=>btMountSprite(id,f), poseLoreNow:()=>poseLore(), nbStyleSprite:(S,f,a)=>nbStyleSprite(S,f,a), armyStyle:(id)=>armyStyle(id), dynThroneFalls:(h)=>dynThroneFalls(h), proclaimDynasty:()=>proclaimDynasty(), plotTargets:()=>plotTargets(), mapZoomTo:(z,x,y)=>mapZoomTo(z,x,y), ASIA_PEOPLES, asiaPeopleFor:(e,o)=>asiaPeopleFor(e,o), EAST_PIN_POS, campaignOdds:(cp)=>campaignOdds(cp), updateBattle:(dt)=>updateBattle(dt), drawBattle:()=>drawBattle(), get BT(){ return BT; }, romStyles:()=>ROM_STYLES, startRomanticStyled:(a,b)=>startRomanticStyled(a,b), bgFn:(n)=>({bgPalace,bgWar,bgCoast,bgWoa,bgOpelia,bgIsle,bgReiko,bgForge})[n], setPairSS:(v)=>{ PAIR_SS=v; }, ICE_T:{ get AC(){return AC;}, set AC(v){AC=v;}, iceSlap, iceSkin, iceUlk, iceGulp, iceVoc, iceCrowd, ICE_V, sfx }, ICE_TTS, STRIKES, getDM:()=>DM, drawBridePortrait:(...a)=>drawBridePortrait(...a), rhFig, RH_CAST, openBotWatch, botEnterBeat, getBW:()=>BW, iceGoddessOpen, paintGoddess, startBedScene, regionAny, iceDebug:()=>({here:iceHere(), prey:ICE_PREY_BY_REGION}),
+window.__SS = { roomBackdrop:(T)=>whRoomBackdrop(T), openEmpire:()=>openEmpire(), empSeason:()=>empSeason(), EMP_UI, silkDbg:()=>{ const c=document.createElement("canvas").getContext("2d"); try{ drawSilkRoadLive(c); return {ok:true, n:silkCaravanCount(), at:silkAt(0.5), arc:silkArc().tot}; }catch(e){ return {err:e.message}; } }, btMountSprite:(id,f)=>btMountSprite(id,f), poseLoreNow:()=>poseLore(), nbStyleSprite:(S,f,a)=>nbStyleSprite(S,f,a), armyStyle:(id)=>armyStyle(id), dynThroneFalls:(h)=>dynThroneFalls(h), proclaimDynasty:()=>proclaimDynasty(), plotTargets:()=>plotTargets(), mapZoomTo:(z,x,y)=>mapZoomTo(z,x,y), ASIA_PEOPLES, asiaPeopleFor:(e,o)=>asiaPeopleFor(e,o), EAST_PIN_POS, campaignOdds:(cp)=>campaignOdds(cp), updateBattle:(dt)=>updateBattle(dt), drawBattle:()=>drawBattle(), get BT(){ return BT; }, romStyles:()=>ROM_STYLES, startRomanticStyled:(a,b)=>startRomanticStyled(a,b), bgFn:(n)=>({bgPalace,bgWar,bgCoast,bgWoa,bgOpelia,bgIsle,bgReiko,bgForge})[n], setPairSS:(v)=>{ PAIR_SS=v; }, ICE_T:{ get AC(){return AC;}, set AC(v){AC=v;}, iceSlap, iceSkin, iceUlk, iceGulp, iceVoc, iceCrowd, ICE_V, sfx }, ICE_TTS, STRIKES, getDM:()=>DM, drawBridePortrait:(...a)=>drawBridePortrait(...a), rhFig, RH_CAST, openBotWatch, botEnterBeat, getBW:()=>BW, iceGoddessOpen, paintGoddess, startBedScene, regionAny, iceDebug:()=>({here:iceHere(), prey:ICE_PREY_BY_REGION}),
   openBookViewer:()=>openBookViewer(), openSettings:()=>openSettings(), 
   rhAmbTick:(b)=>rhAmbTick(b), rhAmbHit:(k,n)=>rhAmbHit(k,n), rhAmbStop:()=>rhAmbStop(), rhSting:(b)=>rhSting(b), setMuted:(v)=>{muted=v;}, ambKind:()=>RH_AMB&&RH_AMB.kind, acState:()=>AC&&AC.state,
   WPN_ART, WPN_RANGED, drawRangedIcon, BOWS, wpnStamp, wpnIcon, drawHeldBow, drawHeldPilum, drawHeldBomb, get WPN_DRAWS(){ return WPN_DRAWS; }, setOUTL:(v)=>{ OUTL=!!v; }, drawWeapon2Old,
