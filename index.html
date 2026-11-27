@@ -22385,7 +22385,7 @@ function loop(now){
     try{ mapZoomForWorld(); }catch(e){}
     if(_w==='ice') drawMapCanvasIce(); else if(_w==='rk') drawMapCanvasRk(); else if(_w==='wa') drawMapCanvasWa();
     else if(_w==='east') drawMapCanvasEast(); else drawMapCanvas();
-    if(_w!=='east'){ const sl=document.getElementById('silk-layer'); if(sl) sl.style.display='none'; } }
+    if(_w!=='east' && _w!=='west'){ const sl=document.getElementById('silk-layer'); if(sl) sl.style.display='none'; } }
   else if(state==='title'){ drawTitleHD(now); }
   else if(state==='create'||state==='help'){ drawMenuBg(now); }
   else { try{ if(iceHere()) drawMenuBgIce(now); }catch(e){} }
@@ -75409,9 +75409,10 @@ function cameleerSprite(frame, west){
   return cv;
 }
 /* one string of camels, drawn in sheet units under whatever scale the map is at: nose to tail on a lead rope */
-function drawCaravan(c, u, west, i, T){
+function drawCaravan(c, u, west, i, T, at){
+  at=at||silkAt;
   const step=0.0078, K=2.8/(CAMEL_U*26), pts=[];
-  for(let k=0;k<3;k++){ const q=silkAt(u + (west? k : -k)*step), face=(west? -1 : 1)*q.dir;
+  for(let k=0;k<3;k++){ const q=at(u + (west? k : -k)*step), face=(west? -1 : 1)*q.dir;
     const fr=(Math.floor(T*0.0085+i*1.7+k*2.3)%CAMEL_NF+CAMEL_NF)%CAMEL_NF, spr=camelSprite((i*3+k)%CAMEL_COATS.length, i+k, fr, west);
     c.save(); c.translate(q.x, q.y+0.15); c.scale(face*K, K);
     c.drawImage(spr, -CAMEL_OX, -CAMEL_OY-7.9*CAMEL_U*0.98);
@@ -75423,12 +75424,131 @@ function drawCaravan(c, u, west, i, T){
     const nx=a.x+a.face*15.4*s, ny=a.y+0.15-(9.0+7.9*0.98)*s+7.9*s*0.02, tx=b.x-b.face*9.4*s, ty=b.y+0.15-(1.4+7.9*0.98)*s;
     c.moveTo(nx, ny); c.quadraticCurveTo((nx+tx)/2, Math.max(ny,ty)+0.25, tx, ty); }
   c.stroke();
-  if(i%3===0){ const q=silkAt(u+(west? -1 : 1)*step*0.9), face=(west? -1 : 1)*q.dir, fr=(Math.floor(T*0.0085+i)%CAMEL_NF+CAMEL_NF)%CAMEL_NF;
+  if(i%3===0){ const q=at(u+(west? -1 : 1)*step*0.9), face=(west? -1 : 1)*q.dir, fr=(Math.floor(T*0.0085+i)%CAMEL_NF+CAMEL_NF)%CAMEL_NF;
     c.save(); c.translate(q.x, q.y+0.15); c.scale(face*K*1.05, K*1.05); c.drawImage(cameleerSprite(fr, west), -20, -52); c.restore(); }
 }
-/* the caravans are drawn on their own layer over the sheet, at the screen's own resolution under the map's zoom and pan:
-   painted into the sheet canvas they were blown up with it and went soft */
-function drawSilkOverlay(){
+/* =====================================================================
+   🌊 THE MAPS ARE ALIVE — ships on the sea lanes, caravans on the desert
+   roads, and the weather of the season over the land
+   ---------------------------------------------------------------------
+   The Mediterranean sheet had nothing on it that moved. Now the Alexandria
+   grain fleet works up to Ostia south of Sicily, the corn of Africa comes
+   over from Carthage, the oil of Baetica from Gades, Massilia and the
+   Aegean and the Pontic run all have their sails; strings of camels walk
+   the Palmyra road, the incense road out of Petra and the Garamantes'
+   track across the Fezzan. On the Asia sheet the monsoon ships run from
+   the Red Sea to Muziris and on round to Jiaozhi, and the junks work the
+   China coast. Over the land the weather of the season: snow in the far
+   north and on the roof of the world in winter, the sand lifting over the
+   Sahara, Arabia, the Taklamakan and the Gobi, the monsoon over India and
+   the south in summer. All of it on the screen's own layer, so it stays
+   sharp at any zoom.
+   ===================================================================== */
+const SHIP_SPR=new Map();
+function shipSprite(style, frame, u){
+  u=u||3; const key=style+'|'+frame+'|'+u; let cv=SHIP_SPR.get(key); if(cv) return cv;
+  cv=document.createElement('canvas'); cv.width=Math.ceil(34*u); cv.height=Math.ceil(30*u); const g=cv.getContext('2d');
+  g.translate(15*u, 22*u); g.scale(u,u); g.lineJoin='round'; g.lineCap='round';
+  const ph=frame/8*Math.PI*2, bill=1+Math.sin(ph)*0.06, OL='rgba(24,14,8,.9)';
+  g.fillStyle='rgba(255,255,255,.55)'; g.beginPath(); g.ellipse(-2,3.4,13,1.4,0,0,Math.PI*2); g.fill();            // the bow-wave and the wash
+  g.strokeStyle='rgba(255,255,255,.8)'; g.lineWidth=0.5; g.beginPath(); g.moveTo(10.5,2.2); g.quadraticCurveTo(12.5,3.2,14,2.6+Math.sin(ph)*0.4); g.stroke();
+  if(style==='junk'){
+    // the hull: flat-bottomed, square transom high at the stern, the eye painted on the bow
+    g.fillStyle=wLG(g,0,-3,0,3,[[0,'#8a4a2a'],[1,'#3a1e10']]); g.beginPath(); g.moveTo(-11,-3.2); g.lineTo(-9.4,2.2); g.quadraticCurveTo(0,3.4,9,2.0); g.lineTo(11,-1.4); g.lineTo(-11,-1.6); g.closePath(); g.fill(); g.strokeStyle=OL; g.lineWidth=0.4; g.stroke();
+    g.fillStyle='#5a2a14'; g.fillRect(-11.6,-5.2,3.4,4.0); g.fillStyle='#e8e0d0'; g.beginPath(); g.arc(8.6,-0.4,0.7,0,Math.PI*2); g.fill(); g.fillStyle='#1a1410'; g.beginPath(); g.arc(8.8,-0.4,0.35,0,Math.PI*2); g.fill();
+    // two masts, battened sails of matting in ochre
+    for(const [mx,h,w] of [[-2.5,17,9],[5,12,6.5]]){ g.strokeStyle='#3a2414'; g.lineWidth=0.7; g.beginPath(); g.moveTo(mx,-1.6); g.lineTo(mx,-1.6-h); g.stroke();
+      g.fillStyle=wLG(g,mx-w/2,0,mx+w/2,0,[[0,'#b8803a'],[0.5,'#d8a85a'],[1,'#a8702e']]); g.beginPath(); g.moveTo(mx-w*0.25,-2.6-h*0.92); g.lineTo(mx+w*0.75*bill,-2.6-h*0.85); g.lineTo(mx+w*0.8*bill,-3.6); g.lineTo(mx-w*0.25,-3.2); g.closePath(); g.fill();
+      g.strokeStyle='rgba(60,30,10,.7)'; g.lineWidth=0.35; for(let i=1;i<6;i++){ const y=-3.4-(h*0.85)*i/6; g.beginPath(); g.moveTo(mx-w*0.25,y); g.lineTo(mx+w*0.78*bill,y+0.2); g.stroke(); } }
+  } else {
+    // the corbita: a round hull, the stern sweeping up into the swan's neck, the steering oar, the square mainsail and the little artemon
+    g.fillStyle=wLG(g,0,-3,0,3,[[0,style==='indian'? '#9a6a3a' : '#a8703e'],[1,'#3e2412']]); g.beginPath(); g.moveTo(-10,-2.2); g.quadraticCurveTo(-11.4,-6.4,-9.2,-8.6); g.quadraticCurveTo(-8.4,-6.6,-8.2,-3.6);
+    g.lineTo(8.6,-2.4); g.quadraticCurveTo(11.4,-2.6,12,-4.4); g.quadraticCurveTo(12,-0.6,9.4,1.6); g.quadraticCurveTo(0,3.4,-8.4,1.8); g.quadraticCurveTo(-10.4,0.4,-10,-2.2); g.closePath(); g.fill(); g.strokeStyle=OL; g.lineWidth=0.4; g.stroke();
+    g.strokeStyle='rgba(255,220,170,.4)'; g.lineWidth=0.35; g.beginPath(); g.moveTo(-8,-1.6); g.quadraticCurveTo(0,-0.6,9.4,-1.8); g.stroke();
+    if(style!=='indian'){ g.fillStyle='#e8c34a'; g.beginPath(); g.arc(-9.3,-8.8,0.7,0,Math.PI*2); g.fill(); }                    // the gilded swan's head
+    g.strokeStyle='#4a2c16'; g.lineWidth=0.6; g.beginPath(); g.moveTo(-7.2,-2.4); g.lineTo(-9.8,2.8); g.stroke();                 // the steering oar
+    g.strokeStyle='#3a2414'; g.lineWidth=0.7; g.beginPath(); g.moveTo(0,-2.4); g.lineTo(0,-19); g.stroke(); g.beginPath(); g.moveTo(-6.4,-17.6); g.lineTo(6.4,-17.6); g.stroke();
+    g.beginPath(); g.moveTo(8.6,-2.4); g.lineTo(12.6,-8.6); g.stroke();                                                         // the artemon's mast, raked forward
+    const sc= style==='indian'? ['#e8dcc0','#c8b890'] : ['#f4ecd8','#d8c8a0'];
+    g.fillStyle=wLG(g,-6,0,6,0,[[0,sc[1]],[0.5,sc[0]],[1,sc[1]]]); g.beginPath(); g.moveTo(-6.2,-17.4); g.quadraticCurveTo(0,-16.4,6.2,-17.4); g.quadraticCurveTo(6.6*bill,-10,5.6,-4.4); g.quadraticCurveTo(0,-3.0,-5.6,-4.4); g.quadraticCurveTo(-6.6*bill,-10,-6.2,-17.4); g.fill();
+    g.strokeStyle='rgba(120,90,50,.5)'; g.lineWidth=0.3; for(let i=-2;i<=2;i++){ g.beginPath(); g.moveTo(i*2.4,-17); g.lineTo(i*2.4*1.05,-4.2); g.stroke(); }   // the brails
+    if(style!=='indian'){ g.fillStyle='#a8302a'; g.beginPath(); g.moveTo(-3,-14); g.lineTo(3,-14); g.lineTo(3,-12.8); g.lineTo(-3,-12.8); g.fill(); }
+    g.fillStyle=sc[0]; g.beginPath(); g.moveTo(10.2,-8.4); g.lineTo(13.2,-8.6); g.lineTo(13.6*bill,-5.2); g.lineTo(10.8,-5.0); g.closePath(); g.fill();
+  }
+  SHIP_SPR.set(key, cv); if(SHIP_SPR.size>120) SHIP_SPR.delete(SHIP_SPR.keys().next().value);
+  return cv;
+}
+const MAP_LANES={
+  west:[
+    {s:'roman', n:3, sp:1.0, p:[[29.9,31.4],[28,32.6],[25,34.0],[22,35.0],[19,35.9],[15.8,36.3],[12.3,36.9],[11.6,37.9],[11.9,39.6],[12.25,41.6]]},   // the grain fleet, Alexandria to Ostia
+    {s:'roman', n:2, sp:1.2, p:[[10.3,37.0],[10.8,38.4],[11.4,40.0],[12.2,41.6]]},                                                                     // Carthage to Ostia
+    {s:'roman', n:2, sp:0.9, p:[[-6.3,36.4],[-5.4,35.95],[-2,36.4],[2,37.6],[5.5,38.4],[8.6,38.6],[10.2,39.2],[11.4,40.4],[12.2,41.6]]},               // Gades and the oil of Baetica
+    {s:'roman', n:1, sp:1.1, p:[[5.4,43.1],[7.5,43.5],[8.4,43.6],[9.8,43.1],[10.6,42.4],[11.6,42.0],[12.2,41.7]]},                                      // Massilia
+    {s:'roman', n:2, sp:1.0, p:[[29.9,31.4],[28.6,34.0],[28.2,36.2],[26.6,37.6],[25.6,39.3],[26.2,40.1],[27.4,40.6],[28.9,41.0]]},                    // the Aegean, up to Byzantium
+    {s:'roman', n:1, sp:0.9, p:[[29.1,41.3],[31,42.4],[33.5,42.6],[36.5,41.9],[39.6,41.1]]},                                                           // the Pontic run to Trapezus
+  ],
+  east:[
+    {s:'roman', n:2, sp:1.0, p:[[34.3,26.1],[36.6,22.4],[39.4,17.6],[42.6,13.6],[45,12.2],[51,12.8],[58,13.2],[66,12.4],[72,11.0],[75.8,10.2]]},      // Myos Hormos to Muziris, on the monsoon
+    {s:'indian', n:2, sp:0.9, p:[[76.2,9.6],[78.4,7.2],[81.6,6.0],[86,6.0],[92,5.4],[97,4.8],[100.5,3.4],[104,2.6],[105.5,6.8],[108.6,11.4],[109.6,15.6],[108,19.2],[106.8,20.4]]},   // round Lanka and the straits to Jiaozhi
+    {s:'junk', n:3, sp:1.1, p:[[106.8,20.4],[108.6,21.2],[110.6,20.6],[112.4,21.4],[113.4,22.6],[115.6,22.8],[117.8,24.2],[119.6,26.0],[120.8,28.6],[121.8,31.0]]},   // the China coast, Jiaozhi to the Yangzi mouth
+    {s:'junk', n:1, sp:0.8, p:[[121.8,31.2],[122.6,34.2],[121.6,37.0],[122.4,38.6],[124.6,38.0],[125.6,37.4]]},                                                            // over to Lelang
+  ],
+};
+const MAP_ROADS_W=[
+  {n:2, p:[[35.44,30.33],[35.9,31.95],[36.3,33.5],[37.4,34.0],[38.27,34.55],[39.6,34.7],[40.73,34.75]]},     // Petra, Damascus, Palmyra, Dura
+  {n:1, p:[[35.44,30.33],[36.3,28.4],[37.4,27.2],[37.95,26.6],[38.8,25.0],[39.6,24.0]]},                     // the incense road south out of Petra
+  {n:1, p:[[14.3,32.6],[13.8,31.0],[13.6,29.0],[13.4,27.4],[13.0,26.4]]},                                    // the Garamantes' track into the Fezzan
+];
+const MAP_WEATHER={
+  west:[ {k:'snow', b:[-8,55,-1.5,57]}, {k:'snow', b:[7,52.5,22,57]}, {k:'snow', b:[24,47.5,52,57]}, {k:'rain', b:[-5.5,50.3,1.8,55]},
+         {k:'sand', b:[-9,23,32,29.6]}, {k:'sand', b:[36,23,58,30.5]} ],
+  east:[ {k:'snow', b:[78,29.5,101,36.5], high:true}, {k:'snow', b:[60,49,140,57]}, {k:'sand', b:[77,37,90,40.5]}, {k:'sand', b:[95,40,113,45.5]}, {k:'sand', b:[44,16,58,28]},
+         {k:'rain', b:[72,8,90,24], monsoon:true}, {k:'rain', b:[93,10,110,22], monsoon:true} ],
+};
+const _LANE_ARC=new Map();
+function laneArc(L, Q){ const key=L; let A=_LANE_ARC.get(key); if(A) return A; const P=L.p.map(q=>Q(q[0],q[1])), D=[0];
+  for(let i=1;i<P.length;i++) D.push(D[i-1]+Math.hypot(P[i][0]-P[i-1][0],P[i][1]-P[i-1][1])); A={P,D,tot:D[D.length-1]}; _LANE_ARC.set(key,A); return A; }
+function arcAt(A, u){ const d=((u%1)+1)%1*A.tot; let i=1; while(i<A.D.length-1 && A.D[i]<d) i++;
+  const t=(d-A.D[i-1])/Math.max(1e-6,A.D[i]-A.D[i-1]), a=A.P[i-1], b=A.P[i]; return {x:a[0]+(b[0]-a[0])*t, y:a[1]+(b[1]-a[1])*t, dir:(b[0]>=a[0])? 1 : -1}; }
+/* 0 spring, 1 summer, 2 autumn, 3 winter: the game's own short year */
+function mapSeason(){ return Math.floor((((G&&G.day)||0)/5))%4; }
+function drawLanes(c, world, Q, T){
+  (MAP_LANES[world]||[]).forEach((L,li)=>{ const A=laneArc(L,Q);
+    for(let k=0;k<L.n;k++){ const back=(k%2===1), u0=(T*0.0000062*L.sp + k/L.n + li*0.17)%1, u=back? 1-u0 : u0, q=arcAt(A,u), face=back? -q.dir : q.dir;
+      const fr=(Math.floor(T*0.006+k*3+li)%8+8)%8, spr=shipSprite(L.s, fr, 4), K=5.0/(34*4);
+      c.save(); c.translate(q.x, q.y+0.3+Math.sin(T*0.002+k+li)*0.08); c.scale(face*K, K); c.drawImage(spr, -15*4, -22*4); c.restore(); } });
+}
+function drawWestCaravans(c, T){
+  MAP_ROADS_W.forEach((R,ri)=>{ const A=laneArc(R, lonlat);
+    for(let i=0;i<R.n;i++){ const west=((ri+i)%2===0), u0=(T*0.0000095+i/R.n+ri*0.3)%1, u=west? 1-u0 : u0;
+      drawCaravan(c, u, west, ri*3+i, T, (v)=>arcAt(A,v)); } });
+}
+function drawWeather(c, world, Q, T, only){
+  const S=mapSeason(), z=(typeof MZ!=='undefined' && MZ.z)? MZ.z : 1, rad=0.42/Math.sqrt(z)+0.16;
+  (MAP_WEATHER[world]||[]).forEach((Z,zi)=>{
+    if(only && Z.k!==only) return;
+    const on = Z.k==='snow'? (S===3? 1 : (S===2||S===0)? (Z.high? 0.8 : 0.35) : (Z.high? 0.5 : 0))
+             : Z.k==='rain'? (Z.monsoon? (S===1? 1 : S===2? 0.4 : 0) : (S===1? 0.3 : 0.75))
+             : Z.k==='sand'? (S===0||S===1? 0.85 : 0.35) : 0;
+    if(on<=0.02) return;
+    const a=Q(Z.b[0],Z.b[3]), b=Q(Z.b[2],Z.b[1]), x0=Math.min(a[0],b[0]), y0=Math.min(a[1],b[1]), w=Math.abs(b[0]-a[0]), h=Math.abs(b[1]-a[1]);
+    const edge=(x,y)=>Math.min(1,(x-x0)/6,(x0+w-x)/6,(y-y0)/6,(y0+h-y)/6);
+    const n=Math.round(Math.min(160, w*h*0.05)*on);
+    if(Z.k==='snow'){ c.fillStyle='rgba(200,214,232,'+(0.10*on).toFixed(2)+')'; c.fillRect(x0,y0,w,h);                       // the grey of a snow sky over it
+      for(let i=0;i<n;i++){ const x=x0+((i*37.7+T*0.0016*(1+(i%3)*0.4))%w), y=y0+((i*23.3+T*0.004*(1+(i%5)*0.25))%h), e=edge(x,y); if(e<=0) continue; const xx=x+Math.sin(T*0.001+i)*0.6;
+        c.fillStyle='rgba(70,90,120,'+(0.35*e*on).toFixed(2)+')'; c.beginPath(); c.arc(xx+0.12,y+0.12,rad*1.15,0,Math.PI*2); c.fill();
+        c.fillStyle='rgba(255,255,255,'+(0.95*e*on).toFixed(2)+')'; c.beginPath(); c.arc(xx,y,rad,0,Math.PI*2); c.fill(); } }
+    else if(Z.k==='rain'){ const cg=c.createRadialGradient(x0+w/2,y0+h/2,2,x0+w/2,y0+h/2,Math.max(w,h)*0.65); cg.addColorStop(0,'rgba(70,84,110,'+(0.20*on).toFixed(2)+')'); cg.addColorStop(1,'rgba(70,84,110,0)'); c.fillStyle=cg; c.fillRect(x0,y0,w,h);   // the cloud over it
+      c.strokeStyle='rgba(70,96,150,'+(0.70*on).toFixed(2)+')'; c.lineWidth=0.3; c.beginPath();
+      for(let i=0;i<n;i++){ const x=x0+((i*41.3+T*0.004)%w), y=y0+((i*17.9+T*0.03)%h); if(edge(x,y)<=0.2) continue; c.moveTo(x,y); c.lineTo(x-0.7,y+2.4); } c.stroke(); }
+    else if(Z.k==='sand'){ const g=c.createLinearGradient(x0,0,x0+w,0); g.addColorStop(0,'rgba(220,180,110,0)'); g.addColorStop(0.5,'rgba(214,170,96,'+(0.18*on).toFixed(2)+')'); g.addColorStop(1,'rgba(220,180,110,0)');
+      c.fillStyle=g; c.fillRect(x0,y0,w,h);
+      c.strokeStyle='rgba(196,150,80,'+(0.65*on).toFixed(2)+')'; c.lineWidth=0.3; c.beginPath();
+      for(let i=0;i<Math.round(n*0.6);i++){ const x=x0+((i*53.1+T*0.006*(1+(i%4)*0.3))%w), y=y0+((i*29.7)%h)+Math.sin(T*0.001+i)*0.8; if(edge(x,y)<=0.2) continue; c.moveTo(x,y); c.quadraticCurveTo(x+1.5,y-0.4,x+3.2,y); } c.stroke(); }
+  });
+}
+/* the one layer both sheets draw their life on, at the screen's resolution under the map's zoom and pan */
+function drawMapLife(world){
   const pl=document.getElementById('map-plate'); if(!pl) return;
   let cv=document.getElementById('silk-layer');
   if(!cv){ cv=document.createElement('canvas'); cv.id='silk-layer'; cv.style.cssText='position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:3'; pl.appendChild(cv); }
@@ -75437,8 +75557,16 @@ function drawSilkOverlay(){
   if(cv.width!==bw || cv.height!==bh){ cv.width=bw; cv.height=bh; }
   const g=cv.getContext('2d'); g.setTransform(1,0,0,1,0,0); g.clearRect(0,0,bw,bh);
   const k=W/480*MZ.z; g.setTransform(dpr*k,0,0,dpr*k, dpr*MZ.tx, dpr*MZ.ty); g.imageSmoothingEnabled=true; try{ g.imageSmoothingQuality='high'; }catch(e){}
-  drawSilkRoadLive(g);
+  const T=performance.now();
+  if(world==='east'){ try{ drawWeather(g,'east',lonlatE,T); }catch(e){} try{ drawLanes(g,'east',lonlatE,T); }catch(e){} drawSilkRoadLive(g); }
+  else { try{ drawWeather(g,'west',lonlat,T); }catch(e){} try{ drawLanes(g,'west',lonlat,T); }catch(e){} try{ drawWestCaravans(g,T); }catch(e){} }
+  /* and what season it is, in the corner, so the snow and the rain mean something */
+  { const S=mapSeason(), L=[['🌱 SPRING','the sand lifts in the deserts'],['☀ SUMMER', world==='east'? 'the monsoon is on India and the south' : 'the sailing season: every lane busy'],['🍂 AUTUMN','the last ships before the sea shuts'],['❄ WINTER','snow in the north; the sea is closed to the careful']][S];
+    g.setTransform(dpr,0,0,dpr,0,0); g.font='bold 11px Georgia, serif'; const tw=Math.max(g.measureText(L[0]).width, (g.font='italic 10px Georgia, serif', g.measureText(L[1]).width))+16;
+    g.fillStyle='rgba(24,16,8,.72)'; g.fillRect(56,H-40,tw,32); g.strokeStyle='rgba(232,195,74,.6)'; g.lineWidth=1; g.strokeRect(56.5,H-39.5,tw-1,31);
+    g.fillStyle='#f0d890'; g.font='bold 11px Georgia, serif'; g.fillText(L[0],64,H-26); g.fillStyle='rgba(240,226,200,.85)'; g.font='italic 10px Georgia, serif'; g.fillText(L[1],64,H-13); }
 }
+function drawSilkOverlay(){ drawMapLife('east'); }
 function drawSilkRoadLive(c){
   const T=performance.now(), n=silkCaravanCount();
   for(let i=0;i<n;i++){ const west=(i%2===0), sp=0.0000085*(0.8+(i%3)*0.15), u=west? (1-((T*sp+i/n)%1)) : ((T*sp+i/n+0.37)%1);
@@ -76898,6 +77026,7 @@ function drawMapCanvas(){
     sheet=_mapStatic; }
   mctx.setTransform(1,0,0,1,0,0); mctx.imageSmoothingEnabled=true; mctx.drawImage(sheet,0,0);
   drawWestSeats(S);
+  try{ drawMapLife('west'); }catch(e){}
   mctx.setTransform(S,0,0,S,0,0);
   const Q=lonlat;
   // when the King of Kings bays for war, the Roman-Parthian border burns
@@ -79139,7 +79268,7 @@ function openHeroes(){
       msg('🐎 Red Hare: red as fire, a thousand li a day. Lü Bu rode him; now you do. Your horse fight a fifth harder.'); } });
 }
 
-window.__SS = { gunPreview:(id,ph,t,k,x,y)=>{ ctx.save(); ctx.setTransform(k,0,0,k,x,y); try{ drawHeldGun(bowOf(id),ph,t); }finally{ ctx.restore(); } }, openHeroes:()=>openHeroes(), heroYear:()=>heroYear(), heroDayTick:()=>heroDayTick(), HEROES, heroCanRecruit:(id)=>heroCanRecruit(HERO_BY_ID[id]), heroAudience:(id)=>heroAudience(HERO_BY_ID[id]), heroGeneral:(id)=>heroGeneral(HERO_BY_ID[id]), setTitleT:(v)=>{ TT_FORCE_T=v; }, enterMap:()=>enterMap(), silkTickerToggle:()=>silkTickerToggle(), camelSprite:(a,b,c,d)=>camelSprite(a,b,c,d), bedStroke:(vt,T,k)=>bedStroke(vt,T,k), bedLoreKey:()=>bedLoreKey(), setBedKey:(k)=>{ BED_KEY_FORCE=k||null; }, BED_ENTRY, POSE_LORE, armyStyleOfPeople:(p)=>armyStyleOfPeople(p), armyStyleKeys:()=>Object.keys(ARMY_STYLE), armyStyleHere:(id)=>armyStyleHere(id), kanvekTier:(w)=>kanvekTier(w), kanvekLvInfo:(w)=>kanvekLvInfo(w), kanvekLevel:(w)=>kanvekLevel(w), kanvekGrow:(w)=>kanvekGrow(w), KANVEK_LEVELS, drawHallMan:(...a)=>drawHallMan(...a), drawFemProfile:(...a)=>drawFemProfile(...a), drawHallFem:(...a)=>drawHallFem(...a), folkLookId:(w)=>folkLookId(w), drawFolkLook:(c,w,o)=>drawFolkLook(c,w,o), drawPortraitFigure:(...a)=>drawPortraitFigure(...a), drawKidProfile:(...a)=>drawKidProfile(...a), CUSTOMS, customsHere:()=>customsHere(), customsHers:(w)=>customsHers(w), customsTabooToday:(d)=>customsTabooToday(d), customsConceive:(B)=>customsConceive(B), customsChildName:(s)=>customsChildName(s), customsWeddingLine:(w)=>customsWeddingLine(w), customsJealMul:()=>customsJealMul(), buildCustomsCard:(b)=>buildCustomsCard(b), finishBedNow:()=>finishBed(), getBC:()=>BC, setBC:(v)=>{ BC=v; }, roomBackdrop:(T)=>whRoomBackdrop(T), openEmpire:()=>openEmpire(), empSeason:()=>empSeason(), EMP_UI, silkDbg:()=>{ const c=document.createElement("canvas").getContext("2d"); try{ drawSilkRoadLive(c); return {ok:true, n:silkCaravanCount(), at:silkAt(0.5), arc:silkArc().tot}; }catch(e){ return {err:e.message}; } }, btMountSprite:(id,f)=>btMountSprite(id,f), poseLoreNow:()=>poseLore(), nbStyleSprite:(S,f,a,h)=>nbStyleSprite(S,f,a,h), armyStyle:(id)=>armyStyle(id), dynThroneFalls:(h)=>dynThroneFalls(h), proclaimDynasty:()=>proclaimDynasty(), plotTargets:()=>plotTargets(), mapZoomTo:(z,x,y)=>mapZoomTo(z,x,y), ASIA_PEOPLES, asiaPeopleFor:(e,o)=>asiaPeopleFor(e,o), EAST_PIN_POS, campaignOdds:(cp)=>campaignOdds(cp), updateBattle:(dt)=>updateBattle(dt), drawBattle:()=>drawBattle(), get BT(){ return BT; }, romStyles:()=>ROM_STYLES, startRomanticStyled:(a,b)=>startRomanticStyled(a,b), bgFn:(n)=>({bgPalace,bgWar,bgCoast,bgWoa,bgOpelia,bgIsle,bgReiko,bgForge})[n], setPairSS:(v)=>{ PAIR_SS=v; }, ICE_T:{ get AC(){return AC;}, set AC(v){AC=v;}, iceSlap, iceSkin, iceUlk, iceGulp, iceVoc, iceCrowd, ICE_V, sfx }, ICE_TTS, STRIKES, getDM:()=>DM, drawBridePortrait:(...a)=>drawBridePortrait(...a), rhFig, RH_CAST, openBotWatch, botEnterBeat, getBW:()=>BW, iceGoddessOpen, paintGoddess, startBedScene, regionAny, iceDebug:()=>({here:iceHere(), prey:ICE_PREY_BY_REGION}),
+window.__SS = { weatherTest:(w,only)=>{ try{ const cv=document.createElement("canvas"); cv.width=960; cv.height=520; const c=cv.getContext("2d"); c.setTransform(2,0,0,2,0,0); drawWeather(c,w,w==="east"? lonlatE : lonlat,1000,only); const d=c.getImageData(0,0,960,520).data; let n=0; for(let i=3;i<d.length;i+=4) if(d[i]>20) n++; return "px "+n; }catch(e){ return "ERR "+e.message; } }, shipSprite:(a,b,c)=>shipSprite(a,b,c), mapSeason:()=>mapSeason(), gunPreview:(id,ph,t,k,x,y)=>{ ctx.save(); ctx.setTransform(k,0,0,k,x,y); try{ drawHeldGun(bowOf(id),ph,t); }finally{ ctx.restore(); } }, openHeroes:()=>openHeroes(), heroYear:()=>heroYear(), heroDayTick:()=>heroDayTick(), HEROES, heroCanRecruit:(id)=>heroCanRecruit(HERO_BY_ID[id]), heroAudience:(id)=>heroAudience(HERO_BY_ID[id]), heroGeneral:(id)=>heroGeneral(HERO_BY_ID[id]), setTitleT:(v)=>{ TT_FORCE_T=v; }, enterMap:()=>enterMap(), silkTickerToggle:()=>silkTickerToggle(), camelSprite:(a,b,c,d)=>camelSprite(a,b,c,d), bedStroke:(vt,T,k)=>bedStroke(vt,T,k), bedLoreKey:()=>bedLoreKey(), setBedKey:(k)=>{ BED_KEY_FORCE=k||null; }, BED_ENTRY, POSE_LORE, armyStyleOfPeople:(p)=>armyStyleOfPeople(p), armyStyleKeys:()=>Object.keys(ARMY_STYLE), armyStyleHere:(id)=>armyStyleHere(id), kanvekTier:(w)=>kanvekTier(w), kanvekLvInfo:(w)=>kanvekLvInfo(w), kanvekLevel:(w)=>kanvekLevel(w), kanvekGrow:(w)=>kanvekGrow(w), KANVEK_LEVELS, drawHallMan:(...a)=>drawHallMan(...a), drawFemProfile:(...a)=>drawFemProfile(...a), drawHallFem:(...a)=>drawHallFem(...a), folkLookId:(w)=>folkLookId(w), drawFolkLook:(c,w,o)=>drawFolkLook(c,w,o), drawPortraitFigure:(...a)=>drawPortraitFigure(...a), drawKidProfile:(...a)=>drawKidProfile(...a), CUSTOMS, customsHere:()=>customsHere(), customsHers:(w)=>customsHers(w), customsTabooToday:(d)=>customsTabooToday(d), customsConceive:(B)=>customsConceive(B), customsChildName:(s)=>customsChildName(s), customsWeddingLine:(w)=>customsWeddingLine(w), customsJealMul:()=>customsJealMul(), buildCustomsCard:(b)=>buildCustomsCard(b), finishBedNow:()=>finishBed(), getBC:()=>BC, setBC:(v)=>{ BC=v; }, roomBackdrop:(T)=>whRoomBackdrop(T), openEmpire:()=>openEmpire(), empSeason:()=>empSeason(), EMP_UI, silkDbg:()=>{ const c=document.createElement("canvas").getContext("2d"); try{ drawSilkRoadLive(c); return {ok:true, n:silkCaravanCount(), at:silkAt(0.5), arc:silkArc().tot}; }catch(e){ return {err:e.message}; } }, btMountSprite:(id,f)=>btMountSprite(id,f), poseLoreNow:()=>poseLore(), nbStyleSprite:(S,f,a,h)=>nbStyleSprite(S,f,a,h), armyStyle:(id)=>armyStyle(id), dynThroneFalls:(h)=>dynThroneFalls(h), proclaimDynasty:()=>proclaimDynasty(), plotTargets:()=>plotTargets(), mapZoomTo:(z,x,y)=>mapZoomTo(z,x,y), ASIA_PEOPLES, asiaPeopleFor:(e,o)=>asiaPeopleFor(e,o), EAST_PIN_POS, campaignOdds:(cp)=>campaignOdds(cp), updateBattle:(dt)=>updateBattle(dt), drawBattle:()=>drawBattle(), get BT(){ return BT; }, romStyles:()=>ROM_STYLES, startRomanticStyled:(a,b)=>startRomanticStyled(a,b), bgFn:(n)=>({bgPalace,bgWar,bgCoast,bgWoa,bgOpelia,bgIsle,bgReiko,bgForge})[n], setPairSS:(v)=>{ PAIR_SS=v; }, ICE_T:{ get AC(){return AC;}, set AC(v){AC=v;}, iceSlap, iceSkin, iceUlk, iceGulp, iceVoc, iceCrowd, ICE_V, sfx }, ICE_TTS, STRIKES, getDM:()=>DM, drawBridePortrait:(...a)=>drawBridePortrait(...a), rhFig, RH_CAST, openBotWatch, botEnterBeat, getBW:()=>BW, iceGoddessOpen, paintGoddess, startBedScene, regionAny, iceDebug:()=>({here:iceHere(), prey:ICE_PREY_BY_REGION}),
   openBookViewer:()=>openBookViewer(), openSettings:()=>openSettings(), 
   rhAmbTick:(b)=>rhAmbTick(b), rhAmbHit:(k,n)=>rhAmbHit(k,n), rhAmbStop:()=>rhAmbStop(), rhSting:(b)=>rhSting(b), setMuted:(v)=>{muted=v;}, ambKind:()=>RH_AMB&&RH_AMB.kind, acState:()=>AC&&AC.state,
   WPN_ART, WPN_RANGED, drawRangedIcon, BOWS, wpnStamp, wpnIcon, drawHeldBow, drawHeldPilum, drawHeldBomb, get WPN_DRAWS(){ return WPN_DRAWS; }, setOUTL:(v)=>{ OUTL=!!v; }, drawWeapon2Old,
