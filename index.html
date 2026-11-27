@@ -21479,10 +21479,14 @@ function drawBattleHost(x,men,maxMen,facing,col,crest,advance,shieldC,S){
     for(let r=0;r<ranks;r++){ const sc=0.56+r*0.11, y=134+r*11;
       for(let f=0;f<files;f++){ const idx=r*files+f; if(idx>=icons) continue;
         const sx=x + facing*(f*10.5*sc + (r%2)*5*sc) + advance*facing + facing*(ranks-1-r)*4;
-        drawStyledSoldier(sx, y, facing, S, idx, sc, !!(S.archer && r<=1)); } }
+        /* the order of battle: archers in the rear ranks, the line in the centre, the auxiliaries on the wings —
+           a whole column of the same people, so it reads as a cohort and not as confetti */
+        const part=(S.mix && S.mix.arch && r<=1)? 'arch' : (f<=1 || f>=files-2)? 'wing' : 'front';
+        const S2=hostPick(S, part, (f>>1)*13+(part==='arch'? 101 : part==='wing'? 57 : 0)) || S;
+        drawStyledSoldier(sx, y, facing, S2, idx, sc, part==='arch' || !!(!S.mix && S.archer && r<=1)); } }
     drawStyledStandard(x+advance*facing+facing*-8, 124, facing, S);
     const live=horseN? Math.max(1,Math.round(horseN*men/maxMen)) : 0;
-    for(let k=0;k<live;k++){ const row=k%3, cc=(k/3)|0; drawStyledRider(x + facing*(cc*18-14+row*7) + advance*facing*(hf>0.5? 1.1 : 0.7), 176+row*9, facing, S, k, 0.92+row*0.06); }
+    for(let k=0;k<live;k++){ const row=k%3, cc=(k/3)|0, SR=hostPick(S,'horse',(cc>>1)*11+row*3)||S; drawStyledRider(x + facing*(cc*18-14+row*7) + advance*facing*(hf>0.5? 1.1 : 0.7), 176+row*9, facing, SR, k, 0.92+row*0.06); }
     return; }
 }
 function drawBattle(){
@@ -32289,6 +32293,7 @@ function armyStyleHere(id){
       if(/^(armenian|kartvelian|albanian|laz)$/.test(P)) return 'armenian'; if(/^(parthian|pars|adiabenian|hatran|mesene|elymaean|sakastani|chorasmian)$/.test(P)) return 'parthian';
       if(/^(arab|gerrhaean|omani|sabaean|himyarite|hadrami|blemmye)$/.test(P)) return 'arab'; if(/^(kushite|aksumite)$/.test(P)) return 'kush';
       if(/sogdian|tocharian|kroraina|saka|kangju|dayuan/.test(P)) return 'sogdian';
+      if(typeof HAN_GROUND!=='undefined' && HAN_GROUND[R.id]) return HAN_GROUND[R.id];
       return ({han:'han_yuan', steppe:'xianbei', kushan:'indian', tamil:'tamil', korean:'korean', persian:'parthian'})[R.cul] || 'han_yuan'; } }catch(e){}
   return 'germanic';
 }
@@ -32304,7 +32309,7 @@ function nbStyleSprite(S, frame, archer){
   const skins=S.skins? S.skins : S.id==='tamil'||S.id==='cham'||S.id==='indian'? ['#9a6a3e','#8a5a34','#a87048','#7a4e2a'] : S.id==='yue'? ['#b8885a','#a87a4e','#c89868','#9a6e44'] : ['#caa06a','#b88a5a','#d8b088','#a87a4a'];
   const C=Object.assign({}, paletteFor({skin:skins[frame%4], tunic:S.tunic}));
   const hairC=S.hairC? S.hairC[frame%S.hairC.length] : '#1e1410';
-  const look={male:true, skin:skins[frame%4], hair:hairC, beard:'none', body:{legs:6,bust:6,booty:6,waist:6}};
+  const look={male:true, skin:skins[frame%4], hair:hairC, beard:(S.beard&&frame%4!==3)? S.beard : 'none', body:Object.assign({legs:6,bust:6,booty:6,waist:6}, S.build||{})};
   const kit={C, loin:S.tunic, belt:C.leather, armor:S.armor||null, armorSpec:(!S.armor && S.garment)? S.garment : null, helm:S.helm||null, blood:0, t:0};
   const ph=frame*Math.PI/2, arm=archer? (S.archer||'bow') : S.arm;
   const hands= arm==='bow'? {near:[10,-46], far:[14,-50]} : arm==='crossbow'? {near:[10,-44], far:[14,-46]} : {near:[6,-40], far:[9,-44]};
@@ -32321,12 +32326,23 @@ function nbStyleSprite(S, frame, archer){
       g.lineWidth=0.9; g.beginPath(); g.moveTo(-3,-78); g.lineTo(4,-78); g.stroke();
       g.globalAlpha=0.26; g.fillStyle=S.paint; g.fillRect(-24,-92,48,94); g.restore(); }   // and the whole skin goes faintly blue with it
     /* the Suebian knot, combed to the side and tied */
+    if(S.headband && !S.helm){ g.fillStyle=S.headband; g.fillRect(-6,-81,13,3.4); g.fillStyle=mixHex(S.headband,'#000000',0.35); g.fillRect(-6,-78,13,0.8); g.fillStyle=S.headband; g.beginPath(); g.moveTo(-6,-80); g.lineTo(-11,-75+Math.sin(ph)*1.5); g.lineTo(-9,-74+Math.sin(ph)*1.5); g.lineTo(-5,-78); g.closePath(); g.fill(); }   // the scarf, and its tails
+    if(S.helmPlume && S.helm){ for(let i=0;i<4;i++){ g.strokeStyle=i%2? S.helmPlume : mixHex(S.helmPlume,'#a8a090',0.3); g.lineWidth=1.8; g.beginPath(); g.moveTo(-1+i,-86); g.quadraticCurveTo(-6+i*2,-98,-12+i*3+Math.sin(ph+i)*1.2,-94+i); g.stroke(); } }   // white yak-tail plumes
     if(S.knot && !S.helm){ g.fillStyle=hairC; g.beginPath(); g.arc(5.6,-75.5,3.2,0,7); g.fill(); g.strokeStyle=mixHex(hairC,'#000000',0.45); g.lineWidth=0.9; g.beginPath(); g.arc(5.6,-75.5,1.5,0,7); g.stroke(); }
     const steel='#dfe6ee', wood='#8a6a44';
     // ---- the weapon ----
     if(arm==='bow'){ g.strokeStyle='#5a3a1a'; g.lineWidth=2.2; g.beginPath(); g.arc(4,-48,22,-1.2,1.2); g.stroke(); g.strokeStyle='#e8e0d0'; g.lineWidth=0.7; g.beginPath(); g.moveTo(4+22*Math.cos(-1.2),-48+22*Math.sin(-1.2)); g.lineTo(4+22*Math.cos(1.2),-48+22*Math.sin(1.2)); g.stroke();
       g.fillStyle='#6a3a1a'; g.fillRect(-12,-70,6,26); for(let i=0;i<4;i++){ g.fillStyle=i%2? '#e8e0d0' : '#c8342a'; g.fillRect(-12+i*1.5,-76,1.2,7); } }
     else if(arm==='crossbow'){ g.fillStyle='#5a3a1a'; g.fillRect(0,-48,26,3); g.strokeStyle='#3a2a1a'; g.lineWidth=2.4; g.beginPath(); g.moveTo(22,-60); g.quadraticCurveTo(28,-47,22,-34); g.stroke(); g.fillStyle='#c8a040'; g.fillRect(6,-47,4,3); }
+    else if(arm==='dao'){ /* the ring-pommelled sword of the Han, single-edged and straight, carried with a shield */
+      g.strokeStyle='#c8a040'; g.lineWidth=1.2; g.beginPath(); g.arc(8,-36,2.2,0,7); g.stroke(); g.fillStyle='#5a3a1e'; g.fillRect(7.2,-46,2,9); g.fillStyle='#8a7a5a'; g.fillRect(5,-47,6.5,1.6);
+      g.fillStyle='#dfe6ee'; g.beginPath(); g.moveTo(7.4,-47); g.lineTo(10.2,-47); g.lineTo(10.6,-76); g.lineTo(8.6,-80); g.lineTo(7.4,-76); g.closePath(); g.fill(); g.fillStyle='rgba(255,255,255,.7)'; g.fillRect(9.6,-76,0.7,28); }
+    else if(arm==='rhomphaia'){ /* the Thracian two-handed blade on a long haft, the edge on the inside of the curve */
+      g.strokeStyle='#6a4a2a'; g.lineWidth=2.2; g.beginPath(); g.moveTo(5,-22); g.lineTo(9,-64); g.stroke();
+      g.fillStyle='#dfe6ee'; g.beginPath(); g.moveTo(8.4,-64); g.quadraticCurveTo(13,-80,19,-96); g.lineTo(16,-97); g.quadraticCurveTo(11,-82,10.6,-64); g.closePath(); g.fill(); }
+    else if(arm==='sling'){ /* a braided sling, whirling, the stone at the end of the arc */
+      const a=ph*2.2; g.strokeStyle='#d8ccb0'; g.lineWidth=0.9; g.beginPath(); g.moveTo(8,-52); g.lineTo(8+Math.cos(a)*14,-66+Math.sin(a)*14); g.stroke(); g.fillStyle='#8a847a'; g.beginPath(); g.arc(8+Math.cos(a)*14,-66+Math.sin(a)*14,1.8,0,7); g.fill();
+      g.fillStyle='#6a5a44'; g.fillRect(-12,-50,5,8); }
     else if(arm==='club'){ g.strokeStyle='#6a4a2a'; g.lineWidth=2.6; g.beginPath(); g.moveTo(8,-30); g.lineTo(13,-66); g.stroke(); g.fillStyle='#5a3a1e'; g.beginPath(); g.ellipse(13.5,-70,4.2,7,0.15,0,7); g.fill(); g.fillStyle='#3a2414'; for(const [x,y] of [[12,-74],[15,-70],[12.5,-66]]){ g.beginPath(); g.arc(x,y,0.9,0,7); g.fill(); } }
     else { const top= arm==='lance'? -112 : arm==='ge'? -78 : arm==='javelin'? -80 : -90;
       g.strokeStyle=wood; g.lineWidth=2.2; g.beginPath(); g.moveTo(7,-8); g.lineTo(7,top); g.stroke();
@@ -57506,6 +57522,99 @@ const CAMPAIGNS_EAST=[
   {id:'roof',   name:'THE ROOF OF THE WORLD',    where:'Zhangzhung',     diff:3, style:'plateau',  foe:'ZHANGZHUNG RIDERS', blurb:'Up past the Kunlun, where the air is too thin for your horses and not for theirs.'},
   {id:'satrap', name:'THE SAKA SATRAPS',         where:'Malwa',          diff:2, style:'indian',   foe:'THE WESTERN KSHATRAPAS', blurb:'The satraps of Ujjain are pushing east again, with elephants in the van and archers on the elephants.'},
 ];
+/* =====================================================================
+   ⚔ A HOST IS MANY PEOPLES
+   ---------------------------------------------------------------------
+   No army of the year 200 was one man repeated. A Roman field army was
+   its legions plus as many auxiliaries again, raised wherever Rome ruled.
+   By now the legionaries are mostly from the Danube, Illyricum and
+   Thrace: the hardest recruiting ground in the empire, the country that
+   will give Rome Decius, Claudius Gothicus, Aurelian, Probus, Diocletian
+   and Constantine. Severus has just rebuilt his Praetorian Guard out of
+   Danubian legionaries. Around them stand Gallic and British infantry,
+   Anatolians and Egyptians, Hemesan and Palmyrene archers, Moorish horse
+   of the kind Lusius Quietus led, and Thracian cavalry.
+   The Han raised its armies the same way. Heartland conscripts with
+   crossbows and ring-pommelled swords; Southern Xiongnu and Wuhuan horse;
+   Qiang auxiliaries; oasis levies from the Western Regions. Each warlord
+   now has a host with its own character:
+   · CAO CAO: the Qingzhou Corps, thirty thousand surrendered Yellow
+     Turbans enlisted in 192 (here they keep the yellow scarf), and the
+     Tiger and Leopard Cavalry, his household's elite.
+   · YUAN SHAO: the biggest army in the empire; Qu Yi's First-to-Ascend
+     (先登), eight hundred big-shield crossbowmen who broke Gongsun Zan's
+     cavalry at Jieqiao; and his allied Wuhuan horse.
+   · THE SUN (Sun Ce falls this spring, Sun Quan is eighteen): Jiangdong
+     marines with sword and shield, and Shanyue hill-men pressed into the
+     ranks. Almost no cavalry: a river army.
+   · LIU BEI: a small band with Guan Yu and Zhang Fei, Danyang soldiers
+     inherited from Tao Qian, and the White-Eared Guard (白毦兵), with white
+     plumes, that Chen Dao will command.
+   · MA TENG and HAN SUI: the Liang horse, half of them Qiang.
+   · GONGSUN DU in Liaodong, with Korean frontier troops; LIU ZHANG in Yi,
+     with Sou bowmen from the southwestern hills.
+   ===================================================================== */
+const MIX_CACHE=new Map();
+function mixStyle(id, ov){ if(!ov) return armyStyle(id); const key=id+'@'+JSON.stringify(ov); let S=MIX_CACHE.get(key);
+  if(!S){ S=Object.assign({}, armyStyle(id), ov, {id:key}); MIX_CACHE.set(key,S); } return S; }
+function hostPick(S, part, cohort){ const M=S && S.mix && S.mix[part]; if(!M || !M.length) return null; let tot=0; for(const m of M) tot+=m[1];
+  let h=(((cohort+7)*2654435761)>>>0)%10000/10000*tot; for(const m of M){ h-=m[1]; if(h<0) return mixStyle(m[0], m[2]); } return mixStyle(M[0][0], M[0][2]); }
+Object.assign(ARMY_STYLE,{
+  /* ---- the empire's recruits ---- */
+  leg_illyr: {inherit:'legion', name:'ILLYRIAN LEGIONARIES', beard:'full', build:{legs:8,waist:7,bust:8,booty:7}, cloak:'#5a3a22', tunic:'#8a2422', hairC:['#3a2418','#5a3a22','#2a1a10','#6a4a2a'], skins:['#c8a070','#b88a5a','#d0a878','#a87a4a']},
+  leg_thrac: {inherit:'legion', name:'THRACIAN LEGIONARIES', beard:'full', build:{legs:7,waist:6,bust:7,booty:6}, cloak:'#6a2a4a', tunic:'#9a2a2a', hairC:['#2a1a10','#3a2418','#5a3a22','#1e1410']},
+  aux_thrac: {inherit:'legion', name:'THRACIAN AUXILIA', armor:'squamata', shield:'oval', shieldC:'#3a5a7a', boss:'#c8c8d0', arm:'rhomphaia', cloak:'#8a4a6a', beard:'full', tunic:'#6a3a5a'},
+  aux_syr:   {inherit:'parthian', name:'HEMESAN ARCHERS', armor:'squamata', helm:'steppe_cap', shield:'none', arm:'bow', archer:'bow', tunic:'#c8a878', rider:'#c8a878', barded:false, beard:'full', skins:['#b88a5a','#a87a4a','#c89a68','#9a6e44'], hairC:['#1e1410','#2a1a10']},
+  aux_palm:  {inherit:'aux_syr', name:'PALMYRENE ARCHERS', armor:null, helm:null, garment:{kind:'coat', col:'#8a3a5a', strips:['#e8c34a','#c8452a','#2f7a8a'], top:1.0, bot:0.02, hem:0.55, sleeve:'full', legs:'#4a2a3a'}, tunic:'#8a3a5a', rider:'#8a3a5a'},
+  aux_anat:  {inherit:'legion', name:'ANATOLIAN COHORTS', armor:'hamata', shield:'oval', shieldC:'#c8742a', boss:'#e8c34a', arm:'spear', tunic:'#b8823a', beard:'full', cloak:'#7a5a2a'},
+  aux_gaul:  {inherit:'legion', name:'GALLIC AUXILIA', armor:null, garment:{kind:'mail', mat:'iron', top:1.0, bot:0.02, hem:0.40, sleeve:'short', slcol:'iron', legs:'#5a4a3a'}, shield:'oval', shieldC:'#2a5a3a', boss:'#c8c8d0', arm:'spear', cloak:'#3a5a2a', hairC:['#d8b060','#b8823a','#8a5a2a','#c86a2a'], tunic:'#4a6a3a', rider:'#4a6a3a'},
+  aux_brit:  {inherit:'celt', name:'NUMERI BRITTONUM', paint:null, bare:false, garment:{kind:'coat', col:'#6a5a3a', top:1.0, bot:0.02, hem:0.50, sleeve:'full', legs:'#5a4a32'}, cloak:'#4a6a3a', shield:'oval', shieldC:'#5a3a2a', arm:'spear', tunic:'#6a5a3a'},
+  aux_egy:   {inherit:'legion', name:'EGYPTIAN COHORTS', armor:'kavacha', helm:null, shield:'round', shieldC:'#3a6a8a', boss:'#e8c34a', arm:'spear', tunic:'#ece6d6', cloak:null, skins:['#a87848','#9a6a3e','#b88a5a','#8a5a34'], hairC:['#1a1410']},
+  eq_thrac:  {inherit:'legion', name:'THRACIAN HORSE', tunic:'#6a2a4a', rider:'#6a2a4a', cloak:'#8a4a6a', beard:'full', shield:'oval', shieldC:'#6a2a4a', arm:'spear'},
+  /* ---- the Han and its frontiers ---- */
+  hz_dao:     {inherit:'han', name:'SWORD-AND-SHIELD MEN', arm:'dao', shield:'tall'},
+  hz_xbow:    {inherit:'han', name:'CROSSBOWMEN', archer:'crossbow', shield:'none'},
+  hz_xiyu:    {inherit:'sogdian', name:'WESTERN REGIONS LEVIES', armor:null, garment:{kind:'coat', col:'#7a5a8a', top:1.0, bot:0.02, hem:0.62, sleeve:'full', legs:'#4a3a2a', sash:'#c8a040'}, helm:'steppe_cap', tunic:'#7a5a8a', rider:'#7a5a8a', arm:'spear', archer:'bow', shield:'round', shieldC:'#8a5a2a', hairC:['#8a4a22','#b8823a','#5a3a22','#c8a060'], skins:['#d8b088','#caa070','#e0c098','#c09068'], beard:'full', std:'flag', stdC:'#7a5a8a', stdD:'#e8c34a', elephants:0},
+  hz_qiang:   {inherit:'plateau', name:'QIANG AUXILIARIES', armor:null, garment:{kind:'coat', col:'#e0d4b8', top:1.0, bot:0.02, hem:0.60, sleeve:'full', legs:'#6a5a44', toggles:'#8a6a3a'}, tunic:'#e0d4b8', rider:'#e0d4b8', arm:'sling', helm:null, shield:'round', shieldC:'#8a6a3a', hairC:['#1e1410','#2a1a10']},
+  hz_qingzhou:{inherit:'han', name:'THE QINGZHOU CORPS', armor:null, garment:{kind:'coat', col:'#8a7a4a', top:1.0, bot:0.02, hem:0.46, sleeve:'short', legs:'#4a4030'}, helm:null, headband:'#e8c030', tunic:'#8a7a4a', arm:'spear', shield:'round', shieldC:'#8a6a2a'},
+  hz_hubao:   {inherit:'han', name:'TIGER AND LEOPARD CAVALRY', tunic:'#2a2a2a', rider:'#2a2a2a', helm:'dou_mou', cloak:'#c89a3a', arm:'ji'},
+  hz_xianzhen:{inherit:'han', name:'THE FIRST-TO-ASCEND', archer:'crossbow', arm:'crossbow', shield:'tall', shieldC:'#c8a034', boss:'#2a2a2a', tunic:'#7a5a2a'},
+  hz_danyang: {inherit:'han', name:'DANYANG SOLDIERS', armor:null, garment:{kind:'coat', col:'#3a5a3a', top:1.0, bot:0.02, hem:0.46, sleeve:'short', legs:'#3a3a2a'}, helm:null, headband:'#2a3a2a', tunic:'#3a5a3a', arm:'dao', shield:'tall', shieldC:'#4a3a2a'},
+  hz_baier:   {inherit:'han', name:'THE WHITE-EARED GUARD', tunic:'#4a6a3a', helmPlume:'#f4f0e6', arm:'ji'},
+  hz_jiangdong:{inherit:'han', name:'JIANGDONG MARINES', armor:null, garment:{kind:'coat', col:'#8a2a22', top:1.0, bot:0.02, hem:0.40, sleeve:'short', legs:'#4a3020'}, helm:'he_guan', tunic:'#8a2a22', arm:'dao', shield:'round', shieldC:'#6a3a1a', land:'river'},
+  hz_sou:     {inherit:'yue', name:'SOU BOWMEN', arm:'bow', archer:'bow', shield:'none', tunic:'#4a3a2a', plume:false},
+  han_bei:    {inherit:'han', name:'LIU BEI’S BAND', stdC:'#a83030', tunic:'#4a6a3a', rider:'#4a6a3a', glyph:'備', cloak:'#2a4a2a'},
+  han_liang:  {inherit:'han', name:'THE LIANG HORSE', tunic:'#6a5a3a', rider:'#6a5a3a', stdC:'#8a6a2a', glyph:'馬', horse:0.55, arm:'lance', land:'steppe'},
+  han_gongsun:{inherit:'han', name:'GONGSUN DU’S LIAODONG', tunic:'#3a4a6a', rider:'#3a4a6a', stdC:'#3a4a6a', glyph:'公', land:'hills'},
+  han_yi:     {inherit:'han', name:'LIU ZHANG’S YI', tunic:'#6a3a6a', rider:'#6a3a6a', stdC:'#6a3a6a', glyph:'益', land:'hills'},
+});
+ARMY_STYLE.han_sun.horse=0.08; ARMY_STYLE.legion.horse=0.22;
+Object.assign(ARMY_STYLE.han_cao,{shieldC:'#2a3040', boss:'#8a8a9a'}); Object.assign(ARMY_STYLE.han_yuan,{shieldC:'#a8842a'}); Object.assign(ARMY_STYLE.han_liu,{shieldC:'#2a6a4a'}); Object.assign(ARMY_STYLE.han_sun,{shieldC:'#7a2a1a'});
+/* the order of battle: [style, weight, recolour] for the centre, the wings, the rear (archers) and the horse */
+const HOST_MIX={
+  legion:  {front:[['leg_illyr',4],['leg_thrac',2],['legion',2]], wing:[['aux_gaul',2],['aux_anat',2],['aux_brit',1],['aux_egy',1],['aux_thrac',1]], arch:[['aux_syr',2],['aux_palm',2]], horse:[['mauri',3],['eq_thrac',2],['aux_gaul',2],['aux_palm',1]]},
+  usurper: {front:[['usurper',3],['aux_anat',2]], wing:[['aux_anat',2],['aux_egy',1]], arch:[['aux_syr',3],['aux_palm',1]], horse:[['aux_palm',2],['usurper',1]]},
+  han:     {front:[['han',3],['hz_dao',2]], wing:[['hz_dao',2],['han',1]], arch:[['hz_xbow',3]], horse:[['han',2],['xiongnu',1]]},
+  han_cao: {front:[['han_cao',3],['hz_qingzhou',3],['hz_dao',2,{tunic:'#3a3a4a', shieldC:'#2a3040'}]], wing:[['hz_qingzhou',2],['hz_dao',1,{tunic:'#3a3a4a', shieldC:'#2a3040'}]], arch:[['hz_xbow',3,{tunic:'#3a3a4a'}]], horse:[['hz_hubao',3],['han_cao',1]]},
+  han_yuan:{front:[['han_yuan',3],['hz_xianzhen',2],['hz_dao',2,{tunic:'#7a5a2a', shieldC:'#c8a034'}]], wing:[['han_yuan',2],['hz_dao',1,{tunic:'#7a5a2a', shieldC:'#c8a034'}]], arch:[['hz_xianzhen',3]], horse:[['wuhuan',3],['han_yuan',2]]},
+  han_sun: {front:[['hz_jiangdong',3],['han_sun',2],['yue',2]], wing:[['yue',2],['hz_jiangdong',1]], arch:[['hz_xbow',2,{tunic:'#8a2a22'}]], horse:[['han_sun',1]]},
+  han_bei: {front:[['han_bei',2],['hz_danyang',3],['hz_baier',2]], wing:[['hz_danyang',2]], arch:[['hz_xbow',2,{tunic:'#4a6a3a'}]], horse:[['han_bei',2],['wuhuan',1]]},
+  han_liu: {front:[['han_liu',3],['hz_dao',2,{tunic:'#3a5a4a', shieldC:'#2a6a4a'}]], wing:[['hz_dao',1,{tunic:'#3a5a4a'}]], arch:[['hz_xbow',2,{tunic:'#3a5a4a'}]], horse:[['han_liu',1]]},
+  han_liang:{front:[['han_liang',2],['hz_qiang',3]], wing:[['hz_qiang',2]], arch:[['hz_qiang',1]], horse:[['han_liang',3],['xiongnu',1],['hz_qiang',1]]},
+  han_gongsun:{front:[['han_gongsun',3],['korean',2]], wing:[['korean',2]], arch:[['hz_xbow',2,{tunic:'#3a4a6a'}]], horse:[['korean',2],['wuhuan',1]]},
+  han_yi:  {front:[['han_yi',3],['hz_sou',2]], wing:[['hz_sou',2]], arch:[['hz_sou',2]], horse:[['han_yi',1]]},
+  hz_xiyu: {front:[['hz_xiyu',3],['hz_dao',1]], wing:[['hz_xiyu',2]], arch:[['hz_xiyu',2]], horse:[['hz_xiyu',2],['xiongnu',1]]},
+};
+for(const k in HOST_MIX){ if(ARMY_STYLE[k]) ARMY_STYLE[k].mix=HOST_MIX[k]; }
+/* whose host is on this ground, in the year 200 */
+const HAN_GROUND={'Luoyang':'han_cao','Xuchang':'han_cao','Yan Province':'han_cao','Xu Province':'han_cao','Ji Province':'han_yuan','Qing Province':'han_yuan','Bing Province':'han_yuan','Wu':'han_sun','Kuaiji':'han_sun','Jing Province':'han_liu','Yi Province':'han_yi','Hanzhong':'han_yi','Liang Province':'han_liang','Dunhuang':'han_liang','Chang’an':'han_liang','Liaodong':'han_gongsun','Lelang':'han_gongsun','Nanhai':'yue','Jiaozhi':'yue','Tarim Basin':'hz_xiyu','Khotan':'hz_xiyu','Kashgar':'hz_xiyu','Loulan':'hz_xiyu','Turfan':'hz_xiyu'};
+CAMPAIGNS_EAST.push(
+  {id:'runan',  name:'LIU BEI AT RUNAN',        where:'Xuchang',        diff:2, style:'han_bei',   foe:'LIU BEI AND THE YELLOW TURBANS OF RUNAN', blurb:'Liu Bei has slipped away from Yuan Shao and joined the Runan Yellow Turbans behind Cao Cao’s lines. Guan Yu has come back to him.'},
+  {id:'jiangdong',name:'THE LITTLE CONQUEROR’S RIVER', where:'Wu',       diff:3, style:'han_sun',   foe:'THE JIANGDONG FLEET', blurb:'Sun Ce is dead of an assassin’s arrow and his brother is eighteen. Every warlord on the river thinks this is the moment.'},
+  {id:'liang',  name:'THE LIANG HORSE',          where:'Liang Province', diff:2, style:'han_liang', foe:'MA TENG’S AND HAN SUI’S CAVALRY', blurb:'The two lords of Liang have quarrelled again, and their Qiang horse are raiding down the Wei valley while they do.'},
+  {id:'oasis',  name:'THE OASIS KINGDOMS',       where:'Tarim Basin',    diff:2, style:'hz_xiyu',   foe:'THE LEVIES OF SHANSHAN AND QIUCI', blurb:'With the Protector-General gone, the oasis kings have stopped sending hostages. The caravans want them reminded.'}
+);
+
 const CAMPAIGN_STYLE={germ:'germanic', dacia:'dacian', desert:'desert', parth:'parthian', brit:'celt', revolt:'usurper'};
 const CAMPAIGN_FOE={germ:'CHATTI WAR-BAND', dacia:'DACIAN HILLMEN', desert:'CAMEL RAIDERS', parth:'CATAPHRACTS', brit:'PAINTED TRIBES', revolt:'THE USURPER’S LEVIES'};
 /* =====================================================================
