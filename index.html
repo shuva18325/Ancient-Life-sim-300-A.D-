@@ -33544,6 +33544,7 @@ function armyStyleMine(){
 /* whose ground you are standing on, when nobody said whom you are fighting */
 function armyStyleHere(id){
   try{ const R=REGION_EAST_BY_ID[id||G.current]; if(R){ const P=R.people||'';
+      if(typeof armyStyleOfPeople==='function'){ const own=armyStyleOfPeople(P); if(own) return own; }
       if(/zhangzhung|bod|sumpa|qiang/.test(P)) return 'plateau'; if(/wuhuan/.test(P)) return 'wuhuan'; if(/xiongnu/.test(P)) return 'xiongnu';
       if(/yue|lac|dian|ailao/.test(P)) return 'yue'; if(/cham|funan|mon|pyu|malay/.test(P)) return 'cham'; if(/^(alan|sarmatian)$/.test(P)) return 'alan'; if(/^(hun|dahae|jiankun|shiwei)$/.test(P)) return 'hun';
       if(/^(armenian|kartvelian|albanian|laz)$/.test(P)) return 'armenian'; if(/^(parthian|pars|adiabenian|hatran|mesene|elymaean|sakastani|chorasmian)$/.test(P)) return 'parthian';
@@ -33554,19 +33555,37 @@ function armyStyleHere(id){
   return 'germanic';
 }
 
+/* what a people wears on its head when it wears no helmet: the felt caps of the steppe, the Saka's tall point, the Dong Son
+   feather crown, the Dian bun, the Pyu cone, the Blemmye mop, the Over-Shore hood */
+function nbDrawHat(g, kind, col, ph, hairC){
+  const dk=mixHex(col,'#000000',0.35), lt=mixHex(col,'#ffffff',0.35);
+  switch(kind){
+    case 'fur': g.fillStyle=col; g.beginPath(); g.ellipse(1,-82,7.4,5.2,0,Math.PI,0); g.lineTo(8.4,-79); g.lineTo(-6.4,-79); g.closePath(); g.fill();
+      g.fillStyle=lt; g.beginPath(); g.ellipse(1,-79.4,8.2,2.1,0,0,7); g.fill(); g.strokeStyle=dk; g.lineWidth=0.7; for(let i=-5;i<=6;i+=2){ g.beginPath(); g.moveTo(1+i,-80.6); g.lineTo(1+i*0.8,-82.4); g.stroke(); }
+      g.fillStyle=lt; g.beginPath(); g.ellipse(-5.6,-76.4,2.1,3.6,0.2,0,7); g.fill(); break;   // the ear-flap
+    case 'pointed': g.fillStyle=col; g.beginPath(); g.moveTo(-6.6,-79); g.quadraticCurveTo(-5,-90,-4,-99); g.quadraticCurveTo(3,-90,8.4,-79); g.closePath(); g.fill();
+      g.strokeStyle=dk; g.lineWidth=0.8; g.beginPath(); g.moveTo(-4,-99); g.quadraticCurveTo(0,-88,1,-80); g.stroke(); g.fillStyle=lt; g.fillRect(-6.8,-80.4,15.4,2); break;
+    case 'band': g.fillStyle=col; g.fillRect(-6.2,-81.6,14,2.6); { const sw=Math.sin(ph)*1.2; g.strokeStyle=col; g.lineWidth=1.4; g.beginPath(); g.moveTo(-6,-80.4); g.quadraticCurveTo(-9,-78+sw,-12,-74+sw); g.moveTo(-6,-80.4); g.quadraticCurveTo(-10,-80+sw,-13,-77+sw); g.stroke(); } break;
+    case 'feathers': g.fillStyle=col; g.fillRect(-6,-82,14,3); for(let i=0;i<6;i++){ const bx=-4+i*2.2, sw=Math.sin(ph+i)*0.8; g.strokeStyle=i%2? '#efe6cf' : col; g.lineWidth=1.8; g.beginPath(); g.moveTo(bx,-82); g.quadraticCurveTo(bx-4,-94,bx-12+sw,-102+i*1.6); g.stroke(); g.strokeStyle='#1a1410'; g.lineWidth=0.6; g.beginPath(); g.moveTo(bx-9+sw,-98+i*1.6); g.lineTo(bx-12+sw,-102+i*1.6); g.stroke(); } break;
+    case 'knotbun': g.fillStyle=col; g.beginPath(); g.arc(2.5,-85,3.6,0,7); g.fill(); g.strokeStyle='#e8c870'; g.lineWidth=0.9; g.beginPath(); g.moveTo(-2.5,-86.5); g.lineTo(8,-84); g.stroke(); break;
+    case 'conical': g.fillStyle=col; g.beginPath(); g.moveTo(-8,-79.5); g.lineTo(1.5,-95); g.lineTo(11,-79.5); g.closePath(); g.fill(); g.strokeStyle=dk; g.lineWidth=0.7; for(let i=1;i<4;i++){ const y=-79.5-i*3.8, hw=9.5*(1-i/4.1); g.beginPath(); g.moveTo(1.5-hw,y); g.lineTo(1.5+hw,y); g.stroke(); } g.fillStyle=lt; g.beginPath(); g.arc(1.5,-95.5,1.4,0,7); g.fill(); break;
+    case 'mop': g.fillStyle=col; g.beginPath(); g.ellipse(-0.5,-81,8.6,6.6,0,Math.PI*0.95,Math.PI*2.08); g.closePath(); g.fill(); g.fillStyle=mixHex(col,'#ffffff',0.12); for(let i=0;i<7;i++){ g.beginPath(); g.arc(-7+i*2.3,-84+Math.abs(i-3)*0.9,1.3,0,7); g.fill(); } break;
+    case 'hood': g.strokeStyle=col; g.lineWidth=4.2; g.beginPath(); g.arc(1,-76,7.4,Math.PI*0.55,Math.PI*1.95); g.stroke(); g.strokeStyle='#ece0c6'; g.lineWidth=1.8; g.beginPath(); g.arc(1,-76,9.6,Math.PI*1.25,Math.PI*1.98); g.stroke(); break;
+  }
+}
 /* ---- the foot soldier: the template figure in the people's armour and helmet, then the people's weapon and shield ---- */
 const NB_STYLE_CACHE=new Map();
-function nbStyleSprite(S, frame, archer){
-  const key=S.id+'|'+frame+'|'+(archer?1:0);
+function nbStyleSprite(S, frame, archer, hd){
+  const HD=hd||1, key=S.id+'|'+frame+'|'+(archer?1:0)+(HD>1? '|hd'+HD : '');
   let cv=NB_STYLE_CACHE.get(key); if(cv) return cv;
-  cv=document.createElement('canvas'); cv.width=34; cv.height=34;
-  const g=cv.getContext('2d',{willReadFrequently:true}); const k=0.27;
-  g.setTransform(k,0,0,k,15,31);
+  cv=document.createElement('canvas'); cv.width=34*HD; cv.height=34*HD;
+  const g=cv.getContext('2d',{willReadFrequently:true}); const k=0.27*HD;
+  g.setTransform(k,0,0,k,15*HD,31*HD);
   const skins=S.skins? S.skins : S.id==='tamil'||S.id==='cham'||S.id==='indian'? ['#9a6a3e','#8a5a34','#a87048','#7a4e2a'] : S.id==='yue'? ['#b8885a','#a87a4e','#c89868','#9a6e44'] : ['#caa06a','#b88a5a','#d8b088','#a87a4a'];
   const C=Object.assign({}, paletteFor({skin:skins[frame%4], tunic:S.tunic}));
   const hairC=S.hairC? S.hairC[frame%S.hairC.length] : '#1e1410';
   const look={male:true, skin:skins[frame%4], hair:hairC, beard:(S.beard&&frame%4!==3)? S.beard : 'none', body:Object.assign({legs:6,bust:6,booty:6,waist:6}, S.build||{})};
-  const kit={C, loin:S.tunic, belt:C.leather, armor:S.armor||null, armorSpec:(!S.armor && S.garment)? S.garment : null, helm:S.helm||null, blood:0, t:0};
+  const kit={C, loin:S.tunic, belt:C.leather, armor:S.armor||null, armorSpec:(!S.armor && S.garment)? S.garment : null, helm:(S.hat? null : S.helm||null), blood:0, t:0};
   const ph=frame*Math.PI/2, arm=archer? (S.archer||'bow') : S.arm;
   const hands= arm==='bow'? {near:[10,-46], far:[14,-50]} : arm==='crossbow'? {near:[10,-44], far:[14,-46]} : {near:[6,-40], far:[9,-44]};
   try{
@@ -33624,13 +33643,16 @@ function nbStyleSprite(S, frame, archer){
       case 'long': g.fillStyle=sc; g.beginPath(); g.moveTo(9,-74); g.lineTo(16,-62); g.lineTo(16,-28); g.lineTo(9,-16); g.lineTo(2,-28); g.lineTo(2,-62); g.closePath(); g.fill(); g.fillStyle=S.boss; g.fillRect(8,-60,2,30); g.beginPath(); g.ellipse(9,-45,3.4,4.4,0,0,7); g.fill(); break;
       default: break; }
     // ---- what is on the head that the helmet table does not have ----
+    g.save(); g.translate(2.2,12.4);   // these were drawn a head too high: the crown of the head is at -70, not -82
     if(S.plume){ for(let i=0;i<5;i++){ g.strokeStyle=i%2? '#2a6a4a' : '#e8e0c8'; g.lineWidth=1.6; g.beginPath(); g.moveTo(0,-82); g.quadraticCurveTo(-6+i*3,-96,-10+i*5,-104+Math.abs(i-2)*2); g.stroke(); } g.fillStyle='#c8b060'; g.fillRect(-6,-84,12,3); }
     else if(!S.helm && S.id==='plateau'){ g.fillStyle='#e8e0d0'; g.fillRect(-7,-84,14,4); g.fillStyle='#2a8a8a'; g.fillRect(-2,-85,3,3); g.fillStyle='#c8342a'; g.fillRect(3,-84,2,2); }
     else if(!S.helm && S.crest && S.bare){ g.fillStyle=S.crest; g.fillRect(-5,-84,10,3); }
     else if(S.helm==='galea_prov'){ g.fillStyle=S.crest; g.fillRect(-4,-86,10,5); }
+    g.restore();
+    if(S.hat){ g.save(); g.translate(2.2,12.4); nbDrawHat(g, S.hat, S.hatC||'#3a2a1a', ph, hairC); g.restore(); }
   }catch(e){}
   g.setTransform(1,0,0,1,0,0);
-  const im=g.getImageData(0,0,34,34), d=im.data; for(let i=3;i<d.length;i+=4) d[i]= d[i]>=100? 255 : 0; g.putImageData(im,0,0);
+  if(HD===1){ const im=g.getImageData(0,0,34,34), d=im.data; for(let i=3;i<d.length;i+=4) d[i]= d[i]>=100? 255 : 0; g.putImageData(im,0,0); }
   NB_STYLE_CACHE.set(key, cv); if(NB_STYLE_CACHE.size>220) NB_STYLE_CACHE.delete(NB_STYLE_CACHE.keys().next().value);
   return cv;
 }
@@ -59489,6 +59511,97 @@ Object.assign(ARMY_STYLE,{
   osrhoene:  {inherit:'parthian', name:'OSRHOENE', tunic:'#3a5a7a', armor:'squamata', arm:'bow', std:'flag', stdC:'#3a5a7a', barded:false},
   carpi:     {inherit:'dacian', name:'THE CARPI', cloak:'#5a3a2a'},
 });
+/* ---- ⚔ EVERY PEOPLE OF ASIA FIELDS ITS OWN MEN. Before this the Dingling marched as Xianbei, the Pyu as Linyi, Kalinga as
+   "the kingdom's army". Now each people on the Asia sheet has its own coat, cap, weapon, shield and standard, drawn from what
+   the Chinese, Indian, Greek and Roman writers of the age say about them, and from what their graves hold. ---- */
+const STEPSKIN=['#d8b088','#c89a6a','#e0bc90','#b88a5a'], SASKIN=['#9a6a3e','#8a5a34','#a87048','#7a4e2a'], SEASKIN=['#b8885a','#a87a4e','#c89868','#9a6e44'],
+      PLATSKIN=['#b07c4c','#a06e42','#bc8a5a','#8e6038'], IRSKIN=['#c8a070','#b88e60','#d4ac80','#a87e52'], NORTHSKIN=['#d8b48a','#cca67a','#e2c098','#bf9a6e'];
+const GARB={
+  coat:(col,legs,o)=>Object.assign({kind:'coat', col, top:1.0, bot:0.02, hem:0.60, sleeve:'full', legs:legs||mixHex(col,'#000000',0.35)}, o||{}),
+  robe:(col,o)=>Object.assign({kind:'robe', col, top:0.98, bot:0.02, hem:1.20, sleeve:'full', slcol:col}, o||{}),
+  wrap:(col,o)=>Object.assign({kind:'wrap', col, panel:mixHex(col,'#000000',0.18), top:1.0, bot:0.02, hem:0.44, sleeve:'short'}, o||{}),
+  parka:(col,trim,o)=>Object.assign({kind:'parka', col, trim, seam:'#d8d0b0', top:1.04, bot:0.02, hem:0.66, sleeve:'full', legs:mixHex(col,'#000000',0.3)}, o||{}),
+  quilt:(col,o)=>Object.assign({kind:'quilt', col, top:1.0, bot:0.02, hem:0.36, sleeve:'short'}, o||{}),
+  lam:(col,lace,o)=>Object.assign({kind:'lamellar', col, lace:[lace||'#c8a24a'], top:1.0, bot:0.02, hem:0.50, sleeve:'short', slcol:mixHex(col,'#000000',0.2)}, o||{}),
+  scale:(col,o)=>Object.assign({kind:'scale', col, top:1.0, bot:0.02, hem:0.44, sleeve:'short', slcol:mixHex(col,'#000000',0.2), belt:true}, o||{}),
+};
+/* the base looks the inherited peoples take their skin from */
+Object.assign(ARMY_STYLE.indian,{skins:SASKIN}); Object.assign(ARMY_STYLE.tamil,{skins:SASKIN}); Object.assign(ARMY_STYLE.kush,{skins:DEEPSKIN, hairC:DARKHAIR});
+Object.assign(ARMY_STYLE.yue,{skins:SEASKIN}); Object.assign(ARMY_STYLE.cham,{skins:SASKIN}); Object.assign(ARMY_STYLE.parthian,{skins:IRSKIN, beard:'full'});
+Object.assign(ARMY_STYLE.xianbei,{skins:STEPSKIN}); Object.assign(ARMY_STYLE.plateau,{skins:PLATSKIN}); Object.assign(ARMY_STYLE.desert,{skins:IRSKIN, beard:'full'});
+Object.assign(ARMY_STYLE.armenian,{beard:'full'}); Object.assign(ARMY_STYLE.sogdian,{skins:IRSKIN, beard:'full'});
+Object.assign(ARMY_STYLE,{
+  /* the north: the steppe and the forest beyond it */
+  dingling:  {inherit:'xianbei', name:'THE DINGLING', tunic:'#6a5a3a', armor:null, garment:GARB.coat('#8a7a5a','#4a3a2a',{trim:'#e8dcc0'}), hat:'fur', hatC:'#5a4a3a', arm:'bow', std:'tug', stdC:'#c8b088', horse:0.6, land:'steppe'},
+  wusun:     {inherit:'xianbei', name:'THE WUSUN', tunic:'#3a5a6a', armor:'squamata', helm:null, hat:'pointed', hatC:'#3a5a6a', arm:'lance', hairC:REDHAIR, skins:FAIRSKIN, beard:'full', std:'beast', stdC:'#8a6a3a', horse:0.9},
+  jiankun:   {inherit:'hun', name:'THE JIANKUN (KYRGYZ)', armor:null, garment:GARB.coat('#5a3a2a','#3a2a1a'), helm:null, hat:'fur', hatC:'#3a2a1a', hairC:REDHAIR, skins:FAIRSKIN, arm:'bow', stdC:'#8a2a1a'},
+  shiwei:    {inherit:'hun', name:'THE SHIWEI', armor:null, garment:GARB.coat('#8a6a4a','#5a4a3a'), helm:null, hat:'band', hatC:'#3a2a1a', arm:'bow', horse:0.15, std:'beast', stdC:'#5a4a3a', land:'forest'},
+  dahae:     {inherit:'hun', name:'THE DAHAE', armor:null, garment:GARB.coat('#6a3a2a','#3a2a1a',{sash:'#c8a24a'}), helm:null, hat:'pointed', hatC:'#6a3a2a', skins:STEPSKIN, beard:'full', arm:'bow', horse:0.85, std:'tamgha', stdC:'#6a3a2a', stdD:'#e8c34a'},
+  /* the roof of the world */
+  zhangzhung:{inherit:'plateau', name:'ZHANG ZHUNG', tunic:'#6a2a4a', armor:null, garment:GARB.coat('#6a2a4a','#3a2418',{trim:'#2a8a8a'}), hat:'band', hatC:'#2a8a8a', arm:'spear', sling:false, std:'yaktail', stdC:'#e8e0d0'},
+  bod:       {inherit:'plateau', name:'THE BOD OF YARLUNG', tunic:'#8a3a1a', arm:'sling', shield:'round', shieldC:'#8a6a3a', std:'yaktail', stdC:'#1a1410'},
+  sumpa:     {inherit:'plateau', name:'THE SUMPA', tunic:'#3a4a3a', armor:null, garment:GARB.coat('#8a7a5a','#3a3a2a',{trim:'#5a4a3a'}), hat:'fur', hatC:'#6a5a4a', arm:'bow', shield:'none', std:'beast', stdC:'#6a5a4a'},
+  qiang:     {inherit:'plateau', name:'THE QIANG', tunic:'#5a4a3a', armor:null, garment:FOLK_GARB.goat('#a8986a'), arm:'spear', shield:'small', shieldC:'#6a5a3a', boss:'#a8a8a8', horse:0.25, std:'yaktail', stdC:'#5a4a3a'},
+  /* the oases */
+  kangju:    {inherit:'sogdian', name:'KANGJU', tunic:'#5a3a2a', armor:'steppe_lamellar', helm:'steppe_cap', arm:'bow', horse:0.75, shield:'none', std:'tamgha', stdC:'#5a3a2a', stdD:'#e8c34a'},
+  dayuan:    {inherit:'sogdian', name:'DAYUAN · FERGHANA', tunic:'#8a5a2a', armor:'squamata', helm:'persian_helm', arm:'lance', horse:0.9, horseC:['#c8a060','#e8d8b0','#8a6a3a'], std:'flag', stdC:'#c8a060', stdD:'#8a2a1a'},
+  tocharian: {inherit:'sogdian', name:'KUCHA · THE TOCHARIANS', tunic:'#3a6a5a', armor:'hamata', helm:null, hat:'band', hatC:'#c8a24a', arm:'spear', shield:'round', shieldC:'#3a6a5a', hairC:['#8a5a2a','#b8823a','#5a3a22','#a86a3a'], skins:FAIRSKIN, beard:'stubble', std:'flag', stdC:'#3a6a5a', stdD:'#e8c34a'},
+  kroraina:  {inherit:'sogdian', name:'KRORAINA (LOULAN)', tunic:'#c8a878', armor:null, garment:GARB.coat('#c8a878','#6a5a3a',{trim:'#8a2a2a'}), helm:null, hat:'fur', hatC:'#e8dcc0', arm:'bow', shield:'small', shieldC:'#8a6a3a', std:'flag', stdC:'#8a2a2a'},
+  saka:      {inherit:'sogdian', name:'THE SAKA OF KHOTAN', tunic:'#6a2a2a', armor:'steppe_coat', helm:null, hat:'pointed', hatC:'#2a2a3a', arm:'bow', horse:0.6, std:'tamgha', stdC:'#6a2a2a', stdD:'#c8a24a'},
+  chorasmian:{inherit:'parthian', name:'CHORASMIA', tunic:'#4a5a3a', stdC:'#4a5a3a', crest:'#e8c34a'},
+  /* Manchuria and the peninsula */
+  buyeo:     {inherit:'korean', name:'BUYEO', tunic:'#ece6d6', armor:null, garment:GARB.coat('#ece6d6','#d8d0c0',{trim:'#8a2a2a'}), helm:'dou_mou', arm:'bow', archer:'bow', horse:0.55, std:'banner', stdC:'#ece6d6', glyph:'夫'},
+  okjeo:     {inherit:'korean', name:'OKJEO', tunic:'#8a7a5a', armor:null, garment:GARB.coat('#8a7a5a','#5a4a3a'), helm:null, knot:true, arm:'spear', shield:'long', shieldC:'#6a5a3a', horse:0.05, std:'flag', stdC:'#5a4a3a'},
+  samhan:    {inherit:'korean', name:'THE SAMHAN', tunic:'#c8b890', armor:null, garment:GARB.wrap('#c8b890'), helm:null, knot:true, paint:'#2a3a5a', arm:'spear', shield:'tall', shieldC:'#8a6a3a', horse:0.04, std:'feather', stdC:'#e8dcc0'},
+  dongye:    {inherit:'korean', name:'DONGYE (EAST YE)', tunic:'#6a4a3a', armor:null, garment:GARB.coat('#6a4a3a','#3a2a1a'), helm:null, hat:'band', hatC:'#c8342a', arm:'lance', shield:'none', horse:0.04, std:'tiger', stdC:'#e8a020'},
+  yilou:     {inherit:'korean', name:'THE YILOU', tunic:'#7a5a3a', armor:null, garment:GARB.coat('#7a5a3a','#4a3a2a',{hem:0.42}), helm:null, hat:'fur', hatC:'#4a3a2a', arm:'bow', archer:'bow', shield:'none', horse:0, std:'beast', stdC:'#4a3a2a', land:'forest'},
+  lelang:    {inherit:'han', name:'THE LELANG GARRISON', tunic:'#3a4a5a', stdC:'#3a4a5a', glyph:'樂', land:'hills'},
+  /* the south: the bronze-drum peoples */
+  lac:       {inherit:'yue', name:'THE LẠC OF JIAOZHI', tunic:'#6a5a2a', plume:false, hat:'feathers', hatC:'#c8902a', paint:'#1a3a4a', arm:'spear', archer:'crossbow', shield:'tall', shieldC:'#a8884a', std:'feather', stdC:'#c8902a'},
+  dian:      {inherit:'yue', name:'THE KINGDOM OF DIAN', tunic:'#6a3a2a', bare:false, plume:false, armor:null, garment:GARB.lam('#b08a3a','#5a2a1a',{hem:0.40}), hat:'knotbun', hatC:'#1e1410', arm:'ge', shield:'round', shieldC:'#b08a3a', boss:'#e8c870', horse:0.3, horseC:['#6a5038','#8a6a4a'], std:'feather', stdC:'#b08a3a'},
+  ailao:     {inherit:'yue', name:'THE AILAO', tunic:'#4a5a2a', plume:false, paint:'#2a2a1a', hat:'band', hatC:'#8a2a1a', arm:'bow', archer:'bow', shield:'none', std:'feather', stdC:'#4a5a2a'},
+  funan:     {inherit:'cham', name:'FUNAN', tunic:'#7a2a1a', bare:true, hairC:DARKHAIR, arm:'spear', shield:'long', shieldC:'#6a4a2a', elephants:2, std:'flag', stdC:'#c8902a', stdD:'#7a2a1a'},
+  mon:       {inherit:'cham', name:'THE MON', tunic:'#8a3a2a', bare:false, garment:GARB.wrap('#8a3a2a',{hem:0.5}), hat:'band', hatC:'#e8c34a', arm:'spear', shield:'round', shieldC:'#8a5a2a', elephants:1, std:'flag', stdC:'#8a3a2a', stdD:'#e8c34a'},
+  pyu:       {inherit:'cham', name:'THE PYU', tunic:'#e8d8a8', bare:false, garment:GARB.wrap('#e8d8a8',{panel:'#c8342a'}), hat:'conical', hatC:'#c8a24a', arm:'bow', archer:'bow', shield:'none', elephants:1, std:'flag', stdC:'#e8c34a', stdD:'#c8342a'},
+  malay:     {inherit:'cham', name:'THE STRAITS MALAY', tunic:'#8a2a2a', bare:true, hat:'band', hatC:'#8a2a2a', arm:'javelin', shield:'long', shieldC:'#a87a4a', elephants:0, std:'feather', stdC:'#8a2a2a', land:'tropic'},
+  /* the subcontinent */
+  sinhala:   {inherit:'tamil', name:'ANURADHAPURA', tunic:'#e8d0a0', bare:false, armor:'kavacha', helm:'pagri', arm:'spear', shield:'round', shieldC:'#8a5a2a', elephants:3, std:'flag', stdC:'#c8342a', stdD:'#e8c34a'},
+  chera:     {inherit:'tamil', name:'THE CHERA', tunic:'#e8dcc0', arm:'bow', archer:'bow', shield:'none', std:'flag', stdC:'#e8a020', stdD:'#5a3418'},
+  chutu:     {inherit:'tamil', name:'THE CHUTU', tunic:'#d8c8a0', helm:null, hat:'band', hatC:'#c8342a', arm:'javelin', shield:'small', shieldC:'#6a4a2a', std:'flag', stdC:'#2a5a3a'},
+  puzhi:     {inherit:'tamil', name:'EZHIL MALAI', tunic:'#c8b890', helm:null, hat:'band', hatC:'#2a6a3a', arm:'bow', archer:'bow', shield:'none', elephants:1, std:'tiger', stdC:'#c8902a', land:'tropic'},
+  andhra:    {inherit:'indian', name:'THE SATAVAHANAS', tunic:'#e8dcc0', armor:'kavacha', arm:'spear', shield:'long', shieldC:'#5a3a22', std:'flag', stdC:'#2a5a8a', stdD:'#e8c34a', elephants:2},
+  kalinga:   {inherit:'indian', name:'KALINGA', tunic:'#e8c8a0', arm:'bow', elephants:3, std:'flag', stdC:'#c8342a', stdD:'#e8dcc0'},
+  vanga:     {inherit:'indian', name:'VANGA · THE GANGARIDAI', tunic:'#3a6a5a', armor:null, garment:GARB.wrap('#3a6a5a'), helm:null, hat:'band', hatC:'#e8c34a', arm:'spear', shield:'tall', shieldC:'#6a4a2a', elephants:2, std:'flag', stdC:'#3a6a5a'},
+  kamarupa:  {inherit:'indian', name:'KAMARUPA', tunic:'#c83a2a', armor:null, garment:GARB.wrap('#c83a2a',{panel:'#ece0c8'}), helm:null, hat:'band', hatC:'#ece0c8', skins:SEASKIN, arm:'bow', shield:'none', elephants:1, std:'flag', stdC:'#c83a2a', land:'tropic'},
+  kuninda:   {inherit:'indian', name:'THE KUNINDAS', tunic:'#7a6a4a', armor:null, garment:GARB.coat('#7a6a4a','#4a3a2a'), helm:null, hat:'fur', hatC:'#e8dcc0', skins:PLATSKIN, arm:'spear', shield:'round', shieldC:'#6a4a2a', elephants:0, horse:0.2, std:'flag', stdC:'#7a6a4a', land:'hills'},
+  magadhan:  {inherit:'indian', name:'MAGADHA', tunic:'#e8dcc0', armor:'kavacha', arm:'bow', elephants:2, std:'flag', stdC:'#e8a020', stdD:'#2a5a8a'},
+  naga:      {inherit:'indian', name:'THE NAGAS OF PADMAVATI', tunic:'#2a5a3a', armor:'kavacha', arm:'spear', shield:'round', shieldC:'#2a5a3a', std:'flag', stdC:'#2a6a4a', stdD:'#e8c34a', elephants:1},
+  kosalan:   {inherit:'indian', name:'KOSALA', tunic:'#d8c090', arm:'spear', shield:'long', shieldC:'#7a4a2a', std:'flag', stdC:'#c8902a', stdD:'#e8dcc0', elephants:1},
+  /* Iran, Mesopotamia, the Caucasus */
+  pars:      {inherit:'parthian', name:'PERSIS · HOUSE OF SASAN', tunic:'#8a2a2a', armor:'squamata', arm:'lance', std:'flag', stdC:'#a8302a', stdD:'#e8c34a', crest:'#e8c34a'},
+  adiabenian:{inherit:'parthian', name:'ADIABENE', tunic:'#5a3a6a', armor:'squamata', arm:'spear', shield:'oval', shieldC:'#5a3a6a', boss:'#e8c34a', barded:false, horse:0.4, std:'flag', stdC:'#5a3a6a'},
+  hatran:    {inherit:'parthian', name:'HATRA', tunic:'#c8a060', armor:'squamata', arm:'bow', archer:'bow', barded:false, horse:0.5, std:'flag', stdC:'#c8a060', stdD:'#e8e0d0'},
+  mesene:    {inherit:'parthian', name:'CHARACENE (MESENE)', tunic:'#3a6a6a', armor:null, garment:GARB.robe('#3a6a6a',{hem:0.9, sash:'#e8c34a'}), helm:null, hat:'band', hatC:'#e8dcc0', arm:'spear', shield:'round', shieldC:'#3a6a6a', horse:0.25, barded:false, std:'flag', stdC:'#3a6a6a', land:'river'},
+  elymaean:  {inherit:'parthian', name:'ELYMAIS', tunic:'#6a5a2a', armor:null, garment:GARB.coat('#6a5a2a','#3a3a2a'), helm:null, hat:'band', hatC:'#c8a24a', arm:'bow', archer:'bow', barded:false, horse:0.3, std:'flag', stdC:'#6a5a2a', land:'hills'},
+  sakastani: {inherit:'parthian', name:'SAKASTAN', tunic:'#7a4a2a', helm:'steppe_cap', std:'tamgha', stdC:'#7a4a2a', stdD:'#e8c34a'},
+  kartvelian:{inherit:'armenian', name:'IBERIA (KARTLI)', tunic:'#3a5a3a', armor:'squamata', helm:'persian_helm', arm:'spear', shield:'round', shieldC:'#3a5a3a', std:'flag', stdC:'#3a5a3a', stdD:'#e8dcc0'},
+  albanian:  {inherit:'armenian', name:'CAUCASIAN ALBANIA', tunic:'#6a5a2a', armor:null, garment:GARB.coat('#6a5a2a','#3a2a1a'), helm:null, hat:'fur', hatC:'#2a2018', arm:'javelin', shield:'small', shieldC:'#6a4a2a', std:'flag', stdC:'#6a5a2a'},
+  laz:       {inherit:'armenian', name:'LAZICA (COLCHIS)', tunic:'#2a4a6a', armor:'hamata', helm:null, hat:'pointed', hatC:'#2a4a6a', arm:'spear', shield:'oval', shieldC:'#2a4a6a', boss:'#c8c8d0', horse:0.15, std:'flag', stdC:'#2a4a6a', stdD:'#e8c34a'},
+  /* Arabia, the Red Sea, the Nile */
+  gerrhaean: {inherit:'arab', name:'GERRHA', tunic:'#c8b080', camel:true, arm:'spear', shield:'small', shieldC:'#8a6a3a', std:'flag', stdC:'#8a5a2a'},
+  omani:     {inherit:'arab', name:'MAZUN (OMAN)', tunic:'#e0d0a8', camel:true, helm:null, hat:'band', hatC:'#3a5a7a', arm:'javelin', shield:'small', shieldC:'#6a4a2a', std:'flag', stdC:'#3a5a7a'},
+  sabaean:   {inherit:'arab', name:'SABA', tunic:'#ece0c8', armor:null, garment:GARB.wrap('#ece0c8',{panel:'#8a5a2a'}), helm:null, hat:'band', hatC:'#c8902a', arm:'spear', shield:'round', shieldC:'#8a5a2a', camel:true, std:'flag', stdC:'#c8902a', stdD:'#ece0c8'},
+  himyarite: {inherit:'arab', name:'ḤIMYAR', tunic:'#8a3a2a', armor:'squamata', helm:null, hat:'band', hatC:'#e8c34a', arm:'spear', shield:'round', shieldC:'#6a3a2a', boss:'#e8c34a', camel:false, horse:0.45, std:'flag', stdC:'#8a3a2a', stdD:'#e8c34a'},
+  hadrami:   {inherit:'arab', name:'ḤAḌRAMAWT', tunic:'#a8885a', arm:'bow', archer:'bow', shield:'none', camel:true, std:'flag', stdC:'#5a3a2a'},
+  blemmye:   {inherit:'arab', name:'THE BLEMMYES', tunic:'#d8c8a0', bare:true, helm:null, hat:'mop', hatC:'#1e1410', skins:AFRSKIN, beard:'none', arm:'javelin', shield:'small', shieldC:'#c8b080', boss:'#6a4a2a', camel:true, std:'flag', stdC:'#8a2a1a'},
+  aksumite:  {inherit:'kush', name:'AKSUM', tunic:'#e8e0d0', arm:'spear', shield:'round', shieldC:'#6a4a2a', boss:'#c8a040', elephants:1, std:'flag', stdC:'#c8342a', stdD:'#e8dcc0', skins:AFRSKIN, hat:'band', hatC:'#c8342a'},
+  /* the far north-east: the Amur and the Over-Shore */
+  kheru:     {inherit:'xianbei', name:'KHERU OF THE AMUR', tunic:'#a89a6a', armor:null, garment:GARB.coat('#a89a6a','#6a5a3a',{trim:'#3a5a7a', hem:0.66}), helm:null, hat:'fur', hatC:'#5a4030', skins:NORTHSKIN, hairC:DARKHAIR, arm:'spear', archer:'bow', shield:'none', horse:0, std:'beast', stdC:'#6a5a3a', land:'forest'},
+  vaak:      {inherit:'xianbei', name:'VAAK OF THE OVER-SHORE', tunic:'#6a6a5c', armor:'sealskin', helm:null, hat:'hood', hatC:'#6a6a5c', skins:NORTHSKIN, hairC:DARKHAIR, arm:'javelin', archer:'bow', shield:'none', horse:0, std:'beast', stdC:'#e8e0d0', land:'forest'},
+});
+/* the people → the army: the peoples above field their own style; a few go by a shared name */
+const PEOPLE_ARMY={kushite:'kush'};
+function armyStyleOfPeople(p){ if(!p) return null; if(PEOPLE_ARMY[p]) return PEOPLE_ARMY[p]; return ARMY_STYLE[p]? p : null; }
 const FOLK_OF_PEOPLE={caledonian:'caledonian', pict:'pict', irish:'irish', frisian:'frisian', jute:'jute', herul:'herul', goth:'goth', aesti:'aesti', venedi:'venedi', marcomanni:'marcomanni', quadi:'quadi', alamanni:'alamanni', sarmatian:'sarmatian', mauri:'mauri', gaetuli:'gaetuli', garamantes:'garamantes', nasamones:'nasamones', osrhoene:'osrhoene', palmyrene:'palmyrene', arab:'arab'};
 /* the West's own campaigns: one for each people on the frontier */
 CAMPAIGNS.push(
@@ -77690,7 +77803,7 @@ drawLogo();
 })();
 
 try{ iceMythInit(); iceClothInit(); iceTtsInit(); iceWrap(); }catch(e){ console.error('iceMythInit',e); }
-window.__SS = { kanvekTier:(w)=>kanvekTier(w), kanvekLvInfo:(w)=>kanvekLvInfo(w), kanvekLevel:(w)=>kanvekLevel(w), kanvekGrow:(w)=>kanvekGrow(w), KANVEK_LEVELS, drawHallMan:(...a)=>drawHallMan(...a), drawFemProfile:(...a)=>drawFemProfile(...a), drawHallFem:(...a)=>drawHallFem(...a), folkLookId:(w)=>folkLookId(w), drawFolkLook:(c,w,o)=>drawFolkLook(c,w,o), drawPortraitFigure:(...a)=>drawPortraitFigure(...a), drawKidProfile:(...a)=>drawKidProfile(...a), CUSTOMS, customsHere:()=>customsHere(), customsHers:(w)=>customsHers(w), customsTabooToday:(d)=>customsTabooToday(d), customsConceive:(B)=>customsConceive(B), customsChildName:(s)=>customsChildName(s), customsWeddingLine:(w)=>customsWeddingLine(w), customsJealMul:()=>customsJealMul(), buildCustomsCard:(b)=>buildCustomsCard(b), finishBedNow:()=>finishBed(), getBC:()=>BC, setBC:(v)=>{ BC=v; }, roomBackdrop:(T)=>whRoomBackdrop(T), openEmpire:()=>openEmpire(), empSeason:()=>empSeason(), EMP_UI, silkDbg:()=>{ const c=document.createElement("canvas").getContext("2d"); try{ drawSilkRoadLive(c); return {ok:true, n:silkCaravanCount(), at:silkAt(0.5), arc:silkArc().tot}; }catch(e){ return {err:e.message}; } }, btMountSprite:(id,f)=>btMountSprite(id,f), poseLoreNow:()=>poseLore(), nbStyleSprite:(S,f,a)=>nbStyleSprite(S,f,a), armyStyle:(id)=>armyStyle(id), dynThroneFalls:(h)=>dynThroneFalls(h), proclaimDynasty:()=>proclaimDynasty(), plotTargets:()=>plotTargets(), mapZoomTo:(z,x,y)=>mapZoomTo(z,x,y), ASIA_PEOPLES, asiaPeopleFor:(e,o)=>asiaPeopleFor(e,o), EAST_PIN_POS, campaignOdds:(cp)=>campaignOdds(cp), updateBattle:(dt)=>updateBattle(dt), drawBattle:()=>drawBattle(), get BT(){ return BT; }, romStyles:()=>ROM_STYLES, startRomanticStyled:(a,b)=>startRomanticStyled(a,b), bgFn:(n)=>({bgPalace,bgWar,bgCoast,bgWoa,bgOpelia,bgIsle,bgReiko,bgForge})[n], setPairSS:(v)=>{ PAIR_SS=v; }, ICE_T:{ get AC(){return AC;}, set AC(v){AC=v;}, iceSlap, iceSkin, iceUlk, iceGulp, iceVoc, iceCrowd, ICE_V, sfx }, ICE_TTS, STRIKES, getDM:()=>DM, drawBridePortrait:(...a)=>drawBridePortrait(...a), rhFig, RH_CAST, openBotWatch, botEnterBeat, getBW:()=>BW, iceGoddessOpen, paintGoddess, startBedScene, regionAny, iceDebug:()=>({here:iceHere(), prey:ICE_PREY_BY_REGION}),
+window.__SS = { armyStyleOfPeople:(p)=>armyStyleOfPeople(p), armyStyleKeys:()=>Object.keys(ARMY_STYLE), armyStyleHere:(id)=>armyStyleHere(id), kanvekTier:(w)=>kanvekTier(w), kanvekLvInfo:(w)=>kanvekLvInfo(w), kanvekLevel:(w)=>kanvekLevel(w), kanvekGrow:(w)=>kanvekGrow(w), KANVEK_LEVELS, drawHallMan:(...a)=>drawHallMan(...a), drawFemProfile:(...a)=>drawFemProfile(...a), drawHallFem:(...a)=>drawHallFem(...a), folkLookId:(w)=>folkLookId(w), drawFolkLook:(c,w,o)=>drawFolkLook(c,w,o), drawPortraitFigure:(...a)=>drawPortraitFigure(...a), drawKidProfile:(...a)=>drawKidProfile(...a), CUSTOMS, customsHere:()=>customsHere(), customsHers:(w)=>customsHers(w), customsTabooToday:(d)=>customsTabooToday(d), customsConceive:(B)=>customsConceive(B), customsChildName:(s)=>customsChildName(s), customsWeddingLine:(w)=>customsWeddingLine(w), customsJealMul:()=>customsJealMul(), buildCustomsCard:(b)=>buildCustomsCard(b), finishBedNow:()=>finishBed(), getBC:()=>BC, setBC:(v)=>{ BC=v; }, roomBackdrop:(T)=>whRoomBackdrop(T), openEmpire:()=>openEmpire(), empSeason:()=>empSeason(), EMP_UI, silkDbg:()=>{ const c=document.createElement("canvas").getContext("2d"); try{ drawSilkRoadLive(c); return {ok:true, n:silkCaravanCount(), at:silkAt(0.5), arc:silkArc().tot}; }catch(e){ return {err:e.message}; } }, btMountSprite:(id,f)=>btMountSprite(id,f), poseLoreNow:()=>poseLore(), nbStyleSprite:(S,f,a,h)=>nbStyleSprite(S,f,a,h), armyStyle:(id)=>armyStyle(id), dynThroneFalls:(h)=>dynThroneFalls(h), proclaimDynasty:()=>proclaimDynasty(), plotTargets:()=>plotTargets(), mapZoomTo:(z,x,y)=>mapZoomTo(z,x,y), ASIA_PEOPLES, asiaPeopleFor:(e,o)=>asiaPeopleFor(e,o), EAST_PIN_POS, campaignOdds:(cp)=>campaignOdds(cp), updateBattle:(dt)=>updateBattle(dt), drawBattle:()=>drawBattle(), get BT(){ return BT; }, romStyles:()=>ROM_STYLES, startRomanticStyled:(a,b)=>startRomanticStyled(a,b), bgFn:(n)=>({bgPalace,bgWar,bgCoast,bgWoa,bgOpelia,bgIsle,bgReiko,bgForge})[n], setPairSS:(v)=>{ PAIR_SS=v; }, ICE_T:{ get AC(){return AC;}, set AC(v){AC=v;}, iceSlap, iceSkin, iceUlk, iceGulp, iceVoc, iceCrowd, ICE_V, sfx }, ICE_TTS, STRIKES, getDM:()=>DM, drawBridePortrait:(...a)=>drawBridePortrait(...a), rhFig, RH_CAST, openBotWatch, botEnterBeat, getBW:()=>BW, iceGoddessOpen, paintGoddess, startBedScene, regionAny, iceDebug:()=>({here:iceHere(), prey:ICE_PREY_BY_REGION}),
   openBookViewer:()=>openBookViewer(), openSettings:()=>openSettings(), 
   rhAmbTick:(b)=>rhAmbTick(b), rhAmbHit:(k,n)=>rhAmbHit(k,n), rhAmbStop:()=>rhAmbStop(), rhSting:(b)=>rhSting(b), setMuted:(v)=>{muted=v;}, ambKind:()=>RH_AMB&&RH_AMB.kind, acState:()=>AC&&AC.state,
   WPN_ART, WPN_RANGED, drawRangedIcon, BOWS, wpnStamp, wpnIcon, drawHeldBow, drawHeldPilum, drawHeldBomb, get WPN_DRAWS(){ return WPN_DRAWS; }, setOUTL:(v)=>{ OUTL=!!v; }, drawWeapon2Old,
