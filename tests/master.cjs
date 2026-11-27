@@ -70,7 +70,7 @@ const ok=(name,cond,note)=>{ if(cond){pass++; console.log('  PASS  '+name+(note?
 
   console.log('\n=== 🛏 EVERY POSITION, ON THE NEW BODIES ===');
   R=await T((src)=>{ const S=window.__SS; const G=eval(src)('rk'); G.hasPool=true; G.hasWardrobe=true; const res={}, errs=[];
-    for(let vi=0; vi<=26; vi++){ const place=[8,9,10].includes(vi)? 'pool' : [11,12,13].includes(vi)? 'bath' : [14,15,16].includes(vi)? 'wardrobe' : 'bed';
+    for(let vi=0; vi<=35; vi++){ const place=[8,9,10].includes(vi)? 'pool' : [11,12,13].includes(vi)? 'bath' : [14,15,16].includes(vi)? 'wardrobe' : 'bed';
       S.setWH('done'); S.startBedScene('fun','night',place); const BC=S.BC; if(!BC){ res[vi]='noBC'; continue; }
       BC.forcePose=vi; S.setBCT(600+vi*7); const n0=S.BEDPOSE_DRAWS;
       try{ S.drawBed(); }catch(e){ errs.push(vi+':'+e.message); }
@@ -78,7 +78,7 @@ const ok=(name,cond,note)=>{ if(cond){pass++; console.log('  PASS  '+name+(note?
     S.setMediumCensor(false); S.setWH('done'); S.startBedScene('fun','night','bed'); S.BC.forcePose=2; S.setBCT(700); const h0=S.BEDPOSE_DRAWS; S.drawBed(); const heavy=S.BEDPOSE_DRAWS>h0; S.setMediumCensor(true);
     return {res, errs, heavy}; }, src);
   const bad=R.res? Object.entries(R.res).filter(([k,v])=>v!=='ok').map(([k])=>k) : ['?'];
-  ok('all 27 positions (bed, lagoon, bath, wardrobe, the cultures, the coast and the tubs) draw the two new figures', !R.err && bad.length===0 && R.errs.length===0, R.err||('not new: '+(bad.join(',')||'none')+(R.errs.length? ' · '+R.errs[0] : '')));
+  ok('all 36 positions (bed, lagoon, bath, wardrobe, the cultures, the coast, the tubs and the countries’ own) draw the two new figures', !R.err && bad.length===0 && R.errs.length===0, R.err||('not new: '+(bad.join(',')||'none')+(R.errs.length? ' · '+R.errs[0] : '')));
   ok('and the silhouette setting still gets its silhouettes', !R.err && R.heavy===false);
 
   console.log('\n=== ✧ THE KANVEK ===');
