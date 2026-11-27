@@ -1,0 +1,24 @@
+/* ✦ THE NIGHT FLOWS: you can pick the next position, a change of position dissolves instead of cutting, and the heat builds */
+const {chromium}=require('playwright');
+const SETUP=()=>{ const S=window.__SS; S.newDemo('Marcus','Italia','Roman'); const G=S.G;
+    G.world='rome'; G.coin=99999; G.isFemale=false; G.married=true; G.hygiene=90; G.day=400; G.lastLoveDay=399; G.hasVilla=true;
+    const sp=S.makeBride('roman',false,9,{male:true}); sp.male=false; sp.eth='roman'; sp.name='Julia'; sp.quirks=[]; sp.flaws=[]; sp.traits=['tempting'];
+    sp.body=Object.assign(sp.body||{},{booty:8,bust:8,waist:7,legs:7,face:8,secret:5}); G.wife=sp; G.wifeRel=85; G.wifePhys=60; G.body=G.body||{}; G.body.secret=8; return G; };
+(async()=>{ const br=await chromium.launch(); const pg=await br.newPage({viewport:{width:1000,height:700}}); const errs=[]; pg.on('pageerror',e=>errs.push(''+e));
+ await pg.goto('file://'+require('path').resolve(__dirname,'../index.html')); await pg.evaluate(()=>localStorage.setItem('SANDSTEEL_ADULT','1')); await pg.reload(); await pg.waitForTimeout(400);
+ let fail=0; const ok=(c,m)=>{ console.log((c?'  PASS  ':'  FAIL  ')+m); if(!c) fail++; };
+ await pg.evaluate((src)=>{ const S=window.__SS; eval(src)(); S.setWH('done'); S.startBedScene('fun','night','bed'); S.setBCT(900); }, '('+SETUP.toString()+')');
+ await pg.waitForTimeout(300);
+ const before=await pg.evaluate(()=>({vi:window.__SS.BEDPOSE_LAST&&window.__SS.BEDPOSE_LAST.vi, set:window.__SS.BC._SET, btns:[...document.querySelectorAll('#scene-acts button, .scene-act, [data-k]')].map(b=>b.textContent).join('|')}));
+ await pg.keyboard.press('d'); await pg.waitForTimeout(250);
+ const after=await pg.evaluate(()=>{ const B=window.__SS.BC; return {chosen:B.chosenPose, vi:window.__SS.BEDPOSE_LAST&&window.__SS.BEDPOSE_LAST.vi, trans:B.trans}; });
+ ok(after.chosen!==undefined && after.chosen!==before.vi && before.set.indexOf(after.chosen)>=0, '▶ picks the next of this country’s positions ('+before.vi+' → '+after.chosen+')');
+ const held=await pg.evaluate(()=>{ const S=window.__SS; S.setBCT(S.BC.t+500); return new Promise(r=>setTimeout(()=>r({vi:S.BEDPOSE_LAST&&S.BEDPOSE_LAST.vi, chosen:S.BC.chosenPose}),200)); });
+ ok(held.vi===held.chosen, 'and it holds while the running order would have moved on');
+ await pg.keyboard.press('w'); await pg.waitForTimeout(150);
+ ok(await pg.evaluate(()=>window.__SS.BC.chosenPose===undefined), 'W hands it back to their own order');
+ ok(after.trans && typeof after.trans.from==='number', 'a change of position is a shift: the last one is kept to dissolve out');
+ const heat=await pg.evaluate(()=>{ const S=window.__SS, a=S.BC.heat; S.setBCT(S.BC.t+1200); return new Promise(r=>setTimeout(()=>r([a, S.BC.heat]),200)); });
+ ok(heat[1]>heat[0], 'and the night builds ('+heat.map(v=>v.toFixed(2)).join(' → ')+')');
+ ok(errs.length===0, 'no page errors'+(errs[0]? ' — '+errs[0] : ''));
+ console.log(fail? '✗ '+fail+' FAILED' : 'ALL GREEN'); await br.close(); process.exit(fail?1:0); })();

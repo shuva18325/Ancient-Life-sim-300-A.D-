@@ -22198,6 +22198,10 @@ document.addEventListener('mousedown',e=>{ if(e.button===0 && state==='fight'){ 
 function sceneActions(){
   if(state==='bed' && typeof BC!=='undefined' && BC && BC.fin && BC.fin.ph==='ask')          // ✧ the one decision that is his, as buttons too
     return [{k:'k', c:'K', t:'KEEP IT (inside)', hot:true}, {k:'x', c:'X', t:'NOT THIS TIME (outside)'}];
+  if(state==='bed' && typeof BC!=='undefined' && BC && BC.t>520 && !BC.kanvekOnly && Array.isArray(BC._SET) && BC._SET.length>1){
+    const B=[{k:'a', c:'◀', t:'POSITION'}, {k:'d', c:'▶', t:'POSITION', hot:true}];
+    if(BC.chosenPose!==undefined) B.push({k:'w', c:'W', t:'↻ THEIR OWN ORDER'});
+    B.push({k:'space', c:'␣', t:'TO THE MORNING'}); return B; }
   const D=DM; if(!D || state!=='domus') return [];
   const A=[];
   const SC0=D.scene; if(SC0 && (SC0.kind==='villalove'||SC0.kind==='escalate') && SC0.asked && !SC0.choice){      // 💞 / 🌾 the ask, as buttons too
@@ -24537,6 +24541,13 @@ function updateBed(dt){ const s=BC; s.t+=dt; const T=s.t;
   // the discreet exit: once the door is shut, SPACE slips away to the morning
   if(T<=520 || asking){ edge.space=false; edge.attack=false; }      // a press the scene cannot use yet is not kept for later
   if(T>520 && !asking && consume('space')) s.t=Math.max(s.t,(s.dur||700)-2);
+  /* ✦ YOU PICK THE NEXT ONE. ◀ ▶ walk through this country's own positions and hold the one you land on; W hands it back
+     to the running order. (Not for her gift, and not while he is deciding.) */
+  if(T>520 && !asking && !s.kanvekOnly && Array.isArray(s._SET) && s._SET.length>1){
+    const SET=s._SET, nx=consume('d'), pv=!nx && consume('a');
+    if(nx||pv){ const cur=(s.chosenPose!==undefined)? s.chosenPose : s.lastVi; let i=SET.indexOf(cur); if(i<0) i=0;
+      i=(i+(nx? 1 : -1)+SET.length)%SET.length; s.chosenPose=SET[i]; s.chosenAt=T; try{ sfx('creak'); }catch(e){} }
+    else if(s.chosenPose!==undefined && consume('w')){ s.chosenPose=undefined; s.chosenAt=undefined; } }
   if(rkFinOn(s)){
     const at=rkFinAt(s);
     if(!s.fin && T>=at) startRkFin(s);
@@ -28461,6 +28472,21 @@ function drawBedStageUI(s){
     pixelText((TT.spent && left<=0.02)? (ST.you? '😴 YOU ARE SPENT' : '😴 SHE IS SPENT') : (ST.you? TT.you : TT.her), x0+55, yy+15, TT.col, 0.56); }
   ctx.restore(); ctx.textAlign='left';
 }
+/* ✦ THE SHIFT. The running order used to cut from one position to the next on a single frame. The new one is drawn, and
+   the last one is drawn over it into its own layer and faded out across a third of a second, so they move into it. */
+let BED_SHIFT_CV=null;
+function bedPoseWithShift(vi, E, Tn){
+  const ok=drawBedPose(vi, E); const tr=E.s && E.s.trans;
+  if(ok && tr && typeof tr.from==='number' && tr.from!==vi && Tn-tr.t0<22){
+    const k=clamp((Tn-tr.t0)/22,0,1), cv0=E.c.canvas;
+    if(!BED_SHIFT_CV || BED_SHIFT_CV.width!==cv0.width || BED_SHIFT_CV.height!==cv0.height){ BED_SHIFT_CV=document.createElement('canvas'); BED_SHIFT_CV.width=cv0.width; BED_SHIFT_CV.height=cv0.height; }
+    const g=BED_SHIFT_CV.getContext('2d'); g.setTransform(1,0,0,1,0,0); g.clearRect(0,0,cv0.width,cv0.height); g.setTransform(E.c.getTransform());
+    const keep=BEDPOSE_LAST, S0=E.s, kb=S0.poseBeat, knf=S0.nf, kkd=S0.kanDeep;
+    try{ drawBedPose(tr.from, Object.assign({}, E, {c:g, vt:BED_STEP-1, HB:()=>{}})); }catch(e){}
+    BEDPOSE_LAST=keep; S0.poseBeat=kb; S0.nf=knf; S0.kanDeep=kkd;
+    E.c.save(); E.c.setTransform(1,0,0,1,0,0); E.c.globalAlpha=(1-k)*(1-k*0.4); E.c.drawImage(BED_SHIFT_CV,0,0); E.c.restore(); }
+  return ok;
+}
 function drawBedPose(vi, E){
   const c=E.c, T=E.T, s=E.s, cx0=E.cx0, base=E.base, HB=E.HB||(()=>{});
   if(!G) return false;
@@ -28487,7 +28513,8 @@ function drawBedPose(vi, E){
   const HIM=(M)=>{ const a=(M.aro===undefined)? 1 : M.aro, IN=lengthInches(him,a);
     if(s && s.choice==='love' && s.fx && s.kind==='escalate') M=Object.assign({}, M, {noLen:true});                 // 💦 out — the finish draws it
     return drawMateFig(c, c, Object.assign({look:him, bare:true, noFloorCloth:true, face:HF, lenIn:IN.now, diaIn:IN.dia, pxi:1.0, floor:base, aro:a}, M)); };
-  const HER=(F)=>drawFemFig(c, c, Object.assign({look:her, floor:base, t:T, expr:HE}, F));
+  const HEAT=(s && s.heat)||0;                                                  // ✦ the night builds: flush, sweat, hair coming down
+  const HER=(F)=>drawFemFig(c, c, Object.assign({look:her, floor:base, t:T, expr:HE}, F, (F.blush!==undefined || HEAT>0.05)? {blush:clamp((F.blush||0)+HEAT*0.35,0,1)} : {}));
   // mirror: draw about x, and bring the points it returns back into the room
   const MX=(x0,fn)=>{ c.save(); c.translate(x0,0); c.scale(-1,1); c.translate(-x0,0); let r=null; try{ r=fn(); }finally{ c.restore(); }
     if(r){ const o={}; for(const k in r){ const v=r[k]; o[k]=(Array.isArray(v) && v.length===2 && typeof v[0]==='number')? [2*x0-v[0], v[1]] : v; } return o; } return r; };
@@ -28536,7 +28563,17 @@ function drawBedPose(vi, E){
     c.fillStyle=mixHex(gc,'#ffffff',0.25); for(let i=0;i<5;i++) c.fillRect(x+6+i*w/5, base-3.4+(i%2), w/9, 0.8); };
   BEDPOSE_DRAWS++;
   const Lpos={};   // for the tests: where the two of them ended up
-  const done=(HM,HR,kind)=>{ BEDPOSE_LAST={vi, kind, him:HM, her:HR}; return true; };
+  const done=(HM,HR,kind)=>{ BEDPOSE_LAST={vi, kind, him:HM, her:HR};
+    /* ✦ and as the night goes on it SHOWS: beads of sweat catching the lamp on her and on him, her hair coming loose */
+    if(HEAT>0.35 && vi!=='undress'){ const a=clamp((HEAT-0.35)/0.5,0,1);
+      const bead=(p,n,sd)=>{ if(!p) return; for(let i=0;i<n;i++){ const x=p[0]+Math.sin(i*2.7+sd)*3.2, y=p[1]+Math.cos(i*1.9+sd)*2.6+((T*0.05+i*0.3)%1)*1.4;
+          c.fillStyle='rgba(235,245,255,'+(0.55*a).toFixed(2)+')'; c.fillRect(x,y,0.9,1.1); c.fillStyle='rgba(255,255,255,'+(0.8*a).toFixed(2)+')'; c.fillRect(x,y,0.45,0.45); } };
+      if(HR){ bead(HR.chest, 3, 1.3); bead(HR.head? [HR.head[0], HR.head[1]-2.5] : null, 2, 4.1); bead(HR.hip, 2, 2.2); }
+      if(HM){ bead(HM.shoulder, 3, 0.7); bead(HM.head? [HM.head[0], HM.head[1]-2.5] : null, 2, 3.3); }
+      if(HR && HR.head && a>0.3){ const hc=hexOf((her&&her.hair)||'#2a1a10'); c.strokeStyle=hc; c.lineWidth=0.7; c.globalAlpha=a*0.85;
+        for(let i=0;i<4;i++){ const sx=HR.head[0]-3+i*2, sy=HR.head[1]-3, sw=Math.sin(T*0.06+i)*1.2; c.beginPath(); c.moveTo(sx,sy); c.quadraticCurveTo(sx+3+sw,sy+4,sx+1+sw*1.5,sy+8+i); c.stroke(); }
+        c.globalAlpha=1; } }
+    return true; };
   if(povBed(vi,{c,T,s,her,him,HE,HF,OH,base,cx0})) return done(null,null,'pov');
 
   /* ================= THE CLOTHES COME OFF — before the first position =================
@@ -30365,10 +30402,15 @@ function drawShadowPlay(s,T){
              : (s.rkFinPose!==undefined && SET.indexOf(s.rkFinPose)>=0)
              ? s.rkFinPose
              : (s.stage && s.stage.rest && !s.kanvekOnly)? bedRestPose(SET)   // ✦ the afterglow always ends at rest
+             : (s.chosenPose!==undefined && SET.indexOf(s.chosenPose)>=0)? s.chosenPose   // ✦ the one YOU picked, held until you pick again
              : SET[ ((step%cut)+cut)%cut ];
+  s._SET=SET;
   /* the silhouette setting has no drawings of the countries' own positions: it plays the nearest one it has */
   const vi = (!RIG && typeof vi0==='number' && vi0>=27 && vi0<=38)? ({27:3,28:3,29:11,30:2,31:17,32:2,33:14,34:11,35:8,36:17,37:3,38:3})[vi0] : vi0;
-  const vt=((T-_T0)%BED_STEP+BED_STEP)%BED_STEP;
+  const vt=(s.chosenPose!==undefined && vi0===s.chosenPose && s.chosenAt!==undefined)? ((T-s.chosenAt)%BED_STEP+BED_STEP)%BED_STEP : ((T-_T0)%BED_STEP+BED_STEP)%BED_STEP;
+  /* ✦ a change of position is a SHIFT, not a cut: note it, and the draw dissolves the old one out over the new */
+  if(typeof vi==='number'){ if(s.lastVi!==vi){ s.trans={from:s.lastVi, t0:T}; s.lastVi=vi; } }
+  s.heat=clamp((T-_T0)/Math.max(200,(s.dur||700)-_T0),0,1);
   const POSE_NAMES=['the embrace','the kiss','from behind','the ride','the lift','the sundial','the tangle','at rest',
                     'on the pool rim','the ledge','afloat',
                     'on the warm marble','the bench','under the spout',
@@ -30527,7 +30569,7 @@ function drawShadowPlay(s,T){
     const ut=(s.forceUndress!==undefined)? s.forceUndress : T-520;
     drawBedPose('undress', {c:ctx, s, T, vt, cx0, base, place, HB, ut});
     s.poseName='the clothes come off'; s.poseFade=clamp(ut/30,0,1)*clamp((BED_UNDRESS-ut)/30,0,1); }
-  else if(RIG && typeof drawBedPose==='function' && drawBedPose(vi, {c:ctx, s, T:(s.stage? s.tT : T), vt, cx0, base, place, HB})){ /* drawn — at the stage's tempo */ }
+  else if(RIG && typeof drawBedPose==='function' && bedPoseWithShift(vi, {c:ctx, s, T:(s.stage? s.tT : T), vt, cx0, base, place, HB}, T)){ /* drawn — at the stage's tempo, the last one dissolving out */ }
   else if(vi===0){ // THE EMBRACE — he grinds against her in a real, hungry rhythm; the tease reads in the gap
     const beat=Math.max(0,Math.sin(T*0.30)), sw=beat*3;                 // fast, insistent — not a tap
     const hx=cx0-16+beat*7, wx=cx0+13;                                  // he presses in (7px) then eases back, again and again
