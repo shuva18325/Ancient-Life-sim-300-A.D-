@@ -17,5 +17,7 @@ const {chromium}=require('playwright');
  ok(r.closed, 'Esc closes a panel');
  // the slot screen shows the picture
  const s2=await pg.evaluate(()=>{ try{ const b=document.getElementById('btn-slots'); return !!b; }catch(e){ return false; } });
+ const h=await pg.evaluate(()=>{ const S=window.__SS; S.newDemo('M','Rome','Roman'); S.enterMap(); const vis=id=>{ const b=document.getElementById(id); return !!b && b.style.display!=='none'; }; document.getElementById('btn-home').click(); return {home:vis('btn-home'), villaHidden:!vis('btn-villa'), tiles:document.querySelectorAll('#home-grid > button').length}; });
+ ok(h.home && h.villaHidden && h.tiles===5, 'one HOME button on the bar opens the five rooms of home');
  ok(errs.length===0, 'no page errors'+(errs[0]? ' — '+errs[0] : ''));
  console.log(fail? '✗ '+fail+' FAILED' : 'ALL GREEN'); await br.close(); process.exit(fail?1:0); })();
