@@ -1,0 +1,22 @@
+/* ⭐ HEROES OF THE OTHER WORLDS: India, the Sengoku, the Rkrai shore and the Ice, each on its own calendar */
+const {chromium}=require('playwright');
+(async()=>{ const br=await chromium.launch(); const pg=await br.newPage({viewport:{width:1280,height:900}}); const errs=[]; pg.on('pageerror',e=>errs.push(''+e));
+ await pg.goto('file://'+require('path').resolve(__dirname,'../index.html')); await pg.waitForTimeout(400);
+ let fail=0; const ok=(c,m)=>{ console.log((c?'  PASS  ':'  FAIL  ')+m); if(!c) fail++; };
+ const r=await pg.evaluate(()=>{ const S=window.__SS, o={}; const ids=w=>S.HEROES.filter(h=>h.world===w).map(h=>h.id);
+   S.newDemo('K','Owari','WaSamurai'); S.G.waEra=1561; S.G.waDay0=S.G.day; o.waYear=S.heroYear(); o.waN=ids('wa').length; o.nobu=S.heroAudience('nobunaga'); o.hideRec=S.heroCanRecruit('hideyoshi').why;
+   S.G.heroFired={}; S.G.heroLog=[]; S.heroDayTick(); o.waNews=S.G.heroLog.map(e=>e.t).join('|'); 
+   S.newDemo('A','Leokanis','RkKaiq'); o.rkN=ids('rk').length; S.G.coin=500; o.aq=S.heroAudience('aqarun');
+   S.newDemo('B','The Taurus Mountains','IceHunter'); o.iceN=ids('ice').length; o.tusk=S.heroCanRecruit('tuskbreaker').why;
+   S.newDemo('L','Luoyang','Han'); S.G.world='east'; o.india=['vasudeva','senguttuvan','nedunjeliyan'].every(i=>S.HEROES.some(h=>h.id===i)); o.eastYear=S.heroYear();
+   S.openHeroes(); o.open=!!document.getElementById('heroes-ov');
+   return o; });
+ ok(r.waYear===1561 && r.waN>=9, 'the Sengoku keeps its own year ('+r.waYear+') and has '+r.waN+' heroes');
+ ok(/Portuguese|Atsumori/.test(r.nobu)||/gift/.test(r.nobu), 'an audience with Oda Nobunaga ('+r.nobu.slice(0,60)+'…)');
+ ok(/serves/.test(r.hideRec)||/favour/.test(r.hideRec), 'Hideyoshi serves Nobunaga first ('+r.hideRec+')');
+ ok(/OKEHAZAMA/.test(r.waNews) && !/Guandu|GUANDU|Sun Ce/.test(r.waNews), 'Wa hears its own news, not Han’s');
+ ok(r.rkN>=4 && /tally|notch/i.test(r.aq), 'the Rkrai shore has its own heroes');
+ ok(r.iceN>=4 && /gift/.test(r.tusk), 'the Ice has its legends');
+ ok(r.india && r.eastYear===200 && r.open, 'India’s kings join the eastern hall; the east is still 200');
+ ok(errs.length===0, 'no page errors'+(errs[0]? ' — '+errs[0] : ''));
+ console.log(fail? '✗ '+fail+' FAILED' : 'ALL GREEN'); await br.close(); process.exit(fail?1:0); })();
