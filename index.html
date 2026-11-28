@@ -23028,9 +23028,11 @@ function armyBattle(cfg){
   cfg.sub=(cfg.sub?cfg.sub+'   ·   ':'')+({field:'PITCHED BATTLE',siege:'SIEGE ASSAULT',ambush:'NIGHT AMBUSH'})[kind];
   let yS='legion', eS='germanic';
   try{ yS=cfg.yourStyle||armyStyleMine(); }catch(e){}
+  const _hero=(cfg.general && cfg.general.hero && typeof HERO_BY_ID!=='undefined')? HERO_BY_ID[cfg.general.hero] : null;
+  if(_hero && !cfg.yourStyle && ARMY_STYLE['hero_'+_hero.id]) yS='hero_'+_hero.id;      // ⭐ his own men, under his own character
   try{ eS=cfg.enemyStyle || (cfg.enemyName==='CATAPHRACTS'? 'parthian' : (playerWorld()==='east'? armyStyleHere() : (cfg.enemyName==='GARRISON'||cfg.enemyName==='LOYALISTS'? 'usurper' : (folkStyleFor(G.current)||'germanic')))); }catch(e){}
   BT={cfg,kind,win,yourPower,enemyPower,yourLoss,enemyLoss,yourMen:cfg.yourMen,enemyMen:cfg.enemyMen,
-      yourS:armyStyle(yS), enemyS:armyStyle(eS),
+      yourS:armyStyle(yS), enemyS:armyStyle(eS), hero:_hero,
       t:0,dur:170,parts:[],shake:0,ended:false};
   state='battle';
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('on'));
@@ -23136,6 +23138,7 @@ function drawBattle(){
     ctx.beginPath(); ctx.ellipse(W/2,140,44+clash*20,18,0,0,7); ctx.fill();
     ctx.beginPath(); ctx.ellipse(W/2-20,152,30,12,0,0,7); ctx.fill();
     ctx.beginPath(); ctx.ellipse(W/2+24,150,30,12,0,0,7); ctx.fill(); ctx.globalAlpha=1; }
+  if(t.hero){ try{ const hx=56+adv+52+(clash>0? clash*22 : 0); heroChampion(ctx, t.hero, hx, 176, 0.56, t.t/60, 1, clash>0&&clash<1); ctx.textAlign='center'; pixelText('⭐ '+t.hero.name.toUpperCase(), hx, 132, '#ffe08a', 0.62); ctx.textAlign='left'; }catch(e){} }   // ⭐ the hero, twice the height of his men, at their head
   // sparks & blood at the line
   for(const b of t.parts) px(b.x,b.y,2,2,b.c);
   ctx.restore();
@@ -24487,10 +24490,16 @@ function updateRkFin(s, dt){
 }
 function updateBed(dt){ const s=BC; s.t+=dt; const T=s.t;
   /* ✦ the stage, and the rhythm clock it drives */
-  { const st=bedStage(s); s.stage=st; s.tT = (s.tT===undefined || !st)? T : s.tT + dt*st.tempo*(s.bigSlow||1);   // ✦ and a big one, slower
+  { const st=bedStage(s); s.stage=st;
+    /* ✦ the tempo EASES from one stage to the next instead of lurching, and every new position starts a little slower
+       and builds into the stage's pace over its first two seconds */
+    if(st){ s.tempoNow = (s.tempoNow===undefined)? st.tempo : s.tempoNow+(st.tempo-s.tempoNow)*Math.min(1,dt*0.035); }
+    const ramp = (st && s.poseT0!==undefined)? 0.72+0.28*clamp((T-s.poseT0-40)/110,0,1) : 1;
+    s.tT = (s.tT===undefined || !st)? T : s.tT + dt*(s.tempoNow||st.tempo)*ramp*(s.bigSlow||1);   // ✦ and a big one, slower
     if(st && st.peak && (T|0)%6<1) s.hearts.push({x:200+rnd(-60,60), y:150+rnd(-20,20), vy:rnd(0.5,1.1), life:rnd(30,52), c:pick(['#ff6a9a','#ffb0d0','#ff8ad0'])}); }
-  for(const p of s.props){ p.x+=p.vx*dt; p.y+=p.vy*dt; p.vy+=0.16*dt; p.r+=p.vr*dt;
-    if(p.y>222){ p.y=222; p.vx*=0.5; p.vy=0; p.vr*=0.3; } }
+  for(const p of s.props){ if(p.landed){ continue; } p.age=(p.age||0)+dt; p.x+=p.vx*dt; p.y+=p.vy*dt; p.vy+=0.16*dt; p.r+=p.vr*dt;
+    const ly=p.landY||222; if(p.y>ly && p.vy>0){ p.y=ly; if(p.v2){ p.landed=true; } else { p.vx*=0.5; p.vy=0; p.vr*=0.3; } } }
+  try{ prelude2Props(s, T); }catch(e){}
   for(const h of s.hearts){ h.y-=h.vy*dt; h.x+=Math.sin(h.y*0.09)*0.4*dt; h.life-=dt; }
   s.hearts=s.hearts.filter(h=>h.life>0);
   if(!s.splash) s.splash=[];                       // old saves / scenes started before the pool play existed
@@ -24501,10 +24510,11 @@ function updateBed(dt){ const s=BC; s.t+=dt; const T=s.t;
   const HIS=[['tunic',148,-2.9,-2.5,-0.08],['belt',154,-2.4,-2.9,0.12],['subligar',150,-2.6,-3.4,0.18],['msandal',166,-3.2,-2.2,-0.2]];
   const first=G.isFemale?HIS:HERS, second=G.isFemale?HERS:HIS;
   const T1=[150,190,218,240,258], T2=[360,378,392,404,416];
-  first.forEach((it,i)=>{ const tt=T1[i]; if(T>tt&&T<tt+2){ s.props.push({kind:it[0],x:368,y:it[1],vx:it[2],vy:it[3],r:0,vr:it[4]}); if(it[0]==='subligar') sfx('giggle'); } });
-  second.forEach((it,i)=>{ const tt=T2[i]; if(T>tt&&T<tt+2){ s.props.push({kind:it[0],x:368,y:it[1],vx:it[2],vy:it[3],r:0,vr:it[4]}); if(it[0]==='subligar') sfx('giggle'); } });
+  const P2=prelude2On(s);
+  if(!P2) first.forEach((it,i)=>{ const tt=T1[i]; if(T>tt&&T<tt+2){ s.props.push({kind:it[0],x:368,y:it[1],vx:it[2],vy:it[3],r:0,vr:it[4]}); if(it[0]==='subligar') sfx('giggle'); } });
+  if(!P2) second.forEach((it,i)=>{ const tt=T2[i]; if(T>tt&&T<tt+2){ s.props.push({kind:it[0],x:368,y:it[1],vx:it[2],vy:it[3],r:0,vr:it[4]}); if(it[0]==='subligar') sfx('giggle'); } });
   // longer sessions: MORE of the wardrobe goes airborne before the door shuts
-  if(s.len!=='quick'){
+  if(s.len!=='quick' && !P2){
     if(T>424&&T<426) s.props.push({kind:'veil',   x:368,y:144,vx:-2.2,vy:-2.2,r:0,vr:0.05});
     if(T>438&&T<440) s.props.push({kind:'necklace',x:368,y:150,vx:-2.7,vy:-3.1,r:0,vr:0.22});
     if(T>452&&T<454) s.props.push({kind:'girdle', x:368,y:156,vx:-3.0,vy:-2.4,r:0,vr:-0.14});
@@ -25637,7 +25647,7 @@ function drawBed(){
   if(place==='pool'||place==='bath'){ drawPoolPlace(s,T,dx,dw,place); }
   else { drawRoomPlace(s,T,dx,dw,place); }
   // flung clothes arc across the room and settle — full garments, not scraps
-  for(const p of s.props) drawFlungProp(p);
+  for(const p of s.props) if(!p.v2) drawFlungProp(p);                       // (the new prelude draws its own cloth)
   drawBedAfterProps(s,T,dx,dw);
 }
 /* =====================================================================
@@ -25718,6 +25728,7 @@ function preludeWalkX(T, dx){ const x1=dx-66, x0=x1-preludeWalkSpan(); return x0
 function preludeOtherX(T, dx){ return (dx-56) + clamp((T-236)/110,0,1)*72; }
 function preludeWalkA(T){ return clamp(T/14,0,1); }
 function drawRoomPlace(s,T,dx,dw,place){
+  if(prelude2On(s)){ if(T<=540) drawPrelude2(s,T); return; }                     // 🌹 the prelude, rebuilt (see drawPrelude2)
   const ward=place==='wardrobe', CHK=(!ward && CH_PAINTERS[hallPlan().kind])? hallPlan().kind : null;   // 🏯 a room of its own people's
   // the chamber (or the atrium, if the wardrobe is tonight's arena)
   if(!ward){
@@ -25885,7 +25896,7 @@ function drawBedAfterProps(s,T,dx,dw){
     if(!pool){
       const dim=clamp((T-490)/60,0,1)*0.5;
       ctx.globalAlpha=dim; px(-4,-4,W+8,H+8,'#0c0806'); ctx.globalAlpha=1;
-      if(place==='bed'){ const knock=Math.sin(T*0.35)*clamp((T-502)/40,0,1);
+      if(place==='bed' && !prelude2On(s)){ const knock=Math.sin(T*0.35)*clamp((T-502)/40,0,1);
         px(dx-3+knock*1.8,88,3,136,'#5a4028'); }                               // the frame knocks
       if(T>520) drawShadowTheatre(s,T);                                        // the lamp throws EVERYTHING on the wall
     } else if(T>560) drawShadowTheatre(s,T);                                   // the pool/bath plays its own reflection theatre
@@ -26442,41 +26453,54 @@ function bedLoreKey(){
 }
 /* one position's stroke at this instant: d — how deep (0 out of the beat, 1 home); out — how far out he still is on the way
    in (1 = only the tip at her, 0 = in), dy — a lift or drop of his hips for the strokes that have one; label — what to call it */
+/* ✦ a pulse that LANDS. max(0,sin) — the thrust used all through the scenes — arrives at rest at full speed and stops dead,
+   which reads as a twitch; this is the same hump and the same pause with zero speed where it meets the rest */
+function hsin(x){ const v=Math.max(0,Math.sin(x)); return v*v*(3-2*v); }
 function bedStroke(vt, T, k, ph){
   const st=BED_ENTRY[bedLoreKey()];
   const sw=(p)=>0.5-0.5*Math.cos(p);
-  if(!st) return {d:Math.max(0,Math.sin(T*k+(ph||0))), out:0, dy:0, label:null, entry:false};
+  if(!st) return {d:sw(T*k+(ph||0)), out:0, dy:0, label:null, entry:false};
   const ET=ENTRY_T[st.entry]||44, ss=(a,b,x)=>{ const t=clamp((x-a)/(b-a),0,1); return t*t*(3-2*t); };
   if(vt<ET){
     let out=0, guide=false, jolt=0;
     if(st.entry==='press') out=1-ss(4,40,vt);
     else if(st.entry==='sink') out=1-ss(6,52,vt);
     else if(st.entry==='guide'){ out=1-ss(12,46,vt); guide=true; }
-    else if(st.entry==='tease') out= vt<34? 0.70+0.30*Math.cos(vt*0.56) : 0.70*(1-ss(34,47,vt));
-    else if(st.entry==='sudden'){ out= vt<10? 1 : vt<13? 1-(vt-10)/3 : 0; jolt= (vt>=13 && vt<18)? 1-(vt-13)/5 : 0; }
+    else if(st.entry==='tease'){ const o34=0.70+0.30*Math.cos(34*0.56); out= vt<34? 0.70+0.30*Math.cos(vt*0.56) : o34*(1-ss(34,47,vt)); }   // (it used to drop from 0.99 to 0.70 in one frame)
+    else if(st.entry==='sudden'){ out= vt<9? 1 : 1-ss(9,14,vt); jolt= (vt>=12 && vt<18)? 1-ss(12,18,vt) : 0; }
     return {d:clamp(1-out,0,1), out:clamp(out,0,1), dy:0, label:ENTRY_NAMES[st.entry], entry:true, guide, jolt};
   }
-  const P=T*k+(ph||0);
+  const B=bedBeat(st, T*k+(ph||0), sw, ss), w=ss(ET, ET+34, vt);
+  if(w<1){ B.d=1+(B.d-1)*w; B.dy=(B.dy||0)*w; }
+  return B;
+}
+/* ✦ THE BEAT ITSELF. Every rhythm is continuous now: the Kama Sutra's eight strokes blend from one into the next instead of
+   cutting (the depth used to jump from nothing to 0.82, and the side-to-side flipped in a single frame), the hard rhythm is a
+   quick thrust and a slower withdrawal with soft turns instead of a cusp, and the drawn-back stroke eases back out. */
+function bedBeat(st, P, sw, ss){
   if(st.beat==='nine'){
     const n=Math.floor(P*1.15/(Math.PI*2))%10, f=(P*1.15/(Math.PI*2))%1, deep=(n===9);
     return {d:(deep? 1 : 0.36)*sw(f*Math.PI*2), out:0, dy:0, entry:false,
             label: deep? '九淺一深 — and one deep' : '九淺一深 — nine shallow, one deep · '+NINE_CN[n]};
   }
   if(st.beat==='kama'){
-    const PP=P/(Math.PI*2), si=Math.floor(PP/2)%KAMA_STROKES.length, f=PP%1, base=sw(f*Math.PI*2);
-    let d=base, dy=0;
-    if(si===1){ dy=Math.sin(f*Math.PI*2)*1.3; }                                     // manthana: round and round
-    else if(si===2){ dy=-1.5*base; }                                                // hula: from above
-    else if(si===3){ dy=1.4*base; }                                                 // avamardana: from below
-    else if(si===4){ d=0.82+0.18*Math.sin(f*Math.PI*4); }                           // pīḍitaka: in, and held
-    else if(si===5){ d= f<0.72? 0.06 : clamp((f-0.72)/0.06,0,1); }                  // nirghāta: drawn back, then all at once
-    else if(si===6){ dy=1.1; }                                                      // varāhaghāta: to one side
-    else if(si===7){ dy=(Math.floor(PP)%2? 1.1 : -1.1); }                           // vṛṣāghāta: to both sides
-    else if(si===8){ d=0.58+0.42*sw(f*Math.PI*6); }                                 // caṭakavilāsa: quick and small
-    return {d, out:0, dy, entry:false, label:KAMA_STROKES[si][0]+' — '+KAMA_STROKES[si][1]};
+    const PP=Math.max(0,P/(Math.PI*2)), N=KAMA_STROKES.length, blk=Math.floor(PP/2), si=blk%N, f=PP%1, base=sw(f*Math.PI*2);
+    const one=(k)=>{ let d=base, dy=0;
+      if(k===1){ dy=Math.sin(f*Math.PI*2)*1.3; }                                    // manthana: round and round
+      else if(k===2){ dy=-1.5*base; }                                               // hula: from above
+      else if(k===3){ dy=1.4*base; }                                                // avamardana: from below
+      else if(k===4){ d=0.82+0.18*Math.sin(f*Math.PI*4); }                          // pīḍitaka: in, and held
+      else if(k===5){ d= f<0.70? 0.06 : f<0.80? 0.06+0.94*ss(0.70,0.80,f) : 1-0.94*ss(0.82,1.0,f); }   // nirghāta: drawn back, then all at once
+      else if(k===6){ dy=1.1; }                                                     // varāhaghāta: to one side
+      else if(k===7){ dy=1.1*Math.sin(PP*Math.PI); }                                // vṛṣāghāta: to both sides, swung
+      else if(k===8){ d=0.58+0.42*sw(f*Math.PI*6); }                                // caṭakavilāsa: quick and small
+      return [d,dy]; };
+    const cur=one(si), w=ss(0,0.45,(PP%2)/2);                                       // the first part of each stroke blends out of the last
+    const pr= (blk>0 && w<1)? one((si-1+N)%N) : cur;
+    return {d:pr[0]+(cur[0]-pr[0])*w, out:0, dy:pr[1]+(cur[1]-pr[1])*w, entry:false, label:KAMA_STROKES[si][0]+' — '+KAMA_STROKES[si][1]};
   }
   if(st.beat==='slow') return {d:sw(P*0.72), out:0, dy:0, entry:false, label:BEAT_NAMES.slow};
-  if(st.beat==='hard') return {d:Math.pow(sw(P*1.3),0.55), out:0, dy:0, entry:false, label:BEAT_NAMES.hard};
+  if(st.beat==='hard'){ const f=((P*1.3/(Math.PI*2))%1+1)%1; return {d: f<0.36? ss(0,0.36,f) : 1-ss(0.36,1,f), out:0, dy:0, entry:false, label:BEAT_NAMES.hard}; }   // in fast, out slower, soft at both ends
   return {d:sw(P), out:0, dy:0, entry:false, label:null};
 }
 /* ---- the sheets get the positions only they have, and names for them out of their own books ---- */
@@ -28425,7 +28449,8 @@ function drawStaminaIcon(cv, lv){
   P(9,32,22,3,'#6a3a1a'); P(11,31,5,2,'#c8452a'); P(20,31,6,2,'#e8702a');
   P(3, S-5, Math.round((S-6)*k), 2, k>=1? '#e8c34a' : '#b8912f');
 }
-const BED_STEP=160;                                // ticks per position: the positions' own beats are cut to this
+const BED_RHYTHM=0.5;                              // the stroke clock against the scene clock (see drawBedPose)
+const BED_STEP=330;                                // ticks per position (5½ s): long enough to get into it — at 160 the positions flicked past every 2.7 s
 const BED_STAGES=[
   {id:'warm',  name:'WARMING UP',          tempo:0.78, at:0.00, col:'#e8c34a'},
   {id:'find',  name:'FINDING THE RHYTHM',  tempo:1.00, at:0.20, col:'#f0b060'},
@@ -28436,7 +28461,7 @@ const BED_STAGES=[
 /* how long each length of session runs, so it has room for positions after the doorway and the clothes */
 function bedSessionDur(len, kan){
   if(kan) return 860;
-  return len==='vigil'? 18000 : len==='night'? 3600 : len==='long'? BED_INTRO+7*BED_STEP+40 : BED_INTRO+3*BED_STEP+40;
+  return len==='vigil'? 18000 : len==='night'? BED_INTRO+11*BED_STEP+40 : len==='long'? BED_INTRO+7*BED_STEP+40 : BED_INTRO+3*BED_STEP+40;
 }
 /* where the positions start in THIS place: the quay has the walk in from outside, the hub does not */
 function bedIntroFor(s){
@@ -28481,16 +28506,25 @@ function drawBedStageUI(s){
    the last one is drawn over it into its own layer and faded out across a third of a second, so they move into it. */
 let BED_SHIFT_CV=null;
 function bedPoseWithShift(vi, E, Tn){
-  const ok=drawBedPose(vi, E); const tr=E.s && E.s.trans;
-  if(ok && tr && typeof tr.from==='number' && tr.from!==vi && Tn-tr.t0<22){
-    const k=clamp((Tn-tr.t0)/22,0,1), cv0=E.c.canvas;
-    if(!BED_SHIFT_CV || BED_SHIFT_CV.width!==cv0.width || BED_SHIFT_CV.height!==cv0.height){ BED_SHIFT_CV=document.createElement('canvas'); BED_SHIFT_CV.width=cv0.width; BED_SHIFT_CV.height=cv0.height; }
-    const g=BED_SHIFT_CV.getContext('2d'); g.setTransform(1,0,0,1,0,0); g.clearRect(0,0,cv0.width,cv0.height); g.setTransform(E.c.getTransform());
-    const keep=BEDPOSE_LAST, S0=E.s, kb=S0.poseBeat, knf=S0.nf, kkd=S0.kanDeep;
-    try{ drawBedPose(tr.from, Object.assign({}, E, {c:g, vt:BED_STEP-1, HB:()=>{}})); }catch(e){}
+  /* ✦ THE SHIFT, AGAIN. The old position used to be laid over the new one at nearly full strength and faded across a third
+     of a second, so for that moment there were four bodies on the bed — it read as the figures spasming. Now the old one
+     fades out on its own (8 ticks), then the new one fades in on its own (12): one couple on the bed at every frame. */
+  const tr=E.s && E.s.trans, OUT=8, IN=12, dt0=tr? Tn-tr.t0 : 99;
+  const shifting= tr && typeof tr.from==='number' && tr.from!==vi && dt0<OUT+IN;
+  if(!shifting) return drawBedPose(vi, E);
+  const cv0=E.c.canvas;
+  if(!BED_SHIFT_CV || BED_SHIFT_CV.width!==cv0.width || BED_SHIFT_CV.height!==cv0.height){ BED_SHIFT_CV=document.createElement('canvas'); BED_SHIFT_CV.width=cv0.width; BED_SHIFT_CV.height=cv0.height; }
+  const g=BED_SHIFT_CV.getContext('2d'); g.setTransform(1,0,0,1,0,0); g.clearRect(0,0,cv0.width,cv0.height); g.setTransform(E.c.getTransform());
+  let ok=true, a;
+  if(dt0<OUT){ const keep=BEDPOSE_LAST, S0=E.s, kb=S0.poseBeat, knf=S0.nf, kkd=S0.kanDeep;
+    try{ ok=drawBedPose(tr.from, Object.assign({}, E, {c:g, vt:BED_STEP-1, HB:()=>{}})); }catch(e){ ok=false; }
     BEDPOSE_LAST=keep; S0.poseBeat=kb; S0.nf=knf; S0.kanDeep=kkd;
-    E.c.save(); E.c.setTransform(1,0,0,1,0,0); E.c.globalAlpha=(1-k)*(1-k*0.4); E.c.drawImage(BED_SHIFT_CV,0,0); E.c.restore(); }
-  return ok;
+    try{ drawBedPose(vi, Object.assign({}, E, {c:document.createElement('canvas').getContext('2d')})); }catch(e){}   // (the new one still sets its name and beat)
+    a=1-dt0/OUT; a=a*a*(3-2*a); }
+  else { try{ ok=drawBedPose(vi, Object.assign({}, E, {c:g})); }catch(e){ ok=false; }
+    a=(dt0-OUT)/IN; a=a*a*(3-2*a); }
+  if(ok!==false){ E.c.save(); E.c.setTransform(1,0,0,1,0,0); E.c.globalAlpha=clamp(a,0,1); E.c.drawImage(BED_SHIFT_CV,0,0); E.c.restore(); }
+  return ok!==false? true : drawBedPose(vi, E);
 }
 function drawBedPose(vi, E){
   try{ if(GAL===null || !GAL.poses[vi]) galSee(vi); }catch(e){}
@@ -28525,10 +28559,14 @@ function drawBedPose(vi, E){
   const MX=(x0,fn)=>{ c.save(); c.translate(x0,0); c.scale(-1,1); c.translate(-x0,0); let r=null; try{ r=fn(); }finally{ c.restore(); }
     if(r){ const o={}; for(const k in r){ const v=r[k]; o[k]=(Array.isArray(v) && v.length===2 && typeof v[0]==='number')? [2*x0-v[0], v[1]] : v; } return o; } return r; };
   const L=(x0,p)=> p? [2*x0-p[0], p[1]] : p;               // a room point into a mirrored figure's own frame
-  const bt=(k,ph)=>Math.max(0,Math.sin(T*k+(ph||0)));
-  const sn=(k,ph)=>Math.sin(T*k+(ph||0));
+  /* ✦ THE RHYTHM AT A HUMAN PACE. The strokes ran at 3–4 a second warming up and 6–10 at the peak (k≈0.36 rad a tick at
+     sixty ticks a second): the bodies vibrated rather than moved, which is what "spasming" was. The stroke clock runs at
+     half that now — about one and a third a second warming up, three at the peak — and the rocking that goes with it follows. */
+  const TR=T*BED_RHYTHM;
+  const bt=(k,ph)=>hsin(TR*k+(ph||0));
+  const sn=(k,ph)=>Math.sin(TR*k+(ph||0));
   /* ✦ the country's way in and its rhythm (bedStroke): d is the depth, out is how far out he still is on the way in */
-  const SK=(k,ph)=>{ const r=bedStroke(E.vt||0, T, k, ph); if(s) s.poseBeat=r.label||null; return r; };
+  const SK=(k,ph)=>{ const r=bedStroke(E.vt||0, TR, k, ph); if(s) s.poseBeat=r.label||null; return r; };
   const K=vecKit(c);
   const shadow=(x,y,rx)=>{ c.save(); c.globalAlpha=0.28; c.fillStyle='#120b08'; c.beginPath(); c.ellipse(x,y,rx,2.6,0,0,7); c.fill(); c.restore(); };
   const grad=(x0,y0,x1,y1,stops)=>{ const g=c.createLinearGradient(x0,y0,x1,y1); stops.forEach(([o,col])=>g.addColorStop(o,col)); return g; };
@@ -28604,7 +28642,7 @@ function drawBedPose(vi, E){
                    : uS<0.2? {near:[hipW[0]+2.5, hipW[1]-23], far:[hipW[0]-0.5, hipW[1]-24]}
                    : uS<0.85? {near:[hipW[0]+4.2, hipW[1]-3+push*16], far:[hipW[0]-3.5, hipW[1]-3+push*16]}
                    : {near:L(wx,[hx+3, base-52]), far:L(wx,[hx+1, base-46])};
-    const herF={hip:hipW, lean:0.02+close*0.06, headAng:-0.18-close*0.12, expr:(ut<100? 'smug' : ((s.bigV||0)>=9? 'shock' : 'flush')), blush:0.2+uS*0.5, rock:Math.sin(T*0.2)*0.2*uS,
+    const herF={hip:hipW, lean:0.02+close*0.06, headAng:-0.18-close*0.12, expr:(ut<100? 'smug' : ((s.bigV||0)>=9? 'shock' : 'flush')), blush:0.2+uS*0.5, rock:Math.sin(T*0.05)*0.1*uS,
                 ankles:{near:[wx+0.5, base-3.2], far:[wx+3, base-2.6]}, hands:herHands,
                 dress:{col:hexOf((her&&her.dress)||'#8a2f5a'), cut:(coastB? 'ulvik' : 'stola'), u:uS, band, noble:!!(her&&her.tier&&her.tier!=='common')}};
     shadow(cx0, base-1, 24);
@@ -28886,7 +28924,7 @@ function drawBedPose(vi, E){
       const cap=Math.max(2.2, plen*KL.frac);                                         // ✧ what she can take: her level's share of HIM, not a fixed eight units
       const eat=kAll? (KLV>=4? 1 : sstep(0,1,clamp((vt-60)/220,0,1))) : 0;          // she starts eating it up — from the first stroke, once that is her level
       const Dmax=cap+(Math.max(cap,plen*0.97)-cap)*eat, Dmin=Math.min(1.3, plen*0.2);
-      const kst= KL.hold? clamp(0.5-0.62*Math.cos(T*0.19),0,1) : 0.5-0.5*Math.cos(T*0.19);   // one long stroke, tip to depth and back — and at Kan's Own she stays at the bottom
+      const kst= KL.hold? clamp(0.5-0.62*Math.cos(TR*0.19),0,1) : 0.5-0.5*Math.cos(TR*0.19);   // one long stroke, tip to depth and back — and at Kan's Own she stays at the bottom
       s.kanDeep.kst=kst;
       kd = SWAL>=0? Dmin+(cap-Dmin)*(0.42+0.10*Math.sin(SWAL*0.22)) : Dmin+(Dmax-Dmin)*kst;   // swallowing, she eases back so he shows
       kd = Math.min(kd, plen);
@@ -29973,7 +30011,10 @@ function drawBreedPlace(s,T,place){
   const undressing=(!forced && TT<UND_T) || s.forceUndress!==undefined;
   const SET=RK_BREED_POSES[place]||RK_BREED_POSES.breed;
   const TP=TT-UND_T, step=Math.floor(TP/230), vi=forced? s.forcePose : (s.stage && s.stage.rest)? SET[SET.length-1] : SET[((step%SET.length)+SET.length)%SET.length];
-  const vt=((TP%230)+230)%230;
+  /* ✦ the position's own clock runs on from when it began (it wrapped every 230 ticks and replayed the entry, so a held
+     position — the afterglow, a forced one — snapped out and back in) */
+  if(typeof vi==='number' && s.brLastVi!==vi){ s.brLastVi=vi; s.brPoseT0=T; }
+  const vt=(s.brPoseT0!==undefined && s.brPoseT0<=T)? T-s.brPoseT0 : ((TP%230)+230)%230;
   const HB=(x,y,c)=>{ const iv=Math.max(4,c||14); if((T|0)%iv<2){ const p=toS(x,y); s.hearts.push({x:p[0], y:p[1], vy:0.6, life:46, c:'#ff8ad0'}); } };
   ctx.save(); ctx.translate(CX,172); ctx.scale(Z,Z); ctx.translate(-SX0,-SY0+22);
   drawTubBack(TX,rimY,TW,hub,T,base);
@@ -30416,9 +30457,13 @@ function drawShadowPlay(s,T){
   s._SET=SET;
   /* the silhouette setting has no drawings of the countries' own positions: it plays the nearest one it has */
   const vi = (!RIG && typeof vi0==='number' && vi0>=27 && vi0<=38)? ({27:3,28:3,29:11,30:2,31:17,32:2,33:14,34:11,35:8,36:17,37:3,38:3})[vi0] : vi0;
-  const vt=(s.chosenPose!==undefined && vi0===s.chosenPose && s.chosenAt!==undefined)? ((T-s.chosenAt)%BED_STEP+BED_STEP)%BED_STEP : ((T-_T0)%BED_STEP+BED_STEP)%BED_STEP;
-  /* ✦ a change of position is a SHIFT, not a cut: note it, and the draw dissolves the old one out over the new */
-  if(typeof vi==='number'){ if(s.lastVi!==vi){ s.trans={from:s.lastVi, t0:T}; s.lastVi=vi; } }
+  /* ✦ a change of position is a SHIFT, not a cut: note it, and the draw dissolves the old one out before the new one comes in */
+  if(typeof vi==='number'){ if(s.lastVi!==vi){ s.trans={from:s.lastVi, t0:T}; s.lastVi=vi; s.poseT0=T; } }
+  /* ✦ AND ITS OWN CLOCK RUNS ON. vt was the time into the 160-tick step, modulo the step — so a position you held (picked,
+     manual, the afterglow) wrapped back to zero every 2.7 s and played its entry again: he snapped all the way out and
+     pressed back in, over and over. It is now the time since this position began, and it never goes back. */
+  if(s.poseT0===undefined || s.poseT0>T) s.poseT0=T;
+  const vt=Math.max(0, T-s.poseT0);
   s.heat=clamp((T-_T0)/Math.max(200,(s.dur||700)-_T0),0,1);
   const POSE_NAMES=['the embrace','the kiss','from behind','the ride','the lift','the sundial','the tangle','at rest',
                     'on the pool rim','the ledge','afloat',
@@ -30580,7 +30625,7 @@ function drawShadowPlay(s,T){
     s.poseName='the clothes come off'; s.poseFade=clamp(ut/30,0,1)*clamp((BED_UNDRESS-ut)/30,0,1); }
   else if(RIG && typeof drawBedPose==='function' && bedPoseWithShift(vi, {c:ctx, s, T:(s.stage? s.tT : T), vt, cx0, base, place, HB}, T)){ /* drawn — at the stage's tempo, the last one dissolving out */ }
   else if(vi===0){ // THE EMBRACE — he grinds against her in a real, hungry rhythm; the tease reads in the gap
-    const beat=Math.max(0,Math.sin(T*0.30)), sw=beat*3;                 // fast, insistent — not a tap
+    const beat=hsin(T*0.30), sw=beat*3;                 // fast, insistent — not a tap
     const hx=cx0-16+beat*7, wx=cx0+13;                                  // he presses in (7px) then eases back, again and again
     if(RIG){
       // her first — she is the far body, and she takes his weight on the press
@@ -30623,7 +30668,7 @@ function drawShadowPlay(s,T){
          his hips, her heels coming off the floor, both heads, his hands
          travelling up her back, and the band between them breathing. */
       const gap=Math.max(0,9-vt*0.30);
-      const push=Math.max(0,Math.sin(T*0.34));                            // the rhythm, once they are together
+      const push=hsin(T*0.34);                            // the rhythm, once they are together
       const on=gap<=0.6? 1 : 0;                                           // and it only starts when they arrive
       const dr=push*on, lift=dr*2.8, br=Math.sin(T*0.06)*0.7;
       const hx=cx0-8-gap+dr*4.2, wx=cx0+8+gap;                            // he presses in, she gives and comes back
@@ -30688,7 +30733,7 @@ function drawShadowPlay(s,T){
     woad(cx0-30,base-44);
     }
   } else if(vi===2){ // THE 🍑 & HIM — her on all fours, him behind, the rhythm plain
-    const th=Math.max(0,Math.sin(T*0.5))*7;
+    const th=hsin(T*0.5)*7;
     if(RIG){
       /* Nothing about this one is a standing figure, so it is composed straight
          out of the rig's parts: a horizontal trunk with a real arch in it, the
@@ -30730,7 +30775,7 @@ function drawShadowPlay(s,T){
         px(hipX+4,backY-4,4,3,ms); px(hipX+2,backY+2,4,3,ms);
         rhead(kx-2,base-59,true,0.16,-1); }
       // the drive reads in the air behind him, not in the join
-      for(let i=0;i<2;i++){ ctx.globalAlpha=0.22*Math.max(0,Math.sin(T*0.5-i*0.5));
+      for(let i=0;i<2;i++){ ctx.globalAlpha=0.22*hsin(T*0.5-i*0.5);
         px(cx0+26+i*6, base-34-i*3, 6,1,'rgba(255,224,190,.9)'); } ctx.globalAlpha=1;
       veil(hipX-3, backY+1, 24, 7, 0);                                             // where they meet
       veil(shX+12, backY+4, 15, 5, 2.2);                                           // and her front, hanging
@@ -30756,7 +30801,7 @@ function drawShadowPlay(s,T){
     HB(cx0-6,base-82,10);
     }
   } else if(vi===3){ // THE RIDE — her astride, rising & falling, hair & bust alive
-    const bo=Math.max(0,Math.sin(T*0.42))*6, sw=Math.sin(T*0.42);
+    const bo=hsin(T*0.42)*6, sw=Math.sin(T*0.42);
     if(RIG){
       /* He is flat on his back, so he is drawn ON HIS SIDE — a horizontal trunk
          with one arm propping him up to watch. She is the vertical one, and the
@@ -30814,7 +30859,7 @@ function drawShadowPlay(s,T){
     HB(cx0-8,base-82,10);
     }
   } else if(vi===4){ // THE LIFT — he holds her to the wall, legs wrapped, bouncing
-    const bo=Math.max(0,Math.sin(T*0.44))*7;      // 4px of travel was invisible behind two overlapping bodies
+    const bo=hsin(T*0.44)*7;      // 4px of travel was invisible behind two overlapping bodies
     if(RIG){
       /* Her feet never touch the ground in this one — she is carried, and the
          give is all in HIS knees. The wall behind them takes the weight too. */
@@ -31038,7 +31083,7 @@ function drawShadowPlay(s,T){
      water, three that need a heated marble bench, three that need a cupboard
      you can barely turn round in. Each has its own motion. ================= */
   else if(vi===8){ // POOL — ON THE RIM: she sits on the pool edge, he stands in the water
-    const bo=Math.max(0,Math.sin(T*0.40))*4, sw=Math.sin(T*0.40)*1.6;
+    const bo=hsin(T*0.40)*4, sw=Math.sin(T*0.40)*1.6;
     px(cx0-52,base-26,104,5,'rgba(206,192,162,.92)'); px(cx0-52,base-26,104,1,'rgba(238,226,198,.95)'); // the rim
     px(cx0-56,base-21,112,24,'rgba(38,96,130,.72)'); px(cx0-56,base-21,112,2,'rgba(160,220,244,.7)');   // water
     // HER, sat on the stone with her legs hanging into the water
@@ -31146,7 +31191,7 @@ function drawShadowPlay(s,T){
     HB(cx0-6,base-46,10);
   }
   else if(vi===12){ // BATH — THE BENCH: him seated on the ledge, her astride, facing
-    const bo=Math.max(0,Math.sin(T*0.44))*5;
+    const bo=hsin(T*0.44)*5;
     px(cx0-20,base-20,52,9,'#e0d6c0'); px(cx0-20,base-20,52,2,'#f6efdc');  // the bench, UNDER him
     px(cx0-20,base-11,52,2,'#b8ac94'); px(cx0-16,base-9,4,9,'#c8bca0'); px(cx0+24,base-9,4,9,'#c8bca0');
     // HIM, sat on the ledge with his feet on the floor
@@ -31192,7 +31237,7 @@ function drawShadowPlay(s,T){
     HB(cx0,base-84,10);
   }
   else if(vi===14){ // WARDROBE — AGAINST THE DOORS: upright, cramped, the cedar complaining
-    const kn=Math.max(0,Math.sin(T*0.46)), push=kn*4;
+    const kn=hsin(T*0.46), push=kn*4;
     px(cx0-34,base-84,68,84,'#5a3f26'); px(cx0-34,base-84,68,3,'#7a5a38');  // the inside of the cupboard
     px(cx0-1,base-84,2,84,'#3a2718');
     rfig({x:cx0+9-push*0.5, y:base, male:false, face:-1, crouch:kn*0.08,
@@ -31204,7 +31249,7 @@ function drawShadowPlay(s,T){
     HB(cx0+2,base-88,9);
   }
   else if(vi===15){ // WARDROBE — PINNED TO THE CEDAR: one leg up, back to the boards
-    const bo=Math.max(0,Math.sin(T*0.42))*4;
+    const bo=hsin(T*0.42)*4;
     px(cx0-34,base-84,68,84,'#5a3f26'); px(cx0-34,base-84,68,3,'#7a5a38');
     for(let i=0;i<4;i++) px(cx0-30+i*17,base-82,1,80,'#4a3320');
     // HER: one foot still on the floor, the other leg hooked right over him
@@ -31276,7 +31321,7 @@ function drawShadowPlay(s,T){
        produced two people standing next to each other. The spine here is
        one long limb from her hips up to her shoulders, the neck levels off
        from there, and the head is at the end of it. */
-    const rd=Math.max(0,Math.sin(T*0.50));        // the rhythm
+    const rd=hsin(T*0.50);        // the rhythm
     const dip=rd*3.2;                             // and the head rides on it
     // ---- the room she is in ----
     for(let i=0;i<8;i++) px(cx0-48+i*12,base-8,11,8,i%2?'#a8843e':'#c09a52');   // a reed mat
@@ -31347,7 +31392,7 @@ function drawShadowPlay(s,T){
 
        Rhauna's domain is weight and staying put. So she does not move much,
        and that is the point rather than a shortcut. */
-    const rd=Math.max(0,Math.sin(T*0.46)), push=rd*4;
+    const rd=hsin(T*0.46), push=rd*4;
     // the plank wall of the longhouse behind them
     { let x2=cx0-52, i=0;
       while(x2<cx0+52){ const bw2=9+((i*7)%6);
@@ -31417,7 +31462,7 @@ function drawShadowPlay(s,T){
        not been told, which is the one moment in this scene that is hers. */
     const FIN=(s.fin && (s.fin.ph==='in'||s.fin.ph==='out'))? s.fin : null;
     const SWAL=(FIN && FIN.ph==='in')? FIN.t : -1;
-    const gv=(SWAL>=0)? 0 : Math.max(0,Math.sin(T*0.34));   // the rhythm, and it stops
+    const gv=(SWAL>=0)? 0 : hsin(T*0.34);   // the rhythm, and it stops
     const dip=gv*2.2, sway=gv*1.5;                     // and she rides on it
     /* she draws back off him — not far, and not quickly */
     const back=(SWAL<0)? 0 : Math.min(6.5, SWAL*0.20);
@@ -31587,7 +31632,7 @@ function drawShadowPlay(s,T){
        IN the storehouse with the racks behind them and her tally still
        in her other hand. She is seated on the counting ledge, which is
        the piece of furniture her whole office is conducted from. */
-    const rd=Math.max(0,Math.sin(T*0.52)), push=rd*3.4;
+    const rd=hsin(T*0.52), push=rd*3.4;
     // the smoke-house wall and the drying racks
     { let x2=cx0-52, i=0;
       while(x2<cx0+52){ px(x2,base-96,8,96, i%2?'#5e4a30':'#54422a');
@@ -31629,7 +31674,7 @@ function drawShadowPlay(s,T){
        that got her the title doing the work. Her boots are still on.
        She has just come in or she is about to go out; either way she is
        not staying long, and both of them know it. */
-    const rd=Math.max(0,Math.sin(T*0.60)), push=rd*4.4;
+    const rd=hsin(T*0.60), push=rd*4.4;
     { let x2=cx0-52, i=0;
       while(x2<cx0+52){ const bw2=9+((i*5)%5);
         px(x2,base-96,bw2-1,96, i%3?'#5a4a36':'#4e4030');
@@ -31665,7 +31710,7 @@ function drawShadowPlay(s,T){
        taken off, the obi is undone and trailing, and the picture is on tatami
        with a byōbu screen knocked half over behind them. A naked body in this
        tradition is a body with its rank taken off it. */
-    const kn=Math.max(0,Math.sin(T*0.40));
+    const kn=hsin(T*0.40);
     for(let i=0;i<5;i++){ px(cx0-45+i*18,base-6,17,6,i%2?'#9aa06a':'#a8ae76'); // tatami, 2:1
       px(cx0-45+i*18,base-6,17,1,'#c0c48e'); px(cx0-45+i*18,base-2,17,1,'#3a4028'); }
     for(let i=0;i<3;i++){ px(cx0-46+i*20,base-88,19,82,'#e8e0cc');             // the byōbu, half over
@@ -31705,7 +31750,7 @@ function drawShadowPlay(s,T){
        custom of the country and on what the two people like. She is in his lap
        on a low charpai under a hanging lamp, which is the posture the text
        discusses it in. */
-    const bt=Math.max(0,Math.sin(T*0.36)), hit=(T%84)<6? 1-((T%84)/6) : 0;
+    const bt=hsin(T*0.36), hit=(T%84)<6? 1-((T%84)/6) : 0;
     px(cx0-38,base-40,76,7,'#7a5634'); px(cx0-38,base-40,76,2,'#a07a4a');       // the charpai
     for(let i=0;i<9;i++) px(cx0-36+i*9,base-33,2,26,'#5a4028');
     for(let i=0;i<7;i++) px(cx0-34,base-38+i*0.6,68,1,'rgba(220,200,150,.22)'); // its woven top
@@ -31996,7 +32041,7 @@ function drawWaterCouple(cx0,wy,T,s,A,B,o){
     } else {
       // HER BUST AT THE WATERLINE, on the same five rungs as everywhere else
       const uT = M.bust>=9?4 : M.bust>=7?3 : M.bust>=5?2 : M.bust>=3?1 : 0;
-      if(uT>0){ const w2=2+uT, h2=3+uT, buoy=Math.max(0,Math.sin(T*0.18))*1.4;
+      if(uT>0){ const w2=2+uT, h2=3+uT, buoy=hsin(T*0.18)*1.4;
         px(X-w2-1,HY+15-buoy,w2,h2,S); px(X+1,HY+15-buoy,w2,h2,S);
         px(X,HY+15-buoy,1,h2-1,shade(S,8));
         if(uT>=3) px(X-w2-2,HY+16-buoy,1,h2-2,S); }
@@ -45324,7 +45369,7 @@ function drawFinishAsk(left, T){
 function drawVillaLove(){
   const D=DM, sc=D.scene, T=sc.t, FY=214, w=G.wife, X=sc.x;
   const heat=clamp(T/560,0,1);
-  const beat=Math.max(0,Math.sin(T*(0.20+heat*0.26)));       // it builds over the fifteen seconds
+  const beat=hsin(T*(0.20+heat*0.26));       // it builds over the fifteen seconds
   /* HE IS STILL GETTING HIS TUNIC OFF. The beat used to drive her, the crate
      and the band from tick zero regardless, so the whole room was already
      going while he was stuck with it over his head. Nothing moves until he
@@ -45334,7 +45379,7 @@ function drawVillaLove(){
   const after = sc.choice? (T-sc.chooseT) : -1, LOVE=(sc.choice==='love'||sc.choice==='across'||sc.choice==='both'||sc.choice==='laklirio'), HEIR=(sc.choice==='heir');   // across her and together, he is out too
   const cool = after>=0? clamp((after-(LOVE? 112 : 124))/150,0,1) : 0;      // the wind-down, 0 → 1 (after the finish has played)
   /* 💦 FOR LOVE he is out — a step back, and aimed up over her; FOR AN HEIR he stays in, and it comes in four pulses */
-  const throb = (HEIR && after>=0 && after<64)? Math.max(0,Math.sin((after-2)*0.44))*(1-after/70) : 0;
+  const throb = (HEIR && after>=0 && after<64)? hsin((after-2)*0.44)*(1-after/70) : 0;
   const outK  = LOVE? clamp((sc.choice==='laklirio'? T-(sc.lakT0||(sc.lakT0=T)) : after)/9,0,1)*(1-clamp((cool-0.15)*2.2,0,1)) : 0;   // laklirio: out once, and he stays out for all five
   const strokeV = 0.5-0.5*Math.cos(T*(0.20+heat*0.26));      // ✦ a stroke that keeps moving: in, out, in — it used to sit fully out for half of every beat
   const dr = (after>=0? (HEIR? 1-cool : 0) : strokeV*ramp) * (1-cool);
@@ -49560,7 +49605,7 @@ function rhunaDraw4(c,b,T,u,dt){
   if(sc==='iswoo'){ const RN=6, rU=0.88/RN, r=Math.min(RN-1,Math.floor(u/rU)), lu=(u-r*rU)/rU, last=u>=0.88;
     const CPS=['table','allfours','carry','kneel','side','lap'], ZM={table:0.95,allfours:1.05,carry:0.78,kneel:0.95,side:1.05,lap:0.95}, id=CPS[r], zs=1.75*(ZM[id]/0.95);
     bgIsle(c,T,r<3? 'storm' : r<5? 'night' : 'dawn',{nohut:true,rain:r<3});
-    const pace=0.07+0.013*r, drive=0.5+0.5*Math.sin(T*pace), push=1+0.1*Math.sin(lu*Math.PI), thun=Math.max(0,Math.sin(T*pace+1.4));
+    const pace=0.07+0.013*r, drive=0.5+0.5*Math.sin(T*pace), push=1+0.1*Math.sin(lu*Math.PI), thun=hsin(T*pace+1.4);
     c.save(); c.translate(228,FL+(push-1)*30); c.scale(push*zs,push*zs); c.translate(-8,0);
     if(id==='table'){ c.fillStyle='#6a4426'; c.fillRect(24,-33,36,2); c.fillStyle='#8a5a30'; c.fillRect(18,-36,50,4); c.fillStyle='#a67840'; c.fillRect(18,-36,50,1); [[26,-32],[56,-32]].forEach(q=>{ c.fillStyle='#5a3a1c'; c.fillRect(q[0],q[1],4,32); }); c.strokeStyle='#3a8a3a'; c.lineWidth=1.4; for(let i2=0;i2<5;i2++){ c.beginPath(); c.moveTo(66,-36); c.quadraticCurveTo(76+i2*2,-44+i2*3,82+i2*3,-30+i2*3); c.stroke(); } }
     else { try{ rhCustomProp(c,id,T,{bg:'isle'}); }catch(e){} }
@@ -51155,7 +51200,7 @@ function povBed1(vi,Q){
   if(!(vi===2||vi===13||vi===14||vi===21||vi===24||vi===25)) return false;
   povMark();
   if(!POV.on) return false;
-  const rate=(vi===24? 0.60 : 0.36), d=Math.max(0,Math.sin(Q.T*rate));
+  const rate=(vi===24? 0.60 : 0.36), d=hsin(Q.T*rate);
   const st=Q.s&&Q.s.stage, peak=!!(st&&st.peak);
   const P={T:povNow(), k:1, drive:d, wlook:Q.her, her:{expr:(d>0.55? Q.OH : Q.HE), blush:0.5+(peak? 0.3 : 0), rock:Math.sin(Q.T*rate)*0.5, pose:(vi===2||vi===25)? 'super' : 'wall', headUp:(vi===2? 0.5 : 0.2)}, he:{look:Q.him, aro:0.4+d*0.6, drive:d, hands:(vi===21? 'waist' : 'hips'), farHands:'hips', face:Q.HF}, hit:false};
   povBlit(Q.c,P,1); return true;
@@ -60613,7 +60658,8 @@ function runCampaign(cp){
   const odds=campaignOdds(cp), won=Math.random()<odds, R=milRank(), men=Math.max(1,armyCommand());
   const lost=Math.round(men*(won?rnd(0.05,0.15):rnd(0.2,0.4))), foe=Math.max(60,Math.round(campaignEnemy(cp)/1.45*rnd(0.9,1.1)));
   const kind=cp.kind || (cp.id==='brit'? 'ambush' : cp.id==='revolt'? 'siege' : 'field');
-  armyBattle({title:cp.name, sub:cp.where+' — '+R.name, enemyName:cp.foe||CAMPAIGN_FOE[cp.id]||'THE ENEMY', enemyStyle:cp.style||CAMPAIGN_STYLE[cp.id], yourMen:men, enemyMen:foe, kind, night:kind==='ambush',
+  const _hg=(G.generals||[]).find(g=>g.hero);
+  armyBattle({title:cp.name, sub:cp.where+' — '+R.name+(_hg? ' — led by '+_hg.name : ''), general:_hg||undefined, enemyName:cp.foe||CAMPAIGN_FOE[cp.id]||'THE ENEMY', enemyStyle:cp.style||CAMPAIGN_STYLE[cp.id], yourMen:men, enemyMen:foe, kind, night:kind==='ambush',
     forceWin:won, yourLoss:lost, onWin:()=>campaignAfter(cp,true,lost), onLose:()=>campaignAfter(cp,false,lost)});
 }
 function campaignAfter(cp, won, lost){
@@ -79355,7 +79401,7 @@ function openHeroes(){
     if(h.id==='lubu' && here) btns+= G.redHare? '<span class="small" style="color:#e8c34a">🐎 Red Hare is in your stable</span>' : '<button class="btn sm gold" data-a="hare" data-h="lubu">🐎 SEEK RED HARE (900)</button>';
     return '<div style="display:flex;gap:10px;background:rgba(40,28,16,.92);border:1px solid #8a6a3a;border-radius:5px;padding:8px;'+(here? '' : 'opacity:.62')+'">'
       +'<canvas data-p="'+i+'" width="110" height="140" style="position:static;inset:auto;width:110px;height:140px;flex:none;background:#2a1e14;border:1px solid #5a4428;border-radius:3px"></canvas>'
-      +'<div style="flex:1;min-width:0"><div style="color:#f0d890;font-size:16px;font-weight:bold">'+h.name+(h.cn? ' <span style="opacity:.8">'+h.cn+'</span>' : '')+'</div>'
+      +'<div style="flex:1;min-width:0"><canvas data-c="'+i+'" width="640" height="200" style="position:static;inset:auto;width:100%;height:auto;display:block;border-radius:4px;margin-bottom:5px;border:1px solid #5a4428"></canvas><div style="color:#f0d890;font-size:16px;font-weight:bold">'+h.name+(h.cn? ' <span style="opacity:.8">'+h.cn+'</span>' : '')+'</div>'
       +'<div style="color:#e0d4bc;font-size:12px;font-style:italic">'+h.title+'</div><div style="font-size:11px;margin:3px 0">'+status+(S.met? ' · <span style="color:#d8c8a0">favour '+S.favor+'</span>' : '')+'</div>'
       +'<div style="color:#e8c34a;font-size:12px">'+h.gift+'</div>'
       +'<div style="color:#bcae94;font-size:11px;margin-top:2px">STR '+h.str+' · WIT '+h.wit+(h.power? ' · leads at ×'+h.power.toFixed(2) : '')+'</div>'
@@ -79367,6 +79413,20 @@ function openHeroes(){
     +'<div style="font-size:13px;color:#c8a060;margin:6px 0 4px">IN YOUR WORLD</div><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:8px">'+mine.map((h,i)=>card(h,i)).join('')+'</div>'
     +(far.length? '<div style="font-size:13px;color:#c8a060;margin:12px 0 4px">ACROSS THE WORLD</div>' : '')+'<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:8px">'+far.map((h,i)=>card(h,i+mine.length)).join('')+'</div>'
     +'<div style="font-size:13px;color:#c8a060;margin:12px 0 4px">THE CHRONICLE</div><div style="font-size:12px;line-height:1.5;color:#d8ccb4">'+((G.heroLog||[]).map(e=>'<div>'+e.y+' — '+e.t.replace(/^⭐ /,'')+'</div>').join('')||'<i>Nothing yet. The year has only begun.</i>')+'</div></div>';
+  // ⭐ each card: the hero himself, at the head of his own men, in his own light
+  { const banners=[...ov.querySelectorAll('canvas[data-c]')].map(cv=>[cv, all[+cv.dataset.c]]);
+    const paintB=(cv,h,tt)=>{ const c=cv.getContext('2d'), W2=cv.width, H2=cv.height; c.setTransform(1,0,0,1,0,0);
+      const sky= h.world==='wa'? ['#3a3a5a','#c8907a'] : h.world==='ice'? ['#0e1424','#4a6a8a'] : h.world==='rk'? ['#3a4a50','#8a9a9a'] : h.world==='west'? ['#4a5a7a','#d8a870'] : ['#3a3a4a','#c87a4a'];
+      const g=c.createLinearGradient(0,0,0,H2); g.addColorStop(0,sky[0]); g.addColorStop(0.75,sky[1]); g.addColorStop(1,'#2a1e14'); c.fillStyle=g; c.fillRect(0,0,W2,H2);
+      c.fillStyle='rgba(20,14,10,.45)'; c.beginPath(); c.moveTo(0,H2*0.78); for(let x=0;x<=W2;x+=20) c.lineTo(x,H2*0.70-Math.sin(x*0.013+h.id.length)*14-Math.sin(x*0.04)*6); c.lineTo(W2,H2); c.lineTo(0,H2); c.fill();
+      c.fillStyle='#3a2a1c'; c.fillRect(0,H2*0.84,W2,H2*0.16);
+      try{ const St=armyStyle(ARMY_STYLE['hero_'+h.id]? 'hero_'+h.id : 'han'); c.imageSmoothingEnabled=true; for(let k=0;k<6;k++){ const sp=nbStyleSprite(St,(k+Math.floor(tt*4))%4,k%3===2,3); c.globalAlpha=0.8; c.drawImage(sp,W2*0.52+k*44,H2*0.84-96+(k%2)*6,102,102); } c.globalAlpha=1;
+        if(St.std){ c.strokeStyle='#3a2a1a'; c.lineWidth=3; c.beginPath(); c.moveTo(W2-46,H2*0.84); c.lineTo(W2-46,26); c.stroke(); c.fillStyle=St.stdC||'#8a2a1a'; c.beginPath(); c.moveTo(W2-46,28); for(let k=0;k<=5;k++) c.lineTo(W2-46-k*8,30+Math.sin(tt*4+k)*3); c.lineTo(W2-86,78+Math.sin(tt*4+5)*3); for(let k=5;k>=0;k--) c.lineTo(W2-46-k*8,76+Math.sin(tt*4+k)*3); c.fill(); if(St.glyph){ c.fillStyle='#f8f0dc'; c.font='900 26px serif'; c.textAlign='center'; c.fillText(St.glyph,W2-66,62); c.textAlign='left'; } } }catch(e){}
+      try{ heroChampion(c, h, W2*0.28, H2*0.9, 2.6, tt, 1, false); }catch(e){}
+      const v=c.createRadialGradient(W2*0.3,H2*0.5,H2*0.3,W2*0.5,H2*0.5,W2*0.7); v.addColorStop(0,'rgba(0,0,0,0)'); v.addColorStop(1,'rgba(0,0,0,.45)'); c.fillStyle=v; c.fillRect(0,0,W2,H2); };
+    banners.forEach(([cv,h])=>paintB(cv,h,1.2));
+    let last=0; const tick=(now)=>{ if(ov.style.display==='none' || !document.body.contains(banners[0]? banners[0][0] : null)) return; if(now-last>40){ last=now; const tt=now/1000; const r0=ov.getBoundingClientRect(); banners.forEach(([cv,h])=>{ const r=cv.getBoundingClientRect(); if(r.bottom>0 && r.top<innerHeight) paintB(cv,h,tt); }); } requestAnimationFrame(tick); };
+    if(banners.length) requestAnimationFrame(tick); }
   ov.querySelectorAll('canvas[data-p]').forEach(cv=>{ const h=all[+cv.dataset.p]; const c=cv.getContext('2d');
     const g=c.createLinearGradient(0,0,0,140); g.addColorStop(0,'#4a3420'); g.addColorStop(1,'#1a120a'); c.fillStyle=g; c.fillRect(0,0,110,140);
     try{ const to=heroBustTo(h.look); drawPortraitFigure(c,110,140,h.look,{face:'flat', noFolk:true, to}); heroAccessory(c,h,110,140,to); }catch(e){}
@@ -80591,7 +80651,8 @@ function openWorldWars(){
 }
 function worldWarRun(cp){
   if(state==='battle') return; const o=worldWarOdds(cp), won=Math.random()<o.p, men=worldWarMen(), lost=Math.round(men*(won? rnd(0.05,0.15) : rnd(0.2,0.4)));
-  armyBattle({title:cp.name, sub:cp.where, enemyName:cp.foe, enemyStyle:cp.style, yourStyle:armyStyleMine(), yourMen:men, enemyMen:o.foe, kind:cp.kind||'field', night:cp.kind==='ambush', forceWin:won, yourLoss:lost,
+  const _hg=(G.generals||[]).find(g=>g.hero);
+  armyBattle({title:cp.name, sub:cp.where+(_hg? ' — led by '+_hg.name : ''), general:_hg||undefined, enemyName:cp.foe, enemyStyle:cp.style, yourStyle:(_hg? undefined : armyStyleMine()), yourMen:men, enemyMen:o.foe, kind:cp.kind||'field', night:cp.kind==='ambush', forceWin:won, yourLoss:lost,
     onWin:()=>worldWarAfter(cp,true,lost), onLose:()=>worldWarAfter(cp,false,lost)});
 }
 function worldWarAfter(cp, won, lost){
@@ -80600,7 +80661,11 @@ function worldWarAfter(cp, won, lost){
   if(won){ const coin=(playerWorld()==='ice'? 20 : 180)+cp.diff*(playerWorld()==='ice'? 15 : 220); G.coin=(G.coin||0)+coin; G.honor=clamp((G.honor||0)+4,0,100); G.glory=(G.glory||0)+30+cp.diff*25; G.pop=clamp((G.pop||0)+3,0,100);
     try{ toast('⚔ VICTORY — '+cp.name+'. '+fmt(lost)+' of yours fall. (+'+coin+', +honor, +glory)',4400); }catch(e){} }
   else { G.honor=clamp((G.honor||0)-3,0,100); try{ toast('⚔ DEFEAT — '+cp.name+'. You fall back with '+fmt(lost)+' dead.',4400); }catch(e){} }
+  /* ⚔ AND HOME AGAIN. The battle ended on a frozen field with nothing to click: finishBattle hands back to 'menu' and this
+     never opened a screen, so every war — won or lost — left the player stranded. A war takes a day; then the town. */
+  try{ advanceDay(1); }catch(e){ console.error(e); }
   try{ refreshStatbar(); saveQuiet(); }catch(e){}
+  try{ if(state==='menu' || state==='battle') enterMap(); }catch(e){ console.error(e); try{ state='map'; show('scr-map'); $('statbar').classList.remove('hide'); }catch(e2){} }
 }
 
 /* ⭐ HEROES OF THE OTHER WORLDS. The hall of heroes had Rome and Han only. Now India (the last great Kushan, the Western
@@ -81112,7 +81177,351 @@ const BED_ROOMS={
   },
 };
 
-window.__SS = { bedCultureRoom:(c,W,H,s,T,f)=>bedCultureRoom(c,W,H,s,T,f), bedRoomFam:()=>bedRoomFam(), BED_ROOMS, openHomeHub:()=>openHomeHub(), openGallery:()=>openGallery(), galSee:(v)=>galSee(v), galLoad:()=>galLoad(), slotThumb:(n)=>slotThumb(n), slotThumbTake:()=>slotThumbTake(), musTick:()=>musTick(), MUSIC_SCALES, openLongRoad:()=>openLongRoad(), longRoadRun:(k)=>longRoadRun(k), LONG_ROADS, heroYearF:()=>heroYearF(), worldWarRun:(i)=>worldWarRun(campaignsForWorld().find(c=>c.id===i)), openWorldWars:()=>openWorldWars(), campaignsForWorld:()=>campaignsForWorld(), worldWarOdds:(cp)=>worldWarOdds(cp), armyStyleMine:()=>armyStyleMine(), gearHDIcon:(cat,id,px)=>gearHDIcon(cat,{id},px), GEAR_IDS:(cat)=>GEAR[cat].map(g=>g.id), openHousehold:()=>openHousehold(), openTemple:()=>openTemple(), hhDayTick:()=>hhDayTick(), hhWomen:()=>hhWomen(), hhWifeArc:()=>hhWifeArc(), ageSlow:(a)=>ageSlow(a), blessWarMult:()=>blessWarMult(), hhPaintTemple:(c,W,H,f,t)=>hhPaintTemple(c,W,H,f,t), tmPaintIdol:(c,S,f,k,t)=>tmPaintIdol(c,S,f,k,t), RELIGION, KID_JOBS, grPaint:(c,W,H,f,st,t)=>grPaintHouse(c,W,H,f,st,t), grFurn:(c,id,x,y,s)=>grPaintFurn(c,id,x,y,s), GR_FURN, openGrounds:()=>openGrounds(), grComfort:()=>grComfort(), grFam:()=>grFam(), openRealm:()=>openRealm(), realmSeason:()=>realmSeason(), realmInit:()=>realmInit(), setSetting:(k,v)=>{ SETTINGS[k]=v; }, festToday:(d)=>festToday(d), festNext:()=>festNext(), festDayTick:()=>festDayTick(), openVisitor:(i)=>openVisitor(VISITORS.find(v=>v.id===i)), VISITORS, HOUSE_FEASTS, weatherTest:(w,only)=>{ try{ const cv=document.createElement("canvas"); cv.width=960; cv.height=520; const c=cv.getContext("2d"); c.setTransform(2,0,0,2,0,0); drawWeather(c,w,w==="east"? lonlatE : lonlat,1000,only); const d=c.getImageData(0,0,960,520).data; let n=0; for(let i=3;i<d.length;i+=4) if(d[i]>20) n++; return "px "+n; }catch(e){ return "ERR "+e.message; } }, shipSprite:(a,b,c)=>shipSprite(a,b,c), mapSeason:()=>mapSeason(), gunPreview:(id,ph,t,k,x,y)=>{ ctx.save(); ctx.setTransform(k,0,0,k,x,y); try{ drawHeldGun(bowOf(id),ph,t); }finally{ ctx.restore(); } }, openHeroes:()=>openHeroes(), heroYear:()=>heroYear(), heroDayTick:()=>heroDayTick(), HEROES, heroCanRecruit:(id)=>heroCanRecruit(HERO_BY_ID[id]), heroAudience:(id)=>heroAudience(HERO_BY_ID[id]), heroGeneral:(id)=>heroGeneral(HERO_BY_ID[id]), setTitleT:(v)=>{ TT_FORCE_T=v; }, enterMap:()=>enterMap(), silkTickerToggle:()=>silkTickerToggle(), camelSprite:(a,b,c,d)=>camelSprite(a,b,c,d), bedStroke:(vt,T,k)=>bedStroke(vt,T,k), bedLoreKey:()=>bedLoreKey(), setBedKey:(k)=>{ BED_KEY_FORCE=k||null; }, BED_ENTRY, POSE_LORE, armyStyleOfPeople:(p)=>armyStyleOfPeople(p), armyStyleKeys:()=>Object.keys(ARMY_STYLE), armyStyleHere:(id)=>armyStyleHere(id), kanvekTier:(w)=>kanvekTier(w), kanvekLvInfo:(w)=>kanvekLvInfo(w), kanvekLevel:(w)=>kanvekLevel(w), kanvekGrow:(w)=>kanvekGrow(w), KANVEK_LEVELS, drawHallMan:(...a)=>drawHallMan(...a), drawFemProfile:(...a)=>drawFemProfile(...a), drawHallFem:(...a)=>drawHallFem(...a), folkLookId:(w)=>folkLookId(w), drawFolkLook:(c,w,o)=>drawFolkLook(c,w,o), drawPortraitFigure:(...a)=>drawPortraitFigure(...a), drawKidProfile:(...a)=>drawKidProfile(...a), CUSTOMS, customsHere:()=>customsHere(), customsHers:(w)=>customsHers(w), customsTabooToday:(d)=>customsTabooToday(d), customsConceive:(B)=>customsConceive(B), customsChildName:(s)=>customsChildName(s), customsWeddingLine:(w)=>customsWeddingLine(w), customsJealMul:()=>customsJealMul(), buildCustomsCard:(b)=>buildCustomsCard(b), finishBedNow:()=>finishBed(), getBC:()=>BC, setBC:(v)=>{ BC=v; }, roomBackdrop:(T)=>whRoomBackdrop(T), openEmpire:()=>openEmpire(), empSeason:()=>empSeason(), EMP_UI, silkDbg:()=>{ const c=document.createElement("canvas").getContext("2d"); try{ drawSilkRoadLive(c); return {ok:true, n:silkCaravanCount(), at:silkAt(0.5), arc:silkArc().tot}; }catch(e){ return {err:e.message}; } }, btMountSprite:(id,f)=>btMountSprite(id,f), poseLoreNow:()=>poseLore(), nbStyleSprite:(S,f,a,h)=>nbStyleSprite(S,f,a,h), armyStyle:(id)=>armyStyle(id), dynThroneFalls:(h)=>dynThroneFalls(h), proclaimDynasty:()=>proclaimDynasty(), plotTargets:()=>plotTargets(), mapZoomTo:(z,x,y)=>mapZoomTo(z,x,y), ASIA_PEOPLES, asiaPeopleFor:(e,o)=>asiaPeopleFor(e,o), EAST_PIN_POS, campaignOdds:(cp)=>campaignOdds(cp), updateBattle:(dt)=>updateBattle(dt), drawBattle:()=>drawBattle(), get BT(){ return BT; }, romStyles:()=>ROM_STYLES, startRomanticStyled:(a,b)=>startRomanticStyled(a,b), bgFn:(n)=>({bgPalace,bgWar,bgCoast,bgWoa,bgOpelia,bgIsle,bgReiko,bgForge})[n], setPairSS:(v)=>{ PAIR_SS=v; }, ICE_T:{ get AC(){return AC;}, set AC(v){AC=v;}, iceSlap, iceSkin, iceUlk, iceGulp, iceVoc, iceCrowd, ICE_V, sfx }, ICE_TTS, STRIKES, getDM:()=>DM, drawBridePortrait:(...a)=>drawBridePortrait(...a), rhFig, RH_CAST, openBotWatch, botEnterBeat, getBW:()=>BW, iceGoddessOpen, paintGoddess, startBedScene, regionAny, iceDebug:()=>({here:iceHere(), prey:ICE_PREY_BY_REGION}),
+/* =====================================================================
+   ⭐ THE CHAMPIONS. A hero used to be a name on a general's card: in battle his army looked like any other army and in
+   the hall he was a head-and-shoulders. Now each hero rides (or stands) as himself, a vector figure twice the height of
+   the men he leads, in his own colours, his own helmet and his own weapon: Lü Bu under the two long pheasant plumes of
+   the stage general, with the sky-piercer halberd and Red Hare; Guan Yu in green with the crescent glaive; Zhang Fei's
+   serpent spear; Zhao Yun in silver on a white horse; Cao Cao in black; Takeda Shingen under white yak-hair; Uesugi
+   Kenshin in his white hood; Honda Tadakatsu's antlers; Severus in the general's cloak; Ardashir's crown; the Rkrai
+   with the harpoon and the Ice with the tusk club, on foot. And each leads his own men under his own character.
+   ===================================================================== */
+const HERO_ART={
+  lubu:{arm:'#2e2426', trim:'#d8b048', cape:'#b0201a', helm:'pheasant', wpn:'ji', horse:'#a8301e', mane:'#f0903a', glyph:'呂', troop:'xianbei', tc:'#8a1a14'},
+  guanyu:{arm:'#2a6a3a', trim:'#d8b048', cape:'#1e4a2a', helm:'hood', hood:'#2a6a3a', beard:'long', wpn:'guandao', horse:'#7a3a22', glyph:'關', troop:'han', tc:'#2a5a34'},
+  zhangfei:{arm:'#1e1e22', trim:'#a8a8a8', cape:'#3a1a14', helm:'han', beard:'bush', wpn:'serpent', horse:'#1e1a1a', glyph:'張', troop:'han', tc:'#2a2a2e'},
+  zhaoyun:{arm:'#d8dcd8', trim:'#5a7a9a', cape:'#e8ecf0', helm:'han', wpn:'spear', horse:'#ecebe4', mane:'#d8d4c8', glyph:'趙', troop:'han', tc:'#c8ccd0'},
+  caocao:{arm:'#22262e', trim:'#c8a040', cape:'#2a3040', helm:'crown', wpn:'sword', horse:'#141214', glyph:'曹', troop:'han_cao'},
+  liubei:{arm:'#4a6a3a', trim:'#e8c34a', cape:'#c8b060', helm:'crown', wpn:'twin', horse:'#e8e2d4', glyph:'劉', troop:'han_liu'},
+  sunce:{arm:'#9a2a1e', trim:'#e8c34a', cape:'#c8342a', helm:'han', wpn:'spear', horse:'#7a4a2a', glyph:'孫', troop:'han_sun'},
+  sunquan:{arm:'#8a2a22', trim:'#d8b048', cape:'#5a1a2a', helm:'crown', wpn:'sword', horse:'#5a3a24', glyph:'孫', troop:'han_sun'},
+  zhouyu:{arm:'#a8302a', trim:'#f0e8d8', cape:'#f0e8d8', helm:'han', wpn:'sword', horse:'#c8b8a0', glyph:'周', troop:'han_sun'},
+  yuanshao:{arm:'#a8862e', trim:'#f0d878', cape:'#6a4a1a', helm:'crown', wpn:'sword', horse:'#c8a878', glyph:'袁', troop:'han_yuan'},
+  zhangliao:{arm:'#3a3a44', trim:'#b0b0b8', cape:'#5a1a1a', helm:'han', wpn:'ji', horse:'#3a2a1e', glyph:'張', troop:'han_cao'},
+  zhugeliang:{arm:'#e8e4d8', trim:'#3a5a7a', cape:'#f0ece0', helm:'scholar', wpn:'fan', foot:true, glyph:'諸', troop:'han_liu'},
+  kebineng:{arm:'#6a5a3a', trim:'#c8a040', cape:'#4a3a24', helm:'fur', wpn:'bow', horse:'#8a6a3a', glyph:'鮮', troop:'xianbei'},
+  tadun:{arm:'#7a3a2a', trim:'#c8b088', cape:'#4a2a1a', helm:'fur', wpn:'bow', horse:'#5a4028', glyph:'烏', troop:'wuhuan'},
+  lubu_:{},
+  severus:{arm:'#c8a050', trim:'#f0d878', cape:'#8a1a2a', helm:'galea', crest:'#c8342a', wpn:'gladius', horse:'#e8e4dc', troop:'legion'},
+  ardashir:{arm:'#8a8a94', trim:'#e8c34a', cape:'#4a2a5a', helm:'korymbos', wpn:'lance', horse:'#5a4a3a', barded:true, troop:'pars'},
+  vasudeva:{arm:'#7a3a4a', trim:'#e8c34a', cape:'#c88a2a', helm:'turban', wpn:'khanda', horse:'#e8e0d0', troop:'kushan'},
+  senguttuvan:{arm:'#8a2a1a', trim:'#e8c34a', cape:'#e89a2a', helm:'turban', wpn:'khanda', horse:'#4a3a2a', troop:'chera'},
+  nedunjeliyan:{arm:'#a8682a', trim:'#f0d878', cape:'#2a5a3a', helm:'turban', wpn:'spear', horse:'#e0d8c8', troop:'tamil'},
+  rudrasena:{arm:'#3a5a7a', trim:'#e8c34a', cape:'#c8a868', helm:'turban', wpn:'lance', horse:'#8a6a4a', troop:'indian'},
+  nobunaga:{arm:'#1a1a1e', trim:'#c8a040', cape:'#a8201a', helm:'nanban', wpn:'katana', horse:'#141214', glyph:'織', troop:'wa_oda'},
+  hideyoshi:{arm:'#a8862e', trim:'#f0d878', cape:'#6a2a1a', helm:'sunrays', wpn:'yari', horse:'#7a5a3a', glyph:'豊', troop:'wa_oda'},
+  ieyasu:{arm:'#5a4a2a', trim:'#d8b048', cape:'#3a3a2a', helm:'kabuto', wpn:'yari', horse:'#4a3a2a', glyph:'葵', troop:'wa_tokugawa'},
+  tadakatsu:{arm:'#141414', trim:'#c8a040', cape:'#2a2a2a', helm:'antlers', wpn:'yari', horse:'#2a2420', glyph:'本', troop:'wa_tokugawa'},
+  shingen:{arm:'#a8322a', trim:'#e8c34a', cape:'#7a1a14', helm:'yakhair', wpn:'gunbai', horse:'#5a3a24', glyph:'風', troop:'wa_takeda'},
+  kenshin:{arm:'#2f5f9a', trim:'#e8e8e8', cape:'#f0f0ec', helm:'whitehood', wpn:'katana', horse:'#ecebe4', glyph:'毘', troop:'wa_uesugi'},
+  motonari:{arm:'#7a4a9a', trim:'#e8c34a', cape:'#3a2a4a', helm:'kabuto', wpn:'bow', horse:'#5a4a3a', glyph:'一', troop:'wa_mori'},
+  yoshihisa:{arm:'#8a2f4a', trim:'#e8e8e8', cape:'#3a1a24', helm:'kabuto', wpn:'katana', horse:'#3a2a1e', glyph:'十', troop:'wa_shimazu'},
+  yoshihiro:{arm:'#5a1a2a', trim:'#e8e8e8', cape:'#2a0e14', helm:'kabuto', wpn:'yari', horse:'#2a1e14', glyph:'十', troop:'wa_shimazu'},
+  aqarun:{arm:'#6a4a3a', trim:'#e8dcc4', cape:'#a8302a', helm:'tusk', wpn:'staff', foot:true, troop:'rk_house'},
+  torvaq:{arm:'#3a4a5a', trim:'#e8dcc4', cape:'#2a6a6a', helm:'tusk', wpn:'harpoon', foot:true, troop:'rk_house'},
+  sivrakka:{arm:'#4a5a3a', trim:'#e8dcc4', cape:'#3a4a2a', helm:'hoodr', wpn:'harpoon', foot:true, troop:'rk_house'},
+  uvraak:{arm:'#7a5a3a', trim:'#e8dcc4', cape:'#5a3a24', helm:'hoodr', wpn:'staff', foot:true, troop:'rk_house'},
+  oldpainter:{arm:'#7a5a3a', trim:'#a8443a', cape:'#5a3a24', helm:'furh', wpn:'staff', foot:true, troop:'ice_band'},
+  tuskbreaker:{arm:'#6a4a30', trim:'#efe6d0', cape:'#4a3020', helm:'furh', wpn:'tusk', foot:true, troop:'ice_band'},
+  herdwalker:{arm:'#7a5a3a', trim:'#c8783a', cape:'#5a3a24', helm:'furh', wpn:'spear', foot:true, troop:'ice_band'},
+  flintfather:{arm:'#6a4a30', trim:'#efe6d0', cape:'#4a3020', helm:'furh', wpn:'spear', foot:true, troop:'ice_band'},
+};
+function heroArt(h){ const A=HERO_ART[h.id]; if(A&&A.arm) return A; const w=h.world;
+  return w==='west'? {arm:'#c8a050', trim:'#f0d878', cape:'#a8201a', helm:'galea', crest:'#c8342a', wpn:'gladius', horse:'#8a6a4a', troop:'legion'}
+       : w==='wa'? {arm:'#2a2a30', trim:'#c8a040', cape:'#5a1a1a', helm:'kabuto', wpn:'yari', horse:'#4a3a2a', troop:'wa_samurai'}
+       : w==='rk'? {arm:'#5a4a3a', trim:'#e8dcc4', cape:'#a8302a', helm:'tusk', wpn:'harpoon', foot:true, troop:'rk_house'}
+       : w==='ice'? {arm:'#6a4a30', trim:'#efe6d0', cape:'#4a3020', helm:'furh', wpn:'spear', foot:true, troop:'ice_band'}
+       : {arm:'#7a2a1a', trim:'#d8b048', cape:'#8a2a1a', helm:'han', wpn:'ji', horse:'#6a4a2a', troop:'han'}; }
+/* the figure: (x,y) is the ground under the horse's belly (or the hero's feet), s=1 → about 70px tall mounted */
+function heroChampion(c, h, x, y, s, t, facing, act){
+  const A=heroArt(h), lin=(x0,y0,x1,y1,st)=>{ const g=c.createLinearGradient(x0,y0,x1,y1); st.forEach((v,i)=>g.addColorStop(i/(st.length-1),v)); return g; };
+  const sh=(col,k)=>mixHex(col,'#000000',k), hi=(col,k)=>mixHex(col,'#ffffff',k);
+  act=act||0; const gal=Math.sin(t*9), bob=Math.abs(Math.sin(t*9))*1.6;
+  c.save(); c.translate(x,y); c.scale(facing*s,s); c.lineJoin='round'; c.lineCap='round';
+  // the hero's own light, so he reads at the head of a thousand men, and his shadow on the ground
+  { const g=c.createRadialGradient(0,-28,4,0,-28,46); g.addColorStop(0,'rgba(255,220,140,.20)'); g.addColorStop(1,'rgba(255,220,140,0)'); c.fillStyle=g; c.fillRect(-50,-76,100,80); }
+  c.fillStyle='rgba(10,6,2,.32)'; c.beginPath(); c.ellipse(0,1,A.foot? 12 : 26,3.4,0,0,7); c.fill();
+  // the cape, streaming behind
+  const cyc=t*3;
+  const riderY= A.foot? -21 : -20-bob;   // the rider's hip, relative to the ground
+  c.fillStyle=lin(-30,riderY-30,0,riderY,[sh(A.cape,0.4),A.cape,hi(A.cape,0.12)]);
+  c.beginPath(); c.moveTo(-2,riderY-26); c.quadraticCurveTo(-18,riderY-24+Math.sin(cyc)*3,-34,riderY-18+Math.sin(cyc+1)*4); c.quadraticCurveTo(-26,riderY-10,-30,riderY-2+Math.sin(cyc+2)*3); c.quadraticCurveTo(-14,riderY-8,-4,riderY-12); c.closePath(); c.fill();
+  if(!A.foot){
+    // the horse: a galloping body with a lit back, the mane and the tail, four legs in the gallop
+    const H=A.horse||'#6a4a2a', M=A.mane||sh(H,0.45), legs=[[-14,0.0],[-9,1.6],[10,3.1],[15,4.7]];
+    for(const [lx,ph] of legs){ const a=Math.sin(t*9+ph)*0.6; c.strokeStyle=sh(H,0.2); c.lineWidth=3.2; c.beginPath(); c.moveTo(lx,-16-bob); c.lineTo(lx+Math.sin(a)*7,-8-bob+Math.abs(Math.cos(a))*1); c.lineTo(lx+Math.sin(a)*9+Math.sin(a*1.4)*3,-1); c.stroke(); c.fillStyle='#1a1410'; c.fillRect(lx+Math.sin(a)*9+Math.sin(a*1.4)*3-1.6,-2,3.2,2); }
+    c.fillStyle=lin(0,-30-bob,0,-12-bob,[hi(H,0.18),H,sh(H,0.3)]); c.beginPath(); c.ellipse(0,-20-bob,20,8.5,-0.05,0,7); c.fill();
+    if(A.barded){ c.fillStyle='rgba(160,160,170,.85)'; c.beginPath(); c.ellipse(0,-19-bob,19,7.5,-0.05,0,Math.PI); c.fill(); c.strokeStyle='rgba(60,60,70,.6)'; c.lineWidth=0.6; for(let k=-16;k<16;k+=3){ c.beginPath(); c.arc(k,-17-bob,1.6,0,Math.PI); c.stroke(); } }
+    c.fillStyle=lin(14,-40-bob,28,-20-bob,[hi(H,0.15),H]); c.beginPath(); c.moveTo(12,-26-bob); c.quadraticCurveTo(20,-36-bob,24,-42-bob); c.lineTo(31,-38-bob); c.quadraticCurveTo(34,-35-bob,32,-32-bob); c.lineTo(25,-31-bob); c.quadraticCurveTo(22,-24-bob,18,-16-bob); c.closePath(); c.fill();
+    c.fillStyle='#120c08'; c.beginPath(); c.arc(27.5,-38.5-bob,0.9,0,7); c.fill(); c.strokeStyle='#2a1a10'; c.lineWidth=0.8; c.beginPath(); c.moveTo(24,-37-bob); c.lineTo(12,-30-bob); c.stroke();
+    c.fillStyle=M; for(let k=0;k<6;k++){ const mx=13+k*2, my=-28-bob-k*2.6; c.beginPath(); c.moveTo(mx,my); c.quadraticCurveTo(mx-6+Math.sin(cyc+k)*2,my+2,mx-9+Math.sin(cyc+k)*3,my+5); c.lineTo(mx+1,my+2); c.fill(); }
+    c.strokeStyle=M; c.lineWidth=3.4; c.beginPath(); c.moveTo(-19,-23-bob); c.quadraticCurveTo(-28,-22+Math.sin(cyc)*3,-34,-14+Math.sin(cyc+1)*3); c.stroke();
+    if(A.mane){ c.globalCompositeOperation='lighter'; c.fillStyle='rgba(255,140,60,.18)'; c.beginPath(); c.ellipse(16,-32-bob,10,8,0,0,7); c.fill(); c.globalCompositeOperation='source-over'; }
+    c.fillStyle=lin(-6,-30-bob,6,-26-bob,[A.trim,sh(A.trim,0.3)]); c.beginPath(); c.ellipse(-2,-28-bob,7,2.4,0,0,7); c.fill();       // the saddle
+  }
+  // the rider: legs, the armoured body, the arms and the weapon, the head and what he wears on it
+  c.save(); c.translate(0,riderY); c.scale(1.28,1.28); c.translate(0,-riderY);
+  const hipY=riderY, shY=hipY-17;
+  c.strokeStyle=sh(A.arm,0.25); c.lineWidth=4.2; c.beginPath(); if(A.foot){ const st=Math.sin(t*6)*0.3*(act? 1 : 0.4); c.moveTo(-1,hipY); c.lineTo(-4+st*6,hipY+12); c.lineTo(-5+st*8,hipY+20); c.moveTo(1,hipY); c.lineTo(4-st*6,hipY+12); c.lineTo(6-st*8,hipY+20); } else { c.moveTo(0,hipY); c.lineTo(5,hipY+8); c.lineTo(3,hipY+14); } c.stroke();
+  c.fillStyle=lin(-7,shY,7,hipY,[hi(A.arm,0.22),A.arm,sh(A.arm,0.35)]); c.beginPath(); c.moveTo(-6,shY); c.lineTo(7,shY); c.lineTo(6,hipY); c.lineTo(-5,hipY); c.closePath(); c.fill();
+  c.strokeStyle=A.trim; c.lineWidth=0.8; for(let k=1;k<4;k++){ c.beginPath(); c.moveTo(-6+k*0.2,shY+k*4); c.lineTo(6.8-k*0.2,shY+k*4); c.stroke(); } c.fillStyle=A.trim; c.fillRect(-5.5,hipY-3,11.5,2);
+  c.fillStyle=lin(-10,shY-2,10,shY+5,[hi(A.arm,0.25),A.arm]); c.beginPath(); c.ellipse(5,shY+1,5,3.4,0.2,0,7); c.fill(); c.strokeStyle=A.trim; c.lineWidth=0.7; c.stroke();
+  // the weapon arm: raised and ready, swung through on the clash
+  const sw=act? Math.sin(t*5)*0.9 : 0.15*Math.sin(t*1.5), ax=7, ay=shY+3, wa=-0.9+sw;
+  c.strokeStyle=sh(A.arm,0.15); c.lineWidth=3.2; const hx=ax+Math.cos(wa)*9, hy=ay+Math.sin(wa)*9+4; c.beginPath(); c.moveTo(ax,ay); c.lineTo(hx,hy); c.stroke();
+  heroWeapon(c,A,hx,hy,wa,t);
+  // the head
+  const hx0=1.5, hy0=shY-6; c.fillStyle='#c89a6a'; c.beginPath(); c.ellipse(hx0,hy0,3.6,4.2,0,0,7); c.fill(); c.fillStyle='#1a120c'; c.fillRect(hx0+1.2,hy0-0.8,1.2,0.8);
+  if(A.beard==='long'){ c.fillStyle='#141010'; c.beginPath(); c.moveTo(hx0-1,hy0+2); c.quadraticCurveTo(hx0+2,hy0+14,hx0+5,hy0+18); c.quadraticCurveTo(hx0+4,hy0+8,hx0+3.6,hy0+2); c.fill(); }
+  if(A.beard==='bush'){ c.fillStyle='#141010'; c.beginPath(); c.arc(hx0+1.5,hy0+2.8,3.4,0,Math.PI); c.fill(); }
+  heroHelm(c,A,hx0,hy0,t);
+  c.restore();
+  c.restore();
+}
+function heroWeapon(c,A,x,y,a,t){ const steel='#e8eef4', wood='#5a3a1e', ux=Math.cos(a-1.15), uy=Math.sin(a-1.15);
+  const pole=(len,col)=>{ c.strokeStyle=col||wood; c.lineWidth=1.6; c.beginPath(); c.moveTo(x-ux*len*0.3,y-uy*len*0.3); c.lineTo(x+ux*len,y+uy*len); c.stroke(); return [x+ux*len,y+uy*len]; };
+  const glint=(px,py)=>{ c.fillStyle='rgba(255,255,255,.85)'; c.beginPath(); c.arc(px,py,0.9,0,7); c.fill(); };
+  const w=A.wpn;
+  if(w==='ji'||w==='guandao'||w==='serpent'||w==='spear'||w==='yari'||w==='lance'||w==='harpoon'||w==='staff'){ const len= w==='lance'? 42 : w==='staff'? 26 : 34; const [tx,ty]=pole(len, w==='yari'? '#2a1e14' : wood);
+    c.save(); c.translate(tx,ty); c.rotate(Math.atan2(uy,ux)); c.fillStyle=steel;
+    if(w==='ji'){ c.beginPath(); c.moveTo(0,-1); c.lineTo(9,0); c.lineTo(0,1); c.fill(); for(const sd of [-1,1]){ c.beginPath(); c.moveTo(-1,0); c.quadraticCurveTo(-3,sd*7,1,sd*8); c.quadraticCurveTo(0,sd*4,2,sd*1); c.closePath(); c.fill(); } c.fillStyle='#c8342a'; c.fillRect(-4,-1.4,2,2.8); }
+    else if(w==='guandao'){ c.beginPath(); c.moveTo(-2,-1); c.quadraticCurveTo(8,-6,13,-1); c.quadraticCurveTo(8,1.6,-2,1.2); c.fill(); c.fillStyle='#c8a040'; c.beginPath(); c.arc(-2,0,1.6,0,7); c.fill(); }
+    else if(w==='serpent'){ c.strokeStyle=steel; c.lineWidth=1.6; c.beginPath(); c.moveTo(0,0); for(let k=1;k<=6;k++) c.lineTo(k*1.8,Math.sin(k*1.6)*1.4); c.stroke(); }
+    else if(w==='harpoon'){ c.beginPath(); c.moveTo(0,-0.8); c.lineTo(7,0); c.lineTo(0,0.8); c.fill(); c.strokeStyle='#efe6d0'; c.lineWidth=0.8; c.beginPath(); c.moveTo(3,0); c.lineTo(1,-2.4); c.moveTo(5,0); c.lineTo(3,2.4); c.stroke(); }
+    else if(w==='staff'){ c.fillStyle='#e8dcc4'; c.beginPath(); c.arc(0,0,2.2,0,7); c.fill(); }
+    else { c.beginPath(); c.moveTo(0,-1.2); c.lineTo(w==='yari'? 9 : 7,0); c.lineTo(0,1.2); c.fill(); if(w==='lance'){ c.fillStyle='#c8342a'; c.beginPath(); c.moveTo(-3,0); c.lineTo(-9,-3); c.lineTo(-9,2); c.fill(); } }
+    c.restore(); glint(tx,ty); }
+  else if(w==='sword'||w==='gladius'||w==='katana'||w==='khanda'||w==='twin'){ const len= w==='gladius'? 9 : 13; const draw=(off)=>{ c.save(); c.translate(x,y); c.rotate(Math.atan2(uy,ux)+off); c.fillStyle='#c8a040'; c.fillRect(-1,-2,1.4,4); c.fillStyle=steel; c.beginPath(); c.moveTo(0,-0.9); if(w==='katana'){ c.quadraticCurveTo(len*0.6,-2,len,-1.6); c.lineTo(len-1,0); c.quadraticCurveTo(len*0.6,-0.6,0,0.9); } else if(w==='khanda'){ c.lineTo(len,-1.6); c.lineTo(len,1.6); c.lineTo(0,0.9); } else { c.lineTo(len,0); c.lineTo(0,0.9); } c.closePath(); c.fill(); c.restore(); }; draw(0); if(w==='twin') draw(0.5); }
+  else if(w==='bow'){ c.save(); c.translate(x,y); c.strokeStyle='#4a2e14'; c.lineWidth=1.4; c.beginPath(); c.arc(0,0,9,-1.3,1.3); c.stroke(); c.strokeStyle='#e8e0c8'; c.lineWidth=0.5; c.beginPath(); c.moveTo(Math.cos(-1.3)*9,Math.sin(-1.3)*9); c.lineTo(Math.cos(1.3)*9,Math.sin(1.3)*9); c.stroke(); c.restore(); }
+  else if(w==='fan'){ c.save(); c.translate(x,y); c.fillStyle='#f4f0e6'; for(let k=0;k<7;k++){ c.beginPath(); c.ellipse(Math.cos(-1.9+k*0.25)*6,Math.sin(-1.9+k*0.25)*6,4,1.2,-1.9+k*0.25,0,7); c.fill(); } c.restore(); }
+  else if(w==='gunbai'){ c.save(); c.translate(x,y); c.fillStyle='#1a1a1a'; c.beginPath(); c.ellipse(4,-4,5,6,0.5,0,7); c.fill(); c.fillStyle='#e8c34a'; c.beginPath(); c.arc(4,-4,2,0,7); c.fill(); c.restore(); }
+  else if(w==='tusk'){ c.save(); c.translate(x,y); c.strokeStyle='#efe6d0'; c.lineWidth=3; c.beginPath(); c.moveTo(0,0); c.quadraticCurveTo(ux*10+3,uy*10-6,ux*18,uy*18-2); c.stroke(); c.restore(); }
+}
+function heroHelm(c,A,x,y,t){ const H=A.helm, met='#c8ccd4';
+  const bowl=(col)=>{ c.fillStyle=col; c.beginPath(); c.arc(x,y-1.4,4.3,Math.PI,0); c.fill(); };
+  if(H==='pheasant'){ // the stage general's crown and the two great plumes, swaying
+    c.fillStyle='#d8b048'; c.beginPath(); c.moveTo(x-4,y-3); c.lineTo(x-3,y-7); c.lineTo(x,y-5); c.lineTo(x+3,y-8); c.lineTo(x+4.5,y-3); c.closePath(); c.fill(); c.fillStyle='#3a8a5a'; c.beginPath(); c.arc(x,y-6,1,0,7); c.fill();
+    for(const sd of [0,1]){ const sway=Math.sin(t*2+sd)*0.12; c.strokeStyle= sd? '#a8201a' : '#c83020'; c.lineWidth=1.6; c.beginPath(); c.moveTo(x+(sd? 2 : -1),y-7); c.bezierCurveTo(x-8+sd*4,y-30,x-24+sd*6,y-34+sway*20,x-34+sd*8,y-22+sway*30); c.stroke();
+      c.strokeStyle='rgba(255,230,180,.5)'; c.lineWidth=0.4; for(let k=1;k<8;k++){ const q=k/8, bx=x-1-34*q+sd*6*q, by=y-7-24*Math.sin(q*Math.PI*0.9); c.beginPath(); c.moveTo(bx,by); c.lineTo(bx-1.5,by+1.5); c.stroke(); } } }
+  else if(H==='hood'){ c.fillStyle=A.hood||'#2a6a3a'; c.beginPath(); c.arc(x,y-1,4.6,Math.PI*0.95,Math.PI*2.05); c.lineTo(x+4,y+3); c.lineTo(x-4.4,y+3); c.closePath(); c.fill(); c.fillStyle='#d8b048'; c.fillRect(x-4,y-2.4,8,0.9); }
+  else if(H==='han'){ bowl(met); c.fillStyle='#8a8e96'; c.fillRect(x-4.6,y-1.6,9.2,1.2); c.strokeStyle='#c8342a'; c.lineWidth=1.4; c.beginPath(); c.moveTo(x,y-5.6); c.quadraticCurveTo(x-3,y-11,x-8+Math.sin(t*3),y-10); c.stroke(); }
+  else if(H==='crown'){ c.fillStyle='#1a1a1a'; c.fillRect(x-3,y-7,6,3.6); c.fillStyle='#1a1a1a'; c.fillRect(x-5,y-7.6,10,1.2); c.fillStyle='#d8b048'; c.fillRect(x-1,y-5.6,2,1); }
+  else if(H==='scholar'){ c.fillStyle='#2a2a2e'; c.beginPath(); c.moveTo(x-4,y-3); c.lineTo(x+4,y-3); c.lineTo(x+2.6,y-8); c.lineTo(x-2.6,y-8); c.closePath(); c.fill(); }
+  else if(H==='fur'||H==='furh'){ c.fillStyle= H==='fur'? '#6a4a30' : '#7a5a3a'; c.beginPath(); c.arc(x,y-1.2,5,Math.PI*0.9,Math.PI*2.1); c.fill(); c.fillStyle='#c8b088'; c.fillRect(x-5,y-1.6,10,1.6); if(H==='furh'){ c.beginPath(); c.moveTo(x-4,y-5); c.lineTo(x-2,y-9); c.lineTo(x,y-5.6); c.fill(); } }
+  else if(H==='galea'){ bowl(A.arm==='#c8a050'? '#d8b060' : met); c.fillStyle=A.crest||'#c8342a'; c.beginPath(); c.moveTo(x-6,y-4); c.quadraticCurveTo(x,y-11,x+5,y-5); c.lineTo(x+4,y-4.6); c.quadraticCurveTo(x,y-8.4,x-5,y-3.4); c.fill(); c.fillStyle='#b89040'; c.fillRect(x+2.6,y-1.6,1.6,4); }
+  else if(H==='korymbos'){ c.fillStyle='#e8c34a'; c.fillRect(x-4,y-5,8,3); c.fillStyle='#4a2a5a'; c.beginPath(); c.arc(x,y-9,4,0,7); c.fill(); c.strokeStyle='#e8c34a'; c.lineWidth=0.6; c.stroke(); c.strokeStyle='#e8c34a'; c.lineWidth=0.8; c.beginPath(); c.moveTo(x-4,y-3.6); c.quadraticCurveTo(x-10,y-2,x-12+Math.sin(t*3),y+2); c.stroke(); }
+  else if(H==='turban'){ c.fillStyle='#e8dcc4'; c.beginPath(); c.ellipse(x,y-3.6,5,3.6,0,0,7); c.fill(); c.strokeStyle='rgba(120,90,40,.5)'; c.lineWidth=0.5; for(let k=0;k<3;k++){ c.beginPath(); c.ellipse(x,y-3.6+k*0.8,4.6-k*0.6,2.6,0,Math.PI,0); c.stroke(); } c.fillStyle=A.trim; c.beginPath(); c.arc(x+3,y-4.6,1,0,7); c.fill(); }
+  else if(H==='kabuto'||H==='antlers'||H==='yakhair'||H==='nanban'||H==='sunrays'){ bowl(H==='nanban'? '#8a8e96' : '#2a2a30'); c.fillStyle='#2a2a30'; for(let k=0;k<3;k++){ c.beginPath(); c.moveTo(x-4.6-k*0.8,y-1+k*1.4); c.lineTo(x-1,y-0.6+k*1.4); c.lineTo(x-1.2,y+0.6+k*1.4); c.lineTo(x-5.4-k*1.2,y+0.6+k*1.6); c.fill(); }
+    if(H==='kabuto'){ c.fillStyle='#d8b048'; c.beginPath(); c.moveTo(x,y-5); c.lineTo(x-3,y-10); c.lineTo(x,y-7); c.lineTo(x+3,y-10); c.closePath(); c.fill(); }
+    if(H==='antlers'){ c.strokeStyle='#1a1410'; c.lineWidth=1.1; for(const sd of [-1,1]){ c.beginPath(); c.moveTo(x+sd*1.5,y-5); c.quadraticCurveTo(x+sd*7,y-10,x+sd*6,y-16); c.moveTo(x+sd*4.6,y-9); c.lineTo(x+sd*8,y-11); c.moveTo(x+sd*5.6,y-13); c.lineTo(x+sd*9,y-14); c.stroke(); } }
+    if(H==='yakhair'){ c.fillStyle='#f4f2ec'; c.beginPath(); c.moveTo(x-3,y-5); c.bezierCurveTo(x-10,y-4,x-14+Math.sin(t*2)*2,y+6,x-12,y+14); c.bezierCurveTo(x-7,y+6,x-4,y,x+2,y-5); c.fill(); c.fillStyle='#d8b048'; c.beginPath(); c.moveTo(x,y-5); c.lineTo(x-2.6,y-9); c.lineTo(x+2.6,y-9); c.closePath(); c.fill(); }
+    if(H==='nanban'){ c.fillStyle='#8a8e96'; c.beginPath(); c.moveTo(x-5,y-2); c.quadraticCurveTo(x,y-10,x+5,y-2); c.fill(); c.strokeStyle='#5a5e66'; c.lineWidth=0.6; c.beginPath(); c.moveTo(x,y-9); c.lineTo(x,y-2); c.stroke(); }
+    if(H==='sunrays'){ c.strokeStyle='#e8c34a'; c.lineWidth=0.8; for(let k=0;k<11;k++){ const a=Math.PI+k*Math.PI/10; c.beginPath(); c.moveTo(x+Math.cos(a)*4,y-2+Math.sin(a)*4); c.lineTo(x+Math.cos(a)*11,y-2+Math.sin(a)*11); c.stroke(); } } }
+  else if(H==='whitehood'){ c.fillStyle='#f0f0ec'; c.beginPath(); c.arc(x,y-0.6,5,Math.PI*0.9,Math.PI*2.1); c.lineTo(x+3.6,y+4.6); c.lineTo(x-4,y+5); c.closePath(); c.fill(); c.fillStyle='#c89a6a'; c.beginPath(); c.ellipse(x+1.4,y+0.2,2.4,2,0,0,7); c.fill(); }
+  else if(H==='tusk'||H==='hoodr'){ c.fillStyle= H==='tusk'? '#6a5a44' : '#5a4a38'; c.beginPath(); c.arc(x,y-0.6,5,Math.PI*0.9,Math.PI*2.1); c.lineTo(x+4,y+4); c.lineTo(x-4.6,y+4.6); c.closePath(); c.fill(); if(H==='tusk'){ c.fillStyle='#ece2c8'; for(let k=0;k<4;k++) c.fillRect(x-4+k*2.2,y-5,1.1,5); } else { c.fillStyle='#d8ccb4'; for(let k=0;k<6;k++){ c.beginPath(); c.arc(x-3.6+k*1.6,y+3.4,1.1,0,7); c.fill(); } } }
+}
+/* each hero's own men, under his own character on the banner */
+(function(){ try{ for(const h of HEROES){ const A=heroArt(h); if(!A.troop) continue; const base=ARMY_STYLE[A.troop]? A.troop : 'han';
+  const o={inherit:base, name:String(h.name).toUpperCase()+'’S MEN', std:'banner', stdC:A.tc||A.cape||'#8a2a1a'}; if(A.glyph) o.glyph=A.glyph; if(A.tc) o.tunic=A.tc;
+  ARMY_STYLE['hero_'+h.id]=o; } }catch(e){} })();
+
+/* =====================================================================
+   🌹 THE PRELUDE, REBUILT. It was a corridor and a lit doorway: she walked to the door, her black shadow rocked in it and
+   waved, she sat on the bed patting the covers with a hand that jumped two pixels every few frames, his shadow walked
+   in, and a wardrobe's worth of little rectangles came sailing out of the door. Now it is played in full colour in her
+   own people's bedchamber — the same painted room the positions play in. She waits by the bed in her dress and her
+   people's outer garment, breathing, shifting her weight; he comes in from the dark, and you can see what the sight of
+   her does to him under the tunic; they meet and kiss; she takes off the palla (the silk scarf, the obi, the dupatta…)
+   and it goes onto the bed as cloth, his belt and sandals go to the floor; she takes his hand and leads him to the bed.
+   ===================================================================== */
+function prelude2On(s){ try{ return !!(s && ADULT && MEDIUM_CENSOR && (s.place||'bed')==='bed' && !s.kanvekOnly && SETTINGS.cultureBed!==false && G && (G.wife||G.isFemale)); }catch(e){ return false; } }
+/* what comes off first, by her people — and his belt and shoes */
+const PRE_GARB={
+  roman:   {her:'palla',   hc:'#8a2f5a', ht:'#e8c34a', belt:'#6a4426', buckle:'#c8a050', shoe:'#7a5030'},
+  han:     {her:'pibo',    hc:'#b83a3a', ht:'#f0d080', belt:'#2a1a14', buckle:'#c8b060', shoe:'#1e1a18'},
+  wa:      {her:'obi',     hc:'#c8902a', ht:'#8a1a2a', belt:'#2a2a3a', buckle:'#c8a040', shoe:'#c8b088'},
+  steppe:  {her:'sash',    hc:'#2a6a8a', ht:'#e8c34a', belt:'#4a3020', buckle:'#d8b048', shoe:'#3a2818'},
+  india:   {her:'dupatta', hc:'#d8502a', ht:'#f0c040', belt:'#5a3a1e', buckle:'#e8c04a', shoe:'#6a4024'},
+  persian: {her:'veil',    hc:'#2a5a8a', ht:'#e8d080', belt:'#4a2e1a', buckle:'#d8b048', shoe:'#5a2a2a'},
+  celt:    {her:'plaid',   hc:'#3a6a3a', ht:'#c8402a', belt:'#5a3a22', buckle:'#c8a050', shoe:'#4a3020'},
+  rkrai:   {her:'fur',     hc:'#8a6a48', ht:'#ece0c6', belt:'#3a2a1a', buckle:'#d8ccb4', shoe:'#5a4028'},
+  egyptian:{her:'collar',  hc:'#2a8a9a', ht:'#e8c34a', belt:'#e8dcc4', buckle:'#c8a040', shoe:'#c8a878'},
+  ice:     {her:'fur',     hc:'#7a5a3a', ht:'#e8dcc0', belt:'#4a3020', buckle:'#d8ccb0', shoe:'#5a4028'},
+};
+function preGarb(){ let f='roman'; try{ f=bedRoomFam(); }catch(e){} return Object.assign({fam:f}, PRE_GARB[f]||PRE_GARB.roman); }
+const PRE_FY=228, PRE_K=1.38;                                       // the figures' floor, and their scale (the room's own)
+const PRE_BED={x0:322, x1:448, top:196};                            // the bed, against the right of the room
+const preSS=(a,b,x)=>{ const t=clamp((x-a)/(b-a),0,1); return t*t*(3-2*t); };
+/* where each of them is, and what they are doing, at T */
+function preludePlan(T){
+  // he walks in from the dark at the left, and stops before her
+  const hx = -18 + preSS(14,236,T)*230 + preSS(400,470,T)*82;
+  // she waits, then comes to meet him, then (after the kiss) leads him to the bed and sits
+  const wx = 306 - preSS(196,262,T)*66 + preSS(332,350,T)*4 + preSS(398,456,T)*88;
+  const seat = preSS(452,482,T);                                    // and down onto the edge of it
+  const kiss = preSS(262,284,T)*(1-preSS(326,342,T));
+  const hug  = preSS(256,280,T)*(1-preSS(392,412,T));
+  const wrapOff = T>=352, beltOff = T>=362;
+  const aro = 0.04 + preSS(120,250,T)*0.34 + preSS(280,340,T)*0.22 + preSS(420,490,T)*0.28;   // what the sight of her does, and then the kiss
+  return {hx, wx, seat, kiss, hug, wrapOff, beltOff, aro,
+    hWalk: (T>14 && T<236) || (T>400 && T<470), wWalk: (T>196 && T<262) || (T>398 && T<452), wBack: (T>398 && T<452)};
+}
+/* the bed she sits on, in her room's colours */
+function preludeBed(c, T, G0){
+  const B=PRE_BED, acc=(BR_ACCENT&&BR_ACCENT[G0.fam])||'#c8a050', wood=G0.fam==='wa'? '#3a2a1e' : G0.fam==='han'? '#5a1a14' : G0.fam==='egyptian'? '#c8a060' : (G0.fam==='rkrai'||G0.fam==='ice')? '#4a3826' : '#5a3820';
+  const woodHi=mixHex(wood,'#ffffff',0.22), woodSh=mixHex(wood,'#000000',0.45), sheet=G0.fam==='wa'? '#e8e0cc' : '#efe6d2';
+  c.save();
+  c.fillStyle='rgba(10,6,4,.35)'; c.beginPath(); c.ellipse((B.x0+B.x1)/2, PRE_FY+1, (B.x1-B.x0)*0.56, 4, 0, 0, 7); c.fill();
+  const low=(G0.fam==='wa'||G0.fam==='steppe'||G0.fam==='ice'||G0.fam==='rkrai');    // a futon or a fur bed on a low platform
+  const top= low? PRE_FY-14 : B.top;
+  if(!low){ // the frame: posts, the headboard, the rail
+    let g=c.createLinearGradient(0,top-36,0,PRE_FY); g.addColorStop(0,woodHi); g.addColorStop(1,woodSh);
+    c.fillStyle=g; c.fillRect(B.x1-6, top-40, 7, PRE_FY-top+40); c.fillRect(B.x0, top-10, 5, PRE_FY-top+10);
+    c.fillStyle=wood; c.fillRect(B.x1-30, top-34, 28, 30);                                   // the headboard
+    c.strokeStyle=rgbA(acc,0.8); c.lineWidth=1; c.strokeRect(B.x1-27, top-31, 22, 24);
+    c.fillStyle=woodSh; c.fillRect(B.x0+3, top+8, 4, PRE_FY-top-8); c.fillRect(B.x1-12, top+8, 4, PRE_FY-top-8);
+    g=c.createLinearGradient(0,top+4,0,top+12); g.addColorStop(0,woodHi); g.addColorStop(1,wood); c.fillStyle=g; c.fillRect(B.x0, top+4, B.x1-B.x0, 8);
+  } else { const g=c.createLinearGradient(0,PRE_FY-8,0,PRE_FY); g.addColorStop(0,woodHi); g.addColorStop(1,woodSh); c.fillStyle=g; c.fillRect(B.x0-6, PRE_FY-8, B.x1-B.x0+12, 8); }
+  // the mattress and the sheet, rumpled, with a coverlet in the room's colour turned down
+  { const g=c.createLinearGradient(0,top-6,0,top+6); g.addColorStop(0,'#fffaf0'); g.addColorStop(1,mixHex(sheet,'#6a5a44',0.3));
+    c.fillStyle=g; c.beginPath(); c.moveTo(B.x0, top+5); for(let i=0;i<=12;i++){ const u=i/12; c.lineTo(B.x0+u*(B.x1-B.x0), top-1.2*Math.sin(u*8+1.1)-1); } c.lineTo(B.x1, top+5); c.closePath(); c.fill();
+    const cv=mixHex(acc,'#3a1a10',0.35); const g2=c.createLinearGradient(0,top-2,0,top+10); g2.addColorStop(0,mixHex(cv,'#ffffff',0.2)); g2.addColorStop(1,mixHex(cv,'#000000',0.35));
+    c.fillStyle=g2; c.beginPath(); c.moveTo(B.x0+40, top+1); c.quadraticCurveTo(B.x0+70, top-4, B.x1-34, top-1); c.lineTo(B.x1-34, top+9); c.lineTo(B.x0+36, top+9); c.closePath(); c.fill();
+    c.strokeStyle=rgbA(acc,0.9); c.lineWidth=0.8; c.beginPath(); c.moveTo(B.x0+40, top+1.4); c.quadraticCurveTo(B.x0+70, top-3.4, B.x1-34, top-0.4); c.stroke();
+    // the pillow, at the head
+    const pg=c.createLinearGradient(0,top-9,0,top); pg.addColorStop(0,'#fffaf0'); pg.addColorStop(1,'#d8ccb4'); c.fillStyle=pg; c.beginPath(); c.ellipse(B.x1-20, top-3, 13, 4.6, -0.05, 0, 7); c.fill(); }
+  c.restore();
+  return top;
+}
+/* ---- 👘 THE CLOTH, AS CLOTH. Each thing that comes off is drawn as a lit vector piece — a long fluttering band while it is in
+   the air, and a draped heap with its folds where it lands — with its own border, fringe or weave. ---- */
+function drawGarment2(c, p){
+  const t=p.age||0, col=hexOf(p.col||'#8a2f5a'), hi=mixHex(col,'#ffffff',0.32), sh=mixHex(col,'#120804',0.48), tr=hexOf(p.trim||'#e8c34a');
+  const lit=(path)=>{ const g=c.createLinearGradient(0,-8,0,8); g.addColorStop(0,hi); g.addColorStop(0.5,col); g.addColorStop(1,sh); c.fillStyle=g; c.fill(path); };
+  c.save(); c.translate(p.x,p.y);
+  const air=!p.landed;
+  if(p.kind==='belt'){ c.rotate(air? p.r : 0.05);
+    const P=new Path2D(); P.moveTo(-13,0); P.bezierCurveTo(-6, air? -5*Math.sin(t*0.4) : -2.5, 4, air? 5*Math.sin(t*0.4) : 2, 13, air? -1 : 0.5);
+    c.strokeStyle=sh; c.lineWidth=3.4; c.lineCap='round'; c.stroke(P); c.strokeStyle=col; c.lineWidth=2.4; c.stroke(P); c.strokeStyle=rgbA(hi,0.7); c.lineWidth=0.6; c.stroke(P);
+    c.fillStyle=tr; c.fillRect(-15,-2.4,4,4.8); c.fillStyle=mixHex(tr,'#000000',0.4); c.fillRect(-14,-1.2,2,2.4); c.fillStyle=mixHex(tr,'#ffffff',0.5); c.fillRect(-15,-2.4,4,0.8);
+    for(let i=0;i<4;i++){ c.fillStyle=tr; c.beginPath(); c.arc(-6+i*5, air? 0 : 0.2, 0.7, 0, 7); c.fill(); }
+  } else if(p.kind==='shoe'){ c.rotate(air? p.r : (p.flip? 0.25 : -0.1));
+    const P=new Path2D(); P.moveTo(-6,1.5); P.quadraticCurveTo(-6,-1,-3,-1.6); P.lineTo(5,-1.2); P.quadraticCurveTo(7,0,6,1.6); P.closePath(); lit(P);
+    c.strokeStyle=rgbA(sh,0.9); c.lineWidth=0.5; c.stroke(P); c.strokeStyle=mixHex(col,'#ffffff',0.25); c.lineWidth=0.8; for(const x of [-2.5,0.5,3.5]){ c.beginPath(); c.moveTo(x,1); c.lineTo(x+1,-3.4); c.stroke(); }
+    c.fillStyle=mixHex(col,'#000000',0.55); c.fillRect(-6,1.4,12,0.9);
+  } else if(p.kind==='collar'){ c.rotate(air? p.r : 0);           // the broad bead collar, the wesekh
+    for(let r=0;r<4;r++){ c.strokeStyle= r%2? tr : col; c.lineWidth=1.4; c.beginPath(); c.arc(0,-3,4+r*1.6,0.15,Math.PI-0.15); c.stroke(); }
+    c.fillStyle=tr; for(let k=0;k<9;k++){ const a=0.2+k*(Math.PI-0.4)/8; c.beginPath(); c.arc(Math.cos(a)*10.6, -3+Math.sin(a)*10.6, 0.9, 0, 7); c.fill(); }
+  } else {
+    /* the long ones: palla, pibo, obi, sash, dupatta, veil, plaid, fur */
+    const L= p.kind==='obi'? 30 : p.kind==='pibo'? 34 : p.kind==='fur'? 22 : 28, Wd= p.kind==='obi'? 4.6 : p.kind==='pibo'||p.kind==='sash'? 3.4 : p.kind==='fur'? 9 : 7.5;
+    if(air){ c.rotate(p.r*0.4);
+      /* a band in the air, its length rippling as it flies */
+      const top=[], bot=[]; for(let i=0;i<=10;i++){ const u=i/10, x=-L/2+u*L, w=Math.sin(u*Math.PI*1.4+t*0.35)*(2.5+u*3.5), wd=Wd*(0.7+0.3*Math.sin(u*3+t*0.2));
+        top.push([x, w-wd/2]); bot.push([x+Math.sin(t*0.3+u*2)*1.2, w+wd/2]); }
+      const P=new Path2D(); P.moveTo(top[0][0],top[0][1]); for(const q of top.slice(1)) P.lineTo(q[0],q[1]); for(const q of bot.slice().reverse()) P.lineTo(q[0],q[1]); P.closePath();
+      lit(P); c.strokeStyle=rgbA(sh,0.6); c.lineWidth=0.4; c.stroke(P);
+      // the border runs along both edges
+      c.strokeStyle=tr; c.lineWidth=p.kind==='fur'? 2.2 : 0.9; c.beginPath(); top.forEach((q,i)=> i? c.lineTo(q[0],q[1]+0.6) : c.moveTo(q[0],q[1]+0.6)); c.stroke();
+      if(p.kind!=='fur'){ c.beginPath(); bot.forEach((q,i)=> i? c.lineTo(q[0],q[1]-0.6) : c.moveTo(q[0],q[1]-0.6)); c.stroke(); }
+      if(p.kind==='palla'||p.kind==='dupatta'||p.kind==='plaid'){ c.strokeStyle=tr; c.lineWidth=0.5; const e=bot[10], f=top[10]; for(let k=0;k<5;k++){ const q=[f[0]+(e[0]-f[0])*k/4, f[1]+(e[1]-f[1])*k/4]; c.beginPath(); c.moveTo(q[0],q[1]); c.lineTo(q[0]+2.4,q[1]+Math.sin(t*0.5+k)); c.stroke(); } }   // the fringe streams
+      if(p.kind==='plaid'){ c.save(); c.clip(P); c.strokeStyle=rgbA(tr,0.55); c.lineWidth=0.6; for(let x=-L/2;x<L/2;x+=4){ c.beginPath(); c.moveTo(x,-12); c.lineTo(x,12); c.stroke(); } for(let y=-10;y<10;y+=3.5){ c.beginPath(); c.moveTo(-L,y); c.lineTo(L,y); c.stroke(); } c.restore(); }
+      if(p.kind==='pibo'||p.kind==='veil'){ c.save(); c.globalAlpha=0.5; c.fillStyle='#ffffff'; c.fill(P); c.restore(); lit(P); c.globalAlpha=1; }
+      if(p.kind==='obi'){ c.save(); c.clip(P); c.fillStyle=rgbA(tr,0.75); for(let k=0;k<7;k++){ c.beginPath(); c.arc(-L/2+3+k*4.4, top[Math.min(10,k+2)][1]+Wd*0.5, 1.1, 0, 7); c.fill(); } c.restore(); }
+    } else {
+      /* landed: a draped heap — the cloth folded back on itself, its folds catching the lamp, its border showing at the turn */
+      const w=L*0.72, h= p.kind==='fur'? 6 : 4.6, sk=p.skew||0;
+      const P=new Path2D(); P.moveTo(-w/2, 1.5); P.bezierCurveTo(-w/2+2, -h-1, -w*0.12, -h*1.4+sk, w*0.08, -h+sk); P.bezierCurveTo(w*0.3, -h*1.5, w/2-1, -h*0.6, w/2, 1.2); P.quadraticCurveTo(0, 3.2, -w/2, 1.5); P.closePath();
+      c.fillStyle='rgba(10,6,4,.3)'; c.beginPath(); c.ellipse(0,2.2,w*0.56,2,0,0,7); c.fill();
+      lit(P); c.save(); c.clip(P);
+      for(let k=0;k<5;k++){ const x=-w/2+4+k*(w-8)/4; c.strokeStyle=rgbA(sh,0.55); c.lineWidth=0.8; c.beginPath(); c.moveTo(x,2); c.quadraticCurveTo(x+1.5,-h*0.6,x+0.6+k*0.4,-h*1.3); c.stroke(); c.strokeStyle=rgbA(hi,0.5); c.lineWidth=0.4; c.beginPath(); c.moveTo(x+0.7,2); c.quadraticCurveTo(x+2.2,-h*0.6,x+1.3+k*0.4,-h*1.3); c.stroke(); }
+      if(p.kind==='plaid'){ c.strokeStyle=rgbA(tr,0.5); c.lineWidth=0.5; for(let x=-w/2;x<w/2;x+=3.6){ c.beginPath(); c.moveTo(x,-8); c.lineTo(x+1,4); c.stroke(); } }
+      if(p.kind==='fur'){ c.strokeStyle=rgbA(hi,0.6); c.lineWidth=0.5; for(let k=0;k<14;k++){ const x=-w/2+k*w/13; c.beginPath(); c.moveTo(x,-h*0.8+Math.sin(k)*1.2); c.lineTo(x+0.8,-h*0.8+Math.sin(k)*1.2-1.6); c.stroke(); } }
+      c.restore();
+      c.strokeStyle=tr; c.lineWidth=p.kind==='fur'? 1.8 : 0.9; c.beginPath(); c.moveTo(-w/2+1, 1.2); c.bezierCurveTo(-w/2+3, -h*0.6, -w*0.18, -h*1.1+sk, w*0.06, -h*0.8+sk); c.stroke();
+      if(p.kind==='palla'||p.kind==='dupatta'||p.kind==='plaid'){ c.lineWidth=0.5; for(let k=0;k<6;k++){ c.beginPath(); c.moveTo(w/2-1-k*1.4, 1.4); c.lineTo(w/2-0.6-k*1.4, 3.4); c.stroke(); } }   // the fringe, lying on the floor
+      if(p.kind==='obi'){ c.fillStyle=tr; for(let k=0;k<4;k++){ c.beginPath(); c.arc(-w/2+5+k*5, -h*0.5, 0.9, 0, 7); c.fill(); } }
+    }
+  }
+  c.restore();
+}
+/* the bodies: her, at the room's scale, facing left (toward the door) unless told otherwise */
+function preHer(c, x, T, P, G0, opt){
+  const her=(G&&G.isFemale)? playerLook() : ((G&&G.wife)||{});
+  const fy=PRE_FY, face=opt.face||-1;
+  c.save(); c.translate(x,fy); c.scale(face>0? PRE_K : -PRE_K, PRE_K); c.translate(-x,-fy);      // (her figure faces right; mirrored, she faces the door)
+  const breathe=Math.sin(T*0.045)*0.35, shift=Math.sin(T*0.018)*0.6;                      // breathing, and the weight going slowly from one foot to the other
+  let hip=[x+shift*0.4, fy-33.4+breathe*0.3], ankles={near:[x+1.5+shift*0.5, fy-2.2], far:[x+4.2, fy-2.6]}, kb=-1;
+  if(opt.walk){ const ph=opt.walkPh||0, st=(o)=>[x+Math.sin(ph+o)*5.6, fy-2.2-Math.max(0,Math.cos(ph+o))*2.2]; ankles={near:st(0), far:st(Math.PI)}; hip=[x+Math.sin(ph)*0.3, fy-33.6-Math.abs(Math.sin(ph))*0.6]; }
+  if(opt.seat>0){ const low=['wa','steppe','ice','rkrai'].includes(G0.fam), sd=opt.seat, seatH=low? 12/PRE_K+1.5 : (fy-PRE_BED.top)/PRE_K+2.5;   // the edge of a bed — or down on a futon                          // down onto the edge of the bed: the hip at the mattress, the knees forward
+    hip=[x-2*sd, fy-33.4+sd*(33.4-seatH)]; ankles={near:[x+7*sd+1.5, fy-2.2], far:[x+9*sd+4, fy-2.6]}; }
+  c.save(); c.globalAlpha=0.26; c.fillStyle='#120b08'; c.beginPath(); c.ellipse(x, fy-1, 11, 2.4, 0,0,7); c.fill(); c.restore();
+  const dress={col:hexOf((her&&her.dress)||'#8a2f5a'), cut:'stola', u:0, trim:G0.ht, noble:!!(her&&her.tier&&her.tier!=='common')};
+  drawFemFig(c, c, Object.assign({look:her, floor:fy, hip, lean:opt.lean||0.04, headAng:opt.headAng||0, expr:opt.expr||'pleased', blush:opt.blush||0.3, t:T, rock:shift*0.3,
+    ankles, kneeBend:kb, hands:opt.hands||{near:[hip[0]+3, hip[1]-6], far:[hip[0]-1, hip[1]-5]}, dress}, (opt.wrap? {wrap:opt.wrap} : {})));
+  c.restore();
+}
+function preHim(c, x, T, P, G0, opt){
+  const him=(typeof pairHimLook==='function')? pairHimLook() : playerLook();
+  c.save(); c.globalAlpha=(opt.alpha===undefined? 1 : opt.alpha);
+  c.globalAlpha*=0.26; c.fillStyle='#120b08'; c.beginPath(); c.ellipse(x, PRE_FY-1, 12, 2.4, 0,0,7); c.fill(); c.globalAlpha=(opt.alpha===undefined? 1 : opt.alpha);
+  drawManProfile(c, x, PRE_FY, him, {u:0, aro:P.aro, walk:opt.walk? 1 : 0, walkPh:opt.walkPh||0, lean:opt.lean||0.04, headAng:opt.headAng, face:opt.face||HARD_FACES.grin,
+    cloth:(G&&G.tunic)||'#7a2f22', k:PRE_K, near:opt.near, far:opt.far}, 1);
+  c.restore();
+}
+function drawPrelude2(s, T){
+  const G0=preGarb(), P=preludePlan(T);
+  try{ bedCultureRoom(ctx, W, H, s, T); }catch(e){ px(-4,-4,W+8,H+8,'#1a100a'); }
+  preludeBed(ctx, T, G0);
+  // where he comes in: the dark at the left edge warms as the door behind it opens
+  { const a=preSS(4,40,T)*(1-preSS(260,320,T)); if(a>0){ const g=ctx.createLinearGradient(0,0,70,0); g.addColorStop(0,'rgba(255,190,110,'+(0.30*a)+')'); g.addColorStop(1,'rgba(255,190,110,0)'); ctx.fillStyle=g; ctx.fillRect(0,60,70,H-60); } }
+  // the garments on the bed and floor, under the bodies where they lie behind them
+  for(const p of s.props) if(p.v2 && p.landed && p.behind) drawGarment2(ctx, p);
+  // her
+  const wHands = P.kiss>0.02? {near:[0,0], far:[0,0]} : null;
+  const wph=(306-P.wx)*Math.PI/(2*5.6*PRE_K)*1.0;
+  const herOpt={walk:P.wWalk && P.seat<0.05, walkPh:wph, seat:P.seat, face: P.wBack? 1 : -1, wrap: P.wrapOff? null : G0.hc,
+    expr: P.kiss>0.4? 'flush' : T>230? 'pleased' : 'smug', blush: 0.25+P.hug*0.45+P.seat*0.2, lean: 0.03+P.kiss*0.10, headAng: -P.kiss*0.22 + (P.seat>0? 0.05 : 0)};
+  // her hands: at her sides, then up round his neck in the kiss, then at the pin of her wrap, then reaching back for his hand
+  { const hip0=[P.wx, PRE_FY-33.4];
+    if(P.hug>0.05){ const tx=P.hx+6, ty=PRE_FY-60;            // round his neck — in her own (mirrored) frame the room's x runs backwards
+      const mx=(x)=>2*P.wx-x; herOpt.hands={near:[mx(tx)+P.hug*0, ty+(1-P.hug)*20], far:[mx(tx+3), ty+3+(1-P.hug)*18]}; }
+    if(T>336 && T<362){ const k=preSS(336,350,T); herOpt.hands={near:[hip0[0]+2-k*1, hip0[1]-24], far:[hip0[0]-2, hip0[1]-25]}; }   // the pin at her shoulder
+    if(P.wBack){ herOpt.hands={near:[hip0[0]-6, hip0[1]-6], far:[hip0[0]+2, hip0[1]-5]}; } }
+  // him
+  const hph=(P.hx+18)*Math.PI/(2*5.2*PRE_K);
+  const himOpt={walk:P.hWalk, walkPh:hph, alpha:preSS(0,26,T), lean:0.04+P.kiss*0.08, headAng: 0.1+P.kiss*0.2, face: P.kiss>0.3? Object.assign({},HARD_FACES.grin,{shut:1,open:0}) : HARD_FACES.grin};
+  if(P.hug>0.05){ himOpt.near=[ (P.wx-P.hx)/PRE_K-4, -4-(1-P.hug)*6 ]; himOpt.far=[ (P.wx-P.hx)/PRE_K-7, -2 ]; }   // his hands at her waist (hip-relative, his units)
+  if(T>354 && T<372){ const k=preSS(354,366,T); himOpt.near=[4, 2-k*2]; himOpt.far=[1, 3]; }                      // at the buckle
+  if(P.wBack && P.hug<0.05){ himOpt.near=[ (P.wx-P.hx)/PRE_K-8, -6 ]; }                                              // his hand in hers
+  // draw order: whoever is behind first (he is on the left, facing right; she faces him — they overlap in the embrace)
+  preHim(ctx, P.hx, T, P, G0, himOpt);
+  preHer(ctx, P.wx, T, P, G0, herOpt);
+  // the garments in the air, and the ones in front
+  for(const p of s.props) if(p.v2 && !(p.landed && p.behind)) drawGarment2(ctx, p);
+  // the moment, named softly at the top
+  ctx.save(); ctx.textAlign='center';
+  const who=(G&&G.wife&&G.wife.name)? G.wife.name.split(' ')[0] : 'she';
+  const line = T<150? (G&&G.isFemale? 'you wait for him' : who+' is waiting') : T<262? (G&&G.isFemale? 'he comes in, and stops when he sees you' : 'you come in, and stop when you see her') : T<345? (s.line||'“Come here…”') : T<400? 'the first things come off' : 'and she takes your hand';
+  const a=preSS(6,30,T)*(1-preSS(486,512,T)); ctx.globalAlpha=a*0.9; pixelText(line, W/2, 30, '#ffd6e6', 0.9);
+  ctx.restore();
+  // a heart or two over them in the kiss
+  if(P.kiss>0.5 && (T|0)%26<1.2) s.hearts.push({x:(P.hx+P.wx)/2+rnd(-6,6), y:PRE_FY-96, vy:0.45, life:56, c:pick(['#ff6a9a','#ffb0d0'])});
+}
+/* the things that come off, thrown — spawned from the hands that take them off */
+function prelude2Props(s, T){
+  if(!prelude2On(s)) return;
+  const G0=preGarb(), P=preludePlan(T), at=(t)=> T>=t && T<t+1.05 && !(s._p2||{})[t];
+  const mark=(t)=>{ (s._p2||(s._p2={}))[t]=1; };
+  if(at(352)){ mark(352); s.props.push({v2:true, kind:G0.her, col:G0.hc, trim:G0.ht, x:P.wx-2, y:PRE_FY-58, vx:1.9, vy:-2.6, r:-0.2, vr:0.05, landY:PRE_BED.top-1, behind:true, skew:-1.5, age:0}); try{ sfx('swing'); }catch(e){} }
+  if(at(366)){ mark(366); s.props.push({v2:true, kind:'belt', col:G0.belt, trim:G0.buckle, x:P.hx+6, y:PRE_FY-46, vx:-1.6, vy:-2.0, r:0.3, vr:-0.12, landY:PRE_FY+4, age:0}); }
+  if(at(380)){ mark(380); s.props.push({v2:true, kind:'shoe', col:G0.shoe, x:P.hx-2, y:PRE_FY-3, vx:-1.2, vy:-1.6, r:0, vr:0.3, landY:PRE_FY+5, age:0}); }
+  if(at(392)){ mark(392); s.props.push({v2:true, kind:'shoe', col:G0.shoe, x:P.hx+3, y:PRE_FY-3, vx:-0.7, vy:-1.9, r:0, vr:-0.28, landY:PRE_FY+7, flip:true, age:0}); }
+  if(at(418) && G0.fam!=='egyptian'){ mark(418); s.props.push({v2:true, kind:'shoe', col:mixHex(G0.hc,'#3a2010',0.5), x:P.wx+2, y:PRE_FY-3, vx:0.8, vy:-1.5, r:0, vr:0.25, landY:PRE_FY+6, age:0}); }
+  if(at(418) && G0.fam==='egyptian'){ mark(418); s.props.push({v2:true, kind:'collar', col:G0.hc, trim:G0.ht, x:P.wx, y:PRE_FY-62, vx:1.4, vy:-2.0, r:0, vr:0.08, landY:PRE_BED.top, behind:true, age:0}); }
+}
+
+window.__SS = { prelude2On:(s)=>prelude2On(s), preludePlan:(T)=>preludePlan(T), heroChampion:(c,id,x,y,sc,t,f,a)=>heroChampion(c,HERO_BY_ID[id],x,y,sc,t,f,a), HERO_ART, bedCultureRoom:(c,W,H,s,T,f)=>bedCultureRoom(c,W,H,s,T,f), bedRoomFam:()=>bedRoomFam(), BED_ROOMS, openHomeHub:()=>openHomeHub(), openGallery:()=>openGallery(), galSee:(v)=>galSee(v), galLoad:()=>galLoad(), slotThumb:(n)=>slotThumb(n), slotThumbTake:()=>slotThumbTake(), musTick:()=>musTick(), MUSIC_SCALES, openLongRoad:()=>openLongRoad(), longRoadRun:(k)=>longRoadRun(k), LONG_ROADS, heroYearF:()=>heroYearF(), worldWarRun:(i)=>worldWarRun(campaignsForWorld().find(c=>c.id===i)), openWorldWars:()=>openWorldWars(), campaignsForWorld:()=>campaignsForWorld(), worldWarOdds:(cp)=>worldWarOdds(cp), armyStyleMine:()=>armyStyleMine(), gearHDIcon:(cat,id,px)=>gearHDIcon(cat,{id},px), GEAR_IDS:(cat)=>GEAR[cat].map(g=>g.id), openHousehold:()=>openHousehold(), openTemple:()=>openTemple(), hhDayTick:()=>hhDayTick(), hhWomen:()=>hhWomen(), hhWifeArc:()=>hhWifeArc(), ageSlow:(a)=>ageSlow(a), blessWarMult:()=>blessWarMult(), hhPaintTemple:(c,W,H,f,t)=>hhPaintTemple(c,W,H,f,t), tmPaintIdol:(c,S,f,k,t)=>tmPaintIdol(c,S,f,k,t), RELIGION, KID_JOBS, grPaint:(c,W,H,f,st,t)=>grPaintHouse(c,W,H,f,st,t), grFurn:(c,id,x,y,s)=>grPaintFurn(c,id,x,y,s), GR_FURN, openGrounds:()=>openGrounds(), grComfort:()=>grComfort(), grFam:()=>grFam(), openRealm:()=>openRealm(), realmSeason:()=>realmSeason(), realmInit:()=>realmInit(), setSetting:(k,v)=>{ SETTINGS[k]=v; }, festToday:(d)=>festToday(d), festNext:()=>festNext(), festDayTick:()=>festDayTick(), openVisitor:(i)=>openVisitor(VISITORS.find(v=>v.id===i)), VISITORS, HOUSE_FEASTS, weatherTest:(w,only)=>{ try{ const cv=document.createElement("canvas"); cv.width=960; cv.height=520; const c=cv.getContext("2d"); c.setTransform(2,0,0,2,0,0); drawWeather(c,w,w==="east"? lonlatE : lonlat,1000,only); const d=c.getImageData(0,0,960,520).data; let n=0; for(let i=3;i<d.length;i+=4) if(d[i]>20) n++; return "px "+n; }catch(e){ return "ERR "+e.message; } }, shipSprite:(a,b,c)=>shipSprite(a,b,c), mapSeason:()=>mapSeason(), gunPreview:(id,ph,t,k,x,y)=>{ ctx.save(); ctx.setTransform(k,0,0,k,x,y); try{ drawHeldGun(bowOf(id),ph,t); }finally{ ctx.restore(); } }, openHeroes:()=>openHeroes(), heroYear:()=>heroYear(), heroDayTick:()=>heroDayTick(), HEROES, heroCanRecruit:(id)=>heroCanRecruit(HERO_BY_ID[id]), heroAudience:(id)=>heroAudience(HERO_BY_ID[id]), heroGeneral:(id)=>heroGeneral(HERO_BY_ID[id]), setTitleT:(v)=>{ TT_FORCE_T=v; }, enterMap:()=>enterMap(), silkTickerToggle:()=>silkTickerToggle(), camelSprite:(a,b,c,d)=>camelSprite(a,b,c,d), bedStroke:(vt,T,k)=>bedStroke(vt,T,k), bedLoreKey:()=>bedLoreKey(), setBedKey:(k)=>{ BED_KEY_FORCE=k||null; }, BED_ENTRY, POSE_LORE, armyStyleOfPeople:(p)=>armyStyleOfPeople(p), armyStyleKeys:()=>Object.keys(ARMY_STYLE), armyStyleHere:(id)=>armyStyleHere(id), kanvekTier:(w)=>kanvekTier(w), kanvekLvInfo:(w)=>kanvekLvInfo(w), kanvekLevel:(w)=>kanvekLevel(w), kanvekGrow:(w)=>kanvekGrow(w), KANVEK_LEVELS, drawHallMan:(...a)=>drawHallMan(...a), drawFemProfile:(...a)=>drawFemProfile(...a), drawHallFem:(...a)=>drawHallFem(...a), folkLookId:(w)=>folkLookId(w), drawFolkLook:(c,w,o)=>drawFolkLook(c,w,o), drawPortraitFigure:(...a)=>drawPortraitFigure(...a), drawKidProfile:(...a)=>drawKidProfile(...a), CUSTOMS, customsHere:()=>customsHere(), customsHers:(w)=>customsHers(w), customsTabooToday:(d)=>customsTabooToday(d), customsConceive:(B)=>customsConceive(B), customsChildName:(s)=>customsChildName(s), customsWeddingLine:(w)=>customsWeddingLine(w), customsJealMul:()=>customsJealMul(), buildCustomsCard:(b)=>buildCustomsCard(b), finishBedNow:()=>finishBed(), getBC:()=>BC, setBC:(v)=>{ BC=v; }, roomBackdrop:(T)=>whRoomBackdrop(T), openEmpire:()=>openEmpire(), empSeason:()=>empSeason(), EMP_UI, silkDbg:()=>{ const c=document.createElement("canvas").getContext("2d"); try{ drawSilkRoadLive(c); return {ok:true, n:silkCaravanCount(), at:silkAt(0.5), arc:silkArc().tot}; }catch(e){ return {err:e.message}; } }, btMountSprite:(id,f)=>btMountSprite(id,f), poseLoreNow:()=>poseLore(), nbStyleSprite:(S,f,a,h)=>nbStyleSprite(S,f,a,h), armyStyle:(id)=>armyStyle(id), dynThroneFalls:(h)=>dynThroneFalls(h), proclaimDynasty:()=>proclaimDynasty(), plotTargets:()=>plotTargets(), mapZoomTo:(z,x,y)=>mapZoomTo(z,x,y), ASIA_PEOPLES, asiaPeopleFor:(e,o)=>asiaPeopleFor(e,o), EAST_PIN_POS, campaignOdds:(cp)=>campaignOdds(cp), updateBattle:(dt)=>updateBattle(dt), drawBattle:()=>drawBattle(), get BT(){ return BT; }, romStyles:()=>ROM_STYLES, startRomanticStyled:(a,b)=>startRomanticStyled(a,b), bgFn:(n)=>({bgPalace,bgWar,bgCoast,bgWoa,bgOpelia,bgIsle,bgReiko,bgForge})[n], setPairSS:(v)=>{ PAIR_SS=v; }, ICE_T:{ get AC(){return AC;}, set AC(v){AC=v;}, iceSlap, iceSkin, iceUlk, iceGulp, iceVoc, iceCrowd, ICE_V, sfx }, ICE_TTS, STRIKES, getDM:()=>DM, drawBridePortrait:(...a)=>drawBridePortrait(...a), rhFig, RH_CAST, openBotWatch, botEnterBeat, getBW:()=>BW, iceGoddessOpen, paintGoddess, startBedScene, regionAny, iceDebug:()=>({here:iceHere(), prey:ICE_PREY_BY_REGION}),
   openBookViewer:()=>openBookViewer(), openSettings:()=>openSettings(), 
   rhAmbTick:(b)=>rhAmbTick(b), rhAmbHit:(k,n)=>rhAmbHit(k,n), rhAmbStop:()=>rhAmbStop(), rhSting:(b)=>rhSting(b), setMuted:(v)=>{muted=v;}, ambKind:()=>RH_AMB&&RH_AMB.kind, acState:()=>AC&&AC.state,
   WPN_ART, WPN_RANGED, drawRangedIcon, BOWS, wpnStamp, wpnIcon, drawHeldBow, drawHeldPilum, drawHeldBomb, get WPN_DRAWS(){ return WPN_DRAWS; }, setOUTL:(v)=>{ OUTL=!!v; }, drawWeapon2Old,

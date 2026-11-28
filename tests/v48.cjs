@@ -74,7 +74,7 @@ const ok=(name,cond,note)=>{ if(cond){pass++; console.log('  PASS  '+name+(note?
     S.newDemo('Kaiq','Leokanis','RkTorvak'); const G=S.G; G.world='rk'; G.married=true; G.isFemale=false; G.hasVilla=true;
     const w=S.makeBride('rkrai',false,9,{male:true}); w.male=false; w.eth='rkrai'; w.flaws=[]; w.quirks=[]; w.traits=['kanvek']; w.body={face:10,hairq:7,bust:7,waist:5,booty:10,legs:7}; w.age=24; G.wife=w; G.body=G.body||{}; G.body.secret=9;
     const i=S.rkPoseOrder().indexOf(22); S.setWH('done'); S.startBedScene('long','love','bed'); S.BC.kanDeep={all:false, snd:[], lastPk:false};
-    const d=[]; for(let k=0;k<34;k+=2){ const Tt=520+(S.BED_UNDRESS||0)+i*160+60+k; S.setBCT(Tt); S.drawShadowPlay(S.BC, Tt); d.push(S.BC.kanDeep.depth); }
+    const d=[]; for(let k=0;k<72;k+=2){ const Tt=520+(S.BED_UNDRESS||0)+i*(S.BED_STEP||160)+60+k; S.setBCT(Tt); S.drawShadowPlay(S.BC, Tt); d.push(S.BC.kanDeep.depth); }
     return {min:Math.min(...d), max:Math.max(...d)}; });
   ok('every stroke runs from the tip to her depth and back (most of him is out at the top of it)', !R.err && R.min<2 && R.max-R.min>2.5, R.err||JSON.stringify(R));
 
