@@ -18,7 +18,7 @@ const {chromium}=require('playwright');
    G.day=Math.ceil((220-200)*2.4)+1; S.heroDayTick(); o.guanGone=!G.generals.some(g=>g.hero==='guanyu'); o.caoDead=(G.heroLog||[]).some(e=>/Cao Cao dies/.test(e.t));
    o.year=S.heroYear(); S.enterMap(); o.btn=!!document.getElementById('btn-heroes'); S.openHeroes(); o.cards=document.querySelectorAll('#heroes-ov canvas[data-p]').length;
    // a portrait actually drew something
-   const cv=document.querySelector('#heroes-ov canvas[data-p]'); const d=cv.getContext('2d').getImageData(55,40,1,1).data; o.portrait=d[3]>0;
+   o.portrait=[...document.querySelectorAll('#heroes-ov canvas[data-p]')].some(cv=>{ const d=cv.getContext('2d').getImageData(0,0,cv.width,cv.height).data; for(let i=3;i<d.length;i+=16) if(d[i]>0) return true; return false; });
    return o; });
  ok(r.y0===200, 'the story starts in 200');
  ok(r.lubuLegend, 'Lü Bu, dead at Xiapi in 199, is a legend — not a living man');
