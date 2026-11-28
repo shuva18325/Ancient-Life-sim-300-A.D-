@@ -28449,19 +28449,19 @@ function drawStaminaIcon(cv, lv){
   P(9,32,22,3,'#6a3a1a'); P(11,31,5,2,'#c8452a'); P(20,31,6,2,'#e8702a');
   P(3, S-5, Math.round((S-6)*k), 2, k>=1? '#e8c34a' : '#b8912f');
 }
-const BED_RHYTHM=0.5;                              // the stroke clock against the scene clock (see drawBedPose)
-const BED_STEP=330;                                // ticks per position (5½ s): long enough to get into it — at 160 the positions flicked past every 2.7 s
+const BED_RHYTHM=0.62;                             // the stroke clock against the scene clock (see drawBedPose): it builds to the old steady ~3 a second at the peak
+const BED_STEP=260;                                // ticks per position (4.3 s): time to get into each one, and still the variety the old 2.7 s gave
 const BED_STAGES=[
-  {id:'warm',  name:'WARMING UP',          tempo:0.78, at:0.00, col:'#e8c34a'},
+  {id:'warm',  name:'WARMING UP',          tempo:0.85, at:0.00, col:'#e8c34a'},
   {id:'find',  name:'FINDING THE RHYTHM',  tempo:1.00, at:0.20, col:'#f0b060'},
-  {id:'fast',  name:'FASTER',              tempo:1.30, at:0.44, col:'#ff8a5a'},
-  {id:'peak',  name:'THE PEAK',            tempo:1.72, at:0.70, col:'#ff5a8a', peak:true},
+  {id:'fast',  name:'FASTER',              tempo:1.20, at:0.44, col:'#ff8a5a'},
+  {id:'peak',  name:'THE PEAK',            tempo:1.45, at:0.70, col:'#ff5a8a', peak:true},     // (it was 1.72: on top of the old stroke that was six a second — a vibration)
   {id:'after', name:'AFTERGLOW',           tempo:0.42, at:0.88, col:'#c8a8ff', rest:true},
 ];
 /* how long each length of session runs, so it has room for positions after the doorway and the clothes */
 function bedSessionDur(len, kan){
   if(kan) return 860;
-  return len==='vigil'? 18000 : len==='night'? BED_INTRO+11*BED_STEP+40 : len==='long'? BED_INTRO+7*BED_STEP+40 : BED_INTRO+3*BED_STEP+40;
+  return len==='vigil'? 18000 : len==='night'? BED_INTRO+13*BED_STEP+40 : len==='long'? BED_INTRO+7*BED_STEP+40 : BED_INTRO+3*BED_STEP+40;
 }
 /* where the positions start in THIS place: the quay has the walk in from outside, the hub does not */
 function bedIntroFor(s){
@@ -50731,7 +50731,7 @@ function povRender(P){
   const shk=ST.flash*3.0*sh;
   const drift=POV.drift? Math.sin(T*0.0065)*18 : 0, driftY=POV.drift? Math.sin(T*0.0043+1)*7 : 0;
   ST.tx=ST.tx+(((POV.look? POV_PTR.x : 0)-ST.tx)*0.07); ST.ty=ST.ty+(((POV.look? POV_PTR.y : 0)-ST.ty)*0.07);
-  const ld0=POV.look? clamp((POV_PTR.y-0.05)/0.85,0,1) : 0, auto=POV.glance? Math.pow(Math.max(0,Math.sin(T*0.0035+1.2)),6)*0.85 : 0;
+  const ld0=POV.look? clamp((POV_PTR.y-0.05)/0.85,0,1) : 0, auto=(POV.glance && !P.bare)? Math.pow(Math.max(0,Math.sin(T*0.0035+1.2)),6)*0.85 : 0;
   ST.ld+=(Math.max(ld0,auto)-ST.ld)*0.07;
   const LX=ST.tx*22+drift, LY=ST.ty*12+driftY;
   const roll=(Math.sin(T*0.012)*0.006+(rock*0.016)*Math.sin(T*0.3))*bobK+ST.tx*0.02;
@@ -50773,21 +50773,28 @@ function povRender(P){
   const pose=her.pose||'wall';
   const armSide=(s)=>{
     const sx=240+s*shW, sy=shY+2;
-    const hx=240+s*(pose==='super'? 84 : pose==='hip'? 46 : 150), hy=pose==='super'? shY-18 : pose==='hip'? waistY-6 : shY-44;
-    const ex=240+s*(pose==='super'? 82 : 112+shW*0.15), ey=(sy+hy)/2+(pose==='super'? -4 : 16)+Math.sin(T*0.2+s)*drive*1.4;
+    /* ✦ her arms go FORWARD, away from him — up the picture, foreshortened, mostly behind her shoulders — to the sheet (or the
+       wall) a little beyond her head. They were flung out to either side like a crucifix with the fingers spiked. */
+    const hx=240+s*(pose==='super'? shW+5 : pose==='hip'? 46 : shW+10), hy=pose==='super'? shY-15 : pose==='hip'? waistY-6 : shY-40;
+    const ex=240+s*(pose==='super'? shW+9 : pose==='hip'? shW+10 : shW+12), ey=(pose==='super'? shY+3 : pose==='hip'? (sy+hy)/2+10 : shY-12)+Math.sin(T*0.2+s)*drive*1.0;
     const wob=ST.push*1.6*s;
     g.lineCap='round'; g.lineJoin='round';
     // the arm, a tube of two segments
     const seg=(x0,y0,x1,y1,w0,w1)=>{ const dx=x1-x0, dy=y1-y0, L=Math.hypot(dx,dy)||1, nx=-dy/L, ny=dx/L;
       g.fillStyle=povGrad(g,x0+nx*w0,y0+ny*w0,x0-nx*w0,y0-ny*w0,[[0,skinHi],[0.45,skin],[1,skinSh]]);
       g.beginPath(); g.moveTo(x0+nx*w0,y0+ny*w0); g.lineTo(x1+nx*w1,y1+ny*w1); g.arc(x1,y1,w1,Math.atan2(ny,nx),Math.atan2(-ny,-nx),true); g.lineTo(x0-nx*w0,y0-ny*w0); g.arc(x0,y0,w0,Math.atan2(-ny,-nx),Math.atan2(ny,nx),true); g.closePath(); g.fill(); };
-    seg(sx,sy,ex+wob,ey,6.4,5.0); seg(ex+wob,ey,hx,hy,5.0,3.6);
+    seg(sx,sy,ex+wob,ey,7.0,5.2); seg(ex+wob,ey,hx,hy,5.0,3.4);
+    g.fillStyle=povRGBA(skinHi,0.35); g.beginPath(); g.ellipse(ex+wob,ey,3.2,2.2,0,0,7); g.fill();                  // the light on the point of the elbow
     // the bronze armlet and the wrist cuff
     if(POV.beads){ const ax=sx+(ex-sx)*0.55, ay=sy+(ey-sy)*0.55; g.strokeStyle='#c88a3a'; g.lineWidth=2; g.beginPath(); g.moveTo(ax-2.4*s,ay-5.6); g.lineTo(ax+2.8*s,ay+5.6); g.stroke(); g.strokeStyle='#ffd88a'; g.lineWidth=0.6; g.beginPath(); g.moveTo(ax-2.4*s+0.6,ay-5.4); g.lineTo(ax+2.8*s+0.6,ay+5.4); g.stroke(); }
     // the hand, spread flat on what she holds to
-    g.fillStyle=povGrad(g,hx-5,hy-4,hx+5,hy+5,[[0,skinHi],[1,skinSh]]); g.beginPath(); g.ellipse(hx,hy,5.6,4.4,s*0.3,0,7); g.fill();
-    g.strokeStyle=skinSh; g.lineWidth=1.3; for(let f=-2;f<=2;f++){ g.beginPath(); g.moveTo(hx+f*1.9,hy-3); g.lineTo(hx+f*2.6+s*0.6,hy-9.5+Math.abs(f)*0.8); g.stroke(); }
-    g.fillStyle='rgba(255,236,190,.18)'; g.beginPath(); g.ellipse(hx,hy-1,7,5,0,0,7); g.fill();                   // the place it grips
+    /* the hand, flat on what she holds to: a soft palm and four short fingers lying together, the sheet gathered under them */
+    g.fillStyle='rgba(20,10,8,.22)'; g.beginPath(); g.ellipse(hx,hy+2.4,7.5,3,0,0,7); g.fill();
+    g.fillStyle=povGrad(g,hx-5,hy-5,hx+5,hy+4,[[0,skinHi],[0.6,skin],[1,skinSh]]); g.beginPath(); g.ellipse(hx,hy,5.2,4.0,s*0.15,0,7); g.fill();
+    for(let f=0;f<4;f++){ const fx2=hx-3.6+f*2.4, fy2=hy-4.2+Math.abs(f-1.5)*0.6; g.fillStyle=povGrad(g,fx2,fy2-3,fx2,fy2+2,[[0,skinHi],[1,skin]]); g.beginPath(); g.ellipse(fx2,fy2,1.25,2.6,s*0.08*(f-1.5),0,7); g.fill(); }
+    g.strokeStyle=povRGBA(skinSh,0.6); g.lineWidth=0.5; for(let f=1;f<4;f++){ const fx2=hx-4.8+f*2.4; g.beginPath(); g.moveTo(fx2,hy-6.2); g.lineTo(fx2,hy-2.6); g.stroke(); }
+    g.fillStyle=povGrad(g,hx+s*4,hy,hx+s*7,hy+3,[[0,skin],[1,skinSh]]); g.beginPath(); g.ellipse(hx+s*4.8,hy+1.2,2.4,1.4,s*0.6,0,7); g.fill();     // the thumb
+    g.strokeStyle='rgba(255,240,220,.18)'; g.lineWidth=0.6; for(let k=0;k<3;k++){ g.beginPath(); g.moveTo(hx-8+k*2,hy+4); g.quadraticCurveTo(hx-4+k*3,hy+1.5,hx+k*3,hy+4.6); g.stroke(); }   // the sheet, gathered
     return [hx,hy]; };
 
   /* her back: the long line of it, a trapezoid that narrows toward the waist, with the spine's groove */
@@ -50798,7 +50805,7 @@ function povRender(P){
     g.bezierCurveTo(240+bw1*0.6,shY-6, 240+10,neckY+2, 240+7,neckY-2); g.lineTo(240-7,neckY-2); g.bezierCurveTo(240-10,neckY+2, 240-bw1*0.6,shY-6, 240-bw1,shY); g.closePath(); };
   armSide(-1); armSide(1);
   [-1,1].forEach(s=>{ const dx=240+s*shW, dy=shY+3; g.fillStyle=povRad(g,dx,dy,1,10,[[0,skinHi],[0.7,skin],[1,skinSh]],-s*2,-2); g.beginPath(); g.arc(dx,dy,9,0,7); g.fill(); });
-  const dressOn=(POV.garment==='worn');
+  const dressOn=(POV.garment==='worn') && !P.bare;
   backPath(); g.fillStyle=povGrad(g,240-bw1,0,240+bw1,0,[[0,skinSh],[0.28,skin],[0.5,skinHi],[0.72,skin],[1,skinSh]]); g.fill();
   g.save(); backPath(); g.clip();
   // warm flush that climbs as it goes on
@@ -50865,7 +50872,8 @@ function povRender(P){
       g.fillStyle='rgba(30,12,8,.22)'; g.fillRect(cx-rx*1.2,cy+ry*0.22,rx*2.4,ry*0.14);
       g.restore();
       g.strokeStyle=povRGBA(povSh(linen,-70),0.55); g.lineWidth=1.1; g.beginPath(); g.moveTo(cx-s*rx*0.1,cy+ry*0.34); g.bezierCurveTo(cx+s*rx*0.62,cy+ry*0.40,cx+s*rx*1.05,cy+ry*0.22,cx+s*rx*1.06,cy+ry*0.02); g.stroke(); };
-    if(!dressOn){ cks.forEach(wrap);
+    if(P.bare){ /* in bed she is bare: nothing over her */ }
+    else if(!dressOn){ cks.forEach(wrap);
       // the tie at the hip, the cords, a bronze bead
       [-1,1].forEach(s=>{ const tx=seatCx+s*(gap+rx*0.98), ty=seatY-ry*0.62; g.strokeStyle=povSh(linen,-40); g.lineWidth=1.3; g.beginPath(); g.moveTo(tx,ty); g.quadraticCurveTo(tx+s*7,ty+8,tx+s*5+Math.sin(T*0.1+s)*1.5,ty+22); g.stroke(); g.fillStyle='#d49a40'; g.beginPath(); g.arc(tx+s*5+Math.sin(T*0.1+s)*1.5,ty+23,1.8,0,7); g.fill(); });
       // the band at the waist
@@ -50881,7 +50889,7 @@ function povRender(P){
 
   /* ---- her head: the hair, the turn, the face looking back at him ---- */
   { const hx=headX, hy=headY, hsc=1.0+ST.push*0.02;
-    g.save(); g.translate(hx,hy); g.scale(1.28,1.28); g.translate(-hx,-hy);
+    g.save(); g.translate(hx,hy); g.scale(1.02,1.02); g.translate(-hx,-hy);          // (it was 1.28: a doll's head on a woman's back)
     // hair falling forward over both shoulders, moving with each stroke
     const sw=hrsw*(0.4+hq*0.05);
     g.fillStyle=povGrad(g,hx-20,hy,hx+20,hy,[[0,hairSh],[0.5,hair],[1,hairSh]]);
@@ -50933,7 +50941,7 @@ function povRender(P){
       g.fillStyle=povGrad(g,fx-8,fy-14,fx+6,fy-4,[[0,hairHi],[0.5,hair],[1,hairSh]]); g.beginPath(); g.moveTo(fx+6.6,fy-14); g.bezierCurveTo(fx-4,fy-15,fx-8,fy-11,fx-9.2,fy-5.2); g.bezierCurveTo(fx-5,fy-9.6,fx-1,fy-8.4,fx+5,fy-8); g.closePath(); g.fill();
       // the ear and its ring
       g.fillStyle=povGrad(g,hx,hy+3,hx+4,hy+9,[[0,skin],[1,skinSh]]); g.beginPath(); g.ellipse(hx+1.4,hy+7,2.3,3.6,0.15,0,7); g.fill(); g.fillStyle='#e0a848'; g.beginPath(); g.arc(hx+1.8,hy+11.4,1.4,0,7); g.fill(); }
-    if(look.crown||look.jewel){ g.strokeStyle='#ffe070'; g.lineWidth=1.8; g.beginPath(); g.arc(hx,hy-6,15,Math.PI*1.1,Math.PI*1.9); g.stroke(); }
+    if(look.crown||look.jewel){ g.strokeStyle='rgba(255,224,112,.75)'; g.lineWidth=1; g.beginPath(); g.arc(hx,hy-4,13,Math.PI*1.25,Math.PI*1.75); g.stroke(); }
     g.restore(); }
   g.restore();
 
@@ -51009,7 +51017,7 @@ function povRender(P){
     const lb=inch.toFixed(1)+'\u2033', ty=(tipY+BY)/2; g.font='bold 11px monospace'; g.textAlign='left'; const tw=g.measureText(lb).width;
     g.fillStyle='rgba(20,10,8,.78)'; g.fillRect(cx+wB+10,ty-11,tw+10,16); g.strokeStyle='rgba(232,195,74,.85)'; g.lineWidth=1; g.strokeRect(cx+wB+10,ty-11,tw+10,16); g.fillStyle='#ffe296'; g.fillText(lb,cx+wB+15,ty+1);
     g.restore(); }
-  if(POV.body && P.he && ST.ld>0.02 && !(typeof BW!=='undefined'&&BW&&BW.rec&&BW.rec.myth)) povBody(g,{T,ld:ST.ld,hskin,hskinSh,hskinHi,kilt:povHex(he.cloth && typeof he.cloth==='string'? he.cloth : '#a63a26'),push:ST.push,drive,aro,camX,camY});
+  if(POV.body && P.he && !P.bare && ST.ld>0.02 && !(typeof BW!=='undefined'&&BW&&BW.rec&&BW.rec.myth)) povBody(g,{T,ld:ST.ld,hskin,hskinSh,hskinHi,kilt:povHex(he.cloth && typeof he.cloth==='string'? he.cloth : '#a63a26'),push:ST.push,drive,aro,camX,camY});
   /* ============ HIS HANDS, from the bottom corners — the near one, the far one ============ */
   if(POV.hands && P.he){
     g.save(); g.translate(240+camX*0.6, 150+camY*0.6); g.rotate(roll*0.6); g.scale(Z,Z); g.translate(-240-LX*0.28, -150-LY*0.28);
@@ -51028,31 +51036,51 @@ function povRender(P){
       const key=which? 'hR' : 'hL', S0=ST[key]||(ST[key]=[X,Y]);
       S0[0]+=(X-S0[0])*0.30; S0[1]+=(Y-S0[1])*0.30; X=S0[0]; Y=S0[1];
       const off=(Y>245); // resting out of view
-      // the forearm, from the corner of the screen
-      const ox=240+sx*(176+Math.sin(T*0.05+which)*2), oy=276;
-      const dx=X-ox, dy=Y-oy, L=Math.hypot(dx,dy), ang=Math.atan2(dy,dx), nx=-Math.sin(ang), ny=Math.cos(ang);
-      const wr=[X-Math.cos(ang)*13, Y-Math.sin(ang)*13];
-      g.fillStyle=povGrad(g,ox+nx*13,oy+ny*13,ox-nx*13,oy-ny*13,[[0,hskinHi],[0.5,hskin],[1,hskinSh]]);
-      { const mx=(ox+wr[0])/2, my=(oy+wr[1])/2; g.beginPath(); g.moveTo(ox+nx*26,oy+ny*26); g.quadraticCurveTo(mx+nx*17,my+ny*17,wr[0]+nx*7.4,wr[1]+ny*7.4); g.lineTo(wr[0]-nx*7.4,wr[1]-ny*7.4); g.quadraticCurveTo(mx-nx*14,my-ny*14,ox-nx*26,oy-ny*26); g.closePath(); g.fill(); }
-      // the muscle line and a vein
-      g.strokeStyle=povRGBA(hskinSh,0.5); g.lineWidth=1.2; g.beginPath(); g.moveTo(ox+nx*2,oy+ny*2); g.lineTo(wr[0]+nx*1,wr[1]+ny*1); g.stroke();
-      g.strokeStyle='rgba(255,255,255,.14)'; g.lineWidth=1.6; g.beginPath(); g.moveTo(ox-nx*7,oy-ny*7); g.lineTo(wr[0]-nx*3.4,wr[1]-ny*3.4); g.stroke();
-      // the bronze bracer
-      const bp=[wr[0]-Math.cos(ang)*14, wr[1]-Math.sin(ang)*14];
-      g.fillStyle=povGrad(g,bp[0]+nx*8,bp[1]+ny*8,bp[0]-nx*8,bp[1]-ny*8,[[0,'#f2c46a'],[0.5,'#c88a3a'],[1,'#7a4c1c']]);
-      g.beginPath(); g.moveTo(bp[0]+nx*8.4,bp[1]+ny*8.4); g.lineTo(bp[0]+Math.cos(ang)*7+nx*7.8,bp[1]+Math.sin(ang)*7+ny*7.8); g.lineTo(bp[0]+Math.cos(ang)*7-nx*7.8,bp[1]+Math.sin(ang)*7-ny*7.8); g.lineTo(bp[0]-nx*8.4,bp[1]-ny*8.4); g.closePath(); g.fill();
-      g.strokeStyle='rgba(60,30,8,.7)'; g.lineWidth=0.8; g.stroke();
-      // the hand: the palm and four fingers closed round her
-      const pc=[X-Math.cos(ang)*3, Y-Math.sin(ang)*3];
+      /* ✦ HIS FOREARM AND HAND, drawn as a forearm and a hand. They were a flat plank with a bronze cuff ending in a round
+         paw with four parallel sausages. Now: the forearm swells near the elbow (nearest the eye, so widest) and tapers to
+         the wrist, lit along the top with the shadow under it and the line of the muscle; the hand is the back of a hand —
+         wider at the knuckles, the four knuckles catching the lamp — and the fingers curl over the curve of her hip and
+         press in, the thumb along her side. */
+      const ox=240+sx*(170+Math.sin(T*0.05+which)*2), oy=280;
+      const dx=X-ox, dy=Y-oy, ang=Math.atan2(dy,dx), nx=-Math.sin(ang), ny=Math.cos(ang), ux=Math.cos(ang), uy=Math.sin(ang);
+      const wr=[X-ux*15, Y-uy*15], Ltot=Math.hypot(wr[0]-ox, wr[1]-oy);
+      const P1=(t,o)=>[ox+(wr[0]-ox)*t+nx*o, oy+(wr[1]-oy)*t+ny*o];
+      const wE=24, wM=19, wW=7.2;                                                      // half-widths: at the elbow end, the belly of the muscle, the wrist
+      const fpath=()=>{ const a0=P1(0,wE), a1=P1(0.30,wM+3), a2=P1(0.72,wW+3.6), a3=P1(1,wW), b3=P1(1,-wW), b2=P1(0.70,-wW-2.4), b1=P1(0.30,-wM), b0=P1(0,-wE);
+        g.beginPath(); g.moveTo(a0[0],a0[1]); g.bezierCurveTo(a1[0],a1[1],a2[0],a2[1],a3[0],a3[1]); g.lineTo(b3[0],b3[1]); g.bezierCurveTo(b2[0],b2[1],b1[0],b1[1],b0[0],b0[1]); g.closePath(); };
+      fpath(); g.fillStyle=povGrad(g,ox+nx*wE,oy+ny*wE,ox-nx*wE,oy-ny*wE,[[0,povMix(hskinHi,'#fff0dc',0.15)],[0.38,hskin],[0.78,hskinSh],[1,povSh(hskinSh,-22)]]); g.fill();
+      g.save(); fpath(); g.clip();
+      g.fillStyle=povGrad(g,ox,oy,wr[0],wr[1],[[0,'rgba(0,0,0,.28)'],[0.35,'rgba(0,0,0,0)'],[1,'rgba(0,0,0,0)']]); g.fillRect(Math.min(ox,wr[0])-30,Math.min(oy,wr[1])-30,Math.abs(wr[0]-ox)+60,Math.abs(wr[1]-oy)+60);   // nearest the eye, out of the lamp
+      { const m0=P1(0.05,wE*0.25), m1=P1(0.5,wM*0.10), m2=P1(0.95,wW*0.1); g.strokeStyle=povRGBA(povSh(hskinSh,-10),0.45); g.lineWidth=1.6; g.beginPath(); g.moveTo(m0[0],m0[1]); g.quadraticCurveTo(m1[0],m1[1],m2[0],m2[1]); g.stroke(); }   // the groove between the muscles
+      { const h0=P1(0.08,wE*0.55), h1=P1(0.5,wM*0.55), h2=P1(0.92,wW*0.5); g.strokeStyle='rgba(255,246,230,.22)'; g.lineWidth=3; g.beginPath(); g.moveTo(h0[0],h0[1]); g.quadraticCurveTo(h1[0],h1[1],h2[0],h2[1]); g.stroke(); }  // the light along the top
+      { const v0=P1(0.35,-wM*0.35), v1=P1(0.62,-wW*0.2), v2=P1(0.9,-wW*0.45); g.strokeStyle=povRGBA(povMix(hskinSh,'#5a4a7a',0.25),0.35); g.lineWidth=1; g.beginPath(); g.moveTo(v0[0],v0[1]); g.quadraticCurveTo(v1[0]+nx*2,v1[1]+ny*2,v2[0],v2[1]); g.stroke(); }  // a vein
+      g.restore();
+      if(!P.bare){ const bp=P1(0.80,0); g.fillStyle=povGrad(g,bp[0]+nx*9,bp[1]+ny*9,bp[0]-nx*9,bp[1]-ny*9,[[0,'#f2c46a'],[0.5,'#c88a3a'],[1,'#7a4c1c']]);   // a bronze bracer, when he is dressed
+        g.beginPath(); const q0=P1(0.76,wW+3.4), q1=P1(0.86,wW+2.4), q2=P1(0.86,-wW-2.2), q3=P1(0.76,-wW-3.2); g.moveTo(q0[0],q0[1]); g.lineTo(q1[0],q1[1]); g.lineTo(q2[0],q2[1]); g.lineTo(q3[0],q3[1]); g.closePath(); g.fill(); }
+      // the hand
+      const pc=[X-ux*4, Y-uy*4];
       g.save(); g.translate(pc[0],pc[1]); g.rotate(ang);
-      g.fillStyle=povGrad(g,-8,-9,8,9,[[0,hskinHi],[0.6,hskin],[1,hskinSh]]); g.beginPath(); g.ellipse(0,0,10.5,9.2,0,0,7); g.fill();
-      if(hand==='seat' && slapUp && he.handK<0.9){ /* open hand, raised to strike: the fingers spread */
-        g.fillStyle=hskin; for(let f=-2;f<=1.5;f++){ g.save(); g.rotate(f*0.18); g.beginPath(); g.ellipse(11,f*2.8,6.2,2.3,0,0,7); g.fill(); g.restore(); }
-      } else { // fingers wrapped over her skin
-        for(let f=0;f<4;f++){ const fy2=-6.5+f*4.4; g.fillStyle=povGrad(g,6,fy2-2,16,fy2+2,[[0,hskin],[1,hskinSh]]); g.beginPath(); g.ellipse(11.4,fy2,6.4,2.5,0.05*(f-1.5),0,7); g.fill();
-          g.strokeStyle='rgba(70,30,14,.35)'; g.lineWidth=0.6; g.beginPath(); g.moveTo(14,fy2-2); g.lineTo(14.4,fy2+2); g.stroke(); }
-        g.fillStyle=hskinHi; g.beginPath(); g.ellipse(-2,-sx*9.5,6.4,3.1,sx*0.5,0,7); g.fill();                  // the thumb
-        g.fillStyle='rgba(255,255,255,.22)'; g.beginPath(); g.ellipse(-1,-2,5,2.2,0.2,0,7); g.fill(); }
+      const open=(hand==='seat' && slapUp && he.handK<0.9);
+      // the back of the hand: from the wrist (x −12) widening to the knuckles (x +5)
+      const bh=()=>{ g.beginPath(); g.moveTo(-13,-6.6); g.bezierCurveTo(-6,-8.6,1,-9.6,5.5,-8.8); g.quadraticCurveTo(8,-4,7.4,2); g.quadraticCurveTo(7,8,4.6,9.4); g.bezierCurveTo(-1,10.4,-7,9.2,-13,6.6); g.closePath(); };
+      bh(); g.fillStyle=povGrad(g,-10,-9,4,10,[[0,povMix(hskinHi,'#fff0dc',0.1)],[0.55,hskin],[1,hskinSh]]); g.fill();
+      g.save(); bh(); g.clip(); g.strokeStyle=povRGBA(hskinSh,0.35); g.lineWidth=0.8; for(let k=0;k<4;k++){ const yy=-6+k*4; g.beginPath(); g.moveTo(-10,yy*0.6); g.quadraticCurveTo(-3,yy*0.85,4,yy); g.stroke(); } g.restore();   // the tendons fanning to the knuckles
+      if(open){ /* raised to strike: the fingers straight and a little spread */
+        for(let f=0;f<4;f++){ const fy2=-6.2+f*4.1; g.save(); g.translate(6,fy2); g.rotate((f-1.5)*0.14); const fl=f===3? 8 : 11-Math.abs(f-1.2);
+          g.fillStyle=povGrad(g,0,-2,fl,2,[[0,hskin],[1,hskinSh]]); g.beginPath(); g.moveTo(0,-2); g.quadraticCurveTo(fl*0.6,-2.4,fl,-1.2); g.quadraticCurveTo(fl+1.6,0,fl,1.3); g.quadraticCurveTo(fl*0.6,2.3,0,2); g.closePath(); g.fill(); g.restore(); } }
+      else { /* closed round her: each finger bends at the knuckle and goes over the curve, foreshortened, the tips pressing in */
+        for(let f=0;f<4;f++){ const fy2=-6.4+f*4.25, fl=f===3? 6.2 : 8.6-Math.abs(f-1.3)*0.8;
+          g.save(); g.translate(5.6,fy2);
+          g.fillStyle='rgba(30,12,8,.22)'; g.beginPath(); g.ellipse(fl+0.6,0.8,2.6,2.0,0,0,7); g.fill();                         // the dent the fingertip makes in her
+          g.fillStyle=povGrad(g,0,-2.2,fl,2.2,[[0,hskinHi],[0.5,hskin],[1,povSh(hskinSh,-8)]]);
+          g.beginPath(); g.moveTo(0,-2.1); g.bezierCurveTo(fl*0.45,-2.6,fl*0.9,-1.8,fl+0.6,-0.4); g.quadraticCurveTo(fl+1.2,1.4,fl-0.4,1.9); g.bezierCurveTo(fl*0.6,2.4,fl*0.3,2.3,0,2.1); g.closePath(); g.fill();
+          g.strokeStyle=povRGBA(hskinSh,0.55); g.lineWidth=0.5; g.beginPath(); g.moveTo(fl*0.45,-1.9); g.quadraticCurveTo(fl*0.5,0,fl*0.45,1.9); g.stroke();   // the middle joint
+          g.fillStyle=povRGBA(povMix(hskin,'#ffd0c0',0.4),0.8); g.beginPath(); g.ellipse(fl-0.2,0,1.3,1.1,0,0,7); g.fill();          // the nail
+          g.restore();
+          g.fillStyle='rgba(255,246,230,.30)'; g.beginPath(); g.ellipse(5.2,fy2,1.5,1.3,0,0,7); g.fill(); }                    // the knuckle, catching the lamp
+        // the thumb, along her side, toward him
+        g.fillStyle=povGrad(g,-8,-sx*8,2,-sx*12,[[0,hskin],[1,hskinSh]]);
+        g.beginPath(); g.moveTo(-9,-sx*6.4); g.quadraticCurveTo(-4,-sx*12.4,2.6,-sx*12.2); g.quadraticCurveTo(4.6,-sx*11,2.4,-sx*9.4); g.quadraticCurveTo(-3,-sx*8.6,-5,-sx*5.6); g.closePath(); g.fill(); }
       g.restore();
       // where it presses, a paler place on her
       if((hand==='hips'||hand==='waist'||hand==='seat') && !off){ g.fillStyle='rgba(255,236,200,'+(0.10+aro*0.12).toFixed(2)+')'; g.beginPath(); g.ellipse(tgt[0]+sx*3,tgt[1],12,8,0,0,7); g.fill(); }
@@ -51200,9 +51228,9 @@ function povBed1(vi,Q){
   if(!(vi===2||vi===13||vi===14||vi===21||vi===24||vi===25)) return false;
   povMark();
   if(!POV.on) return false;
-  const rate=(vi===24? 0.60 : 0.36), d=hsin(Q.T*rate);
+  const rate=(vi===24? 0.60 : 0.36)*BED_RHYTHM, d=hsin(Q.T*rate);
   const st=Q.s&&Q.s.stage, peak=!!(st&&st.peak);
-  const P={T:povNow(), k:1, drive:d, wlook:Q.her, her:{expr:(d>0.55? Q.OH : Q.HE), blush:0.5+(peak? 0.3 : 0), rock:Math.sin(Q.T*rate)*0.5, pose:(vi===2||vi===25)? 'super' : 'wall', headUp:(vi===2? 0.5 : 0.2)}, he:{look:Q.him, aro:0.4+d*0.6, drive:d, hands:(vi===21? 'waist' : 'hips'), farHands:'hips', face:Q.HF}, hit:false};
+  const P={T:povNow(), k:1, drive:d, wlook:Q.her, her:{expr:(d>0.55? Q.OH : Q.HE), blush:0.5+(peak? 0.3 : 0), rock:Math.sin(Q.T*rate)*0.5, pose:(vi===2||vi===25)? 'super' : 'wall', headUp:(vi===2? 0.5 : 0.2)}, he:{look:Q.him, aro:0.4+d*0.6, drive:d, hands:(vi===21? 'waist' : 'hips'), farHands:'hips', face:Q.HF}, hit:false, bare:true};
   povBlit(Q.c,P,1); return true;
 }
 
