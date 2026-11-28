@@ -135,9 +135,11 @@ const ok=(name,cond,note)=>{ if(cond){pass++; console.log('  PASS  '+name+(note?
   console.log('\n=== 🚪 THE DOORWAY BEFORE THE LAMPS GO DOWN ===');
   R=await T((src)=>{ const S=window.__SS; eval(src)('rome'); const got={};
     for(const [place,t] of [['bed',60],['bed',200],['bed',300],['bed',450],['pool',200],['pool',370]]){
-      S.setWH('done'); S.startBedScene('fun','long',place); S.setBCT(t); const s0=S.SIL_DRAWS, f0=S.BEDPOSE_DRAWS; S.drawBed(); got[place+t]=(S.SIL_DRAWS>s0) || t===60; }
+      S.setWH('done'); S.G.hasPool=true; S.startBedScene('fun','long',place); S.setBCT(t); const g=document.getElementById('game').getContext('2d'); g.setTransform(1,0,0,1,0,0); g.clearRect(0,0,480,270); S.drawBed();
+      const d=g.getImageData(0,0,480,270).data; let lit=0; for(let i=0;i<d.length;i+=16) if(d[i]+d[i+1]+d[i+2]>90) lit++;
+      got[place+t]=!!(S.prelude2On(S.BC) && lit>2000); }
     return got; }, src);
-  ok('the doorway gag is played by the new bodies’ own silhouettes, in the bedchamber and at the lagoon', !R.err && Object.values(R).every(Boolean), R.err||JSON.stringify(R));
+  ok('the prelude is played in full colour by the two of them in her own room, in the bedchamber and at the water (the shadow-in-the-door gag is retired)', !R.err && Object.values(R).every(Boolean), R.err||JSON.stringify(R));
 
   console.log('\n=== 🏛 THE ARDOR ===');
   R=await T((src)=>{ const S=window.__SS; eval(src)('rome'); S.openDomus(); const D=S.DM; D.ardor={ph:'wind', heat:60, need:10, got:6, stage:2, t:0};

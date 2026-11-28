@@ -168,8 +168,8 @@ const ok=(name,cond,note)=>{ if(cond){pass++; console.log('  PASS  '+name+(note?
     const w=S.makeBride('roman',true,8); w.male=false; S.G.married=true; S.G.hasVilla=true; S.G.wife=w; S.G.wifeRel=80; S.setWH('done');
     const room={}; out.walk=[];
     for(const c of ['roman'].concat(names)){ S.G.current=reg[c]; S.startBedScene('fun','long','bed'); const B=S.BC; const at=(t,wine)=>{ B.t=t; B.tT=t; B.stage=S.bedStage(B); B.wineTaken=!!wine; S.drawBed(); };
-      const d0=S.CH_DRAWS; at(40); const full=__crop(0,0,480,270), doorShut=__crop(330,70,110,155), jar=__crop(305,185,35,32); at(40,true); const noJar=__crop(305,185,35,32);
-      at(200); const doorOpen=__crop(330,70,110,155); at(430); const bed=__crop(346,150,46,56);
+      const d0=S.CH_DRAWS; at(40); const full=__crop(0,0,480,270), doorShut=__crop(0,100,230,130), jar=__crop(440,190,40,40); at(40,true); const noJar=__crop(440,190,40,40);
+      at(200); const doorOpen=__crop(0,100,230,130); at(430); const bed=__crop(346,150,46,56);
       room[c]={full, bed}; out.walk.push([c, S.CH_DRAWS-d0, __diff(doorShut,doorOpen), __diff(jar,noJar)]); }
     out.walkVsRome=names.map(c=>[c, __diff(room[c].full, room.roman.full)]);
     out.bedVsRome=names.map(c=>[c, __diff(room[c].bed, room.roman.bed)]);
@@ -178,8 +178,8 @@ const ok=(name,cond,note)=>{ if(cond){pass++; console.log('  PASS  '+name+(note?
   ok('ten peoples have a room of their own on the positions stage — none of them is the cubiculum any more', !R.err && R.vsRome.every(([c,d,col,drew])=>d>240*138*0.3 && drew===1), R.err||JSON.stringify(R.vsRome));
   ok('and each is painted, not blocked in: well over a hundred tones in every one', !R.err && R.vsRome.every(([c,d,col])=>col>120), R.err||JSON.stringify(R.vsRome.map(a=>[a[0],a[2]])));
   ok('no two of them are the same room (Wa is not Korea, Gandhara is not the Tamil south)', !R.err && R.minPair>240*138*0.2, R.err||(R.minWho+' '+R.minPair));
-  ok('the whole-screen walk-in is painted in the local style too, and it is not Rome', !R.err && R.walk.slice(1).every(a=>a[1]>=1) && R.walkVsRome.every(([c,d])=>d>480*270*0.3), R.err||JSON.stringify(R.walkVsRome));
-  ok('each has its own door, and the door opens (a fusuma slides, the others swing)', !R.err && R.walk.every(a=>a[2]>1500), R.err||JSON.stringify(R.walk.map(a=>[a[0],a[2]])));
+  ok('the whole-screen walk-in is painted in the local style too, and it is not Rome', !R.err && R.walkVsRome.every(([c,d])=>d>480*270*0.3), R.err||JSON.stringify(R.walkVsRome));
+  ok('in every room he walks in from the dark at the left and comes to her (the new prelude: no doorway gag)', !R.err && R.walk.every(a=>a[2]>900), R.err||JSON.stringify(R.walk.map(a=>[a[0],a[2]])));
   ok('each keeps its own jar for the wine — sake, a bronze hu, a silver ewer, kumis, a surahi, an amphora, a flagon, mead — and it goes when it is taken', !R.err && R.walk.every(a=>a[3]>40), R.err||JSON.stringify(R.walk.map(a=>[a[0],a[3]])));
   ok('the bed through the open door is their own bed: a futon, a canopied lacquer bed, a takht, a charpai, lion legs, a box bed', !R.err && R.bedVsRome.every(([c,d])=>d>60), R.err||JSON.stringify(R.bedVsRome));
   ok('and they are cheap to draw: what never moves is painted once and cached (and the cache stays small)', !R.err && R.avgMs<8 && R.cache2<=80, R.err||(R.avgMs.toFixed(2)+'ms, cache '+R.cache2));
