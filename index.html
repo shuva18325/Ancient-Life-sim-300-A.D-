@@ -15077,7 +15077,7 @@ function migrate(g){ const d={stamina:3,escCoolDay:-1,escSlowDay:-1,escSlow:0,es
     const best=Object.keys(LEGACY_RK).sort((a,b)=>Math.abs(LEGACY_RK[a].w-w0)-Math.abs(LEGACY_RK[b].w-w0))[0];
     g.legacy.prov=best; }
   return g; }
-function saveGame(){ if(BOT_SANDBOX) return; try{ localStorage.setItem(slotKey(saveSlot), JSON.stringify(G)); toast('Saved to slot '+saveSlot+'.'); }catch(e){ toast('⚠ Could not save — browser storage is blocked or full.',3200); } }
+function saveGame(){ if(BOT_SANDBOX) return; try{ slotThumbTake(); }catch(e){} try{ localStorage.setItem(slotKey(saveSlot), JSON.stringify(G)); toast('Saved to slot '+saveSlot+'.'); }catch(e){ toast('⚠ Could not save — browser storage is blocked or full.',3200); } }
 function hasSave(n){ try{ return !!localStorage.getItem(slotKey(n||saveSlot)); }catch(e){ return false; } }
 function loadGame(n){ try{ if(n) setSlot(n); G=migrate(JSON.parse(localStorage.getItem(slotKey(saveSlot)))); return !!G; }catch(e){ return false; } }
 
@@ -20211,7 +20211,7 @@ function finishFight(won){
   showResult(won,{glory,coin,popDelta,honorDelta,note,crowdLove,slaveCoin});
   saveQuiet();
 }
-function saveQuiet(){ if(BOT_SANDBOX) return; try{ localStorage.setItem(slotKey(saveSlot), JSON.stringify(G)); }catch(e){} }
+function saveQuiet(){ if(BOT_SANDBOX) return; try{ localStorage.setItem(slotKey(saveSlot), JSON.stringify(G)); }catch(e){} try{ slotThumbTake(); }catch(e){} }
 
 function showResult(won,r){
   if(won) advanceDay(2);   // victory feasts eat the calendar — a month per triumph (with the road home)
@@ -28491,6 +28491,7 @@ function bedPoseWithShift(vi, E, Tn){
   return ok;
 }
 function drawBedPose(vi, E){
+  try{ if(GAL===null || !GAL.poses[vi]) galSee(vi); }catch(e){}
   const c=E.c, T=E.T, s=E.s, cx0=E.cx0, base=E.base, HB=E.HB||(()=>{});
   if(!G) return false;
   const her = G.isFemale? playerLook() : (G.wife||{});
@@ -47246,10 +47247,11 @@ function openSlots(){
   for(let n=1;n<=NSLOTS;n++){
     const info=slotInfo(n), active=(n===saveSlot);
     const card=document.createElement('div'); card.className='shopcard'+(active?' eq':'');
-    card.innerHTML= info
+    const _th=info? slotThumb(n) : null;
+    card.innerHTML= (_th? '<img src="'+_th.img+'" style="width:192px;height:108px;float:right;margin-left:8px;border:1px solid #8a6a3a;border-radius:3px" alt="">' : '') + (info
       ? `<div><b style="color:var(--gold)">SLOT ${n}${active?' · ACTIVE':''}</b> — <b>${info.name}</b> ${info.female?'♀':'♂'}
            <span class="small muted">· ${info.path} · Lv ${info.level} · age ${info.age} · ${fmt(info.glory)} glory · ${info.wins}–${info.losses}</span></div>`
-      : `<div><b style="color:var(--gold)">SLOT ${n}${active?' · ACTIVE':''}</b> <span class="small muted">— empty</span></div>`;
+      : `<div><b style="color:var(--gold)">SLOT ${n}${active?' · ACTIVE':''}</b> <span class="small muted">— empty</span></div>`);
     const row=document.createElement('div'); row.className='row gap6';
     if(info){
       const lb=document.createElement('button'); lb.className='btn sm gold'; lb.textContent='▶ CONTINUE';
@@ -51679,6 +51681,9 @@ function buildSettings(){
     const r2=document.createElement('div'); r2.style.cssText='display:flex;gap:8px;align-items:center'; r2.appendChild(cv); r2.appendChild(btn); row.appendChild(left); row.appendChild(r2); b.appendChild(row); }
   mkRow('🔊 Sound','Combat &amp; UI sound effects.', SETTINGS.sound?'ON':'OFF', SETTINGS.sound,
     ()=>{ SETTINGS.sound=!SETTINGS.sound; muted=!SETTINGS.sound; saveSettings(); buildSettings(); if(SETTINGS.sound){ try{ sfx('clap'); }catch(e){} } });
+  mkRow('🎵 Music','Quiet live music in each people’s own mode and instruments: lyre, qin, shakuhachi, fiddle, sitar, ney, harp, bone flute.', SETTINGS.music!==false?'ON':'OFF', SETTINGS.music!==false,
+    ()=>{ SETTINGS.music=(SETTINGS.music===false); saveSettings(); buildSettings(); try{ if(SETTINGS.music){ AC=AC||new (window.AudioContext||window.webkitAudioContext)(); AC.resume&&AC.resume(); } else if(MUS.drone){ MUS.drone.g.gain.setTargetAtTime(0.0001,AC.currentTime,0.3); } }catch(e){} });
+  if(ADULT) mkRow('📖 The Gallery','Every position you have reached, in any career, by name. Replay any of them at home.', 'OPEN', true, ()=>openGallery());
   mkRow('📳 Screen shake','Camera shake on heavy hits.', SETTINGS.shake?'ON':'OFF', SETTINGS.shake,
     ()=>{ SETTINGS.shake=!SETTINGS.shake; saveSettings(); buildSettings(); });
   if(ADULT) mkRow('👁 First-person bend view','OFF plays the normal side view in every bend, slap and scene. (In a scene you can also press V.)', POV.on?'ON':'OFF', !!POV.on,
@@ -80694,7 +80699,93 @@ function longRoadPaint(c,W,H,R,f,t){
   L.vignette(0.45);
 }
 
-window.__SS = { openLongRoad:()=>openLongRoad(), longRoadRun:(k)=>longRoadRun(k), LONG_ROADS, heroYearF:()=>heroYearF(), worldWarRun:(i)=>worldWarRun(campaignsForWorld().find(c=>c.id===i)), openWorldWars:()=>openWorldWars(), campaignsForWorld:()=>campaignsForWorld(), worldWarOdds:(cp)=>worldWarOdds(cp), armyStyleMine:()=>armyStyleMine(), gearHDIcon:(cat,id,px)=>gearHDIcon(cat,{id},px), GEAR_IDS:(cat)=>GEAR[cat].map(g=>g.id), openHousehold:()=>openHousehold(), openTemple:()=>openTemple(), hhDayTick:()=>hhDayTick(), hhWomen:()=>hhWomen(), hhWifeArc:()=>hhWifeArc(), ageSlow:(a)=>ageSlow(a), blessWarMult:()=>blessWarMult(), hhPaintTemple:(c,W,H,f,t)=>hhPaintTemple(c,W,H,f,t), tmPaintIdol:(c,S,f,k,t)=>tmPaintIdol(c,S,f,k,t), RELIGION, KID_JOBS, grPaint:(c,W,H,f,st,t)=>grPaintHouse(c,W,H,f,st,t), grFurn:(c,id,x,y,s)=>grPaintFurn(c,id,x,y,s), GR_FURN, openGrounds:()=>openGrounds(), grComfort:()=>grComfort(), grFam:()=>grFam(), openRealm:()=>openRealm(), realmSeason:()=>realmSeason(), realmInit:()=>realmInit(), setSetting:(k,v)=>{ SETTINGS[k]=v; }, festToday:(d)=>festToday(d), festNext:()=>festNext(), festDayTick:()=>festDayTick(), openVisitor:(i)=>openVisitor(VISITORS.find(v=>v.id===i)), VISITORS, HOUSE_FEASTS, weatherTest:(w,only)=>{ try{ const cv=document.createElement("canvas"); cv.width=960; cv.height=520; const c=cv.getContext("2d"); c.setTransform(2,0,0,2,0,0); drawWeather(c,w,w==="east"? lonlatE : lonlat,1000,only); const d=c.getImageData(0,0,960,520).data; let n=0; for(let i=3;i<d.length;i+=4) if(d[i]>20) n++; return "px "+n; }catch(e){ return "ERR "+e.message; } }, shipSprite:(a,b,c)=>shipSprite(a,b,c), mapSeason:()=>mapSeason(), gunPreview:(id,ph,t,k,x,y)=>{ ctx.save(); ctx.setTransform(k,0,0,k,x,y); try{ drawHeldGun(bowOf(id),ph,t); }finally{ ctx.restore(); } }, openHeroes:()=>openHeroes(), heroYear:()=>heroYear(), heroDayTick:()=>heroDayTick(), HEROES, heroCanRecruit:(id)=>heroCanRecruit(HERO_BY_ID[id]), heroAudience:(id)=>heroAudience(HERO_BY_ID[id]), heroGeneral:(id)=>heroGeneral(HERO_BY_ID[id]), setTitleT:(v)=>{ TT_FORCE_T=v; }, enterMap:()=>enterMap(), silkTickerToggle:()=>silkTickerToggle(), camelSprite:(a,b,c,d)=>camelSprite(a,b,c,d), bedStroke:(vt,T,k)=>bedStroke(vt,T,k), bedLoreKey:()=>bedLoreKey(), setBedKey:(k)=>{ BED_KEY_FORCE=k||null; }, BED_ENTRY, POSE_LORE, armyStyleOfPeople:(p)=>armyStyleOfPeople(p), armyStyleKeys:()=>Object.keys(ARMY_STYLE), armyStyleHere:(id)=>armyStyleHere(id), kanvekTier:(w)=>kanvekTier(w), kanvekLvInfo:(w)=>kanvekLvInfo(w), kanvekLevel:(w)=>kanvekLevel(w), kanvekGrow:(w)=>kanvekGrow(w), KANVEK_LEVELS, drawHallMan:(...a)=>drawHallMan(...a), drawFemProfile:(...a)=>drawFemProfile(...a), drawHallFem:(...a)=>drawHallFem(...a), folkLookId:(w)=>folkLookId(w), drawFolkLook:(c,w,o)=>drawFolkLook(c,w,o), drawPortraitFigure:(...a)=>drawPortraitFigure(...a), drawKidProfile:(...a)=>drawKidProfile(...a), CUSTOMS, customsHere:()=>customsHere(), customsHers:(w)=>customsHers(w), customsTabooToday:(d)=>customsTabooToday(d), customsConceive:(B)=>customsConceive(B), customsChildName:(s)=>customsChildName(s), customsWeddingLine:(w)=>customsWeddingLine(w), customsJealMul:()=>customsJealMul(), buildCustomsCard:(b)=>buildCustomsCard(b), finishBedNow:()=>finishBed(), getBC:()=>BC, setBC:(v)=>{ BC=v; }, roomBackdrop:(T)=>whRoomBackdrop(T), openEmpire:()=>openEmpire(), empSeason:()=>empSeason(), EMP_UI, silkDbg:()=>{ const c=document.createElement("canvas").getContext("2d"); try{ drawSilkRoadLive(c); return {ok:true, n:silkCaravanCount(), at:silkAt(0.5), arc:silkArc().tot}; }catch(e){ return {err:e.message}; } }, btMountSprite:(id,f)=>btMountSprite(id,f), poseLoreNow:()=>poseLore(), nbStyleSprite:(S,f,a,h)=>nbStyleSprite(S,f,a,h), armyStyle:(id)=>armyStyle(id), dynThroneFalls:(h)=>dynThroneFalls(h), proclaimDynasty:()=>proclaimDynasty(), plotTargets:()=>plotTargets(), mapZoomTo:(z,x,y)=>mapZoomTo(z,x,y), ASIA_PEOPLES, asiaPeopleFor:(e,o)=>asiaPeopleFor(e,o), EAST_PIN_POS, campaignOdds:(cp)=>campaignOdds(cp), updateBattle:(dt)=>updateBattle(dt), drawBattle:()=>drawBattle(), get BT(){ return BT; }, romStyles:()=>ROM_STYLES, startRomanticStyled:(a,b)=>startRomanticStyled(a,b), bgFn:(n)=>({bgPalace,bgWar,bgCoast,bgWoa,bgOpelia,bgIsle,bgReiko,bgForge})[n], setPairSS:(v)=>{ PAIR_SS=v; }, ICE_T:{ get AC(){return AC;}, set AC(v){AC=v;}, iceSlap, iceSkin, iceUlk, iceGulp, iceVoc, iceCrowd, ICE_V, sfx }, ICE_TTS, STRIKES, getDM:()=>DM, drawBridePortrait:(...a)=>drawBridePortrait(...a), rhFig, RH_CAST, openBotWatch, botEnterBeat, getBW:()=>BW, iceGoddessOpen, paintGoddess, startBedScene, regionAny, iceDebug:()=>({here:iceHere(), prey:ICE_PREY_BY_REGION}),
+/* =====================================================================
+   🛠 QUALITY OF LIFE
+   · 🎵 MUSIC FOR EACH PEOPLE, played live: the Roman lyre in the old
+     Dorian mode over a drone; the Han qin on the pentatonic; the Wa
+     shakuhachi on the in-scale; the steppe fiddle; a tanpura drone and a
+     raga for India; the Persian ney; the Celtic harp; the Rkrai flute and
+     drum; the Egyptian harp; the Ice bone flute. Quiet, and it rests.
+   · 🖼 SAVE SLOTS WITH PICTURES: a thumbnail of the moment you saved.
+   · 📖 THE GALLERY: every position you have reached, by name, to replay.
+   · 📱 PHONE: bigger touch targets, overlays that fit, Esc or a tap on
+     the dark backdrop closes any panel.
+   ===================================================================== */
+const MUSIC_SCALES={roman:[62,64,65,67,69,71,72,74], han:[60,62,64,67,69,72,74,76], wa:[64,65,69,71,72,76,77,81], steppe:[57,60,62,64,67,69,72], india:[60,61,64,65,67,68,71,72], persian:[62,63,66,67,69,70,72,74], celt:[62,64,66,67,69,71,72,74], rkrai:[57,60,62,64,67,69], egyptian:[64,65,68,69,71,72,74,76], ice:[60,62,65,67,69]};
+const MUSIC_VOICE={roman:{lead:'lyre',drone:50,beat:0.62}, han:{lead:'qin',drone:null,beat:0.78}, wa:{lead:'shaku',drone:null,beat:1.05}, steppe:{lead:'fiddle',drone:45,beat:0.66}, india:{lead:'sitar',drone:48,beat:0.56}, persian:{lead:'ney',drone:50,beat:0.7}, celt:{lead:'harp',drone:50,beat:0.5}, rkrai:{lead:'flute',drone:45,beat:0.7,drum:true}, egyptian:{lead:'harp',drone:52,beat:0.6}, ice:{lead:'bone',drone:null,beat:0.9,drum:true}};
+const MUS={fam:null, drone:null, next:0, step:0, deg:2, bus:null};
+function musOn(){ try{ return SETTINGS.music!==false && !muted && !!AC && AC.state==='running'; }catch(e){ return false; } }
+function musQuietState(){ try{ return /fight|battle|bed|scene|duel|slap|bout/.test(String(state)); }catch(e){ return false; } }
+function musBus(){ if(MUS.bus) return MUS.bus; const g=AC.createGain(); g.gain.value=0.05; const lp=AC.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=3200; g.connect(lp); lp.connect(AC.destination); MUS.bus=g; return g; }
+const mtof=m=>440*Math.pow(2,(m-69)/12);
+function musNote(kind, midi, t, dur){
+  const f=mtof(midi), o=AC.createOscillator(), g=AC.createGain(); let peak=0.9, att=0.01, rel=dur;
+  if(kind==='lyre'||kind==='harp'||kind==='qin'||kind==='sitar'){ o.type= kind==='sitar'? 'sawtooth' : 'triangle'; att=0.004; rel=kind==='qin'? 1.6 : kind==='sitar'? 1.2 : 1.0; peak= kind==='sitar'? 0.45 : 0.9; }
+  else if(kind==='shaku'||kind==='ney'||kind==='flute'||kind==='bone'){ o.type='sine'; att=kind==='shaku'? 0.18 : 0.08; rel=dur*0.95; peak=0.75;
+    const lfo=AC.createOscillator(), lg=AC.createGain(); lfo.frequency.value=kind==='shaku'? 4.5 : 5.5; lg.gain.value=f*0.012; lfo.connect(lg); lg.connect(o.frequency); lfo.start(t); lfo.stop(t+rel+0.1);
+    if(kind==='shaku'||kind==='ney'){ const n=AC.createBufferSource(); try{ n.buffer=(NOISE||null); }catch(e){} } }
+  else if(kind==='fiddle'){ o.type='sawtooth'; att=0.12; rel=dur; peak=0.35; }
+  o.frequency.setValueAtTime(f,t); if(kind==='qin'){ o.frequency.setValueAtTime(f*1.03,t); o.frequency.exponentialRampToValueAtTime(f,t+0.25); }   // the qin's slide into the note
+  g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(peak,t+att); g.gain.exponentialRampToValueAtTime(0.0001,t+att+rel);
+  o.connect(g); g.connect(musBus()); o.start(t); o.stop(t+att+rel+0.05);
+}
+function musDrum(t,deep){ const o=AC.createOscillator(), g=AC.createGain(); o.type='sine'; o.frequency.setValueAtTime(deep? 90 : 140,t); o.frequency.exponentialRampToValueAtTime(deep? 45 : 70,t+0.18); g.gain.setValueAtTime(0.8,t); g.gain.exponentialRampToValueAtTime(0.0001,t+0.3); o.connect(g); g.connect(musBus()); o.start(t); o.stop(t+0.35); }
+function musDrone(fam){ try{ if(MUS.drone){ const d=MUS.drone; d.g.gain.setTargetAtTime(0.0001,AC.currentTime,0.6); setTimeout(()=>{ try{ d.o.stop(); d.o2.stop(); }catch(e){} },2500); MUS.drone=null; }
+    const V=MUSIC_VOICE[fam]; if(!V||!V.drone) return; const o=AC.createOscillator(), o2=AC.createOscillator(), g=AC.createGain(), lp=AC.createBiquadFilter(); o.type='sawtooth'; o2.type='sawtooth'; o.frequency.value=mtof(V.drone); o2.frequency.value=mtof(V.drone+7)*1.002; lp.type='lowpass'; lp.frequency.value=420;
+    g.gain.value=0.0001; g.gain.setTargetAtTime(0.16,AC.currentTime,1.5); o.connect(lp); o2.connect(lp); lp.connect(g); g.connect(musBus()); o.start(); o2.start(); MUS.drone={o,o2,g}; }catch(e){} }
+function musTick(){
+  if(!musOn() || musQuietState()){ if(MUS.drone && AC){ try{ MUS.drone.g.gain.setTargetAtTime(0.0001,AC.currentTime,0.4); }catch(e){} } return; }
+  let fam='roman'; try{ fam=grFam(); }catch(e){} if(fam!==MUS.fam){ MUS.fam=fam; MUS.deg=2; musDrone(fam); } else if(MUS.drone){ try{ MUS.drone.g.gain.setTargetAtTime(0.16,AC.currentTime,1.0); }catch(e){} }
+  const V=MUSIC_VOICE[fam]||MUSIC_VOICE.roman, S=MUSIC_SCALES[fam]||MUSIC_SCALES.roman, now=AC.currentTime;
+  if(MUS.next<now) MUS.next=now+0.05;
+  while(MUS.next<now+0.6){ const t=MUS.next; MUS.step++;
+    const phrase=MUS.step%16, rest=(phrase>=13) || Math.random()<0.22;                       // a phrase, then it breathes
+    if(!rest){ MUS.deg=clamp(MUS.deg+[-2,-1,-1,0,1,1,2][Math.floor(Math.random()*7)],0,S.length-1); if(phrase===12) MUS.deg=0;   // phrases come home to the tonic
+      const len=(Math.random()<0.25? 2 : 1)*V.beat; musNote(V.lead, S[MUS.deg], t, len*1.1); if(Math.random()<0.15 && V.lead!=='shaku') musNote(V.lead, S[Math.max(0,MUS.deg-2)]-12, t, len); }
+    if(V.drum && phrase%4===0) musDrum(t, phrase%8===0);
+    MUS.next+=V.beat*(Math.random()<0.2? 1.5 : 1); }
+}
+try{ setInterval(()=>{ try{ musTick(); }catch(e){} }, 250); }catch(e){}
+document.addEventListener('pointerdown',()=>{ try{ if(SETTINGS.music!==false && !muted){ AC=AC||new (window.AudioContext||window.webkitAudioContext)(); if(AC.state==='suspended') AC.resume(); } }catch(e){} }, {passive:true});
+/* ---- 🖼 the save slots get a picture of the moment ---- */
+function slotThumb(n){ try{ return JSON.parse(localStorage.getItem(slotKey(n)+'_thumb')||'null'); }catch(e){ return null; } }
+function slotThumbTake(){
+  try{ if(BOT_SANDBOX) return; const prev=slotThumb(saveSlot); if(prev && Date.now()-prev.at<20000) return;
+    const T=document.createElement('canvas'); T.width=192; T.height=108; const c=T.getContext('2d'); let drew=false;
+    const src=[document.getElementById('game')].concat([...document.querySelectorAll('#scr-map canvas')]).filter(Boolean);
+    for(const s0 of src){ if(!s0.width) continue; try{ c.drawImage(s0,0,0,192,108); const d=c.getImageData(96,54,1,1).data; if(d[3]>0){ drew=true; break; } }catch(e){} }
+    if(!drew){ const g=c.createLinearGradient(0,0,0,108); g.addColorStop(0,'#3a2a1c'); g.addColorStop(1,'#120c07'); c.fillStyle=g; c.fillRect(0,0,192,108); }
+    c.fillStyle='rgba(0,0,0,.55)'; c.fillRect(0,86,192,22); c.fillStyle='#f0d890'; c.font='bold 11px Georgia'; c.fillText(String(G.name||'').slice(0,22),6,101); c.fillStyle='#d8c8a0'; c.font='10px Georgia'; c.textAlign='right'; c.fillText(String(G.current||'').slice(0,18),186,101);
+    localStorage.setItem(slotKey(saveSlot)+'_thumb', JSON.stringify({img:T.toDataURL('image/jpeg',0.72), at:Date.now(), day:G.day|0})); }catch(e){}
+}
+/* ---- 📖 the gallery of positions reached, kept across every career ---- */
+const GAL_KEY='ss_gallery_v1'; let GAL=null;
+function galLoad(){ if(GAL) return GAL; try{ GAL=JSON.parse(localStorage.getItem(GAL_KEY)||'null')||{poses:{}}; }catch(e){ GAL={poses:{}}; } return GAL; }
+function galSee(vi){ const g=galLoad(); if(g.poses[vi]) return; g.poses[vi]=Date.now(); try{ localStorage.setItem(GAL_KEY, JSON.stringify(g)); }catch(e){} }
+function openGallery(){
+  const ov=hhOverlay('gal-ov'), g=galLoad(), N=39, seen=Object.keys(g.poses).length;
+  ov.innerHTML='<div style="'+HH_BOX+'"><div style="display:flex;align-items:center"><div style="flex:1"><div style="font-size:22px;color:#f0d890">📖 THE GALLERY</div><div style="font-size:12px;opacity:.85">every position you have reached, in any career: <b>'+seen+'</b> of '+N+'</div></div><button class="btn" id="gal-close">✕ CLOSE</button></div>'
+   +'<div id="gal-msg" style="min-height:16px;margin:6px 0;font-style:italic;color:#f0e0b0;font-size:13px"></div><div id="gal-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:6px"></div></div>';
+  document.getElementById('gal-close').onclick=()=>{ ov.style.display='none'; };
+  const grid=document.getElementById('gal-grid'), msg=t=>{ document.getElementById('gal-msg').textContent=t; };
+  for(let vi=0;vi<N;vi++){ const on=!!g.poses[vi]; let nm='Position '+(vi+1); try{ nm=poseName(vi,nm); }catch(e){}
+    const d=document.createElement('div'); d.style.cssText='padding:8px;border-radius:5px;border:1px solid '+(on? '#8a6a3a' : '#3a2a1c')+';background:'+(on? 'linear-gradient(135deg,rgba(90,60,30,.6),rgba(30,20,10,.8))' : 'rgba(0,0,0,.35)')+';font-size:12px;min-height:66px;display:flex;flex-direction:column';
+    d.innerHTML='<div style="color:'+(on? '#f0d890' : '#6a5a44')+';font-weight:bold">'+(vi+1)+'. '+(on? nm : '— not yet —')+'</div>';
+    if(on){ const b=document.createElement('button'); b.className='btn sm'; b.style.marginTop='auto'; b.textContent='▶ REPLAY'; b.onclick=()=>{
+      if(!ADULT) return msg('The gallery is closed.'); if(!(G && G.married && G.wife)) return msg('You need a spouse at home to replay a position.');
+      ov.style.display='none'; try{ startBedScene('fun','quick','bed'); if(BC){ BC.forcePose=vi; BC.galReplay=true; } }catch(e){ console.error(e); } }; d.appendChild(b); }
+    grid.appendChild(d); }
+}
+/* ---- 📱 panels that fit a phone, and close the way a phone expects ---- */
+(function(){ try{ const st=document.createElement('style'); st.textContent=
+  '@media (pointer:coarse){ .btn{min-height:40px;padding-left:12px;padding-right:12px} .btn.sm{min-height:34px} #hh-ov select{min-height:34px;font-size:14px} }'+
+  '@media (max-width:640px){ #grounds-ov>div,#hh-ov>div,#temple-ov>div,#wars-ov>div,#road-ov>div,#gal-ov>div{width:100vw!important;max-height:100vh!important;border-radius:0!important;padding:8px!important} }';
+  document.head.appendChild(st); }catch(e){} })();
+const QOL_PANELS=['grounds-ov','hh-ov','temple-ov','wars-ov','road-ov','gal-ov','visit-ov','heroes-ov'];
+document.addEventListener('keydown',e=>{ if(e.key!=='Escape') return; for(const id of QOL_PANELS){ const el=document.getElementById(id); if(el && el.style.display!=='none' && getComputedStyle(el).display!=='none'){ if(id==='road-ov'){ const sk=document.getElementById('road-skip'); if(sk){ sk.click(); return; } } el.style.display='none'; return; } } });
+document.addEventListener('click',e=>{ const id=e.target && e.target.id; if(id && QOL_PANELS.includes(id) && id!=='road-ov' && e.target.style.display!=='none'){ e.target.style.display='none'; } });
+
+window.__SS = { openGallery:()=>openGallery(), galSee:(v)=>galSee(v), galLoad:()=>galLoad(), slotThumb:(n)=>slotThumb(n), slotThumbTake:()=>slotThumbTake(), musTick:()=>musTick(), MUSIC_SCALES, openLongRoad:()=>openLongRoad(), longRoadRun:(k)=>longRoadRun(k), LONG_ROADS, heroYearF:()=>heroYearF(), worldWarRun:(i)=>worldWarRun(campaignsForWorld().find(c=>c.id===i)), openWorldWars:()=>openWorldWars(), campaignsForWorld:()=>campaignsForWorld(), worldWarOdds:(cp)=>worldWarOdds(cp), armyStyleMine:()=>armyStyleMine(), gearHDIcon:(cat,id,px)=>gearHDIcon(cat,{id},px), GEAR_IDS:(cat)=>GEAR[cat].map(g=>g.id), openHousehold:()=>openHousehold(), openTemple:()=>openTemple(), hhDayTick:()=>hhDayTick(), hhWomen:()=>hhWomen(), hhWifeArc:()=>hhWifeArc(), ageSlow:(a)=>ageSlow(a), blessWarMult:()=>blessWarMult(), hhPaintTemple:(c,W,H,f,t)=>hhPaintTemple(c,W,H,f,t), tmPaintIdol:(c,S,f,k,t)=>tmPaintIdol(c,S,f,k,t), RELIGION, KID_JOBS, grPaint:(c,W,H,f,st,t)=>grPaintHouse(c,W,H,f,st,t), grFurn:(c,id,x,y,s)=>grPaintFurn(c,id,x,y,s), GR_FURN, openGrounds:()=>openGrounds(), grComfort:()=>grComfort(), grFam:()=>grFam(), openRealm:()=>openRealm(), realmSeason:()=>realmSeason(), realmInit:()=>realmInit(), setSetting:(k,v)=>{ SETTINGS[k]=v; }, festToday:(d)=>festToday(d), festNext:()=>festNext(), festDayTick:()=>festDayTick(), openVisitor:(i)=>openVisitor(VISITORS.find(v=>v.id===i)), VISITORS, HOUSE_FEASTS, weatherTest:(w,only)=>{ try{ const cv=document.createElement("canvas"); cv.width=960; cv.height=520; const c=cv.getContext("2d"); c.setTransform(2,0,0,2,0,0); drawWeather(c,w,w==="east"? lonlatE : lonlat,1000,only); const d=c.getImageData(0,0,960,520).data; let n=0; for(let i=3;i<d.length;i+=4) if(d[i]>20) n++; return "px "+n; }catch(e){ return "ERR "+e.message; } }, shipSprite:(a,b,c)=>shipSprite(a,b,c), mapSeason:()=>mapSeason(), gunPreview:(id,ph,t,k,x,y)=>{ ctx.save(); ctx.setTransform(k,0,0,k,x,y); try{ drawHeldGun(bowOf(id),ph,t); }finally{ ctx.restore(); } }, openHeroes:()=>openHeroes(), heroYear:()=>heroYear(), heroDayTick:()=>heroDayTick(), HEROES, heroCanRecruit:(id)=>heroCanRecruit(HERO_BY_ID[id]), heroAudience:(id)=>heroAudience(HERO_BY_ID[id]), heroGeneral:(id)=>heroGeneral(HERO_BY_ID[id]), setTitleT:(v)=>{ TT_FORCE_T=v; }, enterMap:()=>enterMap(), silkTickerToggle:()=>silkTickerToggle(), camelSprite:(a,b,c,d)=>camelSprite(a,b,c,d), bedStroke:(vt,T,k)=>bedStroke(vt,T,k), bedLoreKey:()=>bedLoreKey(), setBedKey:(k)=>{ BED_KEY_FORCE=k||null; }, BED_ENTRY, POSE_LORE, armyStyleOfPeople:(p)=>armyStyleOfPeople(p), armyStyleKeys:()=>Object.keys(ARMY_STYLE), armyStyleHere:(id)=>armyStyleHere(id), kanvekTier:(w)=>kanvekTier(w), kanvekLvInfo:(w)=>kanvekLvInfo(w), kanvekLevel:(w)=>kanvekLevel(w), kanvekGrow:(w)=>kanvekGrow(w), KANVEK_LEVELS, drawHallMan:(...a)=>drawHallMan(...a), drawFemProfile:(...a)=>drawFemProfile(...a), drawHallFem:(...a)=>drawHallFem(...a), folkLookId:(w)=>folkLookId(w), drawFolkLook:(c,w,o)=>drawFolkLook(c,w,o), drawPortraitFigure:(...a)=>drawPortraitFigure(...a), drawKidProfile:(...a)=>drawKidProfile(...a), CUSTOMS, customsHere:()=>customsHere(), customsHers:(w)=>customsHers(w), customsTabooToday:(d)=>customsTabooToday(d), customsConceive:(B)=>customsConceive(B), customsChildName:(s)=>customsChildName(s), customsWeddingLine:(w)=>customsWeddingLine(w), customsJealMul:()=>customsJealMul(), buildCustomsCard:(b)=>buildCustomsCard(b), finishBedNow:()=>finishBed(), getBC:()=>BC, setBC:(v)=>{ BC=v; }, roomBackdrop:(T)=>whRoomBackdrop(T), openEmpire:()=>openEmpire(), empSeason:()=>empSeason(), EMP_UI, silkDbg:()=>{ const c=document.createElement("canvas").getContext("2d"); try{ drawSilkRoadLive(c); return {ok:true, n:silkCaravanCount(), at:silkAt(0.5), arc:silkArc().tot}; }catch(e){ return {err:e.message}; } }, btMountSprite:(id,f)=>btMountSprite(id,f), poseLoreNow:()=>poseLore(), nbStyleSprite:(S,f,a,h)=>nbStyleSprite(S,f,a,h), armyStyle:(id)=>armyStyle(id), dynThroneFalls:(h)=>dynThroneFalls(h), proclaimDynasty:()=>proclaimDynasty(), plotTargets:()=>plotTargets(), mapZoomTo:(z,x,y)=>mapZoomTo(z,x,y), ASIA_PEOPLES, asiaPeopleFor:(e,o)=>asiaPeopleFor(e,o), EAST_PIN_POS, campaignOdds:(cp)=>campaignOdds(cp), updateBattle:(dt)=>updateBattle(dt), drawBattle:()=>drawBattle(), get BT(){ return BT; }, romStyles:()=>ROM_STYLES, startRomanticStyled:(a,b)=>startRomanticStyled(a,b), bgFn:(n)=>({bgPalace,bgWar,bgCoast,bgWoa,bgOpelia,bgIsle,bgReiko,bgForge})[n], setPairSS:(v)=>{ PAIR_SS=v; }, ICE_T:{ get AC(){return AC;}, set AC(v){AC=v;}, iceSlap, iceSkin, iceUlk, iceGulp, iceVoc, iceCrowd, ICE_V, sfx }, ICE_TTS, STRIKES, getDM:()=>DM, drawBridePortrait:(...a)=>drawBridePortrait(...a), rhFig, RH_CAST, openBotWatch, botEnterBeat, getBW:()=>BW, iceGoddessOpen, paintGoddess, startBedScene, regionAny, iceDebug:()=>({here:iceHere(), prey:ICE_PREY_BY_REGION}),
   openBookViewer:()=>openBookViewer(), openSettings:()=>openSettings(), 
   rhAmbTick:(b)=>rhAmbTick(b), rhAmbHit:(k,n)=>rhAmbHit(k,n), rhAmbStop:()=>rhAmbStop(), rhSting:(b)=>rhSting(b), setMuted:(v)=>{muted=v;}, ambKind:()=>RH_AMB&&RH_AMB.kind, acState:()=>AC&&AC.state,
   WPN_ART, WPN_RANGED, drawRangedIcon, BOWS, wpnStamp, wpnIcon, drawHeldBow, drawHeldPilum, drawHeldBomb, get WPN_DRAWS(){ return WPN_DRAWS; }, setOUTL:(v)=>{ OUTL=!!v; }, drawWeapon2Old,
